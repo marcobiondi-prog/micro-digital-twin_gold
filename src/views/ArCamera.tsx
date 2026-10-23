@@ -3,6 +3,7 @@ import { flushSync } from "react-dom";
 import { Activity, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grid2X2, Minus, Plus, ScanSearch, SlidersHorizontal, Square, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
 import { supportsCameraTorch, setCameraTorch } from "@/lib/camera-torch";
 import { detectArObject, type Detection, type Soil } from "@/controllers/ar-detect.functions";
+import type { ReferencePhoto, ReferenceVideo } from "@/models/ar-reference-photo";
 import { findSubject, SEARCH_BOX, smoothBox, type SubjectBox } from "@/lib/ar-subject-tracker";
 import { extractPlantPhoto } from "@/views/ar-plant-photo";
 
@@ -31,7 +32,7 @@ type SpeciesInfo = NonNullable<D["species"]> & { cooling: D["cooling"]; identifi
 type TabResult = {
   found: string | null; soil: Soil; survey: GroundSurvey | null; species: SpeciesInfo | null; count: number;
   taps: { x: number; y: number }[]; cooling: PlacementCooling[]; last: Parameters<ArScene["place"]> | null;
-  plantPhoto: HTMLCanvasElement | null; photoPreview: string | null; realPhoto: string | null; recordId: string | null; thermalMin: boolean;
+  plantPhoto: HTMLCanvasElement | null; photoPreview: string | null; realPhoto: string | null; clip: string | null; recordId: string | null; thermalMin: boolean;
 };
 import { type GroundSurvey } from "@/models/ar-recognition";
 import { AR_FOCUS, arFocusOption, defaultArFocus, scanMissing, scanPrecheck, type ArFocus } from "@/models/ar-focus";
@@ -54,7 +55,8 @@ import { satelliteContext, satelliteLine, type SatelliteContext } from "@/models
 import { loadCopernicus } from "@/views/copernicus-client";
 import { coolingAmount, coolingLabel, coolingReadout, scannedSpecimenThermal, scannedSpecimenCount, MAX_SCANNED_SPECIMENS, type PlacementCooling } from "@/models/ar-placement";
 import { loadAirTemperature } from "@/views/air-temp-client";
-import { clearScans, recordScan, scanPhoto, updateScan, useArScans, type ScanRecord } from "@/models/ar-scan-log";
+import { clearScans, recordScan, scanClip, scanPhoto, setScanClip, updateScan, useArScans, type ScanRecord } from "@/models/ar-scan-log";
+import { recordScanClip } from "@/lib/scan-clip";
 import { cameraRotatesNatively, enterCameraChrome, exitCameraChrome, fullscreenExitIsBack } from "@/lib/camera-chrome";
 
 type Mode = "photo" | "video";
@@ -173,6 +175,8 @@ export function ArCamera({
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   // The real photograph of the scanned plant (the frozen frame cropped to its box), shown in Esito.
   const [realPhoto, setRealPhoto] = useState<string | null>(null);
+  // Mini video of the scanned plant: a few seconds of the camera recorded during the scan (lib/scan-clip).
+  const [liveClip, setLiveClip] = useState<string | null>(null);
   const [activeTool, setActiveTool] = useState<"analysis" | "manage" | null>(null);
   const [species, setSpecies] = useState<SpeciesInfo | null>(null);
   const [count, setCount] = useState(0);
@@ -416,7 +420,7 @@ export function ArCamera({
     last.current = null;
     setFound(null);
     setSoil(null);
-    setSurvey(null); plantPhoto.current = null; setPhotoPreview(null); setRealPhoto(null);
+    setSurvey(null); plantPhoto.current = null; setPhotoPreview(null); setRealPhoto(null); setLiveClip(null);
     setSpecies(null);
     setPanelOpen(true);
     setToolsOpen(false); setActiveTool(null);
@@ -556,21 +560,21 @@ export function ArCamera({
     last.current = null; scanRecordId.current = null;
     setSpecies(null);
     setSoil(null);
-    setSurvey(null); plantPhoto.current = null; setPhotoPreview(null); setRealPhoto(null);
+    setSurvey(null); plantPhoto.current = null; setPhotoPreview(null); setRealPhoto(null); setLiveClip(null);
     setFound(null);
   };
   // Switching section keeps each section's own scan: the current one is set aside and the other's comes back
   // (empty the first time). A running scan stops; completed scans are also in the report log.
   const snapshotResults = (): TabResult => ({
     found, soil, survey, species, count: countRef.current, taps: taps.current, cooling: plantedCooling.current,
-    last: last.current, plantPhoto: plantPhoto.current, photoPreview, realPhoto, recordId: scanRecordId.current, thermalMin,
+    last: last.current, plantPhoto: plantPhoto.current, photoPreview, realPhoto, clip: liveClip, recordId: scanRecordId.current, thermalMin,
   });
   const restoreResults = (r: TabResult) => {
     countRef.current = r.count; setCount(r.count);
     taps.current = r.taps; plantedCooling.current = r.cooling;
     last.current = r.last; scanRecordId.current = r.recordId;
     setSpecies(r.species); setSoil(r.soil); setSurvey(r.survey);
-    plantPhoto.current = r.plantPhoto; setPhotoPreview(r.photoPreview); setRealPhoto(r.realPhoto);
+    plantPhoto.current = r.plantPhoto; setPhotoPreview(r.photoPreview); setRealPhoto(r.realPhoto); setLiveClip(r.clip);
     setFound(r.found); setThermalMin(r.thermalMin);
   };
   const selectTarget = (next: ArFocus) => {
@@ -589,7 +593,7 @@ export function ArCamera({
       species: sp ? {
         commonName: sp.commonName, scientificName: sp.scientificName, family: sp.family ?? null,
         level: sp.identification?.level === "species" ? "Specie probabile" : sp.identification?.level === "genus" ? "Genere probabile" : "Identificazione incerta",
-        cooling: sp.cooling?.deltaT ?? null, shade: sp.cooling?.shadeM2 ?? null,
+        cooling: sp.cooling?.deltaT ?? null, shade: sp.cooling?.shadeM2 ?? null, photo: sp.photo, video: sp.video,
       } : null,
       soil: ground ? { label: ground.label, permeability: ground.permeability, plantable: ground.plantable, note: ground.note } : null,
       count: 0, totalCooling: sp?.cooling ? 0 : null, totalShade: sp?.cooling ? 0 : null, satellite: satelliteText,
@@ -602,6 +606,9 @@ export function ArCamera({
     const version = scanVersion.current;
     scanBusy.current = true;
     scanningRef.current = true;
+    // The mini video belongs to the scan's record once a plant is recognized (resolved with its id), else null.
+    let keepClipFor: (recordId: string | null) => void = () => {};
+    const clipOwner = new Promise<string | null>((resolve) => { keepClipFor = resolve; });
     resetResults();
       setScanning(true);
       setPanelOpen(true);
@@ -623,6 +630,14 @@ export function ArCamera({
       // Recognition and frozen preview preserve the live crop and rotation.
       const small = freezeCameraFrame(c, video, -rotationRef.current, digitalZoomRef.current);
       if (!small) return;
+      // The mini video records alongside the AI request, so it never lengthens the scan.
+      // Only a recognized plant keeps it, on that scan's record; any other outcome drops it.
+      void Promise.all([recording ? null : recordScanClip(streamRef.current), clipOwner]).then(([url, id]) => {
+        if (!url) return;
+        if (!id) { URL.revokeObjectURL(url); return; }
+        setScanClip(id, url);
+        if (version === scanVersion.current && scanRecordId.current === id) setLiveClip(url);
+      });
       // Lighter upload (≤1280 px, q0.85): large tablet frames could fail as an empty HTTP error.
       const image = encodeFrame(small, SCAN_IMAGE_PX, 0.85);
       playCameraSound("scan-start", 1.8);
@@ -695,6 +710,7 @@ export function ArCamera({
       setFound(outcome);
       // The report keeps a lighter copy (about 20-30 kB), so a reload keeps each scan's photo in Esito.
       logScan(outcome, identified, r.soil ?? null, photo && cropRealPhoto(small, d.box, SCAN_PHOTO_PX, 0.72));
+      keepClipFor(scanRecordId.current);
 
     } catch (error) {
       console.error("AR scan", error);
@@ -704,6 +720,7 @@ export function ArCamera({
       if (version === scanVersion.current) playCameraSound("scan-fail", 1.8);
       if (version === scanVersion.current) setFound(/Unauthorized/.test(message) ? "Sessione scaduta: esci e accedi di nuovo prima di una nuova analisi." : `Analisi interrotta${detail ? ` (${detail})` : ""}. Controlla la connessione prima di una nuova analisi.`);
     } finally {
+      keepClipFor(null); // no-op once a recognized plant claimed the clip
       if (version === scanVersion.current) { scanBusy.current = false; scanningRef.current = false; setScanning(false); }
     }
   };
@@ -805,17 +822,31 @@ export function ArCamera({
   };
   const fmtC = (v: number, digits = 1) => v.toLocaleString("it-IT", { minimumFractionDigits: digits, maximumFractionDigits: digits });
   // Ogni esemplare in più mostra subito i gradi numerici accanto al conteggio.
-  const countDegrees = species?.cooling ? ` · ${coolingLabel(coolingNow)}` : "";
+  const hasLive = Boolean(found || survey || species || count > 0);
+  const liveRecord = scanRecordId.current ? scanRecords.findIndex((r) => r.id === scanRecordId.current) : -1;
+  const livePage = liveRecord >= 0 ? liveRecord : hasLive ? scanRecords.length : -1;
+  const pageCount = scanRecords.length + (hasLive && liveRecord < 0 ? 1 : 0);
+  const viewPage = Math.min(pageCount - 1, browse ?? (livePage >= 0 ? livePage : scanRecords.length - 1));
+  const viewedRecord = viewPage !== livePage ? scanRecords[viewPage] ?? null : null;
+  // The balance follows the summary page too: a swiped-back scan shows its own specimens and cooling, read-only
+  // (the AR copies on screen belong to the live scan); a past scan without a cooling estimate hides it.
+  const dockRecord = viewedRecord?.species && viewedRecord.species.cooling !== null ? viewedRecord : null;
+  const dockLocked = Boolean(dockRecord);
+  const dockCount = dockRecord ? dockRecord.count : count;
+  const dockCooling = dockRecord ? dockRecord.totalCooling ?? 0 : coolingNow;
+  const dockReadout = dockRecord ? coolingReadout(baseTemp, dockCooling) : readout;
+  const dockHasCooling = dockLocked || Boolean(species?.cooling);
+  const countDegrees = dockHasCooling ? ` · ${coolingLabel(dockCooling)}` : "";
   const greenControls = !scanning && (
     <div className="ar-green-controls" data-camera-controls>
-      <Button variant="ghost" size="icon" className="camera-tool" aria-label="Riduci verde" title="Riduci verde" disabled={count <= 0} onClick={removeGreen}><Minus className="size-4" /></Button>
-      <span className="ar-green-count" aria-live="polite">Esemplari · {count}{countDegrees}</span>
-      <Button variant="ghost" size="icon" className="camera-tool" aria-label="Aggiungi pianta scansionata" title={species?.cooling ? "Aggiungi esemplare alla stima" : "Scansiona prima una pianta"} disabled={!species?.cooling || count >= MAX_GREEN} onClick={addGreen}><Plus className="size-4" /></Button>
+      <Button variant="ghost" size="icon" className="camera-tool" aria-label="Riduci verde" title="Riduci verde" disabled={dockLocked || count <= 0} onClick={removeGreen}><Minus className="size-4" /></Button>
+      <span className="ar-green-count" aria-live="polite">Esemplari · {dockCount}{countDegrees}</span>
+      <Button variant="ghost" size="icon" className="camera-tool" aria-label="Aggiungi pianta scansionata" title={species?.cooling ? "Aggiungi esemplare alla stima" : "Scansiona prima una pianta"} disabled={dockLocked || !species?.cooling || count >= MAX_GREEN} onClick={addGreen}><Plus className="size-4" /></Button>
     </div>
   );
   const balanceDrag = (event: React.PointerEvent<HTMLSpanElement>) => {
     event.stopPropagation();
-    if (scanningRef.current || !ready || !species?.cooling) return;
+    if (scanningRef.current || !ready || dockLocked || !species?.cooling) return;
     const track = event.currentTarget;
     track.setPointerCapture(event.pointerId);
     const apply = (clientX: number) => {
@@ -836,30 +867,30 @@ export function ArCamera({
     track.addEventListener("pointercancel", up);
     track.addEventListener("lostpointercapture", up);
   };
-  const specimenDock = !scanning && species?.cooling && (
+  const specimenDock = !scanning && (viewedRecord ? dockLocked : species?.cooling) && (
     <div className="ar-specimen-dock" data-camera-controls data-collapsed={balanceMin || undefined} aria-label="Esemplari e raffrescamento stimato">
       {/* Smartphones only (CSS hides it on tablets): fold the balance like an accordion, keeping a one-line summary;
           the header stays put at the bottom and the body unfolds from bottom to top. */}
       <button type="button" className="ar-dock-toggle" aria-expanded={!balanceMin} aria-controls="ar-balance-body" onClick={() => setBalanceMin((v) => !v)}>
-        <span>Bilancia termica{balanceMin ? ` · ${count} esemplari · ${readout.after !== null ? `${fmtC(readout.after, readout.digits)} °C` : coolingLabel(coolingNow)}` : ""}</span>
+        <span>Bilancia termica{dockLocked ? ` · scansione ${viewPage + 1} di ${pageCount}` : ""}{balanceMin ? ` · ${dockCount} esemplari · ${dockReadout.after !== null ? `${fmtC(dockReadout.after, dockReadout.digits)} °C` : coolingLabel(dockCooling)}` : ""}</span>
         {balanceMin ? <ChevronUp className="size-3.5 shrink-0" aria-hidden="true" /> : <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" />}
       </button>
       <div id="ar-balance-body" className="ar-dock-body" inert={balanceMin || undefined}>
       {greenControls}
-      <div className="ar-thermal-balance" data-camera-controls role="slider" tabIndex={0} aria-disabled={!species?.cooling || scanning} onKeyDown={e => { if (["ArrowRight", "ArrowUp", "ArrowLeft", "ArrowDown", "Home", "End"].includes(e.key)) { e.preventDefault(); changeGreen(e.key === "Home" ? 0 : e.key === "End" ? MAX_GREEN : countRef.current + (["ArrowRight","ArrowUp"].includes(e.key) ? 1 : -1)); } }} aria-valuemin={0} aria-valuemax={MAX_GREEN} aria-valuenow={count}
-        aria-valuetext={`${count} esemplari, riduzione stimata ${coolingAmount(coolingNow)} gradi`} aria-label="Bilancia termica simulata">
+      <div className="ar-thermal-balance" data-camera-controls role="slider" tabIndex={0} aria-disabled={dockLocked || !species?.cooling || scanning} aria-readonly={dockLocked || undefined} onKeyDown={e => { if (!dockLocked && ["ArrowRight", "ArrowUp", "ArrowLeft", "ArrowDown", "Home", "End"].includes(e.key)) { e.preventDefault(); changeGreen(e.key === "Home" ? 0 : e.key === "End" ? MAX_GREEN : countRef.current + (["ArrowRight","ArrowUp"].includes(e.key) ? 1 : -1)); } }} aria-valuemin={0} aria-valuemax={MAX_GREEN} aria-valuenow={dockCount}
+        aria-valuetext={`${dockCount} esemplari, riduzione stimata ${coolingAmount(dockCooling)} gradi`} aria-label="Bilancia termica simulata">
         <span className="ar-thermal-balance-labels"><span>Caldo</span><span>Fresco</span></span>
-        <span className="ar-thermal-balance-track is-draggable" onPointerDown={balanceDrag}>
-          <span className="ar-thermal-balance-marker" style={{ left: `${Math.min(100, Math.max(0, (count / MAX_GREEN) * 100))}%` }} />
-          {species?.cooling && <span className="ar-thermal-balance-value" style={{ left: `clamp(2.5rem, ${(count / MAX_GREEN) * 100}%, calc(100% - 2.5rem))` }} aria-live="polite">{coolingLabel(coolingNow)}</span>}
+        <span className={`ar-thermal-balance-track${dockLocked ? "" : " is-draggable"}`} onPointerDown={balanceDrag}>
+          <span className="ar-thermal-balance-marker" style={{ left: `${Math.min(100, Math.max(0, (dockCount / MAX_GREEN) * 100))}%` }} />
+          {dockHasCooling && <span className="ar-thermal-balance-value" style={{ left: `clamp(2.5rem, ${(dockCount / MAX_GREEN) * 100}%, calc(100% - 2.5rem))` }} aria-live="polite">{coolingLabel(dockCooling)}</span>}
         </span>
       </div>
       {/* Estimated perceived temperature: the place's air temperature before and after the cooling of the counted specimens. */}
       <p className="ar-cooling-readout" aria-live="polite">
-        {readout.before !== null && readout.after !== null
-          ? <><span>Percepita stimata</span><span className="ar-cooling-temps">{fmtC(readout.before, readout.digits)} °C <span aria-hidden="true">→</span><span className="sr-only"> diventa </span> <strong>{fmtC(readout.after, readout.digits)} °C</strong></span></>
-          : <><span>Raffrescamento stimato</span><strong>{coolingLabel(coolingNow)}</strong></>}
-        {stepFlash && <span key={stepFlash.key} className="ar-cooling-step" data-up={stepFlash.up || undefined}>{flashText(stepFlash)}</span>}
+        {dockReadout.before !== null && dockReadout.after !== null
+          ? <><span>Percepita stimata</span><span className="ar-cooling-temps">{fmtC(dockReadout.before, dockReadout.digits)} °C <span aria-hidden="true">→</span><span className="sr-only"> diventa </span> <strong>{fmtC(dockReadout.after, dockReadout.digits)} °C</strong></span></>
+          : <><span>Raffrescamento stimato</span><strong>{coolingLabel(dockCooling)}</strong></>}
+        {stepFlash && !dockLocked && <span key={stepFlash.key} className="ar-cooling-step" data-up={stepFlash.up || undefined}>{flashText(stepFlash)}</span>}
       </p>
       {/* Copernicus stays alongside: the satellite surface temperature of the area, as a reference. */}
       {satellite?.surfaceTemp !== undefined && <p className="ar-cooling-satellite">Superficie dell’area (Sentinel-3) · {fmtC(satellite.surfaceTemp)} °C</p>}
@@ -873,12 +904,6 @@ export function ArCamera({
       {(species.colUrl || species.gbifUrl) && <span className="block">Tassonomia: {[species.colUrl ? "Catalogue of Life" : null, species.gbifUrl ? "GBIF" : null].filter(Boolean).join(" · ")}</span>}
     </p>
   ) : null;
-  const hasLive = Boolean(found || survey || species || count > 0);
-  const liveRecord = scanRecordId.current ? scanRecords.findIndex((r) => r.id === scanRecordId.current) : -1;
-  const livePage = liveRecord >= 0 ? liveRecord : hasLive ? scanRecords.length : -1;
-  const pageCount = scanRecords.length + (hasLive && liveRecord < 0 ? 1 : 0);
-  const viewPage = Math.min(pageCount - 1, browse ?? (livePage >= 0 ? livePage : scanRecords.length - 1));
-  const viewedRecord = viewPage !== livePage ? scanRecords[viewPage] ?? null : null;
   // Wraps like the tutorial: after the last scan back to the first, before the first to the last.
   const goToPage = (page: number) => setBrowse(pageCount ? (page + pageCount) % pageCount : null);
   const summarySwipeProps = {
@@ -934,7 +959,7 @@ export function ArCamera({
     return (
       <>
         <p className="ar-esito-page">Scansione {viewPage + 1} di {pageCount} · {r.target} · {new Date(r.at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}</p>
-        {photo && <img src={photo} alt={r.species ? `Foto reale: ${r.species.commonName}` : "Foto reale della pianta scansionata"} className="ar-real-photo" />}
+        <EsitoPhoto reference={r.species?.photo ?? null} video={r.species?.video ?? null} scan={photo} clip={scanClip(r.id)} name={r.species?.commonName ?? null} />
         {r.species ? (
           <p>
             <span className="text-sm font-semibold">{r.species.commonName}</span>{" "}
@@ -953,7 +978,6 @@ export function ArCamera({
           </p>
         )}
         {r.soil?.note && <p className="text-muted-foreground">{r.soil.note}</p>}
-        {photo && <p className="mt-1 text-muted-foreground">Foto reale dalla scansione · inquadratura della pianta</p>}
         {r.satellite && <p className="mt-1 text-muted-foreground">{r.satellite} · dati dell’area, non della foto</p>}
         <p className="mt-1 text-muted-foreground">Identificazione e suolo: stime visive, non analisi strumentali.{r.species?.family ? ` · ${r.species.family}` : ""}</p>
       </>
@@ -1320,7 +1344,7 @@ export function ArCamera({
                     aria-live="polite"
                   >
                   {viewedRecord ? recordEsito(viewedRecord) : <>
-                  {realPhoto && <img src={realPhoto} alt={species ? `Foto reale: ${species.commonName}` : "Foto reale della pianta scansionata"} className="ar-real-photo" />}
+                  <EsitoPhoto reference={species?.photo ?? null} video={species?.video ?? null} scan={realPhoto} clip={liveClip} name={species?.commonName ?? null} />
                   {species ? (
                     <p>
                       <span className="text-sm font-semibold">{species.commonName}</span>{" "}
@@ -1348,7 +1372,6 @@ export function ArCamera({
                     <div><dt className="font-semibold">Temperatura del terreno</dt><dd className="text-muted-foreground">Non misurata · serve una sonda termica</dd></div>
                   </dl>}
                   {soil?.note && <p className="text-muted-foreground">{soil.note}</p>}
-                  {realPhoto && <p className="mt-1 text-muted-foreground">Foto reale dalla scansione · inquadratura della pianta</p>}
                   <p className="mt-1 text-muted-foreground">Identificazione e suolo: stime visive, non analisi strumentali.</p>
                   {found && species && <p role="status">{found}</p>}
                   {species && (
@@ -1486,6 +1509,43 @@ function thermal(g: CanvasRenderingContext2D, w: number, h: number, taps: { x: n
 }
 
 /** Real photo of the scanned plant: the recognition frame cropped to the detection box with a small margin. */
+/**
+ * Esito media: the species' reference photo of the whole plant from the botanical database (Kew, else GBIF)
+ * with its credit, the scan's mini video (else its photo) as an inset, and the Wikimedia Commons video of the
+ * species when one exists. Without a database photo the scan photo (or the mini video) takes the frame.
+ */
+function EsitoPhoto({ reference, video, scan, clip, name }: { reference: ReferencePhoto | null; video: ReferenceVideo | null; scan: string | null; clip: string | null; name: string | null }) {
+  const [failed, setFailed] = useState<string | null>(null);
+  const ref = reference && reference.url !== failed ? reference : null;
+  const plant = name ?? "pianta scansionata";
+  const main = ref
+    ? <img src={ref.url} alt={`Foto di riferimento: ${plant}`} className="ar-real-photo is-reference" referrerPolicy="no-referrer" loading="lazy" onError={() => setFailed(ref.url)} />
+    : scan ? <img src={scan} alt={`Foto reale: ${plant}`} className="ar-real-photo" />
+    : clip ? <video src={clip} className="ar-real-photo" autoPlay loop muted playsInline aria-label={`Mini video: ${plant}`} />
+    : null;
+  // The inset is the mini video when there is one (looping, muted), else the scan photo under a database photo.
+  const inset = clip && (ref || scan) ? <video src={clip} className="ar-esito-scan-inset" autoPlay loop muted playsInline aria-label="Mini video della tua scansione" title="La tua scansione" />
+    : ref && scan ? <img src={scan} alt="La tua scansione" title="La tua scansione" className="ar-esito-scan-inset" /> : null;
+  return (
+    <>
+      {main && <figure className="ar-esito-photo">
+        <div className="relative">{main}{inset}</div>
+        <figcaption className="text-muted-foreground">
+          {ref ? <>Foto di riferimento · <a href={ref.link} target="_blank" rel="noreferrer" className="underline">{ref.credit}</a></> : scan ? "Foto reale dalla scansione · inquadratura della pianta" : "Mini video della scansione"}
+          {clip && (ref || scan) ? " · nel riquadro il mini video della scansione" : ""}
+        </figcaption>
+      </figure>}
+      {video && <figure className="ar-esito-video">
+        {/* Not autoplayed: it streams from Commons only when asked. */}
+        <video controls muted playsInline preload="metadata" className="ar-real-photo is-reference" aria-label={`Video di riferimento: ${plant}`}>
+          {video.sources.map((s) => <source key={s.url} src={s.url} type={s.type} />)}
+        </video>
+        <figcaption className="text-muted-foreground">Video di riferimento · <a href={video.link} target="_blank" rel="noreferrer" className="underline">{video.credit}</a></figcaption>
+      </figure>}
+    </>
+  );
+}
+
 function cropRealPhoto(frame: HTMLCanvasElement, box: { x: number; y: number; w: number; h: number }, maxSide = 640, quality = 0.85): string | null {
   const m = 0.06;
   const x = Math.max(0, box.x - m), y = Math.max(0, box.y - m);
