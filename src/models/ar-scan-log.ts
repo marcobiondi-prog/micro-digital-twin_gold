@@ -43,8 +43,34 @@ function hydrate(k: ArKind) {
     if (Array.isArray(saved)) state[k] = saved.filter((r): r is ScanRecord => !!r && typeof r.id === "string").slice(-MAX_SCAN_RECORDS);
   } catch { /* corrupted or unavailable: start empty */ }
 }
+// Real photo of each scan (a light JPEG of the cropped frame), kept apart from the records under its own
+// sessionStorage key so a reload keeps it; memory only when storage is full. Esito shows it again when the
+// summary is swiped back to that scan.
+const PHOTO_KEY = (id: string) => `micro-digital-twin-ar-scan-photo:${id}`;
+const photos = new Map<string, string>();
+export function scanPhoto(id: string): string | null {
+  const cached = photos.get(id);
+  if (cached) return cached;
+  try {
+    const saved = storage()?.getItem(PHOTO_KEY(id));
+    if (saved) photos.set(id, saved);
+    return saved ?? null;
+  } catch { return null; }
+}
+function savePhoto(id: string, photo: string) {
+  photos.set(id, photo);
+  try { storage()?.setItem(PHOTO_KEY(id), photo); } catch { /* quota or private mode: memory only */ }
+}
+function dropPhoto(id: string) {
+  photos.delete(id);
+  try { storage()?.removeItem(PHOTO_KEY(id)); } catch { /* unavailable */ }
+}
+
 function commit(k: ArKind, next: ScanRecord[]) {
+  const dropped = state[k];
   state[k] = next.slice(-MAX_SCAN_RECORDS);
+  const kept = new Set(state[k].map((r) => r.id));
+  for (const r of dropped) if (!kept.has(r.id)) dropPhoto(r.id);
   try { storage()?.setItem(KEY(k), JSON.stringify(state[k])); } catch { /* quota or private mode: memory only */ }
   subs.forEach((f) => f());
 }
@@ -52,9 +78,10 @@ function commit(k: ArKind, next: ScanRecord[]) {
 export function currentScans(k: ArKind): ScanRecord[] { hydrate(k); return state[k]; }
 
 /** Adds a scan and returns its id, used to keep its specimen count up to date. */
-export function recordScan(record: Omit<ScanRecord, "id" | "at"> & { at?: string }): string {
+export function recordScan({ photo, ...record }: Omit<ScanRecord, "id" | "at"> & { at?: string; photo?: string | null }): string {
   hydrate(record.kind);
   const id = `scan-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  if (photo) savePhoto(id, photo);
   commit(record.kind, [...state[record.kind], { ...record, id, at: record.at ?? new Date().toISOString() }]);
   return id;
 }
