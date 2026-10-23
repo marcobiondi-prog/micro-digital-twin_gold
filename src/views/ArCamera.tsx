@@ -836,31 +836,39 @@ export function ArCamera({
   const pageCount = scanRecords.length + (hasLive && liveRecord < 0 ? 1 : 0);
   const viewPage = Math.min(pageCount - 1, browse ?? (livePage >= 0 ? livePage : scanRecords.length - 1));
   const viewedRecord = viewPage !== livePage ? scanRecords[viewPage] ?? null : null;
-  // The balance follows the summary page too: a swiped-back scan shows its own specimens and cooling, read-only
-  // (the AR copies on screen belong to the live scan); a past scan without a cooling estimate hides it.
+  // The balance follows the summary page too: a swiped-back scan shows and edits its own specimens and cooling
+  // (in the report record; the AR copies on screen stay the live scan's); a past scan without a cooling estimate
+  // hides it.
   const dockRecord = viewedRecord?.species && viewedRecord.species.cooling !== null ? viewedRecord : null;
-  const dockLocked = Boolean(dockRecord);
   const dockCount = dockRecord ? dockRecord.count : count;
   const dockCooling = dockRecord ? dockRecord.totalCooling ?? 0 : coolingNow;
   const dockReadout = dockRecord ? coolingReadout(baseTemp, dockCooling) : readout;
-  const dockHasCooling = dockLocked || Boolean(species?.cooling);
+  const dockHasCooling = Boolean(dockRecord) || Boolean(species?.cooling);
+  const dockEditable = dockRecord ? ready : Boolean(species?.cooling);
+  const changeDock = (requested: number) => {
+    if (!dockRecord?.species || dockRecord.species.cooling === null) { changeGreen(requested); return; }
+    if (!ready || scanningRef.current) return;
+    const next = scannedSpecimenCount(requested);
+    const thermal = scannedSpecimenThermal(next, { deltaT: dockRecord.species.cooling, shadeM2: dockRecord.species.shade ?? 0 });
+    updateScan(kind, dockRecord.id, { count: next, totalCooling: thermal.deltaT, totalShade: thermal.shadeM2 });
+  };
   const countDegrees = dockHasCooling ? ` · ${coolingLabel(dockCooling)}` : "";
   const greenControls = !scanning && (
     <div className="ar-green-controls" data-camera-controls>
-      <Button variant="ghost" size="icon" className="camera-tool" aria-label="Riduci verde" title="Riduci verde" disabled={dockLocked || count <= 0} onClick={removeGreen}><Minus className="size-4" /></Button>
+      <Button variant="ghost" size="icon" className="camera-tool" aria-label="Riduci verde" title="Riduci verde" disabled={!dockEditable || dockCount <= 0} onClick={() => changeDock(dockCount - 1)}><Minus className="size-4" /></Button>
       <span className="ar-green-count" aria-live="polite">Esemplari · {dockCount}{countDegrees}</span>
-      <Button variant="ghost" size="icon" className="camera-tool" aria-label="Aggiungi pianta scansionata" title={species?.cooling ? "Aggiungi esemplare alla stima" : "Scansiona prima una pianta"} disabled={dockLocked || !species?.cooling || count >= MAX_GREEN} onClick={addGreen}><Plus className="size-4" /></Button>
+      <Button variant="ghost" size="icon" className="camera-tool" aria-label="Aggiungi pianta scansionata" title={dockEditable ? "Aggiungi esemplare alla stima" : "Scansiona prima una pianta"} disabled={!dockEditable || dockCount >= MAX_GREEN} onClick={() => changeDock(dockCount + 1)}><Plus className="size-4" /></Button>
     </div>
   );
   const balanceDrag = (event: React.PointerEvent<HTMLSpanElement>) => {
     event.stopPropagation();
-    if (scanningRef.current || !ready || dockLocked || !species?.cooling) return;
+    if (scanningRef.current || !ready || !dockEditable) return;
     const track = event.currentTarget;
     track.setPointerCapture(event.pointerId);
     const apply = (clientX: number) => {
       const rect = track.getBoundingClientRect();
       if (!rect.width) return;
-      changeGreen(Math.round(Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)) * MAX_GREEN));
+      changeDock(Math.round(Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)) * MAX_GREEN));
     };
     apply(event.clientX);
     const move = (ev: PointerEvent) => { ev.stopPropagation(); apply(ev.clientX); };
@@ -875,20 +883,20 @@ export function ArCamera({
     track.addEventListener("pointercancel", up);
     track.addEventListener("lostpointercapture", up);
   };
-  const specimenDock = !scanning && (viewedRecord ? dockLocked : species?.cooling) && (
+  const specimenDock = !scanning && (viewedRecord ? dockRecord : species?.cooling) && (
     <div className="ar-specimen-dock" data-camera-controls data-collapsed={balanceMin || undefined} aria-label="Esemplari e raffrescamento stimato">
       {/* Smartphones only (CSS hides it on tablets): fold the balance like an accordion, keeping a one-line summary;
           the header stays put at the bottom and the body unfolds from bottom to top. */}
       <button type="button" className="ar-dock-toggle" aria-expanded={!balanceMin} aria-controls="ar-balance-body" onClick={() => setBalanceMin((v) => !v)}>
-        <span>Bilancia termica{dockLocked ? ` · scansione ${viewPage + 1} di ${pageCount}` : ""}{balanceMin ? ` · ${dockCount} esemplari · ${dockReadout.after !== null ? `${fmtC(dockReadout.after, dockReadout.digits)} °C` : coolingLabel(dockCooling)}` : ""}</span>
+        <span>Bilancia termica{dockRecord ? ` · scansione ${viewPage + 1} di ${pageCount}` : ""}{balanceMin ? ` · ${dockCount} esemplari · ${dockReadout.after !== null ? `${fmtC(dockReadout.after, dockReadout.digits)} °C` : coolingLabel(dockCooling)}` : ""}</span>
         {balanceMin ? <ChevronUp className="size-3.5 shrink-0" aria-hidden="true" /> : <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" />}
       </button>
       <div id="ar-balance-body" className="ar-dock-body" inert={balanceMin || undefined}>
       {greenControls}
-      <div className="ar-thermal-balance" data-camera-controls role="slider" tabIndex={0} aria-disabled={dockLocked || !species?.cooling || scanning} aria-readonly={dockLocked || undefined} onKeyDown={e => { if (!dockLocked && ["ArrowRight", "ArrowUp", "ArrowLeft", "ArrowDown", "Home", "End"].includes(e.key)) { e.preventDefault(); changeGreen(e.key === "Home" ? 0 : e.key === "End" ? MAX_GREEN : countRef.current + (["ArrowRight","ArrowUp"].includes(e.key) ? 1 : -1)); } }} aria-valuemin={0} aria-valuemax={MAX_GREEN} aria-valuenow={dockCount}
+      <div className="ar-thermal-balance" data-camera-controls role="slider" tabIndex={0} aria-disabled={!dockEditable || scanning} onKeyDown={e => { if (dockEditable && ["ArrowRight", "ArrowUp", "ArrowLeft", "ArrowDown", "Home", "End"].includes(e.key)) { e.preventDefault(); changeDock(e.key === "Home" ? 0 : e.key === "End" ? MAX_GREEN : dockCount + (["ArrowRight","ArrowUp"].includes(e.key) ? 1 : -1)); } }} aria-valuemin={0} aria-valuemax={MAX_GREEN} aria-valuenow={dockCount}
         aria-valuetext={`${dockCount} esemplari, riduzione stimata ${coolingAmount(dockCooling)} gradi`} aria-label="Bilancia termica simulata">
         <span className="ar-thermal-balance-labels"><span>Caldo</span><span>Fresco</span></span>
-        <span className={`ar-thermal-balance-track${dockLocked ? "" : " is-draggable"}`} onPointerDown={balanceDrag}>
+        <span className={`ar-thermal-balance-track${dockEditable ? " is-draggable" : ""}`} onPointerDown={balanceDrag}>
           <span className="ar-thermal-balance-marker" style={{ left: `${Math.min(100, Math.max(0, (dockCount / MAX_GREEN) * 100))}%` }} />
           {dockHasCooling && <span className="ar-thermal-balance-value" style={{ left: `clamp(2.5rem, ${(dockCount / MAX_GREEN) * 100}%, calc(100% - 2.5rem))` }} aria-live="polite">{coolingLabel(dockCooling)}</span>}
         </span>
@@ -898,7 +906,7 @@ export function ArCamera({
         {dockReadout.before !== null && dockReadout.after !== null
           ? <><span>Percepita stimata</span><span className="ar-cooling-temps">{fmtC(dockReadout.before, dockReadout.digits)} °C <span aria-hidden="true">→</span><span className="sr-only"> diventa </span> <strong>{fmtC(dockReadout.after, dockReadout.digits)} °C</strong></span></>
           : <><span>Raffrescamento stimato</span><strong>{coolingLabel(dockCooling)}</strong></>}
-        {stepFlash && !dockLocked && <span key={stepFlash.key} className="ar-cooling-step" data-up={stepFlash.up || undefined}>{flashText(stepFlash)}</span>}
+        {stepFlash && !dockRecord && <span key={stepFlash.key} className="ar-cooling-step" data-up={stepFlash.up || undefined}>{flashText(stepFlash)}</span>}
       </p>
       {/* Copernicus stays alongside: the satellite surface temperature of the area, as a reference. */}
       {satellite?.surfaceTemp !== undefined && <p className="ar-cooling-satellite">Superficie dell’area (Sentinel-3) · {fmtC(satellite.surfaceTemp)} °C</p>}
