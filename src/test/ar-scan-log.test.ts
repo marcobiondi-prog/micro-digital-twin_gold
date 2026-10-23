@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clearScans, currentScans, recordScan, scanPhoto, scanReportRows, updateScan } from "@/models/ar-scan-log";
+import { clearScans, currentScans, recordScan, scanPhoto, scanReportRows, setScanSpeciesPhoto, updateScan } from "@/models/ar-scan-log";
 
 const base = { kind: "urban" as const, target: "Alberi e ombra", context: "Piazza", satellite: null };
 
@@ -30,5 +30,13 @@ describe("ar-scan-log", () => {
     clearScans("urban");
     expect(scanPhoto(id)).toBeNull();
     expect(sessionStorage.getItem(`micro-digital-twin-ar-scan-photo:${id}`)).toBeNull();
+  });
+
+  it("adds a reference photo found after the scan was recorded", () => {
+    clearScans("urban");
+    const id = recordScan({ ...base, result: "Leccio", soil: null, count: 0, totalCooling: null, totalShade: null,
+      species: { commonName: "Leccio", scientificName: "Quercus ilex", family: null, level: "Specie probabile", cooling: 0.4, shade: 50, photo: null } });
+    setScanSpeciesPhoto("urban", id, { url: "https://img/tree.jpg", credit: "Ada · CC BY · via GBIF", link: "https://www.gbif.org/occurrence/8" });
+    expect(currentScans("urban")[0]!.species!.photo!.url).toBe("https://img/tree.jpg");
   });
 });

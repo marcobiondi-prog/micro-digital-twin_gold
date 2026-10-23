@@ -8,7 +8,7 @@ import { plantPhotoBounds, type PlantOutline } from "@/models/ar-plant-photo";
 import { arFocusOption } from "@/models/ar-focus";
 import { satellitePrompt } from "@/models/copernicus";
 import { sameBotanicalName, usableBotanicalMatch } from "@/models/ar-botanical-match";
-import { pickGbifPhoto, pickPowoPhoto, type ReferencePhoto } from "@/models/ar-reference-photo";
+import { gbifPhotoSearchUrl, pickGbifPhoto, pickPowoPhoto, type ReferencePhoto } from "@/models/ar-reference-photo";
 
 export type GrowthForm = "columnar" | "conical" | "round" | "umbrella" | "vine" | "shrub";
 
@@ -114,11 +114,11 @@ async function catalogueOfLife(name: string) {
 }
 
 /** Reference photo of the whole plant: Kew's Plants of the World Online first, then an openly licensed GBIF photo.
- * Best effort with short timeouts: a slow or missing database never holds up or fails the scan. */
+ * Best effort with timeouts: a slow or missing database never fails the scan (the camera retries GBIF itself). */
 async function referencePhoto(name: string, gbifKey: number | null): Promise<ReferencePhoto | null> {
   const get = async (url: string) => {
     try {
-      const r = await fetch(url, { signal: AbortSignal.timeout(4000), headers: { accept: "application/json" } });
+      const r = await fetch(url, { signal: AbortSignal.timeout(8000), headers: { accept: "application/json" } });
       return r.ok ? ((await r.json()) as unknown) : null;
     } catch {
       return null;
@@ -127,9 +127,12 @@ async function referencePhoto(name: string, gbifKey: number | null): Promise<Ref
   // The whole plant first: a Kew habit photo, else a GBIF field photo, else any Kew photo that is not a close-up.
   const [powo, occurrences] = await Promise.all([
     get(`https://powo.science.kew.org/api/2/search?q=${encodeURIComponent(name)}`),
-    gbifKey ? get(`https://api.gbif.org/v1/occurrence/search?taxonKey=${gbifKey}&mediaType=StillImage&basisOfRecord=HUMAN_OBSERVATION&limit=30`) : null,
+    gbifKey ? get(gbifPhotoSearchUrl(gbifKey)) : null,
   ]);
-  return pickPowoPhoto(powo, name, true) ?? pickGbifPhoto(occurrences) ?? pickPowoPhoto(powo, name);
+  const photo = pickPowoPhoto(powo, name, true) ?? pickGbifPhoto(occurrences) ?? pickPowoPhoto(powo, name);
+  // Visible in the Vercel logs: which database answered when a species ends up without a reference photo.
+  if (!photo) console.info("AR reference photo: none", { name, kew: powo !== null, gbif: occurrences !== null });
+  return photo;
 }
 
 const detectInput = z.object({ image: z.string().regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/).max(3_000_000), detailImage: z.string().regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/).max(1_000_000).optional(), kind: z.enum(["urban", "vineyard"]).default("urban"), target: z.enum(["tree", "ground", "leaf", "canopy", "interrow"]).optional(), focus: z.object({x:z.number().min(0).max(1),y:z.number().min(0).max(1),w:z.number().min(0).max(1),h:z.number().min(0).max(1)}).optional(), satellite: z.object({ ndvi: z.number().min(-1).max(1).optional(), ndviDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), surfaceTemp: z.number().min(-60).max(80).optional(), tempDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }).optional() });

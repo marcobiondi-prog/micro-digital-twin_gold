@@ -99,6 +99,17 @@ export function updateScan(k: ArKind, id: string, patch: Partial<Pick<ScanRecord
   commit(k, next);
 }
 
+/** Adds the reference photo found after the scan was recorded (the camera's own GBIF retry). */
+export function setScanSpeciesPhoto(k: ArKind, id: string, photo: ReferencePhoto) {
+  hydrate(k);
+  const i = state[k].findIndex((r) => r.id === id);
+  const prev = state[k][i];
+  if (!prev?.species || prev.species.photo?.url === photo.url) return;
+  const next = state[k].slice();
+  next[i] = { ...prev, species: { ...prev.species, photo } };
+  commit(k, next);
+}
+
 export function clearScans(k: ArKind) { hydrate(k); commit(k, []); }
 
 export function useArScans(k: ArKind): ScanRecord[] {

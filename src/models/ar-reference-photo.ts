@@ -57,6 +57,11 @@ export function openLicence(license: string | undefined): string | null {
   return m ? `CC ${m[1]!.replace(/[ _]/g, "-").toUpperCase()}` : null;
 }
 
+/** GBIF field photos of a taxon; the API allows browser requests (CORS), so the camera can retry it directly. */
+export function gbifPhotoSearchUrl(taxonKey: number): string {
+  return `https://api.gbif.org/v1/occurrence/search?taxonKey=${taxonKey}&mediaType=StillImage&basisOfRecord=HUMAN_OBSERVATION&limit=20`;
+}
+
 /**
  * Openly licensed GBIF photo of the species that best shows the whole plant: field observations only (no
  * herbarium sheets), a habit caption first, and never one captioned as a leaf, flower or fruit close-up.
