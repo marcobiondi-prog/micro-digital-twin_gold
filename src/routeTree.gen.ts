@@ -11,11 +11,9 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
-import { Route as CasiRouteImport } from './routes/casi'
-import { Route as DashboardRouteImport } from './routes/dashboard'
-import { Route as FontiRouteImport } from './routes/fonti'
-import { Route as LabRouteImport } from './routes/lab'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as UrbanoRouteImport } from './routes/urbano'
+import { Route as VignetoRouteImport } from './routes/vigneto'
 import { Route as ApiPublicExternalApprovalRouteImport } from './routes/api/public/external-approval'
 import { Route as ApiPublicJobsCaseSourcesRouteImport } from './routes/api/public/jobs/case-sources'
 
@@ -29,29 +27,19 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CasiRoute = CasiRouteImport.update({
-  id: '/casi',
-  path: '/casi',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FontiRoute = FontiRouteImport.update({
-  id: '/fonti',
-  path: '/fonti',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LabRoute = LabRouteImport.update({
-  id: '/lab',
-  path: '/lab',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UrbanoRoute = UrbanoRouteImport.update({
+  id: '/urbano',
+  path: '/urbano',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VignetoRoute = VignetoRouteImport.update({
+  id: '/vigneto',
+  path: '/vigneto',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicExternalApprovalRoute =
@@ -70,22 +58,18 @@ const ApiPublicJobsCaseSourcesRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/casi': typeof CasiRoute
-  '/dashboard': typeof DashboardRoute
-  '/fonti': typeof FontiRoute
-  '/lab': typeof LabRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/urbano': typeof UrbanoRoute
+  '/vigneto': typeof VignetoRoute
   '/api/public/external-approval': typeof ApiPublicExternalApprovalRoute
   '/api/public/jobs/case-sources': typeof ApiPublicJobsCaseSourcesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/casi': typeof CasiRoute
-  '/dashboard': typeof DashboardRoute
-  '/fonti': typeof FontiRoute
-  '/lab': typeof LabRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/urbano': typeof UrbanoRoute
+  '/vigneto': typeof VignetoRoute
   '/api/public/external-approval': typeof ApiPublicExternalApprovalRoute
   '/api/public/jobs/case-sources': typeof ApiPublicJobsCaseSourcesRoute
 }
@@ -93,11 +77,9 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/casi': typeof CasiRoute
-  '/dashboard': typeof DashboardRoute
-  '/fonti': typeof FontiRoute
-  '/lab': typeof LabRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/urbano': typeof UrbanoRoute
+  '/vigneto': typeof VignetoRoute
   '/api/public/external-approval': typeof ApiPublicExternalApprovalRoute
   '/api/public/jobs/case-sources': typeof ApiPublicJobsCaseSourcesRoute
 }
@@ -106,33 +88,27 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
-    | '/casi'
-    | '/dashboard'
-    | '/fonti'
-    | '/lab'
     | '/reset-password'
+    | '/urbano'
+    | '/vigneto'
     | '/api/public/external-approval'
     | '/api/public/jobs/case-sources'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/admin'
-    | '/casi'
-    | '/dashboard'
-    | '/fonti'
-    | '/lab'
     | '/reset-password'
+    | '/urbano'
+    | '/vigneto'
     | '/api/public/external-approval'
     | '/api/public/jobs/case-sources'
   id:
     | '__root__'
     | '/'
     | '/admin'
-    | '/casi'
-    | '/dashboard'
-    | '/fonti'
-    | '/lab'
     | '/reset-password'
+    | '/urbano'
+    | '/vigneto'
     | '/api/public/external-approval'
     | '/api/public/jobs/case-sources'
   fileRoutesById: FileRoutesById
@@ -140,11 +116,9 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
-  CasiRoute: typeof CasiRoute
-  DashboardRoute: typeof DashboardRoute
-  FontiRoute: typeof FontiRoute
-  LabRoute: typeof LabRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  UrbanoRoute: typeof UrbanoRoute
+  VignetoRoute: typeof VignetoRoute
   ApiPublicExternalApprovalRoute: typeof ApiPublicExternalApprovalRoute
   ApiPublicJobsCaseSourcesRoute: typeof ApiPublicJobsCaseSourcesRoute
 }
@@ -165,39 +139,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/casi': {
-      id: '/casi'
-      path: '/casi'
-      fullPath: '/casi'
-      preLoaderRoute: typeof CasiRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/fonti': {
-      id: '/fonti'
-      path: '/fonti'
-      fullPath: '/fonti'
-      preLoaderRoute: typeof FontiRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/lab': {
-      id: '/lab'
-      path: '/lab'
-      fullPath: '/lab'
-      preLoaderRoute: typeof LabRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/reset-password': {
       id: '/reset-password'
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/urbano': {
+      id: '/urbano'
+      path: '/urbano'
+      fullPath: '/urbano'
+      preLoaderRoute: typeof UrbanoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vigneto': {
+      id: '/vigneto'
+      path: '/vigneto'
+      fullPath: '/vigneto'
+      preLoaderRoute: typeof VignetoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/external-approval': {
@@ -220,11 +180,9 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
-  CasiRoute: CasiRoute,
-  DashboardRoute: DashboardRoute,
-  FontiRoute: FontiRoute,
-  LabRoute: LabRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  UrbanoRoute: UrbanoRoute,
+  VignetoRoute: VignetoRoute,
   ApiPublicExternalApprovalRoute: ApiPublicExternalApprovalRoute,
   ApiPublicJobsCaseSourcesRoute: ApiPublicJobsCaseSourcesRoute,
 }

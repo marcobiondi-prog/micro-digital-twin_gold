@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Outlet, Link, createRootRouteWithContext, useLocation, useNavigate, HeadContent, Scripts, type ErrorComponentProps } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
@@ -13,7 +13,6 @@ import { syncAppOrientation } from "@/lib/ar-orientation";
 import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
 import { installUiClicks } from "@/lib/ui-sounds";
 import { reloadFresh } from "@/router";
-import { Home, BookOpen, FlaskConical, LayoutDashboard, Library } from "lucide-react";
 
 function NotFoundComponent() {
   return (
@@ -100,26 +99,8 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
-const nav = [
-  { to: "/", l: "Panoramica" },
-  { to: "/casi", l: "Casi studio" },
-  { to: "/lab", l: "Decision Lab" },
-  { to: "/dashboard", l: "Dashboard" },
-  { to: "/fonti", l: "Fonti" },
-] as const;
-
-const NAV_H = 49;
-
-const bottomItems = [
-  { to: "/", l: "Panoramica", I: Home },
-  { to: "/casi", l: "Casi", I: BookOpen },
-  { to: "/lab", l: "Lab", I: FlaskConical },
-  { to: "/dashboard", l: "Dashboard", I: LayoutDashboard },
-  { to: "/fonti", l: "Fonti", I: Library },
-] as const;
-
-// Keep history flat: sections replace each other, so the back gesture from
-// any section returns to Panoramica instead of the previously visited tab.
+// Keep history flat: going Home from a simulation steps back instead of pushing,
+// so the back gesture from Home leaves the app.
 function goHomeBack(e: { preventDefault: () => void }, to: string, pathname: string) {
   if (to !== "/" || pathname === "/") return false;
   if ((window.history.state?.__TSR_index ?? 0) > 0) {
@@ -128,180 +109,6 @@ function goHomeBack(e: { preventDefault: () => void }, to: string, pathname: str
     return true;
   }
   return false;
-}
-
-function BottomNav() {
-  const pathname = useLocation({ select: (l) => l.pathname });
-  const [hidden, setHidden] = useState(false);
-  useEffect(() => {
-    // Hide the bar while scrolling down, bring it back on the first upward
-    // move. A minimum downward distance avoids jitter from small scroll bumps.
-    let lastY = window.scrollY;
-    let downDist = 0;
-    let lastReflow = -1e9;
-    const ro = new ResizeObserver(() => {
-      // Any layout change (content mounting, switching Lab flow) marks a brief
-      // window in which a scroll jump is the browser clamping the position,
-      // not a finger swipe.
-      lastReflow = performance.now();
-    });
-    ro.observe(document.documentElement);
-    const onScroll = () => {
-      const y = window.scrollY;
-      const dy = y - lastY;
-      lastY = y;
-      if (y <= 0) {
-        downDist = 0;
-        setHidden(false);
-        return;
-      }
-      if (dy > 0) {
-        downDist += dy;
-        if (downDist > 48) setHidden(true);
-      } else if (dy < -2) {
-        if (performance.now() - lastReflow < 250) return;
-        downDist = 0;
-        setHidden(false);
-      }
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      ro.disconnect();
-    };
-  }, [pathname]);
-  return (
-    <nav aria-label="Menu principale" className={`bar-liquid fixed inset-x-0 bottom-0 z-[999999998] pb-[env(safe-area-inset-bottom)] transition-transform duration-300 motion-reduce:transition-none sm:hidden ${hidden ? "translate-y-full" : "translate-y-0"}`}>
-      <ul className="grid grid-cols-5">
-        {bottomItems.map(({ to, l, I }) => {
-          const active = pathname === to;
-          return (
-            <li key={to}>
-              <Link to={to} replace={pathname !== "/"} aria-current={active ? "page" : undefined}
-                onClick={(e) => {
-                  if (goHomeBack(e, to, pathname)) return;
-                  if (!active) return;
-                  e.preventDefault();
-                  window.scrollTo({ top: 0, behavior: "instant" });
-                }}
-                className={`flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium outline-none transition-colors focus-visible:bg-muted ${active ? "text-nav-accent-ink" : "text-muted-foreground dark:text-nav-accent-foreground"}`}>
-                <span className={`nav-glass nav-glass-gloss relative grid h-7 w-12 place-items-center rounded-full ${active ? "nav-glass-on text-nav-accent-foreground" : "text-muted-foreground dark:text-nav-accent-foreground"}`}>
-                  <I className="size-5" aria-hidden="true" />
-                </span>
-                <span className="max-w-full truncate px-1">{l}</span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
-  );
-}
-
-function SmartNav() {
-  const [pinned, setPinned] = useState(false);
-  const [placeholderTop, setPlaceholderTop] = useState(0);
-  useEffect(() => {
-    // Tablet/desktop: the logo header scrolls away with the page, so the
-    // pinned menu only ever needs its own height.
-    document.documentElement.style.setProperty("--nav-h", pinned ? `${NAV_H}px` : "0px");
-    return () => document.documentElement.style.setProperty("--nav-h", "0px");
-  }, [pinned]);
-  useEffect(() => {
-    const ph = document.getElementById("smart-nav-slot");
-    let lastY = window.scrollY;
-    let upDist = 0;
-    let cur = false;
-    const set = (next: boolean) => {
-      if (next === cur) return;
-      cur = next;
-      setPinned(next);
-    };
-    const update = () => {
-      const top = ph ? ph.getBoundingClientRect().top + window.scrollY : 0;
-      setPlaceholderTop(top);
-      const y = window.scrollY;
-      const dy = y - lastY;
-      lastY = y;
-      // Back in the natural slot: let the menu flow with the page.
-      if (y <= top) { upDist = 0; set(false); return; }
-      if (dy > 0) { upDist = 0; set(false); }
-      else if (dy < 0) { upDist -= dy; if (upDist > 24) set(true); }
-    };
-    update();
-    window.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update);
-    return () => {
-      window.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
-      document.documentElement.style.setProperty("--nav-h", "0px");
-    };
-  }, []);
-  void placeholderTop;
-  const navRef = useRef<HTMLElement>(null);
-  const pathname = useLocation({ select: (l) => l.pathname });
-  useEffect(() => {
-    // Center the active item on every page change. This is the single place
-    // that scrolls on navigation, so it never fights the tap handler below.
-    // The active marker is applied after the route commits, so measure on the
-    // next frame (and match by href as a fallback) instead of right away.
-    const nav = navRef.current;
-    if (!nav) return;
-    const frame = requestAnimationFrame(() => {
-      const active =
-        nav.querySelector<HTMLElement>('[data-status="active"]') ??
-        nav.querySelector<HTMLElement>(`a[href="${pathname}"]`);
-      if (!active) return;
-      const n = nav.getBoundingClientRect();
-      const a = active.getBoundingClientRect();
-      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      nav.scrollTo({ left: nav.scrollLeft + (a.left - n.left) - (n.width - a.width) / 2, behavior: reduce ? "auto" : "smooth" });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [pathname]);
-  // Tapping the item that is already active (e.g. Panoramica again) does not
-  // change the pathname, so the effect above would not run; center it here.
-  // Taps on other items are centered by the effect once the route changes.
-  const centerTapped = (el: HTMLElement, isActive: boolean) => {
-    if (!isActive) return;
-    const nav = navRef.current;
-    if (!nav) return;
-    const n = nav.getBoundingClientRect();
-    const a = el.getBoundingClientRect();
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    nav.scrollTo({ left: nav.scrollLeft + (a.left - n.left) - (n.width - a.width) / 2, behavior: reduce ? "auto" : "smooth" });
-  };
-  return (
-    <div id="smart-nav-slot" style={{ height: NAV_H }}>
-      <div
-        className={`${pinned ? "fixed inset-x-0 top-0 animate-in slide-in-from-top duration-300 shadow-md" : "relative"} z-[999999999] isolate border-b bg-background motion-reduce:animate-none`}
-        style={{ height: NAV_H }}
-      >
-        <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-1 px-2 sm:px-4">
-          <nav
-            ref={navRef}
-            aria-label="Menu principale"
-            className="no-scrollbar min-w-0 touch-pan-x overflow-x-auto"
-          >
-            <div className="flex items-center gap-1">
-              {nav.map((n) => (
-                <Link key={n.to} to={n.to} activeOptions={{ exact: n.to === "/" }}
-                  aria-current={pathname === n.to ? "page" : undefined}
-                  replace={pathname !== "/"}
-                  onClick={(e) => { if (goHomeBack(e, n.to, pathname)) return; centerTapped(e.currentTarget, pathname === n.to); }}
-                  className={`nav-glass nav-glass-gloss relative shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring ${pathname === n.to ? "nav-glass-on bg-nav-accent text-nav-accent-foreground" : "text-muted-foreground dark:text-nav-accent-foreground"}`}>
-                  {n.l}
-                </Link>
-              ))}
-            </div>
-          </nav>
-          <div className="shrink-0 pl-1">
-            <ThemeToggle />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // The landing guard below must act only on a real page load, not on the
@@ -359,7 +166,7 @@ function RootComponent() {
     }
     // A fresh open of the app always lands on the Panoramica (/). This effect
     // runs once per document load, so only the opening page redirects; in-app
-    // navigation to /lab, /dashboard, ... keeps working as before.
+    // navigation to /urbano and /vigneto keeps working as before.
     // The move waits a beat: leaving the page while its data is still arriving
     // pulls a match out of the router mid-render and the router throws on a
     // missing routeId.
@@ -421,16 +228,14 @@ function RootComponent() {
               <span className="truncate whitespace-nowrap">MICRO DIGITAL <span className="text-brand-turquoise">TWIN</span></span>
             </Link>
           </div>
-          <AccountControl />
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2"><ThemeToggle /><AccountControl /></div>
         </div>
       </header>
-      <div className="hidden sm:block"><SmartNav /></div>
 
       <main id="main-content" tabIndex={-1} className="app-main mx-auto max-w-7xl px-4 py-8 focus:outline-none"><Outlet /></main><Toaster />
-      <footer className="mx-auto max-w-7xl px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] text-xs text-muted-foreground sm:pb-10">
+      <footer className="mx-auto max-w-7xl px-4 pb-[calc(2.5rem+env(safe-area-inset-bottom))] text-xs text-muted-foreground sm:pb-10">
         I risultati del simulatore sono indicativi e non sostituiscono modelli fisici calibrati.
       </footer>
-      <BottomNav />
     </QueryClientProvider>
   );
 }
