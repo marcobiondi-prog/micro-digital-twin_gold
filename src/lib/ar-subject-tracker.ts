@@ -2,6 +2,8 @@
  * Live subject tracking for the AI camera, in the spirit of phone "eye/object AF" trackers:
  * a tiny frame is scored for vegetation only (excess green plus bark browns), the strongest
  * connected region near the previous lock wins, and the box is smoothed between frames.
+ * Robust to light: a gray-world white balance first neutralizes warm/cool casts, and green is read
+ * from chromaticity (relative to brightness), so dark foliage (holm oak), shade and backlight count.
  * Pure functions: the camera samples pixels, this module decides where the reticle goes.
  */
 export type SubjectBox = { x: number; y: number; w: number; h: number };
@@ -15,13 +17,14 @@ export function findSubject(data: Uint8ClampedArray, width: number, height: numb
   const n = width * height;
   if (!n || data.length < n * 4) return null;
   const score = new Float32Array(n);
-  const lum = new Float32Array(n);
+  const [kr, kg, kb] = grayWorldGains(data, n);
   for (let i = 0; i < n; i++) {
-    const r = data[i * 4] ?? 0, g = data[i * 4 + 1] ?? 0, b = data[i * 4 + 2] ?? 0;
-    lum[i] = 0.299 * r + 0.587 * g + 0.114 * b;
-    // Vegetation only: green must clearly dominate red and blue (trees, shrubs, grass, plants).
-    const exg = 2 * g - r - b;
-    const green = g > r * 1.08 && g > b * 1.08 && exg > 20 ? exg / 255 : 0;
+    const r = (data[i * 4] ?? 0) * kr, g = (data[i * 4 + 1] ?? 0) * kg, b = (data[i * 4 + 2] ?? 0) * kb;
+    // Vegetation only: green must dominate red and blue (trees, shrubs, grass, plants). Read as
+    // chromaticity, so a dark leaf (30,45,28) scores like a bright one; near-black pixels carry no colour.
+    const sum = r + g + b;
+    const exg = sum > 36 ? (2 * g - r - b) / sum : 0;
+    const green = g > r * 1.04 && g > b * 1.04 && exg > 0.07 ? Math.min(1, exg * 1.6) : 0;
     // Bark and trunks: muted browns (red > green > blue, low saturation), never vivid reds.
     const bark = withBark && r > g && g > b && r - g < 45 && g - b > 6 && r - b > 18 && r < 200 && r > 50 ? Math.min(0.5, (r - b) / 160) : 0;
     score[i] = Math.max(green, bark);
@@ -80,6 +83,31 @@ export function smoothBox(current: SubjectBox, target: SubjectBox, factor = 0.35
     w: current.w + (target.w - current.w) * k,
     h: current.h + (target.h - current.h) * k,
   };
+}
+
+/**
+ * Per-channel gains that make the frame's average gray (gray-world white balance), clamped so a frame
+ * that is mostly foliage keeps its green instead of being balanced away.
+ */
+function grayWorldGains(data: Uint8ClampedArray, n: number): [number, number, number] {
+  let r = 0, g = 0, b = 0;
+  for (let i = 0; i < n; i++) { r += data[i * 4] ?? 0; g += data[i * 4 + 1] ?? 0; b += data[i * 4 + 2] ?? 0; }
+  const gray = (r + g + b) / 3;
+  const gain = (c: number) => (c > 0 ? clamp(gray / c, 0.8, 1.25) : 1);
+  return [gain(r), gain(g), gain(b)];
+}
+
+/** Whether the frame can show anything at all: not near-black (lens covered, night) and not flat. */
+export function frameUsable(data: Uint8ClampedArray, width: number, height: number): boolean {
+  const n = width * height;
+  if (!n || data.length < n * 4) return false;
+  let sum = 0, sq = 0;
+  for (let i = 0; i < n; i++) {
+    const l = 0.299 * (data[i * 4] ?? 0) + 0.587 * (data[i * 4 + 1] ?? 0) + 0.114 * (data[i * 4 + 2] ?? 0);
+    sum += l; sq += l * l;
+  }
+  const mean = sum / n;
+  return mean > 14 && Math.sqrt(Math.max(0, sq / n - mean * mean)) > 5;
 }
 
 export const SEARCH_BOX: SubjectBox = { x: 0.3, y: 0.25, w: 0.4, h: 0.3 };

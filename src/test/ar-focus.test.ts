@@ -6,6 +6,9 @@ describe("AI camera per tab", () => {
   it("other tab's target falls back", () => expect(arFocusOption("vineyard", "ground").id).toBe(defaultArFocus("vineyard")));
   it("stops a vegetation scan before the AI when no vegetation is locked, never a ground scan", () => {
     expect(scanPrecheck("urban", "tree", false)).toMatch(/Nessun albero/);
+    // A usable frame without a colour lock still reaches the AI (dark foliage, shade, backlight).
+    expect(scanPrecheck("urban", "tree", false, true)).toBeNull();
+    expect(scanPrecheck("vineyard", "leaf", false, true)).toBeNull();
     expect(scanPrecheck("vineyard", "leaf", false)).toMatch(/Nessuna foglia/);
     expect(scanPrecheck("vineyard", "canopy", true)).toBeNull();
     expect(scanPrecheck("urban", "ground", false)).toBeNull();
