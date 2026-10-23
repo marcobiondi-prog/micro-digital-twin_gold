@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { arRecognitionSchema, estimateCooling, recognitionCanPlace, groundRegionAt, canEstimateRecognizedPlant } from "@/models/ar-recognition";
+import { arRecognitionSchema, estimateCooling, recognitionCanPlace, groundRegionAt, canEstimateRecognizedPlant, withPlantAlternatives } from "@/models/ar-recognition";
 import { gatewayError, readArResponse } from "@/controllers/ar-response.server";
 import { plantPhotoBounds } from "@/models/ar-plant-photo";
 
 describe("AR recognition rules", () => {
   it("estimates leaf-identified plants without requiring a contour, never an uncertain guess", () => {
-    const result = arRecognitionSchema.parse({ identification: {level:"species",leafVisible:true,evidence:"Foglia palmata a cinque lobi"}, survey:null, found:true, outline:null, label:"Acero", type:"tree", box:{x:0.1,y:0.1,w:0.5,h:0.8}, soil:null, plant:{scientificName:"Acer campestre",commonName:"Acero campestre",form:"round",heightM:6,crownM:4,evergreen:false,density:0.6} });
+    const result = arRecognitionSchema.parse({ identification: {level:"species",leafVisible:true,evidence:"Foglia palmata a cinque lobi"}, survey:null, found:true, outline:null, label:"Acero", type:"tree", box:{x:0.1,y:0.1,w:0.5,h:0.8}, soil:null, plant:{scientificName:"Acer campestre",commonName:"Acero campestre",form:"round",heightM:6,crownM:4,evergreen:false,density:0.6,alternatives:null} });
     expect(canEstimateRecognizedPlant(result)).toBe(true);
     expect(canEstimateRecognizedPlant({...result, identification:{level:"uncertain",leafVisible:false,evidence:"Foglie non distinguibili"}})).toBe(false);
     expect(canEstimateRecognizedPlant({...result, type:"object"})).toBe(false);
@@ -55,5 +55,9 @@ describe("AR recognition rules", () => {
   it("stops on a refusal even with HTTP 200", async () => {
     const response = new Response('data: {"type":"response.refusal.done","refusal":"Analysis declined"}\n\n');
     await expect(readArResponse(response)).rejects.toMatchObject({ status: 422, message: "Analysis declined", persistent: false });
+  });
+  it("defaults the look-alike species to none for older replies", () => {
+    const result = arRecognitionSchema.parse(withPlantAlternatives({ identification: null, survey: null, found: true, outline: null, label: "Pianta", type: "tree", box: { x: 0, y: 0, w: 1, h: 1 }, soil: null, plant: { scientificName: "Ficus benjamina", commonName: "Ficus", form: "round", heightM: 2, crownM: 1, evergreen: true, density: 0.7 } }));
+    expect(result.plant?.alternatives).toBeNull();
   });
 });

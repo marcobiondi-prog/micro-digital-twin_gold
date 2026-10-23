@@ -34,6 +34,8 @@ export const arRecognitionSchema = z.object({
     scientificName: z.string(), commonName: z.string(),
     form: z.enum(["columnar", "conical", "round", "umbrella", "vine", "shrub"]),
     heightM: z.number(), crownM: z.number(), evergreen: z.boolean(), density: z.number(),
+    /** Up to two look-alike species the model also considered, tried in order when the first name fails the catalogue. */
+    alternatives: z.array(z.object({ scientificName: z.string(), commonName: z.string() }).strict()).max(3).nullable(),
   }).nullable(),
   soil: z.object({
     kind: z.enum(["artificiale", "argilloso", "sabbioso", "limoso", "franco", "ghiaioso", "roccioso", "prato", "pacciamato"]),
@@ -41,6 +43,13 @@ export const arRecognitionSchema = z.object({
     plantable: z.boolean(), note: z.string(),
   }).nullable(),
 }).strict();
+
+/** A reply from the plain-JSON fallback (or an older model) may omit plant.alternatives: read it as none. */
+export function withPlantAlternatives(raw: unknown): unknown {
+  const plant = (raw as { plant?: Record<string, unknown> | null } | null)?.plant;
+  if (plant && typeof plant === "object" && !("alternatives" in plant)) plant["alternatives"] = null;
+  return raw;
+}
 
 export function estimateCooling(crownM: number, density: number, evergreen: boolean) {
   const shadeM2 = Math.PI * (crownM / 2) ** 2;

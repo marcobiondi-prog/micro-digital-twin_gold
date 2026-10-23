@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { arRecognitionSchema, canEstimateRecognizedPlant, estimateCooling, type GroundSurvey } from "@/models/ar-recognition";
+import { arRecognitionSchema, canEstimateRecognizedPlant, estimateCooling, withPlantAlternatives, type GroundSurvey } from "@/models/ar-recognition";
 import { ArGatewayError, readArResponse } from "@/controllers/ar-response.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { aiConfigured, aiResponses } from "@/lib/ai-responses";
@@ -66,7 +66,7 @@ Aggiungi outline al livello principale del JSON anche quando plant:null: un poli
 Rispondi SOLO con JSON:
 type: "tree" per alberi, arbusti, siepi, piante erbacee e in vaso; "vine" per la vite e i rampicanti; "object" SOLO se non è una pianta.
 {"found":true,"label":"nome comune italiano","type":"tree|vine|object","box":{"x":0-1,"y":0-1,"w":0-1,"h":0-1},
-"plant":{"scientificName":"Genere specie","commonName":"nome comune italiano","form":"columnar|conical|round|umbrella|vine|shrub","heightM":numero,"crownM":diametro chioma tipica indicativa in metri,"evergreen":true|false,"density":0-1 densità fogliare}}
+"plant":{"scientificName":"Genere specie","commonName":"nome comune italiano","form":"columnar|conical|round|umbrella|vine|shrub","heightM":numero,"crownM":diametro chioma tipica indicativa in metri,"evergreen":true|false,"density":0-1 densità fogliare,"alternatives":[fino a 2 {"scientificName","commonName"} di specie simili che hai considerato, dalla più probabile; [] se nessuna]}}
 Aggiungi SEMPRE (anche con found:false) la superficie del terreno visibile:
 "soil":{"kind":"artificiale|argilloso|sabbioso|limoso|franco|ghiaioso|roccioso|prato|pacciamato","label":"descrizione breve italiana (es. asfalto, terra argillosa compatta)","permeability":"bassa|media|alta","plantable":true|false,"note":"consiglio breve per piantare"} oppure "soil":null se il terreno non è visibile.
 "artificiale" = asfalto, cemento, pavimentazione, erba sintetica.
@@ -185,7 +185,7 @@ async function recognize(data: z.infer<typeof detectInput>): Promise<DetectResul
     });
   let p: z.infer<typeof arRecognitionSchema>;
   try {
-    p = arRecognitionSchema.parse(JSON.parse(await readArResponse(res)));
+    p = arRecognitionSchema.parse(withPlantAlternatives(JSON.parse(await readArResponse(res))));
   } catch (error) {
     if (error instanceof ArGatewayError) {
       if (error.persistent) {
@@ -224,10 +224,20 @@ async function recognize(data: z.infer<typeof detectInput>): Promise<DetectResul
   let species: NonNullable<Detection>["species"] = null;
   let cooling: NonNullable<Detection>["cooling"] = null;
   const pl = p.plant;
-  if (pl && canEstimateRecognizedPlant(p) && pl.scientificName.trim()) {
-    const sci = pl.scientificName.trim().replace(/\s+/g, " ").slice(0, 80);
-    const [gbifMatch, col] = await Promise.all([gbif(sci), catalogueOfLife(sci)]);
-    const g = col && gbifMatch && !sameBotanicalName(col.name, gbifMatch.name) ? null : gbifMatch;
+  // A plant the model labelled "object" (a shrub, a potted plant) is still a plant for the estimate.
+  if (pl && canEstimateRecognizedPlant({ ...p, type: type === "object" ? "tree" : type }) && pl.scientificName.trim()) {
+    // The first name the catalogues confirm wins: the model's pick, then its look-alikes in order, so a
+    // misspelt or unlisted first guess no longer leaves the scan without a species.
+    const candidates = [{ scientificName: pl.scientificName, commonName: pl.commonName }, ...(pl.alternatives ?? []).slice(0, 2)]
+      .map((c) => ({ sci: c.scientificName.trim().replace(/\s+/g, " ").slice(0, 80), common: c.commonName }))
+      .filter((c, i, all) => c.sci.length > 1 && all.findIndex((o) => sameBotanicalName(o.sci, c.sci)) === i);
+    let g: Awaited<ReturnType<typeof gbif>> = null, col: Awaited<ReturnType<typeof catalogueOfLife>> = null, sci = candidates[0]?.sci ?? "", common = pl.commonName;
+    for (const c of candidates) {
+      const [gbifMatch, colMatch] = await Promise.all([gbif(c.sci), catalogueOfLife(c.sci)]);
+      g = colMatch && gbifMatch && !sameBotanicalName(colMatch.name, gbifMatch.name) ? null : gbifMatch;
+      col = colMatch;
+      if (g || col) { sci = c.sci; common = c.common; break; }
+    }
     if (!g && !col) return { soil, survey, detection: {label:p.label, type, box:p.box, outline:null, identification:p.identification, species:null, cooling:null} };
     const form: GrowthForm = FORMS.includes(pl.form) ? pl.form : type === "vine" ? "vine" : "round";
     const crownM = num(pl.crownM, 0.3, 30, 4);
@@ -235,7 +245,7 @@ async function recognize(data: z.infer<typeof detectInput>): Promise<DetectResul
     const evergreen = Boolean(pl.evergreen);
     const scientificName = col?.name ?? g?.name ?? sci;
     species = {
-      commonName: String(pl.commonName ?? p.label ?? sci).slice(0, 40),
+      commonName: String(common || p.label || sci).slice(0, 40),
       scientificName,
       family: col?.family ?? g?.family ?? null,
       gbifKey: g?.key ?? null,
