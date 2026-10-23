@@ -13,7 +13,7 @@ import { syncAppOrientation } from "@/lib/ar-orientation";
 import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
 import { installUiClicks } from "@/lib/ui-sounds";
 import { reloadFresh } from "@/router";
-import { Home, BookOpen, FlaskConical, LayoutDashboard, Library } from "lucide-react";
+import { Home, Building2, Grape, LayoutDashboard } from "lucide-react";
 
 function NotFoundComponent() {
   return (
@@ -101,25 +101,23 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 const nav = [
-  { to: "/", l: "Panoramica" },
-  { to: "/casi", l: "Casi studio" },
-  { to: "/lab", l: "Decision Lab" },
+  { to: "/", l: "Home" },
+  { to: "/urbano", l: "Simulazione urbana" },
+  { to: "/vigneto", l: "Simulazione vigneto" },
   { to: "/dashboard", l: "Dashboard" },
-  { to: "/fonti", l: "Fonti" },
 ] as const;
 
 const NAV_H = 49;
 
 const bottomItems = [
-  { to: "/", l: "Panoramica", I: Home },
-  { to: "/casi", l: "Casi", I: BookOpen },
-  { to: "/lab", l: "Lab", I: FlaskConical },
+  { to: "/", l: "Home", I: Home },
+  { to: "/urbano", l: "Urbano", I: Building2 },
+  { to: "/vigneto", l: "Vigneto", I: Grape },
   { to: "/dashboard", l: "Dashboard", I: LayoutDashboard },
-  { to: "/fonti", l: "Fonti", I: Library },
 ] as const;
 
 // Keep history flat: sections replace each other, so the back gesture from
-// any section returns to Panoramica instead of the previously visited tab.
+// any section returns to Home instead of the previously visited tab.
 function goHomeBack(e: { preventDefault: () => void }, to: string, pathname: string) {
   if (to !== "/" || pathname === "/") return false;
   if ((window.history.state?.__TSR_index ?? 0) > 0) {
@@ -172,7 +170,7 @@ function BottomNav() {
   }, [pathname]);
   return (
     <nav aria-label="Menu principale" className={`bar-liquid fixed inset-x-0 bottom-0 z-[999999998] pb-[env(safe-area-inset-bottom)] transition-transform duration-300 motion-reduce:transition-none sm:hidden ${hidden ? "translate-y-full" : "translate-y-0"}`}>
-      <ul className="grid grid-cols-5">
+      <ul className="grid grid-cols-4">
         {bottomItems.map(({ to, l, I }) => {
           const active = pathname === to;
           return (
@@ -259,7 +257,7 @@ function SmartNav() {
     });
     return () => cancelAnimationFrame(frame);
   }, [pathname]);
-  // Tapping the item that is already active (e.g. Panoramica again) does not
+  // Tapping the item that is already active (e.g. Home again) does not
   // change the pathname, so the effect above would not run; center it here.
   // Taps on other items are centered by the effect once the route changes.
   const centerTapped = (el: HTMLElement, isActive: boolean) => {
@@ -357,9 +355,9 @@ function RootComponent() {
       })();
       return;
     }
-    // A fresh open of the app always lands on the Panoramica (/). This effect
+    // A fresh open of the app always lands on Home (/). This effect
     // runs once per document load, so only the opening page redirects; in-app
-    // navigation to /lab, /dashboard, ... keeps working as before.
+    // navigation to /urbano, /vigneto, /dashboard keeps working as before.
     // The move waits a beat: leaving the page while its data is still arriving
     // pulls a match out of the router mid-render and the router throws on a
     // missing routeId.

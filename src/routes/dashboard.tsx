@@ -429,7 +429,7 @@ function VineDash() {
         <Metric label="Sonda 20 cm" value={probeData.at(-1)!.s20} unit="%" color="var(--water)" hint="Umidità volumetrica" />
         <Metric label="Sonda 50 cm" value={probeData.at(-1)!.s50} unit="%" color="var(--urban)" hint="Umidità volumetrica" />
       </div>
-      <p className="mt-3 text-xs text-muted-foreground">I valori seguono in tempo reale il Decision Lab e i cursori di "Irrigazione di soccorso" (valori dimostrativi).</p>
+      <p className="mt-3 text-xs text-muted-foreground">I valori seguono in tempo reale la simulazione e i cursori di "Irrigazione di soccorso" (valori dimostrativi).</p>
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <Card><div className="dashboard-card-title">Sonde umidità multilivello <span>· 14 giorni</span></div>
           <ChartKey items={[{ label: "20 cm", color: "var(--water)" }, { label: "50 cm", color: "var(--urban)" }, { label: `Obiettivo ${tgt}%`, color: "var(--vine)" }]} />
@@ -564,7 +564,7 @@ function Exec() {
     ...ir.notes.slice(0, 6).map((n): [string, string] => [`Quaderno ${n.d}`, n.t]),
     ...v.zones.map((z, i): [string, string] => [`Zona ${i + 1}`, `stress ${Math.round(vm.results[i]?.s ?? 0)} (${vm.results[i]?.risk ?? "-"})`]),
   ];
-  const text = [`MICRO DIGITAL TWIN`, `REPORT SINTETICO DECISIONI — ${ctx}`, `Data: ${stamp}`, "", "Valori dal Decision Lab:", ...labRows.map(([k, x]) => `- ${k}: ${x}`), "", "Indici normalizzati:", ...idx.map(([k, x]) => `- ${k}: ${x}/100 (${lv(x as number)})`), "", ...(ctx === "Urbano" ? ["Dashboard Urbana:", ...urbanDashRows.map(([k, x]) => `- ${k}: ${x}`)] : ["Bilancio idrico (m³):", ...water.map((w) => `- ${w.m}: domanda ${w.domanda}, disponibile ${w.disponibile}, saldo ${w.disponibile - w.domanda}`), "", "Dashboard Vitivinicola:", ...vineDashRows.map(([k, x]) => `- ${k}: ${x}`)]), ...(scanRows.length ? ["", "Scansioni fotocamera AI:", ...scanRows.map(([k, x]) => `- ${k}: ${x}`)] : []), "", "Nota: valori dimostrativi, da validare con un tecnico."].join("\n");
+  const text = [`MICRO DIGITAL TWIN`, `REPORT SINTETICO DECISIONI — ${ctx}`, `Data: ${stamp}`, "", "Valori dalle simulazioni:", ...labRows.map(([k, x]) => `- ${k}: ${x}`), "", "Indici normalizzati:", ...idx.map(([k, x]) => `- ${k}: ${x}/100 (${lv(x as number)})`), "", ...(ctx === "Urbano" ? ["Dashboard Urbana:", ...urbanDashRows.map(([k, x]) => `- ${k}: ${x}`)] : ["Bilancio idrico (m³):", ...water.map((w) => `- ${w.m}: domanda ${w.domanda}, disponibile ${w.disponibile}, saldo ${w.disponibile - w.domanda}`), "", "Dashboard Vitivinicola:", ...vineDashRows.map(([k, x]) => `- ${k}: ${x}`)]), ...(scanRows.length ? ["", "Scansioni fotocamera AI:", ...scanRows.map(([k, x]) => `- ${k}: ${x}`)] : []), "", "Nota: valori dimostrativi, da validare con un tecnico."].join("\n");
   // Report PDF con intestazione del sito e grafica coerente con l'app (usato da Scarica e Stampa).
   async function buildPdfImpl() {
     await step("Preparazione del report…", 5);
@@ -638,7 +638,7 @@ function Exec() {
       doc.setTextColor(255, 255, 255); doc.text(lvl, cx + 30, y + 19);
     });
     y += 38;
-    section("Valori dal Decision Lab");
+    section("Valori dalle simulazioni");
     table(labRows);
     // Grafico a barre del bilancio idrico (solo report vitivinicolo).
     if (ctx === "Vitivinicolo") {
@@ -666,7 +666,7 @@ function Exec() {
     else { section("Dashboard Vitivinicola"); table(vineDashRows); }
     // Scansioni della fotocamera AI: ognuna resta nel report anche senza foto (stime indicative).
     if (scanRows.length) { section(`Scansioni fotocamera AI - ${ctx}`); table(scanRows); }
-    // Foto e video caricati nel Decision Lab (elenco + miniature delle foto).
+    // Foto e video caricati nelle simulazioni (elenco + miniature delle foto).
     const { currentMedia } = await import("@/models/lab-media-store");
     const toData = async (url: string) => {
       try {
@@ -889,7 +889,7 @@ function Exec() {
           <Card key={k as string} className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 sm:gap-4 lift"><Ring value={v as number} size={100} stroke={10} color={levelColor(v as number)}><span className="font-display text-2xl font-semibold">{v}</span></Ring><div className="min-w-0"><div className="dashboard-long-label font-semibold">{k}</div><StatusBadge level={lv(v as number)} /></div></Card>
         ))}
       </div>
-      <Card className="mt-4"><div className="text-sm font-semibold">Valori dal Decision Lab <span className="font-normal text-muted-foreground">· in tempo reale</span></div>
+      <Card className="mt-4"><div className="text-sm font-semibold">Valori dalle simulazioni <span className="font-normal text-muted-foreground">· in tempo reale</span></div>
         <div className="mt-3 space-y-2 text-sm">{labRows.map(([k, x]) => <div key={k} className="dashboard-detail-row"><span className="text-muted-foreground">{k}</span><b>{x}</b></div>)}</div>
       </Card>
       <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1.45fr)_minmax(15rem,0.75fr)]">
@@ -921,9 +921,9 @@ function Dashboard() {
         <LabSyncIndicator className="mb-2 max-w-full" />
         <Pills options={["Urbana", "Vitivinicola", "Esecutivo"] as const} value={t} onChange={setT} className="w-full flex-nowrap overflow-x-auto" />
         {t === "Urbana"
-          ? <AreaBanner label={lab.urban.location.label} lat={lab.urban.location.lat} lng={lab.urban.location.lng} detail={`Area di intervento dal Decision Lab · ${lab.urban.trees} alberi, ${lab.urban.permeable}% suolo, ${lab.urban.shade}% ombra`} />
+          ? <AreaBanner label={lab.urban.location.label} lat={lab.urban.location.lat} lng={lab.urban.location.lng} detail={`Area di intervento dalla simulazione · ${lab.urban.trees} alberi, ${lab.urban.permeable}% suolo, ${lab.urban.shade}% ombra`} />
           : t === "Vitivinicola"
-            ? <AreaBanner label={lab.vineyard.location.label} lat={lab.vineyard.location.lat} lng={lab.vineyard.location.lng} detail={`Fase ${lab.vineyard.phase} · Zona ${lab.vineyard.selected + 1} selezionata nel Decision Lab`} />
+            ? <AreaBanner label={lab.vineyard.location.label} lat={lab.vineyard.location.lat} lng={lab.vineyard.location.lng} detail={`Fase ${lab.vineyard.phase} · Zona ${lab.vineyard.selected + 1} selezionata nella simulazione`} />
             : null}
       </div>
       <div key={t} className="min-w-0">{loading

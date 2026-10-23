@@ -20,9 +20,9 @@
 - MVC: models hold data/formulas/store, controllers are server functions, views are features, routes are pages, ui/lib are shared primitives.
 - Shared logo header stays in normal flow on every page and size; the pinned menu's --nav-h counts only its own height.
 - Offline PWA: generateSW at dist/client/sw.js, registered only via src/lib/register-sw.ts (refuses dev/preview/iframe).
-- Tabs replace history; Back returns to Panoramica. Account/Compare use use-back-close; fresh-open return awaits landing to avoid router crashes.
+- Home is pared down to a title and two start cards. The two simulations are separate pages, /urbano and /vigneto (views/LabFlows.tsx: UrbanFlow/VineyardFlow keep every Lab tool: real data, Copernicus, sensors, media and AI camera, location search and maps, Compare; no flow switch). Menu: Home, Simulazione urbana, Simulazione vigneto, Dashboard (Casi studio and Fonti removed). Tabs replace history; Back returns to Home.
 - Timed email-demo progress stays in local presentation state, not saved decisions; stages derive from entity decisions, Realizzato needs explicit completion; external approvals render below chart/summary.
-- Shared scenarios use a base64 ?scenario= param on / (sections redirect there on fresh open); Panoramica applies it and passes the flow to Lab via sessionStorage.
+- Shared scenarios use a base64 ?scenario= param on / (sections redirect there on fresh open); Home applies it and opens /urbano or /vigneto.
 - Vineyard stress index: shared component; in the controls panel on phone/desktop, a full-width strip under grid+controls on tablet.
 - Compare: stable baselines, snapshot resets; vineyard highlight = card closest to sliders, shared bounds.
 - Mount dialogs closed, then open via state; StrictMode's double mount makes useBackClose close initially open dialogs.

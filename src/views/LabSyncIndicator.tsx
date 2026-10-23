@@ -23,7 +23,7 @@ export function LabSyncIndicator({ className }: { className?: string }) {
           ? "Salvataggio e aggiornamento dashboard…"
           : time
             ? <span>Ultima sincronizzazione completata alle {time}</span>
-            : "Dati del Decision Lab sincronizzati"}
+            : "Dati delle simulazioni sincronizzati"}
       </span>
     </div>
   );

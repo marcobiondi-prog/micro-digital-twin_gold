@@ -1,5 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { ArrowRight, Building2, FlaskConical, Grape, Send, CloudSun } from "lucide-react";
 import { toast } from "sonner";
 import { Card, SectionTitle, StatusBadge } from "@/views/health";
@@ -12,7 +11,7 @@ import { SensorAdvisor } from "@/views/SensorAdvisor";
 import { CopernicusPanel } from "@/views/CopernicusPanel";
 import { RealClimatePanel } from "@/views/RealClimatePanel";
 import { LabMedia } from "@/views/LabMedia";
-import { SimulationGrid, ModeSelector, splitLocation, ImportWeatherButton } from "@/views/SimulationGrid";
+import { SimulationGrid, splitLocation, ImportWeatherButton } from "@/views/SimulationGrid";
 import { comparison, levelTone, nextPhase, piazzaEstimate, prototypeChoice, type PrototypeId } from "@/models/scenarios";
 import { applyVineyardScenario, closestVineyardScenario, vineyardControlValue, vineyardScenarioSteps } from "@/models/vineyard-controls";
 import { resetUrban, resetVineyard, setUrban, setVineyard, useLab, vineMetrics, vineyardSituation, type LabState } from "@/models/lab-store";
@@ -20,23 +19,6 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { getRealClimate } from "@/controllers/climate.functions";
-import { LAB_FLOW_KEY } from "@/views/ScenarioTools";
-
-export const Route = createFileRoute("/lab")({
-  head: () => ({
-    meta: [
-      { title: "MICRO DIGITAL TWIN — Decision Lab" },
-      { name: "description", content: "Simula interventi urbani a Campobasso e monitora le parcelle vitivinicole delle Colline del Molise." },
-      { property: "og:title", content: "MICRO DIGITAL TWIN — Decision Lab" },
-      { property: "og:description", content: "Scenari climatici, aree geolocalizzate e confronto degli interventi per piazza e vigneto." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-  }),
-  component: Lab,
-});
-
-type Flow = "Flusso Urbano" | "Flusso Vitivinicolo";
 
 type UrbanScenario = {
   name: string;
@@ -275,51 +257,8 @@ function ComparisonDialog({ children, matrix, onImportWeather }: { children: Rea
   );
 }
 
-/** Posizione e larghezza del selettore di flusso: la copia bloccata le ricalca, così non cambia dimensione. */
-type PinState = { pinned: boolean; width: number; left: number };
-const PIN_OFF: PinState = { pinned: false, width: 0, left: 0 };
-
-/** Vero quando il selettore di flusso dentro il pannello è scivolato sopra la barra sticky di Confronta. */
-function useModeSelectorPin(pageRef: RefObject<HTMLDivElement | null>, flow: Flow) {
-  const [pin, setPin] = useState<PinState>(PIN_OFF);
-  useEffect(() => {
-    const page = pageRef.current;
-    const sentinel = page?.querySelector<HTMLElement>("[data-mode-selector]");
-    const bar = page?.querySelector<HTMLElement>(".lab-summary");
-    const track = page?.querySelector<HTMLElement>("[data-mode-pin-track]");
-    if (!sentinel || !bar || !track) { setPin((prev) => (prev.pinned ? { ...prev, pinned: false } : prev)); return; }
-    let frame = 0;
-    const check = () => {
-      frame = 0;
-      const box = sentinel.getBoundingClientRect();
-      const next = box.bottom <= bar.getBoundingClientRect().bottom + 2;
-      const width = Math.round(box.width);
-      const left = Math.round(box.left - track.getBoundingClientRect().left);
-      setPin((prev) => (prev.pinned === next && prev.width === width && prev.left === left ? prev : { pinned: next, width, left }));
-    };
-    const schedule = () => { if (!frame) frame = requestAnimationFrame(check); };
-    check();
-    window.addEventListener("scroll", schedule, { passive: true });
-    window.addEventListener("resize", schedule);
-    return () => { window.removeEventListener("scroll", schedule); window.removeEventListener("resize", schedule); if (frame) cancelAnimationFrame(frame); };
-  }, [pageRef, flow]);
-  return pin;
-}
-
-/** Riga dedicata sotto Confronta: il selettore di flusso resta raggiungibile mentre si scorre. */
-function PinnedModeBar({ activeMode, onModeChange, pin }: { activeMode: "urban" | "vineyard"; onModeChange: (mode: "urban" | "vineyard") => void; pin: PinState }) {
-  return (
-    <div data-mode-pin-row="" inert={!pin.pinned} aria-hidden={!pin.pinned} className={cn("absolute inset-x-0 top-full z-10 border-b bg-background px-4 py-2 transition-opacity duration-200 md:hidden", pin.pinned ? "opacity-100" : "pointer-events-none opacity-0")}>
-      <div data-mode-pin-track="" className="w-full">
-        <div style={pin.width ? { width: pin.width, marginLeft: Math.max(0, pin.left) } : undefined}>
-          <ModeSelector pinned activeMode={activeMode} onModeChange={onModeChange} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function UrbanFlow({ onModeChange, pinnedMode }: { onModeChange: (mode: "urban" | "vineyard") => void; pinnedMode: PinState }) {
+/** Simulazione urbana completa: riepilogo con Confronta, dati reali, media, griglia. */
+export function UrbanFlow() {
   const [compareOpen, setCompareOpen] = useState(false);
   const [pinned, setPinned] = useState<PrototypeId | null>(null);
   const [baseline, setBaseline] = useState<LabState["urban"] | null>(null);
@@ -370,14 +309,13 @@ function UrbanFlow({ onModeChange, pinnedMode }: { onModeChange: (mode: "urban" 
             <CompareButton level={activeLevel} onClick={showComparison} />
           </div>
         </Card>
-        <PinnedModeBar activeMode="urban" onModeChange={onModeChange} pin={pinnedMode} />
       </div>
 
       <RealClimatePanel kind="urban" />
       <CopernicusPanel kind="urban" />
       <SensorAdvisor kind="urban" />
       <LabMedia kind="urban" context={`Scenario: ${comparison.find((l) => l.id === activeLevel)?.s ?? "attuale"}`} />
-      <SimulationGrid onReset={restoreScenario} mode="urban" activeLevel={activeLevel} activeMode="urban" onModeChange={onModeChange} trees={trees} permeable={permeable} shade={shade} onTreesChange={setTrees} onPermeableChange={setPermeable} onShadeChange={setShade} />
+      <SimulationGrid onReset={restoreScenario} mode="urban" activeLevel={activeLevel} trees={trees} permeable={permeable} shade={shade} onTreesChange={setTrees} onPermeableChange={setPermeable} onShadeChange={setShade} />
       <Dialog open={compareOpen} onOpenChange={setCompareOpen}>
         <ComparisonDialog onImportWeather={importRealWeather} matrix={<PrototypeMatrix kind="urban" activeLevel={activeLevel} />}><ComparisonTable realTemp={urban.realTemp} place={place} trees={base.trees} permeable={base.permeable} shade={base.shade} activeLevel={activeLevel} onApply={applyScenario} /></ComparisonDialog>
       </Dialog>
@@ -385,7 +323,8 @@ function UrbanFlow({ onModeChange, pinnedMode }: { onModeChange: (mode: "urban" 
   );
 }
 
-function VineyardFlow({ onModeChange, pinnedMode }: { onModeChange: (mode: "urban" | "vineyard") => void; pinnedMode: PinState }) {
+/** Simulazione del vigneto completa: riepilogo con Confronta e invio, dati reali, media, griglia. */
+export function VineyardFlow() {
   const [send, setSend] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [pinned, setPinned] = useState<PrototypeId | null>(null);
@@ -443,37 +382,19 @@ function VineyardFlow({ onModeChange, pinnedMode }: { onModeChange: (mode: "urba
             <CompareButton level={activeLevel} onClick={showComparison} className="sm:mr-1" /><Button size="sm" onClick={() => setSend(true)} aria-label="Invia i dati all’agronomo" className="rounded-full bg-vine px-2.5 hover:bg-vine/90 min-[380px]:px-3 sm:h-10 sm:px-4"><Send /><span className="hidden min-[380px]:inline sm:hidden">Invia</span><span className="hidden sm:inline">Invia i dati all’agronomo</span></Button>
           </div>
         </Card>
-        <PinnedModeBar activeMode="vineyard" onModeChange={onModeChange} pin={pinnedMode} />
       </div>
 
       <RealClimatePanel kind="vineyard" />
       <CopernicusPanel kind="vineyard" />
       <SensorAdvisor kind="vineyard" />
       <LabMedia kind="vineyard" context={`${vineyard.allZones ? "Tutte le zone" : `Zona ${vineyard.selected + 1}`} · ${vineyard.phase}`} />
-      <SimulationGrid onZonesEdit={onZonesEdit} onReset={restoreScenario} mode="vineyard" activeLevel={activeLevel} activeMode="vineyard" onModeChange={onModeChange} />
+      <SimulationGrid onZonesEdit={onZonesEdit} onReset={restoreScenario} mode="vineyard" activeLevel={activeLevel} />
       <Dialog open={compareOpen} onOpenChange={setCompareOpen}>
         <ComparisonDialog onImportWeather={importRealWeather} matrix={<PrototypeMatrix kind="vineyard" activeLevel={activeLevel} />}><VineComparison v={vineyard} base={base} activeLevel={activeLevel} onApply={applyScenario} /></ComparisonDialog>
       </Dialog>
       <Dialog open={send} onOpenChange={setSend}>
         <DialogContent><DialogHeader><DialogTitle>Inviare i dati all’agronomo?</DialogTitle></DialogHeader><p className="text-sm text-muted-foreground">Verranno condivisi i dati delle tre zone, con la Zona 3 segnalata a livello di attenzione. L’invio è dimostrativo.</p><DialogFooter><Button variant="secondary" onClick={() => setSend(false)}>Annulla</Button><Button className="bg-vine hover:bg-vine/90" onClick={() => { setSend(false); toast.success("Dati inviati all’agronomo"); }}>Invia</Button></DialogFooter></DialogContent>
       </Dialog>
-    </div>
-  );
-}
-
-function Lab() {
-  const [flow, setFlow] = useState<Flow>("Flusso Urbano");
-  const pageRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const f = sessionStorage.getItem(LAB_FLOW_KEY);
-    if (f) { sessionStorage.removeItem(LAB_FLOW_KEY); setFlow(f === "vineyard" ? "Flusso Vitivinicolo" : "Flusso Urbano"); }
-  }, []);
-  const pinned = useModeSelectorPin(pageRef, flow);
-  const changeMode = (mode: "urban" | "vineyard") => setFlow(mode === "urban" ? "Flusso Urbano" : "Flusso Vitivinicolo");
-  return (
-    <div ref={pageRef} className="lab-page">
-      <div className="lab-intro"><SectionTitle eyebrow="Prototipo concettuale" title="Decision Lab" desc="Due luoghi, tre livelli di prototipazione: dal Wizard of Oz a costo zero all’MVP sostenibile, fino alla Roadmap 4.0. I risultati sono indicativi e richiedono verifica tecnica." /></div>
-      {flow === "Flusso Urbano" ? <UrbanFlow onModeChange={changeMode} pinnedMode={pinned} /> : <VineyardFlow onModeChange={changeMode} pinnedMode={pinned} />}
     </div>
   );
 }
