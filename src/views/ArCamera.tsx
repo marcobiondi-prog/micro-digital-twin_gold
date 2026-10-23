@@ -839,10 +839,10 @@ export function ArCamera({
   const specimenDock = !scanning && species?.cooling && (
     <div className="ar-specimen-dock" data-camera-controls data-collapsed={balanceMin || undefined} aria-label="Esemplari e raffrescamento stimato">
       {/* Smartphones only (CSS hides it on tablets): fold the balance like an accordion, keeping a one-line summary;
-          the header stays put and the body unfolds from top to bottom. */}
+          the header stays put at the bottom and the body unfolds from bottom to top. */}
       <button type="button" className="ar-dock-toggle" aria-expanded={!balanceMin} aria-controls="ar-balance-body" onClick={() => setBalanceMin((v) => !v)}>
         <span>Bilancia termica{balanceMin ? ` · ${count} esemplari · ${readout.after !== null ? `${fmtC(readout.after, readout.digits)} °C` : coolingLabel(coolingNow)}` : ""}</span>
-        {balanceMin ? <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" /> : <ChevronUp className="size-3.5 shrink-0" aria-hidden="true" />}
+        {balanceMin ? <ChevronUp className="size-3.5 shrink-0" aria-hidden="true" /> : <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" />}
       </button>
       <div id="ar-balance-body" className="ar-dock-body" inert={balanceMin || undefined}>
       {greenControls}
