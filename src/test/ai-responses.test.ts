@@ -4,7 +4,7 @@ import { aiResponses } from "@/lib/ai-responses";
 import { readArResponse } from "@/controllers/ar-response.server";
 import { arRecognitionSchema } from "@/models/ar-recognition";
 
-const recognition = { identification: { level: "genus", leafVisible: true, evidence: "Foglie palmate lobate" }, survey: null, found: true, outline: null, label: "Acero", type: "tree", box: { x: 0.1, y: 0.1, w: 0.5, h: 0.8 }, soil: null, plant: { scientificName: "Acer", commonName: "Acero", form: "round", heightM: 8, crownM: 5, evergreen: false, density: 0.6 } };
+const recognition = { identification: { level: "genus", leafVisible: true, evidence: "Foglie palmate lobate" }, survey: null, found: true, outline: null, label: "Acero", type: "tree", box: { x: 0.1, y: 0.1, w: 0.5, h: 0.8 }, soil: null, plant: { scientificName: "Acer", commonName: "Acero", form: "round", heightM: 8, crownM: 5, evergreen: false, density: 0.6, alternatives: [{ scientificName: "Acer campestre", commonName: "Acero campestre" }] } };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 const reply = (text: string, finishReason = "STOP") => json({ candidates: [{ finishReason, content: { parts: [{ text: "ragionamento", thought: true }, { text }] } }] });
 const cameraRequest = () => aiResponses({

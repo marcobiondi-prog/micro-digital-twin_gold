@@ -671,7 +671,8 @@ export function ArCamera({
         logScan("Terreno analizzato · nessuna specie identificata", null, r.soil ?? null);
         return;
       }
-      setRealPhoto(cropRealPhoto(small, d.box));
+      // Only a recognized species keeps the scan's photo (Esito, report); an unrecognized plant records nothing.
+      if (d.species) setRealPhoto(cropRealPhoto(small, d.box));
       const cutout = d.outline ? await extractPlantPhoto(image, d.outline) : null;
       if (version !== scanVersion.current) return;
       plantPhoto.current = cutout;
@@ -696,8 +697,9 @@ export function ArCamera({
         ? `${d.species.commonName} · ${d.identification?.level === "genus" ? "genere probabile" : "specie probabile"}`
         : `${d.label} · specie incerta, inquadra una foglia da vicino`;
       setFound(outcome);
-      // The report keeps a lighter copy (about 20-30 kB), so a reload keeps each scan's photo in Esito.
-      logScan(outcome, identified, r.soil ?? null, cropRealPhoto(small, d.box, SCAN_PHOTO_PX, 0.72));
+      // The report keeps a lighter copy (about 20-30 kB), so a reload keeps each scan's photo in Esito. An
+      // unrecognized plant is not a scan: no record, so the counter does not move and no photo is kept.
+      if (identified) logScan(outcome, identified, r.soil ?? null, cropRealPhoto(small, d.box, SCAN_PHOTO_PX, 0.72));
       // The reference photo comes after the scan (the scan, and its sound, never wait on the databases): the
       // server asks Kew/GBIF, the phone retries GBIF if that finds none; it then fills Esito and the record.
       if (identified) {
