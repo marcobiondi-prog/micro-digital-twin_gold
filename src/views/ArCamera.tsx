@@ -4,7 +4,7 @@ import { Activity, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Inf
 import { supportsCameraTorch, setCameraTorch } from "@/lib/camera-torch";
 import { detectArObject, type Detection, type Soil } from "@/controllers/ar-detect.functions";
 import type { ReferencePhoto, ReferenceVideo } from "@/models/ar-reference-photo";
-import { findSubject, SEARCH_BOX, smoothBox, type SubjectBox } from "@/lib/ar-subject-tracker";
+import { findSubject, frameUsable, SEARCH_BOX, smoothBox, type SubjectBox } from "@/lib/ar-subject-tracker";
 import { extractPlantPhoto } from "@/views/ar-plant-photo";
 
 type D = NonNullable<Detection>;
@@ -56,7 +56,7 @@ import { loadCopernicus } from "@/views/copernicus-client";
 import { coolingAmount, coolingLabel, coolingReadout, scannedSpecimenThermal, scannedSpecimenCount, MAX_SCANNED_SPECIMENS, type PlacementCooling } from "@/models/ar-placement";
 import { loadAirTemperature } from "@/views/air-temp-client";
 import { clearScans, recordScan, scanClip, scanPhoto, setScanClip, updateScan, useArScans, type ScanRecord } from "@/models/ar-scan-log";
-import { recordScanClip } from "@/lib/scan-clip";
+import { recordScanClip, SCAN_CLIP_MS } from "@/lib/scan-clip";
 import { cameraRotatesNatively, enterCameraChrome, exitCameraChrome, fullscreenExitIsBack } from "@/lib/camera-chrome";
 
 type Mode = "photo" | "video";
@@ -250,6 +250,8 @@ export function ArCamera({
   // The reticle follows greens and bark browns (trunks); the scan gate for vine leaf/canopy
   // counts green alone, so wooden furniture moves the reticle but never unlocks the AI.
   const greenLockRef = useRef(false);
+  // Whether the latest frame shows anything (not black or flat): an unlocked scan still goes to the AI then.
+  const frameUsableRef = useRef(false);
   useEffect(() => {
     if (!mode || !ready) return;
     const sample = document.createElement("canvas");
@@ -267,6 +269,7 @@ export function ArCamera({
       // Stesso ritaglio "a riempimento" dell'anteprima: il mirino coincide con ciò che si vede.
       drawCameraVideo(g, video, W, H, -rotationRef.current, digitalZoomRef.current);
       const pixels = g.getImageData(0, 0, W, H).data;
+      frameUsableRef.current = frameUsable(pixels, W, H);
       const found = findSubject(pixels, W, H, locked ? box : null);
       if (found) { hits++; misses = 0; } else { misses++; hits = 0; }
       if (findSubject(pixels, W, H, null, { bark: false })) { greenHits++; greenMisses = 0; } else { greenMisses++; greenHits = 0; }
@@ -616,7 +619,7 @@ export function ArCamera({
     try {
       // A vegetation target with no vegetation in the frame never calls the AI: a short visible scan
       // (sweep and sound) confirms the tap, then it stops with the section's message.
-      const nothingToScan = scanPrecheck(kind, target, arFocusOption(kind, target).id === "tree" ? subjectLocked : greenLockRef.current);
+      const nothingToScan = scanPrecheck(kind, target, arFocusOption(kind, target).id === "tree" ? subjectLocked : greenLockRef.current, frameUsableRef.current);
       if (nothingToScan) {
         playCameraSound("scan-start", 1.8);
         await new Promise((resolve) => window.setTimeout(resolve, PRECHECK_SCAN_MS));
@@ -1511,8 +1514,9 @@ function thermal(g: CanvasRenderingContext2D, w: number, h: number, taps: { x: n
 /** Real photo of the scanned plant: the recognition frame cropped to the detection box with a small margin. */
 /**
  * Esito media: the species' reference photo of the whole plant from the botanical database (Kew, else GBIF)
- * with its credit, the scan's mini video (else its photo) as an inset, and the Wikimedia Commons video of the
- * species when one exists. Without a database photo the scan photo (or the mini video) takes the frame.
+ * with its credit and the scan photo as an inset; then the scan's mini video (short in length, full width,
+ * looping and muted) and the Wikimedia Commons video of the species when one exists. Without a database photo
+ * the scan photo takes the frame.
  */
 function EsitoPhoto({ reference, video, scan, clip, name }: { reference: ReferencePhoto | null; video: ReferenceVideo | null; scan: string | null; clip: string | null; name: string | null }) {
   const [failed, setFailed] = useState<string | null>(null);
@@ -1520,20 +1524,18 @@ function EsitoPhoto({ reference, video, scan, clip, name }: { reference: Referen
   const plant = name ?? "pianta scansionata";
   const main = ref
     ? <img src={ref.url} alt={`Foto di riferimento: ${plant}`} className="ar-real-photo is-reference" referrerPolicy="no-referrer" loading="lazy" onError={() => setFailed(ref.url)} />
-    : scan ? <img src={scan} alt={`Foto reale: ${plant}`} className="ar-real-photo" />
-    : clip ? <video src={clip} className="ar-real-photo" autoPlay loop muted playsInline aria-label={`Mini video: ${plant}`} />
-    : null;
-  // The inset is the mini video when there is one (looping, muted), else the scan photo under a database photo.
-  const inset = clip && (ref || scan) ? <video src={clip} className="ar-esito-scan-inset" autoPlay loop muted playsInline aria-label="Mini video della tua scansione" title="La tua scansione" />
-    : ref && scan ? <img src={scan} alt="La tua scansione" title="La tua scansione" className="ar-esito-scan-inset" /> : null;
+    : scan ? <img src={scan} alt={`Foto reale: ${plant}`} className="ar-real-photo" /> : null;
   return (
     <>
       {main && <figure className="ar-esito-photo">
-        <div className="relative">{main}{inset}</div>
+        <div className="relative">{main}{ref && scan && <img src={scan} alt="La tua scansione" title="La tua scansione" className="ar-esito-scan-inset" />}</div>
         <figcaption className="text-muted-foreground">
-          {ref ? <>Foto di riferimento · <a href={ref.link} target="_blank" rel="noreferrer" className="underline">{ref.credit}</a></> : scan ? "Foto reale dalla scansione · inquadratura della pianta" : "Mini video della scansione"}
-          {clip && (ref || scan) ? " · nel riquadro il mini video della scansione" : ""}
+          {ref ? <>Foto di riferimento · <a href={ref.link} target="_blank" rel="noreferrer" className="underline">{ref.credit}</a></> : "Foto reale dalla scansione · inquadratura della pianta"}
         </figcaption>
+      </figure>}
+      {clip && <figure className="ar-esito-video">
+        <FadeLoopVideo src={clip} className="ar-real-photo is-reference" label={`Mini video della scansione: ${plant}`} />
+        <figcaption className="text-muted-foreground">Mini video della scansione · pochi secondi, in loop</figcaption>
       </figure>}
       {video && <figure className="ar-esito-video">
         {/* Not autoplayed: it streams from Commons only when asked. */}
@@ -1544,6 +1546,36 @@ function EsitoPhoto({ reference, video, scan, clip, name }: { reference: Referen
       </figure>}
     </>
   );
+}
+
+/** Fade at each end of the mini video, so its loop never jumps (seconds). */
+const CLIP_FADE_S = 0.45;
+/**
+ * The mini video on a loop that fades in at the start and out at the end of every pass instead of cutting
+ * back: opacity follows the playhead each frame. Recorded webm often reports an infinite duration, so the
+ * clip's known length stands in. With reduced motion it simply loops.
+ */
+function FadeLoopVideo({ src, className, label }: { src: string; className: string; label: string }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { v.loop = true; v.style.opacity = "1"; void v.play().catch(() => {}); return; }
+    let frame = 0;
+    const paint = () => {
+      const length = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : SCAN_CLIP_MS / 1000;
+      const t = v.currentTime;
+      v.style.opacity = String(Math.max(0, Math.min(1, t / CLIP_FADE_S, (length - t) / CLIP_FADE_S)));
+      frame = requestAnimationFrame(paint);
+    };
+    const restart = () => { v.style.opacity = "0"; v.currentTime = 0; void v.play().catch(() => {}); };
+    v.style.opacity = "0";
+    v.addEventListener("ended", restart);
+    frame = requestAnimationFrame(paint);
+    void v.play().catch(() => {});
+    return () => { cancelAnimationFrame(frame); v.removeEventListener("ended", restart); };
+  }, [src]);
+  return <video ref={ref} src={src} className={className} muted playsInline autoPlay aria-label={label} />;
 }
 
 function cropRealPhoto(frame: HTMLCanvasElement, box: { x: number; y: number; w: number; h: number }, maxSide = 640, quality = 0.85): string | null {

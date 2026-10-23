@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findSubject, smoothBox } from "@/lib/ar-subject-tracker";
+import { findSubject, frameUsable, smoothBox } from "@/lib/ar-subject-tracker";
 
 function frame(w: number, h: number, paint: (x: number, y: number) => [number, number, number]) {
   const data = new Uint8ClampedArray(w * h * 4);
@@ -39,6 +39,23 @@ describe("AI camera subject tracker", () => {
   it("ignores non-green objects such as a red car", () => {
     const data = frame(48, 36, (x, y) => (x >= 10 && x < 30 && y >= 10 && y < 26 ? [200, 30, 30] : [120, 120, 120]));
     expect(findSubject(data, 48, 36)).toBeNull();
+  });
+
+  it("locks onto dark foliage in shade, like a holm oak", () => {
+    const data = frame(48, 36, (x, y) => (x >= 14 && x < 34 && y >= 6 && y < 26 ? [30, 46, 28] : [70, 70, 72]));
+    expect(findSubject(data, 48, 36, null, { bark: false })).not.toBeNull();
+  });
+
+  it("locks onto leaves under a warm light cast", () => {
+    // Evening light: everything leans orange, the leaves turn olive-yellow.
+    const data = frame(48, 36, (x, y) => (x >= 14 && x < 34 && y >= 6 && y < 26 ? [120, 140, 60] : [170, 140, 100]));
+    expect(findSubject(data, 48, 36, null, { bark: false })).not.toBeNull();
+  });
+
+  it("tells a usable frame from a black or flat one", () => {
+    expect(frameUsable(frame(48, 36, (x) => (x < 24 ? [40, 90, 40] : [150, 150, 150])), 48, 36)).toBe(true);
+    expect(frameUsable(frame(48, 36, () => [5, 5, 5]), 48, 36)).toBe(false);
+    expect(frameUsable(frame(48, 36, () => [120, 120, 120]), 48, 36)).toBe(false);
   });
 
   it("finds nothing in a flat frame", () => {

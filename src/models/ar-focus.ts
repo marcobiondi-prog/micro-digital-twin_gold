@@ -48,10 +48,12 @@ export function arFocusOption(kind: ArKind, focus: ArFocus | undefined): FocusOp
   return AR_FOCUS[kind].find(o => o.id === focus) ?? AR_FOCUS[kind][0]!;
 }
 
-/** Before calling the AI: a vegetation target with no vegetation locked in the frame stops at once. */
-export function scanPrecheck(kind: ArKind, focus: ArFocus | undefined, vegetationLocked: boolean): string | null {
+/** Before calling the AI: a vegetation target stops at once only when nothing is locked AND the frame is unusable. */
+export function scanPrecheck(kind: ArKind, focus: ArFocus | undefined, vegetationLocked: boolean, frameUsable = false): string | null {
   const option = arFocusOption(kind, focus);
-  return option.seeks === "vegetation" && !vegetationLocked ? option.missing : null;
+  // The colour lock is only a hint: an unlocked but usable frame still goes to the AI (dark foliage, shade,
+  // backlight or autumn leaves can miss the lock); only a black or flat frame stops before it.
+  return option.seeks === "vegetation" && !vegetationLocked && !frameUsable ? option.missing : null;
 }
 
 /** After the AI: the result must contain what the target looks for (a plant, or the ground). */
