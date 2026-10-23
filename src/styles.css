@@ -1902,3 +1902,11 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .ar-summary-pager button { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 999px; background: color-mix(in oklab, var(--camera-ink) 10%, transparent); }
 .ar-summary-pager button:disabled { opacity: .35; }
 
+
+/* Esito on a swiped-back scan: which page of the summary it belongs to. */
+.ar-esito-page {
+  margin-bottom: 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--primary);
+}
