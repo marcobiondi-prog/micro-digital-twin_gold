@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as UrbanoRouteImport } from './routes/urbano'
 import { Route as VignetoRouteImport } from './routes/vigneto'
@@ -25,6 +26,11 @@ const IndexRoute = IndexRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -58,6 +64,7 @@ const ApiPublicJobsCaseSourcesRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/dashboard': typeof DashboardRoute
   '/reset-password': typeof ResetPasswordRoute
   '/urbano': typeof UrbanoRoute
   '/vigneto': typeof VignetoRoute
@@ -67,6 +74,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/dashboard': typeof DashboardRoute
   '/reset-password': typeof ResetPasswordRoute
   '/urbano': typeof UrbanoRoute
   '/vigneto': typeof VignetoRoute
@@ -77,6 +85,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/dashboard': typeof DashboardRoute
   '/reset-password': typeof ResetPasswordRoute
   '/urbano': typeof UrbanoRoute
   '/vigneto': typeof VignetoRoute
@@ -88,6 +97,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/dashboard'
     | '/reset-password'
     | '/urbano'
     | '/vigneto'
@@ -97,6 +107,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/dashboard'
     | '/reset-password'
     | '/urbano'
     | '/vigneto'
@@ -106,6 +117,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/dashboard'
     | '/reset-password'
     | '/urbano'
     | '/vigneto'
@@ -116,6 +128,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  DashboardRoute: typeof DashboardRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   UrbanoRoute: typeof UrbanoRoute
   VignetoRoute: typeof VignetoRoute
@@ -137,6 +150,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -180,6 +200,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  DashboardRoute: DashboardRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   UrbanoRoute: UrbanoRoute,
   VignetoRoute: VignetoRoute,

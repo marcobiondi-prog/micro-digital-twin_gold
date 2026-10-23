@@ -20,7 +20,7 @@
 - MVC: models hold data/formulas/store, controllers are server functions, views are features, routes are pages, ui/lib are shared primitives.
 - Shared logo header stays in normal flow on every page and size; the pinned menu's --nav-h counts only its own height.
 - Offline PWA: generateSW at dist/client/sw.js, registered only via src/lib/register-sw.ts (refuses dev/preview/iframe).
-- Pared-down app: Home shows only a title and two start cards, /urbano and /vigneto, each a separate page with just the simulation (grid, sliders, result, reset; no flow switch, location search, real data, media or Compare); no section menu, the header keeps logo, theme toggle and account. Old Lab/Dashboard/Casi/Fonti routes are removed; Back returns to Home. Account/Compare use use-back-close; fresh-open return awaits landing to avoid router crashes.
+- Home is pared down to a title and two start cards. The two simulations are separate pages, /urbano and /vigneto (views/LabFlows.tsx: UrbanFlow/VineyardFlow keep every Lab tool: real data, Copernicus, sensors, media and AI camera, location search and maps, Compare; no flow switch). Menu: Home, Simulazione urbana, Simulazione vigneto, Dashboard (Casi studio and Fonti removed). Tabs replace history; Back returns to Home.
 - Timed email-demo progress stays in local presentation state, not saved decisions; stages derive from entity decisions, Realizzato needs explicit completion; external approvals render below chart/summary.
 - Shared scenarios use a base64 ?scenario= param on / (sections redirect there on fresh open); Home applies it and opens /urbano or /vigneto.
 - Vineyard stress index: shared component; in the controls panel on phone/desktop, a full-width strip under grid+controls on tablet.
