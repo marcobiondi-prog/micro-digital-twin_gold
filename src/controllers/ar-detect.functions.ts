@@ -8,7 +8,7 @@ import { plantPhotoBounds, type PlantOutline } from "@/models/ar-plant-photo";
 import { arFocusOption } from "@/models/ar-focus";
 import { satellitePrompt } from "@/models/copernicus";
 import { sameBotanicalName, usableBotanicalMatch } from "@/models/ar-botanical-match";
-import { pickCommonsVideo, pickGbifPhoto, pickPowoPhoto, type ReferencePhoto, type ReferenceVideo } from "@/models/ar-reference-photo";
+import { pickGbifPhoto, pickPowoPhoto, type ReferencePhoto } from "@/models/ar-reference-photo";
 
 export type GrowthForm = "columnar" | "conical" | "round" | "umbrella" | "vine" | "shrub";
 
@@ -48,8 +48,6 @@ export type Detection = {
     colUrl: string | null;
     /** Reference photo of the species from a botanical database (Kew POWO, else GBIF), shown in Esito. */
     photo: ReferencePhoto | null;
-    /** Short openly licensed video of the species from Wikimedia Commons, when one exists. */
-    video: ReferenceVideo | null;
     form: GrowthForm;
     heightM: number;
     crownM: number;
@@ -115,30 +113,23 @@ async function catalogueOfLife(name: string) {
   }
 }
 
-/** Reference photo of the whole plant (Kew's Plants of the World Online first, then an openly licensed GBIF photo)
- * and a Wikimedia Commons video of the species.
+/** Reference photo of the whole plant: Kew's Plants of the World Online first, then an openly licensed GBIF photo.
  * Best effort with short timeouts: a slow or missing database never holds up or fails the scan. */
-async function referenceMedia(name: string, gbifKey: number | null): Promise<{ photo: ReferencePhoto | null; video: ReferenceVideo | null }> {
+async function referencePhoto(name: string, gbifKey: number | null): Promise<ReferencePhoto | null> {
   const get = async (url: string) => {
     try {
-      // Wikimedia asks API clients to name themselves.
-      const r = await fetch(url, { signal: AbortSignal.timeout(4000), headers: { accept: "application/json", "user-agent": "MicroDigitalTwin/1.0 (AI camera species reference)" } });
+      const r = await fetch(url, { signal: AbortSignal.timeout(4000), headers: { accept: "application/json" } });
       return r.ok ? ((await r.json()) as unknown) : null;
     } catch {
       return null;
     }
   };
   // The whole plant first: a Kew habit photo, else a GBIF field photo, else any Kew photo that is not a close-up.
-  // The video comes from Wikimedia Commons (botanical databases publish photos only), in the same round.
-  const [powo, occurrences, commons] = await Promise.all([
+  const [powo, occurrences] = await Promise.all([
     get(`https://powo.science.kew.org/api/2/search?q=${encodeURIComponent(name)}`),
     gbifKey ? get(`https://api.gbif.org/v1/occurrence/search?taxonKey=${gbifKey}&mediaType=StillImage&basisOfRecord=HUMAN_OBSERVATION&limit=30`) : null,
-    get(`https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search&gsrnamespace=6&gsrlimit=8&gsrsearch=${encodeURIComponent(`filetype:video "${name}"`)}&prop=videoinfo&viprop=url|mime|size|extmetadata|derivatives&viextmetadatafilter=LicenseShortName|Artist|ImageDescription`),
   ]);
-  return {
-    photo: pickPowoPhoto(powo, name, true) ?? pickGbifPhoto(occurrences) ?? pickPowoPhoto(powo, name),
-    video: pickCommonsVideo(commons, name),
-  };
+  return pickPowoPhoto(powo, name, true) ?? pickGbifPhoto(occurrences) ?? pickPowoPhoto(powo, name);
 }
 
 const detectInput = z.object({ image: z.string().regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/).max(3_000_000), detailImage: z.string().regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/).max(1_000_000).optional(), kind: z.enum(["urban", "vineyard"]).default("urban"), target: z.enum(["tree", "ground", "leaf", "canopy", "interrow"]).optional(), focus: z.object({x:z.number().min(0).max(1),y:z.number().min(0).max(1),w:z.number().min(0).max(1),h:z.number().min(0).max(1)}).optional(), satellite: z.object({ ndvi: z.number().min(-1).max(1).optional(), ndviDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), surfaceTemp: z.number().min(-60).max(80).optional(), tempDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }).optional() });
@@ -233,7 +224,7 @@ async function recognize(data: z.infer<typeof detectInput>): Promise<DetectResul
     const density = num(pl.density, 0, 1, 0.6);
     const evergreen = Boolean(pl.evergreen);
     const scientificName = col?.name ?? g?.name ?? sci;
-    const { photo, video } = await referenceMedia(scientificName, g?.key ?? null);
+    const photo = await referencePhoto(scientificName, g?.key ?? null);
     species = {
       commonName: String(pl.commonName ?? p.label ?? sci).slice(0, 40),
       scientificName,
@@ -242,7 +233,6 @@ async function recognize(data: z.infer<typeof detectInput>): Promise<DetectResul
       gbifUrl: g ? `https://www.gbif.org/species/${g.key}` : null,
       colUrl: col ? `https://www.catalogueoflife.org/data/taxon/${encodeURIComponent(col.id)}` : null,
       photo,
-      video,
       form,
       heightM: num(pl.heightM, 0.3, 60, 6),
       crownM,

@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { clearScans, currentScans, recordScan, scanClip, scanPhoto, scanReportRows, setScanClip, updateScan } from "@/models/ar-scan-log";
+import { describe, expect, it } from "vitest";
+import { clearScans, currentScans, recordScan, scanPhoto, scanReportRows, updateScan } from "@/models/ar-scan-log";
 
 const base = { kind: "urban" as const, target: "Alberi e ombra", context: "Piazza", satellite: null };
 
@@ -26,25 +26,9 @@ describe("ar-scan-log", () => {
     expect(scanPhoto(id)).toBe("data:image/jpeg;base64,AA");
     expect(scanPhoto(none)).toBeNull();
     expect(currentScans("urban")[0]).not.toHaveProperty("photo");
-    // Stored apart from the records, so a reload finds it again.
     expect(sessionStorage.getItem(`micro-digital-twin-ar-scan-photo:${id}`)).toBe("data:image/jpeg;base64,AA");
     clearScans("urban");
     expect(scanPhoto(id)).toBeNull();
     expect(sessionStorage.getItem(`micro-digital-twin-ar-scan-photo:${id}`)).toBeNull();
-  });
-
-  it("keeps a scan's mini video until its record goes, and drops clips of unknown scans", () => {
-    const revoke = vi.fn();
-    vi.stubGlobal("URL", Object.assign(URL, { revokeObjectURL: revoke }));
-    clearScans("urban");
-    const id = recordScan({ ...base, result: "Ficus", soil: null, count: 0, totalCooling: null, totalShade: null, species: null });
-    setScanClip(id, "blob:clip-1");
-    expect(scanClip(id)).toBe("blob:clip-1");
-    setScanClip("scan-gone", "blob:orphan");
-    expect(revoke).toHaveBeenCalledWith("blob:orphan");
-    clearScans("urban");
-    expect(scanClip(id)).toBeNull();
-    expect(revoke).toHaveBeenCalledWith("blob:clip-1");
-    vi.unstubAllGlobals();
   });
 });

@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import type { ArKind } from "@/models/ar-focus";
 import { coolingLabel } from "@/models/ar-placement";
-import type { ReferencePhoto, ReferenceVideo } from "@/models/ar-reference-photo";
+import type { ReferencePhoto } from "@/models/ar-reference-photo";
 
 /**
  * Every completed AI camera scan, per flow, kept for the report whether or not a photo was taken.
@@ -14,8 +14,6 @@ export type ScanSpecies = {
   cooling: number | null; shade: number | null;
   /** Reference photo from a botanical database (Kew POWO or GBIF); absent on older records. */
   photo?: ReferencePhoto | null;
-  /** Wikimedia Commons video of the species, when one exists. */
-  video?: ReferenceVideo | null;
 };
 export type ScanSoil = { label: string; permeability: string; plantable: boolean; note: string };
 export type ScanRecord = {
@@ -66,20 +64,7 @@ function savePhoto(id: string, photo: string) {
   photos.set(id, photo);
   try { storage()?.setItem(PHOTO_KEY(id), photo); } catch { /* quota or private mode: memory only */ }
 }
-// Mini video of the scanned plant (a few seconds of the camera, object URL): memory only, a blob does not
-// survive a reload.
-const clips = new Map<string, string>();
-export function scanClip(id: string): string | null { return clips.get(id) ?? null; }
-export function setScanClip(id: string, url: string) {
-  if (!state.urban.some((r) => r.id === id) && !state.vineyard.some((r) => r.id === id)) { URL.revokeObjectURL(url); return; }
-  const old = clips.get(id);
-  if (old && old !== url) URL.revokeObjectURL(old);
-  clips.set(id, url);
-  subs.forEach((f) => f());
-}
 function dropPhoto(id: string) {
-  const clip = clips.get(id);
-  if (clip) { URL.revokeObjectURL(clip); clips.delete(id); }
   photos.delete(id);
   try { storage()?.removeItem(PHOTO_KEY(id)); } catch { /* unavailable */ }
 }
