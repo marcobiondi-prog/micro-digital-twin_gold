@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { openLicence, pickCommonsVideo, pickGbifPhoto, pickPowoPhoto, wholePlantScore } from "@/models/ar-reference-photo";
+import { openLicence, pickGbifPhoto, pickPowoPhoto, wholePlantScore } from "@/models/ar-reference-photo";
 
 describe("ar-reference-photo", () => {
   it("takes the Kew image of the accepted species and links its POWO page", () => {
@@ -53,22 +53,5 @@ describe("ar-reference-photo", () => {
         { type: "StillImage", identifier: "https://img/tree.jpg", license: "CC0", title: "Whole tree in habitat" }] },
     ] };
     expect(pickGbifPhoto(gbif)?.url).toBe("https://img/tree.jpg");
-  });
-
-  it("takes a short, openly licensed Commons video of the species, small transcodes first", () => {
-    const meta = (licence: string) => ({ LicenseShortName: { value: licence }, Artist: { value: '<a href="x">Mario Rossi</a>' } });
-    const json = { query: { pages: {
-      1: { title: "File:Quercus suber tree.webm", videoinfo: [{ descriptionurl: "https://commons/1", extmetadata: meta("CC BY-SA 4.0"), url: "https://upload/1.webm", mime: "video/webm" }] },
-      2: { title: "File:Quercus ilex leaves close-up.webm", videoinfo: [{ descriptionurl: "https://commons/2", extmetadata: meta("CC0"), url: "https://upload/2.webm", mime: "video/webm", size: 1000 }] },
-      3: { title: "File:Quercus ilex all rights.webm", videoinfo: [{ descriptionurl: "https://commons/3", extmetadata: meta("All rights reserved"), url: "https://upload/3.webm", mime: "video/webm", size: 1000 }] },
-      4: { title: "File:Quercus_ilex_in_the_wind.webm", videoinfo: [{ descriptionurl: "https://commons/4", extmetadata: meta("CC BY-SA 4.0"), duration: 30, url: "https://upload/4.webm", mime: "video/webm", size: 90_000_000,
-        derivatives: [{ src: "https://upload/4.1080.webm", type: 'video/webm; codecs="vp9"', height: 1080 }, { src: "https://upload/4.360.webm", type: 'video/webm; codecs="vp9"', height: 360 }, { src: "https://upload/4.360.mp4", type: "video/mp4", height: 360 }] }] },
-    } } };
-    expect(pickCommonsVideo(json, "Quercus ilex")).toEqual({
-      sources: [{ url: "https://upload/4.360.mp4", type: "video/mp4" }, { url: "https://upload/4.360.webm", type: 'video/webm; codecs="vp9"' }],
-      credit: "Mario Rossi · CC BY-SA 4.0 · Wikimedia Commons",
-      link: "https://commons/4",
-    });
-    expect(pickCommonsVideo({ query: {} }, "Quercus ilex")).toBeNull();
   });
 });
