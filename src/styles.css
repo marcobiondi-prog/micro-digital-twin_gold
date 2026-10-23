@@ -1921,4 +1921,4 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .ar-real-photo.is-reference { max-height: 12rem; object-fit: contain; background: oklch(0 0 0 / .25); }
 /* Reference photo in a large corner frame over the scan photo: whole plant, never cropped. */
 .ar-esito-photo .ar-real-photo:not(.is-reference) { min-height: 11rem; max-height: 13rem; }
-.ar-esito-reference-inset { position: absolute; right: .375rem; bottom: .875rem; width: 28%; max-width: 5.5rem; aspect-ratio: 1; border: 2px solid var(--camera-ink, #fff); border-radius: 8px; object-fit: contain; background: oklch(0.16 0.01 255); box-shadow: 0 3px 10px oklch(0 0 0 / .4); }
+.ar-esito-reference-inset { position: absolute; right: .375rem; bottom: .875rem; width: 36%; max-width: 7rem; aspect-ratio: 1; border: 2px solid var(--camera-ink, #fff); border-radius: 8px; object-fit: contain; background: oklch(0.16 0.01 255); box-shadow: 0 3px 10px oklch(0 0 0 / .4); }

@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import { flushSync } from "react-dom";
 import { Activity, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grid2X2, Minus, Plus, ScanSearch, SlidersHorizontal, Square, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
 import { supportsCameraTorch, setCameraTorch } from "@/lib/camera-torch";
-import { detectArObject, type Detection, type Soil } from "@/controllers/ar-detect.functions";
+import { detectArObject, getReferencePhoto, type Detection, type Soil } from "@/controllers/ar-detect.functions";
 import { gbifPhotoSearchUrl, pickGbifPhoto, type ReferencePhoto } from "@/models/ar-reference-photo";
 import { findSubject, frameUsable, SEARCH_BOX, smoothBox, type SubjectBox } from "@/lib/ar-subject-tracker";
 import { extractPlantPhoto } from "@/views/ar-plant-photo";
@@ -698,15 +698,25 @@ export function ArCamera({
       setFound(outcome);
       // The report keeps a lighter copy (about 20-30 kB), so a reload keeps each scan's photo in Esito.
       logScan(outcome, identified, r.soil ?? null, cropRealPhoto(small, d.box, SCAN_PHOTO_PX, 0.72));
-      // No reference photo from the server (a slow database): ask GBIF from the phone, then fill Esito and the record.
-      if (identified && !identified.photo && identified.gbifKey) {
+      // The reference photo comes after the scan (the scan, and its sound, never wait on the databases): the
+      // server asks Kew/GBIF, the phone retries GBIF if that finds none; it then fills Esito and the record.
+      if (identified) {
         const recordId = scanRecordId.current;
-        void fetch(gbifPhotoSearchUrl(identified.gbifKey)).then((res) => (res.ok ? res.json() : null)).then((json: unknown) => {
-          const photo = pickGbifPhoto(json);
-          if (!photo) return;
-          if (recordId) setScanSpeciesPhoto(kind, recordId, photo);
-          if (version === scanVersion.current) setSpecies((s) => (s && s.scientificName === identified.scientificName ? { ...s, photo } : s));
-        }).catch(() => { /* offline: Esito keeps the scan photo alone */ });
+        const gbifKey = identified.gbifKey;
+        const fromPhone = async () => {
+          if (!gbifKey) return null;
+          const res = await fetch(gbifPhotoSearchUrl(gbifKey));
+          return res.ok ? pickGbifPhoto(await res.json()) : null;
+        };
+        void getReferencePhoto({ data: { name: identified.scientificName, gbifKey } })
+          .catch(() => null)
+          .then((photo) => photo ?? fromPhone())
+          .then((photo) => {
+            if (!photo) return;
+            if (recordId) setScanSpeciesPhoto(kind, recordId, photo);
+            if (version === scanVersion.current) setSpecies((s) => (s && s.scientificName === identified.scientificName ? { ...s, photo } : s));
+          })
+          .catch(() => { /* offline: Esito keeps the scan photo alone */ });
       }
 
     } catch (error) {

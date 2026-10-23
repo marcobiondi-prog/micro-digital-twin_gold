@@ -46,7 +46,8 @@ export type Detection = {
     gbifUrl: string | null;
     /** Catalogue of Life: elenco mondiale delle specie (nome accettato). */
     colUrl: string | null;
-    /** Reference photo of the species from a botanical database (Kew POWO, else GBIF), shown in Esito. */
+    /** Reference photo of the species from a botanical database (Kew POWO, else GBIF), shown in Esito. Always
+     * null here: the camera asks for it after the scan (getReferencePhoto), so the scan never waits on it. */
     photo: ReferencePhoto | null;
     form: GrowthForm;
     heightM: number;
@@ -114,7 +115,7 @@ async function catalogueOfLife(name: string) {
 }
 
 /** Reference photo of the whole plant: Kew's Plants of the World Online first, then an openly licensed GBIF photo.
- * Best effort with timeouts: a slow or missing database never fails the scan (the camera retries GBIF itself). */
+ * Best effort with timeouts, outside the scan: the camera asks for it once the species is known. */
 async function referencePhoto(name: string, gbifKey: number | null): Promise<ReferencePhoto | null> {
   const get = async (url: string) => {
     try {
@@ -137,6 +138,12 @@ async function referencePhoto(name: string, gbifKey: number | null): Promise<Ref
 
 const detectInput = z.object({ image: z.string().regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/).max(3_000_000), detailImage: z.string().regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/).max(1_000_000).optional(), kind: z.enum(["urban", "vineyard"]).default("urban"), target: z.enum(["tree", "ground", "leaf", "canopy", "interrow"]).optional(), focus: z.object({x:z.number().min(0).max(1),y:z.number().min(0).max(1),w:z.number().min(0).max(1),h:z.number().min(0).max(1)}).optional(), satellite: z.object({ ndvi: z.number().min(-1).max(1).optional(), ndviDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), surfaceTemp: z.number().min(-60).max(80).optional(), tempDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }).optional() });
 type DetectResult = { detection: Detection; soil?: Soil; survey?: GroundSurvey | null; error?: string; status?: number };
+
+/** Foto di riferimento della specie riconosciuta, chiesta dalla fotocamera dopo la scansione (solo utenti registrati). */
+export const getReferencePhoto = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ name: z.string().trim().min(2).max(80), gbifKey: z.number().int().positive().nullable() }).parse(d))
+  .handler(async ({ data }): Promise<ReferencePhoto | null> => referencePhoto(data.name, data.gbifKey));
 
 /** Riconosce oggetto e specie inquadrati dalla fotocamera AR (solo utenti registrati). */
 export const detectArObject = createServerFn({ method: "POST" })
@@ -227,7 +234,6 @@ async function recognize(data: z.infer<typeof detectInput>): Promise<DetectResul
     const density = num(pl.density, 0, 1, 0.6);
     const evergreen = Boolean(pl.evergreen);
     const scientificName = col?.name ?? g?.name ?? sci;
-    const photo = await referencePhoto(scientificName, g?.key ?? null);
     species = {
       commonName: String(pl.commonName ?? p.label ?? sci).slice(0, 40),
       scientificName,
@@ -235,7 +241,7 @@ async function recognize(data: z.infer<typeof detectInput>): Promise<DetectResul
       gbifKey: g?.key ?? null,
       gbifUrl: g ? `https://www.gbif.org/species/${g.key}` : null,
       colUrl: col ? `https://www.catalogueoflife.org/data/taxon/${encodeURIComponent(col.id)}` : null,
-      photo,
+      photo: null,
       form,
       heightM: num(pl.heightM, 0.3, 60, 6),
       crownM,
