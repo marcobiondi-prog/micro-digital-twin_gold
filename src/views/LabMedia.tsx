@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   Camera,
   ChevronDown,
@@ -107,7 +108,12 @@ function SwipeRow({
 }
 
 /** Foto e video del sopralluogo come pannello a soffietto: l'intestazione apre e chiude caricamento ed elenco. */
-export function LabMedia({ kind, context }: { kind: "urban" | "vineyard"; context?: string }) {
+/** `embedded`: inside a page section (Fold) that brings its own title, so no own toggle; the cameras
+ * then mount on document.body, since a closed section would hide them with it. */
+export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | "vineyard"; context?: string; embedded?: boolean }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const overPage = (node: ReactNode) => (embedded && mounted ? createPortal(node, document.body) : node);
   const [userId, setUserId] = useState<string | null | undefined>(undefined);
   const items = useLabMedia(kind);
   /** Avanzamento dell'invio nella coda condivisa: prosegue anche cambiando scheda o sezione. */
@@ -236,7 +242,7 @@ export function LabMedia({ kind, context }: { kind: "urban" | "vineyard"; contex
   /** Quando l'elenco si svuota dopo un'eliminazione (singola o "Elimina tutti"), il pannello si richiude da solo. */
   const justRemoved = useRef(false);
   useEffect(() => {
-    if (!justRemoved.current || items.length > 0 || uploads.length > 0) return;
+    if (embedded || !justRemoved.current || items.length > 0 || uploads.length > 0) return;
     justRemoved.current = false;
     const t = setTimeout(() => setOpen(false), 420);
     return () => clearTimeout(t);
@@ -317,6 +323,7 @@ export function LabMedia({ kind, context }: { kind: "urban" | "vineyard"; contex
 
   return (
     <Card className="p-4">
+      {!embedded && (
       <button
         type="button"
         aria-expanded={open}
@@ -357,6 +364,8 @@ export function LabMedia({ kind, context }: { kind: "urban" | "vineyard"; contex
           aria-hidden
         />
       </button>
+      )}
+      {overPage(<>
       <ArCamera
         mode={ar}
         kind={kind}
@@ -374,6 +383,7 @@ export function LabMedia({ kind, context }: { kind: "urban" | "vineyard"; contex
       {/* Su Android la selezione multipla apre il gestore file; con un file alla volta si apre
           la galleria di sistema (Google Foto). Altrove resta la scelta multipla. */}
       {input(gallery, "image/*,video/*", undefined, !isAndroid)}
+      </>)}
       <div
         id={bodyId}
         className="lab-media-body"

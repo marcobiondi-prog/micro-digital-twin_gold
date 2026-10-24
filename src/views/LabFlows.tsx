@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
-import { ArrowRight, Building2, FlaskConical, Grape, Send, CloudSun } from "lucide-react";
+import { ArrowRight, Building2, FlaskConical, Grape, Send, CloudSun, MapPin, Camera, Radar } from "lucide-react";
 import { toast } from "sonner";
 import { Card, SectionTitle, StatusBadge } from "@/views/health";
 import { LabSyncIndicator } from "@/views/LabSyncIndicator";
@@ -9,7 +9,10 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SensorAdvisor } from "@/views/SensorAdvisor";
 import { LabMedia } from "@/views/LabMedia";
-import { SimulationGrid, splitLocation, ImportWeatherButton } from "@/views/SimulationGrid";
+import { LocationCard, SimulationGrid, splitLocation, ImportWeatherButton } from "@/views/SimulationGrid";
+import { UrbanPlay } from "@/views/v1/UrbanPlay";
+import { Fold } from "@/views/Fold";
+import { useSignedIn } from "@/lib/use-signed-in";
 import { comparison, levelTone, nextPhase, piazzaEstimate, prototypeChoice, type PrototypeId } from "@/models/scenarios";
 import { applyVineyardScenario, closestVineyardScenario, vineyardControlValue, vineyardScenarioSteps } from "@/models/vineyard-controls";
 import { resetUrban, resetVineyard, setUrban, setVineyard, useLab, vineMetrics, vineyardSituation, type LabState } from "@/models/lab-store";
@@ -257,6 +260,9 @@ function ComparisonDialog({ children, matrix, onImportWeather }: { children: Rea
 
 /** Simulazione urbana completa: riepilogo con Confronta, dati reali, media, griglia. */
 export function UrbanFlow() {
+  const { signedIn, demo } = useSignedIn();
+  // Sensor suggestions call an auth-protected server function: real accounts only.
+  const realSignedIn = signedIn && !demo;
   const [compareOpen, setCompareOpen] = useState(false);
   const [pinned, setPinned] = useState<PrototypeId | null>(null);
   const [baseline, setBaseline] = useState<LabState["urban"] | null>(null);
@@ -309,9 +315,12 @@ export function UrbanFlow() {
         </Card>
       </div>
 
-      <SensorAdvisor kind="urban" />
-      <LabMedia kind="urban" context={`Scenario: ${comparison.find((l) => l.id === activeLevel)?.s ?? "attuale"}`} />
-      <SimulationGrid onReset={restoreScenario} mode="urban" activeLevel={activeLevel} trees={trees} permeable={permeable} shade={shade} onTreesChange={setTrees} onPermeableChange={setPermeable} onShadeChange={setShade} />
+      <UrbanPlay onReset={restoreScenario} />
+      <div className="space-y-2">
+        <Fold title="Luogo e mappa" icon={MapPin}><LocationCard kind="urban" /></Fold>
+        <Fold title="Foto e video" icon={Camera}><LabMedia embedded kind="urban" context={`Scenario: ${comparison.find((l) => l.id === activeLevel)?.s ?? "attuale"}`} /></Fold>
+        {realSignedIn && <Fold title="Dove installare sensori" icon={Radar}><SensorAdvisor embedded kind="urban" /></Fold>}
+      </div>
       <Dialog open={compareOpen} onOpenChange={setCompareOpen}>
         <ComparisonDialog onImportWeather={importRealWeather} matrix={<PrototypeMatrix kind="urban" activeLevel={activeLevel} />}><ComparisonTable realTemp={urban.realTemp} place={place} trees={base.trees} permeable={base.permeable} shade={base.shade} activeLevel={activeLevel} onApply={applyScenario} /></ComparisonDialog>
       </Dialog>
