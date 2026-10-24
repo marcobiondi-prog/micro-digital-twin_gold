@@ -9,8 +9,9 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SensorAdvisor } from "@/views/SensorAdvisor";
 import { LabMedia } from "@/views/LabMedia";
-import { LocationCard, SimulationGrid, splitLocation, ImportWeatherButton } from "@/views/SimulationGrid";
+import { LocationCard, splitLocation, ImportWeatherButton } from "@/views/SimulationGrid";
 import { UrbanPlay } from "@/views/v1/UrbanPlay";
+import { VinePlay } from "@/views/v1/VinePlay";
 import { Fold } from "@/views/Fold";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { comparison, levelTone, nextPhase, piazzaEstimate, prototypeChoice, type PrototypeId } from "@/models/scenarios";
@@ -330,6 +331,9 @@ export function UrbanFlow() {
 
 /** Simulazione del vigneto completa: riepilogo con Confronta e invio, dati reali, media, griglia. */
 export function VineyardFlow() {
+  const { signedIn, demo } = useSignedIn();
+  // Sensor suggestions call an auth-protected server function: real accounts only.
+  const realSignedIn = signedIn && !demo;
   const [send, setSend] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [pinned, setPinned] = useState<PrototypeId | null>(null);
@@ -389,9 +393,12 @@ export function VineyardFlow() {
         </Card>
       </div>
 
-      <SensorAdvisor kind="vineyard" />
-      <LabMedia kind="vineyard" context={`${vineyard.allZones ? "Tutte le zone" : `Zona ${vineyard.selected + 1}`} · ${vineyard.phase}`} />
-      <SimulationGrid onZonesEdit={onZonesEdit} onReset={restoreScenario} mode="vineyard" activeLevel={activeLevel} />
+      <VinePlay onReset={restoreScenario} onZonesEdit={onZonesEdit} />
+      <div className="space-y-2">
+        <Fold title="Luogo e mappa" icon={MapPin}><LocationCard kind="vineyard" /></Fold>
+        <Fold title="Foto e video" icon={Camera}><LabMedia embedded kind="vineyard" context={`${vineyard.allZones ? "Tutte le zone" : `Zona ${vineyard.selected + 1}`} · ${vineyard.phase}`} /></Fold>
+        {realSignedIn && <Fold title="Dove installare sensori" icon={Radar}><SensorAdvisor embedded kind="vineyard" /></Fold>}
+      </div>
       <Dialog open={compareOpen} onOpenChange={setCompareOpen}>
         <ComparisonDialog onImportWeather={importRealWeather} matrix={<PrototypeMatrix kind="vineyard" activeLevel={activeLevel} />}><VineComparison v={vineyard} base={base} activeLevel={activeLevel} onApply={applyScenario} /></ComparisonDialog>
       </Dialog>
