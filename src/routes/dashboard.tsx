@@ -1,12 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { z } from "zod";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { AlertTriangle, Download, Plus, Building2, Grape, LayoutGrid, Copy, Printer, Activity, Trash2, Share2, Mail } from "lucide-react";
+import { AlertTriangle, Download, Plus, Building2, Grape, Copy, Printer, Activity, Trash2, Share2, Mail, ChevronDown, LineChart as LineChartIcon, Leaf, NotebookPen, Droplets, Waves } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Card, Metric, Pills, Ring, SectionTitle, StatusBadge, levelColor } from "@/views/health";
+import { Card, Pills, Ring, StatusBadge, levelColor } from "@/views/health";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { scenarioCsv, scenarioGeoJson } from "@/models/scenario-export";
@@ -22,11 +22,11 @@ import climateTwinLogo from "@/assets/climate-twin-logo-final.png";
 import climateTwinLogoCompact from "@/assets/climate-twin-logo-compact.png";
 
 export const Route = createFileRoute("/dashboard")({
-  validateSearch: z.object({ tab: z.enum(["Urbana", "Vitivinicola", "Esecutivo"]).default("Urbana") }).parse,
+  validateSearch: z.object({ tab: z.enum(["Piazza", "Vigneto"]).catch("Piazza") }).parse,
   head: () => ({
     meta: [
       { title: "Dashboard operative — MICRO DIGITAL TWIN" },
-      { name: "description", content: "Dashboard urbana (WBGT, rifugi), vitivinicola (CWSI, sonde, maturazione) e cruscotto esecutivo unificato." },
+      { name: "description", content: "Dashboard della piazza (calore, rifugi, intervento) e del vigneto (stress, irrigazione, quaderno), con report esportabile." },
       { property: "og:title", content: "Dashboard operative — MICRO DIGITAL TWIN" },
       { property: "og:description", content: "Indicatori di salute climatica, trend e report esportabili." },
       { property: "og:type", content: "website" },
@@ -39,6 +39,7 @@ export const Route = createFileRoute("/dashboard")({
 const hours = Array.from({ length: 24 }, (_, h) => ({ h: `${h}:00`, wbgt: +(22 + 8 * Math.sin(((h - 8) / 24) * Math.PI * 2 * 0.9) * (h > 6 && h < 21 ? 1 : 0.3) + noise(h) * 1.5).toFixed(1) }));
 const days = Array.from({ length: 14 }, (_, d) => ({ d: `G${d + 1}`, s20: +(32 - d * 1.3 + noise(d) * 3).toFixed(1), s50: +(36 - d * 0.7 + noise(d, 2) * 2).toFixed(1) }));
 const ripe = Array.from({ length: 10 }, (_, w) => ({ w: `S${w + 1}`, zuccheri: +(12 + w * 1.4 + noise(w) * 0.5).toFixed(1), polifenoli: +(8 + w * 0.9 - Math.max(0, w - 6) * 0.3 + noise(w, 5) * 0.4).toFixed(1) }));
+const WATER_BALANCE = [{ m: "Giu", domanda: 420, disponibile: 520 }, { m: "Lug", domanda: 610, disponibile: 470 }, { m: "Ago", domanda: 680, disponibile: 410 }, { m: "Set", domanda: 450, disponibile: 480 }];
 const tip = { contentStyle: { borderRadius: 16, border: "none", boxShadow: "0 8px 24px -8px rgb(0 0 0 / .2)" } };
 
 function useChartAnimation() {
@@ -47,10 +48,6 @@ function useChartAnimation() {
     setAnimate(!window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   }, []);
   return animate;
-}
-
-function Header({ icon: Icon, color, title }: { icon: typeof Building2; color: string; title: string }) {
-  return <div className="dashboard-view-header"><span className="dashboard-view-icon text-primary-foreground" style={{ background: color }}><Icon className="size-5" /></span><h3 className="dashboard-view-title">{title}</h3></div>;
 }
 
 function ChartKey({ items }: { items: Array<{ label: string; color: string }> }) {
@@ -86,14 +83,28 @@ function useDashboardLoading(key: string) {
   return loading;
 }
 
-function AreaBanner({ label, lat, lng, detail }: { label: string; lat: number; lng: number; detail: string }) {
-  const p = splitLocation(label);
+/** Indicatore compatto: anello piccolo, nome sotto. Tre per riga anche su telefono, così si leggono insieme. */
+function Kpi({ value, max, color, center, unit, label, children }: { value: number; max: number; color: string; center: ReactNode; unit: string; label: string; children?: ReactNode }) {
   return (
-    <div className="mt-2 flex min-w-0 items-center gap-2 border-t border-border pt-2 text-sm">
-      <MapPin className="size-4 shrink-0 text-primary" />
-      <span className="min-w-0 truncate font-semibold">{p.name}</span>
-      <span className="hidden min-w-0 truncate text-xs text-muted-foreground sm:block">{p.sub ? `${p.sub} · ` : ""}{lat.toFixed(4)}, {lng.toFixed(4)} · {detail}</span>
-    </div>
+    <Card className="flex min-w-0 flex-col items-center gap-1.5 p-2.5 text-center sm:p-5">
+      <Ring value={value} max={max} size={84} stroke={8} color={color}><span className="font-display text-xl font-semibold leading-none">{center}</span><span className="text-[10px] text-muted-foreground">{unit}</span></Ring>
+      <span className="dashboard-long-label text-xs font-semibold sm:text-sm">{label}</span>
+      {children}
+    </Card>
+  );
+}
+
+/** Sezione a fisarmonica: una riga col titolo, il contenuto si apre al tocco (chiuso di partenza). */
+function Fold({ title, hint, icon: Icon, children }: { title: string; hint?: string; icon?: typeof Building2; children: ReactNode }) {
+  return (
+    <details className="dashboard-fold group">
+      <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 rounded-2xl bg-card px-4 py-3 text-sm font-semibold shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+        {Icon && <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />}
+        <span className="min-w-0 flex-1 truncate">{title}{hint && <span className="font-normal text-muted-foreground"> {hint}</span>}</span>
+        <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+      </summary>
+      <div className="dashboard-fold-body mt-2 grid gap-3 sm:gap-4">{children}</div>
+    </details>
   );
 }
 
@@ -277,29 +288,12 @@ function UrbanDash() {
   const co2 = Math.round(lab.trees * 22), water = Math.round(4000 * (lab.permeable / 100) * 0.7 * 0.6), shadeM2 = Math.round(4000 * (lab.shade / 100) + lab.trees * 30);
   return (
     <div className="dashboard-view" data-testid="dashboard-urbana">
-      <Header icon={Building2} color="var(--urban)" title="Dashboard Urbana" />
-      <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
-        <Card className="flex flex-col items-center"><Ring value={peak} max={35} color={levelColor(peak > 29 ? 80 : peak > 26 ? 50 : 20)}><span className="font-display text-2xl font-semibold">{peak}</span><span className="text-[10px] text-muted-foreground">WBGT max °C</span></Ring><StatusBadge level={lvl}>Calore {lvl}</StatusBadge></Card>
-        <Card className="flex flex-col items-center"><Ring value={cover} max={target} color="var(--leaf)"><span className="font-display text-2xl font-semibold">{cover}%</span><span className="text-[10px] text-muted-foreground">target {target}%</span></Ring><span className="text-xs text-muted-foreground">Copertura arborea</span></Card>
-        <Card className="flex flex-col items-center justify-center gap-3">
-          <div className="dashboard-long-label text-center text-sm font-semibold">Isocrone rifugi climatici</div>
-          <div className="relative size-28">
-            <div className="absolute inset-0 rounded-full bg-urban/15" /><div className="absolute inset-5 rounded-full bg-urban/35" /><div className="absolute inset-[44px] rounded-full bg-urban" />
-          </div>
-          <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs"><span><b>{le5}%</b> ≤5 min</span><span><b>{le10}%</b> ≤10 min</span></div>
-        </Card>
-        <Card className="space-y-2">
-          <div className="flex items-center gap-2 text-sm font-semibold"><AlertTriangle className="size-4 text-danger" />Alert calore</div>
-          {[["14:00–17:00", lvl, area], ["12:00–14:00", lvl === "elevato" ? "moderato" : "basso", near], ["Sera", "basso", `Aree verdi · ${area}`]].map(([t, l, p]) => (
-            <div key={p} className="dashboard-alert-row"><div className="min-w-0"><div className="dashboard-long-label font-semibold">{p}</div><div className="text-muted-foreground">{t}</div></div><StatusBadge level={l as string} /></div>
-          ))}
-        </Card>
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <Kpi value={peak} max={35} color={levelColor(peak > 29 ? 80 : peak > 26 ? 50 : 20)} center={peak} unit="WBGT °C" label="Calore"><StatusBadge level={lvl}>{lvl}</StatusBadge></Kpi>
+        <Kpi value={cover} max={target} color="var(--leaf)" center={`${cover}%`} unit={`su ${target}%`} label="Copertura alberi" />
+        <Kpi value={le5} max={100} color="var(--urban)" center={`${le5}%`} unit="≤5 min" label="Rifugi vicini"><span className="text-[10px] text-muted-foreground">{le10}% entro 10 min</span></Kpi>
       </div>
-      <div className="dashboard-urban-main mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-        <Card><div className="dashboard-card-title">Andamento WBGT <span>· 24 h</span></div>
-          <ChartKey items={[{ label: "WBGT (°C)", color: "var(--danger)" }]} />
-          <div className="dashboard-chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={hourData} margin={{ top: 8, right: 6, bottom: 0, left: -20 }}><defs><linearGradient id="gw" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="var(--danger)" stopOpacity={0.4} /><stop offset="100%" stopColor="var(--danger)" stopOpacity={0} /></linearGradient></defs><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" /><XAxis dataKey="h" fontSize={10} interval={3} tickMargin={6} /><YAxis width={30} fontSize={10} domain={[15, 35]} tickMargin={4} /><Tooltip {...tip} /><Area type="monotone" dataKey="wbgt" name="WBGT" stroke="var(--danger)" strokeWidth={3} fill="url(#gw)" isAnimationActive={animateCharts} animationDuration={1400} animationEasing="ease-out" /></AreaChart></ResponsiveContainer></div>
-        </Card>
+      <div className={`dashboard-urban-main mt-4 grid gap-4 ${uid ? "lg:grid-cols-2" : ""}`}>
         <Card><div className="text-sm font-semibold">Scheda intervento</div>
           <div className="mt-3 space-y-2 text-sm">
             {[["Area", area], ["Interventi", `${lab.trees} alberi · ${lab.permeable}% suolo · ${lab.shade}% ombra`], ["ΔT atteso", `−${m.est.lo.toFixed(1)} / −${m.est.hi.toFixed(1)} °C`], ["Posizione", `${lab.location.lat.toFixed(3)}, ${lab.location.lng.toFixed(3)}`], ["Costo stimato", lab.trees + lab.permeable / 5 + lab.shade / 5 > 25 ? "alto" : lab.trees + lab.permeable / 5 + lab.shade / 5 > 12 ? "medio" : "basso"], ["Stato", STAGES[displayedStage]]].map(([k, v]) => <div key={k} className="dashboard-detail-row"><span className="text-muted-foreground">{k}</span>{k === "Stato" ? <b className="flex items-center gap-1.5"><span className={`size-2 shrink-0 rounded-full ${STAGE_TONES[displayedStage]?.dot}`} />{v}</b> : <b>{v}</b>}</div>)}
@@ -346,8 +340,22 @@ function UrbanDash() {
           </>) : null}
            </div>
       </div>
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <Card className="flex flex-col"><div className="text-sm font-semibold">Co-benefici ecologici <span className="font-normal text-muted-foreground">· stima annua</span></div>
+      <div className="mt-4 space-y-2">
+        <Fold title="Andamento del calore" hint="· 24 h" icon={LineChartIcon}>
+        <Card>
+          <ChartKey items={[{ label: "WBGT (°C)", color: "var(--danger)" }]} />
+          <div className="dashboard-chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={hourData} margin={{ top: 8, right: 6, bottom: 0, left: -20 }}><defs><linearGradient id="gw" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="var(--danger)" stopOpacity={0.4} /><stop offset="100%" stopColor="var(--danger)" stopOpacity={0} /></linearGradient></defs><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" /><XAxis dataKey="h" fontSize={10} interval={3} tickMargin={6} /><YAxis width={30} fontSize={10} domain={[15, 35]} tickMargin={4} /><Tooltip {...tip} /><Area type="monotone" dataKey="wbgt" name="WBGT" stroke="var(--danger)" strokeWidth={3} fill="url(#gw)" isAnimationActive={animateCharts} animationDuration={1400} animationEasing="ease-out" /></AreaChart></ResponsiveContainer></div>
+        </Card>
+        </Fold>
+        <Fold title="Avvisi calore" icon={AlertTriangle}>
+        <Card className="space-y-2">
+          {[["14:00–17:00", lvl, area], ["12:00–14:00", lvl === "elevato" ? "moderato" : "basso", near], ["Sera", "basso", `Aree verdi · ${area}`]].map(([t, l, p]) => (
+            <div key={p} className="dashboard-alert-row"><div className="min-w-0"><div className="dashboard-long-label font-semibold">{p}</div><div className="text-muted-foreground">{t}</div></div><StatusBadge level={l as string} /></div>
+          ))}
+        </Card>
+        </Fold>
+        <Fold title="Benefici ambientali" hint="· stima annua" icon={Leaf}>
+        <Card className="flex flex-col">
           <div className="mt-3 grid flex-1 grid-cols-3 gap-2 text-center">
             <div className="dashboard-tile dashboard-tile-stat rounded-xl bg-muted/50 p-2"><div className="dashboard-tile-value font-display text-lg font-semibold">{`${co2} kg`}</div><div className="dashboard-tile-label text-[10px] leading-tight text-muted-foreground">CO₂ assorbita</div></div>
             <div className="dashboard-tile dashboard-tile-stat rounded-xl bg-muted/50 p-2"><div className="dashboard-tile-value font-display text-lg font-semibold">{`${water} m³`}</div><div className="dashboard-tile-label text-[10px] leading-tight text-muted-foreground">Acqua trattenuta</div></div>
@@ -355,21 +363,23 @@ function UrbanDash() {
           </div>
           <p className="mt-3 text-[11px] text-muted-foreground">Valori dimostrativi: ~22 kg CO₂ per albero, 60% di pioggia trattenuta su suolo permeabile (piovosità 700 mm, piazza di riferimento 4000 m²).</p>
         </Card>
+        </Fold>
+        <Fold title="Registro interventi" icon={NotebookPen}>
         <Card>
-          <div className="text-sm font-semibold">Registro interventi urbani</div>
-            <form className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] gap-2" onSubmit={(e) => { e.preventDefault(); if (draft.trim()) { addLog(draft.trim()); setDraft(""); } }}>
+            <form className="grid grid-cols-[minmax(0,1fr)_auto] gap-2" onSubmit={(e) => { e.preventDefault(); if (draft.trim()) { addLog(draft.trim()); setDraft(""); } }}>
               <input value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={140} placeholder="Nuovo intervento…" aria-label="Nuova voce del registro" className="min-w-0 rounded-full bg-muted px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
               <button aria-label="Aggiungi al registro" className="grid size-9 place-items-center rounded-full bg-urban text-primary-foreground"><Plus className="size-4" /></button>
             </form>
-            <button type="button" onClick={() => { addLog(`Scenario: ${lab.trees} alberi, ${lab.permeable}% suolo, ${lab.shade}% ombra (−${m.est.dT.toFixed(1)} °C)`); toast.success("Aggiunto al registro"); }} className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-urban/15 px-3 py-1.5 text-xs font-semibold text-urban"><Plus className="size-3.5" />Registra lo scenario del Lab</button>
+            <button type="button" onClick={() => { addLog(`Scenario: ${lab.trees} alberi, ${lab.permeable}% suolo, ${lab.shade}% ombra (−${m.est.dT.toFixed(1)} °C)`); toast.success("Aggiunto al registro"); }} className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-urban/15 px-3 py-1.5 text-xs font-semibold text-urban"><Plus className="size-3.5" />Registra lo scenario della simulazione</button>
             <ul className="mt-3 max-h-52 space-y-2 overflow-auto">{log.map((n, i) => <li key={`${n.d}-${n.t}-${i}`} className="flex items-start gap-3 rounded-xl bg-muted p-3 text-sm animate-in fade-in slide-in-from-top-1"><b className="shrink-0 text-urban">{n.d}</b><span className="dashboard-long-label min-w-0 flex-1">{n.t}</span><button type="button" aria-label={`Elimina voce del ${n.d}: ${n.t}`} onClick={() => {
               const removed = n;
               setLog((prev) => prev.filter((_, j) => j !== i));
               toast("Voce eliminata", { description: removed.t, duration: 6000, action: { label: "Annulla", onClick: () => setLog((prev) => { const next = [...prev]; next.splice(Math.min(i, next.length), 0, removed); return next; }) } });
             }} className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"><Trash2 className="size-4" /></button></li>)}</ul>
         </Card>
+          <FieldAI kind="urban" onAdd={addLog} />
+        </Fold>
       </div>
-      <FieldAI kind="urban" onAdd={addLog} />
     </div>
   );
 }
@@ -416,33 +426,22 @@ function VineDash() {
   const [txt, setTxt] = useState("");
   return (
     <div className="dashboard-view" data-testid="dashboard-vitivinicola">
-      <Header icon={Grape} color="var(--vine)" title="Dashboard Vitivinicola" />
-      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+      <div className="mb-3 grid grid-cols-3 gap-2 sm:mb-4 sm:gap-4">
         {vineLab.zones.map((z, i) => { const s = Math.round(vm.results[i]?.s ?? 0); const lv = vm.results[i]?.risk ?? "basso"; return (
-          <Card key={i} className={`space-y-2 ${i === vineLab.selected ? "ring-2 ring-inset ring-vine" : ""}`}>
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2"><b className="text-sm">Zona {i + 1}</b><StatusBadge level={lv}>Stress {s}</StatusBadge></div>
-            <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground"><span>Temp. <b className="text-foreground">{z.temperature}°C</b></span><span>Umidità <b className="text-foreground">{z.moisture}%</b></span><span>Vento <b className="text-foreground">{z.wind} km/h</b></span><span>Pioggia <b className="text-foreground">{z.rain ? "sì" : "no"}</b></span></div>
+          <Card key={i} className={`min-w-0 space-y-1.5 p-2.5 sm:p-5 ${i === vineLab.selected ? "ring-2 ring-inset ring-vine" : ""}`}>
+            <div className="flex flex-wrap items-center justify-between gap-1"><b className="text-sm">Zona {i + 1}</b><StatusBadge level={lv}>{s}</StatusBadge></div>
+            <div className="text-xs text-muted-foreground"><b className="text-foreground">{z.temperature}°C</b> · <b className="text-foreground">{z.moisture}%</b><span className="hidden sm:inline"> · {z.wind} km/h · pioggia {z.rain ? "sì" : "no"}</span></div>
           </Card>); })}
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
-        <Card className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 sm:gap-4"><Ring value={cwsi} max={1} color={levelColor(cwsi * 100)}><span className="font-display text-3xl font-semibold">{cwsi}</span><span className="text-[10px] text-muted-foreground">CWSI</span></Ring><div className="min-w-0"><StatusBadge level={cwsiLevel}>Stress {cwsiLevel}</StatusBadge><p className="dashboard-long-label mt-2 text-xs text-muted-foreground">0 = nessuno stress · 1 = stress massimo</p></div></Card>
-        <Metric label="Sonda 20 cm" value={probeData.at(-1)!.s20} unit="%" color="var(--water)" hint="Umidità volumetrica" />
-        <Metric label="Sonda 50 cm" value={probeData.at(-1)!.s50} unit="%" color="var(--urban)" hint="Umidità volumetrica" />
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <Kpi value={cwsi} max={1} color={levelColor(cwsi * 100)} center={cwsi} unit="CWSI" label="Stress idrico"><StatusBadge level={cwsiLevel}>{cwsiLevel}</StatusBadge></Kpi>
+        <Kpi value={probeData.at(-1)!.s20} max={55} color="var(--water)" center={`${probeData.at(-1)!.s20}%`} unit="umidità" label="Sonda 20 cm" />
+        <Kpi value={probeData.at(-1)!.s50} max={55} color="var(--urban)" center={`${probeData.at(-1)!.s50}%`} unit="umidità" label="Sonda 50 cm" />
       </div>
-      <p className="mt-3 text-xs text-muted-foreground">I valori seguono in tempo reale la simulazione e i cursori di "Irrigazione di soccorso" (valori dimostrativi).</p>
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <Card><div className="dashboard-card-title">Sonde umidità multilivello <span>· 14 giorni</span></div>
-          <ChartKey items={[{ label: "20 cm", color: "var(--water)" }, { label: "50 cm", color: "var(--urban)" }, { label: `Obiettivo ${tgt}%`, color: "var(--vine)" }]} />
-          <div className="dashboard-chart dashboard-chart-compact"><ResponsiveContainer width="100%" height="100%"><LineChart data={probeData} margin={{ top: 8, right: 6, bottom: 0, left: -20 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" /><XAxis dataKey="d" fontSize={10} interval={1} tickMargin={6} /><YAxis width={30} fontSize={10} domain={[0, 55]} tickMargin={4} /><Tooltip {...tip} /><ReferenceLine y={tgt} stroke="var(--vine)" strokeDasharray="6 4" /><Line dataKey="s20" name="20 cm" stroke="var(--water)" strokeWidth={3} dot={false} isAnimationActive={animateCharts} animationDuration={600} animationEasing="ease-out" /><Line dataKey="s50" name="50 cm" stroke="var(--urban)" strokeWidth={3} dot={false} isAnimationActive={animateCharts} animationDuration={600} animationEasing="ease-out" /></LineChart></ResponsiveContainer></div>
-        </Card>
-        <Card><div className="dashboard-card-title">Curve di maturazione <span>· confronto</span></div>
-          <ChartKey items={[{ label: "Zuccheri (°Bx)", color: "var(--warn)" }, { label: "Polifenoli (idx)", color: "var(--vine)" }]} />
-          <div className="dashboard-chart dashboard-chart-compact"><ResponsiveContainer width="100%" height="100%"><LineChart data={ripeData} margin={{ top: 8, right: 6, bottom: 0, left: -20 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" /><XAxis dataKey="w" fontSize={10} tickMargin={6} /><YAxis width={30} fontSize={10} domain={[0, 35]} tickMargin={4} /><Tooltip {...tip} /><Line dataKey="zuccheri" name="Zuccheri (°Bx)" stroke="var(--warn)" strokeWidth={3} dot={false} isAnimationActive={animateCharts} animationDuration={600} animationEasing="ease-out" /><Line dataKey="polifenoli" name="Polifenoli (idx)" stroke="var(--vine)" strokeWidth={3} dot={false} isAnimationActive={animateCharts} animationDuration={600} animationEasing="ease-out" /></LineChart></ResponsiveContainer></div>
-        </Card>
-      </div>
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
+      <p className="mt-3 text-xs text-muted-foreground">Valori dimostrativi: seguono la simulazione e l’irrigazione di soccorso. CWSI 0 = nessuno stress, 1 = massimo.</p>
+      <div className="mt-4 space-y-2">
+        <Fold title="Irrigazione di soccorso" icon={Droplets}>
         <Card className="space-y-4">
-          <div className="text-sm font-semibold">Irrigazione di soccorso</div>
           {[["Umidità attuale", cur, setCur, `${cur}%`], ["Umidità obiettivo", tgt, setTgt, `${tgt}%`], ["Efficienza impianto", eff, setEff, `${eff}%`]].map(([l, v, s, lab]) => (
             <div key={l as string}><div className="dashboard-control-label"><span>{l as string}</span><b>{lab as string}</b></div><Slider min={l === "Efficienza impianto" ? 50 : 5} max={l === "Efficienza impianto" ? 100 : 50} value={[v as number]} onValueChange={([x]) => (s as (n: number) => void)(x ?? 0)} /></div>
           ))}
@@ -460,9 +459,10 @@ function VineDash() {
             <button type="button" disabled={vol <= 0} onClick={() => { const z = vineLab.selected != null ? ` zona ${vineLab.selected + 1}` : ""; setNotes((prev) => [{ d: new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }), t: `Irrigazione soccorso ${Math.round(vol)} m³/ha${z} (suolo ${soilInfo.label.toLowerCase()})` }, ...prev]); toast.success("Aggiunto al quaderno"); }} className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-water px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"><Plus className="size-3.5" /> Invia al quaderno</button>
           </div>
         </Card>
+        </Fold>
+        <Fold title="Quaderno di campagna" icon={NotebookPen}>
         <Card>
-          <div className="text-sm font-semibold">Quaderno di campagna digitale</div>
-          <form className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] gap-2" onSubmit={(e) => { e.preventDefault(); if (!txt.trim()) return; setNotes([{ d: new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }), t: txt }, ...notes]); setTxt(""); }}>
+          <form className="grid grid-cols-[minmax(0,1fr)_auto] gap-2" onSubmit={(e) => { e.preventDefault(); if (!txt.trim()) return; setNotes([{ d: new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }), t: txt }, ...notes]); setTxt(""); }}>
             <input value={txt} onChange={(e) => setTxt(e.target.value)} placeholder="Nuova operazione…" className="min-w-0 rounded-full bg-muted px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
             <button className="grid size-9 place-items-center rounded-full bg-vine text-primary-foreground"><Plus className="size-4" /></button>
           </form>
@@ -472,8 +472,24 @@ function VineDash() {
             toast("Nota eliminata", { description: removed.t, duration: 6000, action: { label: "Annulla", onClick: () => setNotes((prev) => { const next = [...prev]; next.splice(Math.min(i, next.length), 0, removed); return next; }) } });
           }} className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"><Trash2 className="size-4" /></button></li>)}</ul>
         </Card>
+        <FieldAI onAdd={(t) => setNotes((prev) => [{ d: new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }), t }, ...prev])} />
+        </Fold>
+        <Fold title="Sonde e maturazione" hint="· 14 giorni e 10 settimane" icon={LineChartIcon}>
+        <Card><div className="dashboard-card-title">Sonde umidità multilivello <span>· 14 giorni</span></div>
+          <ChartKey items={[{ label: "20 cm", color: "var(--water)" }, { label: "50 cm", color: "var(--urban)" }, { label: `Obiettivo ${tgt}%`, color: "var(--vine)" }]} />
+          <div className="dashboard-chart dashboard-chart-compact"><ResponsiveContainer width="100%" height="100%"><LineChart data={probeData} margin={{ top: 8, right: 6, bottom: 0, left: -20 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" /><XAxis dataKey="d" fontSize={10} interval={1} tickMargin={6} /><YAxis width={30} fontSize={10} domain={[0, 55]} tickMargin={4} /><Tooltip {...tip} /><ReferenceLine y={tgt} stroke="var(--vine)" strokeDasharray="6 4" /><Line dataKey="s20" name="20 cm" stroke="var(--water)" strokeWidth={3} dot={false} isAnimationActive={animateCharts} animationDuration={600} animationEasing="ease-out" /><Line dataKey="s50" name="50 cm" stroke="var(--urban)" strokeWidth={3} dot={false} isAnimationActive={animateCharts} animationDuration={600} animationEasing="ease-out" /></LineChart></ResponsiveContainer></div>
+        </Card>
+        <Card><div className="dashboard-card-title">Curve di maturazione <span>· confronto</span></div>
+          <ChartKey items={[{ label: "Zuccheri (°Bx)", color: "var(--warn)" }, { label: "Polifenoli (idx)", color: "var(--vine)" }]} />
+          <div className="dashboard-chart dashboard-chart-compact"><ResponsiveContainer width="100%" height="100%"><LineChart data={ripeData} margin={{ top: 8, right: 6, bottom: 0, left: -20 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" /><XAxis dataKey="w" fontSize={10} tickMargin={6} /><YAxis width={30} fontSize={10} domain={[0, 35]} tickMargin={4} /><Tooltip {...tip} /><Line dataKey="zuccheri" name="Zuccheri (°Bx)" stroke="var(--warn)" strokeWidth={3} dot={false} isAnimationActive={animateCharts} animationDuration={600} animationEasing="ease-out" /><Line dataKey="polifenoli" name="Polifenoli (idx)" stroke="var(--vine)" strokeWidth={3} dot={false} isAnimationActive={animateCharts} animationDuration={600} animationEasing="ease-out" /></LineChart></ResponsiveContainer></div>
+        </Card>
+        </Fold>
+        <Fold title="Bilancio idrico del territorio" hint="· m³" icon={Waves}>
+        <Card><ChartKey items={[{ label: "Domanda", color: "var(--warn)" }, { label: "Disponibile", color: "var(--water)" }]} />
+          <div className="dashboard-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={WATER_BALANCE} margin={{ top: 8, right: 6, bottom: 0, left: -14 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" /><XAxis dataKey="m" fontSize={10} tickMargin={6} /><YAxis width={38} fontSize={10} tickMargin={4} /><Tooltip {...tip} /><Bar dataKey="domanda" name="Domanda" fill="var(--warn)" radius={[8, 8, 0, 0]} isAnimationActive={animateCharts} /><Bar dataKey="disponibile" name="Disponibile" fill="var(--water)" radius={[8, 8, 0, 0]} isAnimationActive={animateCharts} /></BarChart></ResponsiveContainer></div>
+        </Card>
+        </Fold>
       </div>
-      <FieldAI onAdd={(t) => setNotes((prev) => [{ d: new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }), t }, ...prev])} />
     </div>
   );
 }
@@ -495,17 +511,15 @@ function ProgressRing({ pct }: { pct: number }) {
   );
 }
 
-function Exec() {
-  const animateCharts = useChartAnimation();
-  const [ctx, setCtx] = useState<"Urbano" | "Vitivinicolo">("Urbano");
-  const loading = useDashboardLoading(ctx);
+/** "Esporta" della scheda aperta: PDF, copia, stampa, GeoJSON e CSV (prima nel cruscotto esecutivo). */
+function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
+  const water = WATER_BALANCE;
   const labState = useLab(), um = urbanMetrics(labState.urban), vm = vineMetrics(labState.vineyard);
   const reportMedia = useLabMedia(ctx === "Urbano" ? "urban" : "vineyard");
   // Every AI camera scan of this flow, photo or not.
   const scanRows = scanReportRows(useArScans(ctx === "Urbano" ? "urban" : "vineyard"));
   const idx = ctx === "Urbano" ? [["Calore", um.heat], ["Rifugi", um.refuges], ["Verde", um.green]] : [["Stress idrico", vm.waterStress], ["Stress termico", vm.heatStress], ["Maturità", 30]];
   const lv = (v: number) => (v < 35 ? "basso" : v < 65 ? "moderato" : "elevato");
-  const water = [{ m: "Giu", domanda: 420, disponibile: 520 }, { m: "Lug", domanda: 610, disponibile: 470 }, { m: "Ago", domanda: 680, disponibile: 410 }, { m: "Set", domanda: 450, disponibile: 480 }];
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<string[] | null>(null);
   const [mode, setMode] = useState<"print" | "save">("print");
@@ -839,12 +853,8 @@ function Exec() {
     });
   };
   return (
-    <div className="dashboard-view" data-testid="dashboard-esecutivo">
-      <Header icon={LayoutGrid} color="var(--foreground)" title="Cruscotto Esecutivo" />
-      <div className="dashboard-exec-controls sticky top-[calc(var(--nav-h)+95px)] transition-[top] duration-300 z-[999999997] isolate -mx-4 mb-4 border-b bg-background px-4 py-2">
-        <button onClick={startExport} className="inline-flex min-w-0 items-center justify-center gap-2 rounded-full bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 active:bg-primary/80 sm:px-4"><Download className="size-4 shrink-0" /><span className="truncate">Esporta report</span></button>
-        <Pills options={["Urbano", "Vitivinicolo"] as const} value={ctx} onChange={setCtx} className="min-w-0 flex-nowrap" />
-      </div>
+    <>
+      <button onClick={startExport} className="inline-flex min-w-0 items-center justify-center gap-2 rounded-full bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 active:bg-primary/80 sm:px-4"><Download className="size-4 shrink-0" /><span className="truncate">Esporta report</span></button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Esporta report — {ctx}</DialogTitle></DialogHeader>
@@ -883,52 +893,29 @@ function Exec() {
           </div>
         </DialogContent>
       </Dialog>
-      {loading ? <DashboardLoading label={`cruscotto ${ctx.toLowerCase()}`} tone={ctx === "Urbano" ? "urban" : "vine"} /> : <div className="dashboard-content-enter">
-      <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
-        {idx.map(([k, v]) => (
-          <Card key={k as string} className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 sm:gap-4 lift"><Ring value={v as number} size={100} stroke={10} color={levelColor(v as number)}><span className="font-display text-2xl font-semibold">{v}</span></Ring><div className="min-w-0"><div className="dashboard-long-label font-semibold">{k}</div><StatusBadge level={lv(v as number)} /></div></Card>
-        ))}
-      </div>
-      <Card className="mt-4"><div className="text-sm font-semibold">Valori dalle simulazioni <span className="font-normal text-muted-foreground">· in tempo reale</span></div>
-        <div className="mt-3 space-y-2 text-sm">{labRows.map(([k, x]) => <div key={k} className="dashboard-detail-row"><span className="text-muted-foreground">{k}</span><b>{x}</b></div>)}</div>
-      </Card>
-      <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1.45fr)_minmax(15rem,0.75fr)]">
-        <Card><div className="dashboard-card-title">Bilancio idrico territoriale <span>· m³</span></div>
-          <ChartKey items={[{ label: "Domanda", color: "var(--warn)" }, { label: "Disponibile", color: "var(--water)" }]} />
-          <div className="dashboard-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={water} margin={{ top: 8, right: 6, bottom: 0, left: -14 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" /><XAxis dataKey="m" fontSize={10} tickMargin={6} /><YAxis width={38} fontSize={10} tickMargin={4} /><Tooltip {...tip} /><Bar dataKey="domanda" name="Domanda" fill="var(--warn)" radius={[6, 6, 0, 0]} isAnimationActive={animateCharts} animationDuration={1100} animationEasing="ease-out" /><Bar dataKey="disponibile" name="Disponibile" fill="var(--water)" radius={[6, 6, 0, 0]} isAnimationActive={animateCharts} animationBegin={180} animationDuration={1100} animationEasing="ease-out" /></BarChart></ResponsiveContainer></div>
-        </Card>
-        <Card><div className="text-sm font-semibold">Scala di rischio a 3 livelli</div>
-          <div className="mt-3 space-y-2">{[["basso", "0–34", "Monitoraggio ordinario"], ["moderato", "35–64", "Pianificare intervento"], ["elevato", "65–100", "Azione prioritaria"]].map(([l, r, d]) => <div key={l} className="dashboard-risk-row"><StatusBadge level={l as string} /><span className="text-muted-foreground">{r}</span><span className="dashboard-long-label font-medium">{d}</span></div>)}</div>
-        </Card>
-      </div>
-      </div>}
-    </div>
+    </>
   );
 }
 
 function Dashboard() {
-  const { tab } = Route.useSearch();
+  const { tab: t } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
-  const t = tab;
-  const setT = (v: "Urbana" | "Vitivinicola" | "Esecutivo") =>
+  const setT = (v: "Piazza" | "Vigneto") =>
     navigate({ search: (prev) => ({ ...prev, tab: v }), replace: true, resetScroll: false });
   const loading = useDashboardLoading(t);
-  const lab = useLab();
   return (
     <div className="min-w-0 overflow-x-clip">
-      <SectionTitle eyebrow="Monitoraggio" title="Dashboard operative" desc="Indicatori di salute climatica con dati dimostrativi." />
-      <div className="sticky top-[var(--nav-h)] transition-[top] duration-300 z-[999999998] isolate -mx-4 mb-5 min-w-0 overflow-hidden border-b bg-background/95 px-4 py-2 backdrop-blur-xl sm:mb-6">
-        <LabSyncIndicator className="mb-2 max-w-full" />
-        <Pills options={["Urbana", "Vitivinicola", "Esecutivo"] as const} value={t} onChange={setT} className="w-full flex-nowrap overflow-x-auto" />
-        {t === "Urbana"
-          ? <AreaBanner label={lab.urban.location.label} lat={lab.urban.location.lat} lng={lab.urban.location.lng} detail={`Area di intervento dalla simulazione · ${lab.urban.trees} alberi, ${lab.urban.permeable}% suolo, ${lab.urban.shade}% ombra`} />
-          : t === "Vitivinicola"
-            ? <AreaBanner label={lab.vineyard.location.label} lat={lab.vineyard.location.lat} lng={lab.vineyard.location.lng} detail={`Fase ${lab.vineyard.phase} · Zona ${lab.vineyard.selected + 1} selezionata nella simulazione`} />
-            : null}
+      <h1 className="sr-only">Dashboard</h1>
+      <div className="sticky top-[var(--nav-h)] transition-[top] duration-300 z-[999999998] isolate -mx-4 mb-5 min-w-0 border-b bg-background/95 px-4 py-2 backdrop-blur-xl sm:mb-6">
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <Pills options={["Piazza", "Vigneto"] as const} value={t} onChange={setT} className="w-auto flex-nowrap" />
+          <ExportReport ctx={t === "Piazza" ? "Urbano" : "Vitivinicolo"} />
+        </div>
+        <LabSyncIndicator className="mt-2 max-w-full" />
       </div>
       <div key={t} className="min-w-0">{loading
-        ? <DashboardLoading label={t === "Esecutivo" ? "cruscotto esecutivo" : `dashboard ${t.toLowerCase()}`} tone={t === "Urbana" ? "urban" : t === "Vitivinicola" ? "vine" : "primary"} />
-        : <div className="dashboard-content-enter">{t === "Urbana" ? <UrbanDash /> : t === "Vitivinicola" ? <VineDash /> : <Exec />}</div>}
+        ? <DashboardLoading label={t === "Piazza" ? "dashboard della piazza" : "dashboard del vigneto"} tone={t === "Piazza" ? "urban" : "vine"} />
+        : <div className="dashboard-content-enter">{t === "Piazza" ? <UrbanDash /> : <VineDash />}</div>}
       </div>
     </div>
   );
