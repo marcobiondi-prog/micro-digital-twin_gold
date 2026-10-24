@@ -13,7 +13,6 @@ import { LocationCard, splitLocation, ImportWeatherButton } from "@/views/Simula
 import { UrbanPlay } from "@/views/v1/UrbanPlay";
 import { VinePlay } from "@/views/v1/VinePlay";
 import { Fold } from "@/views/Fold";
-import { useSignedIn } from "@/lib/use-signed-in";
 import { comparison, levelTone, nextPhase, piazzaEstimate, prototypeChoice, type PrototypeId } from "@/models/scenarios";
 import { applyVineyardScenario, closestVineyardScenario, vineyardControlValue, vineyardScenarioSteps } from "@/models/vineyard-controls";
 import { resetUrban, resetVineyard, setUrban, setVineyard, useLab, vineMetrics, vineyardSituation, type LabState } from "@/models/lab-store";
@@ -261,9 +260,6 @@ function ComparisonDialog({ children, matrix, onImportWeather }: { children: Rea
 
 /** Simulazione urbana completa: riepilogo con Confronta, dati reali, media, griglia. */
 export function UrbanFlow() {
-  const { signedIn, demo } = useSignedIn();
-  // Sensor suggestions call an auth-protected server function: real accounts only.
-  const realSignedIn = signedIn && !demo;
   const [compareOpen, setCompareOpen] = useState(false);
   const [pinned, setPinned] = useState<PrototypeId | null>(null);
   const [baseline, setBaseline] = useState<LabState["urban"] | null>(null);
@@ -320,7 +316,7 @@ export function UrbanFlow() {
       <div className="space-y-2">
         <Fold title="Luogo e mappa" icon={MapPin}><LocationCard kind="urban" /></Fold>
         <Fold title="Foto e video" icon={Camera}><LabMedia embedded kind="urban" context={`Scenario: ${comparison.find((l) => l.id === activeLevel)?.s ?? "attuale"}`} /></Fold>
-        {realSignedIn && <Fold title="Dove installare sensori" icon={Radar}><SensorAdvisor embedded kind="urban" /></Fold>}
+        <Fold title="Dove mettere i sensori" hint="· AI" icon={Radar}><SensorAdvisor embedded kind="urban" /></Fold>
       </div>
       <Dialog open={compareOpen} onOpenChange={setCompareOpen}>
         <ComparisonDialog onImportWeather={importRealWeather} matrix={<PrototypeMatrix kind="urban" activeLevel={activeLevel} />}><ComparisonTable realTemp={urban.realTemp} place={place} trees={base.trees} permeable={base.permeable} shade={base.shade} activeLevel={activeLevel} onApply={applyScenario} /></ComparisonDialog>
@@ -331,9 +327,6 @@ export function UrbanFlow() {
 
 /** Simulazione del vigneto completa: riepilogo con Confronta e invio, dati reali, media, griglia. */
 export function VineyardFlow() {
-  const { signedIn, demo } = useSignedIn();
-  // Sensor suggestions call an auth-protected server function: real accounts only.
-  const realSignedIn = signedIn && !demo;
   const [send, setSend] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [pinned, setPinned] = useState<PrototypeId | null>(null);
@@ -397,7 +390,7 @@ export function VineyardFlow() {
       <div className="space-y-2">
         <Fold title="Luogo e mappa" icon={MapPin}><LocationCard kind="vineyard" /></Fold>
         <Fold title="Foto e video" icon={Camera}><LabMedia embedded kind="vineyard" context={`${vineyard.allZones ? "Tutte le zone" : `Zona ${vineyard.selected + 1}`} · ${vineyard.phase}`} /></Fold>
-        {realSignedIn && <Fold title="Dove installare sensori" icon={Radar}><SensorAdvisor embedded kind="vineyard" /></Fold>}
+        <Fold title="Dove mettere i sensori" hint="· AI" icon={Radar}><SensorAdvisor embedded kind="vineyard" /></Fold>
       </div>
       <Dialog open={compareOpen} onOpenChange={setCompareOpen}>
         <ComparisonDialog onImportWeather={importRealWeather} matrix={<PrototypeMatrix kind="vineyard" activeLevel={activeLevel} />}><VineComparison v={vineyard} base={base} activeLevel={activeLevel} onApply={applyScenario} /></ComparisonDialog>
