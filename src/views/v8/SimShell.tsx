@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Camera, Images, MapPin, MoreHorizontal, Radar, RotateCcw, Scale, Send, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import { Camera, Images, MapPin, EllipsisVertical, Radar, RotateCcw, Scale, Send, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { setCameraSheetOpen } from "@/lib/camera-dock";
 import { Ambient, HeroButton, PageHero, Panels, TabRow, openSimTab, useSimTab, type SimKind, type SimTab } from "./console";
@@ -31,8 +31,8 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, luog
         actions={<>
           <HeroButton icon={Scale} label="Confronta" onClick={onCompare} showLabel />
           <DropdownMenu>
-            <DropdownMenuTrigger asChild><button type="button" aria-label="Altre azioni" className="grid size-11 place-items-center rounded-full bg-foreground/10 text-foreground outline-none backdrop-blur transition-colors hover:bg-foreground/[0.16] focus-visible:ring-2 focus-visible:ring-ring"><MoreHorizontal className="size-6" aria-hidden="true" /></button></DropdownMenuTrigger>
-            <DropdownMenuContent align="end" sideOffset={8} className="w-64 rounded-2xl border-white/10 bg-[#262b34] p-1.5 text-white shadow-2xl">
+            <DropdownMenuTrigger asChild><button type="button" aria-label="Altre azioni" className="grid size-11 place-items-center rounded-full bg-foreground/10 text-foreground outline-none backdrop-blur transition-colors hover:bg-foreground/[0.16] focus-visible:ring-2 focus-visible:ring-ring"><EllipsisVertical className="size-6" aria-hidden="true" /></button></DropdownMenuTrigger>
+            <DropdownMenuContent align="end" sideOffset={8} className="z-[999999999] w-64 rounded-2xl border-white/10 bg-[#262b34] p-1.5 text-white shadow-2xl">
               <Item icon={Camera} label="Fotocamera" onSelect={() => setCameraSheetOpen(true)} />
               <Item icon={Images} label="Foto e video salvati" onSelect={() => go("media")} />
               <Item icon={Radar} label="Dove mettere i sensori" onSelect={() => go("sensori")} />
