@@ -1,12 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Outlet, Link, createRootRouteWithContext, useLocation, useNavigate, HeadContent, Scripts, type ErrorComponentProps } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { ThemeToggle } from "@/views/theme-toggle";
+import { THEME_DARK, ThemeToggle, themeBootScript } from "@/views/theme-toggle";
 import { AccountControl } from "@/views/account-control";
 import { TwinMascot } from "@/views/TwinMascot";
 import { CameraDockButton, CameraSheet } from "@/views/CameraDock";
@@ -65,12 +65,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "description", content: "Micro digital twin per l'adattamento climatico urbano e vitivinicolo." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "theme-color", content: "#ffffff" },
-      // iPhone/iPad "Aggiungi a Home": full-screen app with its own name and a light status bar.
+      { name: "theme-color", content: THEME_DARK },
+      // iPhone/iPad "Aggiungi a Home": full-screen app with its own name and a dark status bar that matches the canvas.
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-title", content: "Digital Twin" },
-      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -91,8 +91,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="it">
-      <head><HeadContent /></head>
+    <html lang="it" className="dark" style={{ colorScheme: "dark" }} suppressHydrationWarning>
+      <head><HeadContent /><script dangerouslySetInnerHTML={{ __html: themeBootScript }} /></head>
       <body>
         {children}
         <Scripts />
@@ -128,6 +128,15 @@ function goHomeBack(e: { preventDefault: () => void }, to: string, pathname: str
   }
   return false;
 }
+
+// Where the selection light sits for each of the five columns on the 108 px bar: the crescent edge
+// "M0 74 Q50 52 100 74" (viewBox 100×90) is y = 74 − 44·t(1 − t); tilt = its tangent on a ~390 px wide phone.
+const PS_LIGHT: Record<number, { left: string; top: string; tilt: string }> = {
+  0: { left: "10%", top: "81.5px", tilt: "-6deg" },
+  1: { left: "30%", top: "75.5px", tilt: "-3deg" },
+  3: { left: "70%", top: "75.5px", tilt: "3deg" },
+  4: { left: "90%", top: "81.5px", tilt: "6deg" },
+};
 
 function BottomNav() {
   const pathname = useLocation({ select: (l) => l.pathname });
@@ -169,37 +178,52 @@ function BottomNav() {
       ro.disconnect();
     };
   }, [pathname]);
-  const item = ({ to, l, I }: (typeof bottomItems)[number]) => {
+  const item = ({ to, l, I }: (typeof bottomItems)[number], index: number) => {
     const active = pathname === to;
     return (
       <li key={to}>
-        <Link to={to} replace={pathname !== "/"} aria-current={active ? "page" : undefined}
+        <Link to={to} replace={pathname !== "/"} aria-current={active ? "page" : undefined} aria-label={l}
           onClick={(e) => {
             if (goHomeBack(e, to, pathname)) return;
             if (!active) return;
             e.preventDefault();
             window.scrollTo({ top: 0, behavior: "instant" });
           }}
-          className={`flex h-16 flex-col items-center justify-end gap-1 pb-2 text-[11px] font-medium outline-none transition-colors focus-visible:bg-muted ${active ? "text-nav-accent-ink" : "text-muted-foreground dark:text-nav-accent-foreground"}`}>
-          <span className={`nav-glass nav-glass-gloss relative grid h-7 w-12 place-items-center rounded-full ${active ? "nav-glass-on text-nav-accent-foreground" : "text-muted-foreground dark:text-nav-accent-foreground"}`}>
-            <I className="size-5" aria-hidden="true" />
-          </span>
-          <span className="max-w-full truncate px-1">{l}</span>
+          className="ps-nav-item" data-active={active || undefined}>
+          <span className="ps-nav-icon"><I className="size-6" strokeWidth={2} aria-hidden="true" /></span>
         </Link>
       </li>
     );
   };
+  const index = bottomItems.findIndex((b) => b.to === pathname);
+  const current = bottomItems[index];
+  // The selection light rides the edge of the lower crescent: grid column (the camera owns column 2), its height on the curve and the tangent's tilt.
+  const light = index < 0 ? null : PS_LIGHT[index < 2 ? index : index + 1];
   return (
-    <nav aria-label="Menu principale" className={`fixed inset-x-0 bottom-0 z-[999999998] transition-transform duration-300 motion-reduce:transition-none sm:hidden ${hidden ? "translate-y-full" : "translate-y-0"}`}>
-      {/* Arched bar: the top edge rises toward the centre and cradles the camera button. */}
-      <svg className="nav-arc pointer-events-none absolute inset-x-0 bottom-0 h-[calc(6rem+env(safe-area-inset-bottom))] w-full" viewBox="0 0 100 96" preserveAspectRatio="none" aria-hidden="true">
-        <path d="M0 38 Q50 -10 100 38 V96 H0 Z" />
-      </svg>
-      <ul className="relative grid grid-cols-5 items-end pb-[env(safe-area-inset-bottom)]">
-        {bottomItems.slice(0, 2).map(item)}
-        <li className="flex justify-center"><span className="-translate-y-5"><CameraDockButton /></span></li>
-        {bottomItems.slice(2).map(item)}
-      </ul>
+    <nav aria-label="Menu principale" className={`ps-nav fixed inset-x-0 bottom-0 z-[999999998] transition-transform duration-300 motion-reduce:transition-none sm:hidden ${hidden ? "translate-y-full" : "translate-y-0"}`}>
+      {/* PlayStation-app slab: a frosted slate arch for the icons with a darker crescent laid over its foot; a straight light slides along the crescent's edge under the open page, whose name sits in the crescent; the AI camera rises in the middle. */}
+      <div className="relative h-[108px]">
+        <div className="ps-nav-glass pointer-events-none absolute inset-0" aria-hidden="true" />
+        <svg className="ps-nav-bg pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 90" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="ps-nav-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#3d4552" stopOpacity="0.86" /><stop offset="1" stopColor="#232831" stopOpacity="0.94" /></linearGradient>
+            <linearGradient id="ps-nav-band" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1a1d24" /><stop offset="0.45" stopColor="#121419" /><stop offset="1" stopColor="#0e1014" /></linearGradient>
+            <linearGradient id="ps-nav-edge" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#fff" stopOpacity="0.08" /><stop offset="0.5" stopColor="#fff" stopOpacity="0.32" /><stop offset="1" stopColor="#fff" stopOpacity="0.08" /></linearGradient>
+          </defs>
+          <path d="M0 22 Q50 2 100 22 V90 H0 Z" fill="url(#ps-nav-fill)" />
+          <path d="M0 22 Q50 2 100 22" fill="none" stroke="url(#ps-nav-edge)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+          <path className="ps-nav-crescent" d="M0 74 Q50 52 100 74 V90 H0 Z" fill="url(#ps-nav-band)" />
+          <path d="M0 74 Q50 52 100 74" fill="none" stroke="url(#ps-nav-edge)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+        </svg>
+        {light && <span className="ps-nav-light" style={{ left: light.left, top: light.top, "--ps-tilt": light.tilt } as CSSProperties} aria-hidden="true" />}
+        <ul className="relative grid grid-cols-5 items-start pt-6">
+          {bottomItems.slice(0, 2).map((b, i) => item(b, i))}
+          <li className="flex justify-center"><CameraDockButton /></li>
+          {bottomItems.slice(2).map((b, i) => item(b, i + 2))}
+        </ul>
+        <p className="relative h-8 text-center text-[13px] font-medium leading-8 tracking-wide text-white/90" aria-hidden="true">{current?.l ?? ""}</p>
+      </div>
+      <div className="absolute inset-x-0 bottom-0 h-[env(safe-area-inset-bottom)] bg-[#0e1014]" aria-hidden="true" />
     </nav>
   );
 }
@@ -301,9 +325,6 @@ function SmartNav() {
               ))}
             </div>
           </nav>
-          <div className="shrink-0 pl-1">
-            <ThemeToggle />
-          </div>
         </div>
       </div>
     </div>
@@ -417,22 +438,27 @@ function RootComponent() {
       >
         Salta al contenuto principale
       </a>
-      <header id="app-header" className="border-b bg-background pt-[env(safe-area-inset-top)]">
-        <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-2 sm:px-4 sm:py-3">
+      {/* v8: a solid console top bar painted with the page's own ambient light, so it carries the same shades without being see-through. */}
+      <header id="app-header" className="app-header-tint relative pt-[env(safe-area-inset-top)]">
+        <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-2 sm:px-4 sm:py-3">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-            <Link to="/" onClick={(e) => goHomeBack(e, "/", location.pathname)} className="flex min-w-0 items-center gap-1.5 font-display text-base font-semibold sm:gap-2 sm:text-xl">
-              <span className="header-logo-frame grid h-12 w-14 shrink-0 place-items-center sm:h-14 sm:w-16">
+            <Link to="/" onClick={(e) => goHomeBack(e, "/", location.pathname)} className="flex min-w-0 items-center gap-1.5 font-display text-[15px] font-semibold tracking-wide sm:gap-2 sm:text-lg">
+              <span className="header-logo-frame grid h-10 w-12 shrink-0 place-items-center sm:h-12 sm:w-14">
                 <TwinMascot className="header-logo block h-full w-full" />
               </span>
               <span className="truncate whitespace-nowrap">MICRO DIGITAL <span className="text-brand-turquoise">TWIN</span></span>
             </Link>
           </div>
-          <AccountControl />
+          {/* The theme switch sits beside the account button: one place for both, on every size. */}
+          <div className="flex shrink-0 items-center gap-2">
+            <ThemeToggle />
+            <AccountControl />
+          </div>
         </div>
       </header>
       <div className="hidden sm:block"><SmartNav /></div>
 
-      <main id="main-content" tabIndex={-1} className="app-main mx-auto max-w-7xl px-4 py-8 focus:outline-none"><Outlet /></main><Toaster />
+      <main id="main-content" tabIndex={-1} className="app-main mx-auto max-w-7xl px-4 pb-8 pt-6 focus:outline-none sm:pt-8"><Outlet /></main><Toaster />
       <footer className="mx-auto max-w-7xl px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] text-xs text-muted-foreground sm:pb-10">
         I risultati del simulatore sono indicativi e non sostituiscono modelli fisici calibrati.
       </footer>

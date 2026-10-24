@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { VineyardFlow } from "@/views/LabFlows";
-import { SimulationHeader } from "@/views/SimulationHeader";
 
 export const Route = createFileRoute("/vigneto")({
   head: () => ({
@@ -16,7 +15,6 @@ export const Route = createFileRoute("/vigneto")({
 function Vigneto() {
   return (
     <div className="lab-page">
-      <SimulationHeader kind="vineyard" />
       <VineyardFlow />
     </div>
   );

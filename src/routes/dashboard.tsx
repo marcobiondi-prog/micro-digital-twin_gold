@@ -6,7 +6,7 @@ import { AlertTriangle, Download, Plus, Building2, Grape, Copy, Printer, Activit
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Card, Pills, Ring, StatusBadge, levelColor } from "@/views/health";
+import { Card, Ring, StatusBadge, levelColor } from "@/views/health";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { scenarioCsv, scenarioGeoJson } from "@/models/scenario-export";
@@ -17,7 +17,8 @@ import { splitLocation } from "@/views/SimulationGrid";
 import { MapPin } from "lucide-react";
 import { setVineyard, splitLabel, urbanMetrics, useLab, vineMetrics } from "@/models/lab-store";
 import { LabSyncIndicator } from "@/views/LabSyncIndicator";
-import { Fold } from "@/views/Fold";
+import { Fold, FoldTabs } from "@/views/Fold";
+import { Ambient, PageHero, TabRow } from "@/views/v8/console";
 import { FieldAI } from "@/views/FieldAI";
 import climateTwinLogo from "@/assets/climate-twin-logo-final.png";
 import climateTwinLogoCompact from "@/assets/climate-twin-logo-compact.png";
@@ -276,7 +277,7 @@ function UrbanDash() {
   return (
     <div className="dashboard-view" data-testid="dashboard-urbana">
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        <Kpi value={peak} max={35} color={levelColor(peak > 29 ? 80 : peak > 26 ? 50 : 20)} center={peak} unit="WBGT °C" label="Calore"><StatusBadge level={lvl}>{lvl}</StatusBadge></Kpi>
+        <Kpi value={peak} max={35} color={levelColor(peak > 29 ? 80 : peak > 26 ? 50 : 20)} center={peak} unit="°C percepiti" label="Calore"><StatusBadge level={lvl}>{lvl}</StatusBadge></Kpi>
         <Kpi value={cover} max={target} color="var(--leaf)" center={`${cover}%`} unit={`su ${target}%`} label="Copertura alberi" />
         <Kpi value={le5} max={100} color="var(--urban)" center={`${le5}%`} unit="≤5 min" label="Rifugi vicini"><span className="text-[10px] text-muted-foreground">{le10}% entro 10 min</span></Kpi>
       </div>
@@ -327,11 +328,11 @@ function UrbanDash() {
           </>) : null}
            </div>
       </div>
-      <div className="mt-4 space-y-2">
+      <FoldTabs className="mt-6">
         <Fold title="Andamento del calore" hint="· 24 h" icon={LineChartIcon}>
         <Card>
-          <ChartKey items={[{ label: "WBGT (°C)", color: "var(--danger)" }]} />
-          <div className="dashboard-chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={hourData} margin={{ top: 8, right: 6, bottom: 0, left: -20 }}><defs><linearGradient id="gw" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="var(--danger)" stopOpacity={0.4} /><stop offset="100%" stopColor="var(--danger)" stopOpacity={0} /></linearGradient></defs><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" /><XAxis dataKey="h" fontSize={10} interval={3} tickMargin={6} /><YAxis width={30} fontSize={10} domain={[15, 35]} tickMargin={4} /><Tooltip {...tip} /><Area type="monotone" dataKey="wbgt" name="WBGT" stroke="var(--danger)" strokeWidth={3} fill="url(#gw)" isAnimationActive={animateCharts} animationDuration={1400} animationEasing="ease-out" /></AreaChart></ResponsiveContainer></div>
+          <ChartKey items={[{ label: "Calore percepito (°C)", color: "var(--danger)" }]} />
+          <div className="dashboard-chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={hourData} margin={{ top: 8, right: 6, bottom: 0, left: -20 }}><defs><linearGradient id="gw" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="var(--danger)" stopOpacity={0.4} /><stop offset="100%" stopColor="var(--danger)" stopOpacity={0} /></linearGradient></defs><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" /><XAxis dataKey="h" fontSize={10} interval={3} tickMargin={6} /><YAxis width={30} fontSize={10} domain={[15, 35]} tickMargin={4} /><Tooltip {...tip} /><Area type="monotone" dataKey="wbgt" name="Calore percepito" stroke="var(--danger)" strokeWidth={3} fill="url(#gw)" isAnimationActive={animateCharts} animationDuration={1400} animationEasing="ease-out" /></AreaChart></ResponsiveContainer></div>
         </Card>
         </Fold>
         <Fold title="Avvisi calore" icon={AlertTriangle}>
@@ -366,7 +367,7 @@ function UrbanDash() {
         </Card>
           <FieldAI kind="urban" onAdd={addLog} />
         </Fold>
-      </div>
+      </FoldTabs>
     </div>
   );
 }
@@ -421,12 +422,12 @@ function VineDash() {
           </Card>); })}
       </div>
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        <Kpi value={cwsi} max={1} color={levelColor(cwsi * 100)} center={cwsi} unit="CWSI" label="Stress idrico"><StatusBadge level={cwsiLevel}>{cwsiLevel}</StatusBadge></Kpi>
+        <Kpi value={cwsi} max={1} color={levelColor(cwsi * 100)} center={cwsi} unit="su 1" label="Sete della vite"><StatusBadge level={cwsiLevel}>{cwsiLevel}</StatusBadge></Kpi>
         <Kpi value={probeData.at(-1)!.s20} max={55} color="var(--water)" center={`${probeData.at(-1)!.s20}%`} unit="umidità" label="Sonda 20 cm" />
         <Kpi value={probeData.at(-1)!.s50} max={55} color="var(--urban)" center={`${probeData.at(-1)!.s50}%`} unit="umidità" label="Sonda 50 cm" />
       </div>
-      <p className="mt-3 text-xs text-muted-foreground">Valori dimostrativi: seguono la simulazione e l’irrigazione di soccorso. CWSI 0 = nessuno stress, 1 = massimo.</p>
-      <div className="mt-4 space-y-2">
+      <p className="mt-3 text-xs text-muted-foreground">Valori dimostrativi che seguono la simulazione. Sete della vite: 0 = nessuna, 1 = massima.</p>
+      <FoldTabs className="mt-6">
         <Fold title="Irrigazione di soccorso" icon={Droplets}>
         <Card className="space-y-4">
           {[["Umidità attuale", cur, setCur, `${cur}%`], ["Umidità obiettivo", tgt, setTgt, `${tgt}%`], ["Efficienza impianto", eff, setEff, `${eff}%`]].map(([l, v, s, lab]) => (
@@ -476,7 +477,7 @@ function VineDash() {
           <div className="dashboard-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={WATER_BALANCE} margin={{ top: 8, right: 6, bottom: 0, left: -14 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" /><XAxis dataKey="m" fontSize={10} tickMargin={6} /><YAxis width={38} fontSize={10} tickMargin={4} /><Tooltip {...tip} /><Bar dataKey="domanda" name="Domanda" fill="var(--warn)" radius={[8, 8, 0, 0]} isAnimationActive={animateCharts} /><Bar dataKey="disponibile" name="Disponibile" fill="var(--water)" radius={[8, 8, 0, 0]} isAnimationActive={animateCharts} /></BarChart></ResponsiveContainer></div>
         </Card>
         </Fold>
-      </div>
+      </FoldTabs>
     </div>
   );
 }
@@ -540,7 +541,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   const uCost = u.trees + u.permeable / 5 + u.shade / 5 > 25 ? "alto" : u.trees + u.permeable / 5 + u.shade / 5 > 12 ? "medio" : "basso";
   const urbanDashRows: [string, string][] = [
     ["Area", u.location.label],
-    ["WBGT massimo (24 h)", `${uPeak} °C — calore ${uLvl}`],
+    ["Calore percepito massimo (24 h)", `${uPeak} °C — calore ${uLvl}`],
     ["Copertura arborea", `${um.cover}% (target 30%)`],
     ["Rifugi climatici", `${uLe5}% entro 5 min · ${uLe10}% entro 10 min`],
     ["Interventi", `${u.trees} alberi · ${u.permeable}% suolo · ${u.shade}% ombra`],
@@ -557,7 +558,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   const vineDashRows: [string, string][] = [
     ["Area", v.location.label],
     ["Fase fenologica", v.phase],
-    ["CWSI", `${vCwsi} — stress ${vCwsiLevel}`],
+    ["Sete della vite (0–1)", `${vCwsi} — stress ${vCwsiLevel}`],
     ["Sonda 20 cm", `${+(days.at(-1)!.s20 + vShift).toFixed(1)}%`],
     ["Sonda 50 cm", `${+(days.at(-1)!.s50 + vShift * 0.6).toFixed(1)}%`],
     ["Irrigazione di soccorso", `${Math.round(vVol)} m³/ha (obiettivo ${Math.min(vTgt, SOILS[ir.soil].fc)}%, efficienza ${vEff}%)`],
@@ -841,7 +842,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   };
   return (
     <>
-      <button onClick={startExport} className="inline-flex min-w-0 items-center justify-center gap-2 rounded-full bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 active:bg-primary/80 sm:px-4"><Download className="size-4 shrink-0" /><span className="truncate">Esporta report</span></button>
+      <button onClick={startExport} className="inline-flex min-w-0 items-center justify-center gap-2 h-11 rounded-full bg-foreground px-4 text-sm font-semibold text-background transition-colors hover:bg-foreground/90 active:bg-foreground/80"><Download className="size-4 shrink-0" /><span className="truncate">Esporta report</span></button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Esporta report — {ctx}</DialogTitle></DialogHeader>
@@ -892,13 +893,12 @@ function Dashboard() {
   const loading = useDashboardLoading(t);
   return (
     <div className="min-w-0 overflow-x-clip">
-      <h1 className="sr-only">Dashboard</h1>
-      <div className="sticky top-[var(--nav-h)] transition-[top] duration-300 z-[999999998] isolate -mx-4 mb-5 min-w-0 border-b bg-background/95 px-4 py-2 backdrop-blur-xl sm:mb-6">
-        <div className="flex min-w-0 items-center justify-between gap-2">
-          <Pills options={["Piazza", "Vigneto"] as const} value={t} onChange={setT} className="w-auto flex-nowrap" />
-          <ExportReport ctx={t === "Piazza" ? "Urbano" : "Vitivinicolo"} />
-        </div>
-        <LabSyncIndicator className="mt-2 max-w-full" />
+      <Ambient tone={t === "Piazza" ? "rgb(28 112 210 / 0.38)" : "rgb(150 36 110 / 0.38)"} />
+      <LabSyncIndicator />
+      {/* v8: a big thin title with the report on the right, then the PS pills. */}
+      <PageHero title="Dashboard" actions={<ExportReport ctx={t === "Piazza" ? "Urbano" : "Vitivinicolo"} />} />
+      <div className="sticky top-[var(--nav-h)] transition-[top] duration-300 z-[999999998] isolate -mx-4 mb-5 mt-3 min-w-0 bg-background/80 px-4 py-2 backdrop-blur-xl sm:mb-6">
+        <TabRow label="Dashboard" items={[{ id: "Piazza", label: "Piazza", icon: Building2 }, { id: "Vigneto", label: "Vigneto", icon: Grape }]} value={t} onChange={setT} />
       </div>
       <div key={t} className="min-w-0">{loading
         ? <DashboardLoading label={t === "Piazza" ? "dashboard della piazza" : "dashboard del vigneto"} tone={t === "Piazza" ? "urban" : "vine"} />

@@ -111,22 +111,22 @@ export function vineyardSituation(v: LabState["vineyard"]): VineSituation {
   let caption: string;
   if (level === "alto") {
     caption = raining
-      ? `Pioggia simulata, ma lo stress resta alto in ${phase}: l’MVP misura umidità e temperatura per zona.`
+      ? `Pioggia simulata, ma lo stress resta alto in ${phase}: i sensori misurano umidità e temperatura per zona.`
       : driver === "acqua"
-        ? `Terreno secco e foglie stanche in ${phase}: l’MVP misura umidità e temperatura per zona.`
+        ? `Terreno secco e foglie stanche in ${phase}: i sensori misurano umidità e temperatura per zona.`
         : driver === "vento"
-          ? `Vento che asciuga la chioma in ${phase}: l’MVP misura umidità e temperatura per zona.`
-          : `Colpo di calore in ${phase}: l’MVP misura temperatura e umidità per zona.`;
+          ? `Vento che asciuga la chioma in ${phase}: i sensori misurano umidità e temperatura per zona.`
+          : `Colpo di calore in ${phase}: i sensori misurano temperatura e umidità per zona.`;
   } else if (level === "medio") {
     caption = driver === "acqua"
-      ? `Umidità in calo in ${phase}: l’MVP segnala le zone da tenere d’occhio.`
+      ? `Umidità in calo in ${phase}: i sensori segnalano le zone da tenere d’occhio.`
       : driver === "vento"
-        ? `Vento che asciuga il suolo in ${phase}: l’MVP segnala le zone da tenere d’occhio.`
-        : `Caldo sopra la norma in ${phase}: l’MVP segnala le zone da tenere d’occhio.`;
+        ? `Vento che asciuga il suolo in ${phase}: i sensori segnalano le zone da tenere d’occhio.`
+        : `Caldo sopra la norma in ${phase}: i sensori segnalano le zone da tenere d’occhio.`;
   } else {
     caption = raining
-      ? `Pioggia simulata in ${phase}: umidità e temperatura nella norma, l’MVP conferma il monitoraggio per zona.`
-      : `Umidità e temperatura nella norma in ${phase}: l’MVP conferma il monitoraggio per zona.`;
+      ? `Pioggia simulata in ${phase}: umidità e temperatura nella norma, i sensori confermano il controllo per zona.`
+      : `Umidità e temperatura nella norma in ${phase}: i sensori confermano il controllo per zona.`;
   }
   return { peak, level, label: SITUATION_LABELS[level], caption };
 }

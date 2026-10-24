@@ -83,10 +83,10 @@ export function Pills<T extends string>({ options, value, onChange, className }:
   }, [value]);
 
   return (
-    <div className={cn("no-scrollbar flex w-full max-w-full snap-x snap-mandatory flex-nowrap items-center gap-1 overflow-x-auto rounded-full bg-muted p-1 touch-pan-x sm:w-fit", className)}>
+    <div className={cn("no-scrollbar flex w-full max-w-full snap-x snap-mandatory flex-nowrap items-center gap-1 overflow-x-auto rounded-full bg-muted p-1 touch-pan-x sm:w-fit dark:gap-3 dark:bg-transparent dark:p-0", className)}>
       {options.map((o) => (
         <Button key={o} ref={value === o ? activeRef : undefined} type="button" variant="ghost" onClick={() => onChange(o)}
-          className={cn("h-auto shrink-0 snap-center whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium shadow-none transition-all", value === o ? "bg-card text-foreground shadow-sm hover:bg-card" : "text-muted-foreground hover:text-foreground")}>
+          className={cn("h-auto shrink-0 snap-center whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium shadow-none transition-all", value === o ? "bg-card text-foreground shadow-sm hover:bg-card dark:bg-secondary dark:hover:bg-secondary" : "text-muted-foreground hover:text-foreground dark:text-foreground", "dark:px-5 dark:py-2 dark:font-semibold")}>
           {o}
         </Button>
       ))}

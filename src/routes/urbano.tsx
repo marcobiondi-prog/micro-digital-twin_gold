@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { UrbanFlow } from "@/views/LabFlows";
-import { SimulationHeader } from "@/views/SimulationHeader";
 
 export const Route = createFileRoute("/urbano")({
   head: () => ({
@@ -16,7 +15,6 @@ export const Route = createFileRoute("/urbano")({
 function Urbano() {
   return (
     <div className="lab-page">
-      <SimulationHeader kind="urban" />
       <UrbanFlow />
     </div>
   );

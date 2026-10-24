@@ -146,26 +146,27 @@
   --compare-face: linear-gradient(180deg, color-mix(in oklab, var(--primary) 96%, oklch(1 0 0)), var(--primary));
 }
 
+/* PlayStation-app canvas: near-black blue page, slate cards and pills, white text, one blue accent. */
 .dark {
-  --background: oklch(0.14 0.012 255);
-  --foreground: oklch(0.94 0.008 250);
-  --card: oklch(0.19 0.014 255);
-  --card-foreground: oklch(0.94 0.008 250);
-  --popover: oklch(0.21 0.014 255);
-  --popover-foreground: oklch(0.94 0.008 250);
-  --primary: oklch(0.68 0.17 245);
-  --primary-foreground: oklch(0.12 0.015 255);
-  --secondary: oklch(0.25 0.015 255);
-  --secondary-foreground: oklch(0.92 0.008 250);
-  --muted: oklch(0.24 0.012 255);
-  --muted-foreground: oklch(0.78 0.018 250);
-  --accent: oklch(0.28 0.04 245);
-  --accent-foreground: oklch(0.94 0.008 250);
+  --background: oklch(0.155 0.012 265);
+  --foreground: oklch(0.96 0.004 250);
+  --card: oklch(0.215 0.014 260);
+  --card-foreground: oklch(0.96 0.004 250);
+  --popover: oklch(0.24 0.015 260);
+  --popover-foreground: oklch(0.96 0.004 250);
+  --primary: oklch(0.64 0.17 255);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.36 0.016 255);
+  --secondary-foreground: oklch(0.97 0.004 250);
+  --muted: oklch(0.26 0.013 258);
+  --muted-foreground: oklch(0.76 0.012 250);
+  --accent: oklch(0.31 0.02 255);
+  --accent-foreground: oklch(0.96 0.004 250);
   --destructive: oklch(0.65 0.2 25);
   --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.38 0.016 255);
-  --input: oklch(0.34 0.014 255);
-  --ring: oklch(0.68 0.17 245);
+  --border: oklch(0.3 0.014 258);
+  --input: oklch(0.33 0.014 258);
+  --ring: oklch(0.7 0.14 250);
   --urban: oklch(0.7 0.15 220);
   --vine: oklch(0.7 0.15 350);
   --ok: oklch(0.74 0.17 150);
@@ -1932,4 +1933,58 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   html .lab-media-actions .lab-media-ai,
   html .lab-media-actions .lab-media-upload-direct,
   html .lab-media-actions .lab-media-upload-menu { display: none; }
+}
+
+/* v6: PlayStation-style bottom bar — dark slab with a curved top edge, equal icons, the active one
+   lit with a glowing line under it and its name below the row. Same look in light and dark themes. */
+.ps-nav { padding-bottom: env(safe-area-inset-bottom); }
+.ps-nav-bg { filter: drop-shadow(0 -6px 18px rgb(0 0 0 / 0.28)); }
+/* Frosted glass under the slab, cut to the same arch: what scrolls behind shows through, blurred, like the PS app. */
+.ps-nav-glass { backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 90' preserveAspectRatio='none'%3E%3Cpath d='M0 22 Q50 2 100 22 V90 H0 Z'/%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 90' preserveAspectRatio='none'%3E%3Cpath d='M0 22 Q50 2 100 22 V90 H0 Z'/%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat; }
+.ps-nav-item { position: relative; display: flex; width: 100%; height: 3.25rem; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 0.25rem; color: rgb(255 255 255 / 0.88); outline: none; transition: color 200ms ease; }
+.ps-nav-item:focus-visible .ps-nav-icon { box-shadow: 0 0 0 2px rgb(255 255 255 / 0.6); }
+.ps-nav-icon { position: relative; z-index: 1; display: grid; place-items: center; width: 2.75rem; height: 2.25rem; border-radius: 0.75rem; transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1), filter 220ms ease; }
+.ps-nav-item[data-active] { color: #fff; }
+.ps-nav-item[data-active] .ps-nav-icon { filter: drop-shadow(0 0 6px rgb(140 190 255 / 0.85)); }
+/* The PS light: one straight white bar with a blue glow rising from it, gliding along the crescent's edge to the open page. */
+.ps-nav-light { position: absolute; z-index: 1; width: 2.6rem; height: 3px; border-radius: 999px; background: #fff; box-shadow: 0 0 8px 1px rgb(140 190 255 / 0.9); transform: translate(-50%, -50%) rotate(var(--ps-tilt)); transition: left 320ms cubic-bezier(0.2, 0.8, 0.2, 1), top 320ms cubic-bezier(0.2, 0.8, 0.2, 1), transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1); pointer-events: none; }
+.ps-nav-light::before { content: ""; position: absolute; left: 50%; bottom: 0; width: 4rem; height: 2.6rem; background: radial-gradient(ellipse at 50% 100%, rgb(120 180 255 / 0.45), transparent 70%); transform: translateX(-50%); }
+.ps-nav-crescent { filter: drop-shadow(0 -2px 3px rgb(0 0 0 / 0.35)); }
+.ps-nav-item:active .ps-nav-icon { transform: scale(0.9); }
+@media (prefers-reduced-motion: reduce) { .ps-nav-item, .ps-nav-light, .ps-nav-icon { transition: none; } .ps-nav-item:active .ps-nav-icon { transform: none; } }
+
+/* v7: the AI camera rises from the middle of the arch, lit like the active page. */
+.ps-nav-camera { position: relative; display: grid; place-items: center; width: 3.9rem; height: 3.9rem; margin-top: -1.9rem; border-radius: 999px; color: #fff; background: radial-gradient(circle at 30% 22%, #56606f, #262c36 72%); box-shadow: 0 0 0 2px rgb(255 255 255 / 0.85), 0 0 18px 2px rgb(120 180 255 / 0.55), 0 10px 22px rgb(0 0 0 / 0.45); outline: none; transition: transform 160ms ease, box-shadow 160ms ease; }
+.ps-nav-camera[data-ai] { background: #fff; }
+/* A slow halo breathes around the camera: the one main action, like the PS button. */
+.ps-nav-camera::after { content: ""; position: absolute; inset: -6px; border-radius: inherit; box-shadow: 0 0 0 1.5px rgb(140 190 255 / 0.55); animation: ps-camera-halo 2.8s ease-out infinite; pointer-events: none; }
+@keyframes ps-camera-halo { 0% { transform: scale(0.92); opacity: 0.9; } 70%, 100% { transform: scale(1.18); opacity: 0; } }
+.ps-nav-camera:active { transform: scale(0.94); }
+.ps-nav-camera:focus-visible { box-shadow: 0 0 0 3px #fff, 0 0 26px 4px rgb(103 232 249 / 0.6); }
+@media (prefers-reduced-motion: reduce) { .ps-nav-camera { transition: none; } .ps-nav-camera::after { animation: none; opacity: 0; } .ps-nav-camera:active { transform: none; } }
+
+/* v8 Console: PS5 home tiles grow when selected and wear a white focus frame with a soft glow. */
+.ps5-tile { transition: width 260ms cubic-bezier(0.2, 0.8, 0.2, 1), height 260ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 200ms ease, box-shadow 260ms ease; box-shadow: 0 10px 24px rgb(0 0 0 / 0.35); }
+.ps5-tile-on { box-shadow: 0 0 0 3px var(--background), 0 0 0 5.5px #fff, 0 0 26px 4px rgb(255 255 255 / 0.28), 0 14px 30px rgb(0 0 0 / 0.45); }
+.ps5-tile:focus-visible { box-shadow: 0 0 0 3px var(--background), 0 0 0 5.5px var(--ring); }
+.home-scan-line { animation: home-scan 2.6s ease-in-out infinite alternate; }
+@keyframes home-scan { from { transform: translateY(-22px); } to { transform: translateY(22px); } }
+@media (prefers-reduced-motion: reduce) { .ps5-tile { transition: none; } .home-scan-line { animation: none; } }
+
+/* v8: a block that melts into the page: the card colour at the top (white in the light theme) fading into the page colour below, no border. */
+.fuse-canvas { background: linear-gradient(180deg, var(--card) 0%, color-mix(in oklab, var(--card) 55%, var(--background)) 45%, var(--background) 100%); }
+
+/* v8 Home on phones: the picture melts into the ambient light under the header and into the page below. */
+@media (max-width: 639.98px) {
+  .home-art { -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 26%, #000 62%, transparent 100%); mask-image: linear-gradient(180deg, transparent 0%, #000 26%, #000 62%, transparent 100%); }
+}
+
+/* v8: the header is opaque but wears the same light as the page's Ambient (same gradient, same fixed 48vh box), over the page colour. */
+.app-header-tint {
+  background-color: var(--background);
+  background-image: radial-gradient(130% 85% at 50% -15%, var(--ambient-tone, transparent), transparent 72%);
+  background-size: 100% 48vh;
+  background-repeat: no-repeat;
+  background-position: top center;
+  background-attachment: fixed;
 }
