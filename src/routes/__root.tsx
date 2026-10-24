@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Outlet, Link, createRootRouteWithContext, useLocation, useNavigate, HeadContent, Scripts, type ErrorComponentProps } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
@@ -129,6 +129,15 @@ function goHomeBack(e: { preventDefault: () => void }, to: string, pathname: str
   return false;
 }
 
+// Where the selection light sits for each of the five columns on the 108 px bar: the crescent edge
+// "M0 74 Q50 52 100 74" (viewBox 100×90) is y = 74 − 44·t(1 − t); tilt = its tangent on a ~390 px wide phone.
+const PS_LIGHT: Record<number, { left: string; top: string; tilt: string }> = {
+  0: { left: "10%", top: "81.5px", tilt: "-6deg" },
+  1: { left: "30%", top: "75.5px", tilt: "-3deg" },
+  3: { left: "70%", top: "75.5px", tilt: "3deg" },
+  4: { left: "90%", top: "81.5px", tilt: "6deg" },
+};
+
 function BottomNav() {
   const pathname = useLocation({ select: (l) => l.pathname });
   const [hidden, setHidden] = useState(false);
@@ -171,8 +180,6 @@ function BottomNav() {
   }, [pathname]);
   const item = ({ to, l, I }: (typeof bottomItems)[number], index: number) => {
     const active = pathname === to;
-    // Grid column (the camera owns column 2): the light under the active icon tilts with the arch.
-    const col = index < 2 ? index : index + 1;
     return (
       <li key={to}>
         <Link to={to} replace={pathname !== "/"} aria-current={active ? "page" : undefined} aria-label={l}
@@ -182,34 +189,41 @@ function BottomNav() {
             e.preventDefault();
             window.scrollTo({ top: 0, behavior: "instant" });
           }}
-          className="ps-nav-item" data-active={active || undefined} data-col={col}>
+          className="ps-nav-item" data-active={active || undefined}>
           <span className="ps-nav-icon"><I className="size-6" strokeWidth={2} aria-hidden="true" /></span>
         </Link>
       </li>
     );
   };
-  const current = bottomItems.find((b) => b.to === pathname);
+  const index = bottomItems.findIndex((b) => b.to === pathname);
+  const current = bottomItems[index];
+  // The selection light rides the edge of the lower crescent: grid column (the camera owns column 2), its height on the curve and the tangent's tilt.
+  const light = index < 0 ? null : PS_LIGHT[index < 2 ? index : index + 1];
   return (
     <nav aria-label="Menu principale" className={`ps-nav fixed inset-x-0 bottom-0 z-[999999998] transition-transform duration-300 motion-reduce:transition-none sm:hidden ${hidden ? "translate-y-full" : "translate-y-0"}`}>
-      {/* PlayStation-app slab: a slate arch for the icons over a darker band that names the open page; a light curve glows under the active icon and the AI camera rises in the middle. */}
-      <div className="ps-nav-glass pointer-events-none absolute inset-0" aria-hidden="true" />
-      <svg className="ps-nav-bg pointer-events-none absolute inset-x-0 bottom-0 h-full w-full" viewBox="0 0 100 90" preserveAspectRatio="none" aria-hidden="true">
-        <defs>
-          <linearGradient id="ps-nav-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#3d4552" stopOpacity="0.86" /><stop offset="1" stopColor="#232831" stopOpacity="0.94" /></linearGradient>
-          <linearGradient id="ps-nav-band" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1b1f26" /><stop offset="1" stopColor="#101317" /></linearGradient>
-          <linearGradient id="ps-nav-edge" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#fff" stopOpacity="0.08" /><stop offset="0.5" stopColor="#fff" stopOpacity="0.32" /><stop offset="1" stopColor="#fff" stopOpacity="0.08" /></linearGradient>
-        </defs>
-        <path d="M0 22 Q50 2 100 22 V90 H0 Z" fill="url(#ps-nav-fill)" />
-        <path d="M0 22 Q50 2 100 22" fill="none" stroke="url(#ps-nav-edge)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-        <path d="M0 70 Q50 60 100 70 V90 H0 Z" fill="url(#ps-nav-band)" />
-        <path d="M0 70 Q50 60 100 70" fill="none" stroke="rgb(255 255 255 / 0.1)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-      </svg>
-      <ul className="relative grid grid-cols-5 items-start px-2 pt-6">
-        {bottomItems.slice(0, 2).map((b, i) => item(b, i))}
-        <li className="flex justify-center"><CameraDockButton /></li>
-        {bottomItems.slice(2).map((b, i) => item(b, i + 2))}
-      </ul>
-      <p className="relative h-8 pb-[env(safe-area-inset-bottom)] text-center text-[13px] font-medium leading-8 tracking-wide text-white/90" aria-hidden="true">{current?.l ?? ""}</p>
+      {/* PlayStation-app slab: a frosted slate arch for the icons with a darker crescent laid over its foot; a straight light slides along the crescent's edge under the open page, whose name sits in the crescent; the AI camera rises in the middle. */}
+      <div className="relative h-[108px]">
+        <div className="ps-nav-glass pointer-events-none absolute inset-0" aria-hidden="true" />
+        <svg className="ps-nav-bg pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 90" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="ps-nav-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#3d4552" stopOpacity="0.86" /><stop offset="1" stopColor="#232831" stopOpacity="0.94" /></linearGradient>
+            <linearGradient id="ps-nav-band" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1a1d24" /><stop offset="0.45" stopColor="#121419" /><stop offset="1" stopColor="#0e1014" /></linearGradient>
+            <linearGradient id="ps-nav-edge" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#fff" stopOpacity="0.08" /><stop offset="0.5" stopColor="#fff" stopOpacity="0.32" /><stop offset="1" stopColor="#fff" stopOpacity="0.08" /></linearGradient>
+          </defs>
+          <path d="M0 22 Q50 2 100 22 V90 H0 Z" fill="url(#ps-nav-fill)" />
+          <path d="M0 22 Q50 2 100 22" fill="none" stroke="url(#ps-nav-edge)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+          <path className="ps-nav-crescent" d="M0 74 Q50 52 100 74 V90 H0 Z" fill="url(#ps-nav-band)" />
+          <path d="M0 74 Q50 52 100 74" fill="none" stroke="url(#ps-nav-edge)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+        </svg>
+        {light && <span className="ps-nav-light" style={{ left: light.left, top: light.top, "--ps-tilt": light.tilt } as CSSProperties} aria-hidden="true" />}
+        <ul className="relative grid grid-cols-5 items-start pt-6">
+          {bottomItems.slice(0, 2).map((b, i) => item(b, i))}
+          <li className="flex justify-center"><CameraDockButton /></li>
+          {bottomItems.slice(2).map((b, i) => item(b, i + 2))}
+        </ul>
+        <p className="relative h-8 text-center text-[13px] font-medium leading-8 tracking-wide text-white/90" aria-hidden="true">{current?.l ?? ""}</p>
+      </div>
+      <div className="absolute inset-x-0 bottom-0 h-[env(safe-area-inset-bottom)] bg-[#0e1014]" aria-hidden="true" />
     </nav>
   );
 }
