@@ -7,6 +7,7 @@ import { useSignedIn } from "@/lib/use-signed-in";
 import { openAccount } from "@/lib/camera-dock";
 import { suggestHeatSensors, type NetworkSummary, type SensorPick } from "@/controllers/sensor-ai.functions";
 import { useLab } from "@/models/lab-store";
+import { exampleSensorSuggestion } from "@/models/sensor-example";
 
 const tone: Record<string, string> = { alta: "bg-danger/15 text-danger", media: "bg-warn/15 text-warn", bassa: "bg-ok/15 text-ok" };
 
@@ -19,14 +20,16 @@ export function SensorAdvisor({ kind, embedded = false }: { kind: "urban" | "vin
   const [open, setOpen] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [example, setExample] = useState(false);
   const [result, setResult] = useState<{ sintesi: string; sensori: SensorPick[]; network: NetworkSummary } | null>(null);
 
   useEffect(() => { setResult(null); setError(null); }, [kind, location.lat, location.lng]);
 
   const run = async () => {
     if (loading) return;
-    // The suggestion runs on an auth-protected server function: a simulated sign-in cannot call it.
-    if (demo) { setError("Accesso simulato: per i suggerimenti dell’AI serve un account vero."); return; }
+    // The suggestion runs on an auth-protected server function: a simulated sign-in shows a labelled example instead.
+    if (demo) { setError(null); setExample(true); setResult(exampleSensorSuggestion(kind, location.lat, location.lng)); return; }
+    setExample(false);
     setLoading(true); setError(null); setResult(null);
     try {
       const r = await suggest({ data: { kind, label: location.label, lat: location.lat, lng: location.lng } });
@@ -76,6 +79,7 @@ export function SensorAdvisor({ kind, embedded = false }: { kind: "urban" | "vin
                 <div className="rounded-lg bg-muted p-2"><div className="text-muted-foreground">Luoghi sensibili</div><div className="font-mono font-semibold">{result.network.puntiSensibili}</div></div>
                 <div className="rounded-lg bg-muted p-2"><div className="text-muted-foreground">Fermate bus</div><div className="font-mono font-semibold">{result.network.fermate}</div></div>
               </div>
+              {example && <p className="rounded-xl border border-dashed border-primary/50 bg-primary/5 p-3 text-xs text-muted-foreground"><b className="text-foreground">Esempio</b> (accesso simulato): con un account vero l’AI usa i sensori e i luoghi reali attorno alla zona.</p>}
               {result.sintesi && <p className="text-sm text-muted-foreground">{result.sintesi}</p>}
               {result.sensori.map((s, i) => (
                 <div key={i} className="rounded-xl bg-muted p-3 text-sm">
