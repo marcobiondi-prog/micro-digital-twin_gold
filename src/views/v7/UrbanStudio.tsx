@@ -71,11 +71,11 @@ export function UrbanStudio() {
       <div className="mx-auto w-full max-w-[46rem] space-y-4">
         <div className="space-y-3">
           <Readout icon={ThermometerSnowflake} value={`−${fmt(est.dT)}`} unit="°C" tone={GAIN_TEXT[gain]}
-            caption={<><span className="font-mono tabular-nums">{fmt(before)}°</span><ArrowRight className="size-3.5" aria-hidden="true" /><span className="font-mono tabular-nums text-white">{fmt(after)}°</span><span className="text-white/40">· ore 14–17</span></>} />
+            caption={<><span className="font-mono tabular-nums">{fmt(before)}°</span><ArrowRight className="size-3.5" aria-hidden="true" /><span className="font-mono tabular-nums text-foreground">{fmt(after)}°</span><span className="text-muted-foreground">· ore 14–17</span></>} />
           <HeatBar from={before} to={after} min={before - 6} max={before + 0.5} />
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl ring-1 ring-white/10">
+        <div className="relative overflow-hidden rounded-2xl ring-1 ring-foreground/10">
           {/* Thermal image: the same cells blurred together underneath, crisp touch targets on top. */}
           <div className="pointer-events-none absolute inset-0 grid grid-cols-9 scale-110 blur-xl" aria-hidden="true">
             {CELLS.map((i) => <span key={i} style={{ background: HEAT_VAR[cellHeat(i)] }} className="transition-[background-color] duration-500 motion-reduce:transition-none" />)}
@@ -85,7 +85,7 @@ export function UrbanStudio() {
               const item = itemAt(i), Icon = item ? ITEM_ICON[item] : null;
               return (
                 <button key={i} type="button" onClick={() => place(i)} aria-label={`Punto ${i + 1}${item ? `, ${item}` : ""}`}
-                  className="relative grid aspect-square place-items-center bg-transparent outline-none transition-colors hover:bg-white/10 focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-white">
+                  className="relative grid aspect-square place-items-center bg-transparent outline-none transition-colors hover:bg-white/10 focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring">
                   {Icon && item && <span className={cn("grid size-[70%] place-items-center rounded-full bg-[#0d1016]/85 ring-2 animate-in zoom-in-50 duration-200 motion-reduce:animate-none", ITEM_RING[item])}><Icon className="size-[58%]" aria-hidden="true" /></span>}
                   {pulse?.i === i && <span key={pulse.k} className="pointer-events-none absolute inset-0 rounded-sm ring-2 ring-white/80 animate-out fade-out zoom-out-150 duration-500 fill-mode-forwards motion-reduce:hidden" aria-hidden="true" />}
                 </button>
