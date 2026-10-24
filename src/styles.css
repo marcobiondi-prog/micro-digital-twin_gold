@@ -1926,3 +1926,10 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 /* v3: arched bottom bar behind the central camera button. */
 .nav-arc path { fill: color-mix(in oklab, var(--background) 94%, transparent); stroke: var(--border); stroke-width: 1px; vector-effect: non-scaling-stroke; }
 .nav-arc { filter: drop-shadow(0 -4px 12px color-mix(in oklab, var(--foreground) 10%, transparent)); }
+/* v3: on phones the central camera of the arched bar already offers AI, photo, video and gallery,
+   so the media panel keeps only its own actions (send, delete). Tablets and desktops keep them. */
+@media (max-width: 639.98px) {
+  html .lab-media-actions .lab-media-ai,
+  html .lab-media-actions .lab-media-upload-direct,
+  html .lab-media-actions .lab-media-upload-menu { display: none; }
+}
