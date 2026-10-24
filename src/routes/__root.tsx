@@ -325,9 +325,6 @@ function SmartNav() {
               ))}
             </div>
           </nav>
-          <div className="shrink-0 pl-1">
-            <ThemeToggle />
-          </div>
         </div>
       </div>
     </div>
@@ -452,7 +449,11 @@ function RootComponent() {
               <span className="truncate whitespace-nowrap">MICRO DIGITAL <span className="text-brand-turquoise">TWIN</span></span>
             </Link>
           </div>
-          <AccountControl />
+          {/* The theme switch sits beside the account button: one place for both, on every size. */}
+          <div className="flex shrink-0 items-center gap-2">
+            <ThemeToggle />
+            <AccountControl />
+          </div>
         </div>
       </header>
       <div className="hidden sm:block"><SmartNav /></div>

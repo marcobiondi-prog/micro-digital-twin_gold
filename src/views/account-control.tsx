@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { LogOut, Settings2, UserRound, Mail, LockKeyhole, Camera, ShieldCheck } from "lucide-react";
+import { LogOut, UserRound, Mail, LockKeyhole, Camera, ShieldCheck } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,7 +11,6 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn, useDemoSignedIn } from "@/lib/demo-login";
 import { OPEN_ACCOUNT_EVENT } from "@/lib/camera-dock";
-import { ThemeToggle } from "@/views/theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import seedling from "@/assets/avatar-seedling.svg";
 import city from "@/assets/avatar-city.svg";
@@ -262,7 +261,7 @@ export function AccountControl() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-        <Button ref={triggerRef} variant="outline" size="icon" className="size-9 shrink-0 rounded-full sm:size-10" aria-label="Apri account e impostazioni" title="Account e impostazioni" onClick={() => setOpen(true)}>
+        <Button ref={triggerRef} variant="outline" size="icon" className="size-9 shrink-0 rounded-full sm:size-10" aria-label="Apri account" title="Account" onClick={() => setOpen(true)}>
           {avatar("size-9 sm:size-10")}
         </Button>
       <DialogContent ref={placePanel} overlayClassName="account-overlay" className="account-panel flex max-h-[min(680px,90dvh)] w-[min(420px,calc(100vw-2rem))] flex-col gap-0 overflow-y-auto rounded-lg border bg-popover p-0 text-popover-foreground shadow-xl sm:rounded-lg">
@@ -322,10 +321,6 @@ export function AccountControl() {
               {DEMO_LOGIN_AVAILABLE && <Button variant="outline" className="w-full border-dashed" onClick={() => { setDemoSignedIn(true); setOpen(false); }}>Simula l’accesso (solo anteprima)</Button>}
             </section>
           )}
-          <section className="border-t pt-5">
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold"><Settings2 className="size-4" />Impostazioni</h3>
-            <div className="flex items-center justify-between rounded-md border px-3 py-2"><span className="text-sm">Aspetto</span><ThemeToggle /></div>
-          </section>
         </div>
       </DialogContent>
     </Dialog>

@@ -45,10 +45,10 @@ export function ThemeToggle() {
   return (
     <Button
       type="button"
-      variant="ghost"
+      variant="outline"
       size="icon"
       onClick={toggleTheme}
-      className="size-8 shrink-0 rounded-full sm:size-9"
+      className="size-9 shrink-0 rounded-full sm:size-10"
       aria-label={dark ? "Attiva tema chiaro" : "Attiva tema nero"}
       title={dark ? "Tema chiaro" : "Tema nero"}
     >
