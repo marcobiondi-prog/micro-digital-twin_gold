@@ -18,7 +18,7 @@ export function Readout({ icon: Icon, value, unit, tone, caption, children }: { 
     <div className="flex min-w-0 items-center gap-3" aria-live="polite">
       <span className={cn("grid size-12 shrink-0 place-items-center rounded-2xl bg-white/[0.06] ring-1 ring-white/10", tone)}><Icon className="size-6" aria-hidden="true" /></span>
       <div className="min-w-0">
-        <div className={cn("flex items-baseline gap-1 font-mono text-4xl font-bold leading-none tabular-nums transition-colors duration-300 sm:text-5xl", tone)}>{value}<span className="text-lg font-semibold text-white/60">{unit}</span></div>
+        <div className={cn("flex items-baseline gap-1 font-display text-5xl font-light leading-none tracking-tight tabular-nums transition-colors duration-300 sm:text-6xl", tone)}>{value}<span className="text-lg font-semibold text-white/60">{unit}</span></div>
         {caption && <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs font-medium text-white/60 sm:text-sm">{caption}</div>}
       </div>
       {children}
@@ -26,12 +26,12 @@ export function Readout({ icon: Icon, value, unit, tone, caption, children }: { 
   );
 }
 
-/** Tool in the dock: big icon, short word, cyan light when active. */
+/** Tool in the dock: big icon, short word, a white PS5 focus frame when active. */
 export function ToolButton({ icon: Icon, label, active, onClick, swatch, badge, pressed }: { icon: LucideIcon; label: string; active?: boolean; onClick: () => void; swatch?: string; badge?: ReactNode; pressed?: boolean }) {
   return (
     <button type="button" onClick={onClick} aria-pressed={pressed ?? active}
-      className={cn("relative flex min-h-[4.5rem] min-w-0 flex-col items-center justify-center gap-1.5 rounded-2xl px-1 py-2 text-[11px] font-semibold uppercase tracking-wide outline-none transition-[background-color,box-shadow,color,transform] duration-150 focus-visible:ring-2 focus-visible:ring-cyan-300 active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100",
-        active ? "bg-white/[0.12] text-white shadow-[0_0_0_1.5px_rgb(103_232_249),0_0_18px_-4px_rgb(103_232_249)]" : "bg-white/[0.05] text-white/60 hover:bg-white/[0.08]")}>
+      className={cn("relative flex min-h-[4.5rem] min-w-0 flex-col items-center justify-center gap-1.5 rounded-2xl px-1 py-2 text-[11px] font-semibold uppercase tracking-wide outline-none transition-[background-color,box-shadow,color,transform] duration-150 focus-visible:ring-2 focus-visible:ring-white active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100",
+        active ? "bg-white/[0.12] text-white shadow-[0_0_0_2px_#fff,0_0_20px_-2px_rgb(255_255_255/0.45)]" : "bg-white/[0.05] text-white/60 hover:bg-white/[0.08]")}>
       <span className="relative grid size-8 place-items-center">
         <Icon className="size-7" aria-hidden="true" />
         {swatch && <span className={cn("absolute -bottom-1 -right-1 size-3 rounded-full ring-2 ring-[#1f232b]", swatch)} aria-hidden="true" />}
@@ -50,7 +50,7 @@ export function LevelBar({ icon: Icon, label, level, onChange, color, value }: {
       <div className="grid grid-cols-5 gap-1">
         {[0, 1, 2, 3, 4].map((i) => (
           <button key={i} type="button" role="radio" aria-checked={level === i} aria-label={`${label}: livello ${i + 1} di 5`} onClick={() => onChange(i)}
-            className="group h-11 rounded-lg bg-white/[0.07] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-cyan-300">
+            className="group h-11 rounded-lg bg-white/[0.07] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white">
             <span className={cn("block h-full rounded-lg transition-[opacity] duration-200 motion-reduce:transition-none", i <= level ? "opacity-100" : "opacity-0")} style={{ background: color }} />
           </button>
         ))}

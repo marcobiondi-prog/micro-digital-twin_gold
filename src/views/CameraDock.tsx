@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useInstalledApp } from "@/lib/installed-app";
 import { useSignedIn } from "@/lib/use-signed-in";
+import { openSimTab } from "@/views/v8/console";
 import { openAccount, requestCapture, setCameraSheetOpen, useCameraSheetOpen, type CaptureAction } from "@/lib/camera-dock";
 import { cn } from "@/lib/utils";
 import aiLogo from "@/assets/ai-logo.png";
@@ -72,6 +73,8 @@ export function CameraSheet() {
       return;
     }
     if (!requestCapture(kind, action)) toast.error("Fotocamera non pronta, riprova tra un attimo");
+    // The new photo or video lands in the media panel: show it.
+    openSimTab(kind, "media");
     close();
   };
   const goTo = (to: "/urbano" | "/vigneto") => void navigate({ to, replace: pathname !== "/" });

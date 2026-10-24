@@ -39,8 +39,8 @@ export function VineStudio({ onZonesEdit }: { onZonesEdit?: () => void }) {
         <Readout icon={Droplets} value={`${result.s}`} unit="/100" tone={GAIN_TEXT[gain]}
           caption={<><span className={cn("size-2 rounded-full", GAIN_BG[gain])} aria-hidden="true" /><span className="text-white">Sete della vite · zona {sel + 1}</span></>}>
           <button type="button" onClick={toggleRain} aria-pressed={zone.rain} aria-label={`Pioggia sulla zona ${sel + 1}`}
-            className={cn("ml-auto flex shrink-0 flex-col items-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-semibold uppercase tracking-wide outline-none transition-[background-color,box-shadow,color] duration-150 focus-visible:ring-2 focus-visible:ring-cyan-300 motion-reduce:transition-none",
-              zone.rain ? "bg-white/[0.12] text-sky-200 shadow-[0_0_0_1.5px_rgb(103_232_249),0_0_18px_-4px_rgb(103_232_249)]" : "bg-white/[0.05] text-white/60")}>
+            className={cn("ml-auto flex shrink-0 flex-col items-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-semibold uppercase tracking-wide outline-none transition-[background-color,box-shadow,color] duration-150 focus-visible:ring-2 focus-visible:ring-white motion-reduce:transition-none",
+              zone.rain ? "bg-white/[0.12] text-sky-200 shadow-[0_0_0_2px_#fff,0_0_20px_-2px_rgb(255_255_255/0.45)]" : "bg-white/[0.05] text-white/60")}>
             <CloudRain className="size-7" aria-hidden="true" />Pioggia
           </button>
         </Readout>
@@ -53,7 +53,7 @@ export function VineStudio({ onZonesEdit }: { onZonesEdit?: () => void }) {
             return (
               <button key={i} type="button" role="radio" aria-checked={on} aria-label={`Zona ${i + 1}, sete ${r.s} su 100`}
                 onClick={() => { hapticTick(); setVineyard({ selected: i, allZones: false }); }}
-                className={cn("relative overflow-hidden rounded-xl outline-none transition-[box-shadow] duration-200 focus-visible:ring-2 focus-visible:ring-cyan-300", on ? "shadow-[0_0_0_2px_rgb(103_232_249),0_0_18px_-4px_rgb(103_232_249)]" : "")}>
+                className={cn("relative overflow-hidden rounded-xl outline-none transition-[box-shadow] duration-200 focus-visible:ring-2 focus-visible:ring-white", on ? "shadow-[0_0_0_2.5px_#fff,0_0_20px_-2px_rgb(255_255_255/0.45)]" : "")}>
                 <span className="pointer-events-none absolute inset-0 scale-110 blur-lg transition-[background-color] duration-500 motion-reduce:transition-none" style={{ background: HEAT_VAR[4 - g] }} aria-hidden="true" />
                 <span className="relative grid grid-cols-3 gap-1 p-2" aria-hidden="true">
                   {Array.from({ length: ROWS * 3 }, (_, k) => <span key={k} className={cn("mx-auto size-2.5 rounded-full sm:size-3", z.rain ? "bg-sky-200/90" : "bg-[#0d1016]/70")} />)}

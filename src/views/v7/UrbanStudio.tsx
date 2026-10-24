@@ -85,7 +85,7 @@ export function UrbanStudio() {
               const item = itemAt(i), Icon = item ? ITEM_ICON[item] : null;
               return (
                 <button key={i} type="button" onClick={() => place(i)} aria-label={`Punto ${i + 1}${item ? `, ${item}` : ""}`}
-                  className="relative grid aspect-square place-items-center bg-transparent outline-none transition-colors hover:bg-white/10 focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-cyan-300">
+                  className="relative grid aspect-square place-items-center bg-transparent outline-none transition-colors hover:bg-white/10 focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-white">
                   {Icon && item && <span className={cn("grid size-[70%] place-items-center rounded-full bg-[#0d1016]/85 ring-2 animate-in zoom-in-50 duration-200 motion-reduce:animate-none", ITEM_RING[item])}><Icon className="size-[58%]" aria-hidden="true" /></span>}
                   {pulse?.i === i && <span key={pulse.k} className="pointer-events-none absolute inset-0 rounded-sm ring-2 ring-white/80 animate-out fade-out zoom-out-150 duration-500 fill-mode-forwards motion-reduce:hidden" aria-hidden="true" />}
                 </button>

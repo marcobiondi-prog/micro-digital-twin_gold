@@ -1962,3 +1962,11 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .ps-nav-camera:active { transform: scale(0.94); }
 .ps-nav-camera:focus-visible { box-shadow: 0 0 0 3px #fff, 0 0 26px 4px rgb(103 232 249 / 0.6); }
 @media (prefers-reduced-motion: reduce) { .ps-nav-camera { transition: none; } .ps-nav-camera::after { animation: none; opacity: 0; } .ps-nav-camera:active { transform: none; } }
+
+/* v8 Console: PS5 home tiles grow when selected and wear a white focus frame with a soft glow. */
+.ps5-tile { transition: width 260ms cubic-bezier(0.2, 0.8, 0.2, 1), height 260ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 200ms ease, box-shadow 260ms ease; box-shadow: 0 10px 24px rgb(0 0 0 / 0.35); }
+.ps5-tile-on { box-shadow: 0 0 0 3px var(--background), 0 0 0 5.5px #fff, 0 0 26px 4px rgb(255 255 255 / 0.28), 0 14px 30px rgb(0 0 0 / 0.45); }
+.ps5-tile:focus-visible { box-shadow: 0 0 0 3px var(--background), 0 0 0 5.5px var(--ring); }
+.home-scan-line { animation: home-scan 2.6s ease-in-out infinite alternate; }
+@keyframes home-scan { from { transform: translateY(-22px); } to { transform: translateY(22px); } }
+@media (prefers-reduced-motion: reduce) { .ps5-tile { transition: none; } .home-scan-line { animation: none; } }

@@ -441,21 +441,12 @@ function RootComponent() {
       >
         Salta al contenuto principale
       </a>
-      <header id="app-header" className="ps-top relative border-b bg-background pt-[env(safe-area-inset-top)] dark:border-b-0 dark:bg-transparent">
-        {/* Dark canvas: a PlayStation-app slate slab whose lower edge rises gently in the middle, with a handle under it. */}
-        <svg className="pointer-events-none absolute inset-0 hidden h-full w-full dark:block" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-          <defs>
-            <linearGradient id="ps-top-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1d2129" /><stop offset="1" stopColor="#2d333d" /></linearGradient>
-            <linearGradient id="ps-top-edge" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#fff" stopOpacity="0.06" /><stop offset="0.5" stopColor="#fff" stopOpacity="0.22" /><stop offset="1" stopColor="#fff" stopOpacity="0.06" /></linearGradient>
-          </defs>
-          <path d="M0 0 H100 V100 Q50 80 0 100 Z" fill="url(#ps-top-fill)" />
-          <path d="M100 100 Q50 80 0 100" fill="none" stroke="url(#ps-top-edge)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-        </svg>
-        <span className="pointer-events-none absolute -bottom-3 left-1/2 hidden h-1.5 w-12 -translate-x-1/2 rounded-full bg-white/30 dark:block" aria-hidden="true" />
+      {/* v8: a light console top bar floating on the page's ambient light: small logo and name, account on the right. */}
+      <header id="app-header" className="relative border-b bg-background pt-[env(safe-area-inset-top)] dark:border-b-0 dark:bg-transparent">
         <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-2 sm:px-4 sm:py-3">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-            <Link to="/" onClick={(e) => goHomeBack(e, "/", location.pathname)} className="flex min-w-0 items-center gap-1.5 font-display text-base font-semibold sm:gap-2 sm:text-xl">
-              <span className="header-logo-frame grid h-12 w-14 shrink-0 place-items-center sm:h-14 sm:w-16">
+            <Link to="/" onClick={(e) => goHomeBack(e, "/", location.pathname)} className="flex min-w-0 items-center gap-1.5 font-display text-[15px] font-semibold tracking-wide sm:gap-2 sm:text-lg">
+              <span className="header-logo-frame grid h-10 w-12 shrink-0 place-items-center sm:h-12 sm:w-14">
                 <TwinMascot className="header-logo block h-full w-full" />
               </span>
               <span className="truncate whitespace-nowrap">MICRO DIGITAL <span className="text-brand-turquoise">TWIN</span></span>

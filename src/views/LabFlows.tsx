@@ -12,7 +12,7 @@ import { LabMedia } from "@/views/LabMedia";
 import { LocationCard, splitLocation, ImportWeatherButton } from "@/views/SimulationGrid";
 import { UrbanStudio } from "@/views/v7/UrbanStudio";
 import { VineStudio } from "@/views/v7/VineStudio";
-import { StudioBar, foldId } from "@/views/v7/StudioBar";
+import { SimShell } from "@/views/v8/SimShell";
 import { Fold } from "@/views/Fold";
 import { comparison, levelTone, nextPhase, piazzaEstimate, prototypeChoice, type PrototypeId } from "@/models/scenarios";
 import { applyVineyardScenario, closestVineyardScenario, vineyardControlValue, vineyardScenarioSteps } from "@/models/vineyard-controls";
@@ -304,16 +304,11 @@ export function UrbanFlow() {
   return (
     <div className="space-y-4">
       <LabSyncIndicator />
-      <div className="sticky top-[var(--nav-h)] z-[999999998] isolate -mx-4 transition-[top] duration-300">
-        <StudioBar kind="urban" place={place.name} onCompare={showComparison} onReset={restoreScenario} />
-      </div>
-
-      <UrbanStudio />
-      <div className="space-y-2">
-        <Fold id={foldId("urban", "luogo")} title="Luogo e mappa" icon={MapPin}><LocationCard kind="urban" /></Fold>
-        <Fold id={foldId("urban", "media")} title="Foto e video" icon={Camera}><LabMedia embedded kind="urban" context={`Scenario: ${comparison.find((l) => l.id === activeLevel)?.s ?? "attuale"}`} /></Fold>
-        <Fold id={foldId("urban", "sensori")} title="Dove mettere i sensori" hint="· AI" icon={Radar}><SensorAdvisor embedded kind="urban" /></Fold>
-      </div>
+      <SimShell kind="urban" place={place.name} onCompare={showComparison} onReset={restoreScenario}
+        simula={<UrbanStudio />}
+        luogo={<LocationCard kind="urban" />}
+        media={<LabMedia embedded kind="urban" context={`Scenario: ${comparison.find((l) => l.id === activeLevel)?.s ?? "attuale"}`} />}
+        sensori={<SensorAdvisor embedded kind="urban" />} />
       <Dialog open={compareOpen} onOpenChange={setCompareOpen}>
         <ComparisonDialog onImportWeather={importRealWeather} matrix={<PrototypeMatrix kind="urban" activeLevel={activeLevel} />}><ComparisonTable realTemp={urban.realTemp} place={place} trees={base.trees} permeable={base.permeable} shade={base.shade} activeLevel={activeLevel} onApply={applyScenario} /></ComparisonDialog>
       </Dialog>
@@ -372,16 +367,11 @@ export function VineyardFlow() {
   return (
     <div className="space-y-4">
       <LabSyncIndicator />
-      <div className="sticky top-[var(--nav-h)] z-[999999998] isolate -mx-4 transition-[top] duration-300">
-        <StudioBar kind="vineyard" place={place} onCompare={showComparison} onReset={restoreScenario} onSend={() => setSend(true)} />
-      </div>
-
-      <VineStudio onZonesEdit={onZonesEdit} />
-      <div className="space-y-2">
-        <Fold id={foldId("vineyard", "luogo")} title="Luogo e mappa" icon={MapPin}><LocationCard kind="vineyard" /></Fold>
-        <Fold id={foldId("vineyard", "media")} title="Foto e video" icon={Camera}><LabMedia embedded kind="vineyard" context={`${vineyard.allZones ? "Tutte le zone" : `Zona ${vineyard.selected + 1}`} · ${vineyard.phase}`} /></Fold>
-        <Fold id={foldId("vineyard", "sensori")} title="Dove mettere i sensori" hint="· AI" icon={Radar}><SensorAdvisor embedded kind="vineyard" /></Fold>
-      </div>
+      <SimShell kind="vineyard" place={place} onCompare={showComparison} onReset={restoreScenario} onSend={() => setSend(true)}
+        simula={<VineStudio onZonesEdit={onZonesEdit} />}
+        luogo={<LocationCard kind="vineyard" />}
+        media={<LabMedia embedded kind="vineyard" context={`${vineyard.allZones ? "Tutte le zone" : `Zona ${vineyard.selected + 1}`} · ${vineyard.phase}`} />}
+        sensori={<SensorAdvisor embedded kind="vineyard" />} />
       <Dialog open={compareOpen} onOpenChange={setCompareOpen}>
         <ComparisonDialog onImportWeather={importRealWeather} matrix={<PrototypeMatrix kind="vineyard" activeLevel={activeLevel} />}><VineComparison v={vineyard} base={base} activeLevel={activeLevel} onApply={applyScenario} /></ComparisonDialog>
       </Dialog>
