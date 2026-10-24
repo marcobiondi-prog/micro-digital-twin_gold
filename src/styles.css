@@ -1938,22 +1938,30 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
    lit with a glowing line under it and its name below the row. Same look in light and dark themes. */
 .ps-nav { padding-bottom: env(safe-area-inset-bottom); }
 .ps-nav-bg { filter: drop-shadow(0 -6px 18px rgb(0 0 0 / 0.28)); }
-.ps-nav-item { position: relative; z-index: 1; display: flex; width: 100%; height: 3.4rem; flex-direction: column; align-items: center; justify-content: center; gap: 0.15rem; color: rgb(255 255 255 / 0.55); outline: none; transition: color 200ms ease; }
+/* Frosted glass under the slab, cut to the same arch: what scrolls behind shows through, blurred, like the PS app. */
+.ps-nav-glass { backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 90' preserveAspectRatio='none'%3E%3Cpath d='M0 22 Q50 2 100 22 V90 H0 Z'/%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 90' preserveAspectRatio='none'%3E%3Cpath d='M0 22 Q50 2 100 22 V90 H0 Z'/%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat; }
+.ps-nav-item { position: relative; display: flex; width: 100%; height: 3.25rem; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 0.25rem; color: rgb(255 255 255 / 0.88); outline: none; transition: color 200ms ease; }
 .ps-nav-item:focus-visible .ps-nav-icon { box-shadow: 0 0 0 2px rgb(255 255 255 / 0.6); }
-.ps-nav-icon { display: grid; place-items: center; width: 2.75rem; height: 2rem; border-radius: 0.75rem; transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1); }
-.ps-nav-label { font-size: 11px; font-weight: 600; line-height: 1rem; letter-spacing: 0.01em; opacity: 0; transform: translateY(-3px); transition: opacity 200ms ease, transform 220ms ease; }
+.ps-nav-icon { position: relative; z-index: 1; display: grid; place-items: center; width: 2.75rem; height: 2.25rem; border-radius: 0.75rem; transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1), filter 220ms ease; }
 .ps-nav-item[data-active] { color: #fff; }
-.ps-nav-item[data-active] .ps-nav-label { opacity: 1; transform: none; }
+.ps-nav-item[data-active] .ps-nav-icon { filter: drop-shadow(0 0 6px rgb(140 190 255 / 0.85)); }
+/* The PS light: a short curved white line under the active icon, glowing blue upward, tilted with the arch. */
+.ps-nav-item::after { content: ""; position: absolute; left: 50%; bottom: 0.1rem; width: 2.6rem; height: 0.45rem; border-radius: 50% 50% 0 0 / 100% 100% 0 0; border-top: 2.5px solid #fff; box-shadow: 0 -6px 14px -2px rgb(120 180 255 / 0.85); opacity: 0; transform: translateX(-50%) rotate(var(--ps-tilt, 0deg)) scaleX(0.4); transition: opacity 220ms ease, transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+.ps-nav-item::before { content: ""; position: absolute; left: 50%; bottom: 0.2rem; width: 3.6rem; height: 2.6rem; background: radial-gradient(ellipse at 50% 100%, rgb(120 180 255 / 0.4), transparent 70%); opacity: 0; transform: translateX(-50%) rotate(var(--ps-tilt, 0deg)); transition: opacity 220ms ease; pointer-events: none; }
+.ps-nav-item[data-col="0"] { --ps-tilt: -5deg; }
+.ps-nav-item[data-col="1"] { --ps-tilt: -3deg; }
+.ps-nav-item[data-col="3"] { --ps-tilt: 3deg; }
+.ps-nav-item[data-col="4"] { --ps-tilt: 5deg; }
+.ps-nav-item[data-active]::after { opacity: 1; transform: translateX(-50%) rotate(var(--ps-tilt, 0deg)) scaleX(1); }
+.ps-nav-item[data-active]::before { opacity: 1; }
 .ps-nav-item:active .ps-nav-icon { transform: scale(0.9); }
-/* PS5-style cursor: a white rounded frame with a soft glow that glides to the open page. */
-.ps-nav-focus { position: absolute; top: 1.75rem; left: calc(0.5rem + var(--ps-col) * (100% - 1rem) / 5 + 0.3rem); width: calc((100% - 1rem) / 5 - 0.6rem); height: 3.4rem; border-radius: 1rem; background: linear-gradient(180deg, rgb(255 255 255 / 0.14), rgb(255 255 255 / 0.04)); box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.9), 0 0 14px 1px rgb(255 255 255 / 0.22); transition: left 320ms cubic-bezier(0.2, 0.8, 0.2, 1); pointer-events: none; }
-@media (prefers-reduced-motion: reduce) { .ps-nav-item, .ps-nav-icon, .ps-nav-label, .ps-nav-focus { transition: none; } .ps-nav-item:active .ps-nav-icon { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ps-nav-item, .ps-nav-item::after, .ps-nav-item::before, .ps-nav-icon { transition: none; } .ps-nav-item:active .ps-nav-icon { transform: none; } }
 
 /* v7: the AI camera rises from the middle of the arch, lit like the active page. */
-.ps-nav-camera { position: relative; display: grid; place-items: center; width: 3.9rem; height: 3.9rem; margin-top: -2.15rem; border-radius: 999px; color: #fff; background: radial-gradient(circle at 30% 25%, #3a4560, #151a24 70%); box-shadow: 0 0 0 2px rgb(103 232 249 / 0.85), 0 0 22px 2px rgb(103 232 249 / 0.45), 0 10px 22px rgb(0 0 0 / 0.45); outline: none; transition: transform 160ms ease, box-shadow 160ms ease; }
+.ps-nav-camera { position: relative; display: grid; place-items: center; width: 3.9rem; height: 3.9rem; margin-top: -1.9rem; border-radius: 999px; color: #fff; background: radial-gradient(circle at 30% 22%, #56606f, #262c36 72%); box-shadow: 0 0 0 2px rgb(255 255 255 / 0.85), 0 0 18px 2px rgb(120 180 255 / 0.55), 0 10px 22px rgb(0 0 0 / 0.45); outline: none; transition: transform 160ms ease, box-shadow 160ms ease; }
 .ps-nav-camera[data-ai] { background: #fff; }
 /* A slow halo breathes around the camera: the one main action, like the PS button. */
-.ps-nav-camera::after { content: ""; position: absolute; inset: -6px; border-radius: inherit; box-shadow: 0 0 0 1.5px rgb(103 232 249 / 0.5); animation: ps-camera-halo 2.8s ease-out infinite; pointer-events: none; }
+.ps-nav-camera::after { content: ""; position: absolute; inset: -6px; border-radius: inherit; box-shadow: 0 0 0 1.5px rgb(140 190 255 / 0.55); animation: ps-camera-halo 2.8s ease-out infinite; pointer-events: none; }
 @keyframes ps-camera-halo { 0% { transform: scale(0.92); opacity: 0.9; } 70%, 100% { transform: scale(1.18); opacity: 0; } }
 .ps-nav-camera:active { transform: scale(0.94); }
 .ps-nav-camera:focus-visible { box-shadow: 0 0 0 3px #fff, 0 0 26px 4px rgb(103 232 249 / 0.6); }

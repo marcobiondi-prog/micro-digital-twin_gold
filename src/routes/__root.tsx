@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Outlet, Link, createRootRouteWithContext, useLocation, useNavigate, HeadContent, Scripts, type ErrorComponentProps } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
@@ -169,8 +169,10 @@ function BottomNav() {
       ro.disconnect();
     };
   }, [pathname]);
-  const item = ({ to, l, I }: (typeof bottomItems)[number]) => {
+  const item = ({ to, l, I }: (typeof bottomItems)[number], index: number) => {
     const active = pathname === to;
+    // Grid column (the camera owns column 2): the light under the active icon tilts with the arch.
+    const col = index < 2 ? index : index + 1;
     return (
       <li key={to}>
         <Link to={to} replace={pathname !== "/"} aria-current={active ? "page" : undefined} aria-label={l}
@@ -180,33 +182,34 @@ function BottomNav() {
             e.preventDefault();
             window.scrollTo({ top: 0, behavior: "instant" });
           }}
-          className="ps-nav-item" data-active={active || undefined}>
-          <span className="ps-nav-icon"><I className="size-6" strokeWidth={active ? 2.25 : 1.75} aria-hidden="true" /></span>
-          <span className="ps-nav-label" aria-hidden="true">{l}</span>
+          className="ps-nav-item" data-active={active || undefined} data-col={col}>
+          <span className="ps-nav-icon"><I className="size-6" strokeWidth={2} aria-hidden="true" /></span>
         </Link>
       </li>
     );
   };
-  // Grid column of the active page (the camera owns column 2), so the focus frame can glide there.
-  const index = bottomItems.findIndex((b) => b.to === pathname);
-  const col = index < 0 ? -1 : index < 2 ? index : index + 1;
+  const current = bottomItems.find((b) => b.to === pathname);
   return (
     <nav aria-label="Menu principale" className={`ps-nav fixed inset-x-0 bottom-0 z-[999999998] transition-transform duration-300 motion-reduce:transition-none sm:hidden ${hidden ? "translate-y-full" : "translate-y-0"}`}>
-      {/* PlayStation-app look: a dark glass arch, a white focus frame that glides to the open page and names it, the AI camera rising in the middle. */}
-      <svg className="ps-nav-bg pointer-events-none absolute inset-x-0 bottom-0 h-full w-full" viewBox="0 0 100 80" preserveAspectRatio="none" aria-hidden="true">
+      {/* PlayStation-app slab: a slate arch for the icons over a darker band that names the open page; a light curve glows under the active icon and the AI camera rises in the middle. */}
+      <div className="ps-nav-glass pointer-events-none absolute inset-0" aria-hidden="true" />
+      <svg className="ps-nav-bg pointer-events-none absolute inset-x-0 bottom-0 h-full w-full" viewBox="0 0 100 90" preserveAspectRatio="none" aria-hidden="true">
         <defs>
-          <linearGradient id="ps-nav-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1c2029" /><stop offset="1" stopColor="#06070a" /></linearGradient>
-          <linearGradient id="ps-nav-edge" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#fff" stopOpacity="0" /><stop offset="0.5" stopColor="#fff" stopOpacity="0.5" /><stop offset="1" stopColor="#fff" stopOpacity="0" /></linearGradient>
+          <linearGradient id="ps-nav-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#3d4552" stopOpacity="0.86" /><stop offset="1" stopColor="#232831" stopOpacity="0.94" /></linearGradient>
+          <linearGradient id="ps-nav-band" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1b1f26" /><stop offset="1" stopColor="#101317" /></linearGradient>
+          <linearGradient id="ps-nav-edge" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#fff" stopOpacity="0.08" /><stop offset="0.5" stopColor="#fff" stopOpacity="0.32" /><stop offset="1" stopColor="#fff" stopOpacity="0.08" /></linearGradient>
         </defs>
-        <path d="M0 24 Q50 -6 100 24 V80 H0 Z" fill="url(#ps-nav-fill)" />
-        <path d="M0 24 Q50 -6 100 24" fill="none" stroke="url(#ps-nav-edge)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+        <path d="M0 22 Q50 2 100 22 V90 H0 Z" fill="url(#ps-nav-fill)" />
+        <path d="M0 22 Q50 2 100 22" fill="none" stroke="url(#ps-nav-edge)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+        <path d="M0 70 Q50 60 100 70 V90 H0 Z" fill="url(#ps-nav-band)" />
+        <path d="M0 70 Q50 60 100 70" fill="none" stroke="rgb(255 255 255 / 0.1)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
       </svg>
-      <ul className="ps-nav-row relative grid grid-cols-5 items-start px-2 pb-2 pt-7" style={{ "--ps-col": col } as CSSProperties}>
-        {col >= 0 && <li className="ps-nav-focus" aria-hidden="true" />}
-        {bottomItems.slice(0, 2).map(item)}
+      <ul className="relative grid grid-cols-5 items-start px-2 pt-6">
+        {bottomItems.slice(0, 2).map((b, i) => item(b, i))}
         <li className="flex justify-center"><CameraDockButton /></li>
-        {bottomItems.slice(2).map(item)}
+        {bottomItems.slice(2).map((b, i) => item(b, i + 2))}
       </ul>
+      <p className="relative h-8 pb-[env(safe-area-inset-bottom)] text-center text-[13px] font-medium leading-8 tracking-wide text-white/90" aria-hidden="true">{current?.l ?? ""}</p>
     </nav>
   );
 }
