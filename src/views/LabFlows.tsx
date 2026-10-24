@@ -10,10 +10,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SensorAdvisor } from "@/views/SensorAdvisor";
 import { LabMedia } from "@/views/LabMedia";
 import { LocationCard, splitLocation, ImportWeatherButton } from "@/views/SimulationGrid";
-import { UrbanPlay } from "@/views/v1/UrbanPlay";
-import { VinePlay } from "@/views/v1/VinePlay";
+import { UrbanStudio } from "@/views/v7/UrbanStudio";
+import { VineStudio } from "@/views/v7/VineStudio";
+import { StudioBar, foldId } from "@/views/v7/StudioBar";
 import { Fold } from "@/views/Fold";
-import { useSignedIn } from "@/lib/use-signed-in";
 import { comparison, levelTone, nextPhase, piazzaEstimate, prototypeChoice, type PrototypeId } from "@/models/scenarios";
 import { applyVineyardScenario, closestVineyardScenario, vineyardControlValue, vineyardScenarioSteps } from "@/models/vineyard-controls";
 import { resetUrban, resetVineyard, setUrban, setVineyard, useLab, vineMetrics, vineyardSituation, type LabState } from "@/models/lab-store";
@@ -41,28 +41,28 @@ function urbanPrototypeLevel(trees: number, permeable: number, shade: number): P
 function ComparisonTable({ place, trees, permeable, shade, activeLevel, onApply, realTemp }: { realTemp?: number | null | undefined; place: { name: string; sub: string }; trees: number; permeable: number; shade: number; activeLevel: PrototypeId; onApply: (id: PrototypeId, trees: number, permeable: number, shade: number) => void }) {
   const scenarios: UrbanScenario[] = [
     {
-      name: "Zero Budget",
-      dt: "Wizard of Oz",
+      name: "Subito, gratis",
+      dt: "Con i dati che ci sono già",
       trees: Math.max(2, Math.round(trees * 0.6)),
       permeable: Math.max(10, Math.round(permeable * 0.6)),
       shade: Math.max(10, Math.round(shade * 0.6)),
-      emphasis: "Osservazioni e dati aperti sulle aree più esposte: validiamo il bisogno",
+      emphasis: "Osservazioni e dati aperti sulle aree più esposte: capiamo dove serve",
     },
     {
-      name: "Sostenibile",
-      dt: "MVP · da prototipare",
+      name: "Pochi sensori",
+      dt: "Una prova sul posto",
       trees,
       permeable,
       shade,
       emphasis: "Interventi impostati nella griglia, misurati con pochi sensori mirati",
     },
     {
-      name: "Budget Sostenuto",
-      dt: "Roadmap 4.0",
+      name: "Progetto completo",
+      dt: "Su tutta la città",
       trees: Math.min(30, Math.max(trees + 6, Math.round(trees * 1.5))),
       permeable: Math.min(100, Math.max(permeable + 15, Math.round(permeable * 1.35))),
       shade: Math.min(100, Math.max(shade + 15, Math.round(shade * 1.35))),
-      emphasis: "Rinverdimento esteso a regime, dopo la validazione dell’MVP",
+      emphasis: "Più verde in tutta la piazza, dopo che la prova ha funzionato",
     },
   ];
 
@@ -75,7 +75,7 @@ function ComparisonTable({ place, trees, permeable, shade, activeLevel, onApply,
       <div className="grid gap-3 md:grid-cols-3">
         {scenarios.map((scenario) => {
           const estimate = piazzaEstimate(scenario.trees, scenario.permeable, scenario.shade);
-          const scenarioId: PrototypeId = scenario.name === "Zero Budget" ? "zero" : scenario.name === "Sostenibile" ? "mvp" : "roadmap";
+          const scenarioId: PrototypeId = scenario.name === "Subito, gratis" ? "zero" : scenario.name === "Pochi sensori" ? "mvp" : "roadmap";
           const selected = scenarioId === activeLevel;
           const tone = levelTone[scenarioId];
           return (
@@ -115,7 +115,7 @@ function ComparisonTable({ place, trees, permeable, shade, activeLevel, onApply,
 function PrototypeMatrix({ kind, activeLevel }: { kind: "urban" | "vineyard"; activeLevel: PrototypeId }) {
   return (
     <section aria-labelledby={`proto-${kind}`} className="space-y-3">
-      <div className="flex items-center gap-2"><FlaskConical className="size-5 shrink-0 text-primary" /><h3 id={`proto-${kind}`} className="font-semibold">Matrice di prototipazione · Design Thinking</h3></div>
+      <div className="flex items-center gap-2"><FlaskConical className="size-5 shrink-0 text-primary" /><h3 id={`proto-${kind}`} className="font-semibold">Quanto costa e cosa si impara</h3></div>
       <div className="grid gap-3 md:grid-cols-3">
         {comparison.map((l) => {
           const selected = l.id === activeLevel;
@@ -134,13 +134,13 @@ function PrototypeMatrix({ kind, activeLevel }: { kind: "urban" | "vineyard"; ac
               <div className="rounded-md bg-muted p-2"><dt className="text-[10px] text-muted-foreground">Tempi</dt><dd className="break-words font-mono text-xs font-semibold">{l.time}</dd></div>
             </dl>
             <div className="mt-3 border-t pt-3">
-              <span className="text-[10px] font-bold uppercase text-muted-foreground">Obiettivo di test</span>
+              <span className="text-[10px] font-bold uppercase text-muted-foreground">Cosa vogliamo scoprire</span>
               <p className="mt-1 text-sm">{l.test[kind]}</p>
             </div>
           </div>
         );})}
       </div>
-      <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 text-sm"><span className="font-semibold">Perché l’MVP sostenibile: </span>{prototypeChoice}</div>
+      <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 text-sm"><span className="font-semibold">Perché pochi sensori: </span>{prototypeChoice}</div>
       <p className="flex items-start gap-2 text-sm font-medium"><ArrowRight className="mt-0.5 size-4 shrink-0 text-primary" />{nextPhase}</p>
     </section>
   );
@@ -160,9 +160,9 @@ function VineComparison({ v, base, activeLevel, onApply }: { v: LabState["vineya
     return (Math.round(raw * 10) / 10).toLocaleString("it-IT", { maximumFractionDigits: 1 });
   };
   const copy = {
-    zero: { name: "Zero Budget", dt: "Wizard of Oz", emphasis: "Stato attuale delle zone, osservato a mano e con dati aperti" },
-    mvp: { name: "Sostenibile", dt: "MVP · da prototipare", emphasis: "Irrigazione mirata guidata dai sensori sulle zone più asciutte" },
-    roadmap: { name: "Budget Sostenuto", dt: "Roadmap 4.0", emphasis: "Telemetria continua e irrigazione di precisione a regime" },
+    zero: { name: "Subito, gratis", dt: "Con i dati che ci sono già", emphasis: "Stato attuale delle zone, osservato a mano e con dati aperti" },
+    mvp: { name: "Pochi sensori", dt: "Una prova sul posto", emphasis: "Irrigazione mirata guidata dai sensori sulle zone più asciutte" },
+    roadmap: { name: "Progetto completo", dt: "Su tutto il territorio", emphasis: "Misure continue e irrigazione di precisione su tutto il vigneto" },
   } as const;
   const scen = vineyardScenarioSteps.map((step) => ({ ...step, ...copy[step.id] }));
   return (
@@ -236,15 +236,15 @@ function ComparisonDialog({ children, matrix, onImportWeather }: { children: Rea
           <DialogTitle>Confronto scenari</DialogTitle>
         </DialogHeader>
         <p className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b px-4 pb-2 pt-2 text-xs text-muted-foreground sm:px-6">
-          <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-ok" aria-hidden="true" />Costo zero</span>
+          <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-ok" aria-hidden="true" />Gratis</span>
           <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-brand-turquoise" aria-hidden="true" />Costo medio</span>
-          <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-warn" aria-hidden="true" />Budget sostenuto</span>
+          <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-warn" aria-hidden="true" />Costo alto</span>
         </p>
       </div>
       <div className="min-h-0 overflow-y-auto overscroll-contain px-4 pb-4 sm:overflow-visible sm:px-6 sm:pb-6">
         <Tabs value={tab} onValueChange={(v) => setTab(v as "scenarios" | "matrix")} className="min-w-0 pt-4">
           <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-lg bg-nav-accent/[0.06] p-1">
-            {([["scenarios", "Confronto scenari", "aggiornato in tempo reale"], ["matrix", "Matrice di prototipazione", "Design Thinking"]] as const).map(([value, title, sub]) => (
+            {([["scenarios", "Confronto scenari", "aggiornato in tempo reale"], ["matrix", "Costi e tempi", "cosa si impara"]] as const).map(([value, title, sub]) => (
               <TabsTrigger key={value} value={value} onClick={() => setTab(value)} className="group flex min-h-10 min-w-0 flex-col items-center justify-center gap-0.5 whitespace-normal rounded-md px-2 py-1.5 text-center leading-tight text-nav-accent-ink/80 data-[state=active]:bg-nav-accent/85 data-[state=active]:text-nav-accent-foreground data-[state=active]:shadow-none">
                 <span className="text-xs font-medium sm:text-sm">{title}</span>
                 <span className="hidden text-[10px] font-normal opacity-70 min-[380px]:block sm:text-xs">{sub}</span>
@@ -261,9 +261,6 @@ function ComparisonDialog({ children, matrix, onImportWeather }: { children: Rea
 
 /** Simulazione urbana completa: riepilogo con Confronta, dati reali, media, griglia. */
 export function UrbanFlow() {
-  const { signedIn, demo } = useSignedIn();
-  // Sensor suggestions call an auth-protected server function: real accounts only.
-  const realSignedIn = signedIn && !demo;
   const [compareOpen, setCompareOpen] = useState(false);
   const [pinned, setPinned] = useState<PrototypeId | null>(null);
   const [baseline, setBaseline] = useState<LabState["urban"] | null>(null);
@@ -306,21 +303,16 @@ export function UrbanFlow() {
 
   return (
     <div className="space-y-4">
+      <LabSyncIndicator />
       <div className="sticky top-[var(--nav-h)] z-[999999998] isolate -mx-4 transition-[top] duration-300">
-        <div className="border-b bg-background px-4 py-2"><LabSyncIndicator className="max-w-full" /></div>
-        <Card className="lab-summary flex items-center justify-between gap-2 rounded-none border-x-0 border-t-0 bg-card px-3 py-2 shadow-sm sm:gap-4 sm:px-6 sm:py-2 xl:py-3">
-          <div className="flex min-w-0 flex-wrap items-center gap-2 font-semibold sm:gap-x-3"><Building2 className="size-5 shrink-0 text-urban" /><span className="min-w-0 break-words text-[1.0625rem] leading-6">{place.name}</span><p className="hidden min-w-0 basis-48 flex-1 truncate text-sm font-normal text-muted-foreground sm:block">{place.sub}</p></div>
-          <div className="flex shrink-0 items-center gap-2">
-            <CompareButton level={activeLevel} onClick={showComparison} />
-          </div>
-        </Card>
+        <StudioBar kind="urban" place={place.name} onCompare={showComparison} onReset={restoreScenario} />
       </div>
 
-      <UrbanPlay onReset={restoreScenario} />
+      <UrbanStudio />
       <div className="space-y-2">
-        <Fold title="Luogo e mappa" icon={MapPin}><LocationCard kind="urban" /></Fold>
-        <Fold title="Foto e video" icon={Camera}><LabMedia embedded kind="urban" context={`Scenario: ${comparison.find((l) => l.id === activeLevel)?.s ?? "attuale"}`} /></Fold>
-        {realSignedIn && <Fold title="Dove installare sensori" icon={Radar}><SensorAdvisor embedded kind="urban" /></Fold>}
+        <Fold id={foldId("urban", "luogo")} title="Luogo e mappa" icon={MapPin}><LocationCard kind="urban" /></Fold>
+        <Fold id={foldId("urban", "media")} title="Foto e video" icon={Camera}><LabMedia embedded kind="urban" context={`Scenario: ${comparison.find((l) => l.id === activeLevel)?.s ?? "attuale"}`} /></Fold>
+        <Fold id={foldId("urban", "sensori")} title="Dove mettere i sensori" hint="· AI" icon={Radar}><SensorAdvisor embedded kind="urban" /></Fold>
       </div>
       <Dialog open={compareOpen} onOpenChange={setCompareOpen}>
         <ComparisonDialog onImportWeather={importRealWeather} matrix={<PrototypeMatrix kind="urban" activeLevel={activeLevel} />}><ComparisonTable realTemp={urban.realTemp} place={place} trees={base.trees} permeable={base.permeable} shade={base.shade} activeLevel={activeLevel} onApply={applyScenario} /></ComparisonDialog>
@@ -331,9 +323,6 @@ export function UrbanFlow() {
 
 /** Simulazione del vigneto completa: riepilogo con Confronta e invio, dati reali, media, griglia. */
 export function VineyardFlow() {
-  const { signedIn, demo } = useSignedIn();
-  // Sensor suggestions call an auth-protected server function: real accounts only.
-  const realSignedIn = signedIn && !demo;
   const [send, setSend] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [pinned, setPinned] = useState<PrototypeId | null>(null);
@@ -344,7 +333,7 @@ export function VineyardFlow() {
   const showComparison = () => setCompareOpen(true);
   const vineyard = useLab().vineyard;
   const fetchClimate = useServerFn(getRealClimate);
-  // Signed-in only: real Open-Meteo values become the new Zero Budget baseline; zones keep their relative differences.
+  // Signed-in only: real Open-Meteo values become the new "Subito, gratis" baseline; zones keep their relative differences.
   const importRealWeather = async () => {
     const { lat, lng } = vineyard.location;
     const r = await fetchClimate({ data: { lat, lng } }).catch(() => null);
@@ -382,22 +371,16 @@ export function VineyardFlow() {
 
   return (
     <div className="space-y-4">
+      <LabSyncIndicator />
       <div className="sticky top-[var(--nav-h)] z-[999999998] isolate -mx-4 transition-[top] duration-300">
-        <div className="border-b bg-background px-4 py-2"><LabSyncIndicator className="max-w-full" /></div>
-        <Card className="lab-summary flex items-center justify-between gap-2 rounded-none border-x-0 border-t-0 bg-card px-3 py-2 shadow-sm sm:gap-4 sm:px-6 sm:py-2 xl:py-3">
-          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-x-3"><Grape className="size-5 shrink-0 text-vine" /><h3 className="min-w-0 break-words font-semibold">Vigneto · {place}</h3><span className="hidden lg:inline-flex"><span aria-live="polite" title={`Indice massimo ${situation.peak}/100`}><StatusBadge level={situation.level}>{situation.label} · {situation.peak}</StatusBadge></span></span></div>
-          <div className="flex min-w-0 shrink-0 items-center gap-1.5 min-[380px]:gap-2 sm:gap-2">
-            <p className="hidden min-w-0 max-w-72 flex-1 truncate text-sm text-muted-foreground lg:block">{situation.caption}</p>
-            <CompareButton level={activeLevel} onClick={showComparison} className="sm:mr-1" /><Button size="sm" onClick={() => setSend(true)} aria-label="Invia i dati all’agronomo" className="rounded-full bg-vine px-2.5 hover:bg-vine/90 min-[380px]:px-3 sm:h-10 sm:px-4"><Send /><span className="hidden min-[380px]:inline sm:hidden">Invia</span><span className="hidden sm:inline">Invia i dati all’agronomo</span></Button>
-          </div>
-        </Card>
+        <StudioBar kind="vineyard" place={place} onCompare={showComparison} onReset={restoreScenario} onSend={() => setSend(true)} />
       </div>
 
-      <VinePlay onReset={restoreScenario} onZonesEdit={onZonesEdit} />
+      <VineStudio onZonesEdit={onZonesEdit} />
       <div className="space-y-2">
-        <Fold title="Luogo e mappa" icon={MapPin}><LocationCard kind="vineyard" /></Fold>
-        <Fold title="Foto e video" icon={Camera}><LabMedia embedded kind="vineyard" context={`${vineyard.allZones ? "Tutte le zone" : `Zona ${vineyard.selected + 1}`} · ${vineyard.phase}`} /></Fold>
-        {realSignedIn && <Fold title="Dove installare sensori" icon={Radar}><SensorAdvisor embedded kind="vineyard" /></Fold>}
+        <Fold id={foldId("vineyard", "luogo")} title="Luogo e mappa" icon={MapPin}><LocationCard kind="vineyard" /></Fold>
+        <Fold id={foldId("vineyard", "media")} title="Foto e video" icon={Camera}><LabMedia embedded kind="vineyard" context={`${vineyard.allZones ? "Tutte le zone" : `Zona ${vineyard.selected + 1}`} · ${vineyard.phase}`} /></Fold>
+        <Fold id={foldId("vineyard", "sensori")} title="Dove mettere i sensori" hint="· AI" icon={Radar}><SensorAdvisor embedded kind="vineyard" /></Fold>
       </div>
       <Dialog open={compareOpen} onOpenChange={setCompareOpen}>
         <ComparisonDialog onImportWeather={importRealWeather} matrix={<PrototypeMatrix kind="vineyard" activeLevel={activeLevel} />}><VineComparison v={vineyard} base={base} activeLevel={activeLevel} onApply={applyScenario} /></ComparisonDialog>

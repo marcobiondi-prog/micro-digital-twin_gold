@@ -2,10 +2,10 @@ import type { ReactNode } from "react";
 import { ChevronDown, type LucideIcon } from "lucide-react";
 
 /** Sezione a fisarmonica: una riga col titolo, il contenuto si apre al tocco (chiuso di partenza), una sola aperta per volta. */
-export function Fold({ title, hint, icon: Icon, children }: { title: string; hint?: string; icon?: LucideIcon; children: ReactNode }) {
+export function Fold({ id, title, hint, icon: Icon, children }: { id?: string; title: string; hint?: string; icon?: LucideIcon; children: ReactNode }) {
   return (
     // One open section at a time: opening one closes the others in the same list.
-    <details className="dashboard-fold group" onToggle={(e) => {
+    <details id={id} className="dashboard-fold group scroll-mt-[calc(var(--nav-h)+5rem)]" onToggle={(e) => {
       const el = e.currentTarget;
       if (!el.open) return;
       el.parentElement?.querySelectorAll<HTMLDetailsElement>(":scope > details.dashboard-fold[open]").forEach((other) => { if (other !== el) other.open = false; });

@@ -10,15 +10,21 @@ const themeChanged = "climate-twin-theme-changed";
 function applyTheme(theme: Theme) {
   document.documentElement.classList.toggle("dark", theme === "dark");
   document.documentElement.style.colorScheme = theme;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? THEME_DARK : "#ffffff");
 }
 
+/** Status-bar colour of the dark canvas (the top slab's colour). */
+export const THEME_DARK = "#1d2129";
+/** Runs before paint: an explicit light choice drops the dark class the server renders, so there is no flash. */
+export const themeBootScript = `try{if(localStorage.getItem("${themeKey}")==="light"){var d=document.documentElement;d.classList.remove("dark");d.style.colorScheme="light";var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content","#ffffff")}}catch(e){}`;
+
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>("light");
+  const [theme, setTheme] = useState<Theme>("dark");
 
   useEffect(() => {
     const saved = window.localStorage.getItem(themeKey);
-    // No automatic theme: without a saved explicit choice the app is light.
-    const initial: Theme = saved === "dark" ? "dark" : "light";
+    // No automatic theme: without a saved explicit choice the app is dark (the PlayStation-style canvas).
+    const initial: Theme = saved === "light" ? "light" : "dark";
     setTheme(initial);
     applyTheme(initial);
 

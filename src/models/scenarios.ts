@@ -45,8 +45,8 @@ export type PrototypeLevel = {
 /** Three prototyping levels framed with Design Thinking terminology. */
 export const comparison: PrototypeLevel[] = [
   {
-    id: "zero", s: "Zero Budget", dt: "Prototipo a fedeltà minima · Wizard of Oz",
-    def: "Dati aperti, meteo pubblico e osservazioni manuali: valida bisogno e interfaccia a rischio zero, prima di investire in hardware.",
+    id: "zero", s: "Subito, gratis", dt: "Con i dati che ci sono già",
+    def: "Dati aperti, meteo e osservazioni a mano: si capisce subito se l’idea serve, prima di comprare strumenti.",
     cost: "0 €", prec: "Bassa (±3 °C)", time: "Subito",
     test: {
       urban: "L’informazione è davvero utile al tecnico comunale per scegliere dove intervenire?",
@@ -54,8 +54,8 @@ export const comparison: PrototypeLevel[] = [
     },
   },
   {
-    id: "mvp", s: "Sostenibile", dt: "Minimum Viable Prototype · MVP", chosen: true,
-    def: "Pochi sensori mirati e parametri essenziali: massimo rapporto tra costo e apprendimento sul campo in tempi rapidi.",
+    id: "mvp", s: "Pochi sensori", dt: "Una prova sul posto", chosen: true,
+    def: "Pochi sensori messi nei punti giusti: si impara molto spendendo poco, in poche settimane.",
     cost: "€€", prec: "Media (±1 °C)", time: "Settimane",
     test: {
       urban: "Alberi, suolo permeabile e ombra riducono davvero di −2/−4 °C la piazza misurata?",
@@ -63,8 +63,8 @@ export const comparison: PrototypeLevel[] = [
     },
   },
   {
-    id: "roadmap", s: "Budget Sostenuto", dt: "Roadmap 4.0 · Visione di scala",
-    def: "Il gemello digitale completo a regime (3D, telemetria continua, droni, LiDAR), da attivare una volta validato il modello con l’MVP.",
+    id: "roadmap", s: "Progetto completo", dt: "Su tutta la città o il territorio",
+    def: "Misure continue, droni e modello 3D: da fare solo dopo che la prova con pochi sensori ha funzionato.",
     cost: "€€€€", prec: "Alta (±0,3 °C)", time: "Mesi / anni",
     test: {
       urban: "Il modello validato regge su più luoghi della città e nella gestione continua?",
@@ -88,9 +88,9 @@ export function prototypeLevel(id: PrototypeId): PrototypeLevel {
 }
 
 export const prototypeChoice =
-  "Scegliamo l’approccio sostenibile perché è l’unico che garantisce validazione sul campo con risorse certe e tempi brevi, poggiando sulla base a costo zero e preparando il terreno alla scalabilità futura.";
+  "Conviene partire con pochi sensori: si verifica sul posto che gli interventi funzionano, con spese contenute e in poco tempo, e poi si può crescere.";
 
-export const nextPhase = "Fase successiva: prototipazione sul campo e test di usabilità a Campobasso e nelle vigne.";
+export const nextPhase = "Prossimo passo: la prova sul posto a Campobasso e nelle vigne, con chi userà l’app.";
 
 export type AreaKind = "albero" | "permeabile" | "ombra" | "parcella";
 export type Pt = { lat: number; lng: number };
