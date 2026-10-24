@@ -45,7 +45,7 @@ export function VineStudio({ onZonesEdit }: { onZonesEdit?: () => void }) {
           </button>
         </Readout>
 
-        <div className="grid grid-cols-3 gap-1.5 rounded-2xl bg-foreground/[0.06] p-1.5 ring-1 ring-foreground/10" role="radiogroup" aria-label="Zona del vigneto">
+        <div className="grid grid-cols-3 gap-1.5 rounded-2xl p-1.5" role="radiogroup" aria-label="Zona del vigneto">
           {vine.zones.map((z, i) => {
             const r = results[i];
             if (!r) return null;

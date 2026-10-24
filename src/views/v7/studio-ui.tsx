@@ -7,16 +7,16 @@ export const GAIN_TEXT = ["text-radar-extreme", "text-radar-hot", "text-radar-wa
 export const GAIN_BG = ["bg-radar-extreme", "bg-radar-hot", "bg-radar-warm", "bg-radar-mild", "bg-ok"] as const;
 export const HEAT_VAR = ["var(--radar-cool)", "var(--radar-mild)", "var(--radar-warm)", "var(--radar-hot)", "var(--radar-extreme)"] as const;
 
-/** v7 "strumento": the instrument surface, a card that follows the light or dark theme. */
+/** v7 "strumento": the instrument, drawn straight on the page canvas (no card, no border) in the theme's colours. */
 export function Studio({ children, className }: { children: ReactNode; className?: string }) {
-  return <section className={cn("studio relative overflow-hidden rounded-2xl bg-card p-3 text-card-foreground sm:p-5", className)}>{children}</section>;
+  return <section className={cn("studio relative text-foreground", className)}>{children}</section>;
 }
 
 /** Big live reading: one number, its unit, and an icon that says what it is. */
 export function Readout({ icon: Icon, value, unit, tone, caption, children }: { icon: LucideIcon; value: string; unit: string; tone: string; caption?: ReactNode; children?: ReactNode }) {
   return (
     <div className="flex min-w-0 items-center gap-3" aria-live="polite">
-      <span className={cn("grid size-12 shrink-0 place-items-center rounded-2xl bg-foreground/[0.06] ring-1 ring-foreground/10", tone)}><Icon className="size-6" aria-hidden="true" /></span>
+      <span className={cn("grid size-12 shrink-0 place-items-center rounded-2xl bg-foreground/[0.06]", tone)}><Icon className="size-6" aria-hidden="true" /></span>
       <div className="min-w-0">
         <div className={cn("flex items-baseline gap-1 font-display text-5xl font-light leading-none tracking-tight tabular-nums transition-colors duration-300 sm:text-6xl", tone)}>{value}<span className="text-lg font-semibold text-foreground/60">{unit}</span></div>
         {caption && <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs font-medium text-foreground/60 sm:text-sm">{caption}</div>}

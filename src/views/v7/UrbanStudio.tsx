@@ -75,7 +75,7 @@ export function UrbanStudio() {
           <HeatBar from={before} to={after} min={before - 6} max={before + 0.5} />
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl ring-1 ring-foreground/10">
+        <div className="relative overflow-hidden rounded-2xl">
           {/* Thermal image: the same cells blurred together underneath, crisp touch targets on top. */}
           <div className="pointer-events-none absolute inset-0 grid grid-cols-9 scale-110 blur-xl" aria-hidden="true">
             {CELLS.map((i) => <span key={i} style={{ background: HEAT_VAR[cellHeat(i)] }} className="transition-[background-color] duration-500 motion-reduce:transition-none" />)}

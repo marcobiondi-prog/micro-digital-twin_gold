@@ -322,7 +322,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
   );
 
   return (
-    <Card className={embedded ? "p-4 shadow-none" : "p-4"}>
+    <Card className={embedded ? "bg-transparent p-0 shadow-none" : "p-4"}>
       {!embedded && (
       <button
         type="button"
