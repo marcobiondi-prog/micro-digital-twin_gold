@@ -399,7 +399,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
                 ? "\n"
                 : "Modalità ospite: i dati non vengono salvati nel cloud."}
             </p>
-            <div className="lab-media-actions simulation-selector-capsule flex flex-nowrap gap-2 rounded-full" role="group" aria-label={`Azioni sui file ${kind === "urban" ? "della piazza" : "del vigneto"}`}>
+            <div className={`lab-media-actions flex flex-nowrap gap-2 rounded-full ${embedded ? "!p-0" : "simulation-selector-capsule"}`} role="group" aria-label={`Azioni sui file ${kind === "urban" ? "della piazza" : "del vigneto"}`}>
               {aiReady && (
                 <Button
                   size="sm"
