@@ -7,6 +7,7 @@ import { useSignedIn } from "@/lib/use-signed-in";
 import { useInstalledApp } from "@/lib/installed-app";
 import aiLogo from "@/assets/ai-logo.png";
 import { applySharedScenario } from "@/views/ScenarioTools";
+import { PsCardBody, psCardClass } from "@/views/v7/PsCard";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -24,8 +25,8 @@ export const Route = createFileRoute("/")({
 
 type Tile = { to: "/urbano" | "/vigneto"; Icon: typeof Building2; title: string; desc: string; meta: string; art: "urban" | "vine" };
 const tiles: Tile[] = [
-  { to: "/urbano", Icon: Building2, title: "Piazza", desc: "Alberi, prato e ombra: quanti gradi in meno.", meta: "Simulazione", art: "urban" },
-  { to: "/vigneto", Icon: Grape, title: "Vigneto", desc: "Sole, acqua e vento: quanta sete ha la vite.", meta: "Simulazione", art: "vine" },
+  { to: "/urbano", Icon: Building2, title: "Simulazione piazza", desc: "Metti alberi, prato e ombra: vedi subito quanti gradi in meno.", meta: "Rinfresca la piazza", art: "urban" },
+  { to: "/vigneto", Icon: Grape, title: "Simulazione vigneto", desc: "Regola sole, acqua e vento: vedi subito quanta sete ha la vite.", meta: "Disseta il vigneto", art: "vine" },
 ];
 
 const HEAT = ["var(--radar-cool)", "var(--radar-mild)", "var(--radar-warm)", "var(--radar-hot)", "var(--radar-extreme)"];
@@ -33,13 +34,13 @@ const HEAT = ["var(--radar-cool)", "var(--radar-mild)", "var(--radar-warm)", "va
 /** Riquadro "immagine" della mattonella: un disegno essenziale al posto della foto. */
 function TileArt({ art }: { art: Tile["art"] }) {
   if (art === "urban") return (
-    <svg viewBox="0 0 180 90" className="h-full w-full" aria-hidden="true">
+    <svg viewBox="0 0 180 90" preserveAspectRatio="xMidYMid slice" className="h-full w-full" aria-hidden="true">
       {Array.from({ length: 54 }, (_, i) => { const x = i % 9, y = Math.floor(i / 9); const h = Math.min(4, Math.max(0, Math.round(x * 0.55 + (y % 2) * 0.4 - (x < 3 && y > 1 ? 1.5 : 0)))); return <rect key={i} x={9 + x * 18.4} y={4 + y * 14} width="16" height="12" rx="3" fill={HEAT[h]} opacity="0.9" />; })}
       {[[1, 2], [2, 3], [1, 4], [3, 1]].map(([x = 0, y = 0]) => <circle key={`${x}${y}`} cx={9 + x * 18.4 + 8} cy={4 + y * 14 + 6} r="5" fill="var(--ok)" stroke="#fff" strokeWidth="1.5" />)}
     </svg>
   );
   if (art === "vine") return (
-    <svg viewBox="0 0 180 90" className="h-full w-full" aria-hidden="true">
+    <svg viewBox="0 0 180 90" preserveAspectRatio="xMidYMid slice" className="h-full w-full" aria-hidden="true">
       <path d="M0 52 Q90 30 180 52 V90 H0 Z" fill="color-mix(in oklab, var(--leaf) 55%, #3b2f1f)" />
       {[0, 1, 2].map((row) => Array.from({ length: 9 }, (_, k) => { const x = 12 + k * 20, y = 56 + row * 11 - Math.sin((k / 8) * Math.PI) * 6; return <g key={`${row}-${k}`}><circle cx={x} cy={y} r="4.5" fill={row === 0 && k > 5 ? "var(--radar-hot)" : "var(--leaf)"} /><circle cx={x + 2} cy={y + 4} r="2" fill="var(--vine)" /></g>; }))}
       <circle cx="150" cy="20" r="10" fill="var(--warn)" />
@@ -62,37 +63,35 @@ function Index() {
   }, [navigate]);
   const ai = useAiReadyHome();
   return (
-    <div className="mx-auto max-w-5xl space-y-4 py-2 sm:space-y-6 sm:py-8">
+    <div className="mx-auto max-w-5xl py-1 sm:py-6">
       <h1 className="sr-only">Micro Digital Twin</h1>
-      <button type="button" onClick={() => setCameraSheetOpen(true)} className="group relative block w-full overflow-hidden rounded-3xl bg-[#0d1016] p-5 text-left text-white shadow-xl outline-none ring-1 ring-white/10 transition-transform focus-visible:ring-2 focus-visible:ring-cyan-300 active:scale-[0.99] motion-reduce:active:scale-100 sm:p-8">
-        <span className="pointer-events-none absolute -right-10 -top-10 size-56 rounded-full bg-[radial-gradient(circle,rgb(103_232_249/0.35),transparent_65%)]" aria-hidden="true" />
-        <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgb(255_255_255/0.04)_1px,transparent_1px),linear-gradient(90deg,rgb(255_255_255/0.04)_1px,transparent_1px)] bg-[size:24px_24px]" aria-hidden="true" />
-        <span className="relative flex items-center gap-4">
-          <span className={`grid size-16 shrink-0 place-items-center rounded-2xl shadow-[0_0_0_2px_rgb(103_232_249/0.85),0_0_24px_rgb(103_232_249/0.45)] ${ai ? "bg-white" : "bg-[#151a24]"}`}>
-            {ai ? <img src={aiLogo} alt="" aria-hidden="true" className="size-10" /> : <ScanLine className="size-8 text-cyan-300" aria-hidden="true" />}
-          </span>
-          <span className="min-w-0">
-            <span className="block text-2xl font-semibold sm:text-3xl">Fotocamera AI</span>
-            <span className="block text-sm text-white/65 sm:text-base">Inquadra una pianta o il terreno: specie, fresco e foto.</span>
-          </span>
-        </span>
-      </button>
-      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+      {/* PlayStation-app feed: the AI camera first, then the two simulators, each a card with a picture. */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <button type="button" onClick={() => setCameraSheetOpen(true)} className={psCardClass}>
+          <PsCardBody iconImg={ai ? aiLogo : undefined} icon={ScanLine} tone={ai ? "bg-white" : "bg-[linear-gradient(135deg,#1b6fd8,#0b3f8c)]"} source="Fotocamera AI"
+            art={<CameraArt />} title="Inquadra una pianta o il terreno" desc="Riconosce la specie, stima il fresco che regala e salva la foto." meta="Specie · fresco · foto" />
+        </button>
         {tiles.map(({ to, Icon, title, desc, meta, art }) => (
-          <Link key={to} to={to} className="group overflow-hidden rounded-3xl bg-[#0d1016] text-white shadow-lg outline-none ring-1 ring-white/10 transition-transform focus-visible:ring-2 focus-visible:ring-cyan-300 active:scale-[0.99] motion-reduce:active:scale-100">
-            <div className="relative aspect-[4/3] sm:aspect-[2/1]">
-              <TileArt art={art} />
-              <span className={`absolute left-2.5 top-2.5 grid size-9 place-items-center rounded-xl text-white shadow ${art === "urban" ? "bg-urban" : "bg-vine"}`}><Icon className="size-5" aria-hidden="true" /></span>
-            </div>
-            <div className="space-y-1 p-3 sm:p-5">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-cyan-300/80">{meta}</p>
-              <h2 className="text-lg font-semibold leading-tight sm:text-2xl">{title}</h2>
-              <p className="text-xs text-white/60 sm:text-sm">{desc}</p>
-            </div>
+          <Link key={to} to={to} className={psCardClass}>
+            <PsCardBody icon={Icon} tone={art === "urban" ? "bg-urban" : "bg-vine"} source={title} art={<TileArt art={art} />} title={meta} desc={desc} meta={art === "urban" ? "Piazza · calore percepito" : "Vigneto · sete della vite"} />
           </Link>
         ))}
       </div>
     </div>
+  );
+}
+
+/** Picture of the camera card: a dark viewfinder with its corner marks around a leaf. */
+function CameraArt() {
+  return (
+    <svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice" className="h-full w-full" aria-hidden="true">
+      <defs><radialGradient id="cam-art-bg" cx="0.5" cy="0.45" r="0.75"><stop offset="0" stopColor="#24415a" /><stop offset="1" stopColor="#0b0f15" /></radialGradient></defs>
+      <rect width="160" height="90" fill="url(#cam-art-bg)" />
+      <path d="M80 22 C100 28 106 48 96 62 C88 72 72 72 66 62 C58 48 62 30 80 22 Z" fill="var(--leaf)" opacity="0.9" />
+      <path d="M80 26 C78 40 76 54 72 68" stroke="#0b2a17" strokeWidth="1.5" fill="none" opacity="0.6" />
+      {[[52, 14, 1, 1], [108, 14, -1, 1], [52, 76, 1, -1], [108, 76, -1, -1]].map(([x = 0, y = 0, dx = 1, dy = 1]) => <path key={`${x}${y}`} d={`M${x} ${y + dy * 10} V${y} H${x + dx * 10}`} stroke="#fff" strokeWidth="2.2" fill="none" strokeLinecap="round" />)}
+      <rect x="20" y="40" width="120" height="1.5" fill="rgb(103 232 249 / 0.7)" />
+    </svg>
   );
 }
 

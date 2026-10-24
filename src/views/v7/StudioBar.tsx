@@ -24,7 +24,7 @@ function Item({ icon: Icon, label, onSelect }: { icon: LucideIcon; label: string
  */
 export function StudioBar({ kind, place, onCompare, onReset, onSend }: { kind: "urban" | "vineyard"; place: string; onCompare: () => void; onReset: () => void; onSend?: () => void }) {
   return (
-    <div className="flex min-w-0 items-center gap-2 border-b border-white/10 bg-[#0d1016] px-3 py-2 text-white shadow-lg sm:px-6">
+    <div className="flex min-w-0 items-center gap-2 border-b border-white/[0.08] bg-[#1d2129]/95 px-3 py-2 text-white shadow-lg backdrop-blur-md sm:px-6">
       <button type="button" onClick={() => openFold(foldId(kind, "luogo"))} className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-xl px-2 text-left outline-none transition-colors hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-cyan-300" aria-label={`Luogo: ${place}. Tocca per cambiarlo`}>
         <MapPin className="size-5 shrink-0 text-cyan-300" aria-hidden="true" />
         <span className="min-w-0 truncate font-semibold">{place}</span>
@@ -36,7 +36,7 @@ export function StudioBar({ kind, place, onCompare, onReset, onSend }: { kind: "
         <DropdownMenuTrigger asChild>
           <button type="button" aria-label="Altre azioni" className="grid size-11 shrink-0 place-items-center rounded-xl bg-white/[0.08] outline-none transition-colors hover:bg-white/[0.14] focus-visible:ring-2 focus-visible:ring-cyan-300"><MoreHorizontal className="size-6" aria-hidden="true" /></button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" sideOffset={8} className="w-64 rounded-2xl border-white/10 bg-[#151922] p-1.5 text-white shadow-2xl">
+        <DropdownMenuContent align="end" sideOffset={8} className="w-64 rounded-2xl border-white/10 bg-[#262b34] p-1.5 text-white shadow-2xl">
           <Item icon={Camera} label="Fotocamera" onSelect={() => setCameraSheetOpen(true)} />
           <Item icon={Images} label="Foto e video salvati" onSelect={() => openFold(foldId(kind, "media"))} />
           <Item icon={Radar} label="Dove mettere i sensori" onSelect={() => openFold(foldId(kind, "sensori"))} />

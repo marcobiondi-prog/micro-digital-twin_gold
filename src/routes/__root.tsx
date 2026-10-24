@@ -6,7 +6,7 @@ import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { ThemeToggle } from "@/views/theme-toggle";
+import { THEME_DARK, ThemeToggle, themeBootScript } from "@/views/theme-toggle";
 import { AccountControl } from "@/views/account-control";
 import { TwinMascot } from "@/views/TwinMascot";
 import { CameraDockButton, CameraSheet } from "@/views/CameraDock";
@@ -65,12 +65,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "description", content: "Micro digital twin per l'adattamento climatico urbano e vitivinicolo." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "theme-color", content: "#ffffff" },
-      // iPhone/iPad "Aggiungi a Home": full-screen app with its own name and a light status bar.
+      { name: "theme-color", content: THEME_DARK },
+      // iPhone/iPad "Aggiungi a Home": full-screen app with its own name and a dark status bar that matches the canvas.
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-title", content: "Digital Twin" },
-      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -91,8 +91,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="it">
-      <head><HeadContent /></head>
+    <html lang="it" className="dark" style={{ colorScheme: "dark" }} suppressHydrationWarning>
+      <head><HeadContent /><script dangerouslySetInnerHTML={{ __html: themeBootScript }} /></head>
       <body>
         {children}
         <Scripts />
@@ -441,8 +441,18 @@ function RootComponent() {
       >
         Salta al contenuto principale
       </a>
-      <header id="app-header" className="border-b bg-background pt-[env(safe-area-inset-top)]">
-        <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-2 sm:px-4 sm:py-3">
+      <header id="app-header" className="ps-top relative border-b bg-background pt-[env(safe-area-inset-top)] dark:border-b-0 dark:bg-transparent">
+        {/* Dark canvas: a PlayStation-app slate slab whose lower edge rises gently in the middle, with a handle under it. */}
+        <svg className="pointer-events-none absolute inset-0 hidden h-full w-full dark:block" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="ps-top-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1d2129" /><stop offset="1" stopColor="#2d333d" /></linearGradient>
+            <linearGradient id="ps-top-edge" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#fff" stopOpacity="0.06" /><stop offset="0.5" stopColor="#fff" stopOpacity="0.22" /><stop offset="1" stopColor="#fff" stopOpacity="0.06" /></linearGradient>
+          </defs>
+          <path d="M0 0 H100 V100 Q50 80 0 100 Z" fill="url(#ps-top-fill)" />
+          <path d="M100 100 Q50 80 0 100" fill="none" stroke="url(#ps-top-edge)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+        </svg>
+        <span className="pointer-events-none absolute -bottom-3 left-1/2 hidden h-1.5 w-12 -translate-x-1/2 rounded-full bg-white/30 dark:block" aria-hidden="true" />
+        <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-2 sm:px-4 sm:py-3">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <Link to="/" onClick={(e) => goHomeBack(e, "/", location.pathname)} className="flex min-w-0 items-center gap-1.5 font-display text-base font-semibold sm:gap-2 sm:text-xl">
               <span className="header-logo-frame grid h-12 w-14 shrink-0 place-items-center sm:h-14 sm:w-16">
@@ -456,7 +466,7 @@ function RootComponent() {
       </header>
       <div className="hidden sm:block"><SmartNav /></div>
 
-      <main id="main-content" tabIndex={-1} className="app-main mx-auto max-w-7xl px-4 py-8 focus:outline-none"><Outlet /></main><Toaster />
+      <main id="main-content" tabIndex={-1} className="app-main mx-auto max-w-7xl px-4 pb-8 pt-6 focus:outline-none sm:pt-8"><Outlet /></main><Toaster />
       <footer className="mx-auto max-w-7xl px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] text-xs text-muted-foreground sm:pb-10">
         I risultati del simulatore sono indicativi e non sostituiscono modelli fisici calibrati.
       </footer>

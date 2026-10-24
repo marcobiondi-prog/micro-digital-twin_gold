@@ -9,7 +9,7 @@ export const HEAT_VAR = ["var(--radar-cool)", "var(--radar-mild)", "var(--radar-
 
 /** v7 "strumento": dark instrument surface, the same in light and dark themes. */
 export function Studio({ children, className }: { children: ReactNode; className?: string }) {
-  return <section className={cn("studio relative overflow-hidden rounded-3xl bg-[#0d1016] p-3 text-white shadow-xl ring-1 ring-white/10 sm:p-5", className)}>{children}</section>;
+  return <section className={cn("studio relative overflow-hidden rounded-2xl bg-[linear-gradient(180deg,#262b34,#16191f)] p-3 text-white shadow-xl ring-1 ring-white/[0.06] sm:p-5", className)}>{children}</section>;
 }
 
 /** Big live reading: one number, its unit, and an icon that says what it is. */
@@ -34,7 +34,7 @@ export function ToolButton({ icon: Icon, label, active, onClick, swatch, badge, 
         active ? "bg-white/[0.12] text-white shadow-[0_0_0_1.5px_rgb(103_232_249),0_0_18px_-4px_rgb(103_232_249)]" : "bg-white/[0.05] text-white/60 hover:bg-white/[0.08]")}>
       <span className="relative grid size-8 place-items-center">
         <Icon className="size-7" aria-hidden="true" />
-        {swatch && <span className={cn("absolute -bottom-1 -right-1 size-3 rounded-full ring-2 ring-[#0d1016]", swatch)} aria-hidden="true" />}
+        {swatch && <span className={cn("absolute -bottom-1 -right-1 size-3 rounded-full ring-2 ring-[#1f232b]", swatch)} aria-hidden="true" />}
       </span>
       <span className="max-w-full truncate">{label}</span>
       {badge != null && <span className="absolute right-1.5 top-1.5 min-w-5 rounded-full bg-white/15 px-1 text-center font-mono text-[10px] leading-4 text-white">{badge}</span>}
