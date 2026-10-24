@@ -1933,3 +1933,16 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   html .lab-media-actions .lab-media-upload-direct,
   html .lab-media-actions .lab-media-upload-menu { display: none; }
 }
+
+/* v6: PlayStation-style bottom bar — dark slab with a curved top edge, equal icons, the active one
+   lit with a glowing line under it and its name below the row. Same look in light and dark themes. */
+.ps-nav { padding-bottom: env(safe-area-inset-bottom); }
+.ps-nav-bg { filter: drop-shadow(0 -6px 18px rgb(0 0 0 / 0.28)); }
+.ps-nav-item { position: relative; display: flex; width: 100%; height: 3rem; flex-direction: column; align-items: center; justify-content: flex-start; color: rgb(255 255 255 / 0.62); outline: none; transition: color 200ms ease; }
+.ps-nav-item:focus-visible .ps-nav-icon { box-shadow: 0 0 0 2px rgb(255 255 255 / 0.6); }
+.ps-nav-icon { display: grid; place-items: center; width: 2.75rem; height: 2.25rem; border-radius: 0.75rem; transition: transform 200ms ease; }
+.ps-nav-item[data-active] { color: #fff; }
+.ps-nav-item[data-active] .ps-nav-icon { transform: translateY(-2px); }
+.ps-nav-item[data-active]::after { content: ""; position: absolute; bottom: 0.25rem; left: 50%; width: 2.25rem; height: 3px; border-radius: 999px; background: #fff; transform: translateX(-50%); box-shadow: 0 0 10px 2px rgb(140 190 255 / 0.75); }
+.ps-nav-item:active .ps-nav-icon { transform: scale(0.92); }
+@media (prefers-reduced-motion: reduce) { .ps-nav-item, .ps-nav-icon { transition: none; } .ps-nav-item[data-active] .ps-nav-icon, .ps-nav-item:active .ps-nav-icon { transform: none; } }

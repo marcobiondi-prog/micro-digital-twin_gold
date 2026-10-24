@@ -18,7 +18,7 @@ function useAiReady() {
   return { signedIn, aiReady: signedIn && (installed || demo) };
 }
 
-/** Pulsante centrale: fotocamera per gli ospiti, logo AI dopo l'accesso. Apre il pannello con tutte le opzioni. */
+/** Pulsante fotocamera del menu in basso: un'icona come le altre (logo AI dopo l'accesso); apre il pannello con tutte le opzioni. */
 export function CameraDockButton() {
   const { aiReady } = useAiReady();
   return (
@@ -26,16 +26,13 @@ export function CameraDockButton() {
       type="button"
       onClick={() => setCameraSheetOpen(true)}
       aria-label={aiReady ? "Fotocamera AI e altre opzioni" : "Fotocamera: foto, video e galleria"}
-      className={cn(
-        "camera-dock-button relative grid shrink-0 place-items-center rounded-full text-primary-foreground outline-none transition-transform active:scale-95 focus-visible:ring-4 focus-visible:ring-ring/40 motion-reduce:active:scale-100",
-        "size-[4.25rem] shadow-lg ring-4 ring-background",
-        // The AI logo is blue and turquoise: it sits on a light face with a coloured rim.
-        aiReady ? "border-[3px] border-primary bg-card" : "bg-primary",
-      )}
+      className="ps-nav-item camera-dock-button"
     >
-      {aiReady
-        ? <img src={aiLogo} alt="" aria-hidden="true" draggable={false} className="size-9 select-none" />
-        : <Camera className="size-8" aria-hidden="true" />}
+      <span className="ps-nav-icon">
+        {aiReady
+          ? <img src={aiLogo} alt="" aria-hidden="true" draggable={false} className="size-7 select-none" />
+          : <Camera className="size-6" aria-hidden="true" />}
+      </span>
     </button>
   );
 }

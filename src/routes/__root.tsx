@@ -173,33 +173,34 @@ function BottomNav() {
     const active = pathname === to;
     return (
       <li key={to}>
-        <Link to={to} replace={pathname !== "/"} aria-current={active ? "page" : undefined}
+        <Link to={to} replace={pathname !== "/"} aria-current={active ? "page" : undefined} aria-label={l}
           onClick={(e) => {
             if (goHomeBack(e, to, pathname)) return;
             if (!active) return;
             e.preventDefault();
             window.scrollTo({ top: 0, behavior: "instant" });
           }}
-          className={`flex h-16 flex-col items-center justify-end gap-1 pb-2 text-[11px] font-medium outline-none transition-colors focus-visible:bg-muted ${active ? "text-nav-accent-ink" : "text-muted-foreground dark:text-nav-accent-foreground"}`}>
-          <span className={`nav-glass nav-glass-gloss relative grid h-7 w-12 place-items-center rounded-full ${active ? "nav-glass-on text-nav-accent-foreground" : "text-muted-foreground dark:text-nav-accent-foreground"}`}>
-            <I className="size-5" aria-hidden="true" />
-          </span>
-          <span className="max-w-full truncate px-1">{l}</span>
+          className="ps-nav-item" data-active={active || undefined}>
+          <span className="ps-nav-icon"><I className="size-6" aria-hidden="true" /></span>
         </Link>
       </li>
     );
   };
+  const current = bottomItems.find((b) => b.to === pathname);
   return (
-    <nav aria-label="Menu principale" className={`fixed inset-x-0 bottom-0 z-[999999998] transition-transform duration-300 motion-reduce:transition-none sm:hidden ${hidden ? "translate-y-full" : "translate-y-0"}`}>
-      {/* Arched bar: the top edge rises toward the centre and cradles the camera button. */}
-      <svg className="nav-arc pointer-events-none absolute inset-x-0 bottom-0 h-[calc(6rem+env(safe-area-inset-bottom))] w-full" viewBox="0 0 100 96" preserveAspectRatio="none" aria-hidden="true">
-        <path d="M0 38 Q50 -10 100 38 V96 H0 Z" />
+    <nav aria-label="Menu principale" className={`ps-nav fixed inset-x-0 bottom-0 z-[999999998] transition-transform duration-300 motion-reduce:transition-none sm:hidden ${hidden ? "translate-y-full" : "translate-y-0"}`}>
+      {/* Dark slab with a gently curved top edge; icons only, the active one glows and names itself below. */}
+      <svg className="ps-nav-bg pointer-events-none absolute inset-x-0 bottom-0 h-full w-full" viewBox="0 0 100 80" preserveAspectRatio="none" aria-hidden="true">
+        <defs><linearGradient id="ps-nav-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#262b36" /><stop offset="1" stopColor="#11141b" /></linearGradient></defs>
+        <path d="M0 16 Q50 0 100 16 V80 H0 Z" fill="url(#ps-nav-fill)" />
+        <path d="M0 16 Q50 0 100 16" fill="none" stroke="rgb(255 255 255 / 0.14)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
       </svg>
-      <ul className="relative grid grid-cols-5 items-end pb-[env(safe-area-inset-bottom)]">
+      <ul className="relative grid grid-cols-5 items-start px-2 pt-4">
         {bottomItems.slice(0, 2).map(item)}
-        <li className="flex justify-center"><span className="-translate-y-5"><CameraDockButton /></span></li>
+        <li className="flex justify-center"><CameraDockButton /></li>
         {bottomItems.slice(2).map(item)}
       </ul>
+      <p className="relative h-7 pb-[env(safe-area-inset-bottom)] text-center text-[13px] font-medium leading-7 text-white/90" aria-hidden="true">{current?.l ?? ""}</p>
     </nav>
   );
 }
