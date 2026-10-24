@@ -33,7 +33,7 @@ export function useSimTab(kind: SimKind): SimTab {
 }
 
 /** Soft coloured light behind the top of the page, like the art behind the PS5 home. The transparent header
- * shows it, and the phone status bar takes the same tint (the light blended on the page colour). */
+ * repaints it on its own solid background, and the phone status bar takes the same tint (the light blended on the page colour). */
 export function Ambient({ tone }: { tone: string }) {
   useEffect(() => {
     const meta = () => document.querySelector<HTMLMetaElement>(THEME_META);
@@ -47,6 +47,8 @@ export function Ambient({ tone }: { tone: string }) {
       m.content = `rgb(${r} ${gr} ${b})`;
     };
     paint();
+    // The header paints the same light on its own opaque background (styles.css .app-header-tint).
+    document.documentElement.style.setProperty("--ambient-tone", tone);
     // The page colour fades for 0.2 s after a theme switch: read it once it has settled.
     let timer = 0;
     const later = () => { window.clearTimeout(timer); timer = window.setTimeout(paint, 260); };
@@ -54,6 +56,7 @@ export function Ambient({ tone }: { tone: string }) {
     return () => {
       window.clearTimeout(timer);
       window.removeEventListener(THEME_CHANGED, later);
+      document.documentElement.style.removeProperty("--ambient-tone");
       meta()?.setAttribute("content", document.documentElement.classList.contains("dark") ? THEME_DARK : "#ffffff");
     };
   }, [tone]);

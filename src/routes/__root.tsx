@@ -438,8 +438,8 @@ function RootComponent() {
       >
         Salta al contenuto principale
       </a>
-      {/* v8: a transparent console top bar: the page's ambient light shows through it, in both themes. */}
-      <header id="app-header" className="relative bg-transparent pt-[env(safe-area-inset-top)]">
+      {/* v8: a solid console top bar painted with the page's own ambient light, so it carries the same shades without being see-through. */}
+      <header id="app-header" className="app-header-tint relative pt-[env(safe-area-inset-top)]">
         <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-2 sm:px-4 sm:py-3">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <Link to="/" onClick={(e) => goHomeBack(e, "/", location.pathname)} className="flex min-w-0 items-center gap-1.5 font-display text-[15px] font-semibold tracking-wide sm:gap-2 sm:text-lg">

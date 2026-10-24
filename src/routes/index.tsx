@@ -90,8 +90,8 @@ function Index() {
       <h1 className="sr-only">Micro Digital Twin</h1>
       <Ambient tone={item.tone} />
       {/* PS5 home: a big picture of the selected item, a row of square tiles, then its name, one line and one white button. */}
-      {/* Phones: the picture runs up behind the transparent header and fades in from the page's ambient light at the top and back into the page at the bottom, so the header takes the same shades. */}
-      <div className="home-art relative -z-[5] -mx-4 -mt-[calc(5rem+env(safe-area-inset-top))] aspect-[4/3.6] max-h-[56vh] w-[calc(100%+2rem)] overflow-hidden sm:z-auto sm:mx-0 sm:mt-0 sm:aspect-[21/9] sm:max-h-[46vh] sm:w-full sm:rounded-3xl"
+      {/* Phones: the picture fades in from the page's ambient light at the top (the header wears the same light) and back into the page at the bottom. */}
+      <div className="home-art relative -mx-4 -mt-6 aspect-[4/3] max-h-[46vh] w-[calc(100%+2rem)] overflow-hidden sm:mx-0 sm:mt-0 sm:aspect-[21/9] sm:w-full sm:rounded-3xl"
         onPointerDown={(e) => { swipe.current = { x: e.clientX, y: e.clientY }; }}
         onPointerUp={(e) => { const s = swipe.current; swipe.current = null; if (!s) return; const dx = e.clientX - s.x; if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(e.clientY - s.y)) move(dx < 0 ? 1 : -1); }}>
         <div key={item.id} className="absolute inset-0 animate-in fade-in-0 zoom-in-[1.03] duration-500 motion-reduce:animate-none"><Art id={item.id} /></div>
