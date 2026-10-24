@@ -1946,3 +1946,10 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .ps-nav-item[data-active]::after { content: ""; position: absolute; bottom: 0.25rem; left: 50%; width: 2.25rem; height: 3px; border-radius: 999px; background: #fff; transform: translateX(-50%); box-shadow: 0 0 10px 2px rgb(140 190 255 / 0.75); }
 .ps-nav-item:active .ps-nav-icon { transform: scale(0.92); }
 @media (prefers-reduced-motion: reduce) { .ps-nav-item, .ps-nav-icon { transition: none; } .ps-nav-item[data-active] .ps-nav-icon, .ps-nav-item:active .ps-nav-icon { transform: none; } }
+
+/* v7: the AI camera rises from the middle of the arch, lit like the active page. */
+.ps-nav-camera { position: relative; display: grid; place-items: center; width: 3.9rem; height: 3.9rem; margin-top: -1.65rem; border-radius: 999px; color: #fff; background: radial-gradient(circle at 30% 25%, #3a4560, #151a24 70%); box-shadow: 0 0 0 2px rgb(103 232 249 / 0.85), 0 0 22px 2px rgb(103 232 249 / 0.45), 0 10px 22px rgb(0 0 0 / 0.45); outline: none; transition: transform 160ms ease, box-shadow 160ms ease; }
+.ps-nav-camera[data-ai] { background: #fff; }
+.ps-nav-camera:active { transform: scale(0.94); }
+.ps-nav-camera:focus-visible { box-shadow: 0 0 0 3px #fff, 0 0 26px 4px rgb(103 232 249 / 0.6); }
+@media (prefers-reduced-motion: reduce) { .ps-nav-camera { transition: none; } .ps-nav-camera:active { transform: none; } }

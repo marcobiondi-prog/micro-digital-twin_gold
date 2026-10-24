@@ -10,8 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SensorAdvisor } from "@/views/SensorAdvisor";
 import { LabMedia } from "@/views/LabMedia";
 import { LocationCard, splitLocation, ImportWeatherButton } from "@/views/SimulationGrid";
-import { UrbanPlay } from "@/views/v1/UrbanPlay";
-import { VinePlay } from "@/views/v1/VinePlay";
+import { UrbanStudio } from "@/views/v7/UrbanStudio";
+import { VineStudio } from "@/views/v7/VineStudio";
+import { StudioBar, foldId } from "@/views/v7/StudioBar";
 import { Fold } from "@/views/Fold";
 import { comparison, levelTone, nextPhase, piazzaEstimate, prototypeChoice, type PrototypeId } from "@/models/scenarios";
 import { applyVineyardScenario, closestVineyardScenario, vineyardControlValue, vineyardScenarioSteps } from "@/models/vineyard-controls";
@@ -304,19 +305,14 @@ export function UrbanFlow() {
     <div className="space-y-4">
       <LabSyncIndicator />
       <div className="sticky top-[var(--nav-h)] z-[999999998] isolate -mx-4 transition-[top] duration-300">
-        <Card className="lab-summary flex items-center justify-between gap-2 rounded-none border-x-0 border-t-0 bg-card px-3 py-2 shadow-sm sm:gap-4 sm:px-6 sm:py-2 xl:py-3">
-          <div className="flex min-w-0 flex-wrap items-center gap-2 font-semibold sm:gap-x-3"><Building2 className="size-5 shrink-0 text-urban" /><span className="min-w-0 break-words text-[1.0625rem] leading-6">{place.name}</span><p className="hidden min-w-0 basis-48 flex-1 truncate text-sm font-normal text-muted-foreground sm:block">{place.sub}</p></div>
-          <div className="flex shrink-0 items-center gap-2">
-            <CompareButton level={activeLevel} onClick={showComparison} />
-          </div>
-        </Card>
+        <StudioBar kind="urban" place={place.name} onCompare={showComparison} onReset={restoreScenario} />
       </div>
 
-      <UrbanPlay onReset={restoreScenario} />
+      <UrbanStudio />
       <div className="space-y-2">
-        <Fold title="Luogo e mappa" icon={MapPin}><LocationCard kind="urban" /></Fold>
-        <Fold title="Foto e video" icon={Camera}><LabMedia embedded kind="urban" context={`Scenario: ${comparison.find((l) => l.id === activeLevel)?.s ?? "attuale"}`} /></Fold>
-        <Fold title="Dove mettere i sensori" hint="· AI" icon={Radar}><SensorAdvisor embedded kind="urban" /></Fold>
+        <Fold id={foldId("urban", "luogo")} title="Luogo e mappa" icon={MapPin}><LocationCard kind="urban" /></Fold>
+        <Fold id={foldId("urban", "media")} title="Foto e video" icon={Camera}><LabMedia embedded kind="urban" context={`Scenario: ${comparison.find((l) => l.id === activeLevel)?.s ?? "attuale"}`} /></Fold>
+        <Fold id={foldId("urban", "sensori")} title="Dove mettere i sensori" hint="· AI" icon={Radar}><SensorAdvisor embedded kind="urban" /></Fold>
       </div>
       <Dialog open={compareOpen} onOpenChange={setCompareOpen}>
         <ComparisonDialog onImportWeather={importRealWeather} matrix={<PrototypeMatrix kind="urban" activeLevel={activeLevel} />}><ComparisonTable realTemp={urban.realTemp} place={place} trees={base.trees} permeable={base.permeable} shade={base.shade} activeLevel={activeLevel} onApply={applyScenario} /></ComparisonDialog>
@@ -377,20 +373,14 @@ export function VineyardFlow() {
     <div className="space-y-4">
       <LabSyncIndicator />
       <div className="sticky top-[var(--nav-h)] z-[999999998] isolate -mx-4 transition-[top] duration-300">
-        <Card className="lab-summary flex items-center justify-between gap-2 rounded-none border-x-0 border-t-0 bg-card px-3 py-2 shadow-sm sm:gap-4 sm:px-6 sm:py-2 xl:py-3">
-          <div className="flex min-w-0 items-center gap-2 sm:gap-x-3"><Grape className="size-5 shrink-0 text-vine" aria-hidden="true" /><h3 className="min-w-0 truncate font-semibold"><span className="max-sm:sr-only">Vigneto · </span>{place}</h3><span className="hidden lg:inline-flex"><span aria-live="polite" title={`Indice massimo ${situation.peak}/100`}><StatusBadge level={situation.level}>{situation.label} · {situation.peak}</StatusBadge></span></span></div>
-          <div className="flex min-w-0 shrink-0 items-center gap-1.5 min-[380px]:gap-2 sm:gap-2">
-            <p className="hidden min-w-0 max-w-72 flex-1 truncate text-sm text-muted-foreground lg:block">{situation.caption}</p>
-            <CompareButton level={activeLevel} onClick={showComparison} className="sm:mr-1" /><Button size="sm" onClick={() => setSend(true)} aria-label="Invia i dati all’agronomo" className="rounded-full bg-vine px-2.5 hover:bg-vine/90 min-[380px]:px-3 sm:h-10 sm:px-4"><Send /><span className="hidden sm:inline">Invia i dati all’agronomo</span></Button>
-          </div>
-        </Card>
+        <StudioBar kind="vineyard" place={place} onCompare={showComparison} onReset={restoreScenario} onSend={() => setSend(true)} />
       </div>
 
-      <VinePlay onReset={restoreScenario} onZonesEdit={onZonesEdit} />
+      <VineStudio onZonesEdit={onZonesEdit} />
       <div className="space-y-2">
-        <Fold title="Luogo e mappa" icon={MapPin}><LocationCard kind="vineyard" /></Fold>
-        <Fold title="Foto e video" icon={Camera}><LabMedia embedded kind="vineyard" context={`${vineyard.allZones ? "Tutte le zone" : `Zona ${vineyard.selected + 1}`} · ${vineyard.phase}`} /></Fold>
-        <Fold title="Dove mettere i sensori" hint="· AI" icon={Radar}><SensorAdvisor embedded kind="vineyard" /></Fold>
+        <Fold id={foldId("vineyard", "luogo")} title="Luogo e mappa" icon={MapPin}><LocationCard kind="vineyard" /></Fold>
+        <Fold id={foldId("vineyard", "media")} title="Foto e video" icon={Camera}><LabMedia embedded kind="vineyard" context={`${vineyard.allZones ? "Tutte le zone" : `Zona ${vineyard.selected + 1}`} · ${vineyard.phase}`} /></Fold>
+        <Fold id={foldId("vineyard", "sensori")} title="Dove mettere i sensori" hint="· AI" icon={Radar}><SensorAdvisor embedded kind="vineyard" /></Fold>
       </div>
       <Dialog open={compareOpen} onOpenChange={setCompareOpen}>
         <ComparisonDialog onImportWeather={importRealWeather} matrix={<PrototypeMatrix kind="vineyard" activeLevel={activeLevel} />}><VineComparison v={vineyard} base={base} activeLevel={activeLevel} onApply={applyScenario} /></ComparisonDialog>

@@ -1,7 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { toast } from "sonner";
-import { ArrowRight, Building2, Grape, LayoutDashboard } from "lucide-react";
+import { Building2, Grape, ScanLine } from "lucide-react";
+import { setCameraSheetOpen } from "@/lib/camera-dock";
+import { useSignedIn } from "@/lib/use-signed-in";
+import { useInstalledApp } from "@/lib/installed-app";
+import aiLogo from "@/assets/ai-logo.png";
 import { applySharedScenario } from "@/views/ScenarioTools";
 
 export const Route = createFileRoute("/")({
@@ -18,11 +22,10 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Tile = { to: "/urbano" | "/vigneto" | "/dashboard"; Icon: typeof Building2; title: string; desc: string; meta: string; art: "urban" | "vine" | "dash" };
+type Tile = { to: "/urbano" | "/vigneto"; Icon: typeof Building2; title: string; desc: string; meta: string; art: "urban" | "vine" };
 const tiles: Tile[] = [
-  { to: "/urbano", Icon: Building2, title: "Simulazione urbana", desc: "Alberi, prato e ombra in una piazza: quanti gradi si risparmiano.", meta: "Piazza · 1 minuto", art: "urban" },
-  { to: "/vigneto", Icon: Grape, title: "Simulazione vigneto", desc: "Sole, acqua e vento sulle zone del vigneto: quanta sete ha la vite.", meta: "Vigneto · 1 minuto", art: "vine" },
-  { to: "/dashboard", Icon: LayoutDashboard, title: "Dashboard", desc: "I risultati delle due simulazioni e il report da scaricare.", meta: "Risultati e report", art: "dash" },
+  { to: "/urbano", Icon: Building2, title: "Piazza", desc: "Alberi, prato e ombra: quanti gradi in meno.", meta: "Simulazione", art: "urban" },
+  { to: "/vigneto", Icon: Grape, title: "Vigneto", desc: "Sole, acqua e vento: quanta sete ha la vite.", meta: "Simulazione", art: "vine" },
 ];
 
 const HEAT = ["var(--radar-cool)", "var(--radar-mild)", "var(--radar-warm)", "var(--radar-hot)", "var(--radar-extreme)"];
@@ -42,13 +45,7 @@ function TileArt({ art }: { art: Tile["art"] }) {
       <circle cx="150" cy="20" r="10" fill="var(--warn)" />
     </svg>
   );
-  return (
-    <svg viewBox="0 0 180 90" className="h-full w-full" aria-hidden="true">
-      {[30, 52, 40, 64, 48, 72].map((h, k) => <rect key={k} x={16 + k * 16} y={80 - h} width="10" height={h} rx="3" fill={k % 2 ? "var(--urban)" : "var(--vine)"} opacity="0.85" />)}
-      <circle cx="146" cy="44" r="22" fill="none" stroke="rgb(255 255 255 / 0.18)" strokeWidth="7" />
-      <circle cx="146" cy="44" r="22" fill="none" stroke="var(--ok)" strokeWidth="7" strokeDasharray="96 200" strokeLinecap="round" transform="rotate(-90 146 44)" />
-    </svg>
-  );
+  return null;
 }
 
 function Index() {
@@ -63,27 +60,45 @@ function Index() {
     const id = setTimeout(() => void navigate({ to: flow === "urban" ? "/urbano" : "/vigneto", replace: true }), 300);
     return () => clearTimeout(id);
   }, [navigate]);
+  const ai = useAiReadyHome();
   return (
-    <div className="mx-auto max-w-5xl space-y-6 py-2 sm:space-y-8 sm:py-8">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold leading-tight sm:text-4xl">Dal rischio climatico <span className="text-primary">alla scelta informata.</span></h1>
-        <p className="max-w-xl text-sm text-muted-foreground sm:text-base">Scegli da dove partire. I risultati sono indicativi.</p>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="mx-auto max-w-5xl space-y-4 py-2 sm:space-y-6 sm:py-8">
+      <h1 className="sr-only">Micro Digital Twin</h1>
+      <button type="button" onClick={() => setCameraSheetOpen(true)} className="group relative block w-full overflow-hidden rounded-3xl bg-[#0d1016] p-5 text-left text-white shadow-xl outline-none ring-1 ring-white/10 transition-transform focus-visible:ring-2 focus-visible:ring-cyan-300 active:scale-[0.99] motion-reduce:active:scale-100 sm:p-8">
+        <span className="pointer-events-none absolute -right-10 -top-10 size-56 rounded-full bg-[radial-gradient(circle,rgb(103_232_249/0.35),transparent_65%)]" aria-hidden="true" />
+        <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgb(255_255_255/0.04)_1px,transparent_1px),linear-gradient(90deg,rgb(255_255_255/0.04)_1px,transparent_1px)] bg-[size:24px_24px]" aria-hidden="true" />
+        <span className="relative flex items-center gap-4">
+          <span className={`grid size-16 shrink-0 place-items-center rounded-2xl shadow-[0_0_0_2px_rgb(103_232_249/0.85),0_0_24px_rgb(103_232_249/0.45)] ${ai ? "bg-white" : "bg-[#151a24]"}`}>
+            {ai ? <img src={aiLogo} alt="" aria-hidden="true" className="size-10" /> : <ScanLine className="size-8 text-cyan-300" aria-hidden="true" />}
+          </span>
+          <span className="min-w-0">
+            <span className="block text-2xl font-semibold sm:text-3xl">Fotocamera AI</span>
+            <span className="block text-sm text-white/65 sm:text-base">Inquadra una pianta o il terreno: specie, fresco e foto.</span>
+          </span>
+        </span>
+      </button>
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         {tiles.map(({ to, Icon, title, desc, meta, art }) => (
-          <Link key={to} to={to} className="group overflow-hidden rounded-2xl border bg-card shadow-sm outline-none transition-[transform,box-shadow] duration-200 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.99] motion-reduce:transition-none motion-reduce:active:scale-100">
-            <div className="relative aspect-[2/1] bg-[linear-gradient(160deg,#1b2029,#0f1218)]">
+          <Link key={to} to={to} className="group overflow-hidden rounded-3xl bg-[#0d1016] text-white shadow-lg outline-none ring-1 ring-white/10 transition-transform focus-visible:ring-2 focus-visible:ring-cyan-300 active:scale-[0.99] motion-reduce:active:scale-100">
+            <div className="relative aspect-[4/3] sm:aspect-[2/1]">
               <TileArt art={art} />
-              <span className={`absolute left-3 top-3 grid size-10 place-items-center rounded-xl text-white shadow ${art === "urban" ? "bg-urban" : art === "vine" ? "bg-vine" : "bg-primary"}`}><Icon className="size-5" aria-hidden="true" /></span>
+              <span className={`absolute left-2.5 top-2.5 grid size-9 place-items-center rounded-xl text-white shadow ${art === "urban" ? "bg-urban" : "bg-vine"}`}><Icon className="size-5" aria-hidden="true" /></span>
             </div>
-            <div className="space-y-1 p-4 sm:p-5">
-              <h2 className="text-lg font-semibold leading-snug sm:text-xl">{title}</h2>
-              <p className="text-sm text-muted-foreground">{desc}</p>
-              <p className="flex items-center justify-between pt-1 text-xs font-medium text-muted-foreground"><span>{meta}</span><ArrowRight className="size-4 text-primary transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" /></p>
+            <div className="space-y-1 p-3 sm:p-5">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-cyan-300/80">{meta}</p>
+              <h2 className="text-lg font-semibold leading-tight sm:text-2xl">{title}</h2>
+              <p className="text-xs text-white/60 sm:text-sm">{desc}</p>
             </div>
           </Link>
         ))}
       </div>
     </div>
   );
+}
+
+/** AI ready on Home: signed in (or simulated in a preview) and, for real accounts, the installed app. */
+function useAiReadyHome() {
+  const { signedIn, demo } = useSignedIn();
+  const installed = useInstalledApp();
+  return signedIn && (installed || demo);
 }

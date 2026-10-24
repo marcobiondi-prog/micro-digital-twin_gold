@@ -189,13 +189,13 @@ function BottomNav() {
   const current = bottomItems.find((b) => b.to === pathname);
   return (
     <nav aria-label="Menu principale" className={`ps-nav fixed inset-x-0 bottom-0 z-[999999998] transition-transform duration-300 motion-reduce:transition-none sm:hidden ${hidden ? "translate-y-full" : "translate-y-0"}`}>
-      {/* Dark slab with a gently curved top edge; icons only, the active one glows and names itself below. */}
+      {/* Dark arched slab: icons only, the active one glows and names itself below; the AI camera rises in the middle. */}
       <svg className="ps-nav-bg pointer-events-none absolute inset-x-0 bottom-0 h-full w-full" viewBox="0 0 100 80" preserveAspectRatio="none" aria-hidden="true">
         <defs><linearGradient id="ps-nav-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#262b36" /><stop offset="1" stopColor="#11141b" /></linearGradient></defs>
-        <path d="M0 16 Q50 0 100 16 V80 H0 Z" fill="url(#ps-nav-fill)" />
-        <path d="M0 16 Q50 0 100 16" fill="none" stroke="rgb(255 255 255 / 0.14)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+        <path d="M0 26 Q50 -6 100 26 V80 H0 Z" fill="url(#ps-nav-fill)" />
+        <path d="M0 26 Q50 -6 100 26" fill="none" stroke="rgb(255 255 255 / 0.14)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
       </svg>
-      <ul className="relative grid grid-cols-5 items-start px-2 pt-4">
+      <ul className="relative grid grid-cols-5 items-start px-2 pt-5">
         {bottomItems.slice(0, 2).map(item)}
         <li className="flex justify-center"><CameraDockButton /></li>
         {bottomItems.slice(2).map(item)}
