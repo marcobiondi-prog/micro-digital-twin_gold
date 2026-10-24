@@ -8,8 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SensorAdvisor } from "@/views/SensorAdvisor";
-import { CopernicusPanel } from "@/views/CopernicusPanel";
-import { RealClimatePanel } from "@/views/RealClimatePanel";
 import { LabMedia } from "@/views/LabMedia";
 import { SimulationGrid, splitLocation, ImportWeatherButton } from "@/views/SimulationGrid";
 import { comparison, levelTone, nextPhase, piazzaEstimate, prototypeChoice, type PrototypeId } from "@/models/scenarios";
@@ -290,7 +288,7 @@ export function UrbanFlow() {
     const t = r?.openMeteo?.temp;
     if (t == null) { toast.error("Meteo reale non disponibile, riprova tra poco"); return; }
     setUrban({ realTemp: Math.round(t * 10) / 10 });
-    toast.success(`Importati ${t.toLocaleString("it-IT")}°C da Open-Meteo su tutte le schede`);
+    toast.success(`Importati ${t.toLocaleString("it-IT")}°C dal meteo reale su tutte le schede`);
   };
   const restoreScenario = () => {
     const target = suggested.current;
@@ -311,8 +309,6 @@ export function UrbanFlow() {
         </Card>
       </div>
 
-      <RealClimatePanel kind="urban" />
-      <CopernicusPanel kind="urban" />
       <SensorAdvisor kind="urban" />
       <LabMedia kind="urban" context={`Scenario: ${comparison.find((l) => l.id === activeLevel)?.s ?? "attuale"}`} />
       <SimulationGrid onReset={restoreScenario} mode="urban" activeLevel={activeLevel} trees={trees} permeable={permeable} shade={shade} onTreesChange={setTrees} onPermeableChange={setPermeable} onShadeChange={setShade} />
@@ -350,7 +346,7 @@ export function VineyardFlow() {
       wind: om.wind != null ? Math.max(0, Math.min(30, Math.round(om.wind))) : z.wind,
     }));
     suggested.current = null; setBaseline(null); setAppliedZones(null); setPinned("zero"); setVineyard({ zones });
-    toast.success(`Importati ${om.temp.toLocaleString("it-IT")}°C${soil != null ? ` e umidità suolo ${Math.round(soil)}%` : ""} da Open-Meteo`);
+    toast.success(`Importati ${om.temp.toLocaleString("it-IT")}°C${soil != null ? ` e umidità suolo ${Math.round(soil)}%` : ""} dal meteo reale`);
   };
   const base = baseline ?? vineyard.zones;
   // Slider edits keep the cards anchored on the baseline, so the highlight can follow the sliders.
@@ -384,8 +380,6 @@ export function VineyardFlow() {
         </Card>
       </div>
 
-      <RealClimatePanel kind="vineyard" />
-      <CopernicusPanel kind="vineyard" />
       <SensorAdvisor kind="vineyard" />
       <LabMedia kind="vineyard" context={`${vineyard.allZones ? "Tutte le zone" : `Zona ${vineyard.selected + 1}`} · ${vineyard.phase}`} />
       <SimulationGrid onZonesEdit={onZonesEdit} onReset={restoreScenario} mode="vineyard" activeLevel={activeLevel} />

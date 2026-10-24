@@ -54,7 +54,7 @@ export function SensorAdvisor({ kind }: { kind: "urban" | "vineyard" }) {
       <div id={`sensor-panel-${kind}`} className="lab-media-body" data-open={open} aria-hidden={!open} inert={!open}>
         <div className="lab-media-inner">
           <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">L’AI analizza i sensori attivi della rete Sensor.Community e i luoghi sensibili di OpenStreetMap attorno alla zona selezionata. Suggerimenti indicativi.</p>
+      <p className="text-xs text-muted-foreground">L’AI analizza i sensori attivi e i luoghi sensibili attorno alla zona selezionata. Suggerimenti indicativi.</p>
           <Button onClick={run} disabled={loading} className="rounded-full">{loading ? "Analisi della rete…" : "Suggerisci posizioni"}</Button>
           {error && <p role="alert" className="mt-3 rounded-xl bg-danger/10 p-3 text-sm text-danger">{error}</p>}
           {result && (
