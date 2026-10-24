@@ -4,11 +4,11 @@ import { cn } from "@/lib/utils";
 
 export type CompareLevel = "zero" | "mvp" | "roadmap";
 
-/** Etichette dei tre livelli di prototipazione, usate anche come indizio live sul pulsante. */
+/** Etichette dei tre livelli di intervento, usate anche come indizio live sul pulsante. */
 const levelTag: Record<CompareLevel, string> = {
-  zero: "costo zero",
-  mvp: "MVP",
-  roadmap: "budget sostenuto",
+  zero: "gratis",
+  mvp: "pochi sensori",
+  roadmap: "completo",
 };
 
 /**
