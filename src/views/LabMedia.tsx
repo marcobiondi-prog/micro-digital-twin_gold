@@ -14,6 +14,8 @@ import { toast } from "sonner";
 import { ArCamera } from "@/views/ArCamera";
 import { prepareArOrientation } from "@/lib/ar-orientation";
 import { useInstalledApp } from "@/lib/installed-app";
+import { useDemoSignedIn } from "@/lib/demo-login";
+import { registerCaptureHandler } from "@/lib/camera-dock";
 import { openSystemCamera, prepareSystemCamera, supportsSystemCapture } from "@/lib/system-camera";
 import { SystemCamera } from "@/views/SystemCamera";
 import { supabase } from "@/integrations/supabase/client";
@@ -205,8 +207,19 @@ export function LabMedia({ kind, context }: { kind: "urban" | "vineyard"; contex
     pick(gallery.current);
   }
   const [ar, setAr] = useState<"photo" | "video" | null>(null);
-  // The AI camera runs only in the installed app, never in a web browser tab.
+  // The AI camera runs only in the installed app, never in a web browser tab
+  // (the preview-only simulated sign-in shows it in a tab too, to try the interface).
   const installedApp = useInstalledApp();
+  const demo = useDemoSignedIn();
+  const aiReady = (Boolean(userId) || demo) && (installedApp || demo);
+  // The central camera button of the menu starts captures here, inside the same tap.
+  const captureRef = useRef<(action: "ai" | "photo" | "video" | "gallery") => void>(() => undefined);
+  captureRef.current = (action) => {
+    if (action === "ai") { if (aiReady) void prepareArOrientation().then(() => setAr("photo")); }
+    else if (action === "gallery") void pickGallery();
+    else openCamera(action);
+  };
+  useEffect(() => registerCaptureHandler(kind, (action) => captureRef.current(action)), [kind]);
 
   useEffect(() => {
     void supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
@@ -377,7 +390,7 @@ export function LabMedia({ kind, context }: { kind: "urban" | "vineyard"; contex
                 : "Modalità ospite: i dati non vengono salvati nel cloud."}
             </p>
             <div className="lab-media-actions simulation-selector-capsule flex flex-nowrap gap-2 rounded-full" role="group" aria-label={`Azioni sui file ${kind === "urban" ? "della piazza" : "del vigneto"}`}>
-              {userId && installedApp && (
+              {aiReady && (
                 <Button
                   size="sm"
                   variant="secondary"

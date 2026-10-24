@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ThemeToggle } from "@/views/theme-toggle";
 import { AccountControl } from "@/views/account-control";
 import { TwinMascot } from "@/views/TwinMascot";
+import { CameraDockButton, CameraSheet } from "@/views/CameraDock";
 import { syncAppOrientation } from "@/lib/ar-orientation";
 import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
 import { installUiClicks } from "@/lib/ui-sounds";
@@ -168,29 +169,36 @@ function BottomNav() {
       ro.disconnect();
     };
   }, [pathname]);
+  const item = ({ to, l, I }: (typeof bottomItems)[number]) => {
+    const active = pathname === to;
+    return (
+      <li key={to}>
+        <Link to={to} replace={pathname !== "/"} aria-current={active ? "page" : undefined}
+          onClick={(e) => {
+            if (goHomeBack(e, to, pathname)) return;
+            if (!active) return;
+            e.preventDefault();
+            window.scrollTo({ top: 0, behavior: "instant" });
+          }}
+          className={`flex h-16 flex-col items-center justify-end gap-1 pb-2 text-[11px] font-medium outline-none transition-colors focus-visible:bg-muted ${active ? "text-nav-accent-ink" : "text-muted-foreground dark:text-nav-accent-foreground"}`}>
+          <span className={`nav-glass nav-glass-gloss relative grid h-7 w-12 place-items-center rounded-full ${active ? "nav-glass-on text-nav-accent-foreground" : "text-muted-foreground dark:text-nav-accent-foreground"}`}>
+            <I className="size-5" aria-hidden="true" />
+          </span>
+          <span className="max-w-full truncate px-1">{l}</span>
+        </Link>
+      </li>
+    );
+  };
   return (
-    <nav aria-label="Menu principale" className={`bar-liquid fixed inset-x-0 bottom-0 z-[999999998] pb-[env(safe-area-inset-bottom)] transition-transform duration-300 motion-reduce:transition-none sm:hidden ${hidden ? "translate-y-full" : "translate-y-0"}`}>
-      <ul className="grid grid-cols-4">
-        {bottomItems.map(({ to, l, I }) => {
-          const active = pathname === to;
-          return (
-            <li key={to}>
-              <Link to={to} replace={pathname !== "/"} aria-current={active ? "page" : undefined}
-                onClick={(e) => {
-                  if (goHomeBack(e, to, pathname)) return;
-                  if (!active) return;
-                  e.preventDefault();
-                  window.scrollTo({ top: 0, behavior: "instant" });
-                }}
-                className={`flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium outline-none transition-colors focus-visible:bg-muted ${active ? "text-nav-accent-ink" : "text-muted-foreground dark:text-nav-accent-foreground"}`}>
-                <span className={`nav-glass nav-glass-gloss relative grid h-7 w-12 place-items-center rounded-full ${active ? "nav-glass-on text-nav-accent-foreground" : "text-muted-foreground dark:text-nav-accent-foreground"}`}>
-                  <I className="size-5" aria-hidden="true" />
-                </span>
-                <span className="max-w-full truncate px-1">{l}</span>
-              </Link>
-            </li>
-          );
-        })}
+    <nav aria-label="Menu principale" className={`fixed inset-x-0 bottom-0 z-[999999998] transition-transform duration-300 motion-reduce:transition-none sm:hidden ${hidden ? "translate-y-full" : "translate-y-0"}`}>
+      {/* Arched bar: the top edge rises toward the centre and cradles the camera button. */}
+      <svg className="nav-arc pointer-events-none absolute inset-x-0 bottom-0 h-[calc(6rem+env(safe-area-inset-bottom))] w-full" viewBox="0 0 100 96" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0 38 Q50 -10 100 38 V96 H0 Z" />
+      </svg>
+      <ul className="relative grid grid-cols-5 items-end pb-[env(safe-area-inset-bottom)]">
+        {bottomItems.slice(0, 2).map(item)}
+        <li className="flex justify-center"><span className="-translate-y-5"><CameraDockButton /></span></li>
+        {bottomItems.slice(2).map(item)}
       </ul>
     </nav>
   );
@@ -283,13 +291,16 @@ function SmartNav() {
           >
             <div className="flex items-center gap-1">
               {nav.map((n) => (
-                <Link key={n.to} to={n.to} activeOptions={{ exact: n.to === "/" }}
+                <span key={n.to} className="contents">
+                {n.to === "/vigneto" && <span className="px-1"><CameraDockButton size="small" /></span>}
+                <Link to={n.to} activeOptions={{ exact: n.to === "/" }}
                   aria-current={pathname === n.to ? "page" : undefined}
                   replace={pathname !== "/"}
                   onClick={(e) => { if (goHomeBack(e, n.to, pathname)) return; centerTapped(e.currentTarget, pathname === n.to); }}
                   className={`nav-glass nav-glass-gloss relative shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring ${pathname === n.to ? "nav-glass-on bg-nav-accent text-nav-accent-foreground" : "text-muted-foreground dark:text-nav-accent-foreground"}`}>
                   {n.l}
                 </Link>
+                </span>
               ))}
             </div>
           </nav>
@@ -425,10 +436,11 @@ function RootComponent() {
       <div className="hidden sm:block"><SmartNav /></div>
 
       <main id="main-content" tabIndex={-1} className="app-main mx-auto max-w-7xl px-4 py-8 focus:outline-none"><Outlet /></main><Toaster />
-      <footer className="mx-auto max-w-7xl px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] text-xs text-muted-foreground sm:pb-10">
+      <footer className="mx-auto max-w-7xl px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] text-xs text-muted-foreground sm:pb-10">
         I risultati del simulatore sono indicativi e non sostituiscono modelli fisici calibrati.
       </footer>
       <BottomNav />
+      <CameraSheet />
     </QueryClientProvider>
   );
 }

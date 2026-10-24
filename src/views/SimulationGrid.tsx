@@ -18,6 +18,7 @@ import { phenoPhases, vineModel, type Pheno } from "@/models/data";
 import { levelTone, piazzaEstimate, prototypeLevel, vineZones, type AreaKind, type PrototypeId } from "@/models/scenarios";
 
 import { ResetScenarioButton } from "@/views/ResetScenarioButton";
+import { useSignedIn as useSignedInState } from "@/lib/use-signed-in";
 
 const COLS = 9;
 const ROWS = 6;
@@ -153,13 +154,7 @@ const LocationMap3D = lazy(() => import("@/views/LocationMap3D").then((m) => ({ 
 
 /** Premium = signed in (registration required), as for the AI camera. */
 function useSignedIn() {
-  const [signedIn, setSignedIn] = useState(false);
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSignedIn(!!data.session));
-    const { data } = supabase.auth.onAuthStateChange((_e, s) => setSignedIn(!!s));
-    return () => data.subscription.unsubscribe();
-  }, []);
-  return signedIn;
+  return useSignedInState().signedIn;
 }
 
 function LocationMapPreview({ location }: { location: SearchedLocation }) {
