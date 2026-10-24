@@ -11,7 +11,9 @@ import { SensorAdvisor } from "@/views/SensorAdvisor";
 import { CopernicusPanel } from "@/views/CopernicusPanel";
 import { RealClimatePanel } from "@/views/RealClimatePanel";
 import { LabMedia } from "@/views/LabMedia";
-import { SimulationGrid, splitLocation, ImportWeatherButton } from "@/views/SimulationGrid";
+import { LocationCard, splitLocation, ImportWeatherButton } from "@/views/SimulationGrid";
+import { UrbanScene } from "@/views/v2/UrbanScene";
+import { VineScene } from "@/views/v2/VineScene";
 import { comparison, levelTone, nextPhase, piazzaEstimate, prototypeChoice, type PrototypeId } from "@/models/scenarios";
 import { applyVineyardScenario, closestVineyardScenario, vineyardControlValue, vineyardScenarioSteps } from "@/models/vineyard-controls";
 import { resetUrban, resetVineyard, setUrban, setVineyard, useLab, vineMetrics, vineyardSituation, type LabState } from "@/models/lab-store";
@@ -311,11 +313,12 @@ export function UrbanFlow() {
         </Card>
       </div>
 
+      <UrbanScene onReset={restoreScenario} />
       <RealClimatePanel kind="urban" />
       <CopernicusPanel kind="urban" />
       <SensorAdvisor kind="urban" />
       <LabMedia kind="urban" context={`Scenario: ${comparison.find((l) => l.id === activeLevel)?.s ?? "attuale"}`} />
-      <SimulationGrid onReset={restoreScenario} mode="urban" activeLevel={activeLevel} trees={trees} permeable={permeable} shade={shade} onTreesChange={setTrees} onPermeableChange={setPermeable} onShadeChange={setShade} />
+      <LocationCard kind="urban" />
       <Dialog open={compareOpen} onOpenChange={setCompareOpen}>
         <ComparisonDialog onImportWeather={importRealWeather} matrix={<PrototypeMatrix kind="urban" activeLevel={activeLevel} />}><ComparisonTable realTemp={urban.realTemp} place={place} trees={base.trees} permeable={base.permeable} shade={base.shade} activeLevel={activeLevel} onApply={applyScenario} /></ComparisonDialog>
       </Dialog>
@@ -384,11 +387,12 @@ export function VineyardFlow() {
         </Card>
       </div>
 
+      <VineScene onReset={restoreScenario} onZonesEdit={onZonesEdit} />
       <RealClimatePanel kind="vineyard" />
       <CopernicusPanel kind="vineyard" />
       <SensorAdvisor kind="vineyard" />
       <LabMedia kind="vineyard" context={`${vineyard.allZones ? "Tutte le zone" : `Zona ${vineyard.selected + 1}`} · ${vineyard.phase}`} />
-      <SimulationGrid onZonesEdit={onZonesEdit} onReset={restoreScenario} mode="vineyard" activeLevel={activeLevel} />
+      <LocationCard kind="vineyard" />
       <Dialog open={compareOpen} onOpenChange={setCompareOpen}>
         <ComparisonDialog onImportWeather={importRealWeather} matrix={<PrototypeMatrix kind="vineyard" activeLevel={activeLevel} />}><VineComparison v={vineyard} base={base} activeLevel={activeLevel} onApply={applyScenario} /></ComparisonDialog>
       </Dialog>
