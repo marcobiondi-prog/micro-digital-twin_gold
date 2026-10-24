@@ -9,7 +9,8 @@ import { useLab } from "@/models/lab-store";
 
 const tone: Record<string, string> = { alta: "bg-danger/15 text-danger", media: "bg-warn/15 text-warn", bassa: "bg-ok/15 text-ok" };
 
-export function SensorAdvisor({ kind }: { kind: "urban" | "vineyard" }) {
+/** `embedded`: inside a page section (Fold) that brings its own title, so no own toggle. */
+export function SensorAdvisor({ kind, embedded = false }: { kind: "urban" | "vineyard"; embedded?: boolean }) {
   const suggest = useServerFn(suggestHeatSensors);
   const lab = useLab();
   const location = kind === "urban" ? lab.urban.location : lab.vineyard.location;
@@ -41,6 +42,7 @@ export function SensorAdvisor({ kind }: { kind: "urban" | "vineyard" }) {
 
   return (
     <Card className="border p-3 sm:p-5">
+      {!embedded && (
       <button
         type="button"
         aria-expanded={open}
@@ -51,10 +53,11 @@ export function SensorAdvisor({ kind }: { kind: "urban" | "vineyard" }) {
         <span className="flex items-center gap-2 text-sm font-semibold"><Radar className="size-4 shrink-0 text-primary" /> Dove installare sensori di calore</span>
         <ChevronDown className="lab-media-chevron size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       </button>
+      )}
       <div id={`sensor-panel-${kind}`} className="lab-media-body" data-open={open} aria-hidden={!open} inert={!open}>
         <div className="lab-media-inner">
           <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">L’AI analizza i sensori attivi della rete Sensor.Community e i luoghi sensibili di OpenStreetMap attorno alla zona selezionata. Suggerimenti indicativi.</p>
+      <p className="text-xs text-muted-foreground">L’AI analizza i sensori attivi e i luoghi sensibili attorno alla zona selezionata. Suggerimenti indicativi.</p>
           <Button onClick={run} disabled={loading} className="rounded-full">{loading ? "Analisi della rete…" : "Suggerisci posizioni"}</Button>
           {error && <p role="alert" className="mt-3 rounded-xl bg-danger/10 p-3 text-sm text-danger">{error}</p>}
           {result && (

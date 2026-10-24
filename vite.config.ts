@@ -11,6 +11,8 @@ import { VitePWA } from "vite-plugin-pwa";
 // NITRO_PRESET=cloudflare-module npm run build.
 export default defineConfig(({ command }) => ({
   server: { host: "::", port: 8080 },
+  // Simulated sign-in (src/lib/demo-login.ts): dev server and Vercel previews only, never production.
+  define: { __DEMO_LOGIN__: JSON.stringify(command === "serve" || process.env["VERCEL_ENV"] === "preview") },
   resolve: {
     dedupe: ["react", "react-dom", "@tanstack/react-query", "@tanstack/query-core"],
   },

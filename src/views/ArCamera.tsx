@@ -909,7 +909,7 @@ export function ArCamera({
         {stepFlash && !dockRecord && <span key={stepFlash.key} className="ar-cooling-step" data-up={stepFlash.up || undefined}>{flashText(stepFlash)}</span>}
       </p>
       {/* Copernicus stays alongside: the satellite surface temperature of the area, as a reference. */}
-      {satellite?.surfaceTemp !== undefined && <p className="ar-cooling-satellite">Superficie dell’area (Sentinel-3) · {fmtC(satellite.surfaceTemp)} °C</p>}
+      {satellite?.surfaceTemp !== undefined && <p className="ar-cooling-satellite">Superficie dell’area (satellite) · {fmtC(satellite.surfaceTemp)} °C</p>}
       </div>
     </div>
   );
@@ -917,7 +917,7 @@ export function ArCamera({
     <p className="ar-identification-badge">
       {species.identification.level === "species" ? "Specie probabile" : species.identification.level === "genus" ? "Genere probabile" : "Identificazione incerta"}
       {" · "}{species.identification.leafVisible ? "evidenza fogliare" : "corteccia e portamento"}
-      {(species.colUrl || species.gbifUrl) && <span className="block">Tassonomia: {[species.colUrl ? "Catalogue of Life" : null, species.gbifUrl ? "GBIF" : null].filter(Boolean).join(" · ")}</span>}
+      {(species.colUrl || species.gbifUrl) && <span className="block">Tassonomia verificata</span>}
     </p>
   ) : null;
   // Wraps like the tutorial: after the last scan back to the first, before the first to the last.
@@ -1396,13 +1396,13 @@ export function ArCamera({
                       {species.colUrl && (
                         <>
                           {" · "}
-                          <a href={species.colUrl} target="_blank" rel="noreferrer" className="underline">Catalogue of Life</a>
+                          <a href={species.colUrl} target="_blank" rel="noreferrer" className="underline">Scheda della specie</a>
                         </>
                       )}
                       {species.gbifUrl && (
                         <>
                           {" · "}
-                          <a href={species.gbifUrl} target="_blank" rel="noreferrer" className="underline">GBIF</a>
+                          <a href={species.gbifUrl} target="_blank" rel="noreferrer" className="underline">Osservazioni</a>
                         </>
                       )}
 

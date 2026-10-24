@@ -1,16 +1,15 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const views = [
-  { tab: "Urbana", testId: "dashboard-urbana" },
-  { tab: "Vitivinicola", testId: "dashboard-vitivinicola" },
-  { tab: "Esecutivo", testId: "dashboard-esecutivo" },
+  { tab: "Piazza", testId: "dashboard-urbana" },
+  { tab: "Vigneto", testId: "dashboard-vitivinicola" },
 ] as const;
 
 /**
- * A fresh document load always lands on Panoramica, so the dashboard is opened
+ * A fresh document load always lands on Home, so the dashboard is opened
  * in-app like a visitor does. A click that lands before the page has hydrated
  * reloads the document instead, and that fresh dashboard load is sent back to
- * Panoramica — so the visit is retried until the in-app navigation sticks.
+ * Home — so the visit is retried until the in-app navigation sticks.
  */
 async function openView(page: Page, tab: string, testId: string) {
   const view = page.getByTestId(testId);
@@ -18,7 +17,7 @@ async function openView(page: Page, tab: string, testId: string) {
     try {
       if (!page.url().includes("/dashboard")) {
         await page.locator("[href='/dashboard']").locator("visible=true").first().click();
-        await expect(page.getByRole("heading", { name: "Dashboard operative" })).toBeVisible({ timeout: 5_000 });
+        await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 5_000 });
       }
       const splash = page.locator(".splash-screen");
       if (await splash.count()) await splash.evaluate((element) => element.remove());

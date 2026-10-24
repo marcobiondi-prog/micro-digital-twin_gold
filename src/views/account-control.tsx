@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn, useDemoSignedIn } from "@/lib/demo-login";
+import { OPEN_ACCOUNT_EVENT } from "@/lib/camera-dock";
 import { ThemeToggle } from "@/views/theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import seedling from "@/assets/avatar-seedling.svg";
@@ -57,6 +59,13 @@ function authMessage(error: { code?: string | undefined; message: string }) {
 
 export function AccountControl() {
   const [open, setOpen] = useState(false);
+  const demo = useDemoSignedIn();
+  // The locked AI option of the camera sheet opens this dialog to sign in.
+  useEffect(() => {
+    const show = () => setOpen(true);
+    window.addEventListener(OPEN_ACCOUNT_EVENT, show);
+    return () => window.removeEventListener(OPEN_ACCOUNT_EVENT, show);
+  }, []);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [account, setAccount] = useState<Account>(null);
   const [mode, setMode] = useState<"signin" | "signup" | "reset">("signin");
@@ -260,7 +269,7 @@ export function AccountControl() {
         <DialogHeader className="border-b px-6 py-5 text-left">
           <div className="mb-2">{avatar("size-10")}</div>
           <DialogTitle className="text-xl">Account</DialogTitle>
-          <DialogDescription>{account ? account.email : "Accedi o continua come ospite."}</DialogDescription>
+          <DialogDescription>{account ? account.email : demo ? "Accesso simulato (solo anteprima)" : "Accedi o continua come ospite."}</DialogDescription>
         </DialogHeader>
         <div className="space-y-6 px-6 py-6">
           {mode !== "reset" && <section className="space-y-3" aria-label="Immagine account">
@@ -274,7 +283,15 @@ export function AccountControl() {
               <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" tabIndex={-1} aria-label="Seleziona immagine account" onChange={chooseFile} />
             </div>
           </section>}
-          {account ? (
+          {demo && !account ? (
+            <section className="space-y-4">
+              <div className="rounded-md border bg-muted/40 p-4">
+                <p className="text-sm font-semibold">Accesso simulato</p>
+                <p className="mt-1 text-xs text-muted-foreground">Solo nelle anteprime: mostra le funzioni riservate a chi accede, come la fotocamera AI. Non è un account e le analisi AI richiedono un accesso vero.</p>
+              </div>
+              <Button variant="ghost" className="w-full justify-start" onClick={() => { setDemoSignedIn(false); setOpen(false); }}><LogOut />Esci dalla simulazione</Button>
+            </section>
+          ) : account ? (
             <section className="space-y-4">
               <div className="rounded-md border bg-muted/40 p-4">
                 <p className="text-sm font-semibold">{account.guest ? "Sessione ospite" : account.email}</p>
@@ -302,6 +319,7 @@ export function AccountControl() {
               {mode === "reset" && <Button variant="link" className="h-auto px-0" onClick={() => changeMode("signin")}>Torna all'accesso</Button>}
               {mode !== "reset" && googleEnabled && <><div className="flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />oppure<span className="h-px flex-1 bg-border" /></div><Button variant="outline" className="w-full" disabled={pending} onClick={() => void googleSignIn()}><GoogleLogo />{mode === "signup" ? "Registrati con Google" : "Accedi con Google"}</Button></>}
               <Button variant="ghost" className="w-full" onClick={enterGuest}>Continua come ospite</Button>
+              {DEMO_LOGIN_AVAILABLE && <Button variant="outline" className="w-full border-dashed" onClick={() => { setDemoSignedIn(true); setOpen(false); }}>Simula l’accesso (solo anteprima)</Button>}
             </section>
           )}
           <section className="border-t pt-5">
