@@ -7,9 +7,9 @@ export const GAIN_TEXT = ["text-radar-extreme", "text-radar-hot", "text-radar-wa
 export const GAIN_BG = ["bg-radar-extreme", "bg-radar-hot", "bg-radar-warm", "bg-radar-mild", "bg-ok"] as const;
 export const HEAT_VAR = ["var(--radar-cool)", "var(--radar-mild)", "var(--radar-warm)", "var(--radar-hot)", "var(--radar-extreme)"] as const;
 
-/** v7 "strumento": the instrument, drawn straight on the page canvas (no card, no border) in the theme's colours. */
+/** v7 "strumento": the instrument on a surface that fades from the card colour (white in light) into the page below, no border. */
 export function Studio({ children, className }: { children: ReactNode; className?: string }) {
-  return <section className={cn("studio relative text-foreground", className)}>{children}</section>;
+  return <section className={cn("studio fuse-canvas relative rounded-t-3xl px-3 pt-4 pb-6 text-foreground sm:px-5 sm:pt-5", className)}>{children}</section>;
 }
 
 /** Big live reading: one number, its unit, and an icon that says what it is. */
