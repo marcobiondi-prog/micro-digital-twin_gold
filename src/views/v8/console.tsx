@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
  */
 
 export type SimKind = "urban" | "vineyard";
-export type SimTab = "simula" | "luogo" | "media" | "sensori";
+export type SimTab = "simula" | "luogo" | "sensori";
 
 // The open tab of each simulator lives at module level, so the ⋯ menu and the camera can switch it.
 const tabs: Record<SimKind, SimTab> = { urban: "simula", vineyard: "simula" };
@@ -18,6 +18,14 @@ export function openSimTab(kind: SimKind, tab: SimTab) {
   if (tabs[kind] === tab) return;
   tabs[kind] = tab;
   listeners.forEach((l) => l());
+}
+/** Id of the photo and video block under a simulator, which the camera and the ⋮ menu bring into view. */
+export const simMediaId = (kind: SimKind) => `sim-media-${kind}`;
+/** Opens Simula and scrolls to its photos and videos, once the panel shows and the closing menu or sheet has handed focus back. */
+export function showSimMedia(kind: SimKind) {
+  openSimTab(kind, "simula");
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  window.setTimeout(() => document.getElementById(simMediaId(kind))?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }), 250);
 }
 export function useSimTab(kind: SimKind): SimTab {
   return useSyncExternalStore((l) => { listeners.add(l); return () => { listeners.delete(l); }; }, () => tabs[kind], () => "simula");

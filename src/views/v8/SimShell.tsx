@@ -2,12 +2,11 @@ import type { ReactNode } from "react";
 import { Camera, Images, MapPin, EllipsisVertical, Radar, RotateCcw, Scale, Send, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { setCameraSheetOpen } from "@/lib/camera-dock";
-import { Ambient, HeroButton, PageHero, Panels, TabRow, openSimTab, useSimTab, type SimKind, type SimTab } from "./console";
+import { Ambient, HeroButton, PageHero, Panels, TabRow, openSimTab, showSimMedia, simMediaId, useSimTab, type SimKind, type SimTab } from "./console";
 
 const TABS: ReadonlyArray<{ id: SimTab; label: string; icon: LucideIcon }> = [
   { id: "simula", label: "Simula", icon: SlidersHorizontal },
   { id: "luogo", label: "Luogo", icon: MapPin },
-  { id: "media", label: "Foto e video", icon: Images },
   { id: "sensori", label: "Sensori AI", icon: Radar },
 ];
 const TONE: Record<SimKind, string> = { urban: "rgb(28 112 210 / 0.42)", vineyard: "rgb(150 36 110 / 0.42)" };
@@ -18,8 +17,8 @@ function Item({ icon: Icon, label, onSelect }: { icon: LucideIcon; label: string
 
 /**
  * v8 simulator page: ambient light, the place (touch to change it) above a big thin title, Confronta and
- * the ⋯ context menu on the right, then pill tabs (Simula · Luogo · Foto e video · Sensori AI) and one panel.
- * The media panel is always mounted so the camera dock can reach it from any tab.
+ * the ⋮ context menu on the right, then pill tabs (Simula · Luogo · Sensori AI) and one panel.
+ * Simula shows the simulation with its photos and videos below it.
  */
 export function SimShell({ kind, place, onCompare, onReset, onSend, simula, luogo, media, sensori }: { kind: SimKind; place: string; onCompare: () => void; onReset: () => void; onSend?: () => void; simula: ReactNode; luogo: ReactNode; media: ReactNode; sensori: ReactNode }) {
   const tab = useSimTab(kind);
@@ -34,7 +33,7 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, luog
             <DropdownMenuTrigger asChild><button type="button" aria-label="Altre azioni" className="grid size-11 place-items-center rounded-full bg-foreground/10 text-foreground outline-none backdrop-blur transition-colors hover:bg-foreground/[0.16] focus-visible:ring-2 focus-visible:ring-ring"><EllipsisVertical className="size-6" aria-hidden="true" /></button></DropdownMenuTrigger>
             <DropdownMenuContent align="end" sideOffset={8} className="z-[999999999] w-64 rounded-2xl p-1.5 shadow-2xl">
               <Item icon={Camera} label="Fotocamera" onSelect={() => setCameraSheetOpen(true)} />
-              <Item icon={Images} label="Foto e video salvati" onSelect={() => go("media")} />
+              <Item icon={Images} label="Foto e video salvati" onSelect={() => showSimMedia(kind)} />
               <Item icon={Radar} label="Dove mettere i sensori" onSelect={() => go("sensori")} />
               <Item icon={MapPin} label="Cambia luogo" onSelect={() => go("luogo")} />
               <DropdownMenuSeparator />
@@ -47,9 +46,9 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, luog
         <TabRow label="Sezioni" items={TABS} value={tab} onChange={go} />
       </div>
       <Panels value={tab} panels={[
-        { id: "simula", content: simula },
+        // Simula carries the photos and videos under the simulation, so it stays mounted: the camera dock reaches LabMedia from any tab.
+        { id: "simula", always: true, content: <div className="space-y-6">{simula}<section id={simMediaId(kind)} aria-labelledby={`${simMediaId(kind)}-title`} className="scroll-mt-[calc(var(--nav-h)+5rem)] space-y-3"><h2 id={`${simMediaId(kind)}-title`} className="flex items-center gap-2 text-lg font-semibold"><Images className="size-5 text-muted-foreground" aria-hidden="true" />Foto e video</h2>{media}</section></div> },
         { id: "luogo", content: luogo },
-        { id: "media", always: true, content: media },
         { id: "sensori", content: sensori },
       ]} />
     </div>

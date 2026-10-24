@@ -9,7 +9,7 @@ export const HEAT_VAR = ["var(--radar-cool)", "var(--radar-mild)", "var(--radar-
 
 /** v7 "strumento": the instrument surface, a card that follows the light or dark theme. */
 export function Studio({ children, className }: { children: ReactNode; className?: string }) {
-  return <section className={cn("studio relative overflow-hidden rounded-2xl bg-card p-3 text-card-foreground shadow-xl ring-1 ring-foreground/[0.06] sm:p-5", className)}>{children}</section>;
+  return <section className={cn("studio relative overflow-hidden rounded-2xl bg-card p-3 text-card-foreground sm:p-5", className)}>{children}</section>;
 }
 
 /** Big live reading: one number, its unit, and an icon that says what it is. */
