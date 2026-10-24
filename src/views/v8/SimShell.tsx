@@ -13,7 +13,7 @@ const TABS: ReadonlyArray<{ id: SimTab; label: string; icon: LucideIcon }> = [
 const TONE: Record<SimKind, string> = { urban: "rgb(28 112 210 / 0.42)", vineyard: "rgb(150 36 110 / 0.42)" };
 
 function Item({ icon: Icon, label, onSelect }: { icon: LucideIcon; label: string; onSelect: () => void }) {
-  return <DropdownMenuItem onSelect={onSelect} className="min-h-12 gap-3 rounded-xl px-3 text-[15px] font-medium focus:bg-white/10 focus:text-white"><Icon className="size-5 text-white/70" aria-hidden="true" />{label}</DropdownMenuItem>;
+  return <DropdownMenuItem onSelect={onSelect} className="min-h-12 gap-3 rounded-xl px-3 text-[15px] font-medium focus:bg-accent focus:text-accent-foreground"><Icon className="size-5 text-muted-foreground" aria-hidden="true" />{label}</DropdownMenuItem>;
 }
 
 /**
@@ -32,12 +32,12 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, luog
           <HeroButton icon={Scale} label="Confronta" onClick={onCompare} showLabel />
           <DropdownMenu>
             <DropdownMenuTrigger asChild><button type="button" aria-label="Altre azioni" className="grid size-11 place-items-center rounded-full bg-foreground/10 text-foreground outline-none backdrop-blur transition-colors hover:bg-foreground/[0.16] focus-visible:ring-2 focus-visible:ring-ring"><EllipsisVertical className="size-6" aria-hidden="true" /></button></DropdownMenuTrigger>
-            <DropdownMenuContent align="end" sideOffset={8} className="z-[999999999] w-64 rounded-2xl border-white/10 bg-[#262b34] p-1.5 text-white shadow-2xl">
+            <DropdownMenuContent align="end" sideOffset={8} className="z-[999999999] w-64 rounded-2xl p-1.5 shadow-2xl">
               <Item icon={Camera} label="Fotocamera" onSelect={() => setCameraSheetOpen(true)} />
               <Item icon={Images} label="Foto e video salvati" onSelect={() => go("media")} />
               <Item icon={Radar} label="Dove mettere i sensori" onSelect={() => go("sensori")} />
               <Item icon={MapPin} label="Cambia luogo" onSelect={() => go("luogo")} />
-              <DropdownMenuSeparator className="bg-white/10" />
+              <DropdownMenuSeparator />
               {onSend && <Item icon={Send} label="Invia all’agronomo" onSelect={onSend} />}
               <Item icon={RotateCcw} label="Ricomincia" onSelect={onReset} />
             </DropdownMenuContent>
