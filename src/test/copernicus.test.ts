@@ -50,15 +50,15 @@ describe("AI camera satellite context", () => {
   });
   it("writes one caption line and an honest prompt", () => {
     const line = satelliteLine(satelliteContext(reading));
-    expect(line).toMatch(/^Satellite Copernicus · NDVI 0,42 vegetazione moderata \(12 ott\) · superficie 31 °C \(20 ott\)$/);
+    expect(line).toMatch(/^Satellite · NDVI 0,42 vegetazione moderata \(12 ott\) · superficie 31 °C \(20 ott\)$/);
     const prompt = satellitePrompt(satelliteContext(reading));
     expect(prompt).toContain("NON misure della pianta");
     expect(prompt).toContain("0.42");
     expect(satellitePrompt(null)).toBe("");
   });
   it("adds the satellite line to the photo caption", () => {
-    const lines = captureSummaryLines({ commonName: "Leccio", scientificName: "Quercus ilex", level: "Specie probabile", count: 2, cooling: 1.2, shade: 40 }, "Piazza", "Satellite Copernicus · NDVI 0,42");
-    expect(lines.at(-2)).toBe("Satellite Copernicus · NDVI 0,42");
-    expect(captureSummaryLines(null, "Piazza", "Satellite Copernicus · NDVI 0,42").at(-1)).toBe("Satellite Copernicus · NDVI 0,42");
+    const lines = captureSummaryLines({ commonName: "Leccio", scientificName: "Quercus ilex", level: "Specie probabile", count: 2, cooling: 1.2, shade: 40 }, "Piazza", "Satellite · NDVI 0,42");
+    expect(lines.at(-2)).toBe("Satellite · NDVI 0,42");
+    expect(captureSummaryLines(null, "Piazza", "Satellite · NDVI 0,42").at(-1)).toBe("Satellite · NDVI 0,42");
   });
 });

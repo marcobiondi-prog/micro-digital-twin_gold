@@ -96,10 +96,10 @@ export function satelliteContext(reading: CopernicusReading | null | undefined):
 
 const shortDay = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("it-IT", { day: "numeric", month: "short" });
 
-/** One caption/HUD line, e.g. "Satellite Copernicus · NDVI 0,42 vegetazione moderata (12 ott) · superficie 31 °C (20 ott)". */
+/** One caption/HUD line, e.g. "Satellite · NDVI 0,42 vegetazione moderata (12 ott) · superficie 31 °C (20 ott)". */
 export function satelliteLine(context: SatelliteContext | null): string | null {
   if (!context) return null;
-  const parts = ["Satellite Copernicus"];
+  const parts = ["Satellite"];
   if (context.ndvi !== undefined) parts.push(`NDVI ${context.ndvi.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${ndviLabel(context.ndvi).toLowerCase()}${context.ndviDate ? ` (${shortDay(context.ndviDate)})` : ""}`);
   if (context.surfaceTemp !== undefined) parts.push(`superficie ${context.surfaceTemp.toLocaleString("it-IT", { maximumFractionDigits: 0 })} °C${context.tempDate ? ` (${shortDay(context.tempDate)})` : ""}`);
   return parts.join(" · ");
