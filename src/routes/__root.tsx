@@ -291,16 +291,13 @@ function SmartNav() {
           >
             <div className="flex items-center gap-1">
               {nav.map((n) => (
-                <span key={n.to} className="contents">
-                {n.to === "/vigneto" && <span className="px-1"><CameraDockButton size="small" /></span>}
-                <Link to={n.to} activeOptions={{ exact: n.to === "/" }}
+                <Link key={n.to} to={n.to} activeOptions={{ exact: n.to === "/" }}
                   aria-current={pathname === n.to ? "page" : undefined}
                   replace={pathname !== "/"}
                   onClick={(e) => { if (goHomeBack(e, n.to, pathname)) return; centerTapped(e.currentTarget, pathname === n.to); }}
                   className={`nav-glass nav-glass-gloss relative shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring ${pathname === n.to ? "nav-glass-on bg-nav-accent text-nav-accent-foreground" : "text-muted-foreground dark:text-nav-accent-foreground"}`}>
                   {n.l}
                 </Link>
-                </span>
               ))}
             </div>
           </nav>
