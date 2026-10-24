@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { THEME_CHANGED, THEME_DARK, THEME_META } from "@/views/theme-toggle";
 
 /**
  * v8 "Console": the PlayStation-app design language shared by every page.
@@ -31,8 +32,31 @@ export function useSimTab(kind: SimKind): SimTab {
   return useSyncExternalStore((l) => { listeners.add(l); return () => { listeners.delete(l); }; }, () => tabs[kind], () => "simula");
 }
 
-/** Soft coloured light behind the top of the page, like the art behind the PS5 home. */
+/** Soft coloured light behind the top of the page, like the art behind the PS5 home. The transparent header
+ * shows it, and the phone status bar takes the same tint (the light blended on the page colour). */
 export function Ambient({ tone }: { tone: string }) {
+  useEffect(() => {
+    const meta = () => document.querySelector<HTMLMetaElement>(THEME_META);
+    const paint = () => {
+      const m = meta(), g = document.createElement("canvas").getContext("2d");
+      if (!m || !g) return;
+      g.fillStyle = getComputedStyle(document.body).backgroundColor; g.fillRect(0, 0, 1, 1);
+      // The glow reaches the top edge at about 70% of its strength (the ellipse is centred above the screen).
+      g.globalAlpha = 0.72; g.fillStyle = tone; g.fillRect(0, 0, 1, 1);
+      const [r = 0, gr = 0, b = 0] = g.getImageData(0, 0, 1, 1).data;
+      m.content = `rgb(${r} ${gr} ${b})`;
+    };
+    paint();
+    // The page colour fades for 0.2 s after a theme switch: read it once it has settled.
+    let timer = 0;
+    const later = () => { window.clearTimeout(timer); timer = window.setTimeout(paint, 260); };
+    window.addEventListener(THEME_CHANGED, later);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener(THEME_CHANGED, later);
+      meta()?.setAttribute("content", document.documentElement.classList.contains("dark") ? THEME_DARK : "#ffffff");
+    };
+  }, [tone]);
   return <div className="console-ambient pointer-events-none fixed inset-x-0 top-0 -z-10 h-[48vh] transition-[background] duration-700 motion-reduce:transition-none" style={{ background: `radial-gradient(130% 85% at 50% -15%, ${tone}, transparent 72%)` }} aria-hidden="true" />;
 }
 
