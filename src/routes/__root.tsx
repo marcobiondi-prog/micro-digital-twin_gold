@@ -9,7 +9,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useHomeFocus } from "@/lib/home-focus";
 import { THEME_DARK, ThemeToggle, themeBootScript } from "@/views/theme-toggle";
 import { AccountControl } from "@/views/account-control";
-import { TwinMascot } from "@/views/TwinMascot";
 import { CameraDockButton, CameraSheet } from "@/views/CameraDock";
 import { syncAppOrientation } from "@/lib/ar-orientation";
 import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
@@ -450,19 +449,9 @@ function RootComponent() {
       {/* v8: a solid console top bar painted with the page's own ambient light, so it carries the same shades without being see-through. */}
       <header id="app-header" className="app-header-tint relative pt-[env(safe-area-inset-top)]">
         <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-2 sm:px-4 sm:py-3">
-          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-            <Link to="/" onClick={(e) => goHomeBack(e, "/", location.pathname)} className="flex min-w-0 items-center gap-1.5 font-display text-[15px] font-semibold tracking-wide sm:gap-2 sm:text-lg">
-              <span className="header-logo-frame grid h-10 w-12 shrink-0 place-items-center sm:h-12 sm:w-14">
-                <TwinMascot className="header-logo block h-full w-full" />
-              </span>
-              <span className="truncate whitespace-nowrap">MICRO DIGITAL <span className="text-brand-turquoise">TWIN</span></span>
-            </Link>
-          </div>
-          {/* The theme switch sits beside the account button: one place for both, on every size. */}
-          <div className="flex shrink-0 items-center gap-2">
-            <ThemeToggle />
-            <AccountControl />
-          </div>
+          {/* No logo nor name here: the account sits where the logo was, the theme switch on the right. */}
+          <div className="flex min-w-0 items-center"><AccountControl /></div>
+          <div className="flex shrink-0 items-center gap-2"><ThemeToggle /></div>
         </div>
       </header>
       <div className="hidden sm:block"><SmartNav /></div>

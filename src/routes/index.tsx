@@ -8,6 +8,7 @@ import { useInstalledApp } from "@/lib/installed-app";
 import aiLogo from "@/assets/ai-logo.png";
 import { applySharedScenario } from "@/views/ScenarioTools";
 import { hapticTick } from "@/lib/haptics";
+import { TwinMascot } from "@/views/TwinMascot";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -59,12 +60,12 @@ function Index() {
     <div className="relative isolate flex min-h-dvh flex-col overflow-hidden px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))] sm:px-12">
       <Isolines />
       <h1 className="sr-only">Micro Digital Twin</h1>
-      <div {...rise(0)} className={`${rise(0).className} flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.28em] text-foreground/60`}>
-        <span>Micro Digital Twin</span>
-        <span className="font-mono tabular-nums tracking-normal" aria-hidden="true">0{sel + 1} / 0{items.length}</span>
+      {/* Twin, big, is the page's only colour: the app's own mascot greets before the question. */}
+      <div {...rise(0)} className={`${rise(0).className} mx-auto mt-[4vh] w-full max-w-xl`}>
+        <span className="block h-32 w-36 sm:h-40 sm:w-44"><TwinMascot className="block h-full w-full drop-shadow-[0_12px_40px_rgb(76_201_189/0.25)]" /></span>
       </div>
       <div className="mx-auto flex w-full max-w-xl flex-1 flex-col">
-        <h2 {...rise(1)} className={`${rise(1).className} mt-[12vh] font-display text-[3.4rem] font-extralight leading-[0.95] tracking-tight text-foreground sm:text-7xl`}>Da dove<br />vuoi iniziare?</h2>
+        <h2 {...rise(1)} className={`${rise(1).className} mt-8 font-display text-[3.4rem] font-extralight leading-[0.95] tracking-tight text-foreground sm:text-7xl`}>Da dove<br />vuoi iniziare?</h2>
         <p {...rise(2)} className={`${rise(2).className} mt-5 max-w-xs text-[15px] leading-relaxed text-foreground/60`}>Scegli una strada. Le altre restano a un tocco, nel menu.</p>
         <div role="radiogroup" aria-label="Da dove vuoi iniziare" className="mt-10 space-y-1"
           onKeyDown={(e) => {
