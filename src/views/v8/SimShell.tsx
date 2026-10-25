@@ -20,7 +20,7 @@ function Item({ icon: Icon, label, onSelect }: { icon: LucideIcon; label: string
  * the ⋮ context menu on the right, then pill tabs (Simula · Luogo · Sensori AI) and one panel.
  * Simula shows the simulation with its photos and videos below it.
  */
-export function SimShell({ kind, place, onCompare, onReset, onSend, simula, luogo, media, sensori }: { kind: SimKind; place: string; onCompare: () => void; onReset: () => void; onSend?: () => void; simula: ReactNode; luogo: ReactNode; media: ReactNode; sensori: ReactNode }) {
+export function SimShell({ kind, place, onCompare, onReset, onSend, simula, luogo, media, sensori }: { kind: SimKind; place: string; onCompare?: (() => void) | undefined; onReset: () => void; onSend?: () => void; simula: ReactNode; luogo: ReactNode; media: ReactNode; sensori: ReactNode }) {
   const tab = useSimTab(kind);
   const go = (t: SimTab) => openSimTab(kind, t);
   return (
@@ -28,7 +28,7 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, luog
       <Ambient tone={TONE[kind]} />
       <PageHero kicker={place} kickerIcon={MapPin} onKicker={() => go("luogo")} title={kind === "urban" ? "Piazza" : "Vigneto"}
         actions={<>
-          <HeroButton icon={Scale} label="Confronta" onClick={onCompare} showLabel />
+          {onCompare && <HeroButton icon={Scale} label="Confronta" onClick={onCompare} showLabel />}
           <DropdownMenu>
             <DropdownMenuTrigger asChild><button type="button" aria-label="Altre azioni" className="grid size-11 place-items-center rounded-full bg-foreground/10 text-foreground outline-none backdrop-blur transition-colors hover:bg-foreground/[0.16] focus-visible:ring-2 focus-visible:ring-ring"><EllipsisVertical className="size-6" aria-hidden="true" /></button></DropdownMenuTrigger>
             <DropdownMenuContent align="end" sideOffset={8} className="z-[999999999] w-64 rounded-2xl p-1.5 shadow-2xl">

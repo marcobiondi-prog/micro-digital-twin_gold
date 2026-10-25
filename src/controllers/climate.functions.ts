@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { seasonalProfile, type SeasonProfile } from "@/models/season-climate";
 
 const input = z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) });
 
@@ -48,4 +49,24 @@ export const getRealClimate = createServerFn({ method: "POST" })
       } catch { return null; }
     })();
     return { openMeteo: await om, nasa: await nasa };
+  });
+
+/**
+ * The place's last full year of perceived temperature, hour by hour, averaged for each season and hour of the day.
+ * Real data from the weather archive (it lags a few days behind today).
+ */
+export const getSeasonalClimate = createServerFn({ method: "POST" })
+  .inputValidator((d) => input.parse(d))
+  .handler(async ({ data }): Promise<{ profile: SeasonProfile; from: string; to: string } | null> => {
+    const end = new Date(Date.now() - 6 * 864e5), start = new Date(end.getTime() - 364 * 864e5);
+    const day = (d: Date) => d.toISOString().slice(0, 10);
+    const u = `https://archive-api.open-meteo.com/v1/archive?latitude=${data.lat}&longitude=${data.lng}&start_date=${day(start)}&end_date=${day(end)}&hourly=apparent_temperature&timezone=auto`;
+    try {
+      const r = await fetch(u, { headers: { "User-Agent": "MicroDigitalTwin/1.0" } });
+      if (!r.ok) { console.error(`Seasonal climate failed [${r.status}]`); return null; }
+      const j = (await r.json()) as { hourly?: { time?: string[]; apparent_temperature?: Array<number | null> } };
+      const times = j.hourly?.time ?? [], values = j.hourly?.apparent_temperature ?? [];
+      if (!times.length) return null;
+      return { profile: seasonalProfile(times, values), from: day(start), to: day(end) };
+    } catch { return null; }
   });
