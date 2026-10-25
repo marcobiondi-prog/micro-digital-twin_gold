@@ -78,82 +78,23 @@ const DOTS: Array<[number, number, number, number]> = [[8, 12, 2, 0], [22, 26, 1
 const SPARKS: Array<[number, number, number, number]> = [[12, 3, 14, 0], [27, 2, 18, 4], [41, 3, 16, 9], [55, 2, 20, 2], [68, 3, 15, 7], [82, 2, 19, 11], [93, 3, 17, 5], [5, 2, 21, 13], [48, 2, 13, 15], [74, 3, 22, 1]];
 
 /**
- * The entrance's backdrop, a digital twin's horizon: an aurora in Twin's turquoise, a cool blue and a warm heat glow, slowly
- * turning and breathing; a sky of twinkling data points; a glowing planet rising behind a perspective grid floor that glides
- * toward you, crossed by a band of light; sparks rising from it. Still with reduced motion.
+ * The entrance's backdrop, light and airy: an aurora in Twin's turquoise, a cool blue and a warm heat glow, slowly turning and
+ * breathing, a sky of twinkling data points and sparks rising from the bottom. Still with reduced motion.
  */
 function Backdrop() {
   return (
     <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[#05070c]" aria-hidden="true">
       {/* Aurora: three coloured lights, blended so they brighten where they meet. */}
-      <div className="intro-aurora absolute -inset-[20%] opacity-90 [mix-blend-mode:screen]">
+      <div className="intro-aurora absolute -inset-[20%] [mix-blend-mode:screen]">
         <div className="intro-glow intro-glow-a absolute left-[5%] top-[2%] h-[60vh] w-[75vw] rounded-[45%_55%_60%_40%] bg-[radial-gradient(closest-side,rgb(76_201_189/0.55),transparent)] blur-3xl" />
         <div className="intro-glow intro-glow-b absolute right-[0%] top-[20%] h-[55vh] w-[70vw] rounded-[60%_40%_45%_55%] bg-[radial-gradient(closest-side,rgb(40_100_230/0.5),transparent)] blur-3xl" />
         <div className="intro-glow intro-glow-c absolute bottom-[18%] left-[25%] h-[40vh] w-[60vw] rounded-[50%] bg-[radial-gradient(closest-side,rgb(255_130_60/0.3),transparent)] blur-3xl" />
       </div>
       {DOTS.map(([x, y, r, d]) => <span key={`${x}-${y}`} className="intro-dot absolute rounded-full bg-white" style={{ left: `${x}%`, top: `${y}%`, width: r, height: r, animationDelay: `${d}s` }} />)}
-      {/* The planet: a lit globe rising at the bottom, its atmosphere glowing on the rim, a digital grid turning on it. */}
-      <div className="intro-halo absolute bottom-[10vh] left-1/2 h-[36vh] w-[150vw] -translate-x-1/2 rounded-[50%] bg-[radial-gradient(closest-side,rgb(76_201_189/0.4),rgb(40_100_230/0.18)_60%,transparent)] blur-2xl" />
-      <Planet />
       {SPARKS.map(([x, r, t, d]) => <span key={x} className="intro-spark absolute bottom-[8vh] rounded-full bg-[rgb(140_240_225)] shadow-[0_0_8px_rgb(76_201_189)]" style={{ left: `${x}%`, width: r, height: r, animationDuration: `${t}s`, animationDelay: `${d}s` }} />)}
       {/* A soft vignette keeps the text readable. */}
       <div className="absolute inset-0 bg-[radial-gradient(120%_90%_at_50%_45%,transparent_55%,rgb(0_0_0/0.55))]" />
     </div>
-  );
-}
-
-/**
- * A planet as a digital twin: a sphere lit from the upper left (turquoise to deep blue to night), a glowing atmosphere on its
- * rim, parallels and meridians that turn (the meridians narrow and widen like a spinning globe), and lit points on its face.
- * Only its upper part shows, rising from the bottom of the screen. The grid stands still with reduced motion.
- */
-function Planet() {
-  const [still, setStill] = useState(true);
-  useEffect(() => { setStill(reduceMotion()); }, []);
-  const parallels = [-60, -40, -20, 0, 20, 40, 60];
-  const meridians = [0, 1, 2, 3, 4, 5];
-  const cities: Array<[number, number]> = [[-38, -62], [-12, -70], [20, -58], [44, -40], [-56, -30], [8, -36], [-26, -44], [32, -74], [-4, -52]];
-  return (
-    <svg viewBox="-110 -110 220 220" className="absolute left-1/2 top-[64vh] aspect-square w-[175vw] max-w-none -translate-x-1/2 sm:top-[72vh] sm:w-[105vw]">
-      <defs>
-        <radialGradient id="planet-surface" cx="0.36" cy="0.18" r="0.85">
-          <stop offset="0" stopColor="#8ff0e2" />
-          <stop offset="0.16" stopColor="#2fb4a8" />
-          <stop offset="0.42" stopColor="#1b4f9e" />
-          <stop offset="0.72" stopColor="#0b1838" />
-          <stop offset="1" stopColor="#04060c" />
-        </radialGradient>
-        <radialGradient id="planet-air" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0.86" stopColor="rgb(76 201 189)" stopOpacity="0" />
-          <stop offset="0.91" stopColor="rgb(120 235 220)" stopOpacity="0.85" />
-          <stop offset="0.95" stopColor="rgb(60 140 240)" stopOpacity="0.35" />
-          <stop offset="1" stopColor="rgb(40 100 230)" stopOpacity="0" />
-        </radialGradient>
-        <clipPath id="planet-clip"><circle r="100" /></clipPath>
-      </defs>
-      <circle r="110" fill="url(#planet-air)" />
-      <circle r="100" fill="url(#planet-surface)" />
-      <g clipPath="url(#planet-clip)" fill="none" stroke="rgb(160 245 235)" strokeWidth="0.35">
-        {parallels.map((lat) => {
-          const y = -Math.sin((lat * Math.PI) / 180) * 100, rx = Math.cos((lat * Math.PI) / 180) * 100;
-          return <ellipse key={lat} cx="0" cy={y} rx={rx} ry={rx * 0.18} strokeOpacity={0.28} />;
-        })}
-        {meridians.map((k) => (
-          <ellipse key={k} cx="0" cy="0" rx={100 * Math.abs(Math.cos((k * Math.PI) / 6))} ry="100" strokeOpacity={0.3}>
-            {!still && <animate attributeName="rx" dur="24s" repeatCount="indefinite" begin={`${-k * 4}s`} values="100;50;0;50;100" keyTimes="0;0.25;0.5;0.75;1" />}
-          </ellipse>
-        ))}
-        {cities.map(([x, y], i) => <circle key={i} cx={x} cy={y} r="0.9" fill="rgb(200 255 248)" stroke="none" className="intro-dot" style={{ animationDelay: `${i * 0.45}s` }} />)}
-      </g>
-      {/* Night side: the lower right fades into the dark. */}
-      <circle r="100" fill="url(#planet-shade)" />
-      <defs>
-        <radialGradient id="planet-shade" cx="0.75" cy="0.85" r="0.75">
-          <stop offset="0" stopColor="#020308" stopOpacity="0.85" />
-          <stop offset="1" stopColor="#020308" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-    </svg>
   );
 }
 
