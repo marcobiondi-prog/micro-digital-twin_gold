@@ -20,6 +20,7 @@ import { LabSyncIndicator } from "@/views/LabSyncIndicator";
 import { Fold, FoldTabs } from "@/views/Fold";
 import { Ambient, PageHero, TabRow } from "@/views/v8/console";
 import { FieldAI } from "@/views/FieldAI";
+import { DashCard, DashSection, PiazzaDashboard, VineDashboard } from "@/views/v10/Dashboard";
 import climateTwinLogo from "@/assets/climate-twin-logo-final.png";
 import climateTwinLogoCompact from "@/assets/climate-twin-logo-compact.png";
 
@@ -39,9 +40,6 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 const hours = Array.from({ length: 24 }, (_, h) => ({ h: `${h}:00`, wbgt: +(22 + 8 * Math.sin(((h - 8) / 24) * Math.PI * 2 * 0.9) * (h > 6 && h < 21 ? 1 : 0.3) + noise(h) * 1.5).toFixed(1) }));
-const days = Array.from({ length: 14 }, (_, d) => ({ d: `G${d + 1}`, s20: +(32 - d * 1.3 + noise(d) * 3).toFixed(1), s50: +(36 - d * 0.7 + noise(d, 2) * 2).toFixed(1) }));
-const ripe = Array.from({ length: 10 }, (_, w) => ({ w: `S${w + 1}`, zuccheri: +(12 + w * 1.4 + noise(w) * 0.5).toFixed(1), polifenoli: +(8 + w * 0.9 - Math.max(0, w - 6) * 0.3 + noise(w, 5) * 0.4).toFixed(1) }));
-const WATER_BALANCE = [{ m: "Giu", domanda: 420, disponibile: 520 }, { m: "Lug", domanda: 610, disponibile: 470 }, { m: "Ago", domanda: 680, disponibile: 410 }, { m: "Set", domanda: 450, disponibile: 480 }];
 const tip = { contentStyle: { borderRadius: 16, border: "none", boxShadow: "0 8px 24px -8px rgb(0 0 0 / .2)" } };
 
 function useChartAnimation() {
@@ -133,16 +131,9 @@ const DEFAULT_LOG: { d: string; t: string }[] = [
   { d: "28/09", t: "Scenario condiviso con l'ufficio tecnico" },
 ];
 
-function UrbanDash() {
-  const animateCharts = useChartAnimation();
-  const [target] = useState(30);
-  const lab = useLab().urban, m = urbanMetrics(lab), area = splitLabel(lab.location.label), place = splitLocation(lab.location.label);
-  const near = place.sub ? splitLabel(place.sub) : `Zona limitrofa · ${area}`;
-  const le5 = Math.min(100, Math.round(m.refuges * 1.6)), le10 = Math.min(100, Math.max(le5, Math.round(m.refuges * 2.3)));
-  const cover = m.cover;
-  const hourData = hours.map((x, h) => ({ ...x, wbgt: +(x.wbgt - (h > 9 && h < 19 ? m.est.dT * 0.7 : m.est.dT * 0.25)).toFixed(1) }));
-  const peak = Math.max(...hourData.map((x) => x.wbgt));
-  const lvl = peak > 29 ? "elevato" : peak > 26 ? "moderato" : "basso";
+/** Premium records of the piazza: the approval cycle with the public bodies, the log of interventions and the AI plan. */
+function UrbanRecords() {
+  const lab = useLab().urban, m = urbanMetrics(lab);
   const [stage, setStage] = useState(0);
   const [approvals, setApprovals] = useState<Record<string, Approval>>({});
   const [draft, setDraft] = useState("");
@@ -273,19 +264,10 @@ function UrbanDash() {
     window.addEventListener("focus", check);
     return () => { alive = false; clearInterval(iv); window.removeEventListener("focus", check); };
   }, [uid, loaded]);
-  const co2 = Math.round(lab.trees * 22), water = Math.round(4000 * (lab.permeable / 100) * 0.7 * 0.6), shadeM2 = Math.round(4000 * (lab.shade / 100) + lab.trees * 30);
   return (
-    <div className="dashboard-view" data-testid="dashboard-urbana">
-      <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        <Kpi value={peak} max={35} color={levelColor(peak > 29 ? 80 : peak > 26 ? 50 : 20)} center={peak} unit="°C percepiti" label="Calore"><StatusBadge level={lvl}>{lvl}</StatusBadge></Kpi>
-        <Kpi value={cover} max={target} color="var(--leaf)" center={`${cover}%`} unit={`su ${target}%`} label="Copertura alberi" />
-        <Kpi value={le5} max={100} color="var(--urban)" center={`${le5}%`} unit="≤5 min" label="Rifugi vicini"><span className="text-[10px] text-muted-foreground">{le10}% entro 10 min</span></Kpi>
-      </div>
-      <div className={`dashboard-urban-main mt-4 grid gap-4 ${uid ? "lg:grid-cols-2" : ""}`}>
-        <Card><div className="text-sm font-semibold">Scheda intervento</div>
-          <div className="mt-3 space-y-2 text-sm">
-            {[["Area", area], ["Interventi", `${lab.trees} alberi · ${lab.permeable}% suolo · ${lab.shade}% ombra`], ["ΔT atteso", `−${m.est.lo.toFixed(1)} / −${m.est.hi.toFixed(1)} °C`], ["Posizione", `${lab.location.lat.toFixed(3)}, ${lab.location.lng.toFixed(3)}`], ["Costo stimato", lab.trees + lab.permeable / 5 + lab.shade / 5 > 25 ? "alto" : lab.trees + lab.permeable / 5 + lab.shade / 5 > 12 ? "medio" : "basso"], ["Stato", STAGES[displayedStage]]].map(([k, v]) => <div key={k} className="dashboard-detail-row"><span className="text-muted-foreground">{k}</span>{k === "Stato" ? <b className="flex items-center gap-1.5"><span className={`size-2 shrink-0 rounded-full ${STAGE_TONES[displayedStage]?.dot}`} />{v}</b> : <b>{v}</b>}</div>)}
-          </div>
+    <div className="space-y-8">
+      <DashSection title="Approvazioni" hint={STAGES[displayedStage]}>
+        <DashCard>
             <div className="mt-4 flex items-center justify-between text-xs font-semibold text-muted-foreground"><span>Ciclo di approvazione</span><span className="text-foreground">{progress}%</span></div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Avanzamento approvazione" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
               <div className={`h-full rounded-full transition-[width] duration-500 motion-reduce:transition-none ${STAGE_TONES[displayedStage]?.dot}`} style={{ width: `${progress}%` }} />
@@ -294,7 +276,6 @@ function UrbanDash() {
               {STAGES.map((s, i) => <li key={s} aria-current={i === displayedStage ? "step" : undefined} className={i === displayedStage ? "font-semibold text-foreground" : "text-muted-foreground"}>{s}</li>)}
             </ol>
             {!uid && <Button type="button" variant="ghost" onClick={simulateEmail} disabled={simBusy} className="mt-2 h-9 w-full rounded-full bg-urban/15 px-3 text-xs font-semibold text-urban"><Mail />{simBusy ? "Ricezione in corso…" : simUnits === null ? "Simula arrivo parere via email" : "Reinvia email simulata"}</Button>}
-        </Card>
            <div className="dashboard-external-section">
            {uid ? (<>
              <div className="mt-3 text-xs font-semibold text-muted-foreground md:mt-0">Approvazioni esterne</div>
@@ -327,33 +308,10 @@ function UrbanDash() {
             {stage === 2 && approvedCount === EXTERNAL.length && <Button type="button" variant="outline" onClick={confirmRealized} className="mt-2 w-full border-ok/40 text-xs text-ok">Conferma intervento realizzato</Button>}
           </>) : null}
            </div>
-      </div>
-      <FoldTabs className="mt-6">
-        <Fold title="Andamento del calore" hint="· 24 h" icon={LineChartIcon}>
-        <Card>
-          <ChartKey items={[{ label: "Calore percepito (°C)", color: "var(--danger)" }]} />
-          <div className="dashboard-chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={hourData} margin={{ top: 8, right: 6, bottom: 0, left: -20 }}><defs><linearGradient id="gw" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="var(--danger)" stopOpacity={0.4} /><stop offset="100%" stopColor="var(--danger)" stopOpacity={0} /></linearGradient></defs><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" /><XAxis dataKey="h" fontSize={10} interval={3} tickMargin={6} /><YAxis width={30} fontSize={10} domain={[15, 35]} tickMargin={4} /><Tooltip {...tip} /><Area type="monotone" dataKey="wbgt" name="Calore percepito" stroke="var(--danger)" strokeWidth={3} fill="url(#gw)" isAnimationActive={animateCharts} animationDuration={1400} animationEasing="ease-out" /></AreaChart></ResponsiveContainer></div>
-        </Card>
-        </Fold>
-        <Fold title="Avvisi calore" icon={AlertTriangle}>
-        <Card className="space-y-2">
-          {[["14:00–17:00", lvl, area], ["12:00–14:00", lvl === "elevato" ? "moderato" : "basso", near], ["Sera", "basso", `Aree verdi · ${area}`]].map(([t, l, p]) => (
-            <div key={p} className="dashboard-alert-row"><div className="min-w-0"><div className="dashboard-long-label font-semibold">{p}</div><div className="text-muted-foreground">{t}</div></div><StatusBadge level={l as string} /></div>
-          ))}
-        </Card>
-        </Fold>
-        <Fold title="Benefici ambientali" hint="· stima annua" icon={Leaf}>
-        <Card className="flex flex-col">
-          <div className="mt-3 grid flex-1 grid-cols-3 gap-2 text-center">
-            <div className="dashboard-tile dashboard-tile-stat rounded-xl bg-muted/50 p-2"><div className="dashboard-tile-value font-display text-lg font-semibold">{`${co2} kg`}</div><div className="dashboard-tile-label text-[10px] leading-tight text-muted-foreground">CO₂ assorbita</div></div>
-            <div className="dashboard-tile dashboard-tile-stat rounded-xl bg-muted/50 p-2"><div className="dashboard-tile-value font-display text-lg font-semibold">{`${water} m³`}</div><div className="dashboard-tile-label text-[10px] leading-tight text-muted-foreground">Acqua trattenuta</div></div>
-            <div className="dashboard-tile dashboard-tile-stat rounded-xl bg-muted/50 p-2"><div className="dashboard-tile-value font-display text-lg font-semibold">{`${shadeM2} m²`}</div><div className="dashboard-tile-label text-[10px] leading-tight text-muted-foreground">Superficie ombreggiata</div></div>
-          </div>
-          <p className="mt-3 text-[11px] text-muted-foreground">Valori dimostrativi: ~22 kg CO₂ per albero, 60% di pioggia trattenuta su suolo permeabile (piovosità 700 mm, piazza di riferimento 4000 m²).</p>
-        </Card>
-        </Fold>
-        <Fold title="Registro interventi" icon={NotebookPen}>
-        <Card>
+        </DashCard>
+      </DashSection>
+      <DashSection title="Registro interventi">
+        <DashCard>
             <form className="grid grid-cols-[minmax(0,1fr)_auto] gap-2" onSubmit={(e) => { e.preventDefault(); if (draft.trim()) { addLog(draft.trim()); setDraft(""); } }}>
               <input value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={140} placeholder="Nuovo intervento…" aria-label="Nuova voce del registro" className="min-w-0 rounded-full bg-muted px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
               <button aria-label="Aggiungi al registro" className="grid size-9 place-items-center rounded-full bg-urban text-primary-foreground"><Plus className="size-4" /></button>
@@ -364,92 +322,27 @@ function UrbanDash() {
               setLog((prev) => prev.filter((_, j) => j !== i));
               toast("Voce eliminata", { description: removed.t, duration: 6000, action: { label: "Annulla", onClick: () => setLog((prev) => { const next = [...prev]; next.splice(Math.min(i, next.length), 0, removed); return next; }) } });
             }} className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"><Trash2 className="size-4" /></button></li>)}</ul>
-        </Card>
+        </DashCard>
           <FieldAI kind="urban" onAdd={addLog} />
-        </Fold>
-      </FoldTabs>
+      </DashSection>
     </div>
   );
 }
 
-/** Soil texture: field capacity cap (% vol) and percolation-loss factor. */
-const SOILS = {
-  sabbioso: { label: "Sabbioso", fc: 20, loss: 1.2 },
-  franco: { label: "Franco", fc: 32, loss: 1 },
-  argilloso: { label: "Argilloso", fc: 42, loss: 0.9 },
-} as const;
+type Notes = { d: string; t: string }[];
+let vineNotes: Notes = [{ d: "24/09", t: "Trattamento rame zona B" }, { d: "26/09", t: "Irrigazione soccorso 90 m³/ha zona A" }];
+const notesSubs = new Set<() => void>();
+const setNotesStore = (n: Notes) => { vineNotes = n; notesSubs.forEach((f) => f()); };
+function useNotes() { return useSyncExternalStore((f) => { notesSubs.add(f); return () => notesSubs.delete(f); }, () => vineNotes, () => vineNotes); }
 
-type Irrig = { tgt: number; eff: number; soil: keyof typeof SOILS; notes: { d: string; t: string }[] };
-let irrig: Irrig = { tgt: 32, eff: 85, soil: "franco", notes: [{ d: "24/09", t: "Trattamento rame zona B" }, { d: "26/09", t: "Irrigazione soccorso 90 m³/ha zona A" }] };
-const irrigSubs = new Set<() => void>();
-const setIrrig = (p: Partial<Irrig>) => { irrig = { ...irrig, ...p }; irrigSubs.forEach((f) => f()); };
-function useIrrig() { return useSyncExternalStore((f) => { irrigSubs.add(f); return () => irrigSubs.delete(f); }, () => irrig, () => irrig); }
-const irrigVolume = (tgt: number, cur: number, eff: number, soil: keyof typeof SOILS) => Math.max(0, ((Math.min(tgt, SOILS[soil].fc) - cur) / 100) * 0.5 * 10000 * SOILS[soil].loss / (eff / 100));
-
-function VineDash() {
-  const animateCharts = useChartAnimation();
-  const vineLab = useLab().vineyard, vm = vineMetrics(vineLab);
-  const cur = vm.moisture;
-  const setCur = (value: number) => { const delta = value - cur; setVineyard((v) => ({ zones: v.zones.map((z) => ({ ...z, moisture: Math.max(0, Math.min(60, z.moisture + delta)) })) })); };
-  const ir = useIrrig();
-  const { tgt, eff, soil, notes } = ir;
-  const setTgt = (n: number) => setIrrig({ tgt: n }), setEff = (n: number) => setIrrig({ eff: n }), setSoil = (k: keyof typeof SOILS) => setIrrig({ soil: k });
-  const setNotes = (u: Irrig["notes"] | ((p: Irrig["notes"]) => Irrig["notes"])) => setIrrig({ notes: typeof u === "function" ? u(irrig.notes) : u });
-  const soilInfo = SOILS[soil];
-  const effTgt = Math.min(tgt, soilInfo.fc);
-  const vol = Math.max(0, ((effTgt - cur) / 100) * 0.5 * 10000 * soilInfo.loss / (eff / 100));
-  const deficit = Math.max(0, tgt - cur);
-  const cwsi = +Math.min(1, Math.max(0, deficit / Math.max(tgt, 1) * 0.5 + vm.waterStress / 200)).toFixed(2);
-  const cwsiLevel = cwsi < 0.35 ? "basso" : cwsi < 0.65 ? "moderato" : "elevato";
-  const shift = cur - days.at(-1)!.s20;
-  const probeData = days.map((p, i) => {
-    const w = i / (days.length - 1);
-    return { d: p.d, s20: +(p.s20 + shift * w).toFixed(1), s50: +(p.s50 + shift * 0.6 * w).toFixed(1) };
-  });
-  const ripeData = ripe.map((r, i) => ({
-    w: r.w,
-    zuccheri: +(r.zuccheri + i * deficit * 0.02 * (eff / 100)).toFixed(1),
-    polifenoli: +(r.polifenoli + i * (deficit < 15 ? deficit * 0.015 : (30 - deficit) * 0.015)).toFixed(1),
-  }));
+/** Premium records of the vineyard: the field notebook and the AI plan. */
+function VineRecords() {
+  const notes = useNotes();
+  const setNotes = (u: Notes | ((p: Notes) => Notes)) => setNotesStore(typeof u === "function" ? u(vineNotes) : u);
   const [txt, setTxt] = useState("");
   return (
-    <div className="dashboard-view" data-testid="dashboard-vitivinicola">
-      <div className="mb-3 grid grid-cols-3 gap-2 sm:mb-4 sm:gap-4">
-        {vineLab.zones.map((z, i) => { const s = Math.round(vm.results[i]?.s ?? 0); const lv = vm.results[i]?.risk ?? "basso"; return (
-          <Card key={i} className={`min-w-0 space-y-1.5 p-2.5 sm:p-5 ${i === vineLab.selected ? "ring-2 ring-inset ring-vine" : ""}`}>
-            <div className="flex flex-wrap items-center justify-between gap-1"><b className="text-sm">Zona {i + 1}</b><StatusBadge level={lv}>{s}</StatusBadge></div>
-            <div className="text-xs text-muted-foreground"><b className="text-foreground">{z.temperature}°C</b> · <b className="text-foreground">{z.moisture}%</b><span className="hidden sm:inline"> · {z.wind} km/h · pioggia {z.rain ? "sì" : "no"}</span></div>
-          </Card>); })}
-      </div>
-      <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        <Kpi value={cwsi} max={1} color={levelColor(cwsi * 100)} center={cwsi} unit="su 1" label="Sete della vite"><StatusBadge level={cwsiLevel}>{cwsiLevel}</StatusBadge></Kpi>
-        <Kpi value={probeData.at(-1)!.s20} max={55} color="var(--water)" center={`${probeData.at(-1)!.s20}%`} unit="umidità" label="Sonda 20 cm" />
-        <Kpi value={probeData.at(-1)!.s50} max={55} color="var(--urban)" center={`${probeData.at(-1)!.s50}%`} unit="umidità" label="Sonda 50 cm" />
-      </div>
-      <p className="mt-3 text-xs text-muted-foreground">Valori dimostrativi che seguono la simulazione. Sete della vite: 0 = nessuna, 1 = massima.</p>
-      <FoldTabs className="mt-6">
-        <Fold title="Irrigazione di soccorso" icon={Droplets}>
-        <Card className="space-y-4">
-          {[["Umidità attuale", cur, setCur, `${cur}%`], ["Umidità obiettivo", tgt, setTgt, `${tgt}%`], ["Efficienza impianto", eff, setEff, `${eff}%`]].map(([l, v, s, lab]) => (
-            <div key={l as string}><div className="dashboard-control-label"><span>{l as string}</span><b>{lab as string}</b></div><Slider min={l === "Efficienza impianto" ? 50 : 5} max={l === "Efficienza impianto" ? 100 : 50} value={[v as number]} onValueChange={([x]) => (s as (n: number) => void)(x ?? 0)} /></div>
-          ))}
-          <div><div className="dashboard-control-label"><span>Tessitura del suolo</span><b>max {soilInfo.fc}%</b></div>
-            <div role="radiogroup" aria-label="Tessitura del suolo" className="mt-2 grid grid-cols-3 gap-1 rounded-full bg-muted p-1">
-              {(Object.keys(SOILS) as (keyof typeof SOILS)[]).map((k) => (
-                <button key={k} type="button" role="radio" aria-checked={soil === k} onClick={() => setSoil(k)} className={`rounded-full px-2 py-1.5 text-xs font-semibold ${soil === k ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`}>{SOILS[k].label}</button>
-              ))}
-            </div>
-          </div>
-          <div className="rounded-2xl bg-water/10 p-4">
-            <div className="text-xs text-muted-foreground">Volume consigliato (strato 50 cm · {soilInfo.label.toLowerCase()})</div>
-            <div className="font-display text-4xl font-semibold text-water">{Math.round(vol)} <span className="text-base">m³/ha</span></div>
-            {effTgt < tgt && <p className="mt-1 text-xs text-muted-foreground">Obiettivo limitato a {soilInfo.fc}%: oltre la capacità di campo l'acqua si perde.</p>}
-            <button type="button" disabled={vol <= 0} onClick={() => { const z = vineLab.selected != null ? ` zona ${vineLab.selected + 1}` : ""; setNotes((prev) => [{ d: new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }), t: `Irrigazione soccorso ${Math.round(vol)} m³/ha${z} (suolo ${soilInfo.label.toLowerCase()})` }, ...prev]); toast.success("Aggiunto al quaderno"); }} className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-water px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"><Plus className="size-3.5" /> Invia al quaderno</button>
-          </div>
-        </Card>
-        </Fold>
-        <Fold title="Quaderno di campagna" icon={NotebookPen}>
-        <Card>
+      <DashSection title="Quaderno di campagna">
+        <DashCard>
           <form className="grid grid-cols-[minmax(0,1fr)_auto] gap-2" onSubmit={(e) => { e.preventDefault(); if (!txt.trim()) return; setNotes([{ d: new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }), t: txt }, ...notes]); setTxt(""); }}>
             <input value={txt} onChange={(e) => setTxt(e.target.value)} placeholder="Nuova operazione…" className="min-w-0 rounded-full bg-muted px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
             <button className="grid size-9 place-items-center rounded-full bg-vine text-primary-foreground"><Plus className="size-4" /></button>
@@ -459,26 +352,9 @@ function VineDash() {
             setNotes((prev) => prev.filter((_, j) => j !== i));
             toast("Nota eliminata", { description: removed.t, duration: 6000, action: { label: "Annulla", onClick: () => setNotes((prev) => { const next = [...prev]; next.splice(Math.min(i, next.length), 0, removed); return next; }) } });
           }} className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"><Trash2 className="size-4" /></button></li>)}</ul>
-        </Card>
+        </DashCard>
         <FieldAI onAdd={(t) => setNotes((prev) => [{ d: new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }), t }, ...prev])} />
-        </Fold>
-        <Fold title="Sonde e maturazione" hint="· 14 giorni e 10 settimane" icon={LineChartIcon}>
-        <Card><div className="dashboard-card-title">Sonde umidità multilivello <span>· 14 giorni</span></div>
-          <ChartKey items={[{ label: "20 cm", color: "var(--water)" }, { label: "50 cm", color: "var(--urban)" }, { label: `Obiettivo ${tgt}%`, color: "var(--vine)" }]} />
-          <div className="dashboard-chart dashboard-chart-compact"><ResponsiveContainer width="100%" height="100%"><LineChart data={probeData} margin={{ top: 8, right: 6, bottom: 0, left: -20 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" /><XAxis dataKey="d" fontSize={10} interval={1} tickMargin={6} /><YAxis width={30} fontSize={10} domain={[0, 55]} tickMargin={4} /><Tooltip {...tip} /><ReferenceLine y={tgt} stroke="var(--vine)" strokeDasharray="6 4" /><Line dataKey="s20" name="20 cm" stroke="var(--water)" strokeWidth={3} dot={false} isAnimationActive={animateCharts} animationDuration={600} animationEasing="ease-out" /><Line dataKey="s50" name="50 cm" stroke="var(--urban)" strokeWidth={3} dot={false} isAnimationActive={animateCharts} animationDuration={600} animationEasing="ease-out" /></LineChart></ResponsiveContainer></div>
-        </Card>
-        <Card><div className="dashboard-card-title">Curve di maturazione <span>· confronto</span></div>
-          <ChartKey items={[{ label: "Zuccheri (°Bx)", color: "var(--warn)" }, { label: "Polifenoli (idx)", color: "var(--vine)" }]} />
-          <div className="dashboard-chart dashboard-chart-compact"><ResponsiveContainer width="100%" height="100%"><LineChart data={ripeData} margin={{ top: 8, right: 6, bottom: 0, left: -20 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" /><XAxis dataKey="w" fontSize={10} tickMargin={6} /><YAxis width={30} fontSize={10} domain={[0, 35]} tickMargin={4} /><Tooltip {...tip} /><Line dataKey="zuccheri" name="Zuccheri (°Bx)" stroke="var(--warn)" strokeWidth={3} dot={false} isAnimationActive={animateCharts} animationDuration={600} animationEasing="ease-out" /><Line dataKey="polifenoli" name="Polifenoli (idx)" stroke="var(--vine)" strokeWidth={3} dot={false} isAnimationActive={animateCharts} animationDuration={600} animationEasing="ease-out" /></LineChart></ResponsiveContainer></div>
-        </Card>
-        </Fold>
-        <Fold title="Bilancio idrico del territorio" hint="· m³" icon={Waves}>
-        <Card><ChartKey items={[{ label: "Domanda", color: "var(--warn)" }, { label: "Disponibile", color: "var(--water)" }]} />
-          <div className="dashboard-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={WATER_BALANCE} margin={{ top: 8, right: 6, bottom: 0, left: -14 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" /><XAxis dataKey="m" fontSize={10} tickMargin={6} /><YAxis width={38} fontSize={10} tickMargin={4} /><Tooltip {...tip} /><Bar dataKey="domanda" name="Domanda" fill="var(--warn)" radius={[8, 8, 0, 0]} isAnimationActive={animateCharts} /><Bar dataKey="disponibile" name="Disponibile" fill="var(--water)" radius={[8, 8, 0, 0]} isAnimationActive={animateCharts} /></BarChart></ResponsiveContainer></div>
-        </Card>
-        </Fold>
-      </FoldTabs>
-    </div>
+      </DashSection>
   );
 }
 
@@ -501,7 +377,6 @@ function ProgressRing({ pct }: { pct: number }) {
 
 /** "Esporta" della scheda aperta: PDF, copia, stampa, GeoJSON e CSV (prima nel cruscotto esecutivo). */
 function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
-  const water = WATER_BALANCE;
   const labState = useLab(), um = urbanMetrics(labState.urban), vm = vineMetrics(labState.vineyard);
   const reportMedia = useLabMedia(ctx === "Urbano" ? "urban" : "vineyard");
   // Every AI camera scan of this flow, photo or not.
@@ -548,25 +423,16 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
     ["ΔT atteso", `−${um.est.lo.toFixed(1)} / −${um.est.hi.toFixed(1)} °C`],
     ["Costo stimato", uCost],
   ];
-  const ir = useIrrig();
-  const vCur = vm.moisture, vTgt = ir.tgt, vEff = ir.eff;
-  const vDeficit = Math.max(0, vTgt - vCur);
-  const vCwsi = +Math.min(1, Math.max(0, vDeficit / Math.max(vTgt, 1) * 0.5 + vm.waterStress / 200)).toFixed(2);
-  const vCwsiLevel = vCwsi < 0.35 ? "basso" : vCwsi < 0.65 ? "moderato" : "elevato";
-  const vShift = vCur - days.at(-1)!.s20;
-  const vVol = irrigVolume(vTgt, vCur, vEff, ir.soil);
+  const notes = useNotes();
+  const vThirst = Math.round(vm.results.reduce((t, r) => t + r.s, 0) / Math.max(1, vm.results.length));
   const vineDashRows: [string, string][] = [
     ["Area", v.location.label],
-    ["Fase fenologica", v.phase],
-    ["Sete della vite (0–1)", `${vCwsi} — stress ${vCwsiLevel}`],
-    ["Sonda 20 cm", `${+(days.at(-1)!.s20 + vShift).toFixed(1)}%`],
-    ["Sonda 50 cm", `${+(days.at(-1)!.s50 + vShift * 0.6).toFixed(1)}%`],
-    ["Irrigazione di soccorso", `${Math.round(vVol)} m³/ha (obiettivo ${Math.min(vTgt, SOILS[ir.soil].fc)}%, efficienza ${vEff}%)`],
-    ["Tessitura del suolo", `${SOILS[ir.soil].label} (capacità di campo ${SOILS[ir.soil].fc}%)`],
-    ...ir.notes.slice(0, 6).map((n): [string, string] => [`Quaderno ${n.d}`, n.t]),
-    ...v.zones.map((z, i): [string, string] => [`Zona ${i + 1}`, `stress ${Math.round(vm.results[i]?.s ?? 0)} (${vm.results[i]?.risk ?? "-"})`]),
+    ["Fase della vite", v.phase],
+    ["Sete delle viti (media, 0–100)", `${vThirst} — ${vThirst >= 65 ? "sete forte" : vThirst >= 35 ? "da tenere d'occhio" : "le viti stanno bene"}`],
+    ...v.zones.map((z, i): [string, string] => [`Zona ${i + 1}`, `sete ${Math.round(vm.results[i]?.s ?? 0)} · ${Math.round(z.temperature)} °C · ${Math.round(z.moisture)}% acqua`]),
+    ...notes.slice(0, 6).map((n): [string, string] => [`Quaderno ${n.d}`, n.t]),
   ];
-  const text = [`MICRO DIGITAL TWIN`, `REPORT SINTETICO DECISIONI — ${ctx}`, `Data: ${stamp}`, "", "Valori dalle simulazioni:", ...labRows.map(([k, x]) => `- ${k}: ${x}`), "", "Indici normalizzati:", ...idx.map(([k, x]) => `- ${k}: ${x}/100 (${lv(x as number)})`), "", ...(ctx === "Urbano" ? ["Dashboard Urbana:", ...urbanDashRows.map(([k, x]) => `- ${k}: ${x}`)] : ["Bilancio idrico (m³):", ...water.map((w) => `- ${w.m}: domanda ${w.domanda}, disponibile ${w.disponibile}, saldo ${w.disponibile - w.domanda}`), "", "Dashboard Vitivinicola:", ...vineDashRows.map(([k, x]) => `- ${k}: ${x}`)]), ...(scanRows.length ? ["", "Scansioni fotocamera AI:", ...scanRows.map(([k, x]) => `- ${k}: ${x}`)] : []), "", "Nota: valori dimostrativi, da validare con un tecnico."].join("\n");
+  const text = [`MICRO DIGITAL TWIN`, `REPORT SINTETICO DECISIONI — ${ctx}`, `Data: ${stamp}`, "", "Valori dalle simulazioni:", ...labRows.map(([k, x]) => `- ${k}: ${x}`), "", "Indici normalizzati:", ...idx.map(([k, x]) => `- ${k}: ${x}/100 (${lv(x as number)})`), "", ...(ctx === "Urbano" ? ["Dashboard Urbana:", ...urbanDashRows.map(([k, x]) => `- ${k}: ${x}`)] : ["Dashboard Vitivinicola:", ...vineDashRows.map(([k, x]) => `- ${k}: ${x}`)]), ...(scanRows.length ? ["", "Scansioni fotocamera AI:", ...scanRows.map(([k, x]) => `- ${k}: ${x}`)] : []), "", "Nota: valori dimostrativi, da validare con un tecnico."].join("\n");
   // Report PDF con intestazione del sito e grafica coerente con l'app (usato da Scarica e Stampa).
   async function buildPdfImpl() {
     await step("Preparazione del report…", 5);
@@ -642,27 +508,6 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
     y += 38;
     section("Valori dalle simulazioni");
     table(labRows);
-    // Grafico a barre del bilancio idrico (solo report vitivinicolo).
-    if (ctx === "Vitivinicolo") {
-    section("Bilancio idrico territoriale (m3)");
-    ensure(58);
-    const chH = 40, chY = y + 2, maxV = 700, gw = CW / water.length;
-    doc.setDrawColor(...C.line); doc.setFontSize(7); doc.setTextColor(...C.muted);
-    [0, 350, 700].forEach((t) => { const ly = chY + chH - (t / maxV) * chH; doc.line(M + 8, ly, M + CW, ly); doc.text(String(t), M + 6, ly + 1, { align: "right" }); });
-    water.forEach((w, i) => {
-      const bx = M + 8 + i * ((CW - 8) / water.length) + 6, bw = ((CW - 8) / water.length - 12) / 2;
-      const hd = (w.domanda / maxV) * chH, ha = (w.disponibile / maxV) * chH;
-      doc.setFillColor(...C.warn); doc.roundedRect(bx, chY + chH - hd, bw - 1, hd, 1, 1, "F");
-      doc.setFillColor(...C.water); doc.roundedRect(bx + bw, chY + chH - ha, bw - 1, ha, 1, 1, "F");
-      doc.setTextColor(...C.muted); doc.text(w.m, bx + bw, chY + chH + 4, { align: "center" });
-    });
-    void gw;
-    y = chY + chH + 9;
-    doc.setFontSize(8);
-    doc.setFillColor(...C.warn); doc.circle(M + 10, y - 1, 1.3, "F"); doc.setTextColor(...C.ink); doc.text("Domanda", M + 13, y);
-    doc.setFillColor(...C.water); doc.circle(M + 34, y - 1, 1.3, "F"); doc.text("Disponibile", M + 37, y);
-    y += 9;
-    }
     await step("Compilazione delle tabelle…", 25);
     if (ctx === "Urbano") { section("Dashboard Urbana"); table(urbanDashRows); }
     else { section("Dashboard Vitivinicola"); table(vineDashRows); }
@@ -902,7 +747,7 @@ function Dashboard() {
       </div>
       <div key={t} className="min-w-0">{loading
         ? <DashboardLoading label={t === "Piazza" ? "dashboard della piazza" : "dashboard del vigneto"} tone={t === "Piazza" ? "urban" : "vine"} />
-        : <div className="dashboard-content-enter">{t === "Piazza" ? <UrbanDash /> : <VineDash />}</div>}
+        : <div className="dashboard-content-enter">{t === "Piazza" ? <PiazzaDashboard records={<UrbanRecords />} /> : <VineDashboard records={<VineRecords />} />}</div>}
       </div>
     </div>
   );
