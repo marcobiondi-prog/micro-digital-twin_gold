@@ -95,8 +95,11 @@ export function HeroButton({ icon: Icon, label, onClick, showLabel }: { icon: Lu
   );
 }
 
-/** PS pill tabs ("PS Blog | Official News"): the open one on a slate pill, the others plain white; one swipeable row. */
-export function TabRow<T extends string>({ items, value, onChange, label }: { items: ReadonlyArray<{ id: T; label: string; icon?: LucideIcon }>; value: T; onChange: (v: T) => void; label: string }) {
+/**
+ * PS pill tabs ("PS Blog | Official News"): the open one on a slate pill, the others plain white; one swipeable row.
+ * With `fill` the pills share the full width in equal parts (few tabs, no scrolling).
+ */
+export function TabRow<T extends string>({ items, value, onChange, label, fill }: { items: ReadonlyArray<{ id: T; label: string; icon?: LucideIcon }>; value: T; onChange: (v: T) => void; label: string; fill?: boolean }) {
   const active = useRef<HTMLButtonElement>(null);
   const row = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -107,12 +110,13 @@ export function TabRow<T extends string>({ items, value, onChange, label }: { it
     r.scrollTo({ left: a.offsetLeft - (r.clientWidth - a.offsetWidth) / 2, behavior: reduce ? "auto" : "smooth" });
   }, [value]);
   return (
-    <div ref={row} role="tablist" aria-label={label} className="no-scrollbar relative -mx-4 flex snap-x gap-1.5 overflow-x-auto px-4 touch-pan-x">
+    <div ref={row} role="tablist" aria-label={label} className={cn("no-scrollbar relative flex gap-1.5", fill ? "w-full" : "-mx-4 snap-x overflow-x-auto px-4 touch-pan-x")}>
       {items.map(({ id, label: l, icon: Icon }) => {
         const on = id === value;
         return (
           <button key={id} ref={on ? active : undefined} type="button" role="tab" aria-selected={on} onClick={() => onChange(id)}
-            className={cn("inline-flex h-11 shrink-0 snap-center items-center gap-2 whitespace-nowrap rounded-full px-5 text-[15px] font-semibold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
+            className={cn("inline-flex h-11 snap-center items-center gap-2 whitespace-nowrap rounded-full px-5 text-[15px] font-semibold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
+              fill ? "min-w-0 flex-1 justify-center" : "shrink-0",
               on ? "bg-secondary text-secondary-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]" : "text-foreground/85 hover:bg-foreground/[0.06]")}>
             {Icon && <Icon className="size-4" aria-hidden="true" />}{l}
           </button>

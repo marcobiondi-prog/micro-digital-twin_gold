@@ -743,7 +743,7 @@ function Dashboard() {
       {/* v8: a big thin title with the report on the right, then the PS pills. */}
       <PageHero title="Dashboard" actions={<ExportReport ctx={t === "Piazza" ? "Urbano" : "Vitivinicolo"} />} />
       <div className="sticky top-[var(--nav-h)] transition-[top] duration-300 z-[999999998] isolate -mx-4 mb-5 mt-3 min-w-0 bg-background/80 px-4 py-2 backdrop-blur-xl sm:mb-6">
-        <TabRow label="Dashboard" items={[{ id: "Piazza", label: "Piazza", icon: Building2 }, { id: "Vigneto", label: "Vigneto", icon: Grape }]} value={t} onChange={setT} />
+        <TabRow fill label="Dashboard" items={[{ id: "Piazza", label: "Piazza", icon: Building2 }, { id: "Vigneto", label: "Vigneto", icon: Grape }]} value={t} onChange={setT} />
       </div>
       <div key={t} className="min-w-0">{loading
         ? <DashboardLoading label={t === "Piazza" ? "dashboard della piazza" : "dashboard del vigneto"} tone={t === "Piazza" ? "urban" : "vine"} />
