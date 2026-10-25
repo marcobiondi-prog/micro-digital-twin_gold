@@ -15,7 +15,7 @@ import { syncAppOrientation } from "@/lib/ar-orientation";
 import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
 import { installUiClicks } from "@/lib/ui-sounds";
 import { reloadFresh } from "@/router";
-import { Home, Building2, Grape, LayoutDashboard } from "lucide-react";
+import { Map as MapIcon, Building2, Grape, LayoutDashboard } from "lucide-react";
 
 function NotFoundComponent() {
   return (
@@ -103,7 +103,7 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 const nav = [
-  { to: "/", l: "Home" },
+  { to: "/mappa", l: "Mappa" },
   { to: "/urbano", l: "Simulazione urbana" },
   { to: "/vigneto", l: "Simulazione vigneto" },
   { to: "/dashboard", l: "Dashboard" },
@@ -112,7 +112,7 @@ const nav = [
 const NAV_H = 49;
 
 const bottomItems = [
-  { to: "/", l: "Home", I: Home },
+  { to: "/mappa", l: "Mappa", I: MapIcon },
   { to: "/urbano", l: "Urbano", I: Building2 },
   { to: "/vigneto", l: "Vigneto", I: Grape },
   { to: "/dashboard", l: "Dashboard", I: LayoutDashboard },
@@ -321,7 +321,7 @@ function SmartNav() {
           >
             <div className="flex items-center gap-1">
               {nav.map((n) => (
-                <Link key={n.to} to={n.to} activeOptions={{ exact: n.to === "/" }}
+                <Link key={n.to} to={n.to}
                   aria-current={pathname === n.to ? "page" : undefined}
                   replace={pathname !== "/"}
                   onClick={(e) => { if (goHomeBack(e, n.to, pathname)) return; centerTapped(e.currentTarget, pathname === n.to); }}
