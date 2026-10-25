@@ -1,7 +1,11 @@
 import { useRef, useState } from "react";
-import { CloudRain, Leaf, Minus, Plus, RotateCcw, Sprout, Sun, TreePine, Umbrella, Wallet, type LucideIcon } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { CloudRain, Leaf, Minus, Plus, Ruler, RotateCcw, Sprout, Sun, TreePine, Umbrella, Wallet, type LucideIcon } from "lucide-react";
 import { comparison, piazzaEstimate, type PrototypeId } from "@/models/scenarios";
 import { setUrban, useLab } from "@/models/lab-store";
+import { REFERENCE_M2, euroRange, grouped, interventionCost } from "@/models/intervention-cost";
+import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { GAIN_BG, GAIN_TEXT } from "@/views/v7/studio-ui";
 import { hapticTick } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
@@ -81,7 +85,8 @@ function Lever({ icon: Icon, label, value, step, max, color, swatch, cooling, on
 
 /**
  * v9 "C · Termometro": no grid. Pick a ready piazza or move the three levers; a big gauge with a dot shows how hot
- * the piazza feels and says it in words, a chip tells what the last touch gained, and four cards give benefits and cost.
+ * the piazza feels and says it in words, a chip tells what the last touch gained; then the estimated cost (total and per m²)
+ * on the place's measured surface, and three small cards with the yearly benefits.
  */
 export function UrbanThermometer() {
   const urban = useLab().urban;
@@ -92,10 +97,17 @@ export function UrbanThermometer() {
   const feel = feeling(after);
   const preset = PRESETS.find((p) => p.trees === urban.trees && p.permeable === urban.permeable && p.shade === urban.shade)?.id ?? null;
   const level = comparison.find((l) => l.id === (preset ?? levelOf(est.dT))) ?? comparison[0]!;
-  // Same yearly estimates as the dashboard (reference piazza of 4000 m², 700 mm of rain).
+  // The real surface of the chosen place, measured on its mapped shape; without one, the reference piazza (said so).
+  const fetchArea = useServerFn(getPlaceArea);
+  const { lat, lng } = urban.location;
+  const area = useQuery({ queryKey: ["place-area", lat, lng], queryFn: () => fetchArea({ data: { lat, lng } }), staleTime: Infinity, retry: 1 });
+  const measured = area.data?.m2 ?? null;
+  const m2 = measured ?? REFERENCE_M2;
+  const cost = interventionCost(m2, urban.trees, urban.permeable, urban.shade);
+  // Same yearly estimates as the dashboard, on this surface (700 mm of rain, 60 % kept by permeable ground).
   const co2 = Math.round(urban.trees * 22);
-  const water = Math.round(4000 * (urban.permeable / 100) * 0.7 * 0.6);
-  const shadeM2 = Math.round(4000 * (urban.shade / 100) + urban.trees * 30);
+  const water = Math.round(m2 * (urban.permeable / 100) * 0.7 * 0.6);
+  const shadeM2 = Math.round(m2 * (urban.shade / 100) + urban.trees * 30);
 
   // The last change, shown as a short-lived chip ("−0,3°") so every touch answers.
   const [delta, setDelta] = useState<{ v: number; k: number } | null>(null);
@@ -111,11 +123,12 @@ export function UrbanThermometer() {
   };
 
   const facts: Array<{ icon: LucideIcon; value: string; label: string }> = [
-    { icon: Leaf, value: `${co2} kg`, label: "CO₂ assorbita" },
-    { icon: CloudRain, value: `${water} m³`, label: "Pioggia trattenuta" },
-    { icon: Sun, value: `${shadeM2} m²`, label: "All'ombra" },
-    { icon: Wallet, value: level.cost, label: level.s },
+    { icon: Leaf, value: `${co2} kg`, label: "CO₂ l'anno" },
+    { icon: CloudRain, value: `${water} m³`, label: "Pioggia tenuta" },
+    { icon: Sun, value: `${grouped(shadeM2)} m²`, label: "All'ombra" },
   ];
+  const surface = area.isPending ? "…" : `${grouped(m2)} m²`;
+  const surfaceNote = area.isPending ? "Misuro la piazza…" : measured ? "Superficie della piazza" : "Superficie di riferimento";
 
   return (
     <section className="fuse-canvas space-y-5 rounded-t-3xl px-3 pb-6 pt-4 text-foreground sm:px-5" aria-label="Termometro della piazza">
@@ -157,11 +170,28 @@ export function UrbanThermometer() {
         <Lever icon={Umbrella} label="Ombra" value={urban.shade} step={10} max={100} color="text-urban" swatch="bg-urban" cooling={urban.shade * 0.03} onChange={(v) => change({ shade: v })} />
       </div>
 
-      <dl className="grid grid-cols-2 gap-2">
+      <div className="rounded-3xl bg-foreground/[0.05] p-4" aria-live="polite">
+        <div className="flex items-start gap-3">
+          <Wallet className="mt-0.5 size-6 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-muted-foreground">Costo stimato dell'intervento · {level.s}</p>
+            <p className="font-display text-3xl font-light tabular-nums">{euroRange(cost.total)}</p>
+            <p className="mt-1 font-mono text-base font-semibold tabular-nums">{Math.round(cost.perM2.lo)}–{Math.round(cost.perM2.hi)} € al m²</p>
+          </div>
+        </div>
+        <div className="mt-3 flex items-center gap-2 border-t border-foreground/10 pt-3 text-sm">
+          <Ruler className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <span className="font-mono font-semibold tabular-nums">{surface}</span>
+          <span className="truncate text-muted-foreground">{surfaceNote}</span>
+        </div>
+        <p className="mt-2 text-[11px] leading-snug text-muted-foreground">Stima indicativa, IVA esclusa: albero 600–1.500 € l'uno, prato 60–140 €/m², ombra 120–350 €/m².</p>
+      </div>
+
+      <dl className="grid grid-cols-3 gap-2">
         {facts.map(({ icon: Icon, value, label }) => (
-          <div key={label} className="flex items-center gap-3 rounded-2xl bg-foreground/[0.05] p-3">
-            <Icon className="size-6 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <div className="flex min-w-0 flex-col-reverse"><dt className="truncate text-xs text-muted-foreground">{label}</dt><dd className="font-mono text-lg font-semibold tabular-nums">{value}</dd></div>
+          <div key={label} className="flex min-w-0 flex-col items-center gap-1 rounded-2xl bg-foreground/[0.05] px-1 py-3 text-center">
+            <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <div className="flex min-w-0 flex-col-reverse"><dt className="truncate text-[11px] text-muted-foreground">{label}</dt><dd className="font-mono text-sm font-semibold tabular-nums">{value}</dd></div>
           </div>
         ))}
       </dl>
