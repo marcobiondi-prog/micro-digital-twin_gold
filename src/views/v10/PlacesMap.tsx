@@ -1,8 +1,13 @@
-import { useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { ArrowRight, Building2, Grape, MapPin } from "lucide-react";
+import { ArrowRight, Building2, Grape, Lock, MapPin } from "lucide-react";
+import { useSignedIn } from "@/lib/use-signed-in";
+import { openAccount } from "@/lib/camera-dock";
+import { cn } from "@/lib/utils";
 import { useLab } from "@/models/lab-store";
 import { Ambient, PageHero, TabRow, openSimTab } from "@/views/v8/console";
+
+const LocationMap3D = lazy(() => import("@/views/LocationMap3D").then((m) => ({ default: m.LocationMap3D })));
 
 type Place = "urban" | "vineyard";
 const PLACES: ReadonlyArray<{ id: Place; label: string; icon: typeof Building2 }> = [
@@ -27,6 +32,13 @@ export function PlacesMap() {
   const src = key
     ? `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(key)}&q=${encodeURIComponent(q)}&zoom=${zoom}&maptype=satellite&language=it`
     : `https://maps.google.com/maps?q=${encodeURIComponent(q)}&z=${zoom}&t=k&hl=it&output=embed`;
+  // 2D (the embed) is the default; 3D (photorealistic, needs the browser key) opens only for signed-in users:
+  // guests see the switch with a lock, and touching it offers the sign-in.
+  const { signedIn } = useSignedIn();
+  const [view, setView] = useState<"2d" | "3d">("2d");
+  const [hint, setHint] = useState(false);
+  useEffect(() => { if (!signedIn) setView("2d"); else setHint(false); }, [signedIn]);
+  const show3d = view === "3d" && signedIn && Boolean(key);
   const go = (tab: "simula" | "luogo") => {
     openSimTab(place, tab);
     void navigate({ to: place === "urban" ? "/urbano" : "/vigneto", replace: true });
@@ -35,9 +47,32 @@ export function PlacesMap() {
     <div className="space-y-4">
       <Ambient tone="rgb(120 130 150 / 0.22)" />
       <PageHero title="Mappa" />
-      <TabRow label="Luogo da vedere" items={PLACES} value={place} onChange={setPlace} />
-      <div data-map-gestures className="-mx-4 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
-        <iframe key={src} title={`Mappa di ${name}`} src={src} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" className="block h-[44vh] min-h-64 w-full border-0" />
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1"><TabRow label="Luogo da vedere" items={PLACES} value={place} onChange={setPlace} /></div>
+        {key && (
+          <div role="group" aria-label="Vista della mappa" className="flex shrink-0 rounded-full bg-foreground/[0.08] p-1">
+            {(["2d", "3d"] as const).map((v) => {
+              const locked = v === "3d" && !signedIn, on = view === v && !locked;
+              return (
+                <button key={v} type="button" aria-pressed={on} aria-label={locked ? "3D: accedi per usarla" : v === "2d" ? "2D" : "3D"}
+                  onClick={() => { if (locked) setHint(true); else { setHint(false); setView(v); } }}
+                  className={cn("inline-flex h-10 min-w-12 items-center justify-center gap-1 rounded-full px-3 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", on ? "bg-foreground text-background" : "text-foreground/80")}>
+                  {locked && <Lock className="size-3.5" aria-hidden="true" />}{v === "2d" ? "2D" : "3D"}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      {hint && !signedIn && (
+        <p role="status" className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">La vista 3D è per chi ha fatto l'accesso.
+          <button type="button" onClick={openAccount} className="font-semibold text-foreground underline underline-offset-4">Accedi</button>
+        </p>
+      )}
+      <div className="-mx-4 h-[44vh] min-h-64 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
+        {show3d && key
+          ? <Suspense fallback={<div className="h-full w-full bg-card" />}><LocationMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} apiKey={key} /></Suspense>
+          : <iframe key={src} data-map-gestures title={`Mappa di ${name}`} src={src} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" className="block h-full w-full border-0" />}
       </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="flex min-w-0 flex-1 items-start gap-3">
