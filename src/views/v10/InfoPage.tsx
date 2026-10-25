@@ -1,7 +1,23 @@
-import type { ReactNode } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { createContext, useContext, type ReactNode } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { openAccount } from "@/lib/camera-dock";
+
+/** The account panel's pages. */
+export type InfoPath = "/piani" | "/faq" | "/privacy/cookie" | "/privacy/informativa" | "/privacy/preferenze" | "/legale/licenze" | "/legale/termini";
+
+/**
+ * Set by the account panel when it shows a page inside itself: back returns to the panel's list (the panel stays open)
+ * and links between pages open the other page in place.
+ */
+export const InfoNav = createContext<{ back: () => void; open: (to: InfoPath) => void } | null>(null);
+
+/** A link to another account page: inside the panel it opens there, on its own route it navigates. */
+export function PageLink({ to, children }: { to: InfoPath; children: ReactNode }) {
+  const nav = useContext(InfoNav);
+  const cls = "font-semibold underline underline-offset-4";
+  return nav ? <button type="button" onClick={() => nav.open(to)} className={cls}>{children}</button> : <Link to={to} className={cls}>{children}</Link>;
+}
 
 /**
  * A plain reading page opened from the account panel (FAQ, privacy, legal): a back arrow and a title on top,
@@ -9,19 +25,20 @@ import { openAccount } from "@/lib/camera-dock";
  */
 export function InfoPage({ title, intro, children }: { title: string; intro?: ReactNode; children: ReactNode }) {
   const navigate = useNavigate();
+  const nav = useContext(InfoNav);
   // These pages are opened from the account panel: the arrow goes back and opens the panel again, to pick another one.
-  const back = () => {
+  const back = nav ? nav.back : () => {
     if ((window.history.state?.__TSR_index ?? 0) > 0) window.history.back();
     else void navigate({ to: "/mappa", replace: true });
     window.setTimeout(openAccount, 350);
   };
   return (
-    <article className="mx-auto max-w-2xl space-y-4">
+    <article className={nav ? "space-y-4" : "mx-auto max-w-2xl space-y-4"}>
       <div className="flex items-center gap-3">
         <button type="button" onClick={back} aria-label="Indietro" className="grid size-11 shrink-0 place-items-center rounded-full outline-none hover:bg-foreground/[0.08] focus-visible:ring-2 focus-visible:ring-ring">
           <ArrowLeft className="size-6" aria-hidden="true" />
         </button>
-        <h1 className="min-w-0 font-display text-3xl font-light tracking-tight sm:text-4xl">{title}</h1>
+        <h1 className={nav ? "min-w-0 font-display text-2xl font-light tracking-tight" : "min-w-0 font-display text-3xl font-light tracking-tight sm:text-4xl"}>{title}</h1>
       </div>
       {intro && <p className="text-[15px] leading-relaxed text-muted-foreground">{intro}</p>}
       {children}

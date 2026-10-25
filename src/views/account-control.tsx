@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ComponentType, type FormEvent } from "react";
 import { LogOut, UserRound, Mail, LockKeyhole, Camera, ShieldCheck, ChevronRight } from "lucide-react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
+import { InfoNav, type InfoPath } from "@/views/v10/InfoPage";
+import { pushBackGuard } from "@/hooks/use-back-close";
+import { CookiePage, FaqPage, LicensesPage, PlansPage, PrivacyPage, PrivacyPrefsPage, TermsPage } from "@/views/v10/legal-pages";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { getMyAdminStatus } from "@/controllers/admin.functions";
@@ -57,8 +60,12 @@ function authMessage(error: { code?: string | undefined; message: string }) {
 }
 
 
-/** The account panel's help, privacy and legal pages. */
-const LINK_GROUPS: Array<{ title: string; links: Array<[string, "/piani" | "/faq" | "/privacy/cookie" | "/privacy/informativa" | "/privacy/preferenze" | "/legale/licenze" | "/legale/termini"]> }> = [
+/** The account panel's plans, help, privacy and legal pages, shown inside the panel. */
+const PAGES: Record<InfoPath, ComponentType> = {
+  "/piani": PlansPage, "/faq": FaqPage, "/privacy/cookie": CookiePage, "/privacy/informativa": PrivacyPage,
+  "/privacy/preferenze": PrivacyPrefsPage, "/legale/licenze": LicensesPage, "/legale/termini": TermsPage,
+};
+const LINK_GROUPS: Array<{ title: string; links: Array<[string, InfoPath]> }> = [
   { title: "Piani", links: [["Free e Premium", "/piani"]] },
   { title: "Aiuto", links: [["Domande frequenti", "/faq"]] },
   { title: "Privacy", links: [["Informativa sui cookie", "/privacy/cookie"], ["Informativa sulla privacy", "/privacy/informativa"], ["Preferenze privacy", "/privacy/preferenze"]] },
@@ -263,27 +270,56 @@ export function AccountControl() {
     finally { setPending(false); }
   };
 
-  // Close the panel first (its Back entry leaves history), then open the page: navigating at once would be undone by that Back.
-  const navigateTo = useNavigate();
-  const openPage = (to: (typeof LINK_GROUPS)[number]["links"][number][1]) => {
-    setOpen(false);
-    window.setTimeout(() => void navigateTo({ to }), 320);
+  // The pages open inside the panel, which stays open: the arrow, a swipe to the right or the phone's Back return to the list.
+  const [page, setPage] = useState<InfoPath | null>(null);
+  const openPage = (to: InfoPath) => {
+    if (!page) window.history.pushState({ ...(window.history.state ?? {}), __panel: true, __accountPage: true }, "");
+    setPage(to);
+    document.querySelector(".account-panel")?.scrollTo({ top: 0 });
   };
+  const closePage = () => { if (window.history.state?.__accountPage) window.history.back(); else setPage(null); };
+  // While a page shows, the Back gesture returns to the list instead of closing the panel.
+  useEffect(() => (page ? pushBackGuard(() => { setPage(null); return true; }) : undefined), [page]);
+  const changeOpen = (next: boolean) => {
+    // Closing with a page open drops its history step too (the panel's own step goes with the panel).
+    if (!next && page) { setPage(null); if (window.history.state?.__accountPage) window.history.back(); }
+    setOpen(next);
+  };
+  const swipe = useRef<{ x: number; y: number } | null>(null);
+  const [dragX, setDragX] = useState(0);
+  const premiumPlan = demo || Boolean(account && !account.guest);
   const changeMode = (next: typeof mode) => { setMode(next); setNotice(""); setPassword(""); };
 
   const displayedAvatar = (choice === "upload" ? draftPreview ?? avatarUrl : suggestions.find((item) => item.id === choice)?.src ?? account?.googleAvatar) ?? undefined;
   const avatar = (size: string) => <Avatar className={`${size} border border-border bg-muted`}><AvatarImage src={displayedAvatar} alt="Immagine account" referrerPolicy="no-referrer" className="object-cover" /><AvatarFallback><UserRound className="size-1/2" aria-hidden="true" /></AvatarFallback></Avatar>;
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={changeOpen}>
         <Button ref={triggerRef} variant="outline" size="icon" className="size-9 shrink-0 rounded-full sm:size-10" aria-label="Apri account" title="Account" onClick={() => setOpen(true)}>
           {avatar("size-9 sm:size-10")}
         </Button>
       <DialogContent ref={placePanel} overlayClassName="account-overlay" className="account-panel flex max-h-[min(680px,90dvh)] w-[min(420px,calc(100vw-2rem))] flex-col gap-0 overflow-y-auto rounded-lg border bg-popover p-0 text-popover-foreground shadow-xl sm:rounded-lg">
+        {page ? (() => {
+          const Page = PAGES[page];
+          return (
+            // A page inside the panel: it slides in, follows a finger dragging it to the right and goes back past 70 px.
+            <div className="touch-pan-y px-5 py-5 animate-in fade-in-0 slide-in-from-right-6 duration-200 motion-reduce:animate-none"
+              style={{ transform: dragX ? `translateX(${dragX}px)` : undefined, transition: dragX ? "none" : "transform 200ms ease" }}
+              onTouchStart={(e) => { const t = e.touches[0]; if (t && e.touches.length === 1) swipe.current = { x: t.clientX, y: t.clientY }; }}
+              onTouchMove={(e) => { const t = e.touches[0], s0 = swipe.current; if (!t || !s0) return; const dx = t.clientX - s0.x, dy = t.clientY - s0.y; if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 12) { swipe.current = null; setDragX(0); return; } if (dx > 0) setDragX(dx); }}
+              onTouchEnd={(e) => { const t = e.changedTouches[0], s0 = swipe.current; swipe.current = null; setDragX(0); if (t && s0 && t.clientX - s0.x > 70) closePage(); }}
+              onTouchCancel={() => { swipe.current = null; setDragX(0); }}>
+              <DialogTitle className="sr-only">Account</DialogTitle>
+              <InfoNav.Provider value={{ back: closePage, open: openPage }}><Page /></InfoNav.Provider>
+            </div>
+          );
+        })() : (<>
         <DialogHeader className="border-b px-6 py-5 text-left">
           <div className="mb-2">{avatar("size-10")}</div>
           <DialogTitle className="text-xl">Account</DialogTitle>
           <DialogDescription>{account ? account.email : demo ? "Accesso simulato (solo anteprima)" : "Accedi o continua come ospite."}</DialogDescription>
+          {/* The plan in use, at a glance (Premium is free with an account). */}
+          <p className="pt-1"><span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${premiumPlan ? "bg-primary text-primary-foreground" : "bg-foreground/[0.08] text-foreground"}`}>Piano {premiumPlan ? "Premium" : "Free"}</span></p>
         </DialogHeader>
         <div className="space-y-6 px-6 py-6">
           {mode !== "reset" && <section className="space-y-3" aria-label="Immagine account">
@@ -344,9 +380,11 @@ export function AccountControl() {
                 <ul>
                   {g.links.map(([label, to]) => (
                     <li key={to}>
-                      <Link to={to} onClick={(e) => { e.preventDefault(); openPage(to); }} className="flex min-h-12 items-center justify-between gap-3 rounded-xl text-[15px] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
-                        {label}<ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                      </Link>
+                      <button type="button" onClick={() => openPage(to)} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl text-left text-[15px] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+                        <span className="min-w-0 flex-1">{label}</span>
+                        {to === "/piani" && <span className="shrink-0 text-sm text-muted-foreground">Il tuo: {premiumPlan ? "Premium" : "Free"}</span>}
+                        <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -356,6 +394,7 @@ export function AccountControl() {
           {/* Twin closes the panel: still (no animation, no name), smiling. */}
           <TwinStill className="mx-auto block h-16 w-auto" />
         </div>
+        </>)}
       </DialogContent>
     </Dialog>
   );

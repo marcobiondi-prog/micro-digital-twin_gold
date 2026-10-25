@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { Link } from "@tanstack/react-router";
 import { comparison, nextPhase, prototypeChoice } from "@/models/scenarios";
 import { UNIT_COST, grouped } from "@/models/intervention-cost";
 import { VINE_UNIT_COST } from "@/models/vine-interventions";
 import { introSeen } from "@/lib/intro-seen";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { Check, X } from "lucide-react";
-import { Faq, InfoCard, InfoPage } from "./InfoPage";
+import { Faq, InfoCard, InfoPage, PageLink } from "./InfoPage";
 
 const eur = (n: number) => `${grouped(n)} €`;
 const level = (id: string) => comparison.find((l) => l.id === id)!;
@@ -65,10 +64,10 @@ export function FaqPage() {
           <p>{nextPhase}</p>
         </Faq>
         <Faq q="Da dove vengono i dati?">
-          <p>Il calore e la temperatura di ogni stagione e ora sono la media dell'ultimo anno nel luogo scelto; la superficie viene misurata sulla forma del luogo disegnata sulla mappa. Quando un dato reale non è disponibile l'app lo dice e usa una stima. Le fonti sono elencate in <Link to="/legale/licenze" className="font-semibold underline underline-offset-4">Licenze</Link>.</p>
+          <p>Il calore e la temperatura di ogni stagione e ora sono la media dell'ultimo anno nel luogo scelto; la superficie viene misurata sulla forma del luogo disegnata sulla mappa. Quando un dato reale non è disponibile l'app lo dice e usa una stima. Le fonti sono elencate in <PageLink to="/legale/licenze">Licenze</PageLink>.</p>
         </Faq>
         <Faq q="I miei dati vengono salvati?">
-          <p>Come ospite le simulazioni, le foto e i video restano su questo dispositivo. Con un account vengono salvati nel tuo spazio personale, visibile solo a te. I dettagli sono nell'<Link to="/privacy/informativa" className="font-semibold underline underline-offset-4">Informativa sulla privacy</Link>.</p>
+          <p>Come ospite le simulazioni, le foto e i video restano su questo dispositivo. Con un account vengono salvati nel tuo spazio personale, visibile solo a te. I dettagli sono nell'<PageLink to="/privacy/informativa">Informativa sulla privacy</PageLink>.</p>
         </Faq>
       </div>
     </InfoPage>
@@ -92,7 +91,7 @@ export function CookiePage() {
           <li>le foto e i video caricati come ospite;</li>
           <li>una copia dell'app per usarla anche senza rete.</li>
         </ul>
-        <p>Puoi cancellare tutto in <Link to="/privacy/preferenze" className="font-semibold underline underline-offset-4">Preferenze privacy</Link>.</p>
+        <p>Puoi cancellare tutto in <PageLink to="/privacy/preferenze">Preferenze privacy</PageLink>.</p>
       </InfoCard>
       <InfoCard title="Mappe">
         <p>Quando apri una mappa interattiva, il servizio che la fornisce può usare propri cookie tecnici, secondo la sua informativa.</p>
