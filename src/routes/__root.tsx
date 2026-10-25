@@ -6,6 +6,7 @@ import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useHomeFocus } from "@/lib/home-focus";
 import { THEME_DARK, ThemeToggle, themeBootScript } from "@/views/theme-toggle";
 import { AccountControl } from "@/views/account-control";
 import { TwinMascot } from "@/views/TwinMascot";
@@ -14,7 +15,7 @@ import { syncAppOrientation } from "@/lib/ar-orientation";
 import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
 import { installUiClicks } from "@/lib/ui-sounds";
 import { reloadFresh } from "@/router";
-import { Home, Building2, Grape, LayoutDashboard } from "lucide-react";
+import { Map as MapIcon, Building2, Grape, LayoutDashboard } from "lucide-react";
 
 function NotFoundComponent() {
   return (
@@ -102,7 +103,7 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 const nav = [
-  { to: "/", l: "Home" },
+  { to: "/mappa", l: "Mappa" },
   { to: "/urbano", l: "Simulazione urbana" },
   { to: "/vigneto", l: "Simulazione vigneto" },
   { to: "/dashboard", l: "Dashboard" },
@@ -111,7 +112,7 @@ const nav = [
 const NAV_H = 49;
 
 const bottomItems = [
-  { to: "/", l: "Home", I: Home },
+  { to: "/mappa", l: "Mappa", I: MapIcon },
   { to: "/urbano", l: "Urbano", I: Building2 },
   { to: "/vigneto", l: "Vigneto", I: Grape },
   { to: "/dashboard", l: "Dashboard", I: LayoutDashboard },
@@ -197,8 +198,13 @@ function BottomNav() {
   };
   const index = bottomItems.findIndex((b) => b.to === pathname);
   const current = bottomItems[index];
+  // On Home the bar points at the tile selected there: the light slides under Urbano or Vigneto, or the camera lights up.
+  const homeFocus = useHomeFocus();
+  const focusing = pathname === "/" && homeFocus !== null;
+  const focusCol = homeFocus === "urban" ? 1 : homeFocus === "vine" ? 3 : null;
   // The selection light rides the edge of the lower crescent: grid column (the camera owns column 2), its height on the curve and the tangent's tilt.
-  const light = index < 0 ? null : PS_LIGHT[index < 2 ? index : index + 1];
+  const light = focusing ? (focusCol === null ? null : PS_LIGHT[focusCol]) : index < 0 ? null : PS_LIGHT[index < 2 ? index : index + 1];
+  const caption = focusing ? (homeFocus === "camera" ? "Fotocamera AI" : homeFocus === "urban" ? "Urbano" : "Vigneto") : current?.l ?? "";
   return (
     <nav aria-label="Menu principale" className={`ps-nav fixed inset-x-0 bottom-0 z-[999999998] transition-transform duration-300 motion-reduce:transition-none sm:hidden ${hidden ? "translate-y-full" : "translate-y-0"}`}>
       {/* PlayStation-app slab: a frosted slate arch for the icons with a darker crescent laid over its foot; a straight light slides along the crescent's edge under the open page, whose name sits in the crescent; the AI camera rises in the middle. */}
@@ -218,10 +224,10 @@ function BottomNav() {
         {light && <span className="ps-nav-light" style={{ left: light.left, top: light.top, "--ps-tilt": light.tilt } as CSSProperties} aria-hidden="true" />}
         <ul className="relative grid grid-cols-5 items-start pt-6">
           {bottomItems.slice(0, 2).map((b, i) => item(b, i))}
-          <li className="flex justify-center"><CameraDockButton /></li>
+          <li className="flex justify-center"><CameraDockButton focused={focusing && homeFocus === "camera"} /></li>
           {bottomItems.slice(2).map((b, i) => item(b, i + 2))}
         </ul>
-        <p className="relative h-8 text-center text-[13px] font-medium leading-8 tracking-wide text-white/90" aria-hidden="true">{current?.l ?? ""}</p>
+        <p className="relative h-8 text-center text-[13px] font-medium leading-8 tracking-wide text-white/90" aria-hidden="true">{caption}</p>
       </div>
       <div className="absolute inset-x-0 bottom-0 h-[env(safe-area-inset-bottom)] bg-[#0e1014]" aria-hidden="true" />
     </nav>
@@ -315,7 +321,7 @@ function SmartNav() {
           >
             <div className="flex items-center gap-1">
               {nav.map((n) => (
-                <Link key={n.to} to={n.to} activeOptions={{ exact: n.to === "/" }}
+                <Link key={n.to} to={n.to}
                   aria-current={pathname === n.to ? "page" : undefined}
                   replace={pathname !== "/"}
                   onClick={(e) => { if (goHomeBack(e, n.to, pathname)) return; centerTapped(e.currentTarget, pathname === n.to); }}

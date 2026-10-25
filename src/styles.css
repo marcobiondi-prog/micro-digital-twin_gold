@@ -1988,3 +1988,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   background-position: top center;
   background-attachment: fixed;
 }
+
+/* Home has the camera tile selected: the centre button glows brighter, like the light under the other items. */
+.ps-nav-camera[data-focus] { box-shadow: 0 0 0 2.5px #fff, 0 0 28px 6px rgb(140 190 255 / 0.85), 0 10px 22px rgb(0 0 0 / 0.45); transform: translateY(-2px); }
+@media (prefers-reduced-motion: reduce) { .ps-nav-camera[data-focus] { transform: none; } }
