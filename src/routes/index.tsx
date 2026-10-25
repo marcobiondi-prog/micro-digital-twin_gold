@@ -7,6 +7,8 @@ import { useSignedIn } from "@/lib/use-signed-in";
 import { useInstalledApp } from "@/lib/installed-app";
 import aiLogo from "@/assets/ai-logo.png";
 import { applySharedScenario } from "@/views/ScenarioTools";
+import { setHomeFocus } from "@/lib/home-focus";
+import { hapticTick } from "@/lib/haptics";
 import { Ambient } from "@/views/v8/console";
 
 export const Route = createFileRoute("/")({
@@ -84,16 +86,28 @@ function Index() {
   // Swipe the picture to move between the three, like the PS5 home row.
   const swipe = useRef<{ x: number; y: number } | null>(null);
   const tiles = useRef<Array<HTMLButtonElement | null>>([]);
-  const move = (d: number) => setSel((i) => (i + d + items.length) % items.length);
+  const move = (d: number) => { hapticTick(); setSel((i) => (i + d + items.length) % items.length); };
+  // The bottom bar points at the selected tile while Home is open, and stops when Home closes.
+  useEffect(() => { setHomeFocus(item.id); }, [item.id]);
+  useEffect(() => () => setHomeFocus(null), []);
+  // A sideways swipe anywhere on Home (pan-y keeps vertical scrolling) moves between the three, like the PS5 row.
+  const onSwipeStart = (e: React.PointerEvent) => { swipe.current = { x: e.clientX, y: e.clientY }; };
+  const onSwipeEnd = (e: React.PointerEvent) => {
+    const s = swipe.current; swipe.current = null;
+    if (!s) return;
+    const dx = e.clientX - s.x;
+    if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(e.clientY - s.y) * 1.5) { swiped.current = true; move(dx < 0 ? 1 : -1); }
+  };
+  // A swipe that ends on a tile must not also open it.
+  const swiped = useRef(false);
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="mx-auto max-w-5xl touch-pan-y" onPointerDown={onSwipeStart} onPointerUp={onSwipeEnd} onPointerCancel={() => { swipe.current = null; }}
+      onClickCapture={(e) => { if (swiped.current) { swiped.current = false; e.stopPropagation(); e.preventDefault(); } }}>
       <h1 className="sr-only">Micro Digital Twin</h1>
       <Ambient tone={item.tone} />
       {/* PS5 home: a big picture of the selected item, a row of square tiles, then its name, one line and one white button. */}
       {/* Phones: the picture fades in from the page's ambient light at the top (the header wears the same light) and back into the page at the bottom. */}
-      <div className="home-art relative -mx-4 -mt-6 aspect-[4/3] max-h-[46vh] w-[calc(100%+2rem)] overflow-hidden sm:mx-0 sm:mt-0 sm:aspect-[21/9] sm:w-full sm:rounded-3xl"
-        onPointerDown={(e) => { swipe.current = { x: e.clientX, y: e.clientY }; }}
-        onPointerUp={(e) => { const s = swipe.current; swipe.current = null; if (!s) return; const dx = e.clientX - s.x; if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(e.clientY - s.y)) move(dx < 0 ? 1 : -1); }}>
+      <div className="home-art relative -mx-4 -mt-6 aspect-[4/3] max-h-[46vh] w-[calc(100%+2rem)] overflow-hidden sm:mx-0 sm:mt-0 sm:aspect-[21/9] sm:w-full sm:rounded-3xl">
         <div key={item.id} className="absolute inset-0 animate-in fade-in-0 zoom-in-[1.03] duration-500 motion-reduce:animate-none"><Art id={item.id} /></div>
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,transparent_45%,var(--background))] sm:block max-sm:hidden" aria-hidden="true" />
       </div>
@@ -103,14 +117,15 @@ function Index() {
           const on = i === sel;
           return (
             <button key={it.id} ref={(el) => { tiles.current[i] = el; }} type="button" role="tab" aria-selected={on} tabIndex={on ? 0 : -1} aria-label={it.name}
-              onClick={() => (on ? open(it) : setSel(i))}
+              onClick={() => { if (on) open(it); else { hapticTick(); setSel(i); } }}
               className={`ps5-tile relative grid shrink-0 place-items-center overflow-hidden rounded-2xl text-white outline-none ${it.tile} ${on ? "ps5-tile-on size-24 sm:size-28" : "size-[4.5rem] opacity-80 sm:size-20"}`}>
               {it.id === "camera" && ai ? <span className="grid size-full place-items-center bg-white"><img src={aiLogo} alt="" aria-hidden="true" className="size-14" /></span> : <it.Icon className={on ? "size-11" : "size-8"} aria-hidden="true" />}
             </button>
           );
         })}
       </div>
-      <div key={item.id} className="mt-5 animate-in fade-in-0 slide-in-from-bottom-1 duration-300 motion-reduce:animate-none" role="tabpanel">
+      <div className="mt-3 flex gap-1.5" aria-hidden="true">{items.map((it, i) => <span key={it.id} className={`h-1.5 rounded-full transition-all duration-300 motion-reduce:transition-none ${i === sel ? "w-6 bg-foreground" : "w-1.5 bg-foreground/30"}`} />)}</div>
+      <div key={item.id} className="mt-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-300 motion-reduce:animate-none" role="tabpanel">
         <p className="text-sm font-medium text-muted-foreground">{item.name}</p>
         <h2 className="mt-1 font-display text-3xl font-light leading-tight tracking-tight text-foreground sm:text-4xl">{item.title}</h2>
         <p className="mt-2 max-w-prose text-[15px] leading-relaxed text-muted-foreground">{item.desc}</p>

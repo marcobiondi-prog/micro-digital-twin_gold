@@ -20,14 +20,15 @@ function useAiReady() {
 }
 
 /** Fotocamera al centro della barra ad arco, rialzata e luminosa (logo AI dopo l'accesso); apre il pannello con tutte le opzioni. */
-export function CameraDockButton() {
+/** `focused`: Home has the camera tile selected, so the button glows brighter to show where it leads. */
+export function CameraDockButton({ focused = false }: { focused?: boolean }) {
   const { aiReady } = useAiReady();
   return (
     <button
       type="button"
       onClick={() => setCameraSheetOpen(true)}
       aria-label={aiReady ? "Fotocamera AI e altre opzioni" : "Fotocamera: foto, video e galleria"}
-      className="ps-nav-camera camera-dock-button" data-ai={aiReady || undefined}
+      className="ps-nav-camera camera-dock-button" data-ai={aiReady || undefined} data-focus={focused || undefined}
     >
       {aiReady
         ? <img src={aiLogo} alt="" aria-hidden="true" draggable={false} className="size-8 select-none" />

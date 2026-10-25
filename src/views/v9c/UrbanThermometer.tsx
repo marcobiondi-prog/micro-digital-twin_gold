@@ -107,30 +107,25 @@ function Gauge({ before, after, lowest, min: MIN, max: MAX, marks, onSlide, onSl
   );
 }
 
-/**
- * One intervention: big − / +, its icon and name, a row of ten marks that fill as it grows (the quantity is seen,
- * not read) and how many degrees it takes away on its own.
- */
-function Lever({ icon: Icon, label, value, step, max, color, swatch, cooling, onChange }: { icon: LucideIcon; label: string; value: number; step: number; max: number; color: string; swatch: string; cooling: number; onChange: (v: number) => void }) {
+/** One intervention on one line: − / +, its icon, name and value, and ten marks that fill as it grows. */
+function Lever({ icon: Icon, label, value, step, max, color, swatch, onChange }: { icon: LucideIcon; label: string; value: number; step: number; max: number; color: string; swatch: string; onChange: (v: number) => void }) {
   const set = (v: number) => { const n = clamp(v, 0, max); if (n !== value) { hapticTick(); onChange(n); } };
   const filled = Math.round((value / max) * MARKS);
-  const unit = step === 1 ? "" : "%";
-  const btn = "grid size-14 shrink-0 place-items-center rounded-2xl bg-foreground/[0.07] text-foreground outline-none transition-[background-color,transform] duration-150 hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring active:scale-90 disabled:opacity-30 motion-reduce:active:scale-100";
+  const btn = "grid size-12 shrink-0 place-items-center rounded-2xl bg-foreground/[0.07] text-foreground outline-none transition-[background-color,transform] duration-150 hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring active:scale-90 disabled:opacity-30 motion-reduce:active:scale-100";
   return (
-    <div className="flex items-center gap-3 rounded-3xl bg-foreground/[0.04] p-3" role="group" aria-label={label}>
-      <button type="button" className={btn} onClick={() => set(value - step)} disabled={value <= 0} aria-label={`Meno ${label.toLowerCase()}`}><Minus className="size-6" aria-hidden="true" /></button>
+    <div className="flex items-center gap-3" role="group" aria-label={label}>
+      <button type="button" className={btn} onClick={() => set(value - step)} disabled={value <= 0} aria-label={`Meno ${label.toLowerCase()}`}><Minus className="size-5" aria-hidden="true" /></button>
       <div className="min-w-0 flex-1" aria-live="polite">
         <div className="flex items-center gap-2">
-          <Icon className={cn("size-6 shrink-0", color)} aria-hidden="true" />
-          <span className="truncate text-base font-semibold">{label}</span>
-          <span className="ml-auto shrink-0 font-mono text-sm font-semibold tabular-nums">{value}{unit}</span>
+          <Icon className={cn("size-5 shrink-0", color)} aria-hidden="true" />
+          <span className="truncate text-[15px] font-semibold">{label}</span>
+          <span className="ml-auto shrink-0 font-mono text-sm font-semibold tabular-nums">{value}{step === 1 ? "" : "%"}</span>
         </div>
-        <div className="mt-2 grid grid-cols-10 gap-1" aria-hidden="true">
-          {Array.from({ length: MARKS }, (_, k) => <span key={k} className={cn("h-2.5 rounded-full transition-colors duration-200 motion-reduce:transition-none", k < filled ? swatch : "bg-foreground/10")} />)}
+        <div className="mt-1.5 grid grid-cols-10 gap-1" aria-hidden="true">
+          {Array.from({ length: MARKS }, (_, k) => <span key={k} className={cn("h-2 rounded-full transition-colors duration-200 motion-reduce:transition-none", k < filled ? swatch : "bg-foreground/10")} />)}
         </div>
-        <p className="mt-1.5 text-xs text-muted-foreground">−{fmt(cooling)} °C da sola</p>
       </div>
-      <button type="button" className={btn} onClick={() => set(value + step)} disabled={value >= max} aria-label={`Più ${label.toLowerCase()}`}><Plus className="size-6" aria-hidden="true" /></button>
+      <button type="button" className={btn} onClick={() => set(value + step)} disabled={value >= max} aria-label={`Più ${label.toLowerCase()}`}><Plus className="size-5" aria-hidden="true" /></button>
     </div>
   );
 }
@@ -144,6 +139,7 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
   const urban = useLab().urban;
   const [info, setInfo] = useState(false);
   const [costOpen, setCostOpen] = useState(false);
+  const [whenOpen, setWhenOpen] = useState(false);
   // Is the gauge on screen? When not, a compact reading stays pinned under the tabs.
   const gaugeRef = useRef<HTMLDivElement>(null);
   const [gaugeSeen, setGaugeSeen] = useState(true);
@@ -232,30 +228,7 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
 
   return (
     <section className="fuse-canvas space-y-5 rounded-t-3xl px-3 pb-6 pt-4 text-foreground sm:px-5" aria-label="Termometro della piazza">
-      {/* When: the season and the hour, synced with the device clock until changed by hand ("Adesso" goes back to it). */}
-      <div className="space-y-2" role="group" aria-label="Stagione e ora">
-        <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 touch-pan-x" role="radiogroup" aria-label="Stagione">
-          {SEASONS.map((s) => (
-            <button key={s} type="button" role="radio" aria-checked={season === s} onClick={() => { hapticTick(); setLive(false); setSeason(s); }}
-              className={cn("h-10 shrink-0 rounded-full px-4 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", season === s ? "bg-secondary text-secondary-foreground" : "text-foreground/80 hover:bg-foreground/[0.06]")}>{SEASON_LABEL[s]}</button>
-          ))}
-        </div>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={() => { hapticTick(); setLive(false); setHour((h) => (h + 23) % 24); }} aria-label="Un'ora prima" className="grid size-11 shrink-0 place-items-center rounded-full bg-foreground/[0.07] outline-none focus-visible:ring-2 focus-visible:ring-ring"><ChevronLeft className="size-5" aria-hidden="true" /></button>
-          <span className="flex min-w-0 flex-1 items-center justify-center gap-2" aria-live="polite">
-            <Clock className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <span className="font-mono text-xl font-semibold tabular-nums">{String(hour).padStart(2, "0")}:00</span>
-          </span>
-          <button type="button" onClick={() => { hapticTick(); setLive(false); setHour((h) => (h + 1) % 24); }} aria-label="Un'ora dopo" className="grid size-11 shrink-0 place-items-center rounded-full bg-foreground/[0.07] outline-none focus-visible:ring-2 focus-visible:ring-ring"><ChevronRight className="size-5" aria-hidden="true" /></button>
-          <button type="button" aria-pressed={live} onClick={() => { hapticTick(); setLive(true); }}
-            className={cn("inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", live ? "bg-foreground text-background" : "bg-foreground/[0.07]")}>
-            <span className={cn("size-2 rounded-full", live ? "bg-ok animate-pulse motion-reduce:animate-none" : "bg-muted-foreground")} aria-hidden="true" />Adesso
-          </button>
-        </div>
-        <p className="text-center text-[11px] text-muted-foreground">{climate.isPending ? "Leggo l'anno del luogo…" : realBefore !== null ? "Calore percepito medio dell'ultimo anno in questo luogo" : "Stima indicativa: i dati reali del luogo non sono disponibili"}</p>
-      </div>
-
-      {/* The three levels side by side, each with its own result and cost: this is the comparison, one touch applies it. */}
+      {/* 1 · The three levels: the comparison itself, one touch applies it; the nearest one follows the slider. */}
       <div>
         <div className="mb-2 flex items-center justify-between gap-2">
           <h3 className="text-sm font-semibold">Scegli un livello</h3>
@@ -278,13 +251,12 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
             );
           })}
         </div>
-        {onImportWeather && <div className="mt-2"><ImportWeatherButton onImport={onImportWeather} /></div>}
       </div>
 
       {/* The simulation stays the focus: once the gauge scrolls away, its reading rides under the tabs. */}
       <div aria-hidden={gaugeSeen} className={cn("pointer-events-none sticky top-[calc(var(--nav-h)+3.75rem)] z-[999999996] -mb-5 flex h-0 justify-center transition-opacity duration-200 motion-reduce:transition-none", gaugeSeen ? "opacity-0" : "opacity-100")}>
         <button type="button" tabIndex={gaugeSeen ? -1 : 0} onClick={() => gaugeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
-          className="pointer-events-auto mt-1 flex h-11 items-center gap-2 rounded-full bg-card/95 px-4 shadow-lg ring-1 ring-foreground/10 backdrop-blur" style={{ pointerEvents: gaugeSeen ? "none" : "auto" }}>
+          className="mt-1 flex h-11 items-center gap-2 rounded-full bg-card/95 px-4 shadow-lg ring-1 ring-foreground/10 backdrop-blur" style={{ pointerEvents: gaugeSeen ? "none" : "auto" }}>
           <span className={cn("size-2.5 rounded-full", feel.bg ?? GAIN_BG[feel.step])} aria-hidden="true" />
           <span className="font-display text-xl font-light tabular-nums">{fmt(after)}°</span>
           <span className="text-sm text-muted-foreground">{feel.text}</span>
@@ -292,6 +264,7 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
         </button>
       </div>
 
+      {/* 2 · The gauge: drag the white dot to choose how much to cool. */}
       <div ref={gaugeRef} className="relative mx-auto flex max-w-[22rem] flex-col items-center">
         <Gauge before={before} after={after} lowest={before - MAX_GAIN * share} min={dialMin} max={dialMax} onSlide={slideTo} onSlideStart={startSlide}
           marks={PRESETS.map((p) => ({ id: p.id, t: before - piazzaEstimate(p.trees, p.permeable, p.shade).dT * share }))} />
@@ -305,47 +278,72 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
           </span>
         )}
       </div>
-      <p className="-mt-2 text-center text-sm text-muted-foreground">
-        {SEASON_LABEL[season].toLowerCase()} alle {hour}:00 · senza interventi {fmt(before)}° · <b className={cn("font-semibold", GAIN_TEXT[gain])}>−{fmt(gainNow)} °C</b>
-      </p>
-      <p className="-mt-3 text-center text-xs text-muted-foreground">{share > 0 ? "Trascina il punto bianco sull'arco per scegliere quanto rinfrescare" : "A quest'ora non fa caldo: alberi, prato e ombra non hanno calore da togliere"}</p>
 
-      <div className="space-y-2.5">
-        <Lever icon={TreePine} label="Alberi" value={urban.trees} step={1} max={30} color="text-ok" swatch="bg-ok" cooling={urban.trees * 0.25 * share} onChange={(v) => change({ trees: v })} />
-        <Lever icon={Sprout} label="Prato" value={urban.permeable} step={10} max={100} color="text-radar-mild" swatch="bg-radar-mild" cooling={urban.permeable * 0.04 * share} onChange={(v) => change({ permeable: v })} />
-        <Lever icon={Umbrella} label="Ombra" value={urban.shade} step={10} max={100} color="text-urban" swatch="bg-urban" cooling={urban.shade * 0.03 * share} onChange={(v) => change({ shade: v })} />
+      {/* When: one chip under the gauge (season, hour, live dot); touching it opens the season and hour controls. */}
+      <div className="-mt-2 flex flex-col items-center gap-2">
+        <button type="button" onClick={() => setWhenOpen((o) => !o)} aria-expanded={whenOpen} aria-controls="piazza-when"
+          className="inline-flex min-h-10 max-w-full items-center gap-2 rounded-full bg-foreground/[0.06] px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <span className={cn("size-2 shrink-0 rounded-full", live ? "bg-ok animate-pulse motion-reduce:animate-none" : "bg-muted-foreground")} aria-hidden="true" />
+          <span className="truncate"><b className="font-semibold">{SEASON_LABEL[season]}, ore {hour}</b> · senza interventi {fmt(before)}°</span>
+          <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", whenOpen && "rotate-180")} aria-hidden="true" />
+        </button>
+        {share === 0 && <p className="text-center text-xs text-muted-foreground">A quest'ora non fa caldo: non c'è calore da togliere</p>}
+        <div id="piazza-when" hidden={!whenOpen} className="w-full space-y-2 rounded-3xl bg-foreground/[0.04] p-3">
+          <div className="grid grid-cols-4 gap-1" role="radiogroup" aria-label="Stagione">
+            {SEASONS.map((x) => (
+              <button key={x} type="button" role="radio" aria-checked={season === x} onClick={() => { hapticTick(); setLive(false); setSeason(x); }}
+                className={cn("h-10 min-w-0 truncate rounded-full px-1 text-[13px] font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", season === x ? "bg-secondary text-secondary-foreground" : "text-foreground/80 hover:bg-foreground/[0.06]")}>{SEASON_LABEL[x]}</button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => { hapticTick(); setLive(false); setHour((h) => (h + 23) % 24); }} aria-label="Un'ora prima" className="grid size-11 shrink-0 place-items-center rounded-full bg-foreground/[0.07] outline-none focus-visible:ring-2 focus-visible:ring-ring"><ChevronLeft className="size-5" aria-hidden="true" /></button>
+            <span className="flex min-w-0 flex-1 items-center justify-center gap-2" aria-live="polite">
+              <Clock className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <span className="font-mono text-xl font-semibold tabular-nums">{String(hour).padStart(2, "0")}:00</span>
+            </span>
+            <button type="button" onClick={() => { hapticTick(); setLive(false); setHour((h) => (h + 1) % 24); }} aria-label="Un'ora dopo" className="grid size-11 shrink-0 place-items-center rounded-full bg-foreground/[0.07] outline-none focus-visible:ring-2 focus-visible:ring-ring"><ChevronRight className="size-5" aria-hidden="true" /></button>
+            <button type="button" aria-pressed={live} onClick={() => { hapticTick(); setLive(true); }}
+              className={cn("inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", live ? "bg-foreground text-background" : "bg-foreground/[0.07]")}>Adesso</button>
+          </div>
+          <p className="text-center text-[11px] text-muted-foreground">{climate.isPending ? "Leggo l'anno del luogo…" : realBefore !== null ? "Calore percepito medio dell'ultimo anno in questo luogo" : "Stima indicativa: i dati reali del luogo non sono disponibili"}</p>
+          {onImportWeather && <ImportWeatherButton onImport={onImportWeather} />}
+        </div>
       </div>
 
-      {/* The cost folds away: closed it still says the total, open it adds the cost per m², the surface and the unit prices. */}
+      {/* 3 · Fine-tuning by hand. */}
+      <div className="space-y-3">
+        <Lever icon={TreePine} label="Alberi" value={urban.trees} step={1} max={30} color="text-ok" swatch="bg-ok" onChange={(v) => change({ trees: v })} />
+        <Lever icon={Sprout} label="Prato" value={urban.permeable} step={10} max={100} color="text-radar-mild" swatch="bg-radar-mild" onChange={(v) => change({ permeable: v })} />
+        <Lever icon={Umbrella} label="Ombra" value={urban.shade} step={10} max={100} color="text-urban" swatch="bg-urban" onChange={(v) => change({ shade: v })} />
+      </div>
+
+      {/* 4 · Cost and benefits, folded: closed it still says the total. */}
       <div className="rounded-3xl bg-foreground/[0.05]">
         <button type="button" onClick={() => setCostOpen((o) => !o)} aria-expanded={costOpen} aria-controls="piazza-cost-body"
           className="flex w-full items-center gap-3 rounded-3xl p-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <Wallet className="size-6 shrink-0 text-muted-foreground" aria-hidden="true" />
           <span className="min-w-0 flex-1">
-            <span className="block text-xs text-muted-foreground">Costo della tua piazza · {level.s}</span>
+            <span className="block text-xs text-muted-foreground">Costo e benefici · {level.s}</span>
             <span className="block font-display text-2xl font-light tabular-nums" aria-live="polite">{euroRange(cost.total)}</span>
           </span>
           <ChevronDown className={cn("size-5 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", costOpen && "rotate-180")} aria-hidden="true" />
         </button>
-        <div id="piazza-cost-body" hidden={!costOpen} className="px-4 pb-4">
-          <p className="font-mono text-base font-semibold tabular-nums">{Math.round(cost.perM2.lo)}–{Math.round(cost.perM2.hi)} € al m²</p>
-          <div className="mt-3 flex items-center gap-2 border-t border-foreground/10 pt-3 text-sm">
-            <Ruler className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <span className="font-mono font-semibold tabular-nums">{surface}</span>
-            <span className="truncate text-muted-foreground">{surfaceNote}</span>
+        <div id="piazza-cost-body" hidden={!costOpen} className="space-y-3 px-4 pb-4">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            <span className="font-mono font-semibold tabular-nums">{Math.round(cost.perM2.lo)}–{Math.round(cost.perM2.hi)} € al m²</span>
+            <span className="inline-flex items-center gap-1.5 text-muted-foreground"><Ruler className="size-4 shrink-0" aria-hidden="true" />{surface} · {surfaceNote.toLowerCase()}</span>
           </div>
-          <p className="mt-2 text-[11px] leading-snug text-muted-foreground">Stima indicativa, IVA esclusa: albero 600–1.500 € l'uno, prato 60–140 €/m², ombra 120–350 €/m².</p>
+          <dl className="grid grid-cols-3 gap-2 border-t border-foreground/10 pt-3">
+            {facts.map(({ icon: Icon, value, label }) => (
+              <div key={label} className="flex min-w-0 flex-col items-center gap-1 text-center">
+                <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <div className="flex min-w-0 flex-col-reverse"><dt className="truncate text-[11px] text-muted-foreground">{label}</dt><dd className="font-mono text-sm font-semibold tabular-nums">{value}</dd></div>
+              </div>
+            ))}
+          </dl>
+          <p className="text-[11px] leading-snug text-muted-foreground">Stima indicativa, IVA esclusa: albero 600–1.500 € l'uno, prato 60–140 €/m², ombra 120–350 €/m².</p>
         </div>
       </div>
-
-      <dl className="grid grid-cols-3 gap-2">
-        {facts.map(({ icon: Icon, value, label }) => (
-          <div key={label} className="flex min-w-0 flex-col items-center gap-1 rounded-2xl bg-foreground/[0.05] px-1 py-3 text-center">
-            <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <div className="flex min-w-0 flex-col-reverse"><dt className="truncate text-[11px] text-muted-foreground">{label}</dt><dd className="font-mono text-sm font-semibold tabular-nums">{value}</dd></div>
-          </div>
-        ))}
-      </dl>
       {matrix && (
         <Dialog open={info} onOpenChange={setInfo}>
           <DialogContent className="max-h-[calc(100dvh-3rem)] overflow-y-auto sm:max-w-3xl">
