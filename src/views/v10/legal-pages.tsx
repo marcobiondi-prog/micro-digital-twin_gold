@@ -4,6 +4,8 @@ import { comparison, nextPhase, prototypeChoice } from "@/models/scenarios";
 import { UNIT_COST, grouped } from "@/models/intervention-cost";
 import { VINE_UNIT_COST } from "@/models/vine-interventions";
 import { introSeen } from "@/lib/intro-seen";
+import { useSignedIn } from "@/lib/use-signed-in";
+import { Check } from "lucide-react";
 import { Faq, InfoCard, InfoPage } from "./InfoPage";
 
 const eur = (n: number) => `${grouped(n)} €`;
@@ -211,6 +213,44 @@ export function TermsPage() {
       </InfoCard>
       <InfoCard title="Modifiche e legge applicabile">
         <p>I termini possono cambiare: la versione aggiornata è sempre su questa pagina. Si applica la legge italiana; foro competente: [città].</p>
+      </InfoCard>
+    </InfoPage>
+  );
+}
+
+type Plan = { id: string; name: string; who: string; price: string; items: string[] };
+const PLANS: Plan[] = [
+  { id: "base", name: "Base", who: "Per provare", price: "Gratis", items: ["Simulazione della piazza e del vigneto", "Mappa 2D e ricerca dei luoghi", "Foto e video salvati sul dispositivo"] },
+  { id: "premium", name: "Premium", who: "Con un account", price: "Gratis con la registrazione", items: ["Tutto il piano Base", "Fotocamera AI che riconosce piante e terreno", "Mappa 3D e dati da satellite", "Dove mettere i sensori", "Lavoro salvato online e report da esportare"] },
+  { id: "comune", name: "Business · Comuni", who: "Per uffici tecnici e amministrazioni", price: "Su richiesta", items: ["Tutto il piano Premium", "Più piazze e quartieri nello stesso spazio", "Dashboard con stato degli interventi e approvazioni", "Esportazione dei dati per i sistemi del comune", "Prova sul posto con pochi sensori e assistenza"] },
+  { id: "agri", name: "Business · Agricoltura", who: "Per aziende agricole, cantine e cooperative", price: "Su richiesta", items: ["Tutto il piano Premium", "Più vigneti e zone per ogni vigneto", "Quaderno di campagna, sonde e avvisi di sete", "Invio dei dati all'agronomo", "Prova sul campo con pochi sensori e assistenza"] },
+];
+
+/** Plans: what each level of the app offers; the signed-in user's one is marked. */
+export function PlansPage() {
+  const { signedIn } = useSignedIn();
+  const mine = signedIn ? "premium" : "base";
+  return (
+    <InfoPage title="Piani e business" intro="Le simulazioni sono gratuite. Per comuni, aziende agricole e cooperative ci sono piani su misura, con più luoghi, sensori e assistenza.">
+      <div className="space-y-3">
+        {PLANS.map((p) => (
+          <section key={p.id} className={`space-y-3 rounded-3xl p-5 ${p.id === mine ? "bg-foreground/[0.08] shadow-[0_0_0_2px_var(--foreground)]" : "bg-foreground/[0.05]"}`}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-lg font-semibold">{p.name}</h2>
+                <p className="text-sm text-muted-foreground">{p.who}</p>
+              </div>
+              {p.id === mine && <span className="shrink-0 rounded-full bg-foreground px-3 py-1 text-xs font-semibold text-background">Il tuo piano</span>}
+            </div>
+            <p className="font-display text-2xl font-light">{p.price}</p>
+            <ul className="space-y-1.5">
+              {p.items.map((it) => <li key={it} className="flex items-start gap-2 text-[15px]"><Check className="mt-0.5 size-4 shrink-0 text-ok" aria-hidden="true" />{it}</li>)}
+            </ul>
+          </section>
+        ))}
+      </div>
+      <InfoCard title="Richiedi un piano business">
+        <p>Scrivi a [email commerciale] indicando l'ente o l'azienda, i luoghi da seguire e il numero di zone: prepariamo una proposta con costi e tempi.</p>
       </InfoCard>
     </InfoPage>
   );

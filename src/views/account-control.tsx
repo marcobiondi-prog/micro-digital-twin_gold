@@ -58,7 +58,8 @@ function authMessage(error: { code?: string | undefined; message: string }) {
 
 
 /** The account panel's help, privacy and legal pages. */
-const LINK_GROUPS: Array<{ title: string; links: Array<[string, "/faq" | "/privacy/cookie" | "/privacy/informativa" | "/privacy/preferenze" | "/legale/licenze" | "/legale/termini"]> }> = [
+const LINK_GROUPS: Array<{ title: string; links: Array<[string, "/piani" | "/faq" | "/privacy/cookie" | "/privacy/informativa" | "/privacy/preferenze" | "/legale/licenze" | "/legale/termini"]> }> = [
+  { title: "Piani", links: [["Piani e business", "/piani"]] },
   { title: "Aiuto", links: [["Domande frequenti", "/faq"]] },
   { title: "Privacy", links: [["Informativa sui cookie", "/privacy/cookie"], ["Informativa sulla privacy", "/privacy/informativa"], ["Preferenze privacy", "/privacy/preferenze"]] },
   { title: "Legale", links: [["Licenze", "/legale/licenze"], ["Termini di servizio", "/legale/termini"]] },
