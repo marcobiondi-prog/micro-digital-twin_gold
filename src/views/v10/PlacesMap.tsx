@@ -9,6 +9,7 @@ import { useLab } from "@/models/lab-store";
 import { Ambient, PageHero, TabRow, getMapPlace, openSimTab, setMapPlace } from "@/views/v8/console";
 import { PlaceSearch } from "@/views/SimulationGrid";
 
+const OpenMap3D = lazy(() => import("@/views/v10/OpenMap3D").then((m) => ({ default: m.OpenMap3D })));
 const LocationMap3D = lazy(() => import("@/views/LocationMap3D").then((m) => ({ default: m.LocationMap3D })));
 
 type Place = "urban" | "vineyard";
@@ -41,7 +42,8 @@ export function PlacesMap() {
   const [view, setView] = useState<"2d" | "3d">("2d");
   const [hint, setHint] = useState(false);
   useEffect(() => { if (!signedIn) setView("2d"); else setHint(false); }, [signedIn]);
-  const show3d = view === "3d" && signedIn && Boolean(key);
+  // Always both: with the browser key 3D is the photorealistic view, without it an open map with the buildings raised.
+  const show3d = view === "3d" && signedIn;
   const go = () => {
     openSimTab(place, "simula");
     void navigate({ to: place === "urban" ? "/urbano" : "/vigneto", replace: true });
@@ -52,7 +54,6 @@ export function PlacesMap() {
       <PageHero title="Mappa" />
       <div className="flex items-center gap-2">
         <div className="min-w-0 flex-1"><TabRow label="Luogo da vedere" items={PLACES} value={place} onChange={setPlace} /></div>
-        {key && (
           <div role="group" aria-label="Vista della mappa" className="flex shrink-0 rounded-full bg-foreground/[0.08] p-1">
             {(["2d", "3d"] as const).map((v) => {
               const locked = v === "3d" && !signedIn, on = view === v && !locked;
@@ -65,7 +66,6 @@ export function PlacesMap() {
               );
             })}
           </div>
-        )}
       </div>
       {hint && !signedIn && (
         <p role="status" className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">La vista 3D è per chi ha fatto l'accesso.
@@ -77,8 +77,10 @@ export function PlacesMap() {
       {/* The place is chosen here: search it or use the device position; the map follows. */}
       <PlaceSearch key={place} kind={place} />
       <div className="-mx-4 h-[38vh] min-h-60 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
-        {show3d && key
-          ? <Suspense fallback={<div className="h-full w-full bg-card" />}><LocationMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} apiKey={key} /></Suspense>
+        {show3d
+          ? <Suspense fallback={<div className="h-full w-full bg-card" />}>{key
+            ? <LocationMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} apiKey={key} />
+            : <OpenMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={place === "urban" ? 17 : 15} />}</Suspense>
           : <iframe key={src} data-map-gestures title={`Mappa di ${name}`} src={src} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" className="block h-full w-full border-0" />}
       </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
