@@ -10,7 +10,7 @@ export type LabState = {
   syncedAt?: number | null;
   syncedTargets?: string[] | null;
   urban: { trees: number; permeable: number; shade: number; location: Loc; treeCells: number[] | null; permeableCells: number[] | null; shadeCells: number[] | null; realTemp?: number | null };
-  vineyard: { zones: VineZoneState[]; phase: Pheno; selected: number; allZones: boolean; location: Loc; irrigation?: number; shade?: number; windbreak?: number };
+  vineyard: { zones: VineZoneState[]; phase: Pheno; selected: number; allZones: boolean; location: Loc; irrigation?: number; shade?: number; windbreak?: number; climateKey?: string };
 };
 
 const KEY = "micro-digital-twin-lab";

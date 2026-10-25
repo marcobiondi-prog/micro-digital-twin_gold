@@ -8,6 +8,7 @@ import aiLogo from "@/assets/ai-logo.png";
 import { hapticTick } from "@/lib/haptics";
 import { TwinMascot } from "@/views/TwinMascot";
 import { THEME_DARK, THEME_META } from "@/views/theme-toggle";
+import { introSeen, markIntroSeen } from "@/lib/intro-seen";
 
 /**
  * v10 entrance, two pages that stand alone (no header, no menus), black and white over slowly turning heat lines:
@@ -119,7 +120,14 @@ export function Tutorial() {
   const [dragX, setDragX] = useState(0);
   const start = useRef<{ x: number; y: number } | null>(null);
   const [again, setAgain] = useState(false);
-  useEffect(() => { setAgain(fromInfo()); window.scrollTo(0, 0); }, []);
+  // Already seen on this device (and not asked for with the "i"): the root moves on to the map, so draw nothing meanwhile.
+  const [skip, setSkip] = useState(false);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setAgain(fromInfo());
+    setSkip(introSeen() && !params.has("rivedi") && !params.has("scenario"));
+    window.scrollTo(0, 0);
+  }, []);
   const count = STEPS.length + 1;
   const last = page === count - 1;
   const go = (i: number) => {
@@ -143,9 +151,11 @@ export function Tutorial() {
     if (s0 && Math.abs(x - s0.x) > 50) go(page + (x < s0.x ? 1 : -1));
   };
   const finish = () => {
+    markIntroSeen();
     if (again && window.history.length > 1) window.history.back();
     else void navigate({ to: again ? "/mappa" : "/scegli" });
   };
+  if (skip) return <div className="dark h-dvh bg-background" />;
   return (
     <div className="dark relative isolate flex h-dvh flex-col overflow-hidden bg-background text-foreground [color-scheme:dark]"
       onKeyDown={(e) => { if (e.key === "ArrowRight" && !last) { e.preventDefault(); go(page + 1); } if (e.key === "ArrowLeft" && page > 0) { e.preventDefault(); go(page - 1); } }}>
@@ -211,6 +221,7 @@ export function Tutorial() {
 /** The choice (/scegli): one big question, three numbered ways in, one white button and the way to the map. */
 export function Choice() {
   useDarkChrome();
+  useEffect(() => { markIntroSeen(); }, []);
   const navigate = useNavigate();
   const ai = useAiReadyHome();
   const [sel, setSel] = useState(0);

@@ -1,15 +1,14 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronDown, ChevronLeft, ChevronRight, Clock, CloudRain, Leaf, Minus, Plus, Info, Ruler, Sprout, Sun, TreePine, Umbrella, Wallet, type LucideIcon } from "lucide-react";
+import { ChevronDown, CloudRain, Leaf, Minus, Plus,  Ruler, Sprout, Sun, TreePine, Umbrella, Wallet, type LucideIcon } from "lucide-react";
 import { comparison, piazzaEstimate, type PrototypeId } from "@/models/scenarios";
 import { setUrban, useLab } from "@/models/lab-store";
 import { REFERENCE_M2, euroRange, grouped, interventionCost } from "@/models/intervention-cost";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
-import { getSeasonalClimate } from "@/controllers/climate.functions";
-import { SEASONS, SEASON_LABEL, coolingShare, estimatedTemp, seasonOfMonth, type Season } from "@/models/season-climate";
+import { useSeasonClock, WhenPicker } from "@/views/v10/when";
+import { coolingShare, estimatedTemp } from "@/models/season-climate";
 import { GAIN_BG, GAIN_TEXT } from "@/views/v7/studio-ui";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ImportWeatherButton } from "@/views/SimulationGrid";
 import { hapticTick } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
@@ -55,7 +54,7 @@ export type Stop = { id: PrototypeId; label: string; t: number; on: boolean; nea
 /**
  * Half-ring gauge you can slide, the one control of the page: the coloured arc and the white dot show how hot the
  * piazza feels, the faint ring where today starts, and the three levels sit on it as labelled stops (touch one and
- * the dot goes there). A finger anywhere on the arc grabs the dot: it follows the finger exactly, clicks into a stop
+ * the dot goes there). Only a finger on the white dot grabs it: it follows the finger exactly, clicks into a stop
  * when close to it, and the piazza follows; arrow keys move it by 0,1 °C, Page Up/Down jump between stops.
  */
 export function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlide, onStop, unit = "°", spoken = "gradi", label = "Calore percepito da raggiungere", step: keyStep = 0.1 }: { before: number; after: number; lowest: number; min: number; max: number; stops: Stop[]; onSlide: (t: number) => void; onStop: (id: PrototypeId) => void; unit?: string; spoken?: string; label?: string; step?: number }) {
@@ -106,13 +105,14 @@ export function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlid
   const pct = (p: { x: number; y: number }) => ({ left: `${p.x / 2}%`, top: `${(p.y / 112) * 100}%` });
   return (
     // An HTML layer takes the finger (touch-action works everywhere on HTML, not on every SVG): only touches that start
-    // on the arc band grab it, and the page does not scroll under the gauge.
-    <div ref={box} className="relative w-full touch-none select-none rounded-3xl focus-visible:ring-2 focus-visible:ring-ring"
+    // on the white dot grab it, and the page does not scroll under the gauge.
+    <div ref={box} className="relative w-full select-none rounded-3xl focus-visible:ring-2 focus-visible:ring-ring"
       role="slider" tabIndex={0} aria-label={label} aria-valuemin={Math.round(lowest * 10) / 10} aria-valuemax={Math.round(before * 10) / 10} aria-disabled={disabled || undefined}
       aria-valuenow={Math.round(after * 10) / 10} aria-valuetext={`${keyStep >= 1 ? Math.round(after) : fmt(after)} ${spoken}${stops.find((s) => s.on) ? `, ${stops.find((s) => s.on)!.label}` : ""}`} onKeyDown={onKey}
       onPointerDown={(e) => {
-        const { x, y } = local(e), d = Math.hypot(x, y);
-        if (d < R - 34 || d > R + 30 || y < -12 || disabled) return;
+        // Only the white dot can be grabbed, with a touch area wider than the drawn dot (about 44 px on a phone).
+        const { x, y } = local(e), hit = Math.hypot(x - (a.x - 100), y - (100 - a.y));
+        if (hit > 24 || disabled) return;
         e.currentTarget.setPointerCapture(e.pointerId);
         move(e);
       }}
@@ -133,6 +133,8 @@ export function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlid
         <text x="12" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{Math.round(MIN)}{unit}</text>
         <text x="188" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{Math.round(MAX)}{unit}</text>
       </svg>
+      {/* The white dot's touch area: the only place a finger grabs the arc (elsewhere the page scrolls as usual). */}
+      {!disabled && <span className="absolute size-16 -translate-x-1/2 -translate-y-1/2 touch-none rounded-full" style={pct(a)} aria-hidden="true" />}
       {/* The levels, written just outside the arc where their stop is: one touch moves the dot there. */}
       {!disabled && stops.map((s) => (
         <button key={s.id} type="button" tabIndex={-1} aria-pressed={s.on} onPointerDown={(e) => e.stopPropagation()} onClick={() => onStop(s.id)}
@@ -174,11 +176,9 @@ export function Lever({ icon: Icon, label, value, step, max, color, swatch, onCh
  * the piazza feels and says it in words, a chip tells what the last touch gained; then the estimated cost (total and per m²)
  * on the place's measured surface, and three small cards with the yearly benefits.
  */
-export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?: (() => Promise<void>) | undefined; matrix?: ReactNode }) {
+export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() => Promise<void>) | undefined }) {
   const urban = useLab().urban;
-  const [info, setInfo] = useState(false);
   const [costOpen, setCostOpen] = useState(false);
-  const [whenOpen, setWhenOpen] = useState(false);
   // Is the gauge on screen? When not, a compact reading stays pinned under the tabs.
   const gaugeRef = useRef<HTMLDivElement>(null);
   const [gaugeSeen, setGaugeSeen] = useState(true);
@@ -190,22 +190,9 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
     return () => io.disconnect();
   }, []);
   const est = piazzaEstimate(urban.trees, urban.permeable, urban.shade);
-  // Season and hour follow the device clock ("Adesso"), checked every 30 s and on return to the app, until one is chosen by hand.
-  const [live, setLive] = useState(true);
-  const [season, setSeason] = useState<Season>(() => seasonOfMonth(new Date().getMonth()));
-  const [hour, setHour] = useState(() => new Date().getHours());
-  useEffect(() => {
-    if (!live) return;
-    const sync = () => { const now = new Date(); setSeason(seasonOfMonth(now.getMonth())); setHour(now.getHours()); };
-    sync();
-    const id = window.setInterval(sync, 30_000);
-    document.addEventListener("visibilitychange", sync);
-    return () => { window.clearInterval(id); document.removeEventListener("visibilitychange", sync); };
-  }, [live]);
-  // The place's real year, averaged by season and hour; without it, a plain estimate said as such.
-  const fetchSeasons = useServerFn(getSeasonalClimate);
-  const climate = useQuery({ queryKey: ["season-climate", urban.location.lat, urban.location.lng], queryFn: () => fetchSeasons({ data: { lat: urban.location.lat, lng: urban.location.lng } }), staleTime: Infinity, retry: 1 });
-  const realBefore = climate.data?.profile[season][hour] ?? null;
+  // Season and hour (device clock until chosen by hand) and the place's real year for them; without it, a plain estimate said as such.
+  const clock = useSeasonClock(urban.location.lat, urban.location.lng);
+  const { season, hour, real: realBefore } = clock;
   const before = realBefore ?? estimatedTemp(season, hour, urban.realTemp ?? 40);
   // Trees, lawn and shade take heat away only when there is heat: all of it at 40 °C, none at 20 °C.
   const share = coolingShare(before);
@@ -265,7 +252,6 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
       {/* 1 · How to use it, and the costs-and-times table one touch away. */}
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">{share > 0.01 ? "Trascina il punto bianco o tocca un livello" : "Ritocca la piazza qui sotto"}</p>
-        {matrix && <button type="button" onClick={() => setInfo(true)} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-muted-foreground outline-none hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-ring"><Info className="size-4" aria-hidden="true" />Costi e tempi</button>}
       </div>
 
       {/* The simulation stays the focus: once the gauge scrolls away, its reading rides under the tabs. */}
@@ -291,34 +277,12 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
       </div>
 
       {/* When: one chip under the gauge (season, hour, live dot); touching it opens the season and hour controls. */}
-      <div className="-mt-2 flex flex-col items-center gap-2">
-        <button type="button" onClick={() => setWhenOpen((o) => !o)} aria-expanded={whenOpen} aria-controls="piazza-when"
-          className="inline-flex min-h-10 max-w-full items-center gap-2 rounded-full bg-foreground/[0.06] px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <span className={cn("size-2 shrink-0 rounded-full", live ? "bg-ok animate-pulse motion-reduce:animate-none" : "bg-muted-foreground")} aria-hidden="true" />
-          <span className="truncate"><b className="font-semibold">{SEASON_LABEL[season]}, ore {hour}</b> · senza interventi {fmt(before)}°</span>
-          <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", whenOpen && "rotate-180")} aria-hidden="true" />
-        </button>
-        {share === 0 && <p className="text-center text-xs text-muted-foreground">A quest'ora non fa caldo: non c'è calore da togliere</p>}
-        <div id="piazza-when" hidden={!whenOpen} className="w-full space-y-2 rounded-3xl bg-foreground/[0.04] p-3">
-          <div className="grid grid-cols-4 gap-1" role="radiogroup" aria-label="Stagione">
-            {SEASONS.map((x) => (
-              <button key={x} type="button" role="radio" aria-checked={season === x} onClick={() => { hapticTick(); setLive(false); setSeason(x); }}
-                className={cn("h-10 min-w-0 truncate rounded-full px-1 text-[13px] font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", season === x ? "bg-secondary text-secondary-foreground" : "text-foreground/80 hover:bg-foreground/[0.06]")}>{SEASON_LABEL[x]}</button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => { hapticTick(); setLive(false); setHour((h) => (h + 23) % 24); }} aria-label="Un'ora prima" className="grid size-11 shrink-0 place-items-center rounded-full bg-foreground/[0.07] outline-none focus-visible:ring-2 focus-visible:ring-ring"><ChevronLeft className="size-5" aria-hidden="true" /></button>
-            <span className="flex min-w-0 flex-1 items-center justify-center gap-2" aria-live="polite">
-              <Clock className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <span className="font-mono text-xl font-semibold tabular-nums">{String(hour).padStart(2, "0")}:00</span>
-            </span>
-            <button type="button" onClick={() => { hapticTick(); setLive(false); setHour((h) => (h + 1) % 24); }} aria-label="Un'ora dopo" className="grid size-11 shrink-0 place-items-center rounded-full bg-foreground/[0.07] outline-none focus-visible:ring-2 focus-visible:ring-ring"><ChevronRight className="size-5" aria-hidden="true" /></button>
-            <button type="button" aria-pressed={live} onClick={() => { hapticTick(); setLive(true); }}
-              className={cn("inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", live ? "bg-foreground text-background" : "bg-foreground/[0.07]")}>Adesso</button>
-          </div>
-          <p className="text-center text-[11px] text-muted-foreground">{climate.isPending ? "Leggo l'anno del luogo…" : realBefore !== null ? "Calore percepito medio dell'ultimo anno in questo luogo" : "Stima indicativa: i dati reali del luogo non sono disponibili"}</p>
+      <div className="-mt-2 space-y-2">
+        <WhenPicker clock={clock} id="piazza-when" detail={<>senza interventi {fmt(before)}°</>}
+          note={clock.pending ? "Leggo l'anno del luogo…" : realBefore !== null ? "Calore percepito medio dell'ultimo anno in questo luogo" : "Stima indicativa: i dati reali del luogo non sono disponibili"}>
           {onImportWeather && <ImportWeatherButton onImport={onImportWeather} />}
-        </div>
+        </WhenPicker>
+        {share === 0 && <p className="text-center text-xs text-muted-foreground">A quest'ora non fa caldo: non c'è calore da togliere</p>}
       </div>
 
       {/* 3 · Fine-tuning by hand: always open, one line each. */}
@@ -354,15 +318,6 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
           <p className="text-[11px] leading-snug text-muted-foreground">Stima indicativa, IVA esclusa: albero 600–1.500 € l'uno, prato 60–140 €/m², ombra 120–350 €/m².</p>
         </div>
       </div>
-      {matrix && (
-        <Dialog open={info} onOpenChange={setInfo}>
-          <DialogContent className="max-h-[calc(100dvh-3rem)] overflow-y-auto sm:max-w-3xl">
-            {/* The matrix brings its own visible title. */}
-            <DialogHeader className="sr-only"><DialogTitle>Quanto costa e cosa si impara</DialogTitle></DialogHeader>
-            {matrix}
-          </DialogContent>
-        </Dialog>
-      )}
     </section>
   );
 }

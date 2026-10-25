@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronDown, CloudRain, Droplets, Thermometer, Flower2, Grape, Info, Leaf, Ruler, ShieldCheck, Sprout, Umbrella, Wallet, Wind, Wine, type LucideIcon } from "lucide-react";
+import { ChevronDown, CloudRain, Droplets, Thermometer, Flower2, Grape,  Leaf, Ruler, ShieldCheck, Sprout, Umbrella, Wallet, Wind, Wine, type LucideIcon } from "lucide-react";
 import { phenoPhases, type Pheno } from "@/models/data";
+import { estimatedTemp, type Season } from "@/models/season-climate";
+import { useSeasonClock, WhenPicker } from "@/views/v10/when";
 import { comparison, type PrototypeId } from "@/models/scenarios";
 import { setVineyard, useLab, vineMetrics } from "@/models/lab-store";
 import { NO_MIX, VINE_LEVELS, VINE_MAX, VINE_REFERENCE_M2, vineCost, vineMixAt, vineMixOf, zoneMixOf, type VineMix } from "@/models/vine-interventions";
@@ -10,7 +12,6 @@ import { euroRange, grouped } from "@/models/intervention-cost";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { GAIN_BG, GAIN_TEXT } from "@/views/v7/studio-ui";
 import { Gauge, Lever, type Stop } from "@/views/v9c/UrbanThermometer";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ImportWeatherButton } from "@/views/SimulationGrid";
 import { hapticTick } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
@@ -21,7 +22,9 @@ const PHASE_SHORT: Record<Pheno, string> = { Germogliamento: "Germogli", Fioritu
 const stressGain = (s: number) => (s >= 80 ? 0 : s >= 65 ? 1 : s >= 45 ? 2 : s >= 25 ? 3 : 4);
 /** How the vines are, in plain words. */
 const verdict = (s: number) => (s >= 65 ? "Sete forte" : s >= 35 ? "Da tenere d'occhio" : "Le viti stanno bene");
-const AIR_MIN = 15, AIR_MAX = 45;
+const AIR_MIN = 0, AIR_MAX = 45;
+/** The vine's phase that matches each season (winter keeps the one in hand: the vine rests). */
+const PHASE_OF_SEASON: Partial<Record<Season, Pheno>> = { primavera: "Germogliamento", estate: "Invaiatura", autunno: "Maturazione" };
 const avg = (n: number[]) => n.reduce((a, b) => a + b, 0) / Math.max(1, n.length);
 const fmt1 = (n: number) => n.toLocaleString("it-IT", { maximumFractionDigits: 1, minimumFractionDigits: 1 });
 
@@ -30,7 +33,7 @@ const fmt1 = (n: number) => n.toLocaleString("it-IT", { maximumFractionDigits: 1
  * levels sit on it as stops; drag the white dot or touch a level), inside it the verdict, the thirst and the cost; under it the
  * three zones, the phase of the vine and the rain; then three levers (irrigation, shade cloth, windbreak) and the cost per hectare.
  */
-export function VineThirst({ onImportWeather, matrix }: { onImportWeather?: (() => Promise<void>) | undefined; matrix?: ReactNode }) {
+export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promise<void>) | undefined }) {
   const vine = useLab().vineyard;
   // Scope: one zone, or the whole vineyard ("Tutte"); levels, levers and rain act on it.
   const all = vine.allZones;
@@ -40,7 +43,6 @@ export function VineThirst({ onImportWeather, matrix }: { onImportWeather?: (() 
   // On the whole vineyard the levers show the average mix (the same everywhere once set from here).
   const avgMix = (ms: VineMix[]): VineMix => ({ irrigation: Math.round(avg(ms.map((m) => m.irrigation)) / 2) * 2, shade: Math.round(avg(ms.map((m) => m.shade)) / 10) * 10, windbreak: Math.round(avg(ms.map((m) => m.windbreak)) / 10) * 10 });
   const mix = all ? avgMix(mixes) : mixes[vine.selected] ?? NO_MIX;
-  const [info, setInfo] = useState(false);
   const [costOpen, setCostOpen] = useState(false);
   const gaugeRef = useRef<HTMLDivElement>(null);
   const [gaugeSeen, setGaugeSeen] = useState(true);
@@ -88,6 +90,20 @@ export function VineThirst({ onImportWeather, matrix }: { onImportWeather?: (() 
     if (!delta) return;
     setVineyard((vv) => ({ zones: vv.zones.map((z, i) => (targets.includes(i) ? { ...z, temperature: Math.max(0, Math.min(45, z.temperature + delta)) } : z)) }));
   };
+  // Season and hour (device clock until chosen by hand): they set the air temperature of the zones from the place's real
+  // year (else a plain estimate), keeping each zone's difference from the others, and the vine's phase for the season.
+  // Applied once per season, hour and place, so a reload keeps the temperature tuned by hand.
+  const clock = useSeasonClock(vine.location.lat, vine.location.lng);
+  const seasonAir = clock.real ?? estimatedTemp(clock.season, clock.hour, 36);
+  const climateKey = `${clock.season}-${clock.hour}-${vine.location.lat.toFixed(3)},${vine.location.lng.toFixed(3)}-${clock.real === null ? "stima" : "reale"}`;
+  useEffect(() => {
+    if (clock.pending || vine.climateKey === climateKey) return;
+    setVineyard((v) => {
+      const mean = avg(v.zones.map((z) => z.temperature));
+      const phase = PHASE_OF_SEASON[clock.season];
+      return { climateKey, ...(phase ? { phase } : {}), zones: v.zones.map((z) => ({ ...z, temperature: Math.round(Math.max(0, Math.min(45, seasonAir + z.temperature - mean)) * 10) / 10 })) };
+    });
+  }, [climateKey, clock.pending]); // eslint-disable-line react-hooks/exhaustive-deps
   const scopeName = all ? "tutto il vigneto" : `zona ${vine.selected + 1}`;
   // Sliding asks for a thirst: the vineyard walks the path no mix → the three ready vineyards (smallest step that reaches it).
   const slideTo = (t: number) => {
@@ -118,7 +134,6 @@ export function VineThirst({ onImportWeather, matrix }: { onImportWeather?: (() 
     <section className="fuse-canvas space-y-5 rounded-t-3xl px-3 pb-6 pt-4 text-foreground sm:px-5" aria-label="Sete del vigneto">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">{reach > 1 ? "Trascina il punto bianco o tocca un livello" : "Ritocca il vigneto qui sotto"}</p>
-        {matrix && <button type="button" onClick={() => setInfo(true)} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-muted-foreground outline-none hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-ring"><Info className="size-4" aria-hidden="true" />Costi e tempi</button>}
       </div>
 
       {/* The scope: the whole vineyard or one zone, each with its thirst after the interventions. */}
@@ -161,6 +176,8 @@ export function VineThirst({ onImportWeather, matrix }: { onImportWeather?: (() 
       {/* The three zones after the interventions, then the phase of the vine and the rain. */}
       <div className="-mt-2 space-y-3">
         <p className="text-center text-sm text-muted-foreground">Sete della vite, {scopeName}: senza interventi {Math.round(before)}/100</p>
+        <WhenPicker clock={clock} id="vigneto-when" detail={<>aria {Math.round(seasonAir)}°</>}
+          note={clock.pending ? "Leggo l'anno del luogo…" : clock.real !== null ? "Temperatura percepita media dell'ultimo anno in questo luogo, a quella stagione e ora" : "Stima indicativa: i dati reali del luogo non sono disponibili"} />
         <div className="flex items-stretch gap-2">
           <div className="grid flex-1 grid-cols-4 gap-1 rounded-3xl bg-foreground/[0.04] p-1" role="radiogroup" aria-label="Fase della vite">
             {phenoPhases.map((p) => {
@@ -214,14 +231,6 @@ export function VineThirst({ onImportWeather, matrix }: { onImportWeather?: (() 
           <p className="text-[11px] leading-snug text-muted-foreground">Stima indicativa all'ettaro, IVA esclusa, per l'intervento completo: irrigazione a goccia 3.000–6.000 €, teli d'ombra 4.000–8.000 €, frangivento 6.000–12.000 €.</p>
         </div>
       </div>
-      {matrix && (
-        <Dialog open={info} onOpenChange={setInfo}>
-          <DialogContent className="max-h-[calc(100dvh-3rem)] overflow-y-auto sm:max-w-3xl">
-            <DialogHeader className="sr-only"><DialogTitle>Quanto costa e cosa si impara</DialogTitle></DialogHeader>
-            {matrix}
-          </DialogContent>
-        </Dialog>
-      )}
     </section>
   );
 }

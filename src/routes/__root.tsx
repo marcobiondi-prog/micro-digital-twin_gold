@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useHomeFocus } from "@/lib/home-focus";
+import { introSeen } from "@/lib/intro-seen";
 import { THEME_DARK, ThemeToggle, themeBootScript } from "@/views/theme-toggle";
 import { AccountControl } from "@/views/account-control";
 import { CameraDockButton, CameraSheet } from "@/views/CameraDock";
@@ -389,7 +390,7 @@ function RootComponent() {
       })();
       return;
     }
-    // A fresh open of the app always lands on Home (/). This effect
+    // A fresh open of the app lands on the entrance (/) the first time, then on the map. This effect
     // runs once per document load, so only the opening page redirects; in-app
     // navigation to /urbano, /vigneto, /dashboard keeps working as before.
     // The move waits a beat: leaving the page while its data is still arriving
@@ -401,13 +402,20 @@ function RootComponent() {
       sessionStorage.removeItem("mdt-auth-return");
       if (back !== location.pathname + location.searchStr) {
         const id = setTimeout(() => void navigate({ href: back, replace: true }), 250);
-        return () => clearTimeout(id);
+        return () => { clearTimeout(id); landed.__mdtLanded = false; sessionStorage.setItem("mdt-auth-return", back); };
       }
       return;
     }
-    if (location.pathname === "/" || location.pathname === "/index" || location.pathname === "/reset-password") return;
-    const id = setTimeout(() => void navigate({ to: "/", replace: true }), 250);
-    return () => clearTimeout(id);
+    if (location.pathname === "/reset-password") return;
+    // The entrance shows once, at the first access: afterwards a fresh open lands on the map (a shared scenario link or
+    // the "i" still open the tutorial).
+    const params = new URLSearchParams(location.searchStr);
+    if (location.pathname === "/" && (params.has("scenario") || params.has("rivedi"))) return;
+    const home = introSeen() ? "/mappa" : "/";
+    if (location.pathname === home || (home === "/" && location.pathname === "/index")) return;
+    const id = setTimeout(() => void navigate({ to: home, replace: true }), 250);
+    // Unmounted before the move (StrictMode's double mount): let the next mount try again.
+    return () => { clearTimeout(id); landed.__mdtLanded = false; };
   }, []);
   useEffect(() => {
     // Surface Pro-like hybrids: expose real touch capability as a class-independent

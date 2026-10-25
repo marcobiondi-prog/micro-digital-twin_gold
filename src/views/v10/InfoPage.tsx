@@ -1,0 +1,50 @@
+import type { ReactNode } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { ArrowLeft } from "lucide-react";
+
+/**
+ * A plain reading page opened from the account panel (FAQ, privacy, legal): a back arrow and a title on top,
+ * then the text in cards. Back goes to the page it came from (the map when opened directly).
+ */
+export function InfoPage({ title, intro, children }: { title: string; intro?: ReactNode; children: ReactNode }) {
+  const navigate = useNavigate();
+  const back = () => {
+    if ((window.history.state?.__TSR_index ?? 0) > 0) window.history.back();
+    else void navigate({ to: "/mappa", replace: true });
+  };
+  return (
+    <article className="mx-auto max-w-2xl space-y-4">
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={back} aria-label="Indietro" className="grid size-11 shrink-0 place-items-center rounded-full outline-none hover:bg-foreground/[0.08] focus-visible:ring-2 focus-visible:ring-ring">
+          <ArrowLeft className="size-6" aria-hidden="true" />
+        </button>
+        <h1 className="min-w-0 font-display text-3xl font-light tracking-tight sm:text-4xl">{title}</h1>
+      </div>
+      {intro && <p className="text-[15px] leading-relaxed text-muted-foreground">{intro}</p>}
+      {children}
+    </article>
+  );
+}
+
+/** One card of text with a bold heading. */
+export function InfoCard({ title, children }: { title?: string; children: ReactNode }) {
+  return (
+    <section className="space-y-3 rounded-3xl bg-foreground/[0.05] p-5 text-[15px] leading-relaxed">
+      {title && <h2 className="text-base font-semibold">{title}</h2>}
+      <div className="space-y-3 text-foreground/85 [&_li]:ml-5 [&_li]:list-disc [&_ul]:space-y-1.5">{children}</div>
+    </section>
+  );
+}
+
+/** A question that opens in place (native details, so it works with the keyboard and screen readers). */
+export function Faq({ q, children }: { q: string; children: ReactNode }) {
+  return (
+    <details className="group rounded-3xl bg-foreground/[0.05] [&_summary::-webkit-details-marker]:hidden">
+      <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 rounded-3xl px-5 py-3 text-base font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <span className="min-w-0 flex-1">{q}</span>
+        <span className="grid size-7 shrink-0 place-items-center rounded-full bg-foreground/[0.08] text-lg leading-none transition-transform duration-200 group-open:rotate-45 motion-reduce:transition-none" aria-hidden="true">+</span>
+      </summary>
+      <div className="space-y-2 px-5 pb-5 text-[15px] leading-relaxed text-foreground/85 [&_li]:ml-5 [&_li]:list-disc [&_ul]:space-y-1">{children}</div>
+    </details>
+  );
+}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { LogOut, UserRound, Mail, LockKeyhole, Camera, ShieldCheck } from "lucide-react";
-import { Link } from "@tanstack/react-router";
+import { LogOut, UserRound, Mail, LockKeyhole, Camera, ShieldCheck, ChevronRight } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { getMyAdminStatus } from "@/controllers/admin.functions";
@@ -16,6 +16,7 @@ import seedling from "@/assets/avatar-seedling.svg";
 import city from "@/assets/avatar-city.svg";
 import sun from "@/assets/avatar-sun.svg";
 import vine from "@/assets/avatar-vine.svg";
+import twinLogo from "@/assets/climate-twin-logo-compact.png";
 
 const suggestions = [
   { id: "seedling", label: "Germoglio", src: seedling },
@@ -55,6 +56,14 @@ function authMessage(error: { code?: string | undefined; message: string }) {
     default: return /sending confirmation email/i.test(error.message) ? "Invio dell'email di conferma non riuscito. L'amministratore deve configurare l'invio email." : error.message;
   }
 }
+
+
+/** The account panel's help, privacy and legal pages. */
+const LINK_GROUPS: Array<{ title: string; links: Array<[string, "/faq" | "/privacy/cookie" | "/privacy/informativa" | "/privacy/preferenze" | "/legale/licenze" | "/legale/termini"]> }> = [
+  { title: "Aiuto", links: [["Domande frequenti", "/faq"]] },
+  { title: "Privacy", links: [["Informativa sui cookie", "/privacy/cookie"], ["Informativa sulla privacy", "/privacy/informativa"], ["Preferenze privacy", "/privacy/preferenze"]] },
+  { title: "Legale", links: [["Licenze", "/legale/licenze"], ["Termini di servizio", "/legale/termini"]] },
+];
 
 export function AccountControl() {
   const [open, setOpen] = useState(false);
@@ -254,6 +263,12 @@ export function AccountControl() {
     finally { setPending(false); }
   };
 
+  // Close the panel first (its Back entry leaves history), then open the page: navigating at once would be undone by that Back.
+  const navigateTo = useNavigate();
+  const openPage = (to: (typeof LINK_GROUPS)[number]["links"][number][1]) => {
+    setOpen(false);
+    window.setTimeout(() => void navigateTo({ to }), 320);
+  };
   const changeMode = (next: typeof mode) => { setMode(next); setNotice(""); setPassword(""); };
 
   const displayedAvatar = (choice === "upload" ? draftPreview ?? avatarUrl : suggestions.find((item) => item.id === choice)?.src ?? account?.googleAvatar) ?? undefined;
@@ -266,7 +281,8 @@ export function AccountControl() {
         </Button>
       <DialogContent ref={placePanel} overlayClassName="account-overlay" className="account-panel flex max-h-[min(680px,90dvh)] w-[min(420px,calc(100vw-2rem))] flex-col gap-0 overflow-y-auto rounded-lg border bg-popover p-0 text-popover-foreground shadow-xl sm:rounded-lg">
         <DialogHeader className="border-b px-6 py-5 text-left">
-          <div className="mb-2">{avatar("size-10")}</div>
+          {/* Twin, still (no animation, no name), heads the panel. */}
+          <img src={twinLogo} alt="" aria-hidden="true" width={256} height={226} className="mx-auto mb-3 h-20 w-auto" />
           <DialogTitle className="text-xl">Account</DialogTitle>
           <DialogDescription>{account ? account.email : demo ? "Accesso simulato (solo anteprima)" : "Accedi o continua come ospite."}</DialogDescription>
         </DialogHeader>
@@ -321,6 +337,23 @@ export function AccountControl() {
               {DEMO_LOGIN_AVAILABLE && <Button variant="outline" className="w-full border-dashed" onClick={() => { setDemoSignedIn(true); setOpen(false); }}>Simula l’accesso (solo anteprima)</Button>}
             </section>
           )}
+          {/* Help, privacy and legal, as grouped rows; each opens its own page. */}
+          <nav aria-label="Aiuto e informazioni" className="space-y-3 border-t pt-6">
+            {LINK_GROUPS.map((g) => (
+              <section key={g.title} className="rounded-3xl bg-foreground/[0.05] px-5 py-3">
+                <h3 className="py-2 text-base font-semibold">{g.title}</h3>
+                <ul>
+                  {g.links.map(([label, to]) => (
+                    <li key={to}>
+                      <Link to={to} onClick={(e) => { e.preventDefault(); openPage(to); }} className="flex min-h-12 items-center justify-between gap-3 rounded-xl text-[15px] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+                        {label}<ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </nav>
         </div>
       </DialogContent>
     </Dialog>

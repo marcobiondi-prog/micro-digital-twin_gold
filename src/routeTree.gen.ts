@@ -12,11 +12,17 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as FaqRouteImport } from './routes/faq'
 import { Route as MappaRouteImport } from './routes/mappa'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ScegliRouteImport } from './routes/scegli'
 import { Route as UrbanoRouteImport } from './routes/urbano'
 import { Route as VignetoRouteImport } from './routes/vigneto'
+import { Route as LegaleLicenzeRouteImport } from './routes/legale/licenze'
+import { Route as LegaleTerminiRouteImport } from './routes/legale/termini'
+import { Route as PrivacyCookieRouteImport } from './routes/privacy/cookie'
+import { Route as PrivacyInformativaRouteImport } from './routes/privacy/informativa'
+import { Route as PrivacyPreferenzeRouteImport } from './routes/privacy/preferenze'
 import { Route as ApiPublicExternalApprovalRouteImport } from './routes/api/public/external-approval'
 import { Route as ApiPublicJobsCaseSourcesRouteImport } from './routes/api/public/jobs/case-sources'
 
@@ -33,6 +39,11 @@ const AdminRoute = AdminRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FaqRoute = FaqRouteImport.update({
+  id: '/faq',
+  path: '/faq',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MappaRoute = MappaRouteImport.update({
@@ -60,6 +71,31 @@ const VignetoRoute = VignetoRouteImport.update({
   path: '/vigneto',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LegaleLicenzeRoute = LegaleLicenzeRouteImport.update({
+  id: '/legale/licenze',
+  path: '/legale/licenze',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegaleTerminiRoute = LegaleTerminiRouteImport.update({
+  id: '/legale/termini',
+  path: '/legale/termini',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyCookieRoute = PrivacyCookieRouteImport.update({
+  id: '/privacy/cookie',
+  path: '/privacy/cookie',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyInformativaRoute = PrivacyInformativaRouteImport.update({
+  id: '/privacy/informativa',
+  path: '/privacy/informativa',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyPreferenzeRoute = PrivacyPreferenzeRouteImport.update({
+  id: '/privacy/preferenze',
+  path: '/privacy/preferenze',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicExternalApprovalRoute =
   ApiPublicExternalApprovalRouteImport.update({
     id: '/api/public/external-approval',
@@ -77,11 +113,17 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/dashboard': typeof DashboardRoute
+  '/faq': typeof FaqRoute
   '/mappa': typeof MappaRoute
   '/reset-password': typeof ResetPasswordRoute
   '/scegli': typeof ScegliRoute
   '/urbano': typeof UrbanoRoute
   '/vigneto': typeof VignetoRoute
+  '/legale/licenze': typeof LegaleLicenzeRoute
+  '/legale/termini': typeof LegaleTerminiRoute
+  '/privacy/cookie': typeof PrivacyCookieRoute
+  '/privacy/informativa': typeof PrivacyInformativaRoute
+  '/privacy/preferenze': typeof PrivacyPreferenzeRoute
   '/api/public/external-approval': typeof ApiPublicExternalApprovalRoute
   '/api/public/jobs/case-sources': typeof ApiPublicJobsCaseSourcesRoute
 }
@@ -89,11 +131,17 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/dashboard': typeof DashboardRoute
+  '/faq': typeof FaqRoute
   '/mappa': typeof MappaRoute
   '/reset-password': typeof ResetPasswordRoute
   '/scegli': typeof ScegliRoute
   '/urbano': typeof UrbanoRoute
   '/vigneto': typeof VignetoRoute
+  '/legale/licenze': typeof LegaleLicenzeRoute
+  '/legale/termini': typeof LegaleTerminiRoute
+  '/privacy/cookie': typeof PrivacyCookieRoute
+  '/privacy/informativa': typeof PrivacyInformativaRoute
+  '/privacy/preferenze': typeof PrivacyPreferenzeRoute
   '/api/public/external-approval': typeof ApiPublicExternalApprovalRoute
   '/api/public/jobs/case-sources': typeof ApiPublicJobsCaseSourcesRoute
 }
@@ -102,11 +150,17 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/dashboard': typeof DashboardRoute
+  '/faq': typeof FaqRoute
   '/mappa': typeof MappaRoute
   '/reset-password': typeof ResetPasswordRoute
   '/scegli': typeof ScegliRoute
   '/urbano': typeof UrbanoRoute
   '/vigneto': typeof VignetoRoute
+  '/legale/licenze': typeof LegaleLicenzeRoute
+  '/legale/termini': typeof LegaleTerminiRoute
+  '/privacy/cookie': typeof PrivacyCookieRoute
+  '/privacy/informativa': typeof PrivacyInformativaRoute
+  '/privacy/preferenze': typeof PrivacyPreferenzeRoute
   '/api/public/external-approval': typeof ApiPublicExternalApprovalRoute
   '/api/public/jobs/case-sources': typeof ApiPublicJobsCaseSourcesRoute
 }
@@ -116,11 +170,17 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/dashboard'
+    | '/faq'
     | '/mappa'
     | '/reset-password'
     | '/scegli'
     | '/urbano'
     | '/vigneto'
+    | '/legale/licenze'
+    | '/legale/termini'
+    | '/privacy/cookie'
+    | '/privacy/informativa'
+    | '/privacy/preferenze'
     | '/api/public/external-approval'
     | '/api/public/jobs/case-sources'
   fileRoutesByTo: FileRoutesByTo
@@ -128,11 +188,17 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/dashboard'
+    | '/faq'
     | '/mappa'
     | '/reset-password'
     | '/scegli'
     | '/urbano'
     | '/vigneto'
+    | '/legale/licenze'
+    | '/legale/termini'
+    | '/privacy/cookie'
+    | '/privacy/informativa'
+    | '/privacy/preferenze'
     | '/api/public/external-approval'
     | '/api/public/jobs/case-sources'
   id:
@@ -140,11 +206,17 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/dashboard'
+    | '/faq'
     | '/mappa'
     | '/reset-password'
     | '/scegli'
     | '/urbano'
     | '/vigneto'
+    | '/legale/licenze'
+    | '/legale/termini'
+    | '/privacy/cookie'
+    | '/privacy/informativa'
+    | '/privacy/preferenze'
     | '/api/public/external-approval'
     | '/api/public/jobs/case-sources'
   fileRoutesById: FileRoutesById
@@ -153,11 +225,17 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   DashboardRoute: typeof DashboardRoute
+  FaqRoute: typeof FaqRoute
   MappaRoute: typeof MappaRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ScegliRoute: typeof ScegliRoute
   UrbanoRoute: typeof UrbanoRoute
   VignetoRoute: typeof VignetoRoute
+  LegaleLicenzeRoute: typeof LegaleLicenzeRoute
+  LegaleTerminiRoute: typeof LegaleTerminiRoute
+  PrivacyCookieRoute: typeof PrivacyCookieRoute
+  PrivacyInformativaRoute: typeof PrivacyInformativaRoute
+  PrivacyPreferenzeRoute: typeof PrivacyPreferenzeRoute
   ApiPublicExternalApprovalRoute: typeof ApiPublicExternalApprovalRoute
   ApiPublicJobsCaseSourcesRoute: typeof ApiPublicJobsCaseSourcesRoute
 }
@@ -183,6 +261,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/faq': {
+      id: '/faq'
+      path: '/faq'
+      fullPath: '/faq'
+      preLoaderRoute: typeof FaqRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mappa': {
@@ -220,6 +305,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VignetoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/legale/licenze': {
+      id: '/legale/licenze'
+      path: '/legale/licenze'
+      fullPath: '/legale/licenze'
+      preLoaderRoute: typeof LegaleLicenzeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legale/termini': {
+      id: '/legale/termini'
+      path: '/legale/termini'
+      fullPath: '/legale/termini'
+      preLoaderRoute: typeof LegaleTerminiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy/cookie': {
+      id: '/privacy/cookie'
+      path: '/privacy/cookie'
+      fullPath: '/privacy/cookie'
+      preLoaderRoute: typeof PrivacyCookieRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy/informativa': {
+      id: '/privacy/informativa'
+      path: '/privacy/informativa'
+      fullPath: '/privacy/informativa'
+      preLoaderRoute: typeof PrivacyInformativaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy/preferenze': {
+      id: '/privacy/preferenze'
+      path: '/privacy/preferenze'
+      fullPath: '/privacy/preferenze'
+      preLoaderRoute: typeof PrivacyPreferenzeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/external-approval': {
       id: '/api/public/external-approval'
       path: '/api/public/external-approval'
@@ -241,11 +361,17 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   DashboardRoute: DashboardRoute,
+  FaqRoute: FaqRoute,
   MappaRoute: MappaRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ScegliRoute: ScegliRoute,
   UrbanoRoute: UrbanoRoute,
   VignetoRoute: VignetoRoute,
+  LegaleLicenzeRoute: LegaleLicenzeRoute,
+  LegaleTerminiRoute: LegaleTerminiRoute,
+  PrivacyCookieRoute: PrivacyCookieRoute,
+  PrivacyInformativaRoute: PrivacyInformativaRoute,
+  PrivacyPreferenzeRoute: PrivacyPreferenzeRoute,
   ApiPublicExternalApprovalRoute: ApiPublicExternalApprovalRoute,
   ApiPublicJobsCaseSourcesRoute: ApiPublicJobsCaseSourcesRoute,
 }
