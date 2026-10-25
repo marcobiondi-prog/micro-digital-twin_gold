@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { ArrowRight, Building2, Grape, Lock, MapPin } from "lucide-react";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { openAccount } from "@/lib/camera-dock";
+import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn } from "@/lib/demo-login";
 import { cn } from "@/lib/utils";
 import { useLab } from "@/models/lab-store";
 import { Ambient, PageHero, TabRow, openSimTab } from "@/views/v8/console";
@@ -67,6 +68,8 @@ export function PlacesMap() {
       {hint && !signedIn && (
         <p role="status" className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">La vista 3D è per chi ha fatto l'accesso.
           <button type="button" onClick={openAccount} className="font-semibold text-foreground underline underline-offset-4">Accedi</button>
+          {/* Previews only: unlock the 3D view on this device without an account. */}
+          {DEMO_LOGIN_AVAILABLE && <button type="button" onClick={() => { setDemoSignedIn(true); setView("3d"); }} className="font-semibold text-foreground underline underline-offset-4">Simula l'accesso</button>}
         </p>
       )}
       <div className="-mx-4 h-[44vh] min-h-64 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
