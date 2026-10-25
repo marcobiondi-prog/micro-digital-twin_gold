@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronDown, ChevronLeft, ChevronRight, Clock, CloudRain, Leaf, Minus, Plus, Info, Ruler, Sprout, Sun, TreePine, Umbrella, Wallet, type LucideIcon } from "lucide-react";
+import { SlidersHorizontal, ChevronDown, ChevronLeft, ChevronRight, Clock, CloudRain, Leaf, Minus, Plus, Info, Ruler, Sprout, Sun, TreePine, Umbrella, Wallet, type LucideIcon } from "lucide-react";
 import { comparison, piazzaEstimate, type PrototypeId } from "@/models/scenarios";
 import { setUrban, useLab } from "@/models/lab-store";
 import { REFERENCE_M2, euroRange, grouped, interventionCost } from "@/models/intervention-cost";
@@ -140,6 +140,7 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
   const [info, setInfo] = useState(false);
   const [costOpen, setCostOpen] = useState(false);
   const [whenOpen, setWhenOpen] = useState(false);
+  const [tuneOpen, setTuneOpen] = useState(false);
   // Is the gauge on screen? When not, a compact reading stays pinned under the tabs.
   const gaugeRef = useRef<HTMLDivElement>(null);
   const [gaugeSeen, setGaugeSeen] = useState(true);
@@ -238,15 +239,13 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
           {PRESETS.map((p) => {
             const l = comparison.find((c) => c.id === p.id)!, on = preset === p.id, near = !on && level.id === p.id;
             const pAfter = before - piazzaEstimate(p.trees, p.permeable, p.shade).dT * share;
-            const pCost = interventionCost(m2, p.trees, p.permeable, p.shade).total;
             return (
               <button key={p.id} type="button" aria-pressed={on} onClick={() => change({ trees: p.trees, permeable: p.permeable, shade: p.shade })}
-                aria-label={`${l.s}: ${fmt(pAfter)} gradi, ${euroRange(pCost)}`}
-                className={cn("flex min-h-24 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 py-2 text-center outline-none transition-[background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-ring active:scale-95 motion-reduce:active:scale-100",
+                aria-label={`${l.s}: ${fmt(pAfter)} gradi`}
+                className={cn("flex min-h-20 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 py-2 text-center outline-none transition-[background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-ring active:scale-95 motion-reduce:active:scale-100",
                   on ? "bg-foreground/[0.12] shadow-[0_0_0_2px_var(--foreground)]" : near ? "bg-foreground/[0.08] outline-dashed outline-2 outline-offset-0 outline-foreground/50" : "bg-foreground/[0.05] hover:bg-foreground/[0.08]")}>
                 <span className="text-[12px] font-semibold leading-tight"><span className="mr-1.5 inline-block size-2 rounded-full align-middle" style={{ background: LEVEL_COLOR[p.id] }} aria-hidden="true" />{l.s}</span>
                 <span className={cn("font-display text-2xl font-light tabular-nums", GAIN_TEXT[feeling(pAfter).step])}>{fmt(pAfter)}°</span>
-                <span className="font-mono text-[10px] leading-tight text-muted-foreground">{euroRange(pCost)}</span>
               </button>
             );
           })}
@@ -310,11 +309,26 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
         </div>
       </div>
 
-      {/* 3 · Fine-tuning by hand. */}
-      <div className="space-y-3">
-        <Lever icon={TreePine} label="Alberi" value={urban.trees} step={1} max={30} color="text-ok" swatch="bg-ok" onChange={(v) => change({ trees: v })} />
-        <Lever icon={Sprout} label="Prato" value={urban.permeable} step={10} max={100} color="text-radar-mild" swatch="bg-radar-mild" onChange={(v) => change({ permeable: v })} />
-        <Lever icon={Umbrella} label="Ombra" value={urban.shade} step={10} max={100} color="text-urban" swatch="bg-urban" onChange={(v) => change({ shade: v })} />
+      {/* 3 · Fine-tuning by hand, folded: closed it says what is in the piazza. */}
+      <div className="rounded-3xl bg-foreground/[0.05]">
+        <button type="button" onClick={() => setTuneOpen((o) => !o)} aria-expanded={tuneOpen} aria-controls="piazza-tune"
+          className="flex w-full items-center gap-3 rounded-3xl p-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <SlidersHorizontal className="size-6 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs text-muted-foreground">Ritocca a mano</span>
+            <span className="flex flex-wrap items-center gap-x-3 text-[15px] font-semibold" aria-live="polite">
+              <span className="inline-flex items-center gap-1"><TreePine className="size-4 text-ok" aria-hidden="true" />{urban.trees}</span>
+              <span className="inline-flex items-center gap-1"><Sprout className="size-4 text-radar-mild" aria-hidden="true" />{urban.permeable}%</span>
+              <span className="inline-flex items-center gap-1"><Umbrella className="size-4 text-urban" aria-hidden="true" />{urban.shade}%</span>
+            </span>
+          </span>
+          <ChevronDown className={cn("size-5 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", tuneOpen && "rotate-180")} aria-hidden="true" />
+        </button>
+        <div id="piazza-tune" hidden={!tuneOpen} className="space-y-3 px-4 pb-4">
+          <Lever icon={TreePine} label="Alberi" value={urban.trees} step={1} max={30} color="text-ok" swatch="bg-ok" onChange={(v) => change({ trees: v })} />
+          <Lever icon={Sprout} label="Prato" value={urban.permeable} step={10} max={100} color="text-radar-mild" swatch="bg-radar-mild" onChange={(v) => change({ permeable: v })} />
+          <Lever icon={Umbrella} label="Ombra" value={urban.shade} step={10} max={100} color="text-urban" swatch="bg-urban" onChange={(v) => change({ shade: v })} />
+        </div>
       </div>
 
       {/* 4 · Cost and benefits, folded: closed it still says the total. */}

@@ -83,32 +83,50 @@ function Index() {
     if (it.id === "camera") setCameraSheetOpen(true);
     else void navigate({ to: it.id === "urban" ? "/urbano" : "/vigneto" });
   };
-  // Swipe the picture to move between the three, like the PS5 home row.
   const swipe = useRef<{ x: number; y: number } | null>(null);
   const tiles = useRef<Array<HTMLButtonElement | null>>([]);
   const move = (d: number) => { hapticTick(); setSel((i) => (i + d + items.length) % items.length); };
   // The bottom bar points at the selected tile while Home is open, and stops when Home closes.
   useEffect(() => { setHomeFocus(item.id); }, [item.id]);
   useEffect(() => () => setHomeFocus(null), []);
-  // A sideways swipe anywhere on Home (pan-y keeps vertical scrolling) moves between the three, like the PS5 row.
-  const onSwipeStart = (e: React.PointerEvent) => { swipe.current = { x: e.clientX, y: e.clientY }; };
-  const onSwipeEnd = (e: React.PointerEvent) => {
-    const s = swipe.current; swipe.current = null;
-    if (!s) return;
-    const dx = e.clientX - s.x;
-    if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(e.clientY - s.y) * 1.5) { swiped.current = true; move(dx < 0 ? 1 : -1); }
+  // A sideways swipe anywhere on Home moves between the three, like the PS5 row. Touch events (they keep firing whatever
+  // the browser does with the gesture) follow the finger: the picture and the text slide with it, then snap to the next.
+  const [dragX, setDragX] = useState(0);
+  const swipedAt = useRef(0);
+  const start = (x: number, y: number) => { swipe.current = { x, y }; };
+  const track = (x: number, y: number) => {
+    const s0 = swipe.current;
+    if (!s0) return;
+    const dx = x - s0.x, dy = y - s0.y;
+    // Mostly vertical: it is a scroll, let it be.
+    if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 12) { swipe.current = null; setDragX(0); return; }
+    if (Math.abs(dx) > 8) setDragX(dx * 0.6);
   };
-  // A swipe that ends on a tile must not also open it.
-  const swiped = useRef(false);
+  const finish = (x: number) => {
+    const s0 = swipe.current;
+    swipe.current = null;
+    setDragX(0);
+    if (!s0) return;
+    const dx = x - s0.x;
+    if (Math.abs(dx) > 40) { swipedAt.current = performance.now(); move(dx < 0 ? 1 : -1); }
+  };
   return (
-    <div className="mx-auto max-w-5xl touch-pan-y" onPointerDown={onSwipeStart} onPointerUp={onSwipeEnd} onPointerCancel={() => { swipe.current = null; }}
-      onClickCapture={(e) => { if (swiped.current) { swiped.current = false; e.stopPropagation(); e.preventDefault(); } }}>
+    <div className="mx-auto max-w-5xl touch-pan-y"
+      onTouchStart={(e) => { const t = e.touches[0]; if (t && e.touches.length === 1) start(t.clientX, t.clientY); }}
+      onTouchMove={(e) => { const t = e.touches[0]; if (t) track(t.clientX, t.clientY); }}
+      onTouchEnd={(e) => { const t = e.changedTouches[0]; if (t) finish(t.clientX); }}
+      onTouchCancel={() => { swipe.current = null; setDragX(0); }}
+      onPointerDown={(e) => { if (e.pointerType === "mouse") start(e.clientX, e.clientY); }}
+      onPointerMove={(e) => { if (e.pointerType === "mouse" && e.buttons) track(e.clientX, e.clientY); }}
+      onPointerUp={(e) => { if (e.pointerType === "mouse") finish(e.clientX); }}
+      // A swipe that ends on a tile or on the button must not also open it.
+      onClickCapture={(e) => { if (performance.now() - swipedAt.current < 450) { e.stopPropagation(); e.preventDefault(); } }}>
       <h1 className="sr-only">Micro Digital Twin</h1>
       <Ambient tone={item.tone} />
       {/* PS5 home: a big picture of the selected item, a row of square tiles, then its name, one line and one white button. */}
       {/* Phones: the picture fades in from the page's ambient light at the top (the header wears the same light) and back into the page at the bottom. */}
       <div className="home-art relative -mx-4 -mt-6 aspect-[4/3] max-h-[46vh] w-[calc(100%+2rem)] overflow-hidden sm:mx-0 sm:mt-0 sm:aspect-[21/9] sm:w-full sm:rounded-3xl">
-        <div key={item.id} className="absolute inset-0 animate-in fade-in-0 zoom-in-[1.03] duration-500 motion-reduce:animate-none"><Art id={item.id} /></div>
+        <div key={item.id} className="absolute inset-0 animate-in fade-in-0 zoom-in-[1.03] duration-500 motion-reduce:animate-none" style={{ transform: dragX ? `translateX(${dragX}px)` : undefined, transition: dragX ? "none" : "transform 250ms ease" }}><Art id={item.id} /></div>
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,transparent_45%,var(--background))] sm:block max-sm:hidden" aria-hidden="true" />
       </div>
       <div role="tablist" aria-label="Cosa vuoi fare" className="relative -mt-14 flex items-end gap-3 sm:-mt-16"
@@ -125,7 +143,7 @@ function Index() {
         })}
       </div>
       <div className="mt-3 flex gap-1.5" aria-hidden="true">{items.map((it, i) => <span key={it.id} className={`h-1.5 rounded-full transition-all duration-300 motion-reduce:transition-none ${i === sel ? "w-6 bg-foreground" : "w-1.5 bg-foreground/30"}`} />)}</div>
-      <div key={item.id} className="mt-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-300 motion-reduce:animate-none" role="tabpanel">
+      <div key={item.id} style={{ transform: dragX ? `translateX(${dragX * 0.5}px)` : undefined, opacity: dragX ? 1 - Math.min(0.5, Math.abs(dragX) / 300) : undefined }} className="mt-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-300 motion-reduce:animate-none" role="tabpanel">
         <p className="text-sm font-medium text-muted-foreground">{item.name}</p>
         <h2 className="mt-1 font-display text-3xl font-light leading-tight tracking-tight text-foreground sm:text-4xl">{item.title}</h2>
         <p className="mt-2 max-w-prose text-[15px] leading-relaxed text-muted-foreground">{item.desc}</p>
