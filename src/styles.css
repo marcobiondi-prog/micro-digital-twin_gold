@@ -1997,3 +1997,16 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .intro-isolines { animation: intro-isolines-turn 140s linear infinite; }
 @keyframes intro-isolines-turn { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .intro-isolines { animation: none; } }
+
+/* v10 tutorial: each drawing draws itself once its step comes into view (shown at once with reduced motion). */
+.intro-draw :is(path, circle):not(.intro-pop) { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 1.4s cubic-bezier(0.45, 0, 0.2, 1); }
+[data-shown] .intro-draw :is(path, circle):not(.intro-pop) { stroke-dashoffset: 0; }
+.intro-draw .intro-pop { opacity: 0; transition: opacity 0.4s 1.1s; }
+[data-shown] .intro-draw .intro-pop { opacity: 1; }
+[data-shown] .intro-draw .intro-scan { animation: intro-scan 2.6s 1.4s ease-in-out infinite alternate; }
+@keyframes intro-scan { from { transform: translateY(-26px); } to { transform: translateY(26px); } }
+@media (prefers-reduced-motion: reduce) {
+  .intro-draw :is(path, circle):not(.intro-pop) { stroke-dashoffset: 0; transition: none; }
+  .intro-draw .intro-pop { opacity: 1; transition: none; }
+  [data-shown] .intro-draw .intro-scan { animation: none; }
+}
