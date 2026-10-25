@@ -20,7 +20,7 @@ import { LabSyncIndicator } from "@/views/LabSyncIndicator";
 import { Fold, FoldTabs } from "@/views/Fold";
 import { Ambient, PageHero, TabRow } from "@/views/v8/console";
 import { FieldAI } from "@/views/FieldAI";
-import { DashCard, DashSection, PiazzaDashboard, VineDashboard } from "@/views/v10/Dashboard";
+import { DashCard, DashSection, PiazzaDashboard, PremiumPart, URBAN_LOCKED, VINE_LOCKED, VineDashboard } from "@/views/v10/Dashboard";
 import climateTwinLogo from "@/assets/climate-twin-logo-final.png";
 import climateTwinLogoCompact from "@/assets/climate-twin-logo-compact.png";
 
@@ -233,7 +233,14 @@ function UrbanRecords() {
   };
   // Real flow (signed-in): create a secret link per body and send it by email.
   const sendRequest = async (e: string) => {
-    if (!uid) return;
+    if (!uid) {
+      // Simulated sign-in (previews): the email is prepared without the answer link, which needs a real account.
+      editApproval(e, { status: "attesa", sent: new Date().toISOString().slice(0, 10) });
+      addLog(`Richiesta di parere inviata: ${e}`);
+      window.location.href = `mailto:?subject=${encodeURIComponent(`Richiesta di parere · ${e}`)}&body=${encodeURIComponent(`Gentile ${approvals[e]?.ref || "referente"},\n\nle chiediamo un parere sull'intervento in ${lab.location.label}: ${lab.trees} alberi, ${lab.permeable}% di prato, ${lab.shade}% di ombra.\n\nMicro Digital Twin`)}`;
+      toast("Email pronta", { description: "In anteprima manca il link di risposta: serve un account vero." });
+      return;
+    }
     const { data, error } = await (supabase as any).from("external_approval_requests").insert({ user_id: uid, entity: e }).select("token").single();
     if (error || !data) { toast.error("Richiesta non creata"); return; }
     const link = `${window.location.origin}/api/public/external-approval?token=${data.token}`;
@@ -266,7 +273,23 @@ function UrbanRecords() {
   }, [uid, loaded]);
   return (
     <div className="space-y-8">
-      <DashSection title="Approvazioni" hint={STAGES[displayedStage]}>
+      <DashSection title="Registro interventi">
+        <DashCard>
+            <form className="grid grid-cols-[minmax(0,1fr)_auto] gap-2" onSubmit={(e) => { e.preventDefault(); if (draft.trim()) { addLog(draft.trim()); setDraft(""); } }}>
+              <input value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={140} placeholder="Nuovo intervento…" aria-label="Nuova voce del registro" className="min-w-0 rounded-full bg-muted px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
+              <button aria-label="Aggiungi al registro" className="grid size-9 place-items-center rounded-full bg-urban text-primary-foreground"><Plus className="size-4" /></button>
+            </form>
+            <button type="button" onClick={() => { addLog(`Scenario: ${lab.trees} alberi, ${lab.permeable}% suolo, ${lab.shade}% ombra (−${m.est.dT.toFixed(1)} °C)`); toast.success("Aggiunto al registro"); }} className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-urban/15 px-3 py-1.5 text-xs font-semibold text-urban"><Plus className="size-3.5" />Registra lo scenario della simulazione</button>
+            <ul className="mt-3 max-h-52 space-y-2 overflow-auto">{log.map((n, i) => <li key={`${n.d}-${n.t}-${i}`} className="flex items-start gap-3 rounded-xl bg-muted p-3 text-sm animate-in fade-in slide-in-from-top-1"><b className="shrink-0 text-urban">{n.d}</b><span className="dashboard-long-label min-w-0 flex-1">{n.t}</span><button type="button" aria-label={`Elimina voce del ${n.d}: ${n.t}`} onClick={() => {
+              const removed = n;
+              setLog((prev) => prev.filter((_, j) => j !== i));
+              toast("Voce eliminata", { description: removed.t, duration: 6000, action: { label: "Annulla", onClick: () => setLog((prev) => { const next = [...prev]; next.splice(Math.min(i, next.length), 0, removed); return next; }) } });
+            }} className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"><Trash2 className="size-4" /></button></li>)}</ul>
+        </DashCard>
+      </DashSection>
+      <PremiumPart locked={URBAN_LOCKED}>
+        <div className="space-y-8">
+          <DashSection title="Approvazioni degli enti" hint={STAGES[displayedStage]}>
         <DashCard>
             <div className="mt-4 flex items-center justify-between text-xs font-semibold text-muted-foreground"><span>Ciclo di approvazione</span><span className="text-foreground">{progress}%</span></div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Avanzamento approvazione" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
@@ -277,7 +300,7 @@ function UrbanRecords() {
             </ol>
             {!uid && <Button type="button" variant="ghost" onClick={simulateEmail} disabled={simBusy} className="mt-2 h-9 w-full rounded-full bg-urban/15 px-3 text-xs font-semibold text-urban"><Mail />{simBusy ? "Ricezione in corso…" : simUnits === null ? "Simula arrivo parere via email" : "Reinvia email simulata"}</Button>}
            <div className="dashboard-external-section">
-           {uid ? (<>
+           {(<>
              <div className="mt-3 text-xs font-semibold text-muted-foreground md:mt-0">Approvazioni esterne</div>
              <ul className="mt-2 space-y-2 md:grid md:grid-cols-2 md:gap-3 md:space-y-0 lg:grid-cols-3">
               {EXTERNAL.map((e) => {
@@ -306,25 +329,13 @@ function UrbanRecords() {
             </ul>
             <p className="mt-2 text-[11px] text-muted-foreground">Per passare ad “Approvato” servono tutte le approvazioni esterne.</p>
             {stage === 2 && approvedCount === EXTERNAL.length && <Button type="button" variant="outline" onClick={confirmRealized} className="mt-2 w-full border-ok/40 text-xs text-ok">Conferma intervento realizzato</Button>}
-          </>) : null}
+          </>)}
            </div>
         </DashCard>
       </DashSection>
-      <DashSection title="Registro interventi">
-        <DashCard>
-            <form className="grid grid-cols-[minmax(0,1fr)_auto] gap-2" onSubmit={(e) => { e.preventDefault(); if (draft.trim()) { addLog(draft.trim()); setDraft(""); } }}>
-              <input value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={140} placeholder="Nuovo intervento…" aria-label="Nuova voce del registro" className="min-w-0 rounded-full bg-muted px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
-              <button aria-label="Aggiungi al registro" className="grid size-9 place-items-center rounded-full bg-urban text-primary-foreground"><Plus className="size-4" /></button>
-            </form>
-            <button type="button" onClick={() => { addLog(`Scenario: ${lab.trees} alberi, ${lab.permeable}% suolo, ${lab.shade}% ombra (−${m.est.dT.toFixed(1)} °C)`); toast.success("Aggiunto al registro"); }} className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-urban/15 px-3 py-1.5 text-xs font-semibold text-urban"><Plus className="size-3.5" />Registra lo scenario della simulazione</button>
-            <ul className="mt-3 max-h-52 space-y-2 overflow-auto">{log.map((n, i) => <li key={`${n.d}-${n.t}-${i}`} className="flex items-start gap-3 rounded-xl bg-muted p-3 text-sm animate-in fade-in slide-in-from-top-1"><b className="shrink-0 text-urban">{n.d}</b><span className="dashboard-long-label min-w-0 flex-1">{n.t}</span><button type="button" aria-label={`Elimina voce del ${n.d}: ${n.t}`} onClick={() => {
-              const removed = n;
-              setLog((prev) => prev.filter((_, j) => j !== i));
-              toast("Voce eliminata", { description: removed.t, duration: 6000, action: { label: "Annulla", onClick: () => setLog((prev) => { const next = [...prev]; next.splice(Math.min(i, next.length), 0, removed); return next; }) } });
-            }} className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"><Trash2 className="size-4" /></button></li>)}</ul>
-        </DashCard>
-          <FieldAI kind="urban" onAdd={addLog} />
-      </DashSection>
+          <DashSection title="Piano suggerito dall'AI"><FieldAI kind="urban" onAdd={addLog} /></DashSection>
+        </div>
+      </PremiumPart>
     </div>
   );
 }
@@ -341,6 +352,7 @@ function VineRecords() {
   const setNotes = (u: Notes | ((p: Notes) => Notes)) => setNotesStore(typeof u === "function" ? u(vineNotes) : u);
   const [txt, setTxt] = useState("");
   return (
+    <div className="space-y-8">
       <DashSection title="Quaderno di campagna">
         <DashCard>
           <form className="grid grid-cols-[minmax(0,1fr)_auto] gap-2" onSubmit={(e) => { e.preventDefault(); if (!txt.trim()) return; setNotes([{ d: new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }), t: txt }, ...notes]); setTxt(""); }}>
@@ -353,8 +365,11 @@ function VineRecords() {
             toast("Nota eliminata", { description: removed.t, duration: 6000, action: { label: "Annulla", onClick: () => setNotes((prev) => { const next = [...prev]; next.splice(Math.min(i, next.length), 0, removed); return next; }) } });
           }} className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"><Trash2 className="size-4" /></button></li>)}</ul>
         </DashCard>
-        <FieldAI onAdd={(t) => setNotes((prev) => [{ d: new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }), t }, ...prev])} />
       </DashSection>
+      <PremiumPart locked={VINE_LOCKED}>
+        <DashSection title="Piano suggerito dall'AI"><FieldAI onAdd={(t) => setNotes((prev) => [{ d: new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }), t }, ...prev])} /></DashSection>
+      </PremiumPart>
+    </div>
   );
 }
 

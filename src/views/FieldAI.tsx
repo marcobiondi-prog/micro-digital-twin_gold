@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
+import { useSignedIn } from "@/lib/use-signed-in";
 import { useServerFn } from "@tanstack/react-start";
 import { Building2, Grape, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -21,12 +21,8 @@ export function FieldAI({ onAdd, kind = "vineyard" }: { onAdd: (t: string) => vo
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ sintesi: string; interventi: Intervention[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [signedIn, setSignedIn] = useState(false);
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSignedIn(!!data.session));
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSignedIn(!!s));
-    return () => sub.subscription.unsubscribe();
-  }, []);
+  // Signed in, or the simulated sign-in on previews (the AI call itself still needs a real account).
+  const { signedIn } = useSignedIn();
   const submit = async () => {
     if (!signedIn || obs.trim().length < 3 || loading) return;
     setLoading(true); setError(null); setResult(null);
@@ -40,7 +36,7 @@ export function FieldAI({ onAdd, kind = "vineyard" }: { onAdd: (t: string) => vo
   // Guests never see the AI card: it stays hidden until they sign in.
   if (!signedIn) return null;
   return (
-    <Card className="mt-4">
+    <Card>
       <div className="flex items-center gap-2 text-sm font-semibold">{kind === "urban" ? <Building2 className="size-4 text-urban" /> : <Grape className="size-4 text-vine" />} {c.title}</div>
       <p className="mt-1 text-xs text-muted-foreground">{c.hint}</p>
       <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">

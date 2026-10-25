@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { ArrowRight, Camera, ChevronRight, CloudRain, Droplets, Leaf, Lock, MapPin, NotebookPen, Radar, Satellite, ScanLine, ShieldCheck, Sparkles, Sun, TreePine, Umbrella, Wind, type LucideIcon } from "lucide-react";
+import { ArrowRight, Camera, CloudRain, Droplets, Leaf, Lock, Mail, MapPin, ShieldCheck, Sparkles, Sun, TreePine, Umbrella, Wind, type LucideIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLab, vineMetrics } from "@/models/lab-store";
 import { comparison, piazzaEstimate } from "@/models/scenarios";
@@ -11,11 +11,8 @@ import { REFERENCE_M2, UNIT_COST, euroRange, grouped, interventionCost } from "@
 import { NO_MIX, VINE_LEVELS, VINE_REFERENCE_M2, VINE_UNIT_COST, vineCost, vineMixOf, zoneMixOf, type VineMix } from "@/models/vine-interventions";
 import { SEASONS, SEASON_LABEL, coolingShare, estimatedTemp, type Season } from "@/models/season-climate";
 import { ensureMedia, useLabMedia, type MediaKind } from "@/models/lab-media-store";
-import { useArScans } from "@/models/ar-scan-log";
-import { ndviLabel } from "@/models/copernicus";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { getSeasonalClimate } from "@/controllers/climate.functions";
-import { loadCopernicus, type CopernicusResult } from "@/views/copernicus-client";
 import { GAIN_BG, GAIN_TEXT } from "@/views/v7/studio-ui";
 import { openSimTab, showSimMedia, type SimKind } from "@/views/v8/console";
 import { splitLocation } from "@/views/SimulationGrid";
@@ -178,76 +175,13 @@ function MediaStrip({ kind }: { kind: MediaKind }) {
   );
 }
 
-/** The AI camera's scans of this project, newest first. */
-function ScanList({ kind }: { kind: MediaKind }) {
-  const scans = useArScans(kind);
-  const time = (iso: string) => new Date(iso).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-  return (
-    <DashCard className="p-0 sm:p-0">
-      {scans.length ? (
-        <ul className="divide-y divide-foreground/10">
-          {[...scans].reverse().slice(0, 6).map((s) => (
-            <li key={s.id} className="flex items-center gap-3 px-4 py-3 sm:px-5">
-              <ScanLine className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">{s.species?.commonName ?? s.soil?.label ?? s.target}</span>
-                <span className="block truncate text-xs text-muted-foreground">{s.target} · {time(s.at)}{s.count > 1 ? ` · ${s.count} esemplari` : ""}</span>
-              </span>
-              {s.totalCooling != null && <span className="shrink-0 font-mono text-sm font-semibold tabular-nums text-ok">−{fmt1(s.totalCooling)}°</span>}
-            </li>
-          ))}
-        </ul>
-      ) : <p className="p-4 text-sm text-muted-foreground sm:p-5">Nessuna scansione in questa sessione. Inquadra una pianta o il terreno con la Fotocamera AI: il risultato compare qui e nel report.</p>}
-    </DashCard>
-  );
-}
-
-/** Greenery and ground temperature from the satellite, read on demand (signed-in accounts only). */
-function SatelliteCard({ lat, lng }: { lat: number; lng: number }) {
-  const [state, setState] = useState<{ busy: boolean; data: CopernicusResult | null; failed: boolean }>({ busy: false, data: null, failed: false });
-  const read = () => {
-    setState({ busy: true, data: null, failed: false });
-    loadCopernicus(lat, lng).then((data) => setState({ busy: false, data, failed: !data.configured }), () => setState({ busy: false, data: null, failed: true }));
-  };
-  const day = (d: string) => new Date(d).toLocaleDateString("it-IT", { day: "numeric", month: "short" });
-  const { data } = state;
-  return (
-    <DashCard>
-      {data && !state.failed ? (
-        <div className="grid grid-cols-2 gap-3">
-          <div><div className="text-xs text-muted-foreground">Verde</div>
-            {data.ndvi ? <><div className="font-display text-2xl font-light">{data.ndvi.value.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div><div className="text-xs">{ndviLabel(data.ndvi.value)}</div><div className="text-[11px] text-muted-foreground">{day(data.ndvi.date)}</div></> : <div className="text-sm text-muted-foreground">Nessuna immagine senza nuvole</div>}
-          </div>
-          <div><div className="text-xs text-muted-foreground">Suolo</div>
-            {data.surfaceTemp ? <><div className="font-display text-2xl font-light">{fmt1(data.surfaceTemp.value)}°</div><div className="text-xs">temperatura in superficie</div><div className="text-[11px] text-muted-foreground">{day(data.surfaceTemp.date)}</div></> : <div className="text-sm text-muted-foreground">Nessuna lettura recente</div>}
-          </div>
-        </div>
-      ) : <p className="text-sm text-muted-foreground">{state.failed ? "Lettura non riuscita: serve un account con l'accesso fatto davvero. Riprova più tardi." : "Quanto verde c'è e quanto scalda il suolo, visti dal satellite. Un riferimento: non cambia la simulazione."}</p>}
-      <button type="button" onClick={read} disabled={state.busy} className="mt-3 inline-flex h-10 items-center gap-1.5 rounded-full bg-foreground/[0.08] px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">
-        <Satellite className="size-4" aria-hidden="true" />{state.busy ? "Lettura…" : data ? "Aggiorna" : "Leggi dal satellite"}
-      </button>
-    </DashCard>
-  );
-}
-
-/** A row that opens a tool of the simulation. */
-function ToolRow({ icon: Icon, title, line, onClick, to }: { icon: LucideIcon; title: string; line: string; onClick: () => void; to: "/urbano" | "/vigneto" }) {
-  return (
-    <Link to={to} onClick={onClick} className="flex items-center gap-3 rounded-3xl bg-foreground/[0.05] px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-5">
-      <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-      <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{title}</span><span className="block text-xs text-muted-foreground">{line}</span></span>
-      <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-    </Link>
-  );
-}
-
 export type Locked = { icon: LucideIcon; title: string; line: string };
 
 /**
  * The Premium part of the dashboard. Signed in (or simulated on previews) it shows its tools; otherwise each one stays
  * visible with a lock, so it is clear what the sign-in adds, with one Accedi (and "Simula l'accesso" on previews).
  */
-function PremiumPart({ locked, children }: { locked: Locked[]; children: ReactNode }) {
+export function PremiumPart({ locked, children }: { locked: Locked[]; children: ReactNode }) {
   const { signedIn } = useSignedIn();
   return (
     <section className="space-y-3" aria-label="Premium">
@@ -285,15 +219,13 @@ function useSeasonProfile(lat: number, lng: number) {
   return useQuery({ queryKey: ["season-climate", lat, lng], queryFn: () => fetchSeasons({ data: { lat, lng } }), staleTime: Infinity, retry: 1 });
 }
 
-const URBAN_LOCKED: Locked[] = [
-  { icon: ScanLine, title: "Scansioni della Fotocamera AI", line: "Piante e terreno riconosciuti, con il fresco che portano" },
-  { icon: Satellite, title: "Dati da satellite", line: "Quanto verde c'è e quanto scalda il suolo" },
-  { icon: Radar, title: "Dove mettere i sensori", line: "I punti giusti, suggeriti dall'AI" },
-  { icon: ShieldCheck, title: "Approvazioni degli enti", line: "Richieste via email e stato dell'iter, salvati nell'account" },
-  { icon: NotebookPen, title: "Registro interventi e piano AI", line: "Le decisioni prese e quelle suggerite, salvate nell'account" },
+export const URBAN_LOCKED: Locked[] = [
+  { icon: Mail, title: "Email agli enti per l'approvazione", line: "Comune, Soprintendenza e Ufficio tecnico: richiesta via email e risposta con un link" },
+  { icon: ShieldCheck, title: "Iter di approvazione salvato", line: "Lo stato di ogni ente e del progetto, nel tuo account" },
+  { icon: Sparkles, title: "Piano suggerito dall'AI", line: "Descrivi cosa vedi: l'AI propone gli interventi in ordine di priorità" },
 ];
 
-/** Piazza: the summary of the project, then its Premium tools (records: approvals, log and AI plan). */
+/** Piazza: the summary of the project, then its records (the free log, then the Premium approvals and AI plan). */
 export function PiazzaDashboard({ records }: { records: ReactNode }) {
   const urban = useLab().urban;
   const reduce = useReducedMotion();
@@ -377,26 +309,16 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
 
       <DashSection title="Foto e video"><MediaStrip kind="urban" /></DashSection>
 
-      <PremiumPart locked={URBAN_LOCKED}>
-        <div className="space-y-8">
-          <DashSection title="Scansioni AI"><ScanList kind="urban" /></DashSection>
-          <DashSection title="Dal satellite"><SatelliteCard lat={lat} lng={lng} /></DashSection>
-          <ToolRow to="/urbano" onClick={() => openSimTab("urban", "sensori")} icon={Radar} title="Dove mettere i sensori" line="Apri i punti suggeriti dall'AI intorno alla piazza" />
-          {records}
-        </div>
-      </PremiumPart>
+      {records}
     </div>
   );
 }
 
-const VINE_LOCKED: Locked[] = [
-  { icon: ScanLine, title: "Scansioni della Fotocamera AI", line: "Viti e terreno riconosciuti durante i sopralluoghi" },
-  { icon: Satellite, title: "Dati da satellite", line: "Vigore delle viti e temperatura del suolo" },
-  { icon: Radar, title: "Dove mettere i sensori", line: "Le sonde nei punti giusti, suggerite dall'AI" },
-  { icon: Sparkles, title: "Quaderno di campagna e piano AI", line: "Le operazioni fatte e quelle suggerite dall'AI" },
+export const VINE_LOCKED: Locked[] = [
+  { icon: Sparkles, title: "Piano suggerito dall'AI", line: "Descrivi cosa vedi nel vigneto: l'AI propone gli interventi in ordine di priorità" },
 ];
 
-/** Vigneto: the summary of the project, then its Premium tools (records: field notebook and AI plan). */
+/** Vigneto: the summary of the project, then its records (the free field notebook, then the Premium AI plan). */
 export function VineDashboard({ records }: { records: ReactNode }) {
   const vine = useLab().vineyard;
   const { lat, lng } = vine.location;
@@ -460,14 +382,7 @@ export function VineDashboard({ records }: { records: ReactNode }) {
 
       <DashSection title="Foto e video"><MediaStrip kind="vineyard" /></DashSection>
 
-      <PremiumPart locked={VINE_LOCKED}>
-        <div className="space-y-8">
-          <DashSection title="Scansioni AI"><ScanList kind="vineyard" /></DashSection>
-          <DashSection title="Dal satellite"><SatelliteCard lat={lat} lng={lng} /></DashSection>
-          <ToolRow to="/vigneto" onClick={() => openSimTab("vineyard", "sensori")} icon={Radar} title="Dove mettere i sensori" line="Apri le sonde suggerite dall'AI nel vigneto" />
-          {records}
-        </div>
-      </PremiumPart>
+      {records}
     </div>
   );
 }
