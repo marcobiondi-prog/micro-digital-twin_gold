@@ -207,6 +207,32 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
 
   return (
     <section className="fuse-canvas space-y-5 rounded-t-3xl px-3 pb-6 pt-4 text-foreground sm:px-5" aria-label="Termometro della piazza">
+      {/* The three levels side by side, each with its own result and cost: this is the comparison, one touch applies it. */}
+      <div>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold">Scegli un livello</h3>
+          {matrix && <button type="button" onClick={() => setInfo(true)} className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-muted-foreground outline-none hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-ring"><Info className="size-4" aria-hidden="true" />Costi e tempi</button>}
+        </div>
+        <div className="grid grid-cols-3 gap-2" role="group" aria-label="Tre livelli di intervento">
+          {PRESETS.map((p) => {
+            const l = comparison.find((c) => c.id === p.id)!, on = preset === p.id;
+            const pAfter = before - piazzaEstimate(p.trees, p.permeable, p.shade).dT;
+            const pCost = interventionCost(m2, p.trees, p.permeable, p.shade).total;
+            return (
+              <button key={p.id} type="button" aria-pressed={on} onClick={() => change({ trees: p.trees, permeable: p.permeable, shade: p.shade })}
+                aria-label={`${l.s}: ${fmt(pAfter)} gradi, ${euroRange(pCost)}`}
+                className={cn("flex min-h-24 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 py-2 text-center outline-none transition-[background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-ring active:scale-95 motion-reduce:active:scale-100",
+                  on ? "bg-foreground/[0.12] shadow-[0_0_0_2px_var(--foreground)]" : "bg-foreground/[0.05] hover:bg-foreground/[0.08]")}>
+                <span className="text-[12px] font-semibold leading-tight">{l.s}</span>
+                <span className={cn("font-display text-2xl font-light tabular-nums", GAIN_TEXT[feeling(pAfter).step])}>{fmt(pAfter)}°</span>
+                <span className="font-mono text-[10px] leading-tight text-muted-foreground">{euroRange(pCost)}</span>
+              </button>
+            );
+          })}
+        </div>
+        {onImportWeather && <div className="mt-2"><ImportWeatherButton onImport={onImportWeather} /></div>}
+      </div>
+
       {/* The simulation stays the focus: once the gauge scrolls away, its reading rides under the tabs. */}
       <div aria-hidden={gaugeSeen} className={cn("pointer-events-none sticky top-[calc(var(--nav-h)+3.75rem)] z-[999999996] -mb-5 flex h-0 justify-center transition-opacity duration-200 motion-reduce:transition-none", gaugeSeen ? "opacity-0" : "opacity-100")}>
         <button type="button" tabIndex={gaugeSeen ? -1 : 0} onClick={() => gaugeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
@@ -240,33 +266,6 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
         <Lever icon={Sprout} label="Prato" value={urban.permeable} step={10} max={100} color="text-radar-mild" swatch="bg-radar-mild" cooling={urban.permeable * 0.04} onChange={(v) => change({ permeable: v })} />
         <Lever icon={Umbrella} label="Ombra" value={urban.shade} step={10} max={100} color="text-urban" swatch="bg-urban" cooling={urban.shade * 0.03} onChange={(v) => change({ shade: v })} />
       </div>
-
-      {/* The three levels side by side, each with its own result and cost: this is the comparison, one touch applies it. */}
-      <div>
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold">Scegli un livello</h3>
-          {matrix && <button type="button" onClick={() => setInfo(true)} className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-muted-foreground outline-none hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-ring"><Info className="size-4" aria-hidden="true" />Costi e tempi</button>}
-        </div>
-        <div className="grid grid-cols-3 gap-2" role="group" aria-label="Tre livelli di intervento">
-          {PRESETS.map((p) => {
-            const l = comparison.find((c) => c.id === p.id)!, on = preset === p.id;
-            const pAfter = before - piazzaEstimate(p.trees, p.permeable, p.shade).dT;
-            const pCost = interventionCost(m2, p.trees, p.permeable, p.shade).total;
-            return (
-              <button key={p.id} type="button" aria-pressed={on} onClick={() => change({ trees: p.trees, permeable: p.permeable, shade: p.shade })}
-                aria-label={`${l.s}: ${fmt(pAfter)} gradi, ${euroRange(pCost)}`}
-                className={cn("flex min-h-24 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 py-2 text-center outline-none transition-[background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-ring active:scale-95 motion-reduce:active:scale-100",
-                  on ? "bg-foreground/[0.12] shadow-[0_0_0_2px_var(--foreground)]" : "bg-foreground/[0.05] hover:bg-foreground/[0.08]")}>
-                <span className="text-[12px] font-semibold leading-tight">{l.s}</span>
-                <span className={cn("font-display text-2xl font-light tabular-nums", GAIN_TEXT[feeling(pAfter).step])}>{fmt(pAfter)}°</span>
-                <span className="font-mono text-[10px] leading-tight text-muted-foreground">{euroRange(pCost)}</span>
-              </button>
-            );
-          })}
-        </div>
-        {onImportWeather && <div className="mt-2"><ImportWeatherButton onImport={onImportWeather} /></div>}
-      </div>
-
 
       {/* The cost folds away: closed it still says the total, open it adds the cost per m², the surface and the unit prices. */}
       <div className="rounded-3xl bg-foreground/[0.05]">
