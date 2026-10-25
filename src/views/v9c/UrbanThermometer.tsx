@@ -25,21 +25,40 @@ const PRESETS: Array<{ id: PrototypeId; trees: number; permeable: number; shade:
 ];
 /** The level whose ready piazza gains the closest number of degrees: it names the cost of what is on screen. */
 const levelOf = (dT: number): PrototypeId => {
-  const gainOf = (p: (typeof PRESETS)[number]) => piazzaEstimate(p.trees, p.permeable, p.shade).dT;
   return PRESETS.reduce((best, p) => (Math.abs(gainOf(p) - dT) < Math.abs(gainOf(best) - dT) ? p : best)).id;
 };
+/** The gain cap of the trees, lawn and shade together (piazzaEstimate). */
+const MAX_GAIN = 5.2;
+const gainOf = (p: { trees: number; permeable: number; shade: number }) => piazzaEstimate(p.trees, p.permeable, p.shade).dT;
+/** The path the arc walks: empty piazza, then the three ready ones; between two of them the mix is blended. */
+const PATH = [{ trees: 0, permeable: 0, shade: 0 }, ...PRESETS];
+function mixFor(gain: number): { trees: number; permeable: number; shade: number } {
+  for (let i = 0; i < PATH.length - 1; i++) {
+    const a = PATH[i]!, b = PATH[i + 1]!, ga = gainOf(a), gb = gainOf(b);
+    if (gain <= gb + 1e-6) {
+      const f = clamp((gain - ga) / (gb - ga), 0, 1);
+      return { trees: Math.round(a.trees + (b.trees - a.trees) * f), permeable: Math.round(a.permeable + (b.permeable - a.permeable) * f), shade: Math.round(a.shade + (b.shade - a.shade) * f) };
+    }
+  }
+  const last = PATH[PATH.length - 1]!;
+  return { trees: last.trees, permeable: last.permeable, shade: last.shade };
+}
 /** How it feels, in plain words and on the five-step scale (0 = worst; the cool end reads blue). */
 const feeling = (t: number): { text: string; step: number; bg?: string } =>
   t >= 39 ? { text: "Troppo caldo", step: 0 } : t >= 36 ? { text: "Molto caldo", step: 1 } : t >= 30 ? { text: "Caldo", step: 2 }
     : t >= 18 ? { text: "Si sta bene", step: 4 } : t >= 10 ? { text: "Fresco", step: 4, bg: "bg-water" } : { text: "Freddo", step: 4, bg: "bg-urban" };
 
 
+/** A level as a stop on the arc: where its ready piazza would bring the perceived heat now. */
+type Stop = { id: PrototypeId; label: string; t: number; on: boolean; near: boolean };
+
 /**
- * Half-ring gauge you can slide: the coloured arc and the white dot show how hot the piazza feels, the faint ring
- * where today starts. A finger anywhere on the arc grabs it: while it moves the dot follows the finger exactly and
- * the piazza follows the asked temperature; arrow keys move it by 0,1 °C.
+ * Half-ring gauge you can slide, the one control of the page: the coloured arc and the white dot show how hot the
+ * piazza feels, the faint ring where today starts, and the three levels sit on it as labelled stops (touch one and
+ * the dot goes there). A finger anywhere on the arc grabs the dot: it follows the finger exactly, clicks into a stop
+ * when close to it, and the piazza follows; arrow keys move it by 0,1 °C, Page Up/Down jump between stops.
  */
-function Gauge({ before, after, lowest, min: MIN, max: MAX, onSlide, onSlideStart }: { before: number; after: number; lowest: number; min: number; max: number; onSlide: (t: number) => void; onSlideStart: () => void }) {
+function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlide, onStop }: { before: number; after: number; lowest: number; min: number; max: number; stops: Stop[]; onSlide: (t: number) => void; onStop: (id: PrototypeId) => void }) {
   const R = 88, C = Math.PI * R;
   const box = useRef<HTMLDivElement>(null);
   // While sliding, the temperature under the finger (the piazza snaps to whole trees, the dot must not).
@@ -47,41 +66,54 @@ function Gauge({ before, after, lowest, min: MIN, max: MAX, onSlide, onSlideStar
   const shown = finger ?? after;
   const share = (t: number) => clamp((t - MIN) / (MAX - MIN), 0, 1);
   const angle = (t: number) => Math.PI * (1 - share(t));
-  const at = (t: number) => ({ x: 100 + Math.cos(angle(t)) * R, y: 100 - Math.sin(angle(t)) * R });
+  const at = (t: number, r = R) => ({ x: 100 + Math.cos(angle(t)) * r, y: 100 - Math.sin(angle(t)) * r });
   const b = at(before), a = at(shown);
   const reach = (t: number) => clamp(t, lowest, before);
+  const disabled = lowest >= before - 0.05;
   /** Finger position in the drawing's units (viewBox 200 × 112, arc centre at 100,100). */
   const local = (e: PointerEvent<HTMLDivElement>) => {
     const r = box.current!.getBoundingClientRect();
     return { x: ((e.clientX - r.left) / r.width) * 200 - 100, y: 100 - ((e.clientY - r.top) / r.height) * 112 };
   };
   const tempAt = (x: number, y: number) => MIN + (1 - Math.atan2(Math.max(0, y), x) / Math.PI) * (MAX - MIN);
+  // Close to a stop (a few degrees of arc) the dot clicks into it, so a level is easy to hit by finger.
+  const snapGap = (MAX - MIN) * 0.035;
+  const snapped = useRef<PrototypeId | null>(null);
   const move = (e: PointerEvent<HTMLDivElement>) => {
     const { x, y } = local(e);
-    const t = reach(tempAt(x, y));
+    let t = reach(tempAt(x, y));
+    const stop = stops.find((s) => Math.abs(s.t - t) < snapGap);
+    if (stop) t = stop.t;
+    if ((stop?.id ?? null) !== snapped.current) { snapped.current = stop?.id ?? null; if (stop) hapticTick(); }
     setFinger(t);
-    onSlide(Math.round(t * 10) / 10);
+    onSlide(t);
   };
-  const end = () => setFinger(null);
+  const end = () => { setFinger(null); snapped.current = null; };
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "PageDown" || e.key === "PageUp") {
+      // Next stop cooler (Page Down) or warmer (Page Up); past the warmest one, back to no intervention.
+      e.preventDefault();
+      const next = e.key === "PageDown" ? stops.find((s) => s.t < after - 0.05) : [...stops].reverse().find((s) => s.t > after + 0.05);
+      if (next) onStop(next.id); else if (e.key === "PageUp") onSlide(before);
+      return;
+    }
     const step = e.key === "ArrowLeft" || e.key === "ArrowDown" ? -0.1 : e.key === "ArrowRight" || e.key === "ArrowUp" ? 0.1 : e.key === "Home" ? -99 : e.key === "End" ? 99 : 0;
     if (!step) return;
     e.preventDefault();
-    onSlideStart();
-    onSlide(Math.round(reach(after + step) * 10) / 10);
+    onSlide(reach(after + step));
   };
   const motion = finger === null ? "transition-[stroke-dasharray] duration-300 motion-reduce:transition-none" : "";
+  const pct = (p: { x: number; y: number }) => ({ left: `${p.x / 2}%`, top: `${(p.y / 112) * 100}%` });
   return (
     // An HTML layer takes the finger (touch-action works everywhere on HTML, not on every SVG): only touches that start
     // on the arc band grab it, and the page does not scroll under the gauge.
-    <div ref={box} className="relative w-full max-w-[22rem] touch-none select-none rounded-3xl focus-visible:ring-2 focus-visible:ring-ring"
-      role="slider" tabIndex={0} aria-label="Calore percepito da raggiungere" aria-valuemin={Math.round(lowest * 10) / 10} aria-valuemax={before} aria-disabled={lowest >= before - 0.05 || undefined}
-      aria-valuenow={Math.round(after * 10) / 10} aria-valuetext={`${fmt(after)} gradi`} onKeyDown={onKey}
+    <div ref={box} className="relative w-full touch-none select-none rounded-3xl focus-visible:ring-2 focus-visible:ring-ring"
+      role="slider" tabIndex={0} aria-label="Calore percepito da raggiungere" aria-valuemin={Math.round(lowest * 10) / 10} aria-valuemax={Math.round(before * 10) / 10} aria-disabled={disabled || undefined}
+      aria-valuenow={Math.round(after * 10) / 10} aria-valuetext={`${fmt(after)} gradi${stops.find((s) => s.on) ? `, ${stops.find((s) => s.on)!.label}` : ""}`} onKeyDown={onKey}
       onPointerDown={(e) => {
         const { x, y } = local(e), d = Math.hypot(x, y);
-        if (d < R - 34 || d > R + 30 || y < -12 || lowest >= before - 0.05) return;
+        if (d < R - 34 || d > R + 30 || y < -12 || disabled) return;
         e.currentTarget.setPointerCapture(e.pointerId);
-        onSlideStart();
         move(e);
       }}
       onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) move(e); }}
@@ -95,11 +127,21 @@ function Gauge({ before, after, lowest, min: MIN, max: MAX, onSlide, onSlideStar
         </defs>
         <path d="M12 100 A88 88 0 0 1 188 100" fill="none" stroke="currentColor" strokeOpacity="0.1" strokeWidth="14" strokeLinecap="round" />
         <path d="M12 100 A88 88 0 0 1 188 100" fill="none" stroke="url(#thermo-scale)" strokeWidth="14" strokeLinecap="round" strokeDasharray={`${C * share(shown)} ${C}`} className={motion} />
+        {stops.map((s) => { const p = at(s.t); return <circle key={s.id} cx={p.x} cy={p.y} r="2.6" fill="var(--background)" opacity="0.9" />; })}
         <circle cx={b.x} cy={b.y} r="5.5" fill="none" stroke="currentColor" strokeOpacity="0.5" strokeWidth="2" />
         <circle cx={a.x} cy={a.y} r={finger === null ? 9 : 12} fill="#fff" stroke="#0d1016" strokeWidth="2.5" className="[filter:drop-shadow(0_2px_4px_rgb(0_0_0/0.4))]" />
-        <text x="12" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{MIN}°</text>
-        <text x="188" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{MAX}°</text>
+        <text x="12" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{Math.round(MIN)}°</text>
+        <text x="188" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{Math.round(MAX)}°</text>
       </svg>
+      {/* The levels, written just outside the arc where their stop is: one touch moves the dot there. */}
+      {!disabled && stops.map((s) => (
+        <button key={s.id} type="button" tabIndex={-1} aria-pressed={s.on} onPointerDown={(e) => e.stopPropagation()} onClick={() => onStop(s.id)}
+          style={pct(at(s.t, R + 24))}
+          className={cn("absolute w-max max-w-[5rem] -translate-x-1/2 -translate-y-1/2 rounded-xl px-2 py-1 text-center text-[11px] font-semibold leading-tight outline-none transition-[background-color,color,box-shadow,left,top] duration-200 active:scale-95 motion-reduce:transition-none",
+            s.on ? "bg-foreground text-background shadow-[0_0_14px_rgb(255_255_255/0.35)]" : s.near ? "bg-foreground/[0.12] text-foreground ring-1 ring-foreground/40" : "bg-foreground/[0.06] text-foreground/80 hover:bg-foreground/[0.1]")}>
+          {s.label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -170,7 +212,9 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
   const gainNow = est.dT * share;
   const after = before - gainNow;
   const gain = gainNow < 0.8 ? 0 : gainNow < 1.8 ? 1 : gainNow < 2.8 ? 2 : gainNow < 3.8 ? 3 : 4;
-  const dialMax = Math.ceil(before) + 2, dialMin = Math.floor(before) - 8;
+  // The arc spans only what can be reached now (a little past both ends), so the three stops stay apart.
+  const lowest = before - MAX_GAIN * share;
+  const dialMax = before + 0.6, dialMin = lowest - 1.4;
   const feel = feeling(after);
   const preset = PRESETS.find((p) => p.trees === urban.trees && p.permeable === urban.permeable && p.shade === urban.shade)?.id ?? null;
   const level = comparison.find((l) => l.id === (preset ?? levelOf(est.dT))) ?? comparison[0]!;
@@ -191,21 +235,22 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
     setUrban({ ...patch, treeCells: null, permeableCells: null, shadeCells: null });
   };
 
-  // Sliding the gauge asks for a temperature: the mix in hand when the slide began is scaled up or down to reach it
-  // (an empty piazza starts from the "Pochi sensori" mix). The gain grows in step with the mix, up to its 5,2 °C cap.
-  const MAX_GAIN = 5.2;
-  const slideBase = useRef(urban);
-  const startSlide = () => {
-    slideBase.current = est.dT > 0.05 ? urban : { ...urban, ...PRESETS[1]! };
-  };
+  // Sliding the gauge asks for a temperature: the piazza walks the path empty → the three ready piazzas, so every
+  // stop on the arc is exactly its level and the dot between two stops mixes them.
   const slideTo = (t: number) => {
-    const base = slideBase.current, baseGain = piazzaEstimate(base.trees, base.permeable, base.shade).dT;
-    const k = baseGain > 0 && share > 0 ? clamp(before - t, 0, MAX_GAIN * share) / (baseGain * share) : 0;
-    const next = { trees: Math.min(30, Math.round(base.trees * k)), permeable: Math.min(100, Math.round(base.permeable * k)), shade: Math.min(100, Math.round(base.shade * k)) };
+    const next = mixFor(share > 0 ? (before - t) / share : 0);
     if (next.trees === urban.trees && next.permeable === urban.permeable && next.shade === urban.shade) return;
-    hapticTick();
     change(next);
   };
+  const applyLevel = (id: PrototypeId) => {
+    const p = PRESETS.find((x) => x.id === id)!;
+    hapticTick();
+    change({ trees: p.trees, permeable: p.permeable, shade: p.shade });
+  };
+  const stops: Stop[] = PRESETS.map((p) => ({
+    id: p.id, label: comparison.find((c) => c.id === p.id)!.s, t: before - gainOf(p) * share,
+    on: preset === p.id, near: !preset && est.dT > 0.05 && level.id === p.id,
+  }));
 
   const facts: Array<{ icon: LucideIcon; value: string; label: string }> = [
     { icon: Leaf, value: `${co2} kg`, label: "CO₂ l'anno" },
@@ -217,27 +262,10 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
 
   return (
     <section className="fuse-canvas space-y-5 rounded-t-3xl px-3 pb-6 pt-4 text-foreground sm:px-5" aria-label="Termometro della piazza">
-      {/* 1 · The three levels: the comparison itself, one touch applies it; the nearest one follows the slider. */}
-      <div>
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold">Scegli un livello</h3>
-          {matrix && <button type="button" onClick={() => setInfo(true)} className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-muted-foreground outline-none hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-ring"><Info className="size-4" aria-hidden="true" />Costi e tempi</button>}
-        </div>
-        <div className="grid grid-cols-3 gap-2" role="group" aria-label="Tre livelli di intervento">
-          {PRESETS.map((p) => {
-            const l = comparison.find((c) => c.id === p.id)!, on = preset === p.id, near = !on && level.id === p.id;
-            const pAfter = before - piazzaEstimate(p.trees, p.permeable, p.shade).dT * share;
-            return (
-              <button key={p.id} type="button" aria-pressed={on} onClick={() => change({ trees: p.trees, permeable: p.permeable, shade: p.shade })}
-                aria-label={`${l.s}: ${fmt(pAfter)} gradi`}
-                className={cn("flex min-h-20 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 py-2 text-center outline-none transition-[background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-ring active:scale-95 motion-reduce:active:scale-100",
-                  on ? "bg-foreground/[0.12] shadow-[0_0_0_2px_var(--foreground)]" : near ? "bg-foreground/[0.08] outline-dashed outline-2 outline-offset-0 outline-foreground/50" : "bg-foreground/[0.05] hover:bg-foreground/[0.08]")}>
-                <span className="text-[12px] font-semibold leading-tight">{l.s}</span>
-                <span className={cn("font-display text-2xl font-light tabular-nums", GAIN_TEXT[feeling(pAfter).step])}>{fmt(pAfter)}°</span>
-              </button>
-            );
-          })}
-        </div>
+      {/* 1 · How to use it, and the costs-and-times table one touch away. */}
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground">{share > 0.01 ? "Trascina il punto bianco o tocca un livello" : "Ritocca la piazza qui sotto"}</p>
+        {matrix && <button type="button" onClick={() => setInfo(true)} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-muted-foreground outline-none hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-ring"><Info className="size-4" aria-hidden="true" />Costi e tempi</button>}
       </div>
 
       {/* The simulation stays the focus: once the gauge scrolls away, its reading rides under the tabs. */}
@@ -252,11 +280,13 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
       </div>
 
       {/* 2 · The gauge: drag the white dot to choose how much to cool. */}
-      <div ref={gaugeRef} className="relative mx-auto flex max-w-[22rem] flex-col items-center">
-        <Gauge before={before} after={after} lowest={before - MAX_GAIN * share} min={dialMin} max={dialMax} onSlide={slideTo} onSlideStart={startSlide} />
-        <div className="pointer-events-none absolute inset-x-0 bottom-1 flex flex-col items-center" aria-live="polite">
-          <span className={cn("rounded-full px-3 py-0.5 text-sm font-semibold text-white transition-colors duration-300", feel.bg ?? GAIN_BG[feel.step])}>{feel.text}</span>
+      <div ref={gaugeRef} className="relative mx-auto mt-10 flex max-w-[21rem] flex-col items-center px-7">
+        <Gauge before={before} after={after} lowest={lowest} min={dialMin} max={dialMax} stops={share > 0.15 ? stops : []} onSlide={slideTo} onStop={applyLevel} />
+        {/* Inside the arc: how it feels, the reading and what it costs, all following the dot. */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center" aria-live="polite">
+          <span className={cn("rounded-full px-3 py-0.5 text-[13px] font-semibold text-white transition-colors duration-300", feel.bg ?? GAIN_BG[feel.step])}>{feel.text}</span>
           <span className="mt-1 font-display text-6xl font-light leading-none tracking-tight tabular-nums">{fmt(after)}°</span>
+          <span className="mt-1.5 font-mono text-sm font-semibold tabular-nums">{est.dT > 0.05 ? euroRange(cost.total) : "Nessun intervento"}</span>
         </div>
       </div>
 
@@ -304,14 +334,13 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
           className="flex w-full items-center gap-3 rounded-3xl p-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <Wallet className="size-6 shrink-0 text-muted-foreground" aria-hidden="true" />
           <span className="min-w-0 flex-1">
-            <span className="block text-xs text-muted-foreground">Costo e benefici · {level.s}</span>
-            <span className="block font-display text-2xl font-light tabular-nums" aria-live="polite">{euroRange(cost.total)}</span>
+            <span className="block text-xs text-muted-foreground">Dettagli costo e benefici{est.dT <= 0.05 ? "" : preset ? ` · ${level.s}` : ` · vicino a ${level.s}`}</span>
+            <span className="block font-mono text-base font-semibold tabular-nums">{Math.round(cost.perM2.lo)}–{Math.round(cost.perM2.hi)} € al m²</span>
           </span>
           <ChevronDown className={cn("size-5 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", costOpen && "rotate-180")} aria-hidden="true" />
         </button>
         <div id="piazza-cost-body" hidden={!costOpen} className="space-y-3 px-4 pb-4">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-            <span className="font-mono font-semibold tabular-nums">{Math.round(cost.perM2.lo)}–{Math.round(cost.perM2.hi)} € al m²</span>
             <span className="inline-flex items-center gap-1.5 text-muted-foreground"><Ruler className="size-4 shrink-0" aria-hidden="true" />{surface} · {surfaceNote.toLowerCase()}</span>
           </div>
           <dl className="grid grid-cols-3 gap-2 border-t border-foreground/10 pt-3">
