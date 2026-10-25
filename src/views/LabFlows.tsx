@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SensorAdvisor } from "@/views/SensorAdvisor";
 import { LabMedia } from "@/views/LabMedia";
 import { LocationCard, splitLocation, ImportWeatherButton } from "@/views/SimulationGrid";
-import { UrbanStudio } from "@/views/v7/UrbanStudio";
+import { UrbanThermometer } from "@/views/v9c/UrbanThermometer";
 import { VineStudio } from "@/views/v7/VineStudio";
 import { SimShell } from "@/views/v8/SimShell";
 import { Fold } from "@/views/Fold";
@@ -305,7 +305,7 @@ export function UrbanFlow() {
     <div className="space-y-4">
       <LabSyncIndicator />
       <SimShell kind="urban" place={place.name} onCompare={showComparison} onReset={restoreScenario}
-        simula={<UrbanStudio />}
+        simula={<UrbanThermometer />}
         luogo={<LocationCard kind="urban" />}
         media={<LabMedia embedded kind="urban" context={`Scenario: ${comparison.find((l) => l.id === activeLevel)?.s ?? "attuale"}`} />}
         sensori={<SensorAdvisor embedded kind="urban" />} />
