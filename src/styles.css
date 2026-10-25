@@ -1995,15 +1995,15 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 
 /* v10 opening page: the drawn heat lines turn very slowly (still with reduced motion). */
 /* v10 entrance backdrop: a turning, breathing aurora that changes tint now and then, twinkling data points and sparks rising (all still with reduced motion). */
-.intro-aurora { animation: intro-aurora-turn 60s linear infinite, intro-aurora-tint 48s ease-in-out infinite; }
+.intro-aurora { will-change: transform, filter; animation: intro-aurora-turn 150s linear infinite, intro-aurora-tint 90s ease-in-out infinite; }
 @keyframes intro-aurora-turn { to { transform: rotate(360deg); } }
 /* Every now and then the aurora takes another tint (cooler violet-blue, then greener), rests there, and comes back. */
 @keyframes intro-aurora-tint { 0%, 22% { filter: hue-rotate(0deg) saturate(1); } 33%, 55% { filter: hue-rotate(55deg) saturate(1.25); } 66%, 88% { filter: hue-rotate(-45deg) saturate(1.15); } 100% { filter: hue-rotate(0deg) saturate(1); } }
-.intro-glow { animation: intro-drift 14s ease-in-out infinite alternate; }
-.intro-glow-b { animation-duration: 19s; animation-direction: alternate-reverse; }
-.intro-glow-c { animation-duration: 23s; }
-@keyframes intro-drift { from { transform: translate3d(-6%, -4%, 0) scale(0.95); border-radius: 45% 55% 60% 40%; } to { transform: translate3d(8%, 6%, 0) scale(1.2); border-radius: 60% 40% 40% 60%; } }
-.intro-dot { opacity: 0.15; animation: intro-twinkle 4.2s ease-in-out infinite; }
+.intro-glow { will-change: transform; animation: intro-drift 32s ease-in-out infinite alternate; }
+.intro-glow-b { animation-duration: 42s; animation-direction: alternate-reverse; }
+.intro-glow-c { animation-duration: 52s; }
+@keyframes intro-drift { from { transform: translate3d(-5%, -3%, 0) scale(0.95); } to { transform: translate3d(6%, 5%, 0) scale(1.15); } }
+.intro-dot { opacity: 0.15; animation: intro-twinkle 7s ease-in-out infinite; }
 @keyframes intro-twinkle { 50% { opacity: 0.85; } }
 .intro-spark { opacity: 0; animation: intro-rise linear infinite; }
 @keyframes intro-rise { 0% { transform: translateY(0); opacity: 0; } 10% { opacity: 0.9; } 80% { opacity: 0.5; } 100% { transform: translateY(-85vh); opacity: 0; } }

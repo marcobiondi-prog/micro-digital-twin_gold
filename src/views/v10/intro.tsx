@@ -73,24 +73,25 @@ const STEPS: Array<{ title: string; text: string; art: ReactNode }> = [
 ];
 
 /** Where the data points of the sky sit (x %, y %, size px, delay s): fixed, so the server and the phone draw the same sky. */
-const DOTS: Array<[number, number, number, number]> = [[8, 12, 2, 0], [22, 26, 1.5, 1.2], [37, 8, 2, 2.4], [63, 15, 1.5, 0.6], [78, 6, 2, 1.8], [90, 22, 1.5, 3], [14, 40, 1.5, 2.1], [86, 38, 2, 0.9], [50, 30, 1.5, 3.4], [70, 44, 1.5, 1.5], [30, 48, 2, 2.7], [5, 58, 1.5, 0.3]];
+const DOTS: Array<[number, number, number, number]> = [[8, 12, 2, 0], [37, 8, 2, 2.4], [63, 15, 1.5, 0.6], [90, 22, 1.5, 3], [14, 40, 1.5, 2.1], [86, 38, 2, 0.9], [50, 30, 1.5, 3.4], [30, 48, 2, 2.7]];
 /** Sparks rising from the floor (x %, size px, duration s, delay s). */
-const SPARKS: Array<[number, number, number, number]> = [[12, 3, 14, 0], [27, 2, 18, 4], [41, 3, 16, 9], [55, 2, 20, 2], [68, 3, 15, 7], [82, 2, 19, 11], [93, 3, 17, 5], [5, 2, 21, 13], [48, 2, 13, 15], [74, 3, 22, 1]];
+const SPARKS: Array<[number, number, number, number]> = [[12, 3, 26, 0], [41, 3, 30, 9], [55, 2, 34, 3], [74, 3, 28, 15], [90, 2, 32, 6]];
 
 /**
  * The entrance's backdrop, light and airy: an aurora in Twin's turquoise, a cool blue and a warm heat glow, slowly turning and
- * breathing (heavily blurred) and changing tint every now and then, a sky of twinkling data points and sparks rising from the bottom.
+ * breathing and changing tint every now and then, a few twinkling data points and sparks rising from the bottom.
+ * Kept light: the glows are soft gradients (no blur filter, no blending) that only move by transform, so the phone just composites them.
  * Still with reduced motion.
  */
 function Backdrop() {
   return (
     <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[#05070c]" aria-hidden="true">
       {/* Aurora: three coloured lights, blended so they brighten where they meet. */}
-      <div className="intro-aurora absolute -inset-[20%] [mix-blend-mode:screen]">
+      <div className="intro-aurora absolute -inset-[20%]">
         {/* The colours change every now and then: the whole aurora drifts to another tint, rests, and comes back. */}
-        <div className="intro-glow intro-glow-a absolute left-[5%] top-[2%] h-[60vh] w-[75vw] rounded-[45%_55%_60%_40%] bg-[radial-gradient(closest-side,rgb(76_201_189/0.55),transparent)] [filter:blur(90px)]" />
-        <div className="intro-glow intro-glow-b absolute right-[0%] top-[20%] h-[55vh] w-[70vw] rounded-[60%_40%_45%_55%] bg-[radial-gradient(closest-side,rgb(40_100_230/0.5),transparent)] [filter:blur(90px)]" />
-        <div className="intro-glow intro-glow-c absolute bottom-[18%] left-[25%] h-[40vh] w-[60vw] rounded-[50%] bg-[radial-gradient(closest-side,rgb(255_130_60/0.3),transparent)] [filter:blur(90px)]" />
+        <div className="intro-glow intro-glow-a absolute left-[5%] top-[2%] h-[60vh] w-[75vw] bg-[radial-gradient(closest-side,rgb(76_201_189/0.55),rgb(76_201_189/0.22)_45%,transparent)]" />
+        <div className="intro-glow intro-glow-b absolute right-[0%] top-[20%] h-[55vh] w-[70vw] bg-[radial-gradient(closest-side,rgb(40_100_230/0.5),rgb(40_100_230/0.2)_45%,transparent)]" />
+        <div className="intro-glow intro-glow-c absolute bottom-[18%] left-[25%] h-[40vh] w-[60vw] bg-[radial-gradient(closest-side,rgb(255_130_60/0.22),rgb(255_130_60/0.08)_45%,transparent)]" />
       </div>
       {DOTS.map(([x, y, r, d]) => <span key={`${x}-${y}`} className="intro-dot absolute rounded-full bg-white" style={{ left: `${x}%`, top: `${y}%`, width: r, height: r, animationDelay: `${d}s` }} />)}
       {SPARKS.map(([x, r, t, d]) => <span key={x} className="intro-spark absolute bottom-[8vh] rounded-full bg-[rgb(140_240_225)] shadow-[0_0_8px_rgb(76_201_189)]" style={{ left: `${x}%`, width: r, height: r, animationDuration: `${t}s`, animationDelay: `${d}s` }} />)}
