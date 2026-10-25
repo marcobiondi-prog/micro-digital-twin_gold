@@ -51,6 +51,12 @@ export function placeAreaQuery(lat: number, lng: number): string {
   return `[out:json][timeout:20];(way${at}[place=square];relation${at}[place=square];way${at}[highway=pedestrian][area=yes];way${at}["area:highway"=pedestrian];way${at}[leisure~"^(park|garden|playground)$"];relation${at}[highway=pedestrian];);out geom;`;
 }
 
+/** Overpass query for a vineyard: the mapped vineyard plots (landuse=vineyard) within 150 m. */
+export function vineyardAreaQuery(lat: number, lng: number): string {
+  const at = `(around:150,${lat.toFixed(6)},${lng.toFixed(6)})`;
+  return `[out:json][timeout:20];(way${at}[landuse=vineyard];relation${at}[landuse=vineyard];);out geom;`;
+}
+
 type OsmEl = { type: string; tags?: Record<string, string>; geometry?: Array<{ lat: number; lon: number }>; members?: Array<{ role?: string; geometry?: Array<{ lat: number; lon: number }> }> };
 
 /** Reads the Overpass reply into candidates (ways as one ring, relations as their closed outer rings). */

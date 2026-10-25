@@ -50,7 +50,7 @@ const feeling = (t: number): { text: string; step: number; bg?: string } =>
 
 
 /** A level as a stop on the arc: where its ready piazza would bring the perceived heat now. */
-type Stop = { id: PrototypeId; label: string; t: number; on: boolean; near: boolean };
+export type Stop = { id: PrototypeId; label: string; t: number; on: boolean; near: boolean };
 
 /**
  * Half-ring gauge you can slide, the one control of the page: the coloured arc and the white dot show how hot the
@@ -58,7 +58,7 @@ type Stop = { id: PrototypeId; label: string; t: number; on: boolean; near: bool
  * the dot goes there). A finger anywhere on the arc grabs the dot: it follows the finger exactly, clicks into a stop
  * when close to it, and the piazza follows; arrow keys move it by 0,1 °C, Page Up/Down jump between stops.
  */
-function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlide, onStop }: { before: number; after: number; lowest: number; min: number; max: number; stops: Stop[]; onSlide: (t: number) => void; onStop: (id: PrototypeId) => void }) {
+export function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlide, onStop, unit = "°", spoken = "gradi", label = "Calore percepito da raggiungere", step: keyStep = 0.1 }: { before: number; after: number; lowest: number; min: number; max: number; stops: Stop[]; onSlide: (t: number) => void; onStop: (id: PrototypeId) => void; unit?: string; spoken?: string; label?: string; step?: number }) {
   const R = 88, C = Math.PI * R;
   const box = useRef<HTMLDivElement>(null);
   // While sliding, the temperature under the finger (the piazza snaps to whole trees, the dot must not).
@@ -97,7 +97,7 @@ function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlide, onSt
       if (next) onStop(next.id); else if (e.key === "PageUp") onSlide(before);
       return;
     }
-    const step = e.key === "ArrowLeft" || e.key === "ArrowDown" ? -0.1 : e.key === "ArrowRight" || e.key === "ArrowUp" ? 0.1 : e.key === "Home" ? -99 : e.key === "End" ? 99 : 0;
+    const step = e.key === "ArrowLeft" || e.key === "ArrowDown" ? -keyStep : e.key === "ArrowRight" || e.key === "ArrowUp" ? keyStep : e.key === "Home" ? -99 : e.key === "End" ? 99 : 0;
     if (!step) return;
     e.preventDefault();
     onSlide(reach(after + step));
@@ -108,8 +108,8 @@ function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlide, onSt
     // An HTML layer takes the finger (touch-action works everywhere on HTML, not on every SVG): only touches that start
     // on the arc band grab it, and the page does not scroll under the gauge.
     <div ref={box} className="relative w-full touch-none select-none rounded-3xl focus-visible:ring-2 focus-visible:ring-ring"
-      role="slider" tabIndex={0} aria-label="Calore percepito da raggiungere" aria-valuemin={Math.round(lowest * 10) / 10} aria-valuemax={Math.round(before * 10) / 10} aria-disabled={disabled || undefined}
-      aria-valuenow={Math.round(after * 10) / 10} aria-valuetext={`${fmt(after)} gradi${stops.find((s) => s.on) ? `, ${stops.find((s) => s.on)!.label}` : ""}`} onKeyDown={onKey}
+      role="slider" tabIndex={0} aria-label={label} aria-valuemin={Math.round(lowest * 10) / 10} aria-valuemax={Math.round(before * 10) / 10} aria-disabled={disabled || undefined}
+      aria-valuenow={Math.round(after * 10) / 10} aria-valuetext={`${keyStep >= 1 ? Math.round(after) : fmt(after)} ${spoken}${stops.find((s) => s.on) ? `, ${stops.find((s) => s.on)!.label}` : ""}`} onKeyDown={onKey}
       onPointerDown={(e) => {
         const { x, y } = local(e), d = Math.hypot(x, y);
         if (d < R - 34 || d > R + 30 || y < -12 || disabled) return;
@@ -130,8 +130,8 @@ function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlide, onSt
         {stops.map((s) => { const p = at(s.t); return <circle key={s.id} cx={p.x} cy={p.y} r="2.6" fill="var(--background)" opacity="0.9" />; })}
         <circle cx={b.x} cy={b.y} r="5.5" fill="none" stroke="currentColor" strokeOpacity="0.5" strokeWidth="2" />
         <circle cx={a.x} cy={a.y} r={finger === null ? 9 : 12} fill="#fff" stroke="#0d1016" strokeWidth="2.5" className="[filter:drop-shadow(0_2px_4px_rgb(0_0_0/0.4))]" />
-        <text x="12" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{Math.round(MIN)}°</text>
-        <text x="188" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{Math.round(MAX)}°</text>
+        <text x="12" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{Math.round(MIN)}{unit}</text>
+        <text x="188" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{Math.round(MAX)}{unit}</text>
       </svg>
       {/* The levels, written just outside the arc where their stop is: one touch moves the dot there. */}
       {!disabled && stops.map((s) => (
@@ -147,7 +147,7 @@ function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlide, onSt
 }
 
 /** One intervention on one line: − / +, its icon, name and value, and ten marks that fill as it grows. */
-function Lever({ icon: Icon, label, value, step, max, color, swatch, onChange }: { icon: LucideIcon; label: string; value: number; step: number; max: number; color: string; swatch: string; onChange: (v: number) => void }) {
+export function Lever({ icon: Icon, label, value, step, max, color, swatch, onChange, shown }: { icon: LucideIcon; label: string; value: number; step: number; max: number; color: string; swatch: string; onChange: (v: number) => void; shown?: string }) {
   const set = (v: number) => { const n = clamp(v, 0, max); if (n !== value) { hapticTick(); onChange(n); } };
   const filled = Math.round((value / max) * MARKS);
   const btn = "grid size-12 shrink-0 place-items-center rounded-2xl bg-foreground/[0.07] text-foreground outline-none transition-[background-color,transform] duration-150 hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring active:scale-90 disabled:opacity-30 motion-reduce:active:scale-100";
@@ -158,7 +158,7 @@ function Lever({ icon: Icon, label, value, step, max, color, swatch, onChange }:
         <div className="flex items-center gap-2">
           <Icon className={cn("size-5 shrink-0", color)} aria-hidden="true" />
           <span className="truncate text-[15px] font-semibold">{label}</span>
-          <span className="ml-auto shrink-0 font-mono text-sm font-semibold tabular-nums">{value}{step === 1 ? "" : "%"}</span>
+          <span className="ml-auto shrink-0 font-mono text-sm font-semibold tabular-nums">{shown ?? `${value}${step === 1 ? "" : "%"}`}</span>
         </div>
         <div className="mt-1.5 grid grid-cols-10 gap-1" aria-hidden="true">
           {Array.from({ length: MARKS }, (_, k) => <span key={k} className={cn("h-2 rounded-full transition-colors duration-200 motion-reduce:transition-none", k < filled ? swatch : "bg-foreground/10")} />)}

@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { applyVineMix, vineMixOf } from "./vine-interventions";
 import { vineModel, type Pheno } from "./data";
 import { piazzaEstimate, vineZones } from "./scenarios";
 
@@ -9,7 +10,7 @@ export type LabState = {
   syncedAt?: number | null;
   syncedTargets?: string[] | null;
   urban: { trees: number; permeable: number; shade: number; location: Loc; treeCells: number[] | null; permeableCells: number[] | null; shadeCells: number[] | null; realTemp?: number | null };
-  vineyard: { zones: VineZoneState[]; phase: Pheno; selected: number; allZones: boolean; location: Loc };
+  vineyard: { zones: VineZoneState[]; phase: Pheno; selected: number; allZones: boolean; location: Loc; irrigation?: number; shade?: number; windbreak?: number };
 };
 
 const KEY = "micro-digital-twin-lab";
@@ -78,13 +79,15 @@ export function urbanMetrics(u: LabState["urban"]) {
 }
 export function vineMetrics(v: LabState["vineyard"]) {
   const offset = Math.max(-3, Math.min(3, (41.83 - v.location.lat) * 0.6));
-  const results = v.zones.map((z) => vineModel({ moisture: z.moisture, temp: z.temperature + offset, wind: z.wind, phase: v.phase, rain: z.rain }));
+  // The interventions (irrigation, shade cloth, windbreak) act on every zone before the vines' thirst is read.
+  const zones = applyVineMix(v.zones, vineMixOf(v));
+  const results = zones.map((z) => vineModel({ moisture: z.moisture, temp: z.temperature + offset, wind: z.wind, phase: v.phase, rain: z.rain }));
   const avg = (n: number[]) => n.reduce((s, x) => s + x, 0) / Math.max(1, n.length);
   return {
     results,
-    moisture: Math.round(avg(v.zones.map((z) => z.moisture))),
+    moisture: Math.round(avg(zones.map((z) => z.moisture))),
     waterStress: Math.round(avg(results.map((r) => r.s))),
-    heatStress: Math.round(Math.max(0, Math.min(100, ((avg(v.zones.map((z) => z.temperature)) + offset - 20) / 25) * 100))),
+    heatStress: Math.round(Math.max(0, Math.min(100, ((avg(zones.map((z) => z.temperature)) + offset - 20) / 25) * 100))),
   };
 }
 
