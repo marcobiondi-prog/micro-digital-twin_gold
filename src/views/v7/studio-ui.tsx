@@ -59,14 +59,3 @@ export function LevelBar({ icon: Icon, label, level, onChange, color, value }: {
     </div>
   );
 }
-
-/** Thin before → after bar on the heat scale, readable without words. */
-export function HeatBar({ from, to, min, max }: { from: number; to: number; min: number; max: number }) {
-  const pos = (t: number) => `${Math.max(0, Math.min(100, ((t - min) / (max - min)) * 100))}%`;
-  return (
-    <div className="relative h-2.5 rounded-full bg-[linear-gradient(90deg,var(--radar-cool),var(--radar-mild),var(--radar-warm),var(--radar-hot),var(--radar-extreme))]" aria-hidden="true">
-      <span className="absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/80 bg-[#0d1016]" style={{ left: pos(from) }} />
-      <span className="absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-white shadow-[0_0_10px_rgb(255_255_255/0.7)] transition-[left] duration-500 motion-reduce:transition-none" style={{ left: pos(to) }} />
-    </div>
-  );
-}
