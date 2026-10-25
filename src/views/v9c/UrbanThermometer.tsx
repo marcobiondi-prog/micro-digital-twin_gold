@@ -33,55 +33,72 @@ const feeling = (t: number): { text: string; step: number } =>
   t >= 39 ? { text: "Troppo caldo", step: 0 } : t >= 36 ? { text: "Molto caldo", step: 1 } : t >= 33 ? { text: "Caldo", step: 2 } : { text: "Si sta bene", step: 4 };
 
 /**
- * Half-ring gauge you can slide: the coloured arc and the white dot show how hot the piazza feels now, the faint ring
- * where today starts. Dragging the dot (or anywhere on the arc) asks for a temperature; arrow keys move it by 0,1 °C.
+ * Half-ring gauge you can slide: the coloured arc and the white dot show how hot the piazza feels, the faint ring
+ * where today starts. A finger anywhere on the arc grabs it: while it moves the dot follows the finger exactly and
+ * the piazza follows the asked temperature; arrow keys move it by 0,1 °C.
  */
 function Gauge({ before, after, lowest, onSlide, onSlideStart }: { before: number; after: number; lowest: number; onSlide: (t: number) => void; onSlideStart: () => void }) {
   const R = 88, C = Math.PI * R;
-  const svg = useRef<SVGSVGElement>(null);
-  const [dragging, setDragging] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  // While sliding, the temperature under the finger (the piazza snaps to whole trees, the dot must not).
+  const [finger, setFinger] = useState<number | null>(null);
+  const shown = finger ?? after;
   const share = (t: number) => clamp((t - MIN) / (MAX - MIN), 0, 1);
   const angle = (t: number) => Math.PI * (1 - share(t));
   const at = (t: number) => ({ x: 100 + Math.cos(angle(t)) * R, y: 100 - Math.sin(angle(t)) * R });
-  const b = at(before), a = at(after);
-  // Only temperatures the piazza can reach: from today down to the most it can cool.
-  const reach = (t: number) => Math.round(clamp(t, lowest, before) * 10) / 10;
-  const fromPointer = (e: PointerEvent<SVGElement>) => {
-    const r = svg.current?.getBoundingClientRect();
-    if (!r) return;
-    const x = ((e.clientX - r.left) / r.width) * 200 - 100, y = 100 - ((e.clientY - r.top) / r.height) * 112;
-    const ang = Math.atan2(Math.max(0, y), x); // 0 = right end (hot), π = left end (cool)
-    onSlide(reach(MIN + (1 - ang / Math.PI) * (MAX - MIN)));
+  const b = at(before), a = at(shown);
+  const reach = (t: number) => clamp(t, lowest, before);
+  /** Finger position in the drawing's units (viewBox 200 × 112, arc centre at 100,100). */
+  const local = (e: PointerEvent<HTMLDivElement>) => {
+    const r = box.current!.getBoundingClientRect();
+    return { x: ((e.clientX - r.left) / r.width) * 200 - 100, y: 100 - ((e.clientY - r.top) / r.height) * 112 };
   };
-  const onKey = (e: KeyboardEvent<SVGElement>) => {
+  const tempAt = (x: number, y: number) => MIN + (1 - Math.atan2(Math.max(0, y), x) / Math.PI) * (MAX - MIN);
+  const move = (e: PointerEvent<HTMLDivElement>) => {
+    const { x, y } = local(e);
+    const t = reach(tempAt(x, y));
+    setFinger(t);
+    onSlide(Math.round(t * 10) / 10);
+  };
+  const end = () => setFinger(null);
+  const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
     const step = e.key === "ArrowLeft" || e.key === "ArrowDown" ? -0.1 : e.key === "ArrowRight" || e.key === "ArrowUp" ? 0.1 : e.key === "Home" ? -99 : e.key === "End" ? 99 : 0;
     if (!step) return;
     e.preventDefault();
     onSlideStart();
-    onSlide(reach(after + step));
+    onSlide(Math.round(reach(after + step) * 10) / 10);
   };
-  const motion = dragging ? "" : "transition-[stroke-dasharray] duration-500 motion-reduce:transition-none";
+  const motion = finger === null ? "transition-[stroke-dasharray] duration-300 motion-reduce:transition-none" : "";
   return (
-    <svg ref={svg} viewBox="0 0 200 112" className="w-full max-w-[22rem] overflow-visible">
-      <defs>
-        <linearGradient id="thermo-scale" x1="0" x2="1" y1="0" y2="0">
-          <stop offset="0" stopColor="var(--radar-cool)" /><stop offset="0.3" stopColor="var(--radar-mild)" /><stop offset="0.55" stopColor="var(--radar-warm)" /><stop offset="0.78" stopColor="var(--radar-hot)" /><stop offset="1" stopColor="var(--radar-extreme)" />
-        </linearGradient>
-      </defs>
-      <path d="M12 100 A88 88 0 0 1 188 100" fill="none" stroke="currentColor" strokeOpacity="0.1" strokeWidth="14" strokeLinecap="round" aria-hidden="true" />
-      <path d="M12 100 A88 88 0 0 1 188 100" fill="none" stroke="url(#thermo-scale)" strokeWidth="14" strokeLinecap="round" strokeDasharray={`${C * share(after)} ${C}`} className={motion} aria-hidden="true" />
-      <circle cx={b.x} cy={b.y} r="5.5" fill="none" stroke="currentColor" strokeOpacity="0.5" strokeWidth="2" aria-hidden="true" />
-      {/* A wide invisible band along the arc takes the finger, so the page still scrolls elsewhere. */}
-      <path d="M12 100 A88 88 0 0 1 188 100" fill="none" stroke="transparent" strokeWidth="44" pointerEvents="stroke" className="cursor-grab touch-none"
-        onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); setDragging(true); onSlideStart(); fromPointer(e); }}
-        onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) fromPointer(e); }}
-        onPointerUp={() => setDragging(false)} onPointerCancel={() => setDragging(false)} aria-hidden="true" />
-      <circle cx={a.x} cy={a.y} r={dragging ? 11 : 9} fill="#fff" stroke="#0d1016" strokeWidth="2.5"
-        role="slider" tabIndex={0} aria-label="Calore percepito da raggiungere" aria-valuemin={Math.round(lowest * 10) / 10} aria-valuemax={before} aria-valuenow={Math.round(after * 10) / 10} aria-valuetext={`${fmt(after)} gradi`}
-        onKeyDown={onKey} className="pointer-events-none outline-none [filter:drop-shadow(0_2px_4px_rgb(0_0_0/0.4))] focus-visible:stroke-ring" />
-      <text x="12" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55" aria-hidden="true">{MIN}°</text>
-      <text x="188" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55" aria-hidden="true">{MAX}°</text>
-    </svg>
+    // An HTML layer takes the finger (touch-action works everywhere on HTML, not on every SVG): only touches that start
+    // on the arc band grab it, and the page does not scroll under the gauge.
+    <div ref={box} className="relative w-full max-w-[22rem] touch-none select-none rounded-3xl focus-visible:ring-2 focus-visible:ring-ring"
+      role="slider" tabIndex={0} aria-label="Calore percepito da raggiungere" aria-valuemin={Math.round(lowest * 10) / 10} aria-valuemax={before}
+      aria-valuenow={Math.round(after * 10) / 10} aria-valuetext={`${fmt(after)} gradi`} onKeyDown={onKey}
+      onPointerDown={(e) => {
+        const { x, y } = local(e), d = Math.hypot(x, y);
+        if (d < R - 34 || d > R + 30 || y < -12) return;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        onSlideStart();
+        move(e);
+      }}
+      onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) move(e); }}
+      onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end}
+      style={{ outline: "none" }}>
+      <svg viewBox="0 0 200 112" className="pointer-events-none w-full overflow-visible" aria-hidden="true">
+        <defs>
+          <linearGradient id="thermo-scale" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stopColor="var(--radar-cool)" /><stop offset="0.3" stopColor="var(--radar-mild)" /><stop offset="0.55" stopColor="var(--radar-warm)" /><stop offset="0.78" stopColor="var(--radar-hot)" /><stop offset="1" stopColor="var(--radar-extreme)" />
+          </linearGradient>
+        </defs>
+        <path d="M12 100 A88 88 0 0 1 188 100" fill="none" stroke="currentColor" strokeOpacity="0.1" strokeWidth="14" strokeLinecap="round" />
+        <path d="M12 100 A88 88 0 0 1 188 100" fill="none" stroke="url(#thermo-scale)" strokeWidth="14" strokeLinecap="round" strokeDasharray={`${C * share(shown)} ${C}`} className={motion} />
+        <circle cx={b.x} cy={b.y} r="5.5" fill="none" stroke="currentColor" strokeOpacity="0.5" strokeWidth="2" />
+        <circle cx={a.x} cy={a.y} r={finger === null ? 9 : 12} fill="#fff" stroke="#0d1016" strokeWidth="2.5" className="[filter:drop-shadow(0_2px_4px_rgb(0_0_0/0.4))]" />
+        <text x="12" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{MIN}°</text>
+        <text x="188" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{MAX}°</text>
+      </svg>
+    </div>
   );
 }
 
