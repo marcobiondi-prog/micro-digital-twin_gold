@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { CloudRain, Leaf, Minus, Plus, Info, Ruler, Sprout, Sun, TreePine, Umbrella, Wallet, type LucideIcon } from "lucide-react";
@@ -32,27 +32,55 @@ const levelOf = (dT: number): PrototypeId => {
 const feeling = (t: number): { text: string; step: number } =>
   t >= 39 ? { text: "Troppo caldo", step: 0 } : t >= 36 ? { text: "Molto caldo", step: 1 } : t >= 33 ? { text: "Caldo", step: 2 } : { text: "Si sta bene", step: 4 };
 
-/** Half-ring gauge: the coloured arc and the white dot show how hot the piazza feels now, the faint ring where today starts. */
-function Gauge({ before, after }: { before: number; after: number }) {
+/**
+ * Half-ring gauge you can slide: the coloured arc and the white dot show how hot the piazza feels now, the faint ring
+ * where today starts. Dragging the dot (or anywhere on the arc) asks for a temperature; arrow keys move it by 0,1 °C.
+ */
+function Gauge({ before, after, lowest, onSlide, onSlideStart }: { before: number; after: number; lowest: number; onSlide: (t: number) => void; onSlideStart: () => void }) {
   const R = 88, C = Math.PI * R;
+  const svg = useRef<SVGSVGElement>(null);
+  const [dragging, setDragging] = useState(false);
   const share = (t: number) => clamp((t - MIN) / (MAX - MIN), 0, 1);
   const angle = (t: number) => Math.PI * (1 - share(t));
   const at = (t: number) => ({ x: 100 + Math.cos(angle(t)) * R, y: 100 - Math.sin(angle(t)) * R });
   const b = at(before), a = at(after);
+  // Only temperatures the piazza can reach: from today down to the most it can cool.
+  const reach = (t: number) => Math.round(clamp(t, lowest, before) * 10) / 10;
+  const fromPointer = (e: PointerEvent<SVGElement>) => {
+    const r = svg.current?.getBoundingClientRect();
+    if (!r) return;
+    const x = ((e.clientX - r.left) / r.width) * 200 - 100, y = 100 - ((e.clientY - r.top) / r.height) * 112;
+    const ang = Math.atan2(Math.max(0, y), x); // 0 = right end (hot), π = left end (cool)
+    onSlide(reach(MIN + (1 - ang / Math.PI) * (MAX - MIN)));
+  };
+  const onKey = (e: KeyboardEvent<SVGElement>) => {
+    const step = e.key === "ArrowLeft" || e.key === "ArrowDown" ? -0.1 : e.key === "ArrowRight" || e.key === "ArrowUp" ? 0.1 : e.key === "Home" ? -99 : e.key === "End" ? 99 : 0;
+    if (!step) return;
+    e.preventDefault();
+    onSlideStart();
+    onSlide(reach(after + step));
+  };
+  const motion = dragging ? "" : "transition-[stroke-dasharray] duration-500 motion-reduce:transition-none";
   return (
-    <svg viewBox="0 0 200 112" className="w-full max-w-[22rem]" aria-hidden="true">
+    <svg ref={svg} viewBox="0 0 200 112" className="w-full max-w-[22rem] overflow-visible">
       <defs>
         <linearGradient id="thermo-scale" x1="0" x2="1" y1="0" y2="0">
           <stop offset="0" stopColor="var(--radar-cool)" /><stop offset="0.3" stopColor="var(--radar-mild)" /><stop offset="0.55" stopColor="var(--radar-warm)" /><stop offset="0.78" stopColor="var(--radar-hot)" /><stop offset="1" stopColor="var(--radar-extreme)" />
         </linearGradient>
       </defs>
-      <path d="M12 100 A88 88 0 0 1 188 100" fill="none" stroke="currentColor" strokeOpacity="0.1" strokeWidth="14" strokeLinecap="round" />
-      <path d="M12 100 A88 88 0 0 1 188 100" fill="none" stroke="url(#thermo-scale)" strokeWidth="14" strokeLinecap="round"
-        strokeDasharray={`${C * share(after)} ${C}`} className="transition-[stroke-dasharray] duration-500 motion-reduce:transition-none" />
-      <circle cx={b.x} cy={b.y} r="5.5" fill="none" stroke="currentColor" strokeOpacity="0.5" strokeWidth="2" />
-      <circle cx={a.x} cy={a.y} r="8" fill="#fff" stroke="#0d1016" strokeWidth="2.5" className="transition-[cx,cy] duration-500 motion-reduce:transition-none" />
-      <text x="12" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{MIN}°</text>
-      <text x="188" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{MAX}°</text>
+      <path d="M12 100 A88 88 0 0 1 188 100" fill="none" stroke="currentColor" strokeOpacity="0.1" strokeWidth="14" strokeLinecap="round" aria-hidden="true" />
+      <path d="M12 100 A88 88 0 0 1 188 100" fill="none" stroke="url(#thermo-scale)" strokeWidth="14" strokeLinecap="round" strokeDasharray={`${C * share(after)} ${C}`} className={motion} aria-hidden="true" />
+      <circle cx={b.x} cy={b.y} r="5.5" fill="none" stroke="currentColor" strokeOpacity="0.5" strokeWidth="2" aria-hidden="true" />
+      {/* A wide invisible band along the arc takes the finger, so the page still scrolls elsewhere. */}
+      <path d="M12 100 A88 88 0 0 1 188 100" fill="none" stroke="transparent" strokeWidth="44" pointerEvents="stroke" className="cursor-grab touch-none"
+        onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); setDragging(true); onSlideStart(); fromPointer(e); }}
+        onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) fromPointer(e); }}
+        onPointerUp={() => setDragging(false)} onPointerCancel={() => setDragging(false)} aria-hidden="true" />
+      <circle cx={a.x} cy={a.y} r={dragging ? 11 : 9} fill="#fff" stroke="#0d1016" strokeWidth="2.5"
+        role="slider" tabIndex={0} aria-label="Calore percepito da raggiungere" aria-valuemin={Math.round(lowest * 10) / 10} aria-valuemax={before} aria-valuenow={Math.round(after * 10) / 10} aria-valuetext={`${fmt(after)} gradi`}
+        onKeyDown={onKey} className="pointer-events-none outline-none [filter:drop-shadow(0_2px_4px_rgb(0_0_0/0.4))] focus-visible:stroke-ring" />
+      <text x="12" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55" aria-hidden="true">{MIN}°</text>
+      <text x="188" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55" aria-hidden="true">{MAX}°</text>
     </svg>
   );
 }
@@ -125,6 +153,22 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
     timer.current = window.setTimeout(() => setDelta(null), 1600);
   };
 
+  // Sliding the gauge asks for a temperature: the mix in hand when the slide began is scaled up or down to reach it
+  // (an empty piazza starts from the "Pochi sensori" mix). The gain grows in step with the mix, up to its 5,2 °C cap.
+  const MAX_GAIN = 5.2;
+  const slideBase = useRef(urban);
+  const startSlide = () => {
+    slideBase.current = est.dT > 0.05 ? urban : { ...urban, ...PRESETS[1]! };
+  };
+  const slideTo = (t: number) => {
+    const base = slideBase.current, baseGain = piazzaEstimate(base.trees, base.permeable, base.shade).dT;
+    const k = baseGain > 0 ? clamp(before - t, 0, MAX_GAIN) / baseGain : 0;
+    const next = { trees: Math.min(30, Math.round(base.trees * k)), permeable: Math.min(100, Math.round(base.permeable * k)), shade: Math.min(100, Math.round(base.shade * k)) };
+    if (next.trees === urban.trees && next.permeable === urban.permeable && next.shade === urban.shade) return;
+    hapticTick();
+    change(next);
+  };
+
   const facts: Array<{ icon: LucideIcon; value: string; label: string }> = [
     { icon: Leaf, value: `${co2} kg`, label: "CO₂ l'anno" },
     { icon: CloudRain, value: `${water} m³`, label: "Pioggia tenuta" },
@@ -162,8 +206,8 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
       </div>
 
       <div className="relative mx-auto flex max-w-[22rem] flex-col items-center">
-        <Gauge before={before} after={after} />
-        <div className="absolute inset-x-0 bottom-1 flex flex-col items-center" aria-live="polite">
+        <Gauge before={before} after={after} lowest={before - MAX_GAIN} onSlide={slideTo} onSlideStart={startSlide} />
+        <div className="pointer-events-none absolute inset-x-0 bottom-1 flex flex-col items-center" aria-live="polite">
           <span className={cn("rounded-full px-3 py-0.5 text-sm font-semibold text-white transition-colors duration-300", GAIN_BG[feel.step])}>{feel.text}</span>
           <span className="mt-1 font-display text-6xl font-light leading-none tracking-tight tabular-nums">{fmt(after)}°</span>
         </div>
@@ -176,6 +220,7 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
       <p className="-mt-2 text-center text-sm text-muted-foreground">
         alle 14–17 · oggi {fmt(before)}° · <b className={cn("font-semibold", GAIN_TEXT[gain])}>−{fmt(est.dT)} °C</b>
       </p>
+      <p className="-mt-3 text-center text-xs text-muted-foreground">Trascina il punto bianco sull'arco per scegliere quanto rinfrescare</p>
 
       <div className="space-y-2.5">
         <Lever icon={TreePine} label="Alberi" value={urban.trees} step={1} max={30} color="text-ok" swatch="bg-ok" cooling={urban.trees * 0.25} onChange={(v) => change({ trees: v })} />
