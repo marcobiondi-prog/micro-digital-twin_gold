@@ -14,7 +14,7 @@ import { syncAppOrientation } from "@/lib/ar-orientation";
 import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
 import { installUiClicks } from "@/lib/ui-sounds";
 import { reloadFresh } from "@/router";
-import { Map as MapIcon, Building2, Grape, Info, LayoutDashboard } from "lucide-react";
+import { MapPin, Building2, Grape, Info, LayoutDashboard } from "lucide-react";
 
 function NotFoundComponent() {
   return (
@@ -111,7 +111,7 @@ const nav = [
 const NAV_H = 49;
 
 const bottomItems = [
-  { to: "/mappa", l: "Mappa", I: MapIcon },
+  { to: "/mappa", l: "Mappa", I: MapPin },
   { to: "/urbano", l: "Urbano", I: Building2 },
   { to: "/vigneto", l: "Vigneto", I: Grape },
   { to: "/dashboard", l: "Dashboard", I: LayoutDashboard },
@@ -435,7 +435,7 @@ function RootComponent() {
       document.removeEventListener("pointerdown", lock);
     };
   }, []);
-  const intro = location.pathname === "/";
+  const intro = location.pathname === "/" || location.pathname === "/scegli";
   return (
     <QueryClientProvider client={queryClient}>
       <a
@@ -452,12 +452,12 @@ function RootComponent() {
           {/* No logo nor name here: the account sits where the logo was, the theme switch on the right. */}
           <div className="flex min-w-0 items-center"><AccountControl /></div>
           <div className="flex shrink-0 items-center gap-2">
-            <ThemeToggle />
-            {/* "i" brings back the opening page, the app's entrance. */}
-            <Link to="/" aria-label="Schermata di ingresso" title="Schermata di ingresso"
-              className="grid size-9 shrink-0 place-items-center rounded-full border border-foreground/15 bg-foreground/[0.06] text-foreground sm:size-10 outline-none transition-colors hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring">
+            {/* "i" shows the tutorial again (only the tutorial: it ends by coming back here). */}
+            <button type="button" onClick={() => void navigate({ href: "/?rivedi=1" })} aria-label="Come funziona" title="Come funziona"
+              className="grid size-9 shrink-0 place-items-center rounded-full border border-foreground/15 bg-foreground/[0.06] text-foreground outline-none transition-colors hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring sm:size-10">
               <Info className="size-4 sm:size-[1.15rem]" aria-hidden="true" />
-            </Link>
+            </button>
+            <ThemeToggle />
           </div>
         </div>
       </header>

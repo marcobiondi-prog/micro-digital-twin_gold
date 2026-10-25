@@ -14,6 +14,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as MappaRouteImport } from './routes/mappa'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as ScegliRouteImport } from './routes/scegli'
 import { Route as UrbanoRouteImport } from './routes/urbano'
 import { Route as VignetoRouteImport } from './routes/vigneto'
 import { Route as ApiPublicExternalApprovalRouteImport } from './routes/api/public/external-approval'
@@ -42,6 +43,11 @@ const MappaRoute = MappaRouteImport.update({
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ScegliRoute = ScegliRouteImport.update({
+  id: '/scegli',
+  path: '/scegli',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UrbanoRoute = UrbanoRouteImport.update({
@@ -73,6 +79,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/mappa': typeof MappaRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/scegli': typeof ScegliRoute
   '/urbano': typeof UrbanoRoute
   '/vigneto': typeof VignetoRoute
   '/api/public/external-approval': typeof ApiPublicExternalApprovalRoute
@@ -84,6 +91,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/mappa': typeof MappaRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/scegli': typeof ScegliRoute
   '/urbano': typeof UrbanoRoute
   '/vigneto': typeof VignetoRoute
   '/api/public/external-approval': typeof ApiPublicExternalApprovalRoute
@@ -96,6 +104,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/mappa': typeof MappaRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/scegli': typeof ScegliRoute
   '/urbano': typeof UrbanoRoute
   '/vigneto': typeof VignetoRoute
   '/api/public/external-approval': typeof ApiPublicExternalApprovalRoute
@@ -109,6 +118,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/mappa'
     | '/reset-password'
+    | '/scegli'
     | '/urbano'
     | '/vigneto'
     | '/api/public/external-approval'
@@ -120,6 +130,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/mappa'
     | '/reset-password'
+    | '/scegli'
     | '/urbano'
     | '/vigneto'
     | '/api/public/external-approval'
@@ -131,6 +142,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/mappa'
     | '/reset-password'
+    | '/scegli'
     | '/urbano'
     | '/vigneto'
     | '/api/public/external-approval'
@@ -143,6 +155,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   MappaRoute: typeof MappaRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  ScegliRoute: typeof ScegliRoute
   UrbanoRoute: typeof UrbanoRoute
   VignetoRoute: typeof VignetoRoute
   ApiPublicExternalApprovalRoute: typeof ApiPublicExternalApprovalRoute
@@ -186,6 +199,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/scegli': {
+      id: '/scegli'
+      path: '/scegli'
+      fullPath: '/scegli'
+      preLoaderRoute: typeof ScegliRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/urbano': {
       id: '/urbano'
       path: '/urbano'
@@ -223,6 +243,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   MappaRoute: MappaRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  ScegliRoute: ScegliRoute,
   UrbanoRoute: UrbanoRoute,
   VignetoRoute: VignetoRoute,
   ApiPublicExternalApprovalRoute: ApiPublicExternalApprovalRoute,
