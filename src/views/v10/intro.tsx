@@ -97,16 +97,33 @@ const fromInfo = () => typeof window !== "undefined" && new URLSearchParams(wind
 /** The tutorial: five screens side by side (hello + four steps), swiped or stepped with the button, dots and arrow keys. */
 export function Tutorial() {
   const navigate = useNavigate();
-  const track = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState(0);
+  // The finger drags the screens (dragX) and a swipe past 50 px turns the page; a mostly vertical move is ignored.
+  const [dragX, setDragX] = useState(0);
+  const start = useRef<{ x: number; y: number } | null>(null);
   const [again, setAgain] = useState(false);
   useEffect(() => { setAgain(fromInfo()); window.scrollTo(0, 0); }, []);
   const count = STEPS.length + 1;
   const last = page === count - 1;
   const go = (i: number) => {
-    const el = track.current;
-    if (!el) return;
-    el.scrollTo({ left: i * el.clientWidth, behavior: reduceMotion() ? "auto" : "smooth" });
+    const n = Math.max(0, Math.min(count - 1, i));
+    if (n !== page) { hapticTick(); setPage(n); }
+  };
+  const down = (x: number, y: number) => { start.current = { x, y }; };
+  const move = (x: number, y: number) => {
+    const s0 = start.current;
+    if (!s0) return;
+    const dx = x - s0.x, dy = y - s0.y;
+    if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 12) { start.current = null; setDragX(0); return; }
+    // Past the first or the last screen the drag only gives a little.
+    const edge = (dx > 0 && page === 0) || (dx < 0 && page === count - 1);
+    setDragX(edge ? dx * 0.25 : dx);
+  };
+  const up = (x: number) => {
+    const s0 = start.current;
+    start.current = null;
+    setDragX(0);
+    if (s0 && Math.abs(x - s0.x) > 50) go(page + (x < s0.x ? 1 : -1));
   };
   const finish = () => {
     if (again && window.history.length > 1) window.history.back();
@@ -122,10 +139,17 @@ export function Tutorial() {
           {again ? <><X className="size-4" aria-hidden="true" />Chiudi</> : "Salta"}
         </button>
       </div>
-      {/* Sideways track: each screen snaps into place; the page follows the scroll position. */}
-      <div ref={track} className="no-scrollbar flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain"
-        onScroll={(e) => { const el = e.currentTarget; const i = Math.round(el.scrollLeft / Math.max(1, el.clientWidth)); if (i !== page) { setPage(i); hapticTick(); } }}>
-        <section aria-label="Benvenuto" aria-roledescription="schermata" className="flex w-full shrink-0 snap-center flex-col items-center justify-center px-8 text-center">
+      {/* Sideways track: the screens sit side by side and slide with the finger, then settle on the next one. */}
+      <div className="relative min-h-0 flex-1 touch-pan-y overflow-hidden"
+        onTouchStart={(e) => { const t = e.touches[0]; if (t && e.touches.length === 1) down(t.clientX, t.clientY); }}
+        onTouchMove={(e) => { const t = e.touches[0]; if (t) move(t.clientX, t.clientY); }}
+        onTouchEnd={(e) => { const t = e.changedTouches[0]; if (t) up(t.clientX); }}
+        onTouchCancel={() => { start.current = null; setDragX(0); }}
+        onPointerDown={(e) => { if (e.pointerType === "mouse") down(e.clientX, e.clientY); }}
+        onPointerMove={(e) => { if (e.pointerType === "mouse" && e.buttons) move(e.clientX, e.clientY); }}
+        onPointerUp={(e) => { if (e.pointerType === "mouse") up(e.clientX); }}>
+      <div className="flex h-full" style={{ transform: `translateX(calc(${-page * 100}% + ${dragX}px))`, transition: dragX || reduceMotion() ? "none" : "transform 380ms cubic-bezier(0.22, 1, 0.36, 1)" }}>
+        <section aria-label="Benvenuto" aria-roledescription="schermata" aria-hidden={page !== 0 || undefined} className="flex w-full shrink-0 select-none flex-col items-center justify-center px-8 text-center">
           <Reveal className="flex flex-col items-center">
             <span className="block h-36 w-40 sm:h-44 sm:w-48"><TwinMascot className="block h-full w-full drop-shadow-[0_12px_40px_rgb(76_201_189/0.25)]" /></span>
             <h2 className="mt-8 font-display text-[2.6rem] font-extralight leading-[1.02] tracking-tight text-foreground sm:text-6xl">Prova gli interventi<br />prima di farli.</h2>
@@ -133,7 +157,7 @@ export function Tutorial() {
           </Reveal>
         </section>
         {STEPS.map((st, i) => (
-          <section key={st.title} aria-label={`Passo ${i + 1} di ${STEPS.length}: ${st.title}`} aria-roledescription="schermata" className="flex w-full shrink-0 snap-center flex-col justify-center px-8">
+          <section key={st.title} aria-label={`Passo ${i + 1} di ${STEPS.length}: ${st.title}`} aria-roledescription="schermata" aria-hidden={page !== i + 1 || undefined} className="flex w-full shrink-0 select-none flex-col justify-center px-8">
             <Reveal className="mx-auto w-full max-w-md">
               <svg viewBox="0 0 160 100" className="intro-draw h-36 w-auto text-foreground sm:h-44" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{st.art}</svg>
               <p className="mt-8 font-mono text-sm tabular-nums text-foreground/50">0{i + 1} — 0{STEPS.length}</p>
@@ -143,8 +167,16 @@ export function Tutorial() {
           </section>
         ))}
       </div>
-      {/* Dots (touch one to jump) and one white button: Avanti, then Inizia (or Fine when opened from the "i"). */}
-      <div className="mx-auto flex w-full max-w-md items-center justify-between gap-4 px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-4">
+      </div>
+      {/* Only the swipe moves between screens; the dots show where you are. The white button appears on the last one only. */}
+      <div className="mx-auto flex w-full max-w-md flex-col items-center gap-4 px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-4">
+        <div className={`transition-[opacity,transform] duration-300 motion-reduce:transition-none ${last ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0"}`} aria-hidden={!last}>
+          <button type="button" onClick={finish} tabIndex={last ? 0 : -1}
+            className="inline-flex h-14 items-center gap-2 rounded-full bg-foreground pl-7 pr-2 text-base font-semibold text-background outline-none transition-transform focus-visible:ring-4 focus-visible:ring-ring/50 active:scale-[0.98] motion-reduce:active:scale-100">
+            {again ? "Fine" : "Inizia"}
+            <span className="grid size-10 place-items-center rounded-full bg-background text-foreground"><ArrowRight className="size-5" aria-hidden="true" /></span>
+          </button>
+        </div>
         <div className="flex items-center gap-1" role="group" aria-label="Schermate">
           {Array.from({ length: count }, (_, i) => (
             <button key={i} type="button" onClick={() => go(i)} aria-label={`Schermata ${i + 1} di ${count}`} aria-current={i === page ? "step" : undefined}
@@ -153,11 +185,6 @@ export function Tutorial() {
             </button>
           ))}
         </div>
-        <button type="button" onClick={() => (last ? finish() : go(page + 1))}
-          className="inline-flex h-14 items-center gap-2 rounded-full bg-foreground pl-6 pr-2 text-base font-semibold text-background outline-none transition-transform focus-visible:ring-4 focus-visible:ring-ring/50 active:scale-[0.98] motion-reduce:active:scale-100">
-          {last ? (again ? "Fine" : "Inizia") : "Avanti"}
-          <span className="grid size-10 place-items-center rounded-full bg-background text-foreground"><ArrowRight className="size-5" aria-hidden="true" /></span>
-        </button>
       </div>
     </div>
   );
