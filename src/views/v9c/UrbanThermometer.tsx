@@ -1,12 +1,14 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { CloudRain, Leaf, Minus, Plus, Ruler, RotateCcw, Sprout, Sun, TreePine, Umbrella, Wallet, type LucideIcon } from "lucide-react";
+import { CloudRain, Leaf, Minus, Plus, Info, Ruler, Sprout, Sun, TreePine, Umbrella, Wallet, type LucideIcon } from "lucide-react";
 import { comparison, piazzaEstimate, type PrototypeId } from "@/models/scenarios";
 import { setUrban, useLab } from "@/models/lab-store";
 import { REFERENCE_M2, euroRange, grouped, interventionCost } from "@/models/intervention-cost";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { GAIN_BG, GAIN_TEXT } from "@/views/v7/studio-ui";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ImportWeatherButton } from "@/views/SimulationGrid";
 import { hapticTick } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
@@ -88,8 +90,9 @@ function Lever({ icon: Icon, label, value, step, max, color, swatch, cooling, on
  * the piazza feels and says it in words, a chip tells what the last touch gained; then the estimated cost (total and per m²)
  * on the place's measured surface, and three small cards with the yearly benefits.
  */
-export function UrbanThermometer() {
+export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?: (() => Promise<void>) | undefined; matrix?: ReactNode }) {
   const urban = useLab().urban;
+  const [info, setInfo] = useState(false);
   const est = piazzaEstimate(urban.trees, urban.permeable, urban.shade);
   const before = urban.realTemp ?? 40;
   const after = before - est.dT;
@@ -132,20 +135,30 @@ export function UrbanThermometer() {
 
   return (
     <section className="fuse-canvas space-y-5 rounded-t-3xl px-3 pb-6 pt-4 text-foreground sm:px-5" aria-label="Termometro della piazza">
-      <div className="grid grid-cols-[repeat(3,minmax(0,1fr))_auto] gap-2" role="group" aria-label="Piazze già pronte">
-        {PRESETS.map((p) => {
-          const l = comparison.find((c) => c.id === p.id)!, on = preset === p.id;
-          return (
-            <button key={p.id} type="button" aria-pressed={on} onClick={() => change({ trees: p.trees, permeable: p.permeable, shade: p.shade })}
-              className={cn("flex min-h-14 flex-col items-center justify-center rounded-2xl px-1 py-1.5 text-center outline-none transition-[background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-ring active:scale-95 motion-reduce:active:scale-100",
-                on ? "bg-foreground/[0.12] shadow-[0_0_0_2px_var(--foreground)]" : "bg-foreground/[0.05] hover:bg-foreground/[0.08]")}>
-              <span className="text-[12px] font-semibold leading-tight">{l.s}</span>
-              <span className="font-mono text-[11px] text-muted-foreground">{l.cost}</span>
-            </button>
-          );
-        })}
-        <button type="button" onClick={() => { hapticTick(); change({ trees: 0, permeable: 0, shade: 0 }); }} aria-label="Piazza vuota: si riparte da zero" title="Piazza vuota"
-          className="grid min-h-14 w-12 place-items-center rounded-2xl bg-foreground/[0.05] outline-none hover:bg-foreground/[0.08] focus-visible:ring-2 focus-visible:ring-ring"><RotateCcw className="size-5" aria-hidden="true" /></button>
+      {/* The three levels side by side, each with its own result and cost: this is the comparison, one touch applies it. */}
+      <div>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold">Scegli un livello</h3>
+          {matrix && <button type="button" onClick={() => setInfo(true)} className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-muted-foreground outline-none hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-ring"><Info className="size-4" aria-hidden="true" />Costi e tempi</button>}
+        </div>
+        <div className="grid grid-cols-3 gap-2" role="group" aria-label="Tre livelli di intervento">
+          {PRESETS.map((p) => {
+            const l = comparison.find((c) => c.id === p.id)!, on = preset === p.id;
+            const pAfter = before - piazzaEstimate(p.trees, p.permeable, p.shade).dT;
+            const pCost = interventionCost(m2, p.trees, p.permeable, p.shade).total;
+            return (
+              <button key={p.id} type="button" aria-pressed={on} onClick={() => change({ trees: p.trees, permeable: p.permeable, shade: p.shade })}
+                aria-label={`${l.s}: ${fmt(pAfter)} gradi, ${euroRange(pCost)}`}
+                className={cn("flex min-h-24 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 py-2 text-center outline-none transition-[background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-ring active:scale-95 motion-reduce:active:scale-100",
+                  on ? "bg-foreground/[0.12] shadow-[0_0_0_2px_var(--foreground)]" : "bg-foreground/[0.05] hover:bg-foreground/[0.08]")}>
+                <span className="text-[12px] font-semibold leading-tight">{l.s}</span>
+                <span className={cn("font-display text-2xl font-light tabular-nums", GAIN_TEXT[feeling(pAfter).step])}>{fmt(pAfter)}°</span>
+                <span className="font-mono text-[10px] leading-tight text-muted-foreground">{euroRange(pCost)}</span>
+              </button>
+            );
+          })}
+        </div>
+        {onImportWeather && <div className="mt-2"><ImportWeatherButton onImport={onImportWeather} /></div>}
       </div>
 
       <div className="relative mx-auto flex max-w-[22rem] flex-col items-center">
@@ -174,7 +187,7 @@ export function UrbanThermometer() {
         <div className="flex items-start gap-3">
           <Wallet className="mt-0.5 size-6 shrink-0 text-muted-foreground" aria-hidden="true" />
           <div className="min-w-0 flex-1">
-            <p className="text-xs text-muted-foreground">Costo stimato dell'intervento · {level.s}</p>
+            <p className="text-xs text-muted-foreground">Costo della tua piazza · {level.s}</p>
             <p className="font-display text-3xl font-light tabular-nums">{euroRange(cost.total)}</p>
             <p className="mt-1 font-mono text-base font-semibold tabular-nums">{Math.round(cost.perM2.lo)}–{Math.round(cost.perM2.hi)} € al m²</p>
           </div>
@@ -195,6 +208,15 @@ export function UrbanThermometer() {
           </div>
         ))}
       </dl>
+      {matrix && (
+        <Dialog open={info} onOpenChange={setInfo}>
+          <DialogContent className="max-h-[calc(100dvh-3rem)] overflow-y-auto sm:max-w-3xl">
+            {/* The matrix brings its own visible title. */}
+            <DialogHeader className="sr-only"><DialogTitle>Quanto costa e cosa si impara</DialogTitle></DialogHeader>
+            {matrix}
+          </DialogContent>
+        </Dialog>
+      )}
     </section>
   );
 }

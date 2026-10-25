@@ -14,7 +14,7 @@ import { UrbanThermometer } from "@/views/v9c/UrbanThermometer";
 import { VineStudio } from "@/views/v7/VineStudio";
 import { SimShell } from "@/views/v8/SimShell";
 import { Fold } from "@/views/Fold";
-import { comparison, levelTone, nextPhase, piazzaEstimate, prototypeChoice, type PrototypeId } from "@/models/scenarios";
+import { comparison, levelTone, nextPhase, prototypeChoice, type PrototypeId } from "@/models/scenarios";
 import { applyVineyardScenario, closestVineyardScenario, vineyardControlValue, vineyardScenarioSteps } from "@/models/vineyard-controls";
 import { resetUrban, resetVineyard, setUrban, setVineyard, useLab, vineMetrics, vineyardSituation, type LabState } from "@/models/lab-store";
 import { cn } from "@/lib/utils";
@@ -22,14 +22,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { getRealClimate } from "@/controllers/climate.functions";
 
-type UrbanScenario = {
-  name: string;
-  dt: string;
-  trees: number;
-  permeable: number;
-  shade: number;
-  emphasis: string;
-};
 
 
 function urbanPrototypeLevel(trees: number, permeable: number, shade: number): PrototypeId {
@@ -38,79 +30,6 @@ function urbanPrototypeLevel(trees: number, permeable: number, shade: number): P
 }
 
 
-function ComparisonTable({ place, trees, permeable, shade, activeLevel, onApply, realTemp }: { realTemp?: number | null | undefined; place: { name: string; sub: string }; trees: number; permeable: number; shade: number; activeLevel: PrototypeId; onApply: (id: PrototypeId, trees: number, permeable: number, shade: number) => void }) {
-  const scenarios: UrbanScenario[] = [
-    {
-      name: "Subito, gratis",
-      dt: "Con i dati che ci sono già",
-      trees: Math.max(2, Math.round(trees * 0.6)),
-      permeable: Math.max(10, Math.round(permeable * 0.6)),
-      shade: Math.max(10, Math.round(shade * 0.6)),
-      emphasis: "Osservazioni e dati aperti sulle aree più esposte: capiamo dove serve",
-    },
-    {
-      name: "Pochi sensori",
-      dt: "Una prova sul posto",
-      trees,
-      permeable,
-      shade,
-      emphasis: "Interventi impostati nella griglia, misurati con pochi sensori mirati",
-    },
-    {
-      name: "Progetto completo",
-      dt: "Su tutta la città",
-      trees: Math.min(30, Math.max(trees + 6, Math.round(trees * 1.5))),
-      permeable: Math.min(100, Math.max(permeable + 15, Math.round(permeable * 1.35))),
-      shade: Math.min(100, Math.max(shade + 15, Math.round(shade * 1.35))),
-      emphasis: "Più verde in tutta la piazza, dopo che la prova ha funzionato",
-    },
-  ];
-
-  return (
-    <div className="space-y-4">
-      <div className="min-w-0 rounded-lg border bg-muted/45 p-3">
-        <p className="truncate font-semibold">{place.name}</p>
-        <p className="mt-1 break-words text-xs text-muted-foreground">{place.sub || "Zona urbana selezionata"}</p>
-      </div>
-      <div className="grid gap-3 md:grid-cols-3">
-        {scenarios.map((scenario) => {
-          const estimate = piazzaEstimate(scenario.trees, scenario.permeable, scenario.shade);
-          const scenarioId: PrototypeId = scenario.name === "Subito, gratis" ? "zero" : scenario.name === "Pochi sensori" ? "mvp" : "roadmap";
-          const selected = scenarioId === activeLevel;
-          const tone = levelTone[scenarioId];
-          return (
-            <button
-              key={scenario.name}
-              type="button"
-              onClick={() => onApply(scenarioId, scenario.trees, scenario.permeable, scenario.shade)}
-              aria-pressed={selected}
-              aria-label={`Applica lo scenario ${scenario.name} alla griglia`}
-              className={`min-w-0 cursor-pointer rounded-lg border p-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${tone.border} ${selected ? tone.sel : "bg-card"}`}
-            >
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-                <h3 className="flex min-w-0 items-center gap-2 break-words text-sm font-semibold"><span className={`size-2 shrink-0 rounded-full ${tone.dot}`} aria-hidden="true" />{scenario.name}</h3>
-                {selected && <StatusBadge level="basso">In evidenza</StatusBadge>}
-              </div>
-              <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">{scenario.dt}</p>
-              <p className="mt-1 min-h-8 text-xs text-muted-foreground">{scenario.emphasis}</p>
-              <dl className="mt-3 grid grid-cols-3 gap-1.5 text-center">
-                <div className="rounded-md bg-muted p-2"><dt className="text-[10px] text-muted-foreground">Alberi</dt><dd className="font-mono text-sm font-semibold">{scenario.trees}</dd></div>
-                <div className="rounded-md bg-muted p-2"><dt className="text-[10px] text-muted-foreground">Suolo</dt><dd className="font-mono text-sm font-semibold">{scenario.permeable}%</dd></div>
-                <div className="rounded-md bg-muted p-2"><dt className="text-[10px] text-muted-foreground">Ombra</dt><dd className="font-mono text-sm font-semibold">{scenario.shade}%</dd></div>
-              </dl>
-              <div className="mt-3 border-t pt-3">
-                <span className="text-[10px] font-bold uppercase text-muted-foreground">Riduzione stimata</span>
-                <p className={`mt-1 font-mono text-lg font-bold ${tone.value}`}>−{estimate.lo.toFixed(1)} / −{estimate.hi.toFixed(1)}°C</p>
-                {realTemp != null && <p className="mt-1 text-xs">Meteo reale <span className="font-mono font-semibold">{realTemp.toLocaleString("it-IT")}°C</span> → percepita <span className="font-mono font-semibold">{(realTemp - (estimate.lo + estimate.hi) / 2).toFixed(1)}°C</span></p>}
-              </div>
-              <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{selected ? "Scenario applicato" : "Tocca per applicare"}</p>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 function PrototypeMatrix({ kind, activeLevel }: { kind: "urban" | "vineyard"; activeLevel: PrototypeId }) {
   return (
@@ -259,59 +178,30 @@ function ComparisonDialog({ children, matrix, onImportWeather }: { children: Rea
   );
 }
 
-/** Simulazione urbana completa: riepilogo con Confronta, dati reali, media, griglia. */
+/** Simulazione urbana completa: il termometro porta con sé il confronto dei tre livelli, poi luogo, media e sensori. */
 export function UrbanFlow() {
-  const [compareOpen, setCompareOpen] = useState(false);
-  const [pinned, setPinned] = useState<PrototypeId | null>(null);
-  const [baseline, setBaseline] = useState<LabState["urban"] | null>(null);
-  const [appliedUrban, setAppliedUrban] = useState<LabState["urban"] | null>(null);
-  const suggested = useRef<{ id: PrototypeId; base: LabState["urban"]; values: LabState["urban"] } | null>(null);
-  const showComparison = () => setCompareOpen(true);
   const urban = useLab().urban;
   const { trees, permeable, shade, location } = urban;
-  // Manual slider, cell or location edits establish a fresh comparison baseline.
-  const edited = appliedUrban && (
-    trees !== appliedUrban.trees || permeable !== appliedUrban.permeable || shade !== appliedUrban.shade ||
-    urban.treeCells !== appliedUrban.treeCells || urban.permeableCells !== appliedUrban.permeableCells ||
-    urban.shadeCells !== appliedUrban.shadeCells || location !== appliedUrban.location
-  );
-  if (edited) { setAppliedUrban(null); setBaseline(null); setPinned(null); }
-  const base = edited ? urban : baseline ?? urban;
-  const setTrees = (v: number) => { setPinned(null); setUrban({ trees: v }); }, setPermeable = (v: number) => { setPinned(null); setUrban({ permeable: v }); }, setShade = (v: number) => { setPinned(null); setUrban({ shade: v }); };
   const place = splitLocation(location.label);
-  const activeLevel = pinned ?? urbanPrototypeLevel(trees, permeable, shade);
-  const applyScenario = (id: PrototypeId, t: number, p: number, s: number) => {
-    const next = { ...urban, trees: t, permeable: p, shade: s, treeCells: null, permeableCells: null, shadeCells: null };
-    suggested.current = { id, base, values: next };
-    setBaseline(base); setAppliedUrban(next); setPinned(id); setUrban(next);
-  };
-
+  const activeLevel = urbanPrototypeLevel(trees, permeable, shade);
   const fetchClimate = useServerFn(getRealClimate);
   const importRealWeather = async () => {
     const r = await fetchClimate({ data: { lat: location.lat, lng: location.lng } }).catch(() => null);
     const t = r?.openMeteo?.temp;
     if (t == null) { toast.error("Meteo reale non disponibile, riprova tra poco"); return; }
     setUrban({ realTemp: Math.round(t * 10) / 10 });
-    toast.success(`Importati ${t.toLocaleString("it-IT")}°C dal meteo reale su tutte le schede`);
-  };
-  const restoreScenario = () => {
-    const target = suggested.current;
-    if (!target) { resetUrban(); return; }
-    const next = { ...target.values, location: urban.location };
-    setBaseline({ ...target.base, location: urban.location }); setAppliedUrban(next); setPinned(target.id); setUrban(next);
+    toast.success(`Importati ${t.toLocaleString("it-IT")}°C dal meteo reale`);
   };
 
   return (
     <div className="space-y-4">
       <LabSyncIndicator />
-      <SimShell kind="urban" place={place.name} onCompare={showComparison} onReset={restoreScenario}
-        simula={<UrbanThermometer />}
+      {/* No Confronta here: the three levels are compared inside the thermometer itself. */}
+      <SimShell kind="urban" place={place.name} onReset={resetUrban}
+        simula={<UrbanThermometer onImportWeather={importRealWeather} matrix={<PrototypeMatrix kind="urban" activeLevel={activeLevel} />} />}
         luogo={<LocationCard kind="urban" />}
         media={<LabMedia embedded kind="urban" context={`Scenario: ${comparison.find((l) => l.id === activeLevel)?.s ?? "attuale"}`} />}
         sensori={<SensorAdvisor embedded kind="urban" />} />
-      <Dialog open={compareOpen} onOpenChange={setCompareOpen}>
-        <ComparisonDialog onImportWeather={importRealWeather} matrix={<PrototypeMatrix kind="urban" activeLevel={activeLevel} />}><ComparisonTable realTemp={urban.realTemp} place={place} trees={base.trees} permeable={base.permeable} shade={base.shade} activeLevel={activeLevel} onApply={applyScenario} /></ComparisonDialog>
-      </Dialog>
     </div>
   );
 }
