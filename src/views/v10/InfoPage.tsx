@@ -1,16 +1,19 @@
 import type { ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
+import { openAccount } from "@/lib/camera-dock";
 
 /**
  * A plain reading page opened from the account panel (FAQ, privacy, legal): a back arrow and a title on top,
- * then the text in cards. Back goes to the page it came from (the map when opened directly).
+ * then the text in cards. The arrow goes back to the page it came from (the map when opened directly) with the account panel open.
  */
 export function InfoPage({ title, intro, children }: { title: string; intro?: ReactNode; children: ReactNode }) {
   const navigate = useNavigate();
+  // These pages are opened from the account panel: the arrow goes back and opens the panel again, to pick another one.
   const back = () => {
     if ((window.history.state?.__TSR_index ?? 0) > 0) window.history.back();
     else void navigate({ to: "/mappa", replace: true });
+    window.setTimeout(openAccount, 350);
   };
   return (
     <article className="mx-auto max-w-2xl space-y-4">

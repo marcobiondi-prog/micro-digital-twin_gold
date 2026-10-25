@@ -352,7 +352,7 @@ export function AccountControl() {
               </section>
             ))}
           </nav>
-          {/* Twin closes the panel: still (no animation, no name), eyes open. */}
+          {/* Twin closes the panel: still (no animation, no name), smiling. */}
           <TwinStill className="mx-auto block h-24 w-auto" />
         </div>
       </DialogContent>
@@ -360,7 +360,7 @@ export function AccountControl() {
   );
 }
 
-/** Twin drawn still, with open eyes: the account panel's sign-off (the header mascot keeps its own animated face). */
+/** Twin drawn still, with smiling eyes: the account panel's sign-off (no animation, no name). */
 function TwinStill({ className = "" }: { className?: string }) {
   return (
     <svg viewBox="0 0 512 452" className={className} role="img" aria-label="Twin">
@@ -371,13 +371,9 @@ function TwinStill({ className = "" }: { className?: string }) {
       <ellipse cx="256" cy="300" rx="160" ry="110" fill="#3aa99f" />
       <ellipse cx="256" cy="268" rx="162" ry="148" fill="#4cc9bd" />
       <rect x="143" y="176" width="228" height="140" rx="58" fill="#0f2326" stroke="#2c3e44" strokeWidth="6" />
-      {[216, 296].map((x) => (
-        <g key={x}>
-          <circle cx={x} cy="236" r="22" fill="#fff" />
-          <circle cx={x + 3} cy="240" r="11" fill="#0f2326" />
-          <circle cx={x + 7} cy="234" r="4" fill="#fff" />
-        </g>
-      ))}
+      {/* Smiling eyes, as on the header mascot. */}
+      <path d="M192 234 Q215 198 240 234 Q215 220 192 234 Z" fill="#fff" />
+      <path d="M272 234 Q297 198 320 234 Q297 220 272 234 Z" fill="#fff" />
       <ellipse cx="255" cy="288" rx="24" ry="14" fill="#f2806f" />
       <ellipse cx="150" cy="343" rx="22" ry="13" fill="#f2a0a6" opacity=".9" />
       <ellipse cx="362" cy="343" rx="22" ry="13" fill="#f2a0a6" opacity=".9" />
