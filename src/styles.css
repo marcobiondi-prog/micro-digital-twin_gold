@@ -1992,3 +1992,8 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 /* Home has the camera tile selected: the centre button glows brighter, like the light under the other items. */
 .ps-nav-camera[data-focus] { box-shadow: 0 0 0 2.5px #fff, 0 0 28px 6px rgb(140 190 255 / 0.85), 0 10px 22px rgb(0 0 0 / 0.45); transform: translateY(-2px); }
 @media (prefers-reduced-motion: reduce) { .ps-nav-camera[data-focus] { transform: none; } }
+
+/* v10 opening page: the drawn heat lines turn very slowly (still with reduced motion). */
+.intro-isolines { animation: intro-isolines-turn 140s linear infinite; }
+@keyframes intro-isolines-turn { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .intro-isolines { animation: none; } }

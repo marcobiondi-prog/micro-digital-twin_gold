@@ -7,7 +7,6 @@ import { useSignedIn } from "@/lib/use-signed-in";
 import { useInstalledApp } from "@/lib/installed-app";
 import aiLogo from "@/assets/ai-logo.png";
 import { applySharedScenario } from "@/views/ScenarioTools";
-import { setHomeFocus } from "@/lib/home-focus";
 import { hapticTick } from "@/lib/haptics";
 
 export const Route = createFileRoute("/")({
@@ -50,51 +49,83 @@ function Index() {
     if (it.id === "camera") setCameraSheetOpen(true);
     else void navigate({ to: it.id === "urban" ? "/urbano" : "/vigneto" });
   };
-  // The bottom bar points at the chosen line while this page is open, so the tutorial also shows where each one lives.
-  useEffect(() => { setHomeFocus(item.id); }, [item.id]);
-  useEffect(() => () => setHomeFocus(null), []);
   const rows = useRef<Array<HTMLButtonElement | null>>([]);
+  const pick = (i: number) => { if (i === sel) return; hapticTick(); setSel(i); };
+  // Each block rises in turn when the page opens (none with reduced motion).
+  const rise = (i: number) => ({ className: "animate-in fade-in-0 slide-in-from-bottom-3 fill-mode-both duration-700 motion-reduce:animate-none", style: { animationDelay: `${120 + i * 90}ms` } });
   return (
-    // The opening page, like a first-run tutorial: no colour, one question, three plain choices, one white button.
-    <div className="mx-auto flex min-h-[calc(100dvh-14rem)] max-w-xl flex-col pt-4 sm:pt-12">
+    // The opening page stands alone: it covers the whole app (no logo header, no menus) like a first-run tutorial,
+    // all in black and white: drawn heat lines turning slowly behind, one big question, three numbered choices.
+    <div className="relative isolate flex min-h-dvh flex-col overflow-hidden px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))] sm:px-12">
+      <Isolines />
       <h1 className="sr-only">Micro Digital Twin</h1>
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Benvenuto</p>
-      <h2 className="mt-3 font-display text-4xl font-light leading-tight tracking-tight text-foreground sm:text-5xl">Da dove vuoi iniziare?</h2>
-      <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">Scegli una delle tre. Poi le ritrovi nel menu in basso.</p>
-      <div role="radiogroup" aria-label="Da dove vuoi iniziare" className="mt-8 divide-y divide-foreground/10 border-y border-foreground/10"
-        onKeyDown={(e) => {
-          const d = e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : e.key === "ArrowUp" || e.key === "ArrowLeft" ? -1 : 0;
-          if (!d) return;
-          e.preventDefault();
-          const n = (sel + d + items.length) % items.length;
-          hapticTick(); setSel(n); rows.current[n]?.focus();
-        }}>
-        {items.map((it, i) => {
-          const on = i === sel;
-          return (
-            <button key={it.id} ref={(el) => { rows.current[i] = el; }} type="button" role="radio" aria-checked={on} tabIndex={on ? 0 : -1}
-              onClick={() => { if (on) open(it); else { hapticTick(); setSel(i); } }}
-              className="flex w-full items-center gap-4 py-4 text-left outline-none focus-visible:bg-foreground/[0.04]">
-              <span className="w-5 shrink-0 font-mono text-sm tabular-nums text-muted-foreground">{i + 1}</span>
-              <span className={`grid size-11 shrink-0 place-items-center rounded-full border transition-colors duration-200 motion-reduce:transition-none ${on ? "border-foreground bg-foreground text-background" : "border-foreground/25 text-foreground/80"}`}>
-                {it.id === "camera" && ai ? <img src={aiLogo} alt="" aria-hidden="true" className="size-7" /> : <it.Icon className="size-5" strokeWidth={1.75} aria-hidden="true" />}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className={`block text-base font-semibold ${on ? "text-foreground" : "text-foreground/80"}`}>{it.name}</span>
-                <span className="block text-sm leading-snug text-muted-foreground">{it.desc}</span>
-              </span>
-              <span className={`size-4 shrink-0 rounded-full border-2 transition-colors duration-200 motion-reduce:transition-none ${on ? "border-foreground bg-foreground shadow-[inset_0_0_0_3px_var(--background)]" : "border-foreground/30"}`} aria-hidden="true" />
-            </button>
-          );
+      <div {...rise(0)} className={`${rise(0).className} flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.28em] text-foreground/60`}>
+        <span>Micro Digital Twin</span>
+        <span className="font-mono tabular-nums tracking-normal" aria-hidden="true">0{sel + 1} / 0{items.length}</span>
+      </div>
+      <div className="mx-auto flex w-full max-w-xl flex-1 flex-col">
+        <h2 {...rise(1)} className={`${rise(1).className} mt-[12vh] font-display text-[3.4rem] font-extralight leading-[0.95] tracking-tight text-foreground sm:text-7xl`}>Da dove<br />vuoi iniziare?</h2>
+        <p {...rise(2)} className={`${rise(2).className} mt-5 max-w-xs text-[15px] leading-relaxed text-foreground/60`}>Scegli una strada. Le altre restano a un tocco, nel menu.</p>
+        <div role="radiogroup" aria-label="Da dove vuoi iniziare" className="mt-10 space-y-1"
+          onKeyDown={(e) => {
+            const d = e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : e.key === "ArrowUp" || e.key === "ArrowLeft" ? -1 : 0;
+            if (!d) return;
+            e.preventDefault();
+            const n = (sel + d + items.length) % items.length;
+            pick(n); rows.current[n]?.focus();
+          }}>
+          {items.map((it, i) => {
+            const on = i === sel;
+            return (
+              <button key={it.id} ref={(el) => { rows.current[i] = el; }} type="button" role="radio" aria-checked={on} tabIndex={on ? 0 : -1}
+                onClick={() => (on ? open(it) : pick(i))} {...rise(3 + i)}
+                className={`${rise(3 + i).className} group relative flex w-full items-start gap-5 py-3 pl-5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring`}>
+                {/* The chosen one carries a white line on its left edge, the others fade back. */}
+                <span className={`absolute left-0 top-3 w-[2px] rounded-full bg-foreground transition-all duration-300 motion-reduce:transition-none ${on ? "h-[calc(100%-1.5rem)] opacity-100" : "h-0 opacity-0"}`} aria-hidden="true" />
+                <span className={`font-mono text-sm tabular-nums transition-colors duration-300 ${on ? "text-foreground" : "text-foreground/35"}`}>0{i + 1}</span>
+                <span className="min-w-0 flex-1">
+                  <span className={`flex items-center gap-3 font-display text-[1.75rem] font-light leading-tight transition-colors duration-300 ${on ? "text-foreground" : "text-foreground/40 group-hover:text-foreground/70"}`}>
+                    {it.name}
+                    {it.id === "camera" && ai ? <img src={aiLogo} alt="" aria-hidden="true" className={`size-6 rounded-md bg-white p-0.5 ${on ? "" : "opacity-50 grayscale"}`} /> : <it.Icon className="size-5 opacity-70" strokeWidth={1.5} aria-hidden="true" />}
+                  </span>
+                  <span className={`grid transition-[grid-template-rows,opacity] duration-300 motion-reduce:transition-none ${on ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
+                    <span className="overflow-hidden text-[15px] leading-snug text-foreground/60"><span className="block pt-1">{it.desc}</span></span>
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div {...rise(6)} className={`${rise(6).className} mt-auto flex flex-col items-stretch gap-1 pt-10`}>
+          <button type="button" onClick={() => open(item)}
+            className="inline-flex h-14 items-center justify-between rounded-full bg-foreground pl-7 pr-2 text-base font-semibold text-background outline-none transition-transform focus-visible:ring-4 focus-visible:ring-ring/50 active:scale-[0.98] motion-reduce:active:scale-100">
+            <span>Inizia con {item.name}</span>
+            <span className="grid size-10 place-items-center rounded-full bg-background text-foreground"><ArrowRight className="size-5" aria-hidden="true" /></span>
+          </button>
+          <Link to="/mappa" className="inline-flex h-12 items-center justify-center rounded-full text-sm font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">Salta, vai alla mappa</Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** The page's only drawing: heat lines like a weather map, white and faint, turning very slowly behind the text. */
+function Isolines() {
+  const rings = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+  return (
+    <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
+      <svg viewBox="-200 -200 400 400" className="intro-isolines absolute -right-[93vw] -top-[38vh] h-[120vh] w-[120vh] max-w-none text-foreground sm:-right-[20vw] sm:-top-[20vh]">
+        {rings.map((k) => {
+          const r = 30 + k * 21, w = 6 + k * 2.2;
+          // A wobbly ring: radius bent by two slow waves, so it reads as a drawn contour, not a target.
+          const d = Array.from({ length: 73 }, (_, i) => {
+            const t = (i / 72) * Math.PI * 2, rr = r + Math.sin(t * 3 + k * 0.7) * w * 0.6 + Math.cos(t * 2 - k) * w * 0.4;
+            return `${i ? "L" : "M"}${(Math.cos(t) * rr).toFixed(1)} ${(Math.sin(t) * rr).toFixed(1)}`;
+          }).join(" ") + "Z";
+          return <path key={k} d={d} fill="none" stroke="currentColor" strokeOpacity={0.16 - k * 0.012} strokeWidth="0.8" />;
         })}
-      </div>
-      <div className="mt-auto flex flex-col items-stretch gap-2 pt-10 sm:flex-row sm:items-center">
-        <button type="button" onClick={() => open(item)}
-          className="inline-flex h-14 items-center justify-center gap-2 rounded-full bg-foreground px-8 text-base font-semibold text-background outline-none transition-transform focus-visible:ring-4 focus-visible:ring-ring/50 active:scale-[0.98] motion-reduce:active:scale-100">
-          Continua<ArrowRight className="size-5" aria-hidden="true" />
-        </button>
-        <Link to="/mappa" className="inline-flex h-12 items-center justify-center rounded-full px-6 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">Salta, vai alla mappa</Link>
-      </div>
+      </svg>
+      <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_80%_10%,transparent_30%,var(--background)_85%)]" />
     </div>
   );
 }

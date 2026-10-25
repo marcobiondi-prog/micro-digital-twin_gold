@@ -436,6 +436,7 @@ function RootComponent() {
       document.removeEventListener("pointerdown", lock);
     };
   }, []);
+  const intro = location.pathname === "/";
   return (
     <QueryClientProvider client={queryClient}>
       <a
@@ -444,6 +445,8 @@ function RootComponent() {
       >
         Salta al contenuto principale
       </a>
+      {/* The opening page (/) stands alone: no header, no menus, no footer. */}
+      {!intro && <>
       {/* v8: a solid console top bar painted with the page's own ambient light, so it carries the same shades without being see-through. */}
       <header id="app-header" className="app-header-tint relative pt-[env(safe-area-inset-top)]">
         <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-2 sm:px-4 sm:py-3">
@@ -463,12 +466,13 @@ function RootComponent() {
         </div>
       </header>
       <div className="hidden sm:block"><SmartNav /></div>
+      </>}
 
-      <main id="main-content" tabIndex={-1} className="app-main mx-auto max-w-7xl px-4 pb-8 pt-6 focus:outline-none sm:pt-8"><Outlet /></main><Toaster />
-      <footer className="mx-auto max-w-7xl px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] text-xs text-muted-foreground sm:pb-10">
+      <main id="main-content" tabIndex={-1} className={intro ? "focus:outline-none" : "app-main mx-auto max-w-7xl px-4 pb-8 pt-6 focus:outline-none sm:pt-8"}><Outlet /></main><Toaster />
+      {!intro && <footer className="mx-auto max-w-7xl px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] text-xs text-muted-foreground sm:pb-10">
         I risultati del simulatore sono indicativi e non sostituiscono modelli fisici calibrati.
-      </footer>
-      <BottomNav />
+      </footer>}
+      {!intro && <BottomNav />}
       <CameraSheet />
     </QueryClientProvider>
   );
