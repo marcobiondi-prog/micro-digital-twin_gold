@@ -206,6 +206,8 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
     transition: background-color 0.2s ease, color 0.2s ease;
+    /* Full-bleed bars (100vw, scrollbar included) never make the page scroll sideways; clip keeps sticky working. */
+    overflow-x: clip;
   }
   h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: -0.02em; }
 }

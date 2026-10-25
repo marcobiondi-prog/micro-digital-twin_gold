@@ -737,12 +737,12 @@ function Dashboard() {
     navigate({ search: (prev) => ({ ...prev, tab: v }), replace: true, resetScroll: false });
   const loading = useDashboardLoading(t);
   return (
-    <div className="min-w-0 overflow-x-clip">
+    <div className="min-w-0">
       <Ambient tone={t === "Piazza" ? "rgb(28 112 210 / 0.38)" : "rgb(150 36 110 / 0.38)"} />
       <LabSyncIndicator />
       {/* v8: a big thin title with the report on the right, then the PS pills. */}
       <PageHero title="Dashboard" actions={<ExportReport ctx={t === "Piazza" ? "Urbano" : "Vitivinicolo"} />} />
-      <div className="sticky top-[var(--nav-h)] transition-[top] duration-300 z-[999999998] isolate -mx-4 mb-5 mt-3 min-w-0 bg-background/80 px-4 py-2 backdrop-blur-xl sm:mb-6">
+      <div className="sticky top-[var(--nav-h)] transition-[top] duration-300 z-[999999998] isolate mx-[calc(50%-50vw)] mb-5 mt-3 min-w-0 bg-background/80 px-[calc(50vw-50%)] py-2 backdrop-blur-xl sm:mb-6">
         <TabRow fill label="Dashboard" items={[{ id: "Piazza", label: "Piazza", icon: Building2 }, { id: "Vigneto", label: "Vigneto", icon: Grape }]} value={t} onChange={setT} />
       </div>
       <div key={t} className="min-w-0">{loading
