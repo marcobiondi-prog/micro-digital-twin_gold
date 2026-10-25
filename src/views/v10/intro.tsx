@@ -70,23 +70,25 @@ const STEPS: Array<{ title: string; text: string; art: ReactNode }> = [
     </> },
 ];
 
-/** The page's only drawing: heat lines like a weather map, white and faint, turning very slowly behind the text. */
-function Isolines() {
-  const rings = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+/** Where the data points of the sky sit (x %, y %, size px, delay s): fixed, so the server and the phone draw the same sky. */
+const DOTS: Array<[number, number, number, number]> = [[8, 12, 2, 0], [22, 26, 1.5, 1.2], [37, 8, 2, 2.4], [63, 15, 1.5, 0.6], [78, 6, 2, 1.8], [90, 22, 1.5, 3], [14, 40, 1.5, 2.1], [86, 38, 2, 0.9], [50, 30, 1.5, 3.4], [70, 44, 1.5, 1.5], [30, 48, 2, 2.7], [5, 58, 1.5, 0.3]];
+
+/**
+ * The entrance's backdrop, a digital twin's horizon: soft lights (Twin's turquoise above, a cool blue and a warm heat glow
+ * drifting slowly), a sky of faint data points, and a perspective grid floor that glides toward you, fading into the page.
+ * Still with reduced motion.
+ */
+function Backdrop() {
   return (
-    <div className="pointer-events-none fixed inset-0 -z-10" aria-hidden="true">
-      <svg viewBox="-200 -200 400 400" className="intro-isolines absolute -right-[93vw] -top-[38vh] h-[120vh] w-[120vh] max-w-none text-foreground sm:-right-[20vw] sm:-top-[20vh]">
-        {rings.map((k) => {
-          const r = 30 + k * 21, w = 6 + k * 2.2;
-          // A wobbly ring: radius bent by two slow waves, so it reads as a drawn contour, not a target.
-          const d = Array.from({ length: 73 }, (_, i) => {
-            const t = (i / 72) * Math.PI * 2, rr = r + Math.sin(t * 3 + k * 0.7) * w * 0.6 + Math.cos(t * 2 - k) * w * 0.4;
-            return `${i ? "L" : "M"}${(Math.cos(t) * rr).toFixed(1)} ${(Math.sin(t) * rr).toFixed(1)}`;
-          }).join(" ") + "Z";
-          return <path key={k} d={d} fill="none" stroke="currentColor" strokeOpacity={0.16 - k * 0.012} strokeWidth="0.8" />;
-        })}
-      </svg>
-      <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_80%_10%,transparent_30%,var(--background)_85%)]" />
+    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-background" aria-hidden="true">
+      <div className="intro-glow intro-glow-a absolute -left-[20%] -top-[15%] h-[60vh] w-[80vw] rounded-full bg-[radial-gradient(closest-side,rgb(76_201_189/0.28),transparent)] blur-2xl" />
+      <div className="intro-glow intro-glow-b absolute -right-[25%] top-[18%] h-[55vh] w-[75vw] rounded-full bg-[radial-gradient(closest-side,rgb(40_100_220/0.26),transparent)] blur-2xl" />
+      <div className="intro-glow intro-glow-c absolute -bottom-[10%] left-[10%] h-[45vh] w-[80vw] rounded-full bg-[radial-gradient(closest-side,rgb(255_140_60/0.16),transparent)] blur-2xl" />
+      {DOTS.map(([x, y, r, d]) => <span key={`${x}-${y}`} className="intro-dot absolute rounded-full bg-foreground" style={{ left: `${x}%`, top: `${y}%`, width: r, height: r, animationDelay: `${d}s` }} />)}
+      {/* The floor: a grid laid flat in perspective, gliding toward the viewer. */}
+      <div className="absolute inset-x-0 bottom-0 h-[40vh] [perspective:320px] [mask-image:linear-gradient(to_top,black_10%,transparent_95%)]">
+        <div className="intro-floor absolute -inset-x-[50%] bottom-0 h-[200%] origin-bottom [transform:rotateX(72deg)] bg-[linear-gradient(rgb(76_201_189/0.35)_1px,transparent_1px),linear-gradient(90deg,rgb(76_201_189/0.35)_1px,transparent_1px)] bg-[size:48px_48px]" />
+      </div>
     </div>
   );
 }
@@ -132,7 +134,7 @@ export function Tutorial() {
   return (
     <div className="relative isolate flex h-dvh flex-col overflow-hidden"
       onKeyDown={(e) => { if (e.key === "ArrowRight" && !last) { e.preventDefault(); go(page + 1); } if (e.key === "ArrowLeft" && page > 0) { e.preventDefault(); go(page - 1); } }}>
-      <Isolines />
+      <Backdrop />
       <h1 className="sr-only">Come funziona</h1>
       <div className="flex justify-end px-4 pt-[calc(0.75rem+env(safe-area-inset-top))]">
         <button type="button" onClick={finish} className="inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
@@ -152,7 +154,8 @@ export function Tutorial() {
         <section aria-label="Benvenuto" aria-roledescription="schermata" aria-hidden={page !== 0 || undefined} className="flex w-full shrink-0 select-none flex-col items-center justify-center px-8 text-center">
           <Reveal className="flex flex-col items-center">
             <span className="block h-36 w-40 sm:h-44 sm:w-48"><TwinMascot className="block h-full w-full drop-shadow-[0_12px_40px_rgb(76_201_189/0.25)]" /></span>
-            <h2 className="mt-8 font-display text-[2.6rem] font-extralight leading-[1.02] tracking-tight text-foreground sm:text-6xl">Prova gli interventi<br />prima di farli.</h2>
+            <p className="mt-4 font-display text-xl font-semibold uppercase tracking-[0.18em] text-foreground sm:text-2xl">Micro Digital <span className="text-brand-turquoise">Twin</span></p>
+            <h2 className="mt-6 font-display text-[2.6rem] font-extralight leading-[1.02] tracking-tight text-foreground sm:text-6xl">Prova gli interventi<br />prima di farli.</h2>
             <p className="mt-4 text-[15px] text-foreground/60">Ecco come funziona, in quattro passi.</p>
           </Reveal>
         </section>
@@ -204,7 +207,7 @@ export function Choice() {
   const pick = (i: number) => { if (i === sel) return; hapticTick(); setSel(i); };
   return (
     <div className="relative isolate px-6 sm:px-12">
-      <Isolines />
+      <Backdrop />
       <section aria-label="Scelta" className="mx-auto flex min-h-dvh max-w-xl flex-col pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-[calc(3rem+env(safe-area-inset-top))]">
         <h1 className="sr-only">Da dove vuoi iniziare</h1>
         <Reveal>

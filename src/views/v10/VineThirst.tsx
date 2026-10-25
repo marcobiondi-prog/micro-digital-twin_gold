@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronDown, CloudRain, Droplets, Flower2, Grape, Info, Leaf, Ruler, ShieldCheck, Sprout, Umbrella, Wallet, Wind, Wine, type LucideIcon } from "lucide-react";
+import { ChevronDown, CloudRain, Droplets, Thermometer, Flower2, Grape, Info, Leaf, Ruler, ShieldCheck, Sprout, Umbrella, Wallet, Wind, Wine, type LucideIcon } from "lucide-react";
 import { phenoPhases, type Pheno } from "@/models/data";
 import { comparison, type PrototypeId } from "@/models/scenarios";
 import { setVineyard, useLab, vineMetrics } from "@/models/lab-store";
@@ -21,6 +21,7 @@ const PHASE_SHORT: Record<Pheno, string> = { Germogliamento: "Germogli", Fioritu
 const stressGain = (s: number) => (s >= 80 ? 0 : s >= 65 ? 1 : s >= 45 ? 2 : s >= 25 ? 3 : 4);
 /** How the vines are, in plain words. */
 const verdict = (s: number) => (s >= 65 ? "Sete forte" : s >= 35 ? "Da tenere d'occhio" : "Le viti stanno bene");
+const AIR_MIN = 15, AIR_MAX = 45;
 const avg = (n: number[]) => n.reduce((a, b) => a + b, 0) / Math.max(1, n.length);
 const fmt1 = (n: number) => n.toLocaleString("it-IT", { maximumFractionDigits: 1, minimumFractionDigits: 1 });
 
@@ -80,6 +81,13 @@ export function VineThirst({ onImportWeather, matrix }: { onImportWeather?: (() 
   const change = (patch: Partial<VineMix>) => setVineyard((v) => ({
     zones: v.zones.map((z, i) => ({ ...z, ...(mixes[i] ?? NO_MIX), ...(targets.includes(i) ? { ...mix, ...patch } : {}) })),
   }));
+  // Air temperature of the scope, simulated by hand (15–45 °C): the base the interventions start from.
+  const airShown = Math.round(avg(targets.map((i) => vine.zones[i]?.temperature ?? 0)));
+  const setAir = (v: number) => {
+    const delta = v + AIR_MIN - airShown;
+    if (!delta) return;
+    setVineyard((vv) => ({ zones: vv.zones.map((z, i) => (targets.includes(i) ? { ...z, temperature: Math.max(0, Math.min(45, z.temperature + delta)) } : z)) }));
+  };
   const scopeName = all ? "tutto il vigneto" : `zona ${vine.selected + 1}`;
   // Sliding asks for a thirst: the vineyard walks the path no mix → the three ready vineyards (smallest step that reaches it).
   const slideTo = (t: number) => {
@@ -170,6 +178,8 @@ export function VineThirst({ onImportWeather, matrix }: { onImportWeather?: (() 
             <CloudRain className="size-5" aria-hidden="true" />Pioggia
           </button>
         </div>
+        {/* The air temperature of the scope (on Tutte the average; moving it shifts every zone by the same degrees). */}
+        <Lever icon={Thermometer} label="Temperatura" value={airShown - AIR_MIN} step={1} max={AIR_MAX - AIR_MIN} color="text-radar-hot" swatch="bg-radar-hot" shown={`${airShown} °C`} onChange={setAir} />
         {onImportWeather && <ImportWeatherButton onImport={onImportWeather} />}
       </div>
 

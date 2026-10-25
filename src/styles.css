@@ -1994,9 +1994,16 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 @media (prefers-reduced-motion: reduce) { .ps-nav-camera[data-focus] { transform: none; } }
 
 /* v10 opening page: the drawn heat lines turn very slowly (still with reduced motion). */
-.intro-isolines { animation: intro-isolines-turn 140s linear infinite; }
-@keyframes intro-isolines-turn { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .intro-isolines { animation: none; } }
+/* v10 entrance backdrop: drifting lights, twinkling data points, a grid floor gliding toward the viewer (all still with reduced motion). */
+.intro-glow { animation: intro-drift 18s ease-in-out infinite alternate; }
+.intro-glow-b { animation-duration: 23s; animation-direction: alternate-reverse; }
+.intro-glow-c { animation-duration: 27s; }
+@keyframes intro-drift { from { transform: translate3d(-4%, -2%, 0) scale(1); } to { transform: translate3d(5%, 4%, 0) scale(1.12); } }
+.intro-dot { opacity: 0.15; animation: intro-twinkle 4.2s ease-in-out infinite; }
+@keyframes intro-twinkle { 50% { opacity: 0.7; } }
+.intro-floor { animation: intro-glide 3.2s linear infinite; }
+@keyframes intro-glide { to { background-position: 0 48px; } }
+@media (prefers-reduced-motion: reduce) { .intro-glow, .intro-dot, .intro-floor { animation: none; } }
 
 /* v10 tutorial: each drawing draws itself once its step comes into view (shown at once with reduced motion). */
 .intro-draw :is(path, circle):not(.intro-pop) { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 1.4s cubic-bezier(0.45, 0, 0.2, 1); }
