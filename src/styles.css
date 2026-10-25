@@ -2003,9 +2003,11 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 @keyframes intro-drift { from { transform: translate3d(-6%, -4%, 0) scale(0.95); border-radius: 45% 55% 60% 40%; } to { transform: translate3d(8%, 6%, 0) scale(1.2); border-radius: 60% 40% 40% 60%; } }
 .intro-dot { opacity: 0.15; animation: intro-twinkle 4.2s ease-in-out infinite; }
 @keyframes intro-twinkle { 50% { opacity: 0.85; } }
+.intro-halo { opacity: 0.55; animation: intro-halo-breathe 6s ease-in-out infinite alternate; }
+@keyframes intro-halo-breathe { to { opacity: 1; } }
 .intro-spark { opacity: 0; animation: intro-rise linear infinite; }
 @keyframes intro-rise { 0% { transform: translateY(0); opacity: 0; } 10% { opacity: 0.9; } 80% { opacity: 0.5; } 100% { transform: translateY(-85vh); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .intro-aurora, .intro-glow, .intro-dot, .intro-spark { animation: none; } .intro-spark { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .intro-aurora, .intro-glow, .intro-dot, .intro-halo, .intro-spark { animation: none; } .intro-spark { opacity: 0; } }
 
 /* v10 tutorial: each drawing draws itself once its step comes into view (shown at once with reduced motion). */
 .intro-draw :is(path, circle):not(.intro-pop) { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 1.4s cubic-bezier(0.45, 0, 0.2, 1); }

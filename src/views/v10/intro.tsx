@@ -79,7 +79,8 @@ const SPARKS: Array<[number, number, number, number]> = [[12, 3, 14, 0], [27, 2,
 
 /**
  * The entrance's backdrop, light and airy: an aurora in Twin's turquoise, a cool blue and a warm heat glow, slowly turning and
- * breathing, a sky of twinkling data points and sparks rising from the bottom. Still with reduced motion.
+ * breathing, a sky of twinkling data points, a thin curved horizon of light low on the screen and sparks rising from the bottom.
+ * Still with reduced motion.
  */
 function Backdrop() {
   return (
@@ -91,6 +92,9 @@ function Backdrop() {
         <div className="intro-glow intro-glow-c absolute bottom-[18%] left-[25%] h-[40vh] w-[60vw] rounded-[50%] bg-[radial-gradient(closest-side,rgb(255_130_60/0.3),transparent)] blur-3xl" />
       </div>
       {DOTS.map(([x, y, r, d]) => <span key={`${x}-${y}`} className="intro-dot absolute rounded-full bg-white" style={{ left: `${x}%`, top: `${y}%`, width: r, height: r, animationDelay: `${d}s` }} />)}
+      {/* The horizon: a thin curved line of light low on the screen, glowing softly, the sky above it, the night below. */}
+      <div className="absolute left-1/2 top-[80vh] h-[60vh] w-[260vw] -translate-x-1/2 rounded-[50%] border-t border-[rgb(140_240_225/0.85)] bg-[linear-gradient(to_bottom,rgb(5_7_12/0.55),#05070c_30%)] shadow-[0_-10px_40px_rgb(76_201_189/0.45),0_-40px_120px_rgb(40_100_230/0.35)] sm:top-[78vh] sm:w-[200vw]" />
+      <div className="intro-halo absolute left-1/2 top-[74vh] h-[14vh] w-[120vw] -translate-x-1/2 rounded-[50%] bg-[radial-gradient(closest-side,rgb(120_235_220/0.35),transparent)] blur-2xl" />
       {SPARKS.map(([x, r, t, d]) => <span key={x} className="intro-spark absolute bottom-[8vh] rounded-full bg-[rgb(140_240_225)] shadow-[0_0_8px_rgb(76_201_189)]" style={{ left: `${x}%`, width: r, height: r, animationDuration: `${t}s`, animationDelay: `${d}s` }} />)}
       {/* A soft vignette keeps the text readable. */}
       <div className="absolute inset-0 bg-[radial-gradient(120%_90%_at_50%_45%,transparent_55%,rgb(0_0_0/0.55))]" />
