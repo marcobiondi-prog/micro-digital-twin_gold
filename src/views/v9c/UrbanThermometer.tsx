@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronDown, CloudRain, Leaf, Minus, Plus, Info, Ruler, Sprout, Sun, TreePine, Umbrella, Wallet, type LucideIcon } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Clock, CloudRain, Leaf, Minus, Plus, Info, Ruler, Sprout, Sun, TreePine, Umbrella, Wallet, type LucideIcon } from "lucide-react";
 import { comparison, piazzaEstimate, type PrototypeId } from "@/models/scenarios";
 import { setUrban, useLab } from "@/models/lab-store";
 import { REFERENCE_M2, euroRange, grouped, interventionCost } from "@/models/intervention-cost";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
+import { getSeasonalClimate } from "@/controllers/climate.functions";
+import { SEASONS, SEASON_LABEL, coolingShare, estimatedTemp, seasonOfMonth, type Season } from "@/models/season-climate";
 import { GAIN_BG, GAIN_TEXT } from "@/views/v7/studio-ui";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ImportWeatherButton } from "@/views/SimulationGrid";
@@ -14,8 +16,6 @@ import { cn } from "@/lib/utils";
 
 const fmt = (n: number) => n.toLocaleString("it-IT", { maximumFractionDigits: 1, minimumFractionDigits: 1 });
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
-/** Dial range of perceived heat: the gauge empties toward MIN as the piazza cools. */
-const MIN = 30, MAX = 42;
 const MARKS = 10;
 /** The three ready piazzas: one touch to start, then fine-tune with the levers. */
 const PRESETS: Array<{ id: PrototypeId; trees: number; permeable: number; shade: number }> = [
@@ -28,16 +28,19 @@ const levelOf = (dT: number): PrototypeId => {
   const gainOf = (p: (typeof PRESETS)[number]) => piazzaEstimate(p.trees, p.permeable, p.shade).dT;
   return PRESETS.reduce((best, p) => (Math.abs(gainOf(p) - dT) < Math.abs(gainOf(best) - dT) ? p : best)).id;
 };
-/** How it feels at the hottest hours, in plain words and on the five-step scale (0 = worst). */
-const feeling = (t: number): { text: string; step: number } =>
-  t >= 39 ? { text: "Troppo caldo", step: 0 } : t >= 36 ? { text: "Molto caldo", step: 1 } : t >= 33 ? { text: "Caldo", step: 2 } : { text: "Si sta bene", step: 4 };
+/** How it feels, in plain words and on the five-step scale (0 = worst; the cool end reads blue). */
+const feeling = (t: number): { text: string; step: number; bg?: string } =>
+  t >= 39 ? { text: "Troppo caldo", step: 0 } : t >= 36 ? { text: "Molto caldo", step: 1 } : t >= 30 ? { text: "Caldo", step: 2 }
+    : t >= 18 ? { text: "Si sta bene", step: 4 } : t >= 10 ? { text: "Fresco", step: 4, bg: "bg-water" } : { text: "Freddo", step: 4, bg: "bg-urban" };
+/** Colour of each level on the arc (the same as its dot in the comparison). */
+const LEVEL_COLOR: Record<PrototypeId, string> = { zero: "var(--ok)", mvp: "var(--brand-turquoise)", roadmap: "var(--warn)" };
 
 /**
  * Half-ring gauge you can slide: the coloured arc and the white dot show how hot the piazza feels, the faint ring
  * where today starts. A finger anywhere on the arc grabs it: while it moves the dot follows the finger exactly and
  * the piazza follows the asked temperature; arrow keys move it by 0,1 °C.
  */
-function Gauge({ before, after, lowest, onSlide, onSlideStart }: { before: number; after: number; lowest: number; onSlide: (t: number) => void; onSlideStart: () => void }) {
+function Gauge({ before, after, lowest, min: MIN, max: MAX, marks, onSlide, onSlideStart }: { before: number; after: number; lowest: number; min: number; max: number; marks: Array<{ id: PrototypeId; t: number }>; onSlide: (t: number) => void; onSlideStart: () => void }) {
   const R = 88, C = Math.PI * R;
   const box = useRef<HTMLDivElement>(null);
   // While sliding, the temperature under the finger (the piazza snaps to whole trees, the dot must not).
@@ -73,11 +76,11 @@ function Gauge({ before, after, lowest, onSlide, onSlideStart }: { before: numbe
     // An HTML layer takes the finger (touch-action works everywhere on HTML, not on every SVG): only touches that start
     // on the arc band grab it, and the page does not scroll under the gauge.
     <div ref={box} className="relative w-full max-w-[22rem] touch-none select-none rounded-3xl focus-visible:ring-2 focus-visible:ring-ring"
-      role="slider" tabIndex={0} aria-label="Calore percepito da raggiungere" aria-valuemin={Math.round(lowest * 10) / 10} aria-valuemax={before}
+      role="slider" tabIndex={0} aria-label="Calore percepito da raggiungere" aria-valuemin={Math.round(lowest * 10) / 10} aria-valuemax={before} aria-disabled={lowest >= before - 0.05 || undefined}
       aria-valuenow={Math.round(after * 10) / 10} aria-valuetext={`${fmt(after)} gradi`} onKeyDown={onKey}
       onPointerDown={(e) => {
         const { x, y } = local(e), d = Math.hypot(x, y);
-        if (d < R - 34 || d > R + 30 || y < -12) return;
+        if (d < R - 34 || d > R + 30 || y < -12 || lowest >= before - 0.05) return;
         e.currentTarget.setPointerCapture(e.pointerId);
         onSlideStart();
         move(e);
@@ -94,6 +97,8 @@ function Gauge({ before, after, lowest, onSlide, onSlideStart }: { before: numbe
         <path d="M12 100 A88 88 0 0 1 188 100" fill="none" stroke="currentColor" strokeOpacity="0.1" strokeWidth="14" strokeLinecap="round" />
         <path d="M12 100 A88 88 0 0 1 188 100" fill="none" stroke="url(#thermo-scale)" strokeWidth="14" strokeLinecap="round" strokeDasharray={`${C * share(shown)} ${C}`} className={motion} />
         <circle cx={b.x} cy={b.y} r="5.5" fill="none" stroke="currentColor" strokeOpacity="0.5" strokeWidth="2" />
+        {/* Where each ready level would bring the piazza: a coloured tick just outside the arc. */}
+        {marks.map((m) => { const o = { x: 100 + Math.cos(angle(m.t)) * (R + 13), y: 100 - Math.sin(angle(m.t)) * (R + 13) }; return <circle key={m.id} cx={o.x} cy={o.y} r="3.2" fill={LEVEL_COLOR[m.id]} />; })}
         <circle cx={a.x} cy={a.y} r={finger === null ? 9 : 12} fill="#fff" stroke="#0d1016" strokeWidth="2.5" className="[filter:drop-shadow(0_2px_4px_rgb(0_0_0/0.4))]" />
         <text x="12" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{MIN}°</text>
         <text x="188" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{MAX}°</text>
@@ -150,9 +155,29 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
     return () => io.disconnect();
   }, []);
   const est = piazzaEstimate(urban.trees, urban.permeable, urban.shade);
-  const before = urban.realTemp ?? 40;
-  const after = before - est.dT;
-  const gain = est.dT < 0.8 ? 0 : est.dT < 1.8 ? 1 : est.dT < 2.8 ? 2 : est.dT < 3.8 ? 3 : 4;
+  // Season and hour follow the device clock ("Adesso"), checked every 30 s and on return to the app, until one is chosen by hand.
+  const [live, setLive] = useState(true);
+  const [season, setSeason] = useState<Season>(() => seasonOfMonth(new Date().getMonth()));
+  const [hour, setHour] = useState(() => new Date().getHours());
+  useEffect(() => {
+    if (!live) return;
+    const sync = () => { const now = new Date(); setSeason(seasonOfMonth(now.getMonth())); setHour(now.getHours()); };
+    sync();
+    const id = window.setInterval(sync, 30_000);
+    document.addEventListener("visibilitychange", sync);
+    return () => { window.clearInterval(id); document.removeEventListener("visibilitychange", sync); };
+  }, [live]);
+  // The place's real year, averaged by season and hour; without it, a plain estimate said as such.
+  const fetchSeasons = useServerFn(getSeasonalClimate);
+  const climate = useQuery({ queryKey: ["season-climate", urban.location.lat, urban.location.lng], queryFn: () => fetchSeasons({ data: { lat: urban.location.lat, lng: urban.location.lng } }), staleTime: Infinity, retry: 1 });
+  const realBefore = climate.data?.profile[season][hour] ?? null;
+  const before = realBefore ?? estimatedTemp(season, hour, urban.realTemp ?? 40);
+  // Trees, lawn and shade take heat away only when there is heat: all of it at 40 °C, none at 20 °C.
+  const share = coolingShare(before);
+  const gainNow = est.dT * share;
+  const after = before - gainNow;
+  const gain = gainNow < 0.8 ? 0 : gainNow < 1.8 ? 1 : gainNow < 2.8 ? 2 : gainNow < 3.8 ? 3 : 4;
+  const dialMax = Math.ceil(before) + 2, dialMin = Math.floor(before) - 8;
   const feel = feeling(after);
   const preset = PRESETS.find((p) => p.trees === urban.trees && p.permeable === urban.permeable && p.shade === urban.shade)?.id ?? null;
   const level = comparison.find((l) => l.id === (preset ?? levelOf(est.dT))) ?? comparison[0]!;
@@ -174,7 +199,7 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
   // Levers set totals, so the squares are placed again from the default layout.
   const change = (patch: { trees?: number; permeable?: number; shade?: number }) => {
     const next = { trees: urban.trees, permeable: urban.permeable, shade: urban.shade, ...patch };
-    const d = piazzaEstimate(next.trees, next.permeable, next.shade).dT - est.dT;
+    const d = (piazzaEstimate(next.trees, next.permeable, next.shade).dT - est.dT) * share;
     setUrban({ ...patch, treeCells: null, permeableCells: null, shadeCells: null });
     window.clearTimeout(timer.current);
     setDelta((p) => ({ v: d, k: (p?.k ?? 0) + 1 }));
@@ -190,7 +215,7 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
   };
   const slideTo = (t: number) => {
     const base = slideBase.current, baseGain = piazzaEstimate(base.trees, base.permeable, base.shade).dT;
-    const k = baseGain > 0 ? clamp(before - t, 0, MAX_GAIN) / baseGain : 0;
+    const k = baseGain > 0 && share > 0 ? clamp(before - t, 0, MAX_GAIN * share) / (baseGain * share) : 0;
     const next = { trees: Math.min(30, Math.round(base.trees * k)), permeable: Math.min(100, Math.round(base.permeable * k)), shade: Math.min(100, Math.round(base.shade * k)) };
     if (next.trees === urban.trees && next.permeable === urban.permeable && next.shade === urban.shade) return;
     hapticTick();
@@ -207,6 +232,29 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
 
   return (
     <section className="fuse-canvas space-y-5 rounded-t-3xl px-3 pb-6 pt-4 text-foreground sm:px-5" aria-label="Termometro della piazza">
+      {/* When: the season and the hour, synced with the device clock until changed by hand ("Adesso" goes back to it). */}
+      <div className="space-y-2" role="group" aria-label="Stagione e ora">
+        <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 touch-pan-x" role="radiogroup" aria-label="Stagione">
+          {SEASONS.map((s) => (
+            <button key={s} type="button" role="radio" aria-checked={season === s} onClick={() => { hapticTick(); setLive(false); setSeason(s); }}
+              className={cn("h-10 shrink-0 rounded-full px-4 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", season === s ? "bg-secondary text-secondary-foreground" : "text-foreground/80 hover:bg-foreground/[0.06]")}>{SEASON_LABEL[s]}</button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => { hapticTick(); setLive(false); setHour((h) => (h + 23) % 24); }} aria-label="Un'ora prima" className="grid size-11 shrink-0 place-items-center rounded-full bg-foreground/[0.07] outline-none focus-visible:ring-2 focus-visible:ring-ring"><ChevronLeft className="size-5" aria-hidden="true" /></button>
+          <span className="flex min-w-0 flex-1 items-center justify-center gap-2" aria-live="polite">
+            <Clock className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span className="font-mono text-xl font-semibold tabular-nums">{String(hour).padStart(2, "0")}:00</span>
+          </span>
+          <button type="button" onClick={() => { hapticTick(); setLive(false); setHour((h) => (h + 1) % 24); }} aria-label="Un'ora dopo" className="grid size-11 shrink-0 place-items-center rounded-full bg-foreground/[0.07] outline-none focus-visible:ring-2 focus-visible:ring-ring"><ChevronRight className="size-5" aria-hidden="true" /></button>
+          <button type="button" aria-pressed={live} onClick={() => { hapticTick(); setLive(true); }}
+            className={cn("inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", live ? "bg-foreground text-background" : "bg-foreground/[0.07]")}>
+            <span className={cn("size-2 rounded-full", live ? "bg-ok animate-pulse motion-reduce:animate-none" : "bg-muted-foreground")} aria-hidden="true" />Adesso
+          </button>
+        </div>
+        <p className="text-center text-[11px] text-muted-foreground">{climate.isPending ? "Leggo l'anno del luogo…" : realBefore !== null ? "Calore percepito medio dell'ultimo anno in questo luogo" : "Stima indicativa: i dati reali del luogo non sono disponibili"}</p>
+      </div>
+
       {/* The three levels side by side, each with its own result and cost: this is the comparison, one touch applies it. */}
       <div>
         <div className="mb-2 flex items-center justify-between gap-2">
@@ -215,15 +263,15 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
         </div>
         <div className="grid grid-cols-3 gap-2" role="group" aria-label="Tre livelli di intervento">
           {PRESETS.map((p) => {
-            const l = comparison.find((c) => c.id === p.id)!, on = preset === p.id;
-            const pAfter = before - piazzaEstimate(p.trees, p.permeable, p.shade).dT;
+            const l = comparison.find((c) => c.id === p.id)!, on = preset === p.id, near = !on && level.id === p.id;
+            const pAfter = before - piazzaEstimate(p.trees, p.permeable, p.shade).dT * share;
             const pCost = interventionCost(m2, p.trees, p.permeable, p.shade).total;
             return (
               <button key={p.id} type="button" aria-pressed={on} onClick={() => change({ trees: p.trees, permeable: p.permeable, shade: p.shade })}
                 aria-label={`${l.s}: ${fmt(pAfter)} gradi, ${euroRange(pCost)}`}
                 className={cn("flex min-h-24 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 py-2 text-center outline-none transition-[background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-ring active:scale-95 motion-reduce:active:scale-100",
-                  on ? "bg-foreground/[0.12] shadow-[0_0_0_2px_var(--foreground)]" : "bg-foreground/[0.05] hover:bg-foreground/[0.08]")}>
-                <span className="text-[12px] font-semibold leading-tight">{l.s}</span>
+                  on ? "bg-foreground/[0.12] shadow-[0_0_0_2px_var(--foreground)]" : near ? "bg-foreground/[0.08] outline-dashed outline-2 outline-offset-0 outline-foreground/50" : "bg-foreground/[0.05] hover:bg-foreground/[0.08]")}>
+                <span className="text-[12px] font-semibold leading-tight"><span className="mr-1.5 inline-block size-2 rounded-full align-middle" style={{ background: LEVEL_COLOR[p.id] }} aria-hidden="true" />{l.s}</span>
                 <span className={cn("font-display text-2xl font-light tabular-nums", GAIN_TEXT[feeling(pAfter).step])}>{fmt(pAfter)}°</span>
                 <span className="font-mono text-[10px] leading-tight text-muted-foreground">{euroRange(pCost)}</span>
               </button>
@@ -237,17 +285,18 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
       <div aria-hidden={gaugeSeen} className={cn("pointer-events-none sticky top-[calc(var(--nav-h)+3.75rem)] z-[999999996] -mb-5 flex h-0 justify-center transition-opacity duration-200 motion-reduce:transition-none", gaugeSeen ? "opacity-0" : "opacity-100")}>
         <button type="button" tabIndex={gaugeSeen ? -1 : 0} onClick={() => gaugeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
           className="pointer-events-auto mt-1 flex h-11 items-center gap-2 rounded-full bg-card/95 px-4 shadow-lg ring-1 ring-foreground/10 backdrop-blur" style={{ pointerEvents: gaugeSeen ? "none" : "auto" }}>
-          <span className={cn("size-2.5 rounded-full", GAIN_BG[feel.step])} aria-hidden="true" />
+          <span className={cn("size-2.5 rounded-full", feel.bg ?? GAIN_BG[feel.step])} aria-hidden="true" />
           <span className="font-display text-xl font-light tabular-nums">{fmt(after)}°</span>
           <span className="text-sm text-muted-foreground">{feel.text}</span>
-          <span className={cn("font-mono text-sm font-semibold tabular-nums", GAIN_TEXT[gain])}>−{fmt(est.dT)}</span>
+          <span className={cn("font-mono text-sm font-semibold tabular-nums", GAIN_TEXT[gain])}>−{fmt(gainNow)}</span>
         </button>
       </div>
 
       <div ref={gaugeRef} className="relative mx-auto flex max-w-[22rem] flex-col items-center">
-        <Gauge before={before} after={after} lowest={before - MAX_GAIN} onSlide={slideTo} onSlideStart={startSlide} />
+        <Gauge before={before} after={after} lowest={before - MAX_GAIN * share} min={dialMin} max={dialMax} onSlide={slideTo} onSlideStart={startSlide}
+          marks={PRESETS.map((p) => ({ id: p.id, t: before - piazzaEstimate(p.trees, p.permeable, p.shade).dT * share }))} />
         <div className="pointer-events-none absolute inset-x-0 bottom-1 flex flex-col items-center" aria-live="polite">
-          <span className={cn("rounded-full px-3 py-0.5 text-sm font-semibold text-white transition-colors duration-300", GAIN_BG[feel.step])}>{feel.text}</span>
+          <span className={cn("rounded-full px-3 py-0.5 text-sm font-semibold text-white transition-colors duration-300", feel.bg ?? GAIN_BG[feel.step])}>{feel.text}</span>
           <span className="mt-1 font-display text-6xl font-light leading-none tracking-tight tabular-nums">{fmt(after)}°</span>
         </div>
         {delta && Math.abs(delta.v) >= 0.05 && (
@@ -257,14 +306,14 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
         )}
       </div>
       <p className="-mt-2 text-center text-sm text-muted-foreground">
-        alle 14–17 · oggi {fmt(before)}° · <b className={cn("font-semibold", GAIN_TEXT[gain])}>−{fmt(est.dT)} °C</b>
+        {SEASON_LABEL[season].toLowerCase()} alle {hour}:00 · senza interventi {fmt(before)}° · <b className={cn("font-semibold", GAIN_TEXT[gain])}>−{fmt(gainNow)} °C</b>
       </p>
-      <p className="-mt-3 text-center text-xs text-muted-foreground">Trascina il punto bianco sull'arco per scegliere quanto rinfrescare</p>
+      <p className="-mt-3 text-center text-xs text-muted-foreground">{share > 0 ? "Trascina il punto bianco sull'arco per scegliere quanto rinfrescare" : "A quest'ora non fa caldo: alberi, prato e ombra non hanno calore da togliere"}</p>
 
       <div className="space-y-2.5">
-        <Lever icon={TreePine} label="Alberi" value={urban.trees} step={1} max={30} color="text-ok" swatch="bg-ok" cooling={urban.trees * 0.25} onChange={(v) => change({ trees: v })} />
-        <Lever icon={Sprout} label="Prato" value={urban.permeable} step={10} max={100} color="text-radar-mild" swatch="bg-radar-mild" cooling={urban.permeable * 0.04} onChange={(v) => change({ permeable: v })} />
-        <Lever icon={Umbrella} label="Ombra" value={urban.shade} step={10} max={100} color="text-urban" swatch="bg-urban" cooling={urban.shade * 0.03} onChange={(v) => change({ shade: v })} />
+        <Lever icon={TreePine} label="Alberi" value={urban.trees} step={1} max={30} color="text-ok" swatch="bg-ok" cooling={urban.trees * 0.25 * share} onChange={(v) => change({ trees: v })} />
+        <Lever icon={Sprout} label="Prato" value={urban.permeable} step={10} max={100} color="text-radar-mild" swatch="bg-radar-mild" cooling={urban.permeable * 0.04 * share} onChange={(v) => change({ permeable: v })} />
+        <Lever icon={Umbrella} label="Ombra" value={urban.shade} step={10} max={100} color="text-urban" swatch="bg-urban" cooling={urban.shade * 0.03 * share} onChange={(v) => change({ shade: v })} />
       </div>
 
       {/* The cost folds away: closed it still says the total, open it adds the cost per m², the surface and the unit prices. */}
