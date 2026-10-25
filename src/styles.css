@@ -2005,9 +2005,13 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 @keyframes intro-twinkle { 50% { opacity: 0.85; } }
 .intro-halo { opacity: 0.55; animation: intro-halo-breathe 6s ease-in-out infinite alternate; }
 @keyframes intro-halo-breathe { to { opacity: 1; } }
+.intro-horizon { animation: intro-horizon-float 9s ease-in-out infinite alternate; }
+@keyframes intro-horizon-float { from { transform: translateY(0); } to { transform: translateY(-1.6vh); } }
+.intro-glint { -webkit-mask-image: linear-gradient(90deg, transparent 42%, black 50%, transparent 58%); mask-image: linear-gradient(90deg, transparent 42%, black 50%, transparent 58%); -webkit-mask-size: 300% 100%; mask-size: 300% 100%; animation: intro-glint 7s ease-in-out infinite; }
+@keyframes intro-glint { from { -webkit-mask-position: 100% 0; mask-position: 100% 0; } to { -webkit-mask-position: 0% 0; mask-position: 0% 0; } }
 .intro-spark { opacity: 0; animation: intro-rise linear infinite; }
 @keyframes intro-rise { 0% { transform: translateY(0); opacity: 0; } 10% { opacity: 0.9; } 80% { opacity: 0.5; } 100% { transform: translateY(-85vh); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .intro-aurora, .intro-glow, .intro-dot, .intro-halo, .intro-spark { animation: none; } .intro-spark { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .intro-aurora, .intro-glow, .intro-dot, .intro-halo, .intro-horizon, .intro-glint, .intro-spark { animation: none; } .intro-glint { opacity: 0; } .intro-spark { opacity: 0; } }
 
 /* v10 tutorial: each drawing draws itself once its step comes into view (shown at once with reduced motion). */
 .intro-draw :is(path, circle):not(.intro-pop) { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 1.4s cubic-bezier(0.45, 0, 0.2, 1); }
