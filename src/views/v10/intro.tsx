@@ -73,13 +73,13 @@ const STEPS: Array<{ title: string; text: string; art: ReactNode }> = [
 ];
 
 /** Where the data points of the sky sit (x %, y %, size px, delay s): fixed, so the server and the phone draw the same sky. */
-const DOTS: Array<[number, number, number, number]> = [[8, 12, 2, 0], [37, 8, 2, 2.4], [63, 15, 1.5, 0.6], [90, 22, 1.5, 3], [14, 40, 1.5, 2.1], [86, 38, 2, 0.9], [50, 30, 1.5, 3.4], [30, 48, 2, 2.7]];
+const DOTS: Array<[number, number, number, number]> = [[8, 12, 2, 0], [22, 26, 1.5, 1.2], [37, 8, 2, 2.4], [63, 15, 1.5, 0.6], [78, 6, 2, 1.8], [90, 22, 1.5, 3], [14, 40, 1.5, 2.1], [86, 38, 2, 0.9], [50, 30, 1.5, 3.4], [70, 44, 1.5, 1.5], [30, 48, 2, 2.7], [5, 58, 1.5, 0.3]];
 /** Sparks rising from the floor (x %, size px, duration s, delay s). */
-const SPARKS: Array<[number, number, number, number]> = [[12, 3, 26, 0], [41, 3, 30, 9], [55, 2, 34, 3], [74, 3, 28, 15], [90, 2, 32, 6]];
+const SPARKS: Array<[number, number, number, number]> = [[12, 3, 14, 0], [27, 2, 18, 4], [41, 3, 16, 9], [55, 2, 20, 2], [68, 3, 15, 7], [82, 2, 19, 11], [93, 3, 17, 5], [5, 2, 21, 13], [48, 2, 13, 15], [74, 3, 22, 1]];
 
 /**
  * The entrance's backdrop, light and airy: an aurora in Twin's turquoise, a cool blue and a warm heat glow, slowly turning and
- * breathing and changing tint every now and then, a few twinkling data points and sparks rising from the bottom.
+ * breathing and changing tint every now and then, a sky of twinkling data points and sparks rising from the bottom.
  * Kept light: the glows are soft gradients (no blur filter, no blending) that only move by transform, so the phone just composites them.
  * Still with reduced motion.
  */
