@@ -5,7 +5,7 @@ import { ChevronDown, CloudRain, Droplets, Flower2, Grape, Info, Leaf, Ruler, Sh
 import { phenoPhases, type Pheno } from "@/models/data";
 import { comparison, type PrototypeId } from "@/models/scenarios";
 import { setVineyard, useLab, vineMetrics } from "@/models/lab-store";
-import { NO_MIX, VINE_LEVELS, VINE_MAX, VINE_REFERENCE_M2, vineCost, vineMixAt, vineMixOf, type VineMix } from "@/models/vine-interventions";
+import { NO_MIX, VINE_LEVELS, VINE_MAX, VINE_REFERENCE_M2, vineCost, vineMixAt, vineMixOf, zoneMixOf, type VineMix } from "@/models/vine-interventions";
 import { euroRange, grouped } from "@/models/intervention-cost";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { GAIN_BG, GAIN_TEXT } from "@/views/v7/studio-ui";
@@ -31,7 +31,14 @@ const fmt1 = (n: number) => n.toLocaleString("it-IT", { maximumFractionDigits: 1
  */
 export function VineThirst({ onImportWeather, matrix }: { onImportWeather?: (() => Promise<void>) | undefined; matrix?: ReactNode }) {
   const vine = useLab().vineyard;
-  const mix = vineMixOf(vine);
+  // Scope: one zone, or the whole vineyard ("Tutte"); levels, levers and rain act on it.
+  const all = vine.allZones;
+  const targets = all ? vine.zones.map((_, i) => i) : [vine.selected];
+  const legacy = vineMixOf(vine);
+  const mixes = vine.zones.map((z) => zoneMixOf(z, legacy));
+  // On the whole vineyard the levers show the average mix (the same everywhere once set from here).
+  const avgMix = (ms: VineMix[]): VineMix => ({ irrigation: Math.round(avg(ms.map((m) => m.irrigation)) / 2) * 2, shade: Math.round(avg(ms.map((m) => m.shade)) / 10) * 10, windbreak: Math.round(avg(ms.map((m) => m.windbreak)) / 10) * 10 });
+  const mix = all ? avgMix(mixes) : mixes[vine.selected] ?? NO_MIX;
   const [info, setInfo] = useState(false);
   const [costOpen, setCostOpen] = useState(false);
   const gaugeRef = useRef<HTMLDivElement>(null);
@@ -44,11 +51,13 @@ export function VineThirst({ onImportWeather, matrix }: { onImportWeather?: (() 
     return () => io.disconnect();
   }, []);
 
-  // Thirst of the whole vineyard (average of the three zones) for a given mix, with the same model as the dashboard.
-  const thirstOf = (m: VineMix) => avg(vineMetrics({ ...vine, ...m }).results.map((r) => r.s));
-  const zonesAfter = vineMetrics(vine).results;
+  // Thirst of the scope (one zone, or the average of the three) with a given mix there, same model as the dashboard.
+  const withMix = (m: VineMix) => ({ ...vine, zones: vine.zones.map((z, i) => ({ ...z, ...(targets.includes(i) ? m : mixes[i]) })) });
+  const thirstOf = (m: VineMix) => { const r = vineMetrics(withMix(m)).results; return avg(targets.map((i) => r[i]?.s ?? 0)); };
+  const zonesAfter = vineMetrics({ ...vine, zones: vine.zones.map((z, i) => ({ ...z, ...mixes[i] })) }).results;
   const before = thirstOf(NO_MIX);
-  const after = thirstOf(mix);
+  // What the vines feel now: on the whole vineyard, the real average of the zones (their mixes may differ).
+  const after = avg(targets.map((i) => zonesAfter[i]?.s ?? 0));
   const lowest = Math.min(after, thirstOf(vineMixAt(3)));
   const dialMax = Math.min(100, before + 4), dialMin = Math.max(0, lowest - 6);
   const gain = stressGain(after);
@@ -63,9 +72,15 @@ export function VineThirst({ onImportWeather, matrix }: { onImportWeather?: (() 
   const area = useQuery({ queryKey: ["vine-area", lat, lng], queryFn: () => fetchArea({ data: { lat, lng, kind: "vigneto" } }), staleTime: Infinity, retry: 1 });
   const measured = area.data?.m2 ?? null;
   const m2 = measured ?? VINE_REFERENCE_M2;
-  const cost = vineCost(m2, mix);
+  // Each zone is a third of the vineyard: the cost shown is the one of the scope.
+  const zoneCost = (i: number) => vineCost(m2 / Math.max(1, vine.zones.length), mixes[i] ?? NO_MIX).total;
+  const cost = { total: targets.reduce((t, i) => ({ lo: t.lo + zoneCost(i).lo, hi: t.hi + zoneCost(i).hi }), { lo: 0, hi: 0 }), perHa: vineCost(m2, mix).perHa };
 
-  const change = (patch: Partial<VineMix>) => setVineyard(patch);
+  // Every zone keeps its own mix written down, so the scope can change without the others moving.
+  const change = (patch: Partial<VineMix>) => setVineyard((v) => ({
+    zones: v.zones.map((z, i) => ({ ...z, ...(mixes[i] ?? NO_MIX), ...(targets.includes(i) ? { ...mix, ...patch } : {}) })),
+  }));
+  const scopeName = all ? "tutto il vigneto" : `zona ${vine.selected + 1}`;
   // Sliding asks for a thirst: the vineyard walks the path no mix → the three ready vineyards (smallest step that reaches it).
   const slideTo = (t: number) => {
     let lo = 0, hi = 3;
@@ -81,7 +96,7 @@ export function VineThirst({ onImportWeather, matrix }: { onImportWeather?: (() 
   };
   const reach = before - lowest;
   const stops: Stop[] = VINE_LEVELS.map((p) => ({ id: p.id, label: comparison.find((c) => c.id === p.id)!.s, t: thirstOf(p), on: preset === p.id, near: !preset && any && nearest === p.id }));
-  const raining = vine.zones.length > 0 && vine.zones.every((z) => z.rain);
+  const raining = targets.length > 0 && targets.every((i) => vine.zones[i]?.rain);
   const safe = zonesAfter.filter((r) => r.s < 35).length;
   const facts: Array<{ icon: LucideIcon; value: string; label: string }> = [
     { icon: ShieldCheck, value: `${safe} di ${zonesAfter.length}`, label: "Zone al sicuro" },
@@ -98,20 +113,36 @@ export function VineThirst({ onImportWeather, matrix }: { onImportWeather?: (() 
         {matrix && <button type="button" onClick={() => setInfo(true)} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-muted-foreground outline-none hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-ring"><Info className="size-4" aria-hidden="true" />Costi e tempi</button>}
       </div>
 
+      {/* The scope: the whole vineyard or one zone, each with its thirst after the interventions. */}
+      <div className="grid grid-cols-4 gap-1 rounded-3xl bg-foreground/[0.04] p-1" role="radiogroup" aria-label="Zona del vigneto">
+        {[-1, ...vine.zones.map((_, i) => i)].map((i) => {
+          const on = i === -1 ? all : !all && vine.selected === i;
+          const s = i === -1 ? avg(zonesAfter.map((r) => r.s)) : zonesAfter[i]?.s ?? 0;
+          return (
+            <button key={i} type="button" role="radio" aria-checked={on} aria-label={`${i === -1 ? "Tutte le zone" : `Zona ${i + 1}`}, sete ${Math.round(s)} su 100`}
+              onClick={() => { if (on) return; hapticTick(); setVineyard(i === -1 ? { allZones: true } : { allZones: false, selected: i }); }}
+              className={cn("flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 rounded-[1.25rem] px-1 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", on ? "bg-secondary text-secondary-foreground shadow-[0_0_0_2px_var(--foreground)]" : "text-foreground/75 hover:bg-foreground/[0.06]")}>
+              <span className="truncate text-[12px] font-semibold">{i === -1 ? "Tutte" : `Zona ${i + 1}`}</span>
+              <span className="flex items-center gap-1.5"><span className={cn("size-2 rounded-full", GAIN_BG[stressGain(s)])} aria-hidden="true" /><span className={cn("font-mono text-sm font-semibold tabular-nums", on ? "" : GAIN_TEXT[stressGain(s)])}>{Math.round(s)}</span></span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Once the arc scrolls away, its reading rides under the tabs. */}
       <div aria-hidden={gaugeSeen} className={cn("pointer-events-none sticky top-[calc(var(--nav-h)+3.75rem)] z-[999999996] -mb-5 flex h-0 justify-center transition-opacity duration-200 motion-reduce:transition-none", gaugeSeen ? "opacity-0" : "opacity-100")}>
         <button type="button" tabIndex={gaugeSeen ? -1 : 0} onClick={() => gaugeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
           className="mt-1 flex h-11 items-center gap-2 rounded-full bg-card/95 px-4 shadow-lg ring-1 ring-foreground/10 backdrop-blur" style={{ pointerEvents: gaugeSeen ? "none" : "auto" }}>
           <span className={cn("size-2.5 rounded-full", GAIN_BG[gain])} aria-hidden="true" />
           <span className="font-display text-xl font-light tabular-nums">{Math.round(after)}<span className="text-sm text-muted-foreground">/100</span></span>
-          <span className="text-sm text-muted-foreground">{verdict(after)}</span>
+          <span className="text-sm text-muted-foreground">{all ? "Tutte" : `Zona ${vine.selected + 1}`} · {verdict(after)}</span>
         </button>
       </div>
 
       {/* The arc of the vines' thirst: drag the white dot or touch a level. */}
       <div ref={gaugeRef} className="relative mx-auto mt-10 flex max-w-[21rem] flex-col items-center px-7">
         <Gauge before={before} after={after} lowest={lowest} min={dialMin} max={dialMax} stops={reach > 1 ? stops : []} onSlide={slideTo} onStop={applyLevel}
-          unit="" spoken="su 100" label="Sete della vite da raggiungere" step={1} />
+          unit="" spoken="su 100" label={`Sete della vite da raggiungere, ${scopeName}`} step={1} />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center" aria-live="polite">
           <span className={cn("rounded-full px-3 py-0.5 text-[13px] font-semibold text-white transition-colors duration-300", GAIN_BG[gain])}>{verdict(after)}</span>
           <span className="mt-1 font-display text-6xl font-light leading-none tracking-tight tabular-nums">{Math.round(after)}<span className="text-2xl text-muted-foreground">/100</span></span>
@@ -121,16 +152,7 @@ export function VineThirst({ onImportWeather, matrix }: { onImportWeather?: (() 
 
       {/* The three zones after the interventions, then the phase of the vine and the rain. */}
       <div className="-mt-2 space-y-3">
-        <p className="text-center text-sm text-muted-foreground">Sete della vite, senza interventi {Math.round(before)}/100</p>
-        <div className="grid grid-cols-3 gap-2" aria-label="Le tre zone">
-          {zonesAfter.map((r, i) => (
-            <div key={i} className="flex items-center justify-center gap-2 rounded-2xl bg-foreground/[0.05] py-2">
-              <span className={cn("size-2.5 rounded-full", GAIN_BG[stressGain(r.s)])} aria-hidden="true" />
-              <span className="text-sm text-muted-foreground">Zona {i + 1}</span>
-              <span className={cn("font-mono text-sm font-semibold tabular-nums", GAIN_TEXT[stressGain(r.s)])}>{r.s}</span>
-            </div>
-          ))}
-        </div>
+        <p className="text-center text-sm text-muted-foreground">Sete della vite, {scopeName}: senza interventi {Math.round(before)}/100</p>
         <div className="flex items-stretch gap-2">
           <div className="grid flex-1 grid-cols-4 gap-1 rounded-3xl bg-foreground/[0.04] p-1" role="radiogroup" aria-label="Fase della vite">
             {phenoPhases.map((p) => {
@@ -143,7 +165,7 @@ export function VineThirst({ onImportWeather, matrix }: { onImportWeather?: (() 
               );
             })}
           </div>
-          <button type="button" aria-pressed={raining} onClick={() => { hapticTick(); setVineyard((v) => ({ zones: v.zones.map((z) => ({ ...z, rain: !raining })) })); }}
+          <button type="button" aria-pressed={raining} onClick={() => { hapticTick(); setVineyard((v) => ({ zones: v.zones.map((z, i) => (targets.includes(i) ? { ...z, rain: !raining } : z)) })); }}
             className={cn("flex w-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-3xl text-[11px] font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", raining ? "bg-foreground text-background" : "bg-foreground/[0.06] text-foreground/70")}>
             <CloudRain className="size-5" aria-hidden="true" />Pioggia
           </button>
@@ -152,7 +174,7 @@ export function VineThirst({ onImportWeather, matrix }: { onImportWeather?: (() 
       </div>
 
       {/* Fine-tuning by hand: always open, one line each. */}
-      <div className="space-y-3" role="group" aria-label="Ritocca a mano">
+      <div className="space-y-3" role="group" aria-label={`Interventi, ${scopeName}`}>
         <Lever icon={Droplets} label="Irrigazione" value={mix.irrigation} step={2} max={VINE_MAX.irrigation} color="text-water" swatch="bg-water" shown={`+${mix.irrigation}%`} onChange={(v) => change({ irrigation: v })} />
         <Lever icon={Umbrella} label="Teli d'ombra" value={mix.shade} step={10} max={VINE_MAX.shade} color="text-urban" swatch="bg-urban" onChange={(v) => change({ shade: v })} />
         <Lever icon={Wind} label="Frangivento" value={mix.windbreak} step={10} max={VINE_MAX.windbreak} color="text-ok" swatch="bg-ok" onChange={(v) => change({ windbreak: v })} />

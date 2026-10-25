@@ -1,10 +1,10 @@
 import { useSyncExternalStore } from "react";
-import { applyVineMix, vineMixOf } from "./vine-interventions";
+import { applyZoneMix, vineMixOf, zoneMixOf } from "./vine-interventions";
 import { vineModel, type Pheno } from "./data";
 import { piazzaEstimate, vineZones } from "./scenarios";
 
 export type Loc = { label: string; lat: number; lng: number };
-export type VineZoneState = { temperature: number; moisture: number; wind: number; rain: boolean };
+export type VineZoneState = { temperature: number; moisture: number; wind: number; rain: boolean; irrigation?: number; shade?: number; windbreak?: number };
 export type LabState = {
   savedAt?: number | null;
   syncedAt?: number | null;
@@ -80,7 +80,7 @@ export function urbanMetrics(u: LabState["urban"]) {
 export function vineMetrics(v: LabState["vineyard"]) {
   const offset = Math.max(-3, Math.min(3, (41.83 - v.location.lat) * 0.6));
   // The interventions (irrigation, shade cloth, windbreak) act on every zone before the vines' thirst is read.
-  const zones = applyVineMix(v.zones, vineMixOf(v));
+  const zones = v.zones.map((z) => applyZoneMix(z, zoneMixOf(z, vineMixOf(v))));
   const results = zones.map((z) => vineModel({ moisture: z.moisture, temp: z.temperature + offset, wind: z.wind, phase: v.phase, rain: z.rain }));
   const avg = (n: number[]) => n.reduce((s, x) => s + x, 0) / Math.max(1, n.length);
   return {

@@ -10,7 +10,7 @@ import { LabMedia } from "@/views/LabMedia";
 import { splitLocation } from "@/views/SimulationGrid";
 import { UrbanThermometer } from "@/views/v9c/UrbanThermometer";
 import { VineThirst } from "@/views/v10/VineThirst";
-import { VINE_LEVELS, vineMixOf } from "@/models/vine-interventions";
+import { VINE_LEVELS, vineMixOf, zoneMixOf } from "@/models/vine-interventions";
 import { SimShell } from "@/views/v8/SimShell";
 import { comparison, levelTone, nextPhase, prototypeChoice, type PrototypeId } from "@/models/scenarios";
 import { resetUrban, resetVineyard, setUrban, setVineyard, useLab, type LabState } from "@/models/lab-store";
@@ -116,7 +116,7 @@ export function VineyardFlow() {
       {/* v10: built like the piazza (the arc of the vines' thirst with the three levels on it), so no Confronta here either. */}
       <SimShell kind="vineyard" place={place} onReset={resetVineyard} onSend={() => setSend(true)}
         simula={<VineThirst onImportWeather={importRealWeather} matrix={<PrototypeMatrix kind="vineyard" activeLevel={closestVineLevel(vineyard)} />} />}
-        media={<LabMedia embedded kind="vineyard" context={`Tutte le zone · ${vineyard.phase}`} />}
+        media={<LabMedia embedded kind="vineyard" context={`${vineyard.allZones ? "Tutte le zone" : `Zona ${vineyard.selected + 1}`} · ${vineyard.phase}`} />}
         sensori={<SensorAdvisor embedded kind="vineyard" />} />
       <Dialog open={send} onOpenChange={setSend}>
         <DialogContent><DialogHeader><DialogTitle>Inviare i dati all’agronomo?</DialogTitle></DialogHeader><p className="text-sm text-muted-foreground">Verranno condivisi i dati delle tre zone e gli interventi scelti. L’invio è dimostrativo.</p><DialogFooter><Button variant="secondary" onClick={() => setSend(false)}>Annulla</Button><Button className="bg-vine hover:bg-vine/90" onClick={() => { setSend(false); toast.success("Dati inviati all’agronomo"); }}>Invia</Button></DialogFooter></DialogContent>
@@ -127,7 +127,8 @@ export function VineyardFlow() {
 
 /** The level whose ready vineyard is closest to the interventions in place (for the costs-and-times table). */
 function closestVineLevel(v: LabState["vineyard"]): PrototypeId {
-  const m = vineMixOf(v);
+  const z = v.zones[v.allZones ? 0 : v.selected];
+  const m = z ? zoneMixOf(z, vineMixOf(v)) : vineMixOf(v);
   return VINE_LEVELS.reduce((b, p) => {
     const d = (x: typeof p) => Math.abs(x.irrigation - m.irrigation) * 5 + Math.abs(x.shade - m.shade) + Math.abs(x.windbreak - m.windbreak);
     return d(p) < d(VINE_LEVELS.find((q) => q.id === b)!) ? p.id : b;

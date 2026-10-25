@@ -19,15 +19,22 @@ export const VINE_LEVELS: Array<{ id: "zero" | "mvp" | "roadmap" } & VineMix> = 
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
-/** The zones as the vines feel them once the mix is in place. */
-export function applyVineMix(zones: VineZoneState[], m: VineMix): VineZoneState[] {
-  return zones.map((z) => ({
+/** A zone as the vines feel it once the mix is in place. */
+export function applyZoneMix(z: VineZoneState, m: VineMix): VineZoneState {
+  return {
     ...z,
     moisture: clamp(z.moisture + m.irrigation, 0, 60),
     temperature: clamp(z.temperature - (m.shade / 100) * 3, 0, 45),
     wind: clamp(z.wind * (1 - (m.windbreak / 100) * 0.6), 0, 30),
-  }));
+  };
 }
+
+/** The zones as the vines feel them once the same mix is in place everywhere. */
+export const applyVineMix = (zones: VineZoneState[], m: VineMix): VineZoneState[] => zones.map((z) => applyZoneMix(z, m));
+
+/** Each zone keeps its own mix; a zone saved before zones had one takes the vineyard's (older saves: none). */
+export const zoneMixOf = (z: Partial<VineMix>, fallback: VineMix = NO_MIX): VineMix =>
+  z.irrigation === undefined && z.shade === undefined && z.windbreak === undefined ? fallback : vineMixOf(z);
 
 /** Reads a stored vineyard (older saves have no mix). */
 export const vineMixOf = (v: Partial<VineMix>): VineMix => ({ irrigation: v.irrigation ?? 0, shade: v.shade ?? 0, windbreak: v.windbreak ?? 0 });
