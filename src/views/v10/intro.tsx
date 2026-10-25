@@ -74,23 +74,35 @@ const STEPS: Array<{ title: string; text: string; art: ReactNode }> = [
 
 /** Where the data points of the sky sit (x %, y %, size px, delay s): fixed, so the server and the phone draw the same sky. */
 const DOTS: Array<[number, number, number, number]> = [[8, 12, 2, 0], [22, 26, 1.5, 1.2], [37, 8, 2, 2.4], [63, 15, 1.5, 0.6], [78, 6, 2, 1.8], [90, 22, 1.5, 3], [14, 40, 1.5, 2.1], [86, 38, 2, 0.9], [50, 30, 1.5, 3.4], [70, 44, 1.5, 1.5], [30, 48, 2, 2.7], [5, 58, 1.5, 0.3]];
+/** Sparks rising from the floor (x %, size px, duration s, delay s). */
+const SPARKS: Array<[number, number, number, number]> = [[12, 3, 14, 0], [27, 2, 18, 4], [41, 3, 16, 9], [55, 2, 20, 2], [68, 3, 15, 7], [82, 2, 19, 11], [93, 3, 17, 5], [5, 2, 21, 13], [48, 2, 13, 15], [74, 3, 22, 1]];
 
 /**
- * The entrance's backdrop, a digital twin's horizon: soft lights (Twin's turquoise above, a cool blue and a warm heat glow
- * drifting slowly), a sky of faint data points, and a perspective grid floor that glides toward you, fading into the page.
- * Still with reduced motion.
+ * The entrance's backdrop, a digital twin's horizon: an aurora in Twin's turquoise, a cool blue and a warm heat glow, slowly
+ * turning and breathing; a sky of twinkling data points; a glowing planet rising behind a perspective grid floor that glides
+ * toward you, crossed by a band of light; sparks rising from it. Still with reduced motion.
  */
 function Backdrop() {
   return (
-    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-background" aria-hidden="true">
-      <div className="intro-glow intro-glow-a absolute -left-[20%] -top-[15%] h-[60vh] w-[80vw] rounded-full bg-[radial-gradient(closest-side,rgb(76_201_189/0.28),transparent)] blur-2xl" />
-      <div className="intro-glow intro-glow-b absolute -right-[25%] top-[18%] h-[55vh] w-[75vw] rounded-full bg-[radial-gradient(closest-side,rgb(40_100_220/0.26),transparent)] blur-2xl" />
-      <div className="intro-glow intro-glow-c absolute -bottom-[10%] left-[10%] h-[45vh] w-[80vw] rounded-full bg-[radial-gradient(closest-side,rgb(255_140_60/0.16),transparent)] blur-2xl" />
-      {DOTS.map(([x, y, r, d]) => <span key={`${x}-${y}`} className="intro-dot absolute rounded-full bg-foreground" style={{ left: `${x}%`, top: `${y}%`, width: r, height: r, animationDelay: `${d}s` }} />)}
-      {/* The floor: a grid laid flat in perspective, gliding toward the viewer. */}
-      <div className="absolute inset-x-0 bottom-0 h-[40vh] [perspective:320px] [mask-image:linear-gradient(to_top,black_10%,transparent_95%)]">
-        <div className="intro-floor absolute -inset-x-[50%] bottom-0 h-[200%] origin-bottom [transform:rotateX(72deg)] bg-[linear-gradient(rgb(76_201_189/0.35)_1px,transparent_1px),linear-gradient(90deg,rgb(76_201_189/0.35)_1px,transparent_1px)] bg-[size:48px_48px]" />
+    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[#05070c]" aria-hidden="true">
+      {/* Aurora: three coloured lights, blended so they brighten where they meet. */}
+      <div className="intro-aurora absolute -inset-[20%] opacity-90 [mix-blend-mode:screen]">
+        <div className="intro-glow intro-glow-a absolute left-[5%] top-[2%] h-[60vh] w-[75vw] rounded-[45%_55%_60%_40%] bg-[radial-gradient(closest-side,rgb(76_201_189/0.55),transparent)] blur-3xl" />
+        <div className="intro-glow intro-glow-b absolute right-[0%] top-[20%] h-[55vh] w-[70vw] rounded-[60%_40%_45%_55%] bg-[radial-gradient(closest-side,rgb(40_100_230/0.5),transparent)] blur-3xl" />
+        <div className="intro-glow intro-glow-c absolute bottom-[18%] left-[25%] h-[40vh] w-[60vw] rounded-[50%] bg-[radial-gradient(closest-side,rgb(255_130_60/0.3),transparent)] blur-3xl" />
       </div>
+      {DOTS.map(([x, y, r, d]) => <span key={`${x}-${y}`} className="intro-dot absolute rounded-full bg-white" style={{ left: `${x}%`, top: `${y}%`, width: r, height: r, animationDelay: `${d}s` }} />)}
+      {/* The planet: a huge dark disc whose rim glows, rising behind the horizon, with a halo breathing behind it. */}
+      <div className="intro-halo absolute bottom-[12vh] left-1/2 h-[34vh] w-[150vw] -translate-x-1/2 rounded-[50%] bg-[radial-gradient(closest-side,rgb(76_201_189/0.45),rgb(40_100_230/0.2)_60%,transparent)] blur-2xl" />
+      <div className="absolute bottom-[20vh] left-1/2 aspect-square w-[180vmax] -translate-x-1/2 translate-y-[98%] rounded-full bg-[#05070c] shadow-[0_-2px_0_rgb(120_235_220/0.9),0_-18px_60px_rgb(76_201_189/0.55),0_-60px_160px_rgb(40_100_230/0.45)]" />
+      {/* The floor: a grid laid flat in perspective, gliding toward the viewer, with a band of light running over it. */}
+      <div className="absolute inset-x-0 bottom-0 h-[42vh] [perspective:320px] [mask-image:linear-gradient(to_top,black_15%,transparent_95%)]">
+        <div className="intro-floor absolute -inset-x-[50%] bottom-0 h-[200%] origin-bottom [transform:rotateX(72deg)] bg-[linear-gradient(rgb(76_201_189/0.45)_1px,transparent_1px),linear-gradient(90deg,rgb(76_201_189/0.45)_1px,transparent_1px)] bg-[size:48px_48px]" />
+        <div className="intro-sweep absolute -inset-x-[50%] bottom-0 h-[200%] origin-bottom [transform:rotateX(72deg)] bg-[linear-gradient(to_bottom,transparent_0%,rgb(120_235_220/0.35)_48%,rgb(255_255_255/0.5)_50%,rgb(120_235_220/0.35)_52%,transparent_100%)] bg-[size:100%_40%] bg-no-repeat" />
+      </div>
+      {SPARKS.map(([x, r, t, d]) => <span key={x} className="intro-spark absolute bottom-[8vh] rounded-full bg-[rgb(140_240_225)] shadow-[0_0_8px_rgb(76_201_189)]" style={{ left: `${x}%`, width: r, height: r, animationDuration: `${t}s`, animationDelay: `${d}s` }} />)}
+      {/* A soft vignette keeps the text readable. */}
+      <div className="absolute inset-0 bg-[radial-gradient(120%_90%_at_50%_45%,transparent_55%,rgb(0_0_0/0.55))]" />
     </div>
   );
 }

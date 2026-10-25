@@ -5,7 +5,7 @@ import { UNIT_COST, grouped } from "@/models/intervention-cost";
 import { VINE_UNIT_COST } from "@/models/vine-interventions";
 import { introSeen } from "@/lib/intro-seen";
 import { useSignedIn } from "@/lib/use-signed-in";
-import { Check } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { Faq, InfoCard, InfoPage } from "./InfoPage";
 
 const eur = (n: number) => `${grouped(n)} €`;
@@ -218,40 +218,64 @@ export function TermsPage() {
   );
 }
 
-type Plan = { id: string; name: string; who: string; price: string; items: string[] };
-const PLANS: Plan[] = [
-  { id: "base", name: "Base", who: "Per provare", price: "Gratis", items: ["Simulazione della piazza e del vigneto", "Mappa 2D e ricerca dei luoghi", "Foto e video salvati sul dispositivo"] },
-  { id: "premium", name: "Premium", who: "Con un account", price: "Gratis con la registrazione", items: ["Tutto il piano Base", "Fotocamera AI che riconosce piante e terreno", "Mappa 3D e dati da satellite", "Dove mettere i sensori", "Lavoro salvato online e report da esportare"] },
-  { id: "comune", name: "Business · Comuni", who: "Per uffici tecnici e amministrazioni", price: "Su richiesta", items: ["Tutto il piano Premium", "Più piazze e quartieri nello stesso spazio", "Dashboard con stato degli interventi e approvazioni", "Esportazione dei dati per i sistemi del comune", "Prova sul posto con pochi sensori e assistenza"] },
-  { id: "agri", name: "Business · Agricoltura", who: "Per aziende agricole, cantine e cooperative", price: "Su richiesta", items: ["Tutto il piano Premium", "Più vigneti e zone per ogni vigneto", "Quaderno di campagna, sonde e avvisi di sete", "Invio dei dati all'agronomo", "Prova sul campo con pochi sensori e assistenza"] },
+/**
+ * The original "Modello di business · Free e Premium" table, brought up to today's app: the same rows and green / red marks,
+ * in plain words (no service names) and without the features that left the app (case studies, sources).
+ */
+const PLAN_ROWS: Array<[string, boolean, boolean]> = [
+  ["Simulazione della piazza e del vigneto", true, true],
+  ["Tre livelli di intervento sull'arco, con costi e benefici", true, true],
+  ["Stagioni e ore con il clima reale del luogo", true, true],
+  ["Ricerca del luogo e mappa 2D", true, true],
+  ["Mappa 3D del luogo", false, true],
+  ["Dati da satellite (vegetazione e temperatura del suolo)", false, true],
+  ["Importa il meteo reale come punto di partenza", false, true],
+  ["Report PDF, copia e stampa", true, true],
+  ["Esportazione dei dati per le mappe (GeoJSON) e CSV", true, true],
+  ["Link di condivisione dello scenario", true, true],
+  ["Foto e video sul dispositivo", true, true],
+  ["Invio di più foto e video in un unico ZIP", true, true],
+  ["Fotocamera AI: riconosce piante e terreno (app installata)", false, true],
+  ["Mappa virtuale del terreno durante la scansione", false, true],
+  ["Didascalie AI nelle foto e nei PDF", false, true],
+  ["Dove mettere i sensori, suggerito dall'AI", false, true],
+  ["Piano di interventi suggerito dall'AI", false, true],
+  ["Archivio di foto e video online e link di condivisione", false, true],
+  ["Approvazioni e registro interventi salvati nell'account", false, true],
+  ["Invio di email al funzionario comunale", true, true],
+  ["Email agli enti pubblici per l'approvazione", false, true],
+  ["App installabile su Android, iPhone e computer", true, true],
 ];
 
-/** Plans: what each level of the app offers; the signed-in user's one is marked. */
+function Mark({ on }: { on: boolean }) {
+  return on ? (
+    <span className="grid size-7 place-items-center rounded-full bg-ok text-ok-foreground shadow-sm shadow-ok/45" role="img" aria-label="Incluso"><Check className="size-4 stroke-[3]" /></span>
+  ) : (
+    <span className="grid size-7 place-items-center rounded-full bg-danger text-danger-foreground shadow-sm shadow-danger/45" role="img" aria-label="Non incluso"><X className="size-4 stroke-[3]" /></span>
+  );
+}
+
+/** Piani: the Free / Premium table; the column of the user's own plan is marked. */
 export function PlansPage() {
   const { signedIn } = useSignedIn();
-  const mine = signedIn ? "premium" : "base";
+  const col = (premium: boolean) => (premium === signedIn ? "bg-foreground/[0.06]" : "");
+  const head = "p-3 text-center sm:p-4";
   return (
-    <InfoPage title="Piani e business" intro="Le simulazioni sono gratuite. Per comuni, aziende agricole e cooperative ci sono piani su misura, con più luoghi, sensori e assistenza.">
-      <div className="space-y-3">
-        {PLANS.map((p) => (
-          <section key={p.id} className={`space-y-3 rounded-3xl p-5 ${p.id === mine ? "bg-foreground/[0.08] shadow-[0_0_0_2px_var(--foreground)]" : "bg-foreground/[0.05]"}`}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="text-lg font-semibold">{p.name}</h2>
-                <p className="text-sm text-muted-foreground">{p.who}</p>
-              </div>
-              {p.id === mine && <span className="shrink-0 rounded-full bg-foreground px-3 py-1 text-xs font-semibold text-background">Il tuo piano</span>}
-            </div>
-            <p className="font-display text-2xl font-light">{p.price}</p>
-            <ul className="space-y-1.5">
-              {p.items.map((it) => <li key={it} className="flex items-start gap-2 text-[15px]"><Check className="mt-0.5 size-4 shrink-0 text-ok" aria-hidden="true" />{it}</li>)}
-            </ul>
-          </section>
+    <InfoPage title="Free e Premium" intro="Modello di business: proposta di suddivisione delle funzioni, da validare con i test di usabilità. Premium è gratis con la registrazione; le funzioni con la fotocamera AI sono riservate a Premium.">
+      <div className="overflow-hidden rounded-3xl bg-foreground/[0.05]">
+        <div className="grid grid-cols-[1fr_4.25rem_5.25rem] items-center border-b border-foreground/10 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sm:grid-cols-[1fr_6rem_7rem] sm:text-sm sm:normal-case sm:tracking-normal">
+          <div className="p-3 sm:p-4">Funzione</div>
+          <div className={`${head} ${col(false)}`}>Free{!signedIn && <span className="block text-[10px] normal-case tracking-normal text-foreground">il tuo</span>}</div>
+          <div className={`${head} border-l border-foreground/10 font-semibold text-primary ${col(true)}`}>Premium{signedIn && <span className="block text-[10px] normal-case tracking-normal text-foreground">il tuo</span>}</div>
+        </div>
+        {PLAN_ROWS.map(([t, free, premium]) => (
+          <div key={t} className="grid grid-cols-[1fr_4.25rem_5.25rem] items-center border-b border-foreground/10 text-sm last:border-b-0 sm:grid-cols-[1fr_6rem_7rem]">
+            <div className="p-3 sm:p-4">{t}</div>
+            <div className={`grid h-full place-items-center p-2 sm:p-3 ${col(false)}`}><Mark on={free} /></div>
+            <div className={`grid h-full place-items-center border-l border-foreground/10 p-2 sm:p-3 ${col(true)}`}><Mark on={premium} /></div>
+          </div>
         ))}
       </div>
-      <InfoCard title="Richiedi un piano business">
-        <p>Scrivi a [email commerciale] indicando l'ente o l'azienda, i luoghi da seguire e il numero di zone: prepariamo una proposta con costi e tempi.</p>
-      </InfoCard>
     </InfoPage>
   );
 }

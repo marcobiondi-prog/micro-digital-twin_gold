@@ -1994,16 +1994,25 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 @media (prefers-reduced-motion: reduce) { .ps-nav-camera[data-focus] { transform: none; } }
 
 /* v10 opening page: the drawn heat lines turn very slowly (still with reduced motion). */
-/* v10 entrance backdrop: drifting lights, twinkling data points, a grid floor gliding toward the viewer (all still with reduced motion). */
-.intro-glow { animation: intro-drift 18s ease-in-out infinite alternate; }
-.intro-glow-b { animation-duration: 23s; animation-direction: alternate-reverse; }
-.intro-glow-c { animation-duration: 27s; }
-@keyframes intro-drift { from { transform: translate3d(-4%, -2%, 0) scale(1); } to { transform: translate3d(5%, 4%, 0) scale(1.12); } }
+/* v10 entrance backdrop: a turning, breathing aurora, twinkling data points, a planet rim that breathes, a grid floor gliding
+   toward the viewer with a band of light running over it, sparks rising (all still with reduced motion). */
+.intro-aurora { animation: intro-aurora-turn 60s linear infinite; }
+@keyframes intro-aurora-turn { to { transform: rotate(360deg); } }
+.intro-glow { animation: intro-drift 14s ease-in-out infinite alternate; }
+.intro-glow-b { animation-duration: 19s; animation-direction: alternate-reverse; }
+.intro-glow-c { animation-duration: 23s; }
+@keyframes intro-drift { from { transform: translate3d(-6%, -4%, 0) scale(0.95); border-radius: 45% 55% 60% 40%; } to { transform: translate3d(8%, 6%, 0) scale(1.2); border-radius: 60% 40% 40% 60%; } }
 .intro-dot { opacity: 0.15; animation: intro-twinkle 4.2s ease-in-out infinite; }
-@keyframes intro-twinkle { 50% { opacity: 0.7; } }
+@keyframes intro-twinkle { 50% { opacity: 0.85; } }
+.intro-halo { opacity: 0.6; animation: intro-halo-breathe 6s ease-in-out infinite alternate; }
+@keyframes intro-halo-breathe { to { opacity: 1; transform: translateX(-50%) scale(1.08); } }
 .intro-floor { animation: intro-glide 3.2s linear infinite; }
 @keyframes intro-glide { to { background-position: 0 48px; } }
-@media (prefers-reduced-motion: reduce) { .intro-glow, .intro-dot, .intro-floor { animation: none; } }
+.intro-sweep { animation: intro-sweep 5.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+@keyframes intro-sweep { from { background-position: 0 -40%; } to { background-position: 0 140%; } }
+.intro-spark { opacity: 0; animation: intro-rise linear infinite; }
+@keyframes intro-rise { 0% { transform: translateY(0); opacity: 0; } 10% { opacity: 0.9; } 80% { opacity: 0.5; } 100% { transform: translateY(-85vh); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .intro-aurora, .intro-glow, .intro-dot, .intro-halo, .intro-floor, .intro-sweep, .intro-spark { animation: none; } .intro-spark { opacity: 0; } }
 
 /* v10 tutorial: each drawing draws itself once its step comes into view (shown at once with reduced motion). */
 .intro-draw :is(path, circle):not(.intro-pop) { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 1.4s cubic-bezier(0.45, 0, 0.2, 1); }
