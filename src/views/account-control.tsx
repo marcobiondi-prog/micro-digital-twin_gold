@@ -354,7 +354,7 @@ export function AccountControl() {
             ))}
           </nav>
           {/* Twin closes the panel: still (no animation, no name), smiling. */}
-          <TwinStill className="mx-auto block h-24 w-auto" />
+          <TwinStill className="mx-auto block h-16 w-auto" />
         </div>
       </DialogContent>
     </Dialog>
