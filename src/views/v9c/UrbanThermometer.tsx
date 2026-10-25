@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { SlidersHorizontal, ChevronDown, ChevronLeft, ChevronRight, Clock, CloudRain, Leaf, Minus, Plus, Info, Ruler, Sprout, Sun, TreePine, Umbrella, Wallet, type LucideIcon } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Clock, CloudRain, Leaf, Minus, Plus, Info, Ruler, Sprout, Sun, TreePine, Umbrella, Wallet, type LucideIcon } from "lucide-react";
 import { comparison, piazzaEstimate, type PrototypeId } from "@/models/scenarios";
 import { setUrban, useLab } from "@/models/lab-store";
 import { REFERENCE_M2, euroRange, grouped, interventionCost } from "@/models/intervention-cost";
@@ -32,15 +32,14 @@ const levelOf = (dT: number): PrototypeId => {
 const feeling = (t: number): { text: string; step: number; bg?: string } =>
   t >= 39 ? { text: "Troppo caldo", step: 0 } : t >= 36 ? { text: "Molto caldo", step: 1 } : t >= 30 ? { text: "Caldo", step: 2 }
     : t >= 18 ? { text: "Si sta bene", step: 4 } : t >= 10 ? { text: "Fresco", step: 4, bg: "bg-water" } : { text: "Freddo", step: 4, bg: "bg-urban" };
-/** Colour of each level on the arc (the same as its dot in the comparison). */
-const LEVEL_COLOR: Record<PrototypeId, string> = { zero: "var(--ok)", mvp: "var(--brand-turquoise)", roadmap: "var(--warn)" };
+
 
 /**
  * Half-ring gauge you can slide: the coloured arc and the white dot show how hot the piazza feels, the faint ring
  * where today starts. A finger anywhere on the arc grabs it: while it moves the dot follows the finger exactly and
  * the piazza follows the asked temperature; arrow keys move it by 0,1 °C.
  */
-function Gauge({ before, after, lowest, min: MIN, max: MAX, marks, onSlide, onSlideStart }: { before: number; after: number; lowest: number; min: number; max: number; marks: Array<{ id: PrototypeId; t: number }>; onSlide: (t: number) => void; onSlideStart: () => void }) {
+function Gauge({ before, after, lowest, min: MIN, max: MAX, onSlide, onSlideStart }: { before: number; after: number; lowest: number; min: number; max: number; onSlide: (t: number) => void; onSlideStart: () => void }) {
   const R = 88, C = Math.PI * R;
   const box = useRef<HTMLDivElement>(null);
   // While sliding, the temperature under the finger (the piazza snaps to whole trees, the dot must not).
@@ -97,8 +96,6 @@ function Gauge({ before, after, lowest, min: MIN, max: MAX, marks, onSlide, onSl
         <path d="M12 100 A88 88 0 0 1 188 100" fill="none" stroke="currentColor" strokeOpacity="0.1" strokeWidth="14" strokeLinecap="round" />
         <path d="M12 100 A88 88 0 0 1 188 100" fill="none" stroke="url(#thermo-scale)" strokeWidth="14" strokeLinecap="round" strokeDasharray={`${C * share(shown)} ${C}`} className={motion} />
         <circle cx={b.x} cy={b.y} r="5.5" fill="none" stroke="currentColor" strokeOpacity="0.5" strokeWidth="2" />
-        {/* Where each ready level would bring the piazza: a coloured tick just outside the arc. */}
-        {marks.map((m) => { const o = { x: 100 + Math.cos(angle(m.t)) * (R + 13), y: 100 - Math.sin(angle(m.t)) * (R + 13) }; return <circle key={m.id} cx={o.x} cy={o.y} r="3.2" fill={LEVEL_COLOR[m.id]} />; })}
         <circle cx={a.x} cy={a.y} r={finger === null ? 9 : 12} fill="#fff" stroke="#0d1016" strokeWidth="2.5" className="[filter:drop-shadow(0_2px_4px_rgb(0_0_0/0.4))]" />
         <text x="12" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{MIN}°</text>
         <text x="188" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{MAX}°</text>
@@ -140,7 +137,6 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
   const [info, setInfo] = useState(false);
   const [costOpen, setCostOpen] = useState(false);
   const [whenOpen, setWhenOpen] = useState(false);
-  const [tuneOpen, setTuneOpen] = useState(false);
   // Is the gauge on screen? When not, a compact reading stays pinned under the tabs.
   const gaugeRef = useRef<HTMLDivElement>(null);
   const [gaugeSeen, setGaugeSeen] = useState(true);
@@ -190,17 +186,9 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
   const water = Math.round(m2 * (urban.permeable / 100) * 0.7 * 0.6);
   const shadeM2 = Math.round(m2 * (urban.shade / 100) + urban.trees * 30);
 
-  // The last change, shown as a short-lived chip ("−0,3°") so every touch answers.
-  const [delta, setDelta] = useState<{ v: number; k: number } | null>(null);
-  const timer = useRef<number | undefined>(undefined);
   // Levers set totals, so the squares are placed again from the default layout.
   const change = (patch: { trees?: number; permeable?: number; shade?: number }) => {
-    const next = { trees: urban.trees, permeable: urban.permeable, shade: urban.shade, ...patch };
-    const d = (piazzaEstimate(next.trees, next.permeable, next.shade).dT - est.dT) * share;
     setUrban({ ...patch, treeCells: null, permeableCells: null, shadeCells: null });
-    window.clearTimeout(timer.current);
-    setDelta((p) => ({ v: d, k: (p?.k ?? 0) + 1 }));
-    timer.current = window.setTimeout(() => setDelta(null), 1600);
   };
 
   // Sliding the gauge asks for a temperature: the mix in hand when the slide began is scaled up or down to reach it
@@ -244,7 +232,7 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
                 aria-label={`${l.s}: ${fmt(pAfter)} gradi`}
                 className={cn("flex min-h-20 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 py-2 text-center outline-none transition-[background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-ring active:scale-95 motion-reduce:active:scale-100",
                   on ? "bg-foreground/[0.12] shadow-[0_0_0_2px_var(--foreground)]" : near ? "bg-foreground/[0.08] outline-dashed outline-2 outline-offset-0 outline-foreground/50" : "bg-foreground/[0.05] hover:bg-foreground/[0.08]")}>
-                <span className="text-[12px] font-semibold leading-tight"><span className="mr-1.5 inline-block size-2 rounded-full align-middle" style={{ background: LEVEL_COLOR[p.id] }} aria-hidden="true" />{l.s}</span>
+                <span className="text-[12px] font-semibold leading-tight">{l.s}</span>
                 <span className={cn("font-display text-2xl font-light tabular-nums", GAIN_TEXT[feeling(pAfter).step])}>{fmt(pAfter)}°</span>
               </button>
             );
@@ -265,17 +253,11 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
 
       {/* 2 · The gauge: drag the white dot to choose how much to cool. */}
       <div ref={gaugeRef} className="relative mx-auto flex max-w-[22rem] flex-col items-center">
-        <Gauge before={before} after={after} lowest={before - MAX_GAIN * share} min={dialMin} max={dialMax} onSlide={slideTo} onSlideStart={startSlide}
-          marks={PRESETS.map((p) => ({ id: p.id, t: before - piazzaEstimate(p.trees, p.permeable, p.shade).dT * share }))} />
+        <Gauge before={before} after={after} lowest={before - MAX_GAIN * share} min={dialMin} max={dialMax} onSlide={slideTo} onSlideStart={startSlide} />
         <div className="pointer-events-none absolute inset-x-0 bottom-1 flex flex-col items-center" aria-live="polite">
           <span className={cn("rounded-full px-3 py-0.5 text-sm font-semibold text-white transition-colors duration-300", feel.bg ?? GAIN_BG[feel.step])}>{feel.text}</span>
           <span className="mt-1 font-display text-6xl font-light leading-none tracking-tight tabular-nums">{fmt(after)}°</span>
         </div>
-        {delta && Math.abs(delta.v) >= 0.05 && (
-          <span key={delta.k} className="absolute right-3 top-12 rounded-full bg-foreground px-2.5 py-1 font-mono text-sm font-bold text-background animate-in fade-in-0 slide-in-from-bottom-2 duration-200 motion-reduce:animate-none" aria-hidden="true">
-            {delta.v > 0 ? "−" : "+"}{fmt(Math.abs(delta.v))}°
-          </span>
-        )}
       </div>
 
       {/* When: one chip under the gauge (season, hour, live dot); touching it opens the season and hour controls. */}
@@ -309,26 +291,11 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
         </div>
       </div>
 
-      {/* 3 · Fine-tuning by hand, folded: closed it says what is in the piazza. */}
-      <div className="rounded-3xl bg-foreground/[0.05]">
-        <button type="button" onClick={() => setTuneOpen((o) => !o)} aria-expanded={tuneOpen} aria-controls="piazza-tune"
-          className="flex w-full items-center gap-3 rounded-3xl p-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <SlidersHorizontal className="size-6 shrink-0 text-muted-foreground" aria-hidden="true" />
-          <span className="min-w-0 flex-1">
-            <span className="block text-xs text-muted-foreground">Ritocca a mano</span>
-            <span className="flex flex-wrap items-center gap-x-3 text-[15px] font-semibold" aria-live="polite">
-              <span className="inline-flex items-center gap-1"><TreePine className="size-4 text-ok" aria-hidden="true" />{urban.trees}</span>
-              <span className="inline-flex items-center gap-1"><Sprout className="size-4 text-radar-mild" aria-hidden="true" />{urban.permeable}%</span>
-              <span className="inline-flex items-center gap-1"><Umbrella className="size-4 text-urban" aria-hidden="true" />{urban.shade}%</span>
-            </span>
-          </span>
-          <ChevronDown className={cn("size-5 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", tuneOpen && "rotate-180")} aria-hidden="true" />
-        </button>
-        <div id="piazza-tune" hidden={!tuneOpen} className="space-y-3 px-4 pb-4">
-          <Lever icon={TreePine} label="Alberi" value={urban.trees} step={1} max={30} color="text-ok" swatch="bg-ok" onChange={(v) => change({ trees: v })} />
-          <Lever icon={Sprout} label="Prato" value={urban.permeable} step={10} max={100} color="text-radar-mild" swatch="bg-radar-mild" onChange={(v) => change({ permeable: v })} />
-          <Lever icon={Umbrella} label="Ombra" value={urban.shade} step={10} max={100} color="text-urban" swatch="bg-urban" onChange={(v) => change({ shade: v })} />
-        </div>
+      {/* 3 · Fine-tuning by hand: always open, one line each. */}
+      <div className="space-y-3" role="group" aria-label="Ritocca a mano">
+        <Lever icon={TreePine} label="Alberi" value={urban.trees} step={1} max={30} color="text-ok" swatch="bg-ok" onChange={(v) => change({ trees: v })} />
+        <Lever icon={Sprout} label="Prato" value={urban.permeable} step={10} max={100} color="text-radar-mild" swatch="bg-radar-mild" onChange={(v) => change({ permeable: v })} />
+        <Lever icon={Umbrella} label="Ombra" value={urban.shade} step={10} max={100} color="text-urban" swatch="bg-urban" onChange={(v) => change({ shade: v })} />
       </div>
 
       {/* 4 · Cost and benefits, folded: closed it still says the total. */}
