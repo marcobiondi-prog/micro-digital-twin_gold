@@ -16,7 +16,6 @@ import seedling from "@/assets/avatar-seedling.svg";
 import city from "@/assets/avatar-city.svg";
 import sun from "@/assets/avatar-sun.svg";
 import vine from "@/assets/avatar-vine.svg";
-import twinLogo from "@/assets/climate-twin-logo-compact.png";
 
 const suggestions = [
   { id: "seedling", label: "Germoglio", src: seedling },
@@ -281,8 +280,7 @@ export function AccountControl() {
         </Button>
       <DialogContent ref={placePanel} overlayClassName="account-overlay" className="account-panel flex max-h-[min(680px,90dvh)] w-[min(420px,calc(100vw-2rem))] flex-col gap-0 overflow-y-auto rounded-lg border bg-popover p-0 text-popover-foreground shadow-xl sm:rounded-lg">
         <DialogHeader className="border-b px-6 py-5 text-left">
-          {/* Twin, still (no animation, no name), heads the panel. */}
-          <img src={twinLogo} alt="" aria-hidden="true" width={256} height={226} className="mx-auto mb-3 h-20 w-auto" />
+          <div className="mb-2">{avatar("size-10")}</div>
           <DialogTitle className="text-xl">Account</DialogTitle>
           <DialogDescription>{account ? account.email : demo ? "Accesso simulato (solo anteprima)" : "Accedi o continua come ospite."}</DialogDescription>
         </DialogHeader>
@@ -354,8 +352,35 @@ export function AccountControl() {
               </section>
             ))}
           </nav>
+          {/* Twin closes the panel: still (no animation, no name), eyes open. */}
+          <TwinStill className="mx-auto block h-24 w-auto" />
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Twin drawn still, with open eyes: the account panel's sign-off (the header mascot keeps its own animated face). */
+function TwinStill({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 512 452" className={className} role="img" aria-label="Twin">
+      <path d="M258 125 L262 72" stroke="#3aa99f" strokeWidth="9" strokeLinecap="round" />
+      <circle cx="258" cy="48" r="19" fill="#f4fbf6" stroke="#b9dcc8" strokeWidth="8" />
+      <rect x="38" y="252" width="56" height="118" rx="28" fill="#3aa99f" transform="rotate(28 66 311)" />
+      <rect x="418" y="252" width="56" height="118" rx="28" fill="#3aa99f" transform="rotate(-28 446 311)" />
+      <ellipse cx="256" cy="300" rx="160" ry="110" fill="#3aa99f" />
+      <ellipse cx="256" cy="268" rx="162" ry="148" fill="#4cc9bd" />
+      <rect x="143" y="176" width="228" height="140" rx="58" fill="#0f2326" stroke="#2c3e44" strokeWidth="6" />
+      {[216, 296].map((x) => (
+        <g key={x}>
+          <circle cx={x} cy="236" r="22" fill="#fff" />
+          <circle cx={x + 3} cy="240" r="11" fill="#0f2326" />
+          <circle cx={x + 7} cy="234" r="4" fill="#fff" />
+        </g>
+      ))}
+      <ellipse cx="255" cy="288" rx="24" ry="14" fill="#f2806f" />
+      <ellipse cx="150" cy="343" rx="22" ry="13" fill="#f2a0a6" opacity=".9" />
+      <ellipse cx="362" cy="343" rx="22" ry="13" fill="#f2a0a6" opacity=".9" />
+    </svg>
   );
 }

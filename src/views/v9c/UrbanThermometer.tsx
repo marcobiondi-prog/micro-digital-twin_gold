@@ -110,9 +110,9 @@ export function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlid
       role="slider" tabIndex={0} aria-label={label} aria-valuemin={Math.round(lowest * 10) / 10} aria-valuemax={Math.round(before * 10) / 10} aria-disabled={disabled || undefined}
       aria-valuenow={Math.round(after * 10) / 10} aria-valuetext={`${keyStep >= 1 ? Math.round(after) : fmt(after)} ${spoken}${stops.find((s) => s.on) ? `, ${stops.find((s) => s.on)!.label}` : ""}`} onKeyDown={onKey}
       onPointerDown={(e) => {
-        // Only the white dot can be grabbed, with a touch area wider than the drawn dot (about 44 px on a phone).
+        // Only the white dot can be grabbed: the touch area is the dot itself, with a thin margin for the finger.
         const { x, y } = local(e), hit = Math.hypot(x - (a.x - 100), y - (100 - a.y));
-        if (hit > 24 || disabled) return;
+        if (hit > 15 || disabled) return;
         e.currentTarget.setPointerCapture(e.pointerId);
         move(e);
       }}
@@ -129,12 +129,12 @@ export function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlid
         <path d="M12 100 A88 88 0 0 1 188 100" fill="none" stroke="url(#thermo-scale)" strokeWidth="14" strokeLinecap="round" strokeDasharray={`${C * share(shown)} ${C}`} className={motion} />
         {stops.map((s) => { const p = at(s.t); return <circle key={s.id} cx={p.x} cy={p.y} r="2.6" fill="var(--background)" opacity="0.9" />; })}
         <circle cx={b.x} cy={b.y} r="5.5" fill="none" stroke="currentColor" strokeOpacity="0.5" strokeWidth="2" />
-        <circle cx={a.x} cy={a.y} r={finger === null ? 9 : 12} fill="#fff" stroke="#0d1016" strokeWidth="2.5" className="[filter:drop-shadow(0_2px_4px_rgb(0_0_0/0.4))]" />
+        <circle cx={a.x} cy={a.y} r={finger === null ? 11 : 13} fill="#fff" stroke="#0d1016" strokeWidth="2.5" className="[filter:drop-shadow(0_2px_4px_rgb(0_0_0/0.4))]" />
         <text x="12" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{Math.round(MIN)}{unit}</text>
         <text x="188" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{Math.round(MAX)}{unit}</text>
       </svg>
       {/* The white dot's touch area: the only place a finger grabs the arc (elsewhere the page scrolls as usual). */}
-      {!disabled && <span className="absolute size-16 -translate-x-1/2 -translate-y-1/2 touch-none rounded-full" style={pct(a)} aria-hidden="true" />}
+      {!disabled && <span className="absolute size-10 -translate-x-1/2 -translate-y-1/2 touch-none rounded-full" style={pct(a)} aria-hidden="true" />}
       {/* The levels, written just outside the arc where their stop is: one touch moves the dot there. */}
       {!disabled && stops.map((s) => (
         <button key={s.id} type="button" tabIndex={-1} aria-pressed={s.on} onPointerDown={(e) => e.stopPropagation()} onClick={() => onStop(s.id)}
