@@ -1,7 +1,7 @@
-import { useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { CloudRain, Leaf, Minus, Plus, Info, Ruler, Sprout, Sun, TreePine, Umbrella, Wallet, type LucideIcon } from "lucide-react";
+import { ChevronDown, CloudRain, Leaf, Minus, Plus, Info, Ruler, Sprout, Sun, TreePine, Umbrella, Wallet, type LucideIcon } from "lucide-react";
 import { comparison, piazzaEstimate, type PrototypeId } from "@/models/scenarios";
 import { setUrban, useLab } from "@/models/lab-store";
 import { REFERENCE_M2, euroRange, grouped, interventionCost } from "@/models/intervention-cost";
@@ -138,6 +138,17 @@ function Lever({ icon: Icon, label, value, step, max, color, swatch, cooling, on
 export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?: (() => Promise<void>) | undefined; matrix?: ReactNode }) {
   const urban = useLab().urban;
   const [info, setInfo] = useState(false);
+  const [costOpen, setCostOpen] = useState(false);
+  // Is the gauge on screen? When not, a compact reading stays pinned under the tabs.
+  const gaugeRef = useRef<HTMLDivElement>(null);
+  const [gaugeSeen, setGaugeSeen] = useState(true);
+  useEffect(() => {
+    const el = gaugeRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([e]) => setGaugeSeen(e?.isIntersecting ?? true), { rootMargin: "-120px 0px 0px 0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   const est = piazzaEstimate(urban.trees, urban.permeable, urban.shade);
   const before = urban.realTemp ?? 40;
   const after = before - est.dT;
@@ -196,6 +207,40 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
 
   return (
     <section className="fuse-canvas space-y-5 rounded-t-3xl px-3 pb-6 pt-4 text-foreground sm:px-5" aria-label="Termometro della piazza">
+      {/* The simulation stays the focus: once the gauge scrolls away, its reading rides under the tabs. */}
+      <div aria-hidden={gaugeSeen} className={cn("pointer-events-none sticky top-[calc(var(--nav-h)+3.75rem)] z-[999999996] -mb-5 flex h-0 justify-center transition-opacity duration-200 motion-reduce:transition-none", gaugeSeen ? "opacity-0" : "opacity-100")}>
+        <button type="button" tabIndex={gaugeSeen ? -1 : 0} onClick={() => gaugeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
+          className="pointer-events-auto mt-1 flex h-11 items-center gap-2 rounded-full bg-card/95 px-4 shadow-lg ring-1 ring-foreground/10 backdrop-blur" style={{ pointerEvents: gaugeSeen ? "none" : "auto" }}>
+          <span className={cn("size-2.5 rounded-full", GAIN_BG[feel.step])} aria-hidden="true" />
+          <span className="font-display text-xl font-light tabular-nums">{fmt(after)}°</span>
+          <span className="text-sm text-muted-foreground">{feel.text}</span>
+          <span className={cn("font-mono text-sm font-semibold tabular-nums", GAIN_TEXT[gain])}>−{fmt(est.dT)}</span>
+        </button>
+      </div>
+
+      <div ref={gaugeRef} className="relative mx-auto flex max-w-[22rem] flex-col items-center">
+        <Gauge before={before} after={after} lowest={before - MAX_GAIN} onSlide={slideTo} onSlideStart={startSlide} />
+        <div className="pointer-events-none absolute inset-x-0 bottom-1 flex flex-col items-center" aria-live="polite">
+          <span className={cn("rounded-full px-3 py-0.5 text-sm font-semibold text-white transition-colors duration-300", GAIN_BG[feel.step])}>{feel.text}</span>
+          <span className="mt-1 font-display text-6xl font-light leading-none tracking-tight tabular-nums">{fmt(after)}°</span>
+        </div>
+        {delta && Math.abs(delta.v) >= 0.05 && (
+          <span key={delta.k} className="absolute right-3 top-12 rounded-full bg-foreground px-2.5 py-1 font-mono text-sm font-bold text-background animate-in fade-in-0 slide-in-from-bottom-2 duration-200 motion-reduce:animate-none" aria-hidden="true">
+            {delta.v > 0 ? "−" : "+"}{fmt(Math.abs(delta.v))}°
+          </span>
+        )}
+      </div>
+      <p className="-mt-2 text-center text-sm text-muted-foreground">
+        alle 14–17 · oggi {fmt(before)}° · <b className={cn("font-semibold", GAIN_TEXT[gain])}>−{fmt(est.dT)} °C</b>
+      </p>
+      <p className="-mt-3 text-center text-xs text-muted-foreground">Trascina il punto bianco sull'arco per scegliere quanto rinfrescare</p>
+
+      <div className="space-y-2.5">
+        <Lever icon={TreePine} label="Alberi" value={urban.trees} step={1} max={30} color="text-ok" swatch="bg-ok" cooling={urban.trees * 0.25} onChange={(v) => change({ trees: v })} />
+        <Lever icon={Sprout} label="Prato" value={urban.permeable} step={10} max={100} color="text-radar-mild" swatch="bg-radar-mild" cooling={urban.permeable * 0.04} onChange={(v) => change({ permeable: v })} />
+        <Lever icon={Umbrella} label="Ombra" value={urban.shade} step={10} max={100} color="text-urban" swatch="bg-urban" cooling={urban.shade * 0.03} onChange={(v) => change({ shade: v })} />
+      </div>
+
       {/* The three levels side by side, each with its own result and cost: this is the comparison, one touch applies it. */}
       <div>
         <div className="mb-2 flex items-center justify-between gap-2">
@@ -222,44 +267,27 @@ export function UrbanThermometer({ onImportWeather, matrix }: { onImportWeather?
         {onImportWeather && <div className="mt-2"><ImportWeatherButton onImport={onImportWeather} /></div>}
       </div>
 
-      <div className="relative mx-auto flex max-w-[22rem] flex-col items-center">
-        <Gauge before={before} after={after} lowest={before - MAX_GAIN} onSlide={slideTo} onSlideStart={startSlide} />
-        <div className="pointer-events-none absolute inset-x-0 bottom-1 flex flex-col items-center" aria-live="polite">
-          <span className={cn("rounded-full px-3 py-0.5 text-sm font-semibold text-white transition-colors duration-300", GAIN_BG[feel.step])}>{feel.text}</span>
-          <span className="mt-1 font-display text-6xl font-light leading-none tracking-tight tabular-nums">{fmt(after)}°</span>
-        </div>
-        {delta && Math.abs(delta.v) >= 0.05 && (
-          <span key={delta.k} className="absolute right-3 top-12 rounded-full bg-foreground px-2.5 py-1 font-mono text-sm font-bold text-background animate-in fade-in-0 slide-in-from-bottom-2 duration-200 motion-reduce:animate-none" aria-hidden="true">
-            {delta.v > 0 ? "−" : "+"}{fmt(Math.abs(delta.v))}°
+
+      {/* The cost folds away: closed it still says the total, open it adds the cost per m², the surface and the unit prices. */}
+      <div className="rounded-3xl bg-foreground/[0.05]">
+        <button type="button" onClick={() => setCostOpen((o) => !o)} aria-expanded={costOpen} aria-controls="piazza-cost-body"
+          className="flex w-full items-center gap-3 rounded-3xl p-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Wallet className="size-6 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs text-muted-foreground">Costo della tua piazza · {level.s}</span>
+            <span className="block font-display text-2xl font-light tabular-nums" aria-live="polite">{euroRange(cost.total)}</span>
           </span>
-        )}
-      </div>
-      <p className="-mt-2 text-center text-sm text-muted-foreground">
-        alle 14–17 · oggi {fmt(before)}° · <b className={cn("font-semibold", GAIN_TEXT[gain])}>−{fmt(est.dT)} °C</b>
-      </p>
-      <p className="-mt-3 text-center text-xs text-muted-foreground">Trascina il punto bianco sull'arco per scegliere quanto rinfrescare</p>
-
-      <div className="space-y-2.5">
-        <Lever icon={TreePine} label="Alberi" value={urban.trees} step={1} max={30} color="text-ok" swatch="bg-ok" cooling={urban.trees * 0.25} onChange={(v) => change({ trees: v })} />
-        <Lever icon={Sprout} label="Prato" value={urban.permeable} step={10} max={100} color="text-radar-mild" swatch="bg-radar-mild" cooling={urban.permeable * 0.04} onChange={(v) => change({ permeable: v })} />
-        <Lever icon={Umbrella} label="Ombra" value={urban.shade} step={10} max={100} color="text-urban" swatch="bg-urban" cooling={urban.shade * 0.03} onChange={(v) => change({ shade: v })} />
-      </div>
-
-      <div className="rounded-3xl bg-foreground/[0.05] p-4" aria-live="polite">
-        <div className="flex items-start gap-3">
-          <Wallet className="mt-0.5 size-6 shrink-0 text-muted-foreground" aria-hidden="true" />
-          <div className="min-w-0 flex-1">
-            <p className="text-xs text-muted-foreground">Costo della tua piazza · {level.s}</p>
-            <p className="font-display text-3xl font-light tabular-nums">{euroRange(cost.total)}</p>
-            <p className="mt-1 font-mono text-base font-semibold tabular-nums">{Math.round(cost.perM2.lo)}–{Math.round(cost.perM2.hi)} € al m²</p>
+          <ChevronDown className={cn("size-5 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", costOpen && "rotate-180")} aria-hidden="true" />
+        </button>
+        <div id="piazza-cost-body" hidden={!costOpen} className="px-4 pb-4">
+          <p className="font-mono text-base font-semibold tabular-nums">{Math.round(cost.perM2.lo)}–{Math.round(cost.perM2.hi)} € al m²</p>
+          <div className="mt-3 flex items-center gap-2 border-t border-foreground/10 pt-3 text-sm">
+            <Ruler className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span className="font-mono font-semibold tabular-nums">{surface}</span>
+            <span className="truncate text-muted-foreground">{surfaceNote}</span>
           </div>
+          <p className="mt-2 text-[11px] leading-snug text-muted-foreground">Stima indicativa, IVA esclusa: albero 600–1.500 € l'uno, prato 60–140 €/m², ombra 120–350 €/m².</p>
         </div>
-        <div className="mt-3 flex items-center gap-2 border-t border-foreground/10 pt-3 text-sm">
-          <Ruler className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-          <span className="font-mono font-semibold tabular-nums">{surface}</span>
-          <span className="truncate text-muted-foreground">{surfaceNote}</span>
-        </div>
-        <p className="mt-2 text-[11px] leading-snug text-muted-foreground">Stima indicativa, IVA esclusa: albero 600–1.500 € l'uno, prato 60–140 €/m², ombra 120–350 €/m².</p>
       </div>
 
       <dl className="grid grid-cols-3 gap-2">
