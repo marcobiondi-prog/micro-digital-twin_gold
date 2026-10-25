@@ -7,6 +7,7 @@ import { useInstalledApp } from "@/lib/installed-app";
 import aiLogo from "@/assets/ai-logo.png";
 import { hapticTick } from "@/lib/haptics";
 import { TwinMascot } from "@/views/TwinMascot";
+import { THEME_DARK, THEME_META } from "@/views/theme-toggle";
 
 /**
  * v10 entrance, two pages that stand alone (no header, no menus), black and white over slowly turning heat lines:
@@ -93,11 +94,25 @@ function Backdrop() {
   );
 }
 
+/**
+ * The entrance is always dark, whatever theme the app uses: its pages carry the .dark tokens themselves, and while one is
+ * open the phone's status bar takes the dark canvas colour (the app's own colour comes back on leaving).
+ */
+function useDarkChrome() {
+  useEffect(() => {
+    const meta = document.querySelector<HTMLMetaElement>(THEME_META);
+    const before = meta?.getAttribute("content") ?? null;
+    meta?.setAttribute("content", THEME_DARK);
+    return () => { if (meta && before !== null) meta.setAttribute("content", before); };
+  }, []);
+}
+
 /** True when the "i" opened the tutorial: it then ends by going back instead of on the choice. */
 const fromInfo = () => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("rivedi");
 
 /** The tutorial: five screens side by side (hello + four steps), swiped or stepped with the button, dots and arrow keys. */
 export function Tutorial() {
+  useDarkChrome();
   const navigate = useNavigate();
   const [page, setPage] = useState(0);
   // The finger drags the screens (dragX) and a swipe past 50 px turns the page; a mostly vertical move is ignored.
@@ -132,7 +147,7 @@ export function Tutorial() {
     else void navigate({ to: again ? "/mappa" : "/scegli" });
   };
   return (
-    <div className="relative isolate flex h-dvh flex-col overflow-hidden"
+    <div className="dark relative isolate flex h-dvh flex-col overflow-hidden bg-background text-foreground [color-scheme:dark]"
       onKeyDown={(e) => { if (e.key === "ArrowRight" && !last) { e.preventDefault(); go(page + 1); } if (e.key === "ArrowLeft" && page > 0) { e.preventDefault(); go(page - 1); } }}>
       <Backdrop />
       <h1 className="sr-only">Come funziona</h1>
@@ -195,6 +210,7 @@ export function Tutorial() {
 
 /** The choice (/scegli): one big question, three numbered ways in, one white button and the way to the map. */
 export function Choice() {
+  useDarkChrome();
   const navigate = useNavigate();
   const ai = useAiReadyHome();
   const [sel, setSel] = useState(0);
@@ -206,7 +222,7 @@ export function Choice() {
   const rows = useRef<Array<HTMLButtonElement | null>>([]);
   const pick = (i: number) => { if (i === sel) return; hapticTick(); setSel(i); };
   return (
-    <div className="relative isolate px-6 sm:px-12">
+    <div className="dark relative isolate min-h-dvh bg-background px-6 text-foreground [color-scheme:dark] sm:px-12">
       <Backdrop />
       <section aria-label="Scelta" className="mx-auto flex min-h-dvh max-w-xl flex-col pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-[calc(3rem+env(safe-area-inset-top))]">
         <h1 className="sr-only">Da dove vuoi iniziare</h1>
