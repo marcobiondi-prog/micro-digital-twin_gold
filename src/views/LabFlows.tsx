@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SensorAdvisor } from "@/views/SensorAdvisor";
 import { LabMedia } from "@/views/LabMedia";
-import { LocationCard, splitLocation, ImportWeatherButton } from "@/views/SimulationGrid";
+import { splitLocation, ImportWeatherButton } from "@/views/SimulationGrid";
 import { UrbanThermometer } from "@/views/v9c/UrbanThermometer";
 import { VineStudio } from "@/views/v7/VineStudio";
 import { SimShell } from "@/views/v8/SimShell";
@@ -199,7 +199,6 @@ export function UrbanFlow() {
       {/* No Confronta here: the three levels are compared inside the thermometer itself. */}
       <SimShell kind="urban" place={place.name} onReset={resetUrban}
         simula={<UrbanThermometer onImportWeather={importRealWeather} matrix={<PrototypeMatrix kind="urban" activeLevel={activeLevel} />} />}
-        luogo={<LocationCard kind="urban" />}
         media={<LabMedia embedded kind="urban" context={`Scenario: ${comparison.find((l) => l.id === activeLevel)?.s ?? "attuale"}`} />}
         sensori={<SensorAdvisor embedded kind="urban" />} />
     </div>
@@ -259,7 +258,6 @@ export function VineyardFlow() {
       <LabSyncIndicator />
       <SimShell kind="vineyard" place={place} onCompare={showComparison} onReset={restoreScenario} onSend={() => setSend(true)}
         simula={<VineStudio onZonesEdit={onZonesEdit} />}
-        luogo={<LocationCard kind="vineyard" />}
         media={<LabMedia embedded kind="vineyard" context={`${vineyard.allZones ? "Tutte le zone" : `Zona ${vineyard.selected + 1}`} · ${vineyard.phase}`} />}
         sensori={<SensorAdvisor embedded kind="vineyard" />} />
       <Dialog open={compareOpen} onOpenChange={setCompareOpen}>

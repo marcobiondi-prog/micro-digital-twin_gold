@@ -14,7 +14,7 @@ import { syncAppOrientation } from "@/lib/ar-orientation";
 import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
 import { installUiClicks } from "@/lib/ui-sounds";
 import { reloadFresh } from "@/router";
-import { Map as MapIcon, Building2, Grape, LayoutDashboard } from "lucide-react";
+import { Map as MapIcon, Building2, Grape, Info, LayoutDashboard } from "lucide-react";
 
 function NotFoundComponent() {
   return (
@@ -451,7 +451,14 @@ function RootComponent() {
         <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-2 sm:px-4 sm:py-3">
           {/* No logo nor name here: the account sits where the logo was, the theme switch on the right. */}
           <div className="flex min-w-0 items-center"><AccountControl /></div>
-          <div className="flex shrink-0 items-center gap-2"><ThemeToggle /></div>
+          <div className="flex shrink-0 items-center gap-2">
+            <ThemeToggle />
+            {/* "i" brings back the opening page, the app's entrance. */}
+            <Link to="/" aria-label="Schermata di ingresso" title="Schermata di ingresso"
+              className="grid size-9 shrink-0 place-items-center rounded-full border border-foreground/15 bg-foreground/[0.06] text-foreground sm:size-10 outline-none transition-colors hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring">
+              <Info className="size-4 sm:size-[1.15rem]" aria-hidden="true" />
+            </Link>
+          </div>
         </div>
       </header>
       <div className="hidden sm:block"><SmartNav /></div>

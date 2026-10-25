@@ -6,7 +6,8 @@ import { openAccount } from "@/lib/camera-dock";
 import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn } from "@/lib/demo-login";
 import { cn } from "@/lib/utils";
 import { useLab } from "@/models/lab-store";
-import { Ambient, PageHero, TabRow, openSimTab } from "@/views/v8/console";
+import { Ambient, PageHero, TabRow, getMapPlace, openSimTab, setMapPlace } from "@/views/v8/console";
+import { PlaceSearch } from "@/views/SimulationGrid";
 
 const LocationMap3D = lazy(() => import("@/views/LocationMap3D").then((m) => ({ default: m.LocationMap3D })));
 
@@ -18,12 +19,13 @@ const PLACES: ReadonlyArray<{ id: Place; label: string; icon: typeof Building2 }
 
 /**
  * The map page (it takes Home's place in the menu): the two places being simulated, one at a time on a big
- * interactive map, and under it the place with its two ways in: open the simulation, or change the place there.
+ * interactive map with the search to change it, and under it the place and the way into its simulation.
  */
 export function PlacesMap() {
   const lab = useLab();
   const navigate = useNavigate();
-  const [place, setPlace] = useState<Place>("urban");
+  const [place, setPlaceState] = useState<Place>(getMapPlace);
+  const setPlace = (p: Place) => { setMapPlace(p); setPlaceState(p); };
   const loc = place === "urban" ? lab.urban.location : lab.vineyard.location;
   const [name, ...rest] = loc.label.split(" · ");
   const key = import.meta.env.VITE_GOOGLE_MAPS_BROWSER_KEY;
@@ -40,8 +42,8 @@ export function PlacesMap() {
   const [hint, setHint] = useState(false);
   useEffect(() => { if (!signedIn) setView("2d"); else setHint(false); }, [signedIn]);
   const show3d = view === "3d" && signedIn && Boolean(key);
-  const go = (tab: "simula" | "luogo") => {
-    openSimTab(place, tab);
+  const go = () => {
+    openSimTab(place, "simula");
     void navigate({ to: place === "urban" ? "/urbano" : "/vigneto", replace: true });
   };
   return (
@@ -72,7 +74,9 @@ export function PlacesMap() {
           {DEMO_LOGIN_AVAILABLE && <button type="button" onClick={() => { setDemoSignedIn(true); setView("3d"); }} className="font-semibold text-foreground underline underline-offset-4">Simula l'accesso</button>}
         </p>
       )}
-      <div className="-mx-4 h-[44vh] min-h-64 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
+      {/* The place is chosen here: search it or use the device position; the map follows. */}
+      <PlaceSearch key={place} kind={place} />
+      <div className="-mx-4 h-[38vh] min-h-60 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
         {show3d && key
           ? <Suspense fallback={<div className="h-full w-full bg-card" />}><LocationMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} apiKey={key} /></Suspense>
           : <iframe key={src} data-map-gestures title={`Mappa di ${name}`} src={src} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" className="block h-full w-full border-0" />}
@@ -86,8 +90,7 @@ export function PlacesMap() {
           </div>
         </div>
         <div className="flex gap-2">
-          <button type="button" onClick={() => go("luogo")} className="inline-flex h-12 flex-1 items-center justify-center rounded-full bg-foreground/[0.08] px-5 text-sm font-semibold outline-none hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring sm:flex-none">Cambia luogo</button>
-          <button type="button" onClick={() => go("simula")} className="inline-flex h-12 flex-[1.4] items-center justify-center gap-2 rounded-full bg-foreground px-5 text-sm font-semibold text-background outline-none focus-visible:ring-4 focus-visible:ring-ring/50 active:scale-[0.98] motion-reduce:active:scale-100 sm:flex-none">Apri la simulazione<ArrowRight className="size-4" aria-hidden="true" /></button>
+          <button type="button" onClick={go} className="inline-flex h-12 flex-[1.4] items-center justify-center gap-2 rounded-full bg-foreground px-5 text-sm font-semibold text-background outline-none focus-visible:ring-4 focus-visible:ring-ring/50 active:scale-[0.98] motion-reduce:active:scale-100 sm:flex-none">Apri la simulazione<ArrowRight className="size-4" aria-hidden="true" /></button>
         </div>
       </div>
     </div>

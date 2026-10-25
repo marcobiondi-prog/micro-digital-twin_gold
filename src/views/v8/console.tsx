@@ -10,7 +10,12 @@ import { THEME_CHANGED, THEME_DARK, THEME_META } from "@/views/theme-toggle";
  */
 
 export type SimKind = "urban" | "vineyard";
-export type SimTab = "simula" | "luogo" | "sensori";
+export type SimTab = "simula" | "sensori";
+
+// Which place the Mappa page shows when it opens: the simulator that sent there sets it ("Cambia luogo", the place name).
+let mapPlace: SimKind = "urban";
+export const setMapPlace = (kind: SimKind) => { mapPlace = kind; };
+export const getMapPlace = () => mapPlace;
 
 // The open tab of each simulator lives at module level, so the ⋯ menu and the camera can switch it.
 const tabs: Record<SimKind, SimTab> = { urban: "simula", vineyard: "simula" };

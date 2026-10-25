@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { Camera, Images, MapPin, EllipsisVertical, Radar, RotateCcw, Scale, Send, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { setCameraSheetOpen } from "@/lib/camera-dock";
-import { Ambient, HeroButton, PageHero, Panels, TabRow, openSimTab, showSimMedia, simMediaId, useSimTab, type SimKind, type SimTab } from "./console";
+import { Ambient, HeroButton, PageHero, Panels, TabRow, openSimTab, setMapPlace, showSimMedia, simMediaId, useSimTab, type SimKind, type SimTab } from "./console";
 
 const TABS: ReadonlyArray<{ id: SimTab; label: string; icon: LucideIcon }> = [
   { id: "simula", label: "Simula", icon: SlidersHorizontal },
-  { id: "luogo", label: "Luogo", icon: MapPin },
   { id: "sensori", label: "Sensori AI", icon: Radar },
 ];
 const TONE: Record<SimKind, string> = { urban: "rgb(28 112 210 / 0.42)", vineyard: "rgb(150 36 110 / 0.42)" };
@@ -17,16 +17,19 @@ function Item({ icon: Icon, label, onSelect }: { icon: LucideIcon; label: string
 
 /**
  * v8 simulator page: ambient light, the place (touch to change it) above a big thin title, Confronta and
- * the ⋮ context menu on the right, then pill tabs (Simula · Luogo · Sensori AI) and one panel.
+ * the ⋮ context menu on the right, then pill tabs (Simula · Sensori AI) and one panel.
  * Simula shows the simulation with its photos and videos below it.
  */
-export function SimShell({ kind, place, onCompare, onReset, onSend, simula, luogo, media, sensori }: { kind: SimKind; place: string; onCompare?: (() => void) | undefined; onReset: () => void; onSend?: () => void; simula: ReactNode; luogo: ReactNode; media: ReactNode; sensori: ReactNode }) {
+export function SimShell({ kind, place, onCompare, onReset, onSend, simula, media, sensori }: { kind: SimKind; place: string; onCompare?: (() => void) | undefined; onReset: () => void; onSend?: () => void; simula: ReactNode; media: ReactNode; sensori: ReactNode }) {
   const tab = useSimTab(kind);
   const go = (t: SimTab) => openSimTab(kind, t);
+  // The place lives on the Mappa page (it shows and changes it), opened on this simulator's place.
+  const navigate = useNavigate();
+  const toMap = () => { setMapPlace(kind); void navigate({ to: "/mappa", replace: true }); };
   return (
     <div className="space-y-4">
       <Ambient tone={TONE[kind]} />
-      <PageHero kicker={place} kickerIcon={MapPin} onKicker={() => go("luogo")} title={kind === "urban" ? "Piazza" : "Vigneto"}
+      <PageHero kicker={place} kickerIcon={MapPin} onKicker={toMap} title={kind === "urban" ? "Piazza" : "Vigneto"}
         actions={<>
           {onCompare && <HeroButton icon={Scale} label="Confronta" onClick={onCompare} showLabel />}
           <DropdownMenu>
@@ -35,7 +38,7 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, luog
               <Item icon={Camera} label="Fotocamera" onSelect={() => setCameraSheetOpen(true)} />
               <Item icon={Images} label="Foto e video salvati" onSelect={() => showSimMedia(kind)} />
               <Item icon={Radar} label="Dove mettere i sensori" onSelect={() => go("sensori")} />
-              <Item icon={MapPin} label="Cambia luogo" onSelect={() => go("luogo")} />
+              <Item icon={MapPin} label="Cambia luogo" onSelect={toMap} />
               <DropdownMenuSeparator />
               {onSend && <Item icon={Send} label="Invia all’agronomo" onSelect={onSend} />}
               <Item icon={RotateCcw} label="Ricomincia" onSelect={onReset} />
@@ -48,7 +51,6 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, luog
       <Panels value={tab} panels={[
         // Simula carries the photos and videos under the simulation, so it stays mounted: the camera dock reaches LabMedia from any tab.
         { id: "simula", always: true, content: <div className="space-y-6">{simula}<section id={simMediaId(kind)} aria-label="Foto e video" className="fuse-canvas scroll-mt-[calc(var(--nav-h)+5rem)] rounded-t-3xl px-3 pt-4 pb-6 sm:px-5">{media}</section></div> },
-        { id: "luogo", content: luogo },
         { id: "sensori", content: sensori },
       ]} />
     </div>

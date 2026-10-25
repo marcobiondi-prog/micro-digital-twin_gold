@@ -62,7 +62,7 @@ function Index() {
       <h1 className="sr-only">Micro Digital Twin</h1>
       {/* Twin, big, is the page's only colour: the app's own mascot greets before the question. */}
       <div {...rise(0)} className={`${rise(0).className} mx-auto mt-[4vh] w-full max-w-xl`}>
-        <span className="block h-32 w-36 sm:h-40 sm:w-44"><TwinMascot className="block h-full w-full drop-shadow-[0_12px_40px_rgb(76_201_189/0.25)]" /></span>
+        <span className="mx-auto block h-32 w-36 sm:h-40 sm:w-44"><TwinMascot className="block h-full w-full drop-shadow-[0_12px_40px_rgb(76_201_189/0.25)]" /></span>
       </div>
       <div className="mx-auto flex w-full max-w-xl flex-1 flex-col">
         <h2 {...rise(1)} className={`${rise(1).className} mt-8 font-display text-[3.4rem] font-extralight leading-[0.95] tracking-tight text-foreground sm:text-7xl`}>Da dove<br />vuoi iniziare?</h2>
