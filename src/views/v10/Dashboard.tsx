@@ -3,18 +3,16 @@ import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { ArrowRight, Camera, CloudRain, Droplets, Leaf, Lock, Mail, MapPin, ShieldCheck, Sparkles, Sun, TreePine, Umbrella, Wind, type LucideIcon } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { ArrowRight, CloudRain, Droplets, Leaf, Lock, Mail, MapPin, ShieldCheck, Sparkles, Sun, TreePine, Umbrella, Wind, type LucideIcon } from "lucide-react";
 import { useLab, vineMetrics } from "@/models/lab-store";
 import { comparison, piazzaEstimate } from "@/models/scenarios";
 import { REFERENCE_M2, UNIT_COST, euroRange, grouped, interventionCost } from "@/models/intervention-cost";
 import { NO_MIX, VINE_LEVELS, VINE_REFERENCE_M2, VINE_UNIT_COST, vineCost, vineMixOf, zoneMixOf, type VineMix } from "@/models/vine-interventions";
 import { SEASONS, SEASON_LABEL, coolingShare, estimatedTemp, type Season } from "@/models/season-climate";
-import { ensureMedia, useLabMedia, type MediaKind } from "@/models/lab-media-store";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { getSeasonalClimate } from "@/controllers/climate.functions";
 import { GAIN_BG, GAIN_TEXT } from "@/views/v7/studio-ui";
-import { openSimTab, showSimMedia, type SimKind } from "@/views/v8/console";
+import { openSimTab, type SimKind } from "@/views/v8/console";
 import { splitLocation } from "@/views/SimulationGrid";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn } from "@/lib/demo-login";
@@ -146,32 +144,6 @@ function SeasonPills({ value, onChange }: { value: Season; onChange: (s: Season)
           className={cn("h-9 min-w-0 truncate rounded-full px-1 text-[13px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", value === s ? "bg-secondary text-secondary-foreground" : "text-foreground/75")}>{SEASON_LABEL[s]}</button>
       ))}
     </div>
-  );
-}
-
-/** The photos and videos of the project (on this device, or the account's archive). */
-function MediaStrip({ kind }: { kind: MediaKind }) {
-  const items = useLabMedia(kind);
-  useEffect(() => {
-    void supabase.auth.getSession().then(({ data }) => ensureMedia(kind, data.session?.user.id ?? null)).catch(() => undefined);
-  }, [kind]);
-  const sim: SimKind = kind;
-  const open = () => showSimMedia(sim);
-  return (
-    <DashCard>
-      {items.length ? (
-        <ul className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-          {items.slice(0, 12).map((m) => (
-            <li key={m.id} className="relative size-20 shrink-0 overflow-hidden rounded-2xl bg-foreground/10 sm:size-24">
-              {m.kind === "video" ? <video src={m.url} muted playsInline preload="metadata" className="size-full object-cover" aria-label={m.name} /> : <img src={m.url} alt={m.name} loading="lazy" className="size-full object-cover" />}
-            </li>
-          ))}
-        </ul>
-      ) : <p className="text-sm text-muted-foreground">Nessuna foto o video per ora. Scattali dalla simulazione: finiscono qui e nel report.</p>}
-      <Link to={kind === "urban" ? "/urbano" : "/vigneto"} onClick={open} className="mt-3 inline-flex h-10 items-center gap-1.5 rounded-full bg-foreground/[0.08] px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <Camera className="size-4" aria-hidden="true" />{items.length ? `Tutti (${items.length})` : "Apri foto e video"}
-      </Link>
-    </DashCard>
   );
 }
 
@@ -307,8 +279,6 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
           ]} />
       </DashSection>
 
-      <DashSection title="Foto e video"><MediaStrip kind="urban" /></DashSection>
-
       {records}
     </div>
   );
@@ -379,8 +349,6 @@ export function VineDashboard({ records }: { records: ReactNode }) {
             { icon: Wind, label: "Frangivento", value: `${Math.round(mix.windbreak)}%`, cost: ha(VINE_UNIT_COST.windbreak) },
           ]} />
       </DashSection>
-
-      <DashSection title="Foto e video"><MediaStrip kind="vineyard" /></DashSection>
 
       {records}
     </div>
