@@ -308,7 +308,7 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
             {urban.trees + urban.permeable + urban.shade === 0
               ? <span className="block font-mono text-base font-semibold">Nessun intervento</span>
               : <>
-                <span className="block font-mono text-base font-semibold tabular-nums">{euroRange(cost.total)} in tutto</span>
+                <span className="block font-mono text-base font-semibold tabular-nums">Tot. {euroRange(cost.total)}</span>
                 <span className="block font-mono text-sm tabular-nums text-muted-foreground">{Math.round(cost.perM2.lo)}–{Math.round(cost.perM2.hi)} € al m² · su {surface}</span>
               </>}
             <span className="mt-0.5 block text-xs text-muted-foreground">{costOpen ? "Nascondi i dettagli" : "Tocca per i dettagli e i benefici"}</span>
