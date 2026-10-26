@@ -321,12 +321,11 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
           <Wallet className="size-6 shrink-0 text-muted-foreground" aria-hidden="true" />
           <span className="min-w-0 flex-1">
             <span className="block text-xs text-muted-foreground">Costo stimato dell'intervento{est.dT <= 0.05 ? "" : preset ? ` · ${level.s}` : ` · vicino a ${level.s}`}</span>
-            {/* Shown even folded: the total and the cost per m² on the surface in use. */}
+            {/* Shown even folded: the total; the cost per m² lives inside. */}
             {urban.trees + urban.permeable + urban.shade === 0
               ? <span className="block font-mono text-base font-semibold">Nessun intervento</span>
               : <>
                 <span className="block font-mono text-base font-semibold tabular-nums">Tot. {euroRange(cost.total)}</span>
-                <span className="block font-mono text-sm tabular-nums text-muted-foreground">{Math.round(cost.perM2.lo)}–{Math.round(cost.perM2.hi)} € al m² · su {surface}</span>
               </>}
             <span className="mt-0.5 block text-xs text-muted-foreground">{costOpen ? "Nascondi i dettagli" : "Tocca per i dettagli e i benefici"}</span>
           </span>
@@ -335,6 +334,7 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
         <div id="piazza-cost-body" hidden={!costOpen} className="space-y-3 px-4 pb-4">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
             <span className="inline-flex items-center gap-1.5 text-muted-foreground"><Ruler className="size-4 shrink-0" aria-hidden="true" />{surface} · {surfaceNote.toLowerCase()}</span>
+            {urban.trees + urban.permeable + urban.shade > 0 && <span className="font-mono font-semibold tabular-nums">{Math.round(cost.perM2.lo)}–{Math.round(cost.perM2.hi)} € al m²</span>}
           </div>
           <dl className="grid grid-cols-3 gap-2 border-t border-foreground/10 pt-3">
             {facts.map(({ icon: Icon, value, label }) => (
