@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useContext, useState, type ReactNode } from "react";
 import { comparison, nextPhase, prototypeChoice } from "@/models/scenarios";
 import { UNIT_COST, grouped } from "@/models/intervention-cost";
 import { VINE_UNIT_COST } from "@/models/vine-interventions";
 import { introSeen } from "@/lib/intro-seen";
 import { useSignedIn } from "@/lib/use-signed-in";
-import { Check, X } from "lucide-react";
-import { Faq, InfoCard, InfoPage, PageLink } from "./InfoPage";
+import { Check } from "lucide-react";
+import { openAccount } from "@/lib/camera-dock";
+import { cn } from "@/lib/utils";
+import { Faq, InfoCard, InfoNav, InfoPage, PageLink } from "./InfoPage";
 
 const eur = (n: number) => `${grouped(n)} €`;
 const level = (id: string) => comparison.find((l) => l.id === id)!;
@@ -217,64 +219,58 @@ export function TermsPage() {
   );
 }
 
-/**
- * The original "Modello di business · Free e Premium" table, brought up to today's app: the same rows and green / red marks,
- * in plain words (no service names) and without the features that left the app (case studies, sources).
- */
-const PLAN_ROWS: Array<[string, boolean, boolean]> = [
-  ["Simulazione della piazza e del vigneto", true, true],
-  ["Tre livelli di intervento sull'arco, con costi e benefici", true, true],
-  ["Stagioni e ore con il clima reale del luogo", true, true],
-  ["Ricerca del luogo e mappa 2D", true, true],
-  ["Mappa 3D del luogo", false, true],
-  ["Dati da satellite (vegetazione e temperatura del suolo)", false, true],
-  ["Importa il meteo reale come punto di partenza", false, true],
-  ["Report PDF, copia e stampa", true, true],
-  ["Esportazione dei dati per le mappe (GeoJSON) e CSV", true, true],
-  ["Link di condivisione dello scenario", true, true],
-  ["Foto e video sul dispositivo", true, true],
-  ["Invio di più foto e video in un unico ZIP", true, true],
-  ["Fotocamera AI: riconosce piante e terreno (app installata)", false, true],
-  ["Mappa virtuale del terreno durante la scansione", false, true],
-  ["Didascalie AI nelle foto e nei PDF", false, true],
-  ["Dove mettere i sensori, suggerito dall'AI", false, true],
-  ["Piano di interventi suggerito dall'AI", false, true],
-  ["Archivio di foto e video online e link di condivisione", false, true],
-  ["Registro interventi e quaderno di campagna", true, true],
-  ["Iter di approvazione degli enti salvato nell'account", false, true],
-  ["Invio di email al funzionario comunale", true, true],
-  ["Email agli enti pubblici per l'approvazione", false, true],
-  ["App installabile su Android, iPhone e computer", true, true],
+/** The two plans in a few plain lines: what Free gives, and what Premium adds on top. */
+const FREE_FEATURES = [
+  "Simulazione della piazza e del vigneto, con costi e benefici",
+  "Stagioni e ore con il clima reale del luogo",
+  "Mappa 2D e ricerca del luogo",
+  "Foto e video, registro interventi e quaderno di campagna",
+  "Report PDF, dati per le mappe e link di condivisione",
+];
+const PREMIUM_FEATURES = [
+  "Fotocamera AI: riconosce piante e terreno",
+  "Mappa 3D del luogo e dati da satellite",
+  "Meteo reale come punto di partenza",
+  "Piano di interventi e posizione dei sensori suggeriti dall'AI",
+  "Email di approvazione agli enti e iter salvato nell'account",
+  "Archivio online di foto e video",
 ];
 
-function Mark({ on }: { on: boolean }) {
-  return on ? (
-    <span className="grid size-7 place-items-center rounded-full bg-ok text-ok-foreground shadow-sm shadow-ok/45" role="img" aria-label="Incluso"><Check className="size-4 stroke-[3]" /></span>
-  ) : (
-    <span className="grid size-7 place-items-center rounded-full bg-danger text-danger-foreground shadow-sm shadow-danger/45" role="img" aria-label="Non incluso"><X className="size-4 stroke-[3]" /></span>
+function PlanCard({ name, price, lead, features, current, action }: { name: string; price: string; lead?: string; features: string[]; current: boolean; action?: ReactNode }) {
+  return (
+    <section aria-label={`Piano ${name}${current ? ", il tuo piano" : ""}`}
+      className={cn("space-y-3 rounded-3xl p-5", current ? "bg-foreground/[0.08] ring-2 ring-foreground shadow-[0_0_24px_rgb(255_255_255/0.08)]" : "bg-foreground/[0.04] text-foreground/75")}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="font-display text-2xl font-light tracking-tight text-foreground">{name}</h2>
+          <p className="text-sm text-muted-foreground">{price}</p>
+        </div>
+        {current && <span className="shrink-0 rounded-full bg-foreground px-3 py-1 text-xs font-semibold text-background">Il tuo piano</span>}
+      </div>
+      {lead && <p className="text-sm font-semibold text-foreground">{lead}</p>}
+      <ul className="space-y-2 text-[15px] leading-snug">
+        {features.map((f) => (
+          <li key={f} className="flex gap-2.5"><Check className={cn("mt-0.5 size-4 shrink-0 stroke-[3]", current ? "text-ok" : "text-muted-foreground")} aria-hidden="true" />{f}</li>
+        ))}
+      </ul>
+      {action}
+    </section>
   );
 }
 
-/** Piani: the Free / Premium table; the column of the user's own plan is marked. */
+/** Piani: Free and Premium as two cards, the user's own one highlighted. */
 export function PlansPage() {
   const { signedIn } = useSignedIn();
-  const col = (premium: boolean) => (premium === signedIn ? "bg-foreground/[0.06]" : "");
-  const head = "p-3 text-center sm:p-4";
+  const nav = useContext(InfoNav);
+  // Inside the account panel the sign-in is on the list the back arrow returns to; elsewhere the panel opens.
+  const signIn = () => (nav ? nav.back() : openAccount());
   return (
-    <InfoPage title="Free e Premium" intro="Modello di business: proposta di suddivisione delle funzioni, da validare con i test di usabilità. Premium è gratis con la registrazione; le funzioni con la fotocamera AI sono riservate a Premium.">
-      <div className="overflow-hidden rounded-3xl bg-foreground/[0.05]">
-        <div className="grid grid-cols-[1fr_4.25rem_5.25rem] items-center border-b border-foreground/10 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sm:grid-cols-[1fr_6rem_7rem] sm:text-sm sm:normal-case sm:tracking-normal">
-          <div className="p-3 sm:p-4">Funzione</div>
-          <div className={`${head} ${col(false)}`}>Free{!signedIn && <span className="block text-[10px] normal-case tracking-normal text-foreground">il tuo</span>}</div>
-          <div className={`${head} border-l border-foreground/10 font-semibold text-primary ${col(true)}`}>Premium{signedIn && <span className="block text-[10px] normal-case tracking-normal text-foreground">il tuo</span>}</div>
-        </div>
-        {PLAN_ROWS.map(([t, free, premium]) => (
-          <div key={t} className="grid grid-cols-[1fr_4.25rem_5.25rem] items-center border-b border-foreground/10 text-sm last:border-b-0 sm:grid-cols-[1fr_6rem_7rem]">
-            <div className="p-3 sm:p-4">{t}</div>
-            <div className={`grid h-full place-items-center p-2 sm:p-3 ${col(false)}`}><Mark on={free} /></div>
-            <div className={`grid h-full place-items-center border-l border-foreground/10 p-2 sm:p-3 ${col(true)}`}><Mark on={premium} /></div>
-          </div>
-        ))}
+    <InfoPage title="Free e Premium" intro="Premium è gratis: basta registrarsi.">
+      <div className="space-y-3">
+        <PlanCard name="Free" price="Senza registrazione" features={FREE_FEATURES} current={!signedIn} />
+        <PlanCard name="Premium" price="Gratis con la registrazione" lead="Tutto di Free, più:" features={PREMIUM_FEATURES} current={signedIn}
+          action={!signedIn && <button type="button" onClick={signIn} className="mt-1 inline-flex h-11 w-full items-center justify-center rounded-full bg-foreground text-sm font-semibold text-background outline-none focus-visible:ring-2 focus-visible:ring-ring">Accedi per passare a Premium</button>} />
+        <p className="px-1 text-xs text-muted-foreground">Proposta di suddivisione delle funzioni, da validare con i test di usabilità.</p>
       </div>
     </InfoPage>
   );
