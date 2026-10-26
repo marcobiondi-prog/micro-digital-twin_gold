@@ -121,20 +121,22 @@ export function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlid
         // The grab zone is exactly the round handle below (28 px radius): a touch there never scrolls the page, so the
         // drag goes on wherever the finger then moves; a touch outside it is left to the page.
         const px = hit * (box.current!.getBoundingClientRect().width / 200);
-        if (px > GRAB_RADIUS || disabled) return;
+        // Below the arc's ends (the min/max numbers, the reading inside) nothing is grabbed, even next to the dot.
+        if (px > GRAB_RADIUS || y < 0 || disabled) return;
         e.currentTarget.setPointerCapture(e.pointerId);
-        // A finger does not move the dot yet: the first few pixels tell a sideways slide from a page scroll.
-        if (e.pointerType === "touch") { touchStart.current = { x: e.clientX, y: e.clientY, dragging: false }; return; }
-        move(e);
+        // A touch or a click alone never moves the dot: only a real slide does (for a finger, a sideways one).
+        touchStart.current = { x: e.clientX, y: e.clientY, dragging: false };
       }}
       onPointerMove={(e) => {
         if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
         const start = touchStart.current;
-        if (e.pointerType === "touch" && start && !start.dragging) {
+        if (!start) return;
+        if (!start.dragging) {
           const dx = Math.abs(e.clientX - start.x), dy = Math.abs(e.clientY - start.y);
-          if (Math.max(dx, dy) < 8) return;
-          // Mostly vertical: it is a scroll, the dot stays where it is.
-          if (dy > dx) { e.currentTarget.releasePointerCapture(e.pointerId); end(); return; }
+          const touch = e.pointerType === "touch";
+          if (Math.max(dx, dy) < (touch ? 8 : 3)) return;
+          // A finger moving mostly up or down is scrolling the page: the dot stays where it is.
+          if (touch && dy > dx) { e.currentTarget.releasePointerCapture(e.pointerId); end(); return; }
           start.dragging = true;
         }
         move(e);
