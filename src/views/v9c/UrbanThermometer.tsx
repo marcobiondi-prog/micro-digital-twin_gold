@@ -298,8 +298,15 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
           className="flex w-full items-center gap-3 rounded-3xl p-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <Wallet className="size-6 shrink-0 text-muted-foreground" aria-hidden="true" />
           <span className="min-w-0 flex-1">
-            <span className="block text-xs text-muted-foreground">Dettagli costo e benefici{est.dT <= 0.05 ? "" : preset ? ` · ${level.s}` : ` · vicino a ${level.s}`}</span>
-            <span className="block font-mono text-base font-semibold tabular-nums">{Math.round(cost.perM2.lo)}–{Math.round(cost.perM2.hi)} € al m²</span>
+            <span className="block text-xs text-muted-foreground">Costo stimato dell'intervento{est.dT <= 0.05 ? "" : preset ? ` · ${level.s}` : ` · vicino a ${level.s}`}</span>
+            {/* Shown even folded: the total and the cost per m² on the surface in use. */}
+            {urban.trees + urban.permeable + urban.shade === 0
+              ? <span className="block font-mono text-base font-semibold">Nessun intervento</span>
+              : <>
+                <span className="block font-mono text-base font-semibold tabular-nums">{euroRange(cost.total)} in tutto</span>
+                <span className="block font-mono text-sm tabular-nums text-muted-foreground">{Math.round(cost.perM2.lo)}–{Math.round(cost.perM2.hi)} € al m² · su {surface}</span>
+              </>}
+            <span className="mt-0.5 block text-xs text-muted-foreground">{costOpen ? "Nascondi i dettagli" : "Tocca per i dettagli e i benefici"}</span>
           </span>
           <ChevronDown className={cn("size-5 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", costOpen && "rotate-180")} aria-hidden="true" />
         </button>
