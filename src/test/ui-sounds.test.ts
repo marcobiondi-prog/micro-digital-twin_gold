@@ -83,7 +83,7 @@ describe("compare card click", () => {
     press("inner");
     expect(starts).toHaveBeenCalledTimes(6);
   });
-  it("plays only in the installed app on touch devices: phone volume, softer on tablets, off on desktop and in the browser", async () => {
+  it("plays on touch devices, installed or in the browser: phone volume, softer on tablets, off on desktop", async () => {
     vi.resetModules();
     const { uiClickVolume, UI_CLICK_VOLUME, TABLET_CLICK_VOLUME } = await import("@/lib/ui-sounds");
     device({ width: 412, height: 915 });
@@ -93,8 +93,8 @@ describe("compare card click", () => {
     expect(TABLET_CLICK_VOLUME).toBeLessThan(UI_CLICK_VOLUME);
     device({ touch: false, width: 1920, height: 1080 });
     expect(uiClickVolume()).toBe(0);
-    device({ installed: false });
-    expect(uiClickVolume()).toBe(0);
+    device({ installed: false, width: 412, height: 915 });
+    expect(uiClickVolume()).toBe(UI_CLICK_VOLUME);
   });
   it("stays silent without Web Audio", async () => {
     vi.resetModules();

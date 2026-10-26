@@ -2,7 +2,6 @@
 // WAV, not MP3: MP3 encoders pad the start with silence, which would delay the tap.
 // Imported as an asset so its URL carries a content hash: a changed sound never plays from a stale cache.
 import compareClickUrl from "@/assets/compare-click.wav";
-import { isInstalledApp } from "@/lib/installed-app";
 import { isTouchDevice } from "@/lib/touch-device";
 
 export const COMPARE_CLICK_URL = compareClickUrl;
@@ -12,11 +11,11 @@ export const UI_CLICK_VOLUME = 0.75;
 export const TABLET_CLICK_VOLUME = 0.6;
 
 /**
- * Button taps belong to the installed app on touch devices: silent in a browser tab and on
- * desktops (no touchscreen); phones (short side < 600 px) play at UI_CLICK_VOLUME, tablets softer.
+ * Button taps belong to touch devices, in the installed app and in a browser tab alike; desktops
+ * (no touchscreen) stay silent; phones (short side < 600 px) play at UI_CLICK_VOLUME, tablets softer.
  */
 export function uiClickVolume(): number {
-  if (typeof window === "undefined" || !isInstalledApp() || !isTouchDevice()) return 0;
+  if (typeof window === "undefined" || !isTouchDevice()) return 0;
   return isTabletScreen() ? TABLET_CLICK_VOLUME : UI_CLICK_VOLUME;
 }
 
