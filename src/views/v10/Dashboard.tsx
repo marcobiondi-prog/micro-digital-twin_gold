@@ -1,14 +1,13 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ArrowRight, CloudRain, Droplets, Leaf, Lock, Mail, MapPin, ShieldCheck, Sparkles, Sun, TreePine, Umbrella, Wind, type LucideIcon } from "lucide-react";
-import { useLab, vineMetrics } from "@/models/lab-store";
-import { comparison, piazzaEstimate } from "@/models/scenarios";
-import { REFERENCE_M2, UNIT_COST, euroRange, grouped, interventionCost } from "@/models/intervention-cost";
-import { NO_MIX, VINE_LEVELS, VINE_REFERENCE_M2, VINE_UNIT_COST, vineCost, vineMixOf, zoneMixOf, type VineMix } from "@/models/vine-interventions";
-import { SEASONS, SEASON_LABEL, coolingShare, estimatedTemp, type Season } from "@/models/season-climate";
+import { useLab } from "@/models/lab-store";
+import { heatStep, heatWords, piazzaMix, piazzaSummary, thirstStep, thirstWords, vineMixRows, vineSummary } from "@/models/project-summary";
+import { euroRange, grouped } from "@/models/intervention-cost";
+import { SEASONS, SEASON_LABEL, type Season } from "@/models/season-climate";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { getSeasonalClimate } from "@/controllers/climate.functions";
 import { GAIN_BG, GAIN_TEXT } from "@/views/v7/studio-ui";
@@ -22,16 +21,18 @@ import { cn } from "@/lib/utils";
 
 const fmt1 = (n: number) => n.toLocaleString("it-IT", { maximumFractionDigits: 1, minimumFractionDigits: 1 });
 const avg = (n: number[]) => n.reduce((a, b) => a + b, 0) / Math.max(1, n.length);
-const heatStep = (t: number) => (t >= 39 ? 0 : t >= 36 ? 1 : t >= 30 ? 2 : t >= 26 ? 3 : 4);
-const heatWords = (t: number) => (t >= 39 ? "Troppo caldo" : t >= 36 ? "Molto caldo" : t >= 30 ? "Caldo" : t >= 18 ? "Si sta bene" : t >= 10 ? "Fresco" : "Freddo");
-const thirstStep = (s: number) => (s >= 80 ? 0 : s >= 65 ? 1 : s >= 45 ? 2 : s >= 25 ? 3 : 4);
-const thirstWords = (s: number) => (s >= 65 ? "Sete forte" : s >= 35 ? "Da tenere d'occhio" : "Le viti stanno bene");
-const levelName = (id: string | null) => (id ? comparison.find((c) => c.id === id)?.s ?? null : null);
 const useReducedMotion = () => {
   const [reduce, setReduce] = useState(true);
   useEffect(() => { setReduce(window.matchMedia("(prefers-reduced-motion: reduce)").matches); }, []);
   return reduce;
 };
+
+// The season the piazza is read in (summer by default): shared with the PDF report, so it prints what is on screen.
+let dashSeason: Season = "estate";
+const seasonSubs = new Set<() => void>();
+export const getDashSeason = () => dashSeason;
+const setDashSeason = (s: Season) => { dashSeason = s; seasonSubs.forEach((f) => f()); };
+const useDashSeason = () => useSyncExternalStore((f) => { seasonSubs.add(f); return () => { seasonSubs.delete(f); }; }, () => dashSeason, () => dashSeason);
 
 /** A section of the dashboard: a bold title, an optional hint on the right, then its content. */
 export function DashSection({ title, hint, children }: { title: string; hint?: ReactNode; children: ReactNode }) {
@@ -202,36 +203,21 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
   const urban = useLab().urban;
   const reduce = useReducedMotion();
   const { lat, lng } = urban.location;
-  const [season, setSeason] = useState<Season>("estate");
+  const season = useDashSeason();
   const profile = useSeasonProfile(lat, lng);
-  const real = profile.data?.profile[season] ?? null;
-  const est = piazzaEstimate(urban.trees, urban.permeable, urban.shade);
-  // A whole day of the chosen season: the place's real perceived heat (else an estimate) and the same with the interventions.
-  const day = Array.from({ length: 24 }, (_, h) => {
-    const before = real?.[h] ?? estimatedTemp(season, h, urban.realTemp ?? 40);
-    return { h: `${h}`, prima: +before.toFixed(1), dopo: +(before - est.dT * coolingShare(before)).toFixed(1) };
-  });
-  const estimated = !real || real.every((v) => v === null);
-  // The result is read in the hottest hour of that day: where the interventions matter most.
-  const hot = day.reduce((a, b) => (b.prima > a.prima ? b : a), day[0]!);
-  const before = hot.prima, after = hot.dopo;
   const fetchArea = useServerFn(getPlaceArea);
   const area = useQuery({ queryKey: ["place-area", lat, lng], queryFn: () => fetchArea({ data: { lat, lng } }), staleTime: Infinity, retry: 1 });
-  const m2 = area.data?.m2 ?? REFERENCE_M2;
-  const cost = interventionCost(m2, urban.trees, urban.permeable, urban.shade);
-  const empty = urban.trees + urban.permeable + urban.shade === 0;
-  const presets = { zero: [3, 10, 10], mvp: [6, 20, 15], roadmap: [12, 40, 30] } as const;
-  const preset = (Object.keys(presets) as Array<keyof typeof presets>).find((k) => presets[k][0] === urban.trees && presets[k][1] === urban.permeable && presets[k][2] === urban.shade) ?? null;
+  // The same summary the PDF report reads: a whole day of the season, read at its hottest hour.
+  const sum = piazzaSummary(urban, season, profile.data?.profile[season] ?? null, area.data?.m2 ?? null);
+  const { day, estimated, before, after, empty, m2 } = sum;
   const place = splitLocation(urban.location.label);
-  const co2 = Math.round(urban.trees * 22), water = Math.round(m2 * (urban.permeable / 100) * 0.7 * 0.6), shadeM2 = Math.round(m2 * (urban.shade / 100) + urban.trees * 30);
-  const lawnM2 = Math.round((m2 * urban.permeable) / 100), shadeArea = Math.round((m2 * urban.shade) / 100);
   return (
     <div className="space-y-8" data-testid="dashboard-urbana">
       <ResultCard kind="urban" place={place.name}
-        when={<SeasonPills value={season} onChange={setSeason} />}>
-        <p className="text-center text-sm text-muted-foreground">Nell'ora più calda · {SEASON_LABEL[season].toLowerCase()}, ore {hot.h}</p>
+        when={<SeasonPills value={season} onChange={setDashSeason} />}>
+        <p className="text-center text-sm text-muted-foreground">Nell'ora più calda · {SEASON_LABEL[season].toLowerCase()}, ore {sum.hour}</p>
         <ResultArc before={before} after={after} min={Math.floor(Math.min(after, before) - 3)} max={Math.ceil(before + 2)} unit="°"
-          value={`${fmt1(after)}°`} words={heatWords(after)} step={heatStep(after)} level={empty ? null : levelName(preset) ?? "Su misura"} cost={empty ? "0 €" : euroRange(cost.total)} />
+          value={`${fmt1(after)}°`} words={heatWords(after)} step={heatStep(after)} level={sum.level} cost={empty ? "0 €" : euroRange(sum.cost)} />
         <p className="text-center text-sm">
           {before - after >= 0.05 ? <>Da <b>{fmt1(before)}°</b> a <b className={GAIN_TEXT[heatStep(after)]}>{fmt1(after)}°</b> percepiti: <b>−{fmt1(before - after)}°</b></> : empty ? "Nessun intervento: apri la simulazione per provarne uno." : "In questa stagione gli interventi non cambiano il calore."}
         </p>
@@ -250,7 +236,7 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
                   <linearGradient id="dash-before" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="var(--radar-hot)" stopOpacity={0.35} /><stop offset="100%" stopColor="var(--radar-hot)" stopOpacity={0} /></linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="h" tickLine={false} axisLine={false} interval={5} tickFormatter={(h) => `${h}:00`} fontSize={11} />
+                <XAxis dataKey="h" type="category" tickLine={false} axisLine={false} interval={5} tickFormatter={(h) => `${h}:00`} fontSize={11} />
                 <YAxis tickLine={false} axisLine={false} fontSize={11} domain={["dataMin - 1", "dataMax + 1"]} tickFormatter={(v) => `${Math.round(v)}°`} />
                 <Tooltip formatter={(v: number, n: string) => [`${fmt1(v)}°`, n === "prima" ? "Senza interventi" : "Con gli interventi"]} labelFormatter={(h) => `Ore ${h}:00`} contentStyle={{ borderRadius: 16, border: "none" }} />
                 <Area type="monotone" dataKey="prima" stroke="var(--radar-hot)" strokeWidth={2} fill="url(#dash-before)" isAnimationActive={!reduce} />
@@ -263,20 +249,16 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
 
       <DashSection title="Cosa ottieni" hint="stima annua">
         <Facts items={[
-          { icon: Leaf, value: `${co2} kg`, label: "CO₂ l'anno" },
-          { icon: CloudRain, value: `${grouped(water)} m³`, label: "Pioggia tenuta" },
-          { icon: Sun, value: `${grouped(shadeM2)} m²`, label: "All'ombra" },
+          { icon: Leaf, value: `${sum.co2} kg`, label: "CO₂ l'anno" },
+          { icon: CloudRain, value: `${grouped(sum.water)} m³`, label: "Pioggia tenuta" },
+          { icon: Sun, value: `${grouped(sum.shadeM2)} m²`, label: "All'ombra" },
         ]} />
       </DashSection>
 
       <DashSection title="Cosa hai messo" hint={`${grouped(m2)} m² ${area.data?.m2 ? "della piazza" : "di riferimento"}`}>
-        <MixRows total={empty ? "Nessun intervento" : euroRange(cost.total)}
+        <MixRows total={empty ? "Nessun intervento" : euroRange(sum.cost)}
           note="Costi indicativi IVA esclusa, da verificare con un preventivo."
-          rows={[
-            { icon: TreePine, label: "Alberi", value: `${urban.trees}`, cost: `${euroRange(UNIT_COST.tree)} l'uno` },
-            { icon: Sun, label: "Prato", value: `${urban.permeable}%`, cost: `${grouped(lawnM2)} m² · ${euroRange(UNIT_COST.lawnM2)} al m²` },
-            { icon: Umbrella, label: "Ombra", value: `${urban.shade}%`, cost: `${grouped(shadeArea)} m² · ${euroRange(UNIT_COST.shadeM2)} al m²` },
-          ]} />
+          rows={piazzaMix(urban, sum).map((r, i) => ({ ...r, icon: [TreePine, Sun, Umbrella][i]! }))} />
       </DashSection>
 
       {records}
@@ -292,28 +274,18 @@ export const VINE_LOCKED: Locked[] = [
 export function VineDashboard({ records }: { records: ReactNode }) {
   const vine = useLab().vineyard;
   const { lat, lng } = vine.location;
-  const legacy = vineMixOf(vine);
-  const mixes = vine.zones.map((z) => zoneMixOf(z, legacy));
-  const after = vineMetrics({ ...vine, zones: vine.zones.map((z, i) => ({ ...z, ...mixes[i] })) }).results.map((r) => r.s);
-  const plain = vineMetrics({ ...vine, zones: vine.zones.map((z) => ({ ...z, ...NO_MIX })) }).results.map((r) => r.s);
-  const thirst = avg(after), before = avg(plain);
-  const mix: VineMix = { irrigation: avg(mixes.map((m) => m.irrigation)), shade: avg(mixes.map((m) => m.shade)), windbreak: avg(mixes.map((m) => m.windbreak)) };
   const fetchArea = useServerFn(getPlaceArea);
   const area = useQuery({ queryKey: ["vine-area", lat, lng], queryFn: () => fetchArea({ data: { lat, lng, kind: "vigneto" } }), staleTime: Infinity, retry: 1 });
-  const m2 = area.data?.m2 ?? VINE_REFERENCE_M2;
-  const total = mixes.reduce((t, m) => { const c = vineCost(m2 / Math.max(1, mixes.length), m).total; return { lo: t.lo + c.lo, hi: t.hi + c.hi }; }, { lo: 0, hi: 0 });
-  const empty = mixes.every((m) => m.irrigation + m.shade + m.windbreak === 0);
-  const same = mixes.every((m) => m.irrigation === mixes[0]!.irrigation && m.shade === mixes[0]!.shade && m.windbreak === mixes[0]!.windbreak);
-  const preset = same ? VINE_LEVELS.find((p) => p.irrigation === mixes[0]!.irrigation && p.shade === mixes[0]!.shade && p.windbreak === mixes[0]!.windbreak)?.id ?? null : null;
-  const safe = after.filter((s) => s < 35).length;
+  // The same summary the PDF report reads.
+  const sum = vineSummary(vine, area.data?.m2 ?? null);
+  const { before, after: thirst, mix, empty, same, safe, m2 } = sum;
   const place = splitLocation(vine.location.label);
-  const ha = (r: { lo: number; hi: number }) => `${euroRange(r)} l'ettaro`;
   return (
     <div className="space-y-8" data-testid="dashboard-vitivinicola">
       <ResultCard kind="vineyard" place={place.name} when={<span className="text-xs text-muted-foreground">Media delle tre zone, come le hai lasciate nella simulazione</span>}>
         <p className="text-center text-sm text-muted-foreground">Sete delle viti</p>
         <ResultArc before={before} after={thirst} min={Math.max(0, Math.floor(Math.min(thirst, before) - 8))} max={Math.min(100, Math.ceil(before + 6))} unit=""
-          value={`${Math.round(thirst)}`} words={thirstWords(thirst)} step={thirstStep(thirst)} level={empty ? null : levelName(preset) ?? "Su misura"} cost={empty ? "0 €" : euroRange(total)} />
+          value={`${Math.round(thirst)}`} words={thirstWords(thirst)} step={thirstStep(thirst)} level={sum.level} cost={empty ? "0 €" : euroRange(sum.cost)} />
         <p className="text-center text-sm">
           {before - thirst >= 0.5 ? <>Da <b>{Math.round(before)}</b> a <b className={GAIN_TEXT[thirstStep(thirst)]}>{Math.round(thirst)}</b> su 100: <b>−{Math.round(before - thirst)}</b></> : empty ? "Nessun intervento: apri la simulazione per provarne uno." : "Gli interventi qui cambiano poco."}
         </p>
@@ -324,8 +296,8 @@ export function VineDashboard({ records }: { records: ReactNode }) {
           {vine.zones.map((z, i) => (
             <DashCard key={i} className="space-y-1 px-3 py-4 text-center">
               <div className="text-xs font-semibold text-muted-foreground">Zona {i + 1}</div>
-              <div className={cn("font-display text-3xl font-light tabular-nums", GAIN_TEXT[thirstStep(after[i] ?? 0)])}>{Math.round(after[i] ?? 0)}</div>
-              <div className="text-[11px] text-muted-foreground">senza: {Math.round(plain[i] ?? 0)}</div>
+              <div className={cn("font-display text-3xl font-light tabular-nums", GAIN_TEXT[thirstStep(sum.zones[i]?.after ?? 0)])}>{Math.round(sum.zones[i]?.after ?? 0)}</div>
+              <div className="text-[11px] text-muted-foreground">senza: {Math.round(sum.zones[i]?.plain ?? 0)}</div>
               <div className="text-[11px] text-muted-foreground">{Math.round(z.temperature)}° · {Math.round(z.moisture)}% acqua</div>
             </DashCard>
           ))}
@@ -334,20 +306,16 @@ export function VineDashboard({ records }: { records: ReactNode }) {
 
       <DashSection title="Cosa ottieni">
         <Facts items={[
-          { icon: ShieldCheck, value: `${safe} di ${after.length}`, label: "Zone al sicuro" },
+          { icon: ShieldCheck, value: `${safe} di ${sum.zones.length}`, label: "Zone al sicuro" },
           { icon: Leaf, value: mix.shade ? `−${fmt1((mix.shade / 100) * 3)}°` : "0°", label: "Sulle foglie" },
           { icon: Wind, value: mix.windbreak ? `−${Math.round((mix.windbreak / 100) * 60)}%` : "0%", label: "Vento" },
         ]} />
       </DashSection>
 
       <DashSection title="Cosa hai messo" hint={area.data?.m2 ? `${grouped(m2)} m² del vigneto` : "1 ettaro di riferimento"}>
-        <MixRows total={empty ? "Nessun intervento" : euroRange(total)}
+        <MixRows total={empty ? "Nessun intervento" : euroRange(sum.cost)}
           note={same ? "Costi indicativi IVA esclusa, da verificare con un preventivo." : "Media delle tre zone (ognuna ha il suo intervento). Costi indicativi IVA esclusa."}
-          rows={[
-            { icon: Droplets, label: "Irrigazione", value: `+${Math.round(mix.irrigation)}%`, cost: ha(VINE_UNIT_COST.irrigation) },
-            { icon: Umbrella, label: "Teli d'ombra", value: `${Math.round(mix.shade)}%`, cost: ha(VINE_UNIT_COST.shade) },
-            { icon: Wind, label: "Frangivento", value: `${Math.round(mix.windbreak)}%`, cost: ha(VINE_UNIT_COST.windbreak) },
-          ]} />
+          rows={vineMixRows(sum).map((r, i) => ({ ...r, icon: [Droplets, Umbrella, Wind][i]! }))} />
       </DashSection>
 
       {records}

@@ -3,7 +3,7 @@ import { LogOut, UserRound, Mail, LockKeyhole, Camera, ShieldCheck, ChevronRight
 import { Link } from "@tanstack/react-router";
 import { InfoNav, type InfoPath } from "@/views/v10/InfoPage";
 import { pushBackGuard } from "@/hooks/use-back-close";
-import { CookiePage, FaqPage, LicensesPage, PlansPage, PrivacyPage, PrivacyPrefsPage, TermsPage } from "@/views/v10/legal-pages";
+import { ContactsPage, CookiePage, FaqPage, LicensesPage, PlansPage, PrivacyPage, PrivacyPrefsPage, TermsPage } from "@/views/v10/legal-pages";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { getMyAdminStatus } from "@/controllers/admin.functions";
@@ -62,12 +62,12 @@ function authMessage(error: { code?: string | undefined; message: string }) {
 
 /** The account panel's plans, help, privacy and legal pages, shown inside the panel. */
 const PAGES: Record<InfoPath, ComponentType> = {
-  "/piani": PlansPage, "/faq": FaqPage, "/privacy/cookie": CookiePage, "/privacy/informativa": PrivacyPage,
+  "/piani": PlansPage, "/faq": FaqPage, "/contatti": ContactsPage, "/privacy/cookie": CookiePage, "/privacy/informativa": PrivacyPage,
   "/privacy/preferenze": PrivacyPrefsPage, "/legale/licenze": LicensesPage, "/legale/termini": TermsPage,
 };
 const LINK_GROUPS: Array<{ title: string; links: Array<[string, InfoPath]> }> = [
   { title: "Piani", links: [["Free e Premium", "/piani"]] },
-  { title: "Aiuto", links: [["Domande frequenti", "/faq"]] },
+  { title: "Aiuto", links: [["Domande frequenti", "/faq"], ["Contatti", "/contatti"]] },
   { title: "Privacy", links: [["Informativa sui cookie", "/privacy/cookie"], ["Informativa sulla privacy", "/privacy/informativa"], ["Preferenze privacy", "/privacy/preferenze"]] },
   { title: "Legale", links: [["Licenze", "/legale/licenze"], ["Termini di servizio", "/legale/termini"]] },
 ];

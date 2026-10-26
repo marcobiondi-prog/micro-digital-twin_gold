@@ -20,7 +20,11 @@ import { LabSyncIndicator } from "@/views/LabSyncIndicator";
 import { Fold, FoldTabs } from "@/views/Fold";
 import { Ambient, PageHero, TabRow } from "@/views/v8/console";
 import { FieldAI } from "@/views/FieldAI";
-import { DashCard, DashSection, PiazzaDashboard, PremiumPart, URBAN_LOCKED, VINE_LOCKED, VineDashboard } from "@/views/v10/Dashboard";
+import { DashCard, DashSection, PiazzaDashboard, PremiumPart, URBAN_LOCKED, VINE_LOCKED, VineDashboard, getDashSeason } from "@/views/v10/Dashboard";
+import { useQueryClient } from "@tanstack/react-query";
+import { heatStep, heatWords, piazzaMix, piazzaSummary, thirstStep, thirstWords, vineMixRows, vineSummary } from "@/models/project-summary";
+import { SEASON_LABEL, type Season } from "@/models/season-climate";
+import { euroRange, grouped } from "@/models/intervention-cost";
 import climateTwinLogo from "@/assets/climate-twin-logo-final.png";
 import climateTwinLogoCompact from "@/assets/climate-twin-logo-compact.png";
 
@@ -392,12 +396,10 @@ function ProgressRing({ pct }: { pct: number }) {
 
 /** "Esporta" della scheda aperta: PDF, copia, stampa, GeoJSON e CSV (prima nel cruscotto esecutivo). */
 function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
-  const labState = useLab(), um = urbanMetrics(labState.urban), vm = vineMetrics(labState.vineyard);
+  const labState = useLab();
   const reportMedia = useLabMedia(ctx === "Urbano" ? "urban" : "vineyard");
   // Every AI camera scan of this flow, photo or not.
   const scanRows = scanReportRows(useArScans(ctx === "Urbano" ? "urban" : "vineyard"));
-  const idx = ctx === "Urbano" ? [["Calore", um.heat], ["Rifugi", um.refuges], ["Verde", um.green]] : [["Stress idrico", vm.waterStress], ["Stress termico", vm.heatStress], ["Maturità", 30]];
-  const lv = (v: number) => (v < 35 ? "basso" : v < 65 ? "moderato" : "elevato");
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<string[] | null>(null);
   const [mode, setMode] = useState<"print" | "save">("print");
@@ -405,7 +407,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   const step = async (label: string, pct: number) => { setProgress({ label, pct }); await new Promise<void>((r) => requestAnimationFrame(() => setTimeout(r, 16))); };
   const [prepared, setPrepared] = useState(false);
   // Report tenuto in memoria: finché i dati non cambiano, PDF, copia e stampa riusano lo stesso.
-  const cacheKey = () => JSON.stringify([ctx, labRows, idx, ctx === "Urbano" ? urbanDashRows : vineDashRows, reportMedia.map(m => [m.id, m.name, m.size]), scanRows]);
+  const cacheKey = () => JSON.stringify([ctx, reportRows, ps.day, reportMedia.map(m => [m.id, m.name, m.size]), scanRows]);
   const getDoc = () => {
     const k = cacheKey();
     let e = reportCache.get(k);
@@ -419,116 +421,243 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
     getDoc().then(() => setPrepared(true), () => { setPrepared(true); toast.error("Preparazione non riuscita"); });
   };
   const u = labState.urban, v = labState.vineyard;
-  const labRows: [string, string][] = ctx === "Urbano"
-    ? [["Area", u.location.label], ["Coordinate", `${u.location.lat.toFixed(4)}, ${u.location.lng.toFixed(4)}`], ["Alberi", `${u.trees}`], ["Suolo permeabile", `${u.permeable}%`], ["Pergole/ombra", `${u.shade}%`], ["Riduzione stimata", `-${um.est.lo.toFixed(1)} / -${um.est.hi.toFixed(1)} °C`], ["Copertura arborea", `${um.cover}%`]]
-    : [["Area", v.location.label], ["Coordinate", `${v.location.lat.toFixed(4)}, ${v.location.lng.toFixed(4)}`], ["Fase fenologica", v.phase], ["Zona selezionata", `Zona ${v.selected + 1}`], ...v.zones.map((z, i): [string, string] => [`Zona ${i + 1}`, `${z.temperature}°C · umidità ${z.moisture}% · vento ${z.wind} km/h · pioggia ${z.rain ? "sì" : "no"} · stress ${vm.results[i]?.s ?? 0} (${vm.results[i]?.risk ?? "-"})`])];
-  const stamp = new Date().toLocaleString("it-IT");
-  // Riepiloghi delle due dashboard, calcolati dagli stessi dati del Decision Lab.
-  const uHourData = hours.map((x, h) => +(x.wbgt - (h > 9 && h < 19 ? um.est.dT * 0.7 : um.est.dT * 0.25)).toFixed(1));
-  const uPeak = Math.max(...uHourData);
-  const uLvl = uPeak > 29 ? "elevato" : uPeak > 26 ? "moderato" : "basso";
-  const uLe5 = Math.min(100, Math.round(um.refuges * 1.6)), uLe10 = Math.min(100, Math.max(uLe5, Math.round(um.refuges * 2.3)));
-  const uCost = u.trees + u.permeable / 5 + u.shade / 5 > 25 ? "alto" : u.trees + u.permeable / 5 + u.shade / 5 > 12 ? "medio" : "basso";
-  const urbanDashRows: [string, string][] = [
-    ["Area", u.location.label],
-    ["Calore percepito massimo (24 h)", `${uPeak} °C — calore ${uLvl}`],
-    ["Copertura arborea", `${um.cover}% (target 30%)`],
-    ["Rifugi climatici", `${uLe5}% entro 5 min · ${uLe10}% entro 10 min`],
-    ["Interventi", `${u.trees} alberi · ${u.permeable}% suolo · ${u.shade}% ombra`],
-    ["ΔT atteso", `−${um.est.lo.toFixed(1)} / −${um.est.hi.toFixed(1)} °C`],
-    ["Costo stimato", uCost],
-  ];
+  // The same summary as the dashboard on screen (season, measured surfaces and the place's real year from the shared cache).
+  const qc = useQueryClient();
+  const season = getDashSeason();
+  const areaOf = (key: unknown[]) => (qc.getQueryData(key) as { m2: number | null } | undefined)?.m2 ?? null;
+  const yearOf = qc.getQueryData(["season-climate", u.location.lat, u.location.lng]) as { profile: Record<Season, Array<number | null>> } | undefined;
+  const ps = piazzaSummary(u, season, yearOf?.profile[season] ?? null, areaOf(["place-area", u.location.lat, u.location.lng]));
+  const vs = vineSummary(v, areaOf(["vine-area", v.location.lat, v.location.lng]));
   const notes = useNotes();
-  const vThirst = Math.round(vm.results.reduce((t, r) => t + r.s, 0) / Math.max(1, vm.results.length));
-  const vineDashRows: [string, string][] = [
-    ["Area", v.location.label],
-    ["Fase della vite", v.phase],
-    ["Sete delle viti (media, 0–100)", `${vThirst} — ${vThirst >= 65 ? "sete forte" : vThirst >= 35 ? "da tenere d'occhio" : "le viti stanno bene"}`],
-    ...v.zones.map((z, i): [string, string] => [`Zona ${i + 1}`, `sete ${Math.round(vm.results[i]?.s ?? 0)} · ${Math.round(z.temperature)} °C · ${Math.round(z.moisture)}% acqua`]),
-    ...notes.slice(0, 6).map((n): [string, string] => [`Quaderno ${n.d}`, n.t]),
+  const f1 = (n: number) => n.toLocaleString("it-IT", { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+  const stamp = new Date().toLocaleString("it-IT", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  const mixRows = ctx === "Urbano" ? piazzaMix(u, ps) : vineMixRows(vs);
+  const resultRows: [string, string][] = ctx === "Urbano"
+    ? [
+      ["Luogo", u.location.label],
+      ["Quando", `Ora più calda · ${SEASON_LABEL[season].toLowerCase()}, ore ${ps.hour}${ps.estimated ? " (stima indicativa)" : ""}`],
+      ["Calore percepito", `da ${f1(ps.before)} °C a ${f1(ps.after)} °C (−${f1(ps.before - ps.after)} °C) · ${heatWords(ps.after)}`],
+      ["Livello", ps.level ?? "Nessun intervento"],
+      ["Costo indicativo", ps.empty ? "Nessun intervento" : euroRange(ps.cost)],
+      ["Superficie", `${grouped(ps.m2)} m² ${ps.measured ? "della piazza" : "di riferimento"}`],
+    ]
+    : [
+      ["Luogo", v.location.label],
+      ["Fase della vite", v.phase],
+      ["Sete delle viti", `da ${Math.round(vs.before)} a ${Math.round(vs.after)} su 100 · ${thirstWords(vs.after)}`],
+      ["Livello", vs.level ?? "Nessun intervento"],
+      ["Costo indicativo", vs.empty ? "Nessun intervento" : euroRange(vs.cost)],
+      ["Superficie", vs.measured ? `${grouped(vs.m2)} m² del vigneto` : "1 ettaro di riferimento"],
+    ];
+  const benefits: Array<[string, string]> = ctx === "Urbano"
+    ? [[`${ps.co2} kg`, "CO2 l'anno"], [`${grouped(ps.water)} m³`, "Pioggia tenuta"], [`${grouped(ps.shadeM2)} m²`, "All'ombra"]]
+    : [[`${vs.safe} di ${vs.zones.length}`, "Zone al sicuro"], [vs.mix.shade ? `-${f1((vs.mix.shade / 100) * 3)}°` : "0°", "Sulle foglie"], [vs.mix.windbreak ? `-${Math.round((vs.mix.windbreak / 100) * 60)}%` : "0%", "Vento"]];
+  const zoneRows: [string, string][] = ctx === "Urbano" ? [] : vs.zones.map((z, i): [string, string] => [`Zona ${i + 1}`, `sete ${Math.round(z.after)} (senza: ${Math.round(z.plain)}) · ${Math.round(z.temp)} °C · ${Math.round(z.moisture)}% acqua`]);
+  const noteRows: [string, string][] = ctx === "Urbano" ? [] : notes.slice(0, 8).map((n): [string, string] => [n.d, n.t]);
+  const reportRows: [string, string][] = [
+    ...resultRows,
+    ...mixRows.map((r): [string, string] => [r.label, `${r.value} · ${r.cost}`]),
+    ...benefits.map(([x, l]): [string, string] => [l, x]),
+    ...zoneRows,
+    ...noteRows.map(([d, t]): [string, string] => [`Quaderno ${d}`, t]),
   ];
-  const text = [`MICRO DIGITAL TWIN`, `REPORT SINTETICO DECISIONI — ${ctx}`, `Data: ${stamp}`, "", "Valori dalle simulazioni:", ...labRows.map(([k, x]) => `- ${k}: ${x}`), "", "Indici normalizzati:", ...idx.map(([k, x]) => `- ${k}: ${x}/100 (${lv(x as number)})`), "", ...(ctx === "Urbano" ? ["Dashboard Urbana:", ...urbanDashRows.map(([k, x]) => `- ${k}: ${x}`)] : ["Dashboard Vitivinicola:", ...vineDashRows.map(([k, x]) => `- ${k}: ${x}`)]), ...(scanRows.length ? ["", "Scansioni fotocamera AI:", ...scanRows.map(([k, x]) => `- ${k}: ${x}`)] : []), "", "Nota: valori dimostrativi, da validare con un tecnico."].join("\n");
+  const text = [`MICRO DIGITAL TWIN`, `Report · ${ctx === "Urbano" ? "Piazza" : "Vigneto"}`, stamp, "", ...reportRows.map(([k, x]) => `- ${k}: ${x}`), ...(scanRows.length ? ["", "Scansioni fotocamera AI:", ...scanRows.map(([k, x]) => `- ${k}: ${x}`)] : []), "", "Valori indicativi, da validare con un tecnico."].join("\n");
   // Report PDF con intestazione del sito e grafica coerente con l'app (usato da Scarica e Stampa).
+  // Report PDF in the app's own look (v10): the dark canvas, slate cards, thin big readings, the half ring of the result.
   async function buildPdfImpl() {
     await step("Preparazione del report…", 5);
     const { jsPDF } = await import("jspdf");
     const doc = new jsPDF({ unit: "mm", format: "a4" });
     type RGB = [number, number, number];
-    const C = { turq: [20, 184, 196] as RGB, primary: [37, 99, 235] as RGB, ok: [34, 179, 102] as RGB, warn: [240, 170, 40] as RGB, danger: [222, 72, 52] as RGB, water: [40, 150, 220] as RGB, ink: [22, 28, 40] as RGB, muted: [110, 118, 132] as RGB, line: [226, 230, 236] as RGB, soft: [244, 247, 250] as RGB };
-    const accent: RGB = ctx === "Urbano" ? [30, 150, 215] : [170, 40, 100];
-    const levelRGB = (x: number): RGB => (x < 35 ? C.ok : x < 65 ? C.warn : C.danger);
-    const clean = (t: string) => t.replace(/[−–—]/g, "-").replace(/Δ/g, "Delta ").replace(/→/g, "->").replace(/·/g, "-").replace(/³/g, "3").replace(/≈/g, "~");
-    const W = 210, M = 15, CW = W - 2 * M;
+    const C = {
+      page: [10, 13, 19] as RGB, card: [24, 29, 38] as RGB, line: [42, 49, 61] as RGB, ink: [242, 244, 248] as RGB, muted: [148, 156, 170] as RGB,
+      turq: [76, 201, 189] as RGB, dot: [13, 16, 22] as RGB,
+    };
+    // The five-step scale of the app, worst first (as GAIN_BG), and the arc's gradient from cool to extreme.
+    const STEP: RGB[] = [[220, 38, 38], [249, 115, 22], [234, 179, 8], [132, 204, 22], [34, 197, 94]];
+    const SCALE: RGB[] = [[56, 189, 248], [74, 222, 128], [250, 204, 21], [249, 115, 22], [220, 38, 38]];
+    const scaleAt = (t: number): RGB => {
+      const x = Math.max(0, Math.min(1, t)) * (SCALE.length - 1), i = Math.min(SCALE.length - 2, Math.floor(x)), f = x - i;
+      return SCALE[i]!.map((c, k) => Math.round(c + (SCALE[i + 1]![k]! - c) * f)) as RGB;
+    };
+    const clean = (t: string) => t.replace(/[−–]/g, "-").replace(/—/g, "-").replace(/Δ/g, "Delta ").replace(/→/g, "->").replace(/₂/g, "2").replace(/≈/g, "~");
+    const W = 210, H = 297, M = 14, CW = W - 2 * M, BOTTOM = 280;
+    const flowName = ctx === "Urbano" ? "Piazza" : "Vigneto";
     let y = 0;
-    const header = () => {
-      doc.setFillColor(...C.ink); doc.rect(0, 0, W, 24, "F");
-      doc.setFillColor(...C.turq); doc.rect(0, 24, W, 1.2, "F");
-      try { doc.addImage(climateTwinLogoCompact, "PNG", M, 5, 14, 14); } catch { /* logo opzionale */ }
-      doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(255, 255, 255);
-      doc.text("MICRO DIGITAL", M + 18, 13);
-      doc.setTextColor(...C.turq); doc.text("TWIN", M + 18 + doc.getTextWidth("MICRO DIGITAL "), 13);
-      doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(200, 206, 216);
-      doc.text("Gemello digitale del microclima", M + 18, 18);
-      doc.text(clean(stamp), W - M, 13, { align: "right" });
-      y = 34;
+    const paint = () => {
+      doc.setFillColor(...C.page); doc.rect(0, 0, W, H, "F");
+      doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(...C.ink);
+      doc.text("MICRO DIGITAL", M, 12, { charSpace: 0.9 });
+      doc.setTextColor(...C.turq); doc.text("TWIN", M + doc.getTextWidth("MICRO DIGITAL ") + "MICRO DIGITAL ".length * 0.9, 12, { charSpace: 0.9 });
+      doc.setFont("helvetica", "normal"); doc.setTextColor(...C.muted);
+      doc.text(clean(`Report · ${flowName}`), W - M, 12, { align: "right" });
+      y = 24;
     };
-    const ensure = (h: number) => { if (y + h > 280) { doc.addPage(); header(); } };
-    const section = (title: string) => {
-      ensure(14);
-      doc.setFillColor(...accent); doc.roundedRect(M, y - 3.6, 1.6, 5, 0.8, 0.8, "F");
-      doc.setFont("helvetica", "bold"); doc.setFontSize(11.5); doc.setTextColor(...C.ink);
-      doc.text(clean(title), M + 4, y); y += 5;
+    const ensure = (h: number) => { if (y + h > BOTTOM) { doc.addPage(); paint(); } };
+    const card = (x: number, top: number, w: number, h: number) => { doc.setFillColor(...C.card); doc.roundedRect(x, top, w, h, 4, 4, "F"); };
+    const title = (t: string, hint?: string) => {
+      ensure(28);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.setTextColor(...C.ink); doc.text(clean(t), M + 1, y + 5);
+      if (hint) { doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...C.muted); doc.text(clean(hint), W - M - 1, y + 5, { align: "right" }); }
+      y += 10;
     };
-    const table = (rows: [string, string][]) => {
-      doc.setFontSize(9);
-      rows.forEach(([k, v], i) => {
-        const lines = doc.splitTextToSize(clean(v), CW * 0.6 - 4) as string[];
-        const h = Math.max(7, lines.length * 4.2 + 3);
-        ensure(h);
-        if (i % 2 === 0) { doc.setFillColor(...C.soft); doc.rect(M, y, CW, h, "F"); }
-        doc.setFont("helvetica", "normal"); doc.setTextColor(...C.muted); doc.text(clean(k), M + 3, y + 4.7);
-        doc.setFont("helvetica", "bold"); doc.setTextColor(...C.ink); doc.text(lines, M + CW * 0.4, y + 4.7);
-        y += h;
+    /** Rows in one slate card, a hairline between them: label on the left, value on the right (wrapped). */
+    const rows = (list: Array<[string, string]>, opts: { strongLast?: boolean; head?: [string, string?] } = {}) => {
+      doc.setFontSize(9.5);
+      const lay = list.map(([k, v]) => {
+        const lines = doc.splitTextToSize(clean(v), CW * 0.58 - 8) as string[];
+        return { k, lines, h: Math.max(10, lines.length * 4.4 + 5.6) };
       });
-      doc.setDrawColor(...C.line); doc.line(M, y, M + CW, y); y += 8;
-    };
-    const ring = (cx: number, cy: number, r: number, value: number, color: RGB) => {
-      doc.setLineWidth(2.4); doc.setDrawColor(...C.line); doc.circle(cx, cy, r, "S");
-      doc.setDrawColor(...color);
-      const steps = Math.max(1, Math.round(value * 0.9));
-      for (let s = 0; s < steps; s++) {
-        const a0 = -Math.PI / 2 + (s / steps) * (value / 100) * 2 * Math.PI, a1 = -Math.PI / 2 + ((s + 1) / steps) * (value / 100) * 2 * Math.PI;
-        doc.line(cx + r * Math.cos(a0), cy + r * Math.sin(a0), cx + r * Math.cos(a1), cy + r * Math.sin(a1));
+      // A short card moves whole to the next page (with its title) rather than splitting.
+      const total = lay.reduce((t, r) => t + r.h, 0) + (opts.head ? 10 : 0);
+      if (total <= BOTTOM - 30) ensure(total);
+      if (opts.head) title(opts.head[0], opts.head[1]);
+      let i = 0;
+      while (i < lay.length) {
+        ensure(12);
+        doc.setFontSize(9.5);
+        // As many rows as fit on this page go in one card.
+        let h = 0, j = i;
+        while (j < lay.length && y + h + lay[j]!.h <= BOTTOM) { h += lay[j]!.h; j++; }
+        if (j === i) { h = lay[i]!.h; j = i + 1; }
+        card(M, y, CW, h);
+        let ry = y;
+        for (let r = i; r < j; r++) {
+          const row = lay[r]!, strong = opts.strongLast && r === lay.length - 1;
+          if (r > i) { doc.setDrawColor(...C.line); doc.setLineWidth(0.2); doc.line(M + 5, ry, M + CW - 5, ry); }
+          doc.setFont("helvetica", strong ? "bold" : "normal"); doc.setTextColor(...(strong ? C.ink : C.muted)); doc.text(clean(row.k), M + 5, ry + 6.3);
+          doc.setFont("helvetica", "bold"); doc.setTextColor(...C.ink); doc.text(row.lines, M + CW - 5, ry + 6.3, { align: "right" });
+          ry += row.h;
+        }
+        y += h + 3;
+        i = j;
       }
-      doc.setLineWidth(0.2);
+      y += 5;
     };
-    header();
-    doc.setFont("helvetica", "bold"); doc.setFontSize(17); doc.setTextColor(...C.ink);
-    doc.text(`Report sintetico decisioni - ${ctx}`, M, y); y += 5;
+    /** The half ring of the result, as on screen: grey track, the coloured arc up to the reading, a ring where it starts, the white dot. */
+    const arc = (cx: number, cy: number, r: number, before: number, after: number, min: number, max: number) => {
+      const share = (t: number) => Math.max(0, Math.min(1, (t - min) / (max - min)));
+      const at = (s: number) => ({ x: cx - Math.cos(Math.PI * s) * r, y: cy - Math.sin(Math.PI * s) * r });
+      doc.setLineCap("round"); doc.setLineWidth(6);
+      doc.setDrawColor(...C.line);
+      const N = 72;
+      for (let k = 0; k < N; k++) { const a = at(k / N), b = at((k + 1) / N); doc.line(a.x, a.y, b.x, b.y); }
+      const end = share(after), n = Math.max(1, Math.round(N * end));
+      for (let k = 0; k < n; k++) {
+        const s0 = (k / n) * end, s1 = ((k + 1) / n) * end, a = at(s0), b = at(s1);
+        doc.setDrawColor(...scaleAt((s0 + s1) / 2)); doc.line(a.x, a.y, b.x, b.y);
+      }
+      doc.setLineCap("butt");
+      const b = at(share(before)), d = at(end);
+      doc.setLineWidth(0.8); doc.setDrawColor(...C.muted); doc.circle(b.x, b.y, 2.4, "S");
+      doc.setLineWidth(1); doc.setDrawColor(...C.dot); doc.setFillColor(255, 255, 255); doc.circle(d.x, d.y, 3.6, "FD");
+      doc.setLineWidth(0.2);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...C.muted);
+      doc.text(String(Math.round(min)), cx - r, cy + 7, { align: "center" }); doc.text(String(Math.round(max)), cx + r, cy + 7, { align: "center" });
+    };
+    const pill = (text: string, cx: number, cy: number, color: RGB) => {
+      doc.setFont("helvetica", "bold"); doc.setFontSize(8.5);
+      const w = doc.getTextWidth(clean(text)) + 8;
+      doc.setFillColor(...color); doc.roundedRect(cx - w / 2, cy - 4, w, 6.4, 3.2, 3.2, "F");
+      doc.setTextColor(255, 255, 255); doc.text(clean(text), cx, cy + 0.6, { align: "center" });
+    };
+
+    paint();
+    // Cover: what the report is, the place, the date.
+    const placeName = splitLocation((ctx === "Urbano" ? u : v).location.label);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(...C.turq);
+    doc.text(clean(`REPORT · ${flowName.toUpperCase()}`), M + 1, y + 2, { charSpace: 0.8 });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(28); doc.setTextColor(...C.ink);
+    const nameLines = doc.splitTextToSize(clean(placeName.name), CW) as string[];
+    doc.text(nameLines, M + 1, y + 14); y += 14 + (nameLines.length - 1) * 11;
+    doc.setFontSize(10); doc.setTextColor(...C.muted);
+    doc.text(clean([placeName.sub, stamp].filter(Boolean).join(" · ")), M + 1, y + 7); y += 16;
+
+    // The result, read like the dashboard.
+    const urban = ctx === "Urbano";
+    const before = urban ? ps.before : vs.before, after = urban ? ps.after : vs.after;
+    const min = urban ? Math.floor(Math.min(after, before) - 3) : Math.max(0, Math.floor(Math.min(after, before) - 8));
+    const max = urban ? Math.ceil(before + 2) : Math.min(100, Math.ceil(before + 6));
+    const stepIx = urban ? heatStep(after) : thirstStep(after);
+    const words = urban ? heatWords(after) : thirstWords(after);
+    const level = (urban ? ps.level : vs.level) ?? "Nessun intervento";
+    const cost = (urban ? ps.empty : vs.empty) ? "0 €" : euroRange(urban ? ps.cost : vs.cost);
+    card(M, y, CW, 92);
     doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...C.muted);
-    doc.text(clean(`Area: ${(ctx === "Urbano" ? u : v).location.label}`), M, y); y += 9;
-    // Indici con anelli colorati, come nelle card del cruscotto.
-    section("Indici normalizzati");
-    const cardW = (CW - 8) / 3;
-    idx.forEach(([k, x], i) => {
-      const val = x as number, cx = M + i * (cardW + 4);
-      doc.setFillColor(...C.soft); doc.setDrawColor(...C.line); doc.roundedRect(cx, y, cardW, 30, 3, 3, "FD");
-      ring(cx + 14, y + 15, 9, val, levelRGB(val));
-      doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(...C.ink); doc.text(String(val), cx + 14, y + 16.5, { align: "center" });
-      doc.setFontSize(9.5); doc.text(String(k), cx + 27, y + 12);
-      const lvl = lv(val); doc.setFontSize(7.5); const bw = doc.getTextWidth(lvl) + 6;
-      doc.setFillColor(...levelRGB(val)); doc.roundedRect(cx + 27, y + 15.5, bw, 5, 2.5, 2.5, "F");
-      doc.setTextColor(255, 255, 255); doc.text(lvl, cx + 30, y + 19);
+    doc.text(clean(urban ? `Nell'ora più calda · ${SEASON_LABEL[season].toLowerCase()}, ore ${ps.hour}` : "Sete delle viti · media delle tre zone"), W / 2, y + 10, { align: "center" });
+    const cy = y + 60;
+    arc(W / 2, cy, 38, before, after, min, max);
+    pill(words, W / 2, cy - 25, STEP[stepIx]!);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(34); doc.setTextColor(...C.ink);
+    doc.text(urban ? `${f1(after)}°` : `${Math.round(after)}`, W / 2, cy - 6, { align: "center" });
+    doc.setFontSize(8.5); doc.setTextColor(...C.muted); doc.text(clean(`${level} · ${cost}`), W / 2, cy + 1, { align: "center" });
+    doc.setFontSize(10); doc.setTextColor(...C.ink);
+    const gain = before - after;
+    doc.text(clean(urban
+      ? gain >= 0.05 ? `Da ${f1(before)}° a ${f1(after)}° percepiti: -${f1(gain)}°` : ps.empty ? "Nessun intervento" : "Nessun cambiamento del calore"
+      : gain >= 0.5 ? `Da ${Math.round(before)} a ${Math.round(after)} su 100: -${Math.round(gain)}` : vs.empty ? "Nessun intervento" : "Gli interventi qui cambiano poco"), W / 2, y + 84, { align: "center" });
+    y += 100;
+
+    await step("Disegno dei grafici…", 20);
+    if (urban) {
+      // A day of the season: without (orange, soft fill) and with the interventions (green).
+      title("La giornata", ps.estimated ? "stima indicativa" : "anno reale del luogo");
+      ensure(64);
+      card(M, y, CW, 60);
+      const gx = M + 14, gw = CW - 22, gy = y + 12, gh = 36;
+      const all = ps.day.flatMap((d) => [d.prima, d.dopo]);
+      const lo = Math.floor(Math.min(...all) - 1), hi = Math.ceil(Math.max(...all) + 1);
+      const px = (h: number) => gx + (h / 23) * gw, py = (t: number) => gy + gh - ((t - lo) / (hi - lo)) * gh;
+      doc.setFontSize(7); doc.setTextColor(...C.muted); doc.setDrawColor(...C.line); doc.setLineWidth(0.15);
+      for (const t of [lo, Math.round((lo + hi) / 2), hi]) { doc.line(gx, py(t), gx + gw, py(t)); doc.text(`${t}°`, gx - 2, py(t) + 1, { align: "right" }); }
+      for (const h of [0, 6, 12, 18]) doc.text(`${h}:00`, px(h), gy + gh + 5, { align: "center" });
+      const line = (key: "prima" | "dopo", color: RGB, w: number) => {
+        doc.setDrawColor(...color); doc.setLineWidth(w); doc.setLineCap("round");
+        for (let h = 0; h < 23; h++) doc.line(px(h), py(ps.day[h]![key]), px(h + 1), py(ps.day[h + 1]![key]));
+        doc.setLineCap("butt");
+      };
+      line("prima", [249, 115, 22], 0.8); line("dopo", [34, 197, 94], 1);
+      doc.setFillColor(249, 115, 22); doc.circle(M + 6, y + 6, 1.2, "F"); doc.setTextColor(...C.muted); doc.text("Senza interventi", M + 9, y + 7);
+      doc.setFillColor(34, 197, 94); doc.circle(M + 40, y + 6, 1.2, "F"); doc.text("Con gli interventi", M + 43, y + 7);
+      doc.setLineWidth(0.2);
+      y += 68;
+    } else {
+      // The three zones: thirst after the interventions (coloured), without them, air and water.
+      title("Le tre zone", "sete su 100");
+      ensure(40);
+      const zw = (CW - 6) / 3;
+      vs.zones.forEach((z, i) => {
+        const x = M + i * (zw + 3);
+        card(x, y, zw, 36);
+        doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(...C.muted); doc.text(`Zona ${i + 1}`, x + zw / 2, y + 8, { align: "center" });
+        doc.setFont("helvetica", "normal"); doc.setFontSize(24); doc.setTextColor(...STEP[thirstStep(z.after)]!); doc.text(String(Math.round(z.after)), x + zw / 2, y + 20, { align: "center" });
+        doc.setFontSize(7.5); doc.setTextColor(...C.muted);
+        doc.text(`senza: ${Math.round(z.plain)}`, x + zw / 2, y + 26, { align: "center" });
+        doc.text(`${Math.round(z.temp)}° - ${Math.round(z.moisture)}% acqua`, x + zw / 2, y + 31, { align: "center" });
+      });
+      y += 44;
+    }
+
+    // Three big numbers.
+    title("Cosa ottieni", urban ? "stima annua" : undefined);
+    ensure(30);
+    const fw = (CW - 6) / 3;
+    benefits.forEach(([value, label], i) => {
+      const x = M + i * (fw + 3);
+      card(x, y, fw, 26);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(17); doc.setTextColor(...C.ink); doc.text(clean(value), x + fw / 2, y + 12, { align: "center" });
+      doc.setFontSize(8); doc.setTextColor(...C.muted); doc.text(clean(label), x + fw / 2, y + 19, { align: "center" });
     });
-    y += 38;
-    section("Valori dalle simulazioni");
-    table(labRows);
-    await step("Compilazione delle tabelle…", 25);
-    if (ctx === "Urbano") { section("Dashboard Urbana"); table(urbanDashRows); }
-    else { section("Dashboard Vitivinicola"); table(vineDashRows); }
-    // Scansioni della fotocamera AI: ognuna resta nel report anche senza foto (stime indicative).
-    if (scanRows.length) { section(`Scansioni fotocamera AI - ${ctx}`); table(scanRows); }
-    // Foto e video caricati nelle simulazioni (elenco + miniature delle foto).
+    y += 34;
+
+    await step("Compilazione delle tabelle…", 30);
+    rows([...mixRows.map((r): [string, string] => [`${r.label}  ${r.value}`, r.cost]), ["Totale indicativo", (urban ? ps.empty : vs.empty) ? "Nessun intervento" : euroRange(urban ? ps.cost : vs.cost)]],
+      { strongLast: true, head: ["Cosa hai messo", urban ? `${grouped(ps.m2)} m² ${ps.measured ? "della piazza" : "di riferimento"}` : vs.measured ? `${grouped(vs.m2)} m² del vigneto` : "1 ettaro di riferimento"] });
+    if (noteRows.length) rows(noteRows, { head: ["Quaderno di campagna"] });
+    // AI camera scans: each one stays in the report even without a photo (indicative estimates).
+    if (scanRows.length) rows(scanRows, { head: ["Scansioni della Fotocamera AI"] });
+
+    // Photos and videos of the simulation (list + photo thumbnails).
     const { currentMedia } = await import("@/models/lab-media-store");
     const toData = async (url: string) => {
       try {
@@ -540,34 +669,36 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
         return { d: c.toDataURL("image/jpeg", 0.75), r: c.height / c.width };
       } catch { return null; }
     };
-    for (const [k, label] of ([["urban", "Urbano"], ["vineyard", "Vitivinicolo"]] as const).filter(([, l]) => l === ctx)) {
-      const media = await currentMedia(k);
-      if (!media.length) continue;
-      section(`Foto e video - ${label}`);
-      table(media.map((m, i): [string, string] => [`${i + 1}. ${m.kind === "video" ? "Video" : "Foto"}${/^(foto|video)-ar-/.test(m.name) ? " AR" : ""}`, m.name]));
+    const media = await currentMedia(urban ? "urban" : "vineyard");
+    if (media.length) {
+      title("Foto e video", `${media.length}`);
       const imgs = media.filter((m) => m.kind === "image");
-      const tw = (CW - 8) / 3;
+      const others = media.filter((m) => m.kind !== "image");
+      if (others.length) rows(others.map((m, i): [string, string] => [`Video ${i + 1}`, m.name]));
+      const tw = (CW - 6) / 3;
       let col = 0;
       for (let i = 0; i < imgs.length; i++) {
-        await step(`Elaborazione immagini ${i + 1} di ${imgs.length}…`, 30 + Math.round((i / imgs.length) * 55));
+        await step(`Elaborazione immagini ${i + 1} di ${imgs.length}…`, 35 + Math.round((i / imgs.length) * 50));
         const img = await toData(imgs[i]!.url);
         if (!img) continue;
-        const th = Math.min(tw * img.r, 60);
-        if (col === 0) ensure(64);
-        const x = M + col * (tw + 4);
+        const th = Math.min(tw * img.r, 58);
+        if (col === 0) ensure(62);
+        const x = M + col * (tw + 3);
+        card(x, y, tw, th);
         try { doc.addImage(img.d, "JPEG", x, y, tw, th); } catch { /* immagine non supportata */ }
         col = (col + 1) % 3;
-        if (col === 0) y += 64;
+        if (col === 0) y += 62;
       }
-      if (col !== 0) y += 64;
-      y += 4;
+      if (col !== 0) y += 62;
     }
+
     await step("Finalizzazione PDF…", 86);
     const pages = doc.getNumberOfPages();
     for (let p = 1; p <= pages; p++) {
       doc.setPage(p); doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...C.muted);
-      doc.text("Valori dimostrativi, da validare con un tecnico.", M, 290);
-      doc.text(`Pagina ${p} di ${pages}`, W - M, 290, { align: "right" });
+      doc.setDrawColor(...C.line); doc.setLineWidth(0.2); doc.line(M, 284, W - M, 284);
+      doc.text("Valori indicativi, da validare con un tecnico. Costi IVA esclusa.", M, 290);
+      doc.text(`${p} / ${pages}`, W - M, 290, { align: "right" });
     }
     return doc;
   }

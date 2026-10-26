@@ -4,7 +4,7 @@ import { UNIT_COST, grouped } from "@/models/intervention-cost";
 import { VINE_UNIT_COST } from "@/models/vine-interventions";
 import { introSeen } from "@/lib/intro-seen";
 import { useSignedIn } from "@/lib/use-signed-in";
-import { Check } from "lucide-react";
+import { Check, Mail, MapPin, Phone, type LucideIcon } from "lucide-react";
 import { openAccount } from "@/lib/camera-dock";
 import { cn } from "@/lib/utils";
 import { Faq, InfoCard, InfoNav, InfoPage, PageLink } from "./InfoPage";
@@ -272,6 +272,55 @@ export function PlansPage() {
           action={!signedIn && <button type="button" onClick={signIn} className="mt-1 inline-flex h-11 w-full items-center justify-center rounded-full bg-foreground text-sm font-semibold text-background outline-none focus-visible:ring-2 focus-visible:ring-ring">Accedi per passare a Premium</button>} />
         <p className="px-1 text-xs text-muted-foreground">Proposta di suddivisione delle funzioni, da validare con i test di usabilità.</p>
       </div>
+    </InfoPage>
+  );
+}
+
+/**
+ * Contatti: who to write to and how. The addresses are left to fill in (like the legal drafts); while one is empty its
+ * row says so instead of opening a link that leads nowhere.
+ */
+const CONTACTS = {
+  email: "",
+  phone: "",
+  address: "",
+};
+const CONTACT_ROWS: Array<{ icon: LucideIcon; label: string; value: string; href: (v: string) => string; empty: string }> = [
+  { icon: Mail, label: "Email", value: CONTACTS.email, href: (v) => `mailto:${v}`, empty: "[indirizzo email del progetto]" },
+  { icon: Phone, label: "Telefono", value: CONTACTS.phone, href: (v) => `tel:${v.replace(/\s/g, "")}`, empty: "[numero di telefono]" },
+  { icon: MapPin, label: "Sede", value: CONTACTS.address, href: (v) => `https://maps.google.com/?q=${encodeURIComponent(v)}`, empty: "[indirizzo della sede]" },
+];
+
+export function ContactsPage() {
+  const report = CONTACTS.email
+    ? `mailto:${CONTACTS.email}?subject=${encodeURIComponent("Segnalazione · Micro Digital Twin")}&body=${encodeURIComponent(`\n\n—\nPagina: ${typeof window !== "undefined" ? window.location.pathname : ""}\nDispositivo: ${typeof navigator !== "undefined" ? navigator.userAgent : ""}`)}`
+    : null;
+  return (
+    <InfoPage title="Contatti" intro="Domande, idee o un problema con l'app: scrivici, rispondiamo appena possibile.">
+      <ul className="overflow-hidden rounded-3xl bg-foreground/[0.05]">
+        {CONTACT_ROWS.map(({ icon: Icon, label, value, href, empty }) => {
+          const body = (
+            <>
+              <span className="grid size-10 shrink-0 place-items-center rounded-full bg-foreground/[0.08]"><Icon className="size-5" aria-hidden="true" /></span>
+              <span className="min-w-0 flex-1"><span className="block text-xs text-muted-foreground">{label}</span><span className={cn("block truncate text-[15px] font-semibold", !value && "font-normal text-muted-foreground")}>{value || empty}</span></span>
+            </>
+          );
+          return (
+            <li key={label} className="border-b border-foreground/10 last:border-b-0">
+              {value
+                ? <a href={href(value)} target={label === "Sede" ? "_blank" : undefined} rel="noreferrer" className="flex min-h-16 items-center gap-3 px-5 py-3 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">{body}</a>
+                : <div className="flex min-h-16 items-center gap-3 px-5 py-3">{body}</div>}
+            </li>
+          );
+        })}
+      </ul>
+      <InfoCard title="Segnala un problema">
+        <p>Scrivi cosa stavi facendo e cosa è successo: nell'email aggiungiamo da soli la pagina e il dispositivo, così è più facile capire.</p>
+        {report
+          ? <a href={report} className="inline-flex h-11 items-center gap-2 rounded-full bg-foreground px-5 text-sm font-semibold text-background outline-none focus-visible:ring-2 focus-visible:ring-ring"><Mail className="size-4" aria-hidden="true" />Scrivi la segnalazione</a>
+          : <p className="text-sm text-muted-foreground">Bozza: il pulsante compare quando c'è l'indirizzo email del progetto.</p>}
+      </InfoCard>
+      <p className="px-1 text-xs text-muted-foreground">Per i dati personali vedi l'<PageLink to="/privacy/informativa">informativa sulla privacy</PageLink>.</p>
     </InfoPage>
   );
 }
