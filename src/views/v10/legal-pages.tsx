@@ -324,3 +324,34 @@ export function ContactsPage() {
     </InfoPage>
   );
 }
+
+/**
+ * Chi siamo: what the project is, why it exists and who makes it. The team and partner names are left to fill in
+ * (bracketed, like the legal drafts).
+ */
+export function AboutPage() {
+  return (
+    <InfoPage title="Chi siamo" intro="Micro Digital Twin è un gemello digitale del microclima: una copia al computer di un luogo vero, dove provare gli interventi prima di farli.">
+      <InfoCard title="Perché esiste">
+        <p>Le estati sono sempre più calde. Nelle piazze il caldo si sente sulla pelle, nei vigneti lo sentono le viti. Spesso però si decide senza poter vedere prima cosa cambia davvero.</p>
+        <p>Con l'app chi amministra un comune, chi coltiva o chi studia può provare alberi, prato, ombra, irrigazione o frangivento e vedere subito quanto si guadagna e quanto costa.</p>
+      </InfoCard>
+      <InfoCard title="Cosa facciamo">
+        <ul>
+          <li>Simuliamo una piazza e un vigneto con il clima reale del luogo, stagione per stagione.</li>
+          <li>Proponiamo tre livelli di intervento, da quello che si può fare subito al progetto completo.</li>
+          <li>Riconosciamo piante e terreno con la fotocamera e raccogliamo tutto in un report da condividere.</li>
+        </ul>
+      </InfoCard>
+      <InfoCard title="Dove siamo partiti">
+        <p>Dal Molise: una piazza nel centro di Campobasso e un vigneto sulle colline della regione. Il metodo vale per qualunque luogo si cerchi sulla mappa.</p>
+      </InfoCard>
+      <InfoCard title="Il gruppo">
+        <p>[Nomi e ruoli del gruppo di lavoro]</p>
+        <p>[Scuola, ente o azienda di riferimento]</p>
+        <p>[Partner e collaborazioni]</p>
+      </InfoCard>
+      <p className="px-1 text-sm text-muted-foreground">Vuoi scriverci? Trovi i recapiti nei <PageLink to="/contatti">Contatti</PageLink>.</p>
+    </InfoPage>
+  );
+}

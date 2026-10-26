@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { openAccount } from "@/lib/camera-dock";
 
 /** The account panel's pages. */
-export type InfoPath = "/piani" | "/faq" | "/contatti" | "/privacy/cookie" | "/privacy/informativa" | "/privacy/preferenze" | "/legale/licenze" | "/legale/termini";
+export type InfoPath = "/piani" | "/chi-siamo" | "/faq" | "/contatti" | "/privacy/cookie" | "/privacy/informativa" | "/privacy/preferenze" | "/legale/licenze" | "/legale/termini";
 
 /**
  * Set by the account panel when it shows a page inside itself: back returns to the panel's list (the panel stays open)
