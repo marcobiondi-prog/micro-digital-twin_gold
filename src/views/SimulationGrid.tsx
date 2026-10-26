@@ -186,9 +186,8 @@ function LocationMapPreview({ location }: { location: SearchedLocation }) {
     }
   };
   const coordinates = `${location.lat},${location.lng}`;
-  const src = key
-    ? `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(key)}&q=${encodeURIComponent(coordinates)}&zoom=16&language=it`
-    : `https://maps.google.com/maps?q=${encodeURIComponent(coordinates)}&z=16&hl=it&output=embed`;
+  // The 2D preview is the keyless embed, so it never shows an error when the key does not allow this address.
+  const src = `https://maps.google.com/maps?q=${encodeURIComponent(coordinates)}&z=16&hl=it&output=embed`;
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(coordinates)}`;
   // The photorealistic 3D view needs the browser key (Maps JavaScript API + Map Tiles API): without it only 2D is offered.
   const toggle = key && <div className="flex gap-1 rounded-full border-[1.5px] border-solid border-foreground/25 bg-muted p-1" role="group" aria-label="Vista della mappa">{(["2d", "3d"] as const).map((v) => {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Crosshair, LoaderCircle } from "lucide-react";
 import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camera";
 
@@ -12,6 +12,15 @@ type GoogleMaps = { maps: { importLibrary: (name: string) => Promise<unknown> } 
 type Map3D = HTMLElement & Partial<Camera> & { gestureHandling?: string; flyCameraTo?: (options: { endCamera: Camera; durationMillis: number }) => void };
 
 let loader: Promise<Maps3D> | undefined;
+
+// The browser key can be refused for this address (its allowed sites do not include it): the API then calls
+// window.gm_authFailure. From then on the 3D view hands over to its fallback instead of showing the provider's error.
+let keyRejected = false;
+const rejectedSubs = new Set<() => void>();
+if (typeof window !== "undefined") {
+  (window as typeof window & { gm_authFailure?: () => void }).gm_authFailure = () => { keyRejected = true; rejectedSubs.forEach((f) => f()); };
+}
+const useKeyRejected = () => useSyncExternalStore((f) => { rejectedSubs.add(f); return () => { rejectedSubs.delete(f); }; }, () => keyRejected, () => false);
 
 function loadMaps3D(key: string): Promise<Maps3D> {
   loader ??= new Promise<Maps3D>((resolve, reject) => {
@@ -33,7 +42,8 @@ function applyCamera(map: Map3D, camera: Camera, animate: boolean) {
   Object.assign(map, camera);
 }
 
-export function LocationMap3D({ lat, lng, label, apiKey }: { lat: number; lng: number; label: string; apiKey: string }) {
+export function LocationMap3D({ lat, lng, label, apiKey, fallback }: { lat: number; lng: number; label: string; apiKey: string; fallback?: ReactNode }) {
+  const rejected = useKeyRejected();
   const host = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map3D | null>(null);
   const altitude = useRef(0);
@@ -77,12 +87,13 @@ export function LocationMap3D({ lat, lng, label, apiKey }: { lat: number; lng: n
     observer.observe(el);
     return () => { observer.disconnect(); window.clearTimeout(timer); };
   });
+  if (rejected) return fallback ? <>{fallback}</> : <p role="status" className="grid h-full w-full place-items-center bg-lab-surface px-3 text-center text-xs text-muted-foreground">Vista 3D non disponibile in questo momento.</p>;
   return <div className="relative h-full w-full overflow-hidden bg-lab-surface">
     {/* touch-none + data-map-gestures: drag, pinch and rotate belong to the 3D map, not to the page. */}
     <div ref={host} data-map-gestures="" className="absolute inset-0 touch-none" aria-label={`Vista 3D di ${label}`} role="img" />
     {/* Top-left: Google keeps its map-type thumbnail top-right, compass and fullscreen bottom-right, logo bottom-left. */}
     {state === "ready" && <button type="button" onClick={() => recenter(true)} aria-label="Ricentra la vista 3D sul punto" className="absolute left-2 top-2 grid size-9 place-items-center rounded-full border border-border/60 bg-background/90 text-foreground shadow-sm backdrop-blur"><Crosshair className="size-4" aria-hidden="true" /></button>}
     {state === "loading" && <div className="absolute inset-0 grid place-items-center text-xs text-muted-foreground"><LoaderCircle className="size-4 animate-spin" aria-label="Caricamento vista 3D" /></div>}
-    {state === "error" && <p role="status" className="absolute inset-0 grid place-items-center px-3 text-center text-xs text-muted-foreground">Vista 3D non disponibile: abilita Maps JavaScript API e Map Tiles API sulla chiave browser.</p>}
+    {state === "error" && <p role="status" className="absolute inset-0 grid place-items-center px-3 text-center text-xs text-muted-foreground">Vista 3D non disponibile in questo momento.</p>}
   </div>;
 }

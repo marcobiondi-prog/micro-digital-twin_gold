@@ -32,10 +32,9 @@ export function PlacesMap() {
   const key = import.meta.env.VITE_GOOGLE_MAPS_BROWSER_KEY;
   const q = `${loc.lat},${loc.lng}`;
   const zoom = place === "urban" ? 17 : 14;
-  // With the browser key the official embed, else the keyless one: both are interactive (pan, pinch).
-  const src = key
-    ? `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(key)}&q=${encodeURIComponent(q)}&zoom=${zoom}&maptype=satellite&language=it`
-    : `https://maps.google.com/maps?q=${encodeURIComponent(q)}&z=${zoom}&t=k&hl=it&output=embed`;
+  // The 2D map is the keyless satellite embed: it needs no key, so it never shows an error when the key does not
+  // allow this address (previews, new domains). Interactive (pan, pinch).
+  const src = `https://maps.google.com/maps?q=${encodeURIComponent(q)}&z=${zoom}&t=k&hl=it&output=embed`;
   // 2D (the embed) is the default; 3D (photorealistic, needs the browser key) opens only for signed-in users:
   // guests see the switch with a lock, and touching it offers the sign-in.
   const { signedIn } = useSignedIn();
@@ -79,7 +78,8 @@ export function PlacesMap() {
       <div className="-mx-4 h-[38vh] min-h-60 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
         {show3d
           ? <Suspense fallback={<div className="h-full w-full bg-card" />}>{key
-            ? <LocationMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} apiKey={key} />
+            ? <LocationMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} apiKey={key}
+              fallback={<OpenMap3D lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={place === "urban" ? 17 : 15} />} />
             : <OpenMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={place === "urban" ? 17 : 15} />}</Suspense>
           : <iframe key={src} data-map-gestures title={`Mappa di ${name}`} src={src} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" className="block h-full w-full border-0" />}
       </div>
