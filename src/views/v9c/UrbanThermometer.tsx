@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils";
 const fmt = (n: number) => n.toLocaleString("it-IT", { maximumFractionDigits: 1, minimumFractionDigits: 1 });
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const MARKS = 10;
+/** Radius in px of the round area around the white dot that grabs the arc (a fingertip, about 56 px across). */
+const GRAB_RADIUS = 28;
 /** The three ready piazzas: one touch to start, then fine-tune with the levers. */
 const PRESETS: Array<{ id: PrototypeId; trees: number; permeable: number; shade: number }> = [
   { id: "zero", trees: 3, permeable: 10, shade: 10 },
@@ -112,7 +114,10 @@ export function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlid
       onPointerDown={(e) => {
         // Only the white dot can be grabbed: the touch area is the dot itself, with a thin margin for the finger.
         const { x, y } = local(e), hit = Math.hypot(x - (a.x - 100), y - (100 - a.y));
-        if (hit > 15 || disabled) return;
+        // The grab zone is exactly the round handle below (28 px radius): a touch there never scrolls the page, so the
+        // drag goes on wherever the finger then moves; a touch outside it is left to the page.
+        const px = hit * (box.current!.getBoundingClientRect().width / 200);
+        if (px > GRAB_RADIUS || disabled) return;
         e.currentTarget.setPointerCapture(e.pointerId);
         move(e);
       }}
@@ -134,7 +139,7 @@ export function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlid
         <text x="188" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{Math.round(MAX)}{unit}</text>
       </svg>
       {/* The white dot's touch area: the only place a finger grabs the arc (elsewhere the page scrolls as usual). */}
-      {!disabled && <span className="absolute size-10 -translate-x-1/2 -translate-y-1/2 touch-none rounded-full" style={pct(a)} aria-hidden="true" />}
+      {!disabled && <span className="absolute -translate-x-1/2 -translate-y-1/2 touch-none rounded-full" style={{ ...pct(a), width: GRAB_RADIUS * 2, height: GRAB_RADIUS * 2 }} aria-hidden="true" />}
       {/* The levels, written just outside the arc where their stop is: one touch moves the dot there. */}
       {!disabled && stops.map((s) => (
         <button key={s.id} type="button" tabIndex={-1} aria-pressed={s.on} onPointerDown={(e) => e.stopPropagation()} onClick={() => onStop(s.id)}
