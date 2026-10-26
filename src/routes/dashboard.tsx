@@ -408,15 +408,20 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   const [prepared, setPrepared] = useState(false);
   // Report tenuto in memoria: finché i dati non cambiano, PDF, copia e stampa riusano lo stesso.
   const cacheKey = () => JSON.stringify([ctx, reportRows, ps.day, reportMedia.map(m => [m.id, m.name, m.size]), scanRows]);
-  const getDoc = () => {
-    const k = cacheKey();
+  // Two looks of the same report: the dark one of the app (Salva PDF, Salva in…) and a light one for paper (Stampa).
+  const getDoc = (light = false) => {
+    const base = cacheKey(), k = `${base}|${light ? "light" : "dark"}`;
     let e = reportCache.get(k);
-    if (!e) { e = { doc: buildPdfImpl() }; reportCache.clear(); reportCache.set(k, e); e.doc.catch(() => reportCache.delete(k)); }
+    if (!e) {
+      e = { doc: buildPdfImpl(light) };
+      for (const old of [...reportCache.keys()]) if (!old.startsWith(base)) reportCache.delete(old);
+      reportCache.set(k, e); e.doc.catch(() => reportCache.delete(k));
+    }
     return e.doc;
   };
   /** "Esporta report": anello di avanzamento finché il report non è pronto, poi le opzioni. */
   const startExport = () => {
-    const cached = reportCache.has(cacheKey());
+    const cached = reportCache.has(`${cacheKey()}|dark`);
     setPrepared(false); setProgress({ label: "Preparazione del report…", pct: cached ? 100 : 2 }); setOpen(true);
     getDoc().then(() => setPrepared(true), () => { setPrepared(true); toast.error("Preparazione non riuscita"); });
   };
@@ -464,15 +469,15 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   const text = [`MICRO DIGITAL TWIN`, `Report · ${ctx === "Urbano" ? "Piazza" : "Vigneto"}`, stamp, "", ...reportRows.map(([k, x]) => `- ${k}: ${x}`), ...(scanRows.length ? ["", "Scansioni fotocamera AI:", ...scanRows.map(([k, x]) => `- ${k}: ${x}`)] : []), "", "Valori indicativi, da validare con un tecnico."].join("\n");
   // Report PDF con intestazione del sito e grafica coerente con l'app (usato da Scarica e Stampa).
   // Report PDF in the app's own look (v10): the dark canvas, slate cards, thin big readings, the half ring of the result.
-  async function buildPdfImpl() {
+  async function buildPdfImpl(light = false) {
     await step("Preparazione del report…", 5);
     const { jsPDF } = await import("jspdf");
     const doc = new jsPDF({ unit: "mm", format: "a4" });
     type RGB = [number, number, number];
-    const C = {
-      page: [10, 13, 19] as RGB, card: [24, 29, 38] as RGB, line: [42, 49, 61] as RGB, ink: [242, 244, 248] as RGB, muted: [148, 156, 170] as RGB,
-      turq: [76, 201, 189] as RGB, dot: [13, 16, 22] as RGB,
-    };
+    // Dark like the app on screen, or light for paper (white page, pale cards, dark ink, a deeper turquoise to stay legible).
+    const C = light
+      ? { page: [255, 255, 255] as RGB, card: [241, 243, 246] as RGB, line: [221, 225, 231] as RGB, ink: [20, 26, 38] as RGB, muted: [98, 107, 122] as RGB, turq: [13, 148, 136] as RGB, dot: [20, 26, 38] as RGB }
+      : { page: [10, 13, 19] as RGB, card: [24, 29, 38] as RGB, line: [42, 49, 61] as RGB, ink: [242, 244, 248] as RGB, muted: [148, 156, 170] as RGB, turq: [76, 201, 189] as RGB, dot: [13, 16, 22] as RGB };
     // The five-step scale of the app, worst first (as GAIN_BG), and the arc's gradient from cool to extreme.
     const STEP: RGB[] = [[220, 38, 38], [249, 115, 22], [234, 179, 8], [132, 204, 22], [34, 197, 94]];
     const SCALE: RGB[] = [[56, 189, 248], [74, 222, 128], [250, 204, 21], [249, 115, 22], [220, 38, 38]];
@@ -757,7 +762,8 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   });
   const openPreview = async (m: "print" | "save") => {
     setMode(m);
-    const entry = reportCache.get(cacheKey());
+    const light = m === "print", key = `${cacheKey()}|${light ? "light" : "dark"}`;
+    const entry = reportCache.get(key);
     if (entry?.pages) {
       // Prima chiude la finestra delle opzioni, poi mostra l'anteprima già pronta:
       // aprirle nello stesso istante faceva richiudere subito l'anteprima.
@@ -772,7 +778,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
     setProgress({ label: "Preparazione del report…", pct: 2 });
     setOpen(false);
     try {
-      const doc = await getDoc();
+      const doc = await getDoc(light);
       await step("Caricamento anteprima…", 90);
       const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
       const workerUrl = (await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url")).default;
@@ -788,7 +794,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
         await page.render({ canvas, canvasContext: canvas.getContext("2d")!, viewport: vp }).promise;
         pages.push(canvas.toDataURL("image/jpeg", 0.85));
       }
-      const e2 = reportCache.get(cacheKey()); if (e2) e2.pages = pages;
+      const e2 = reportCache.get(key); if (e2) e2.pages = pages;
       setPreview(pages);
       setProgress(null);
     } catch (e) {
