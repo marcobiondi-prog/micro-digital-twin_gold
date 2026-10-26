@@ -486,12 +486,16 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
     let y = 0;
     const paint = () => {
       doc.setFillColor(...C.page); doc.rect(0, 0, W, H, "F");
+      // The app's logo, then the name spaced out (TWIN in turquoise), as the heading of every page.
+      try { doc.addImage(climateTwinLogoCompact, "PNG", M, 5.5, 10, 10); } catch { /* logo opzionale */ }
+      const nx = M + 13;
       doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(...C.ink);
-      doc.text("MICRO DIGITAL", M, 12, { charSpace: 0.9 });
-      doc.setTextColor(...C.turq); doc.text("TWIN", M + doc.getTextWidth("MICRO DIGITAL ") + "MICRO DIGITAL ".length * 0.9, 12, { charSpace: 0.9 });
+      doc.text("MICRO DIGITAL", nx, 11.8, { charSpace: 0.9 });
+      doc.setTextColor(...C.turq); doc.text("TWIN", nx + doc.getTextWidth("MICRO DIGITAL ") + "MICRO DIGITAL ".length * 0.9, 11.8, { charSpace: 0.9 });
       doc.setFont("helvetica", "normal"); doc.setTextColor(...C.muted);
-      doc.text(clean(`Report · ${flowName}`), W - M, 12, { align: "right" });
-      y = 24;
+      doc.text(clean(`Report · ${flowName}`), W - M, 11.8, { align: "right" });
+      doc.setDrawColor(...C.line); doc.setLineWidth(0.2); doc.line(M, 19, W - M, 19);
+      y = 27;
     };
     const ensure = (h: number) => { if (y + h > BOTTOM) { doc.addPage(); paint(); } };
     const card = (x: number, top: number, w: number, h: number) => { doc.setFillColor(...C.card); doc.roundedRect(x, top, w, h, 4, 4, "F"); };
