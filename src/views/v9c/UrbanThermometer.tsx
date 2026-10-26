@@ -80,16 +80,20 @@ export function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlid
   // Close to a stop (a few degrees of arc) the dot clicks into it, so a level is easy to hit by finger.
   const snapGap = (MAX - MIN) * 0.035;
   const snapped = useRef<PrototypeId | null>(null);
+  // A finger slides the dot sideways: its horizontal position is projected onto the arc, so a vertical move stays free
+  // for the page to scroll (the handle lets vertical pans through) and the whole arc is reachable with a sideways swipe.
+  const tempAtX = (x: number) => MIN + (1 - Math.acos(clamp(x / R, -1, 1)) / Math.PI) * (MAX - MIN);
+  const touchStart = useRef<{ x: number; y: number; dragging: boolean } | null>(null);
   const move = (e: PointerEvent<HTMLDivElement>) => {
     const { x, y } = local(e);
-    let t = reach(tempAt(x, y));
+    let t = reach(e.pointerType === "touch" ? tempAtX(x) : tempAt(x, y));
     const stop = stops.find((s) => Math.abs(s.t - t) < snapGap);
     if (stop) t = stop.t;
     if ((stop?.id ?? null) !== snapped.current) { snapped.current = stop?.id ?? null; if (stop) hapticTick(); }
     setFinger(t);
     onSlide(t);
   };
-  const end = () => { setFinger(null); snapped.current = null; };
+  const end = () => { setFinger(null); snapped.current = null; touchStart.current = null; };
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "PageDown" || e.key === "PageUp") {
       // Next stop cooler (Page Down) or warmer (Page Up); past the warmest one, back to no intervention.
@@ -119,9 +123,22 @@ export function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlid
         const px = hit * (box.current!.getBoundingClientRect().width / 200);
         if (px > GRAB_RADIUS || disabled) return;
         e.currentTarget.setPointerCapture(e.pointerId);
+        // A finger does not move the dot yet: the first few pixels tell a sideways slide from a page scroll.
+        if (e.pointerType === "touch") { touchStart.current = { x: e.clientX, y: e.clientY, dragging: false }; return; }
         move(e);
       }}
-      onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) move(e); }}
+      onPointerMove={(e) => {
+        if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+        const start = touchStart.current;
+        if (e.pointerType === "touch" && start && !start.dragging) {
+          const dx = Math.abs(e.clientX - start.x), dy = Math.abs(e.clientY - start.y);
+          if (Math.max(dx, dy) < 8) return;
+          // Mostly vertical: it is a scroll, the dot stays where it is.
+          if (dy > dx) { e.currentTarget.releasePointerCapture(e.pointerId); end(); return; }
+          start.dragging = true;
+        }
+        move(e);
+      }}
       onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end}
       style={{ outline: "none" }}>
       <svg viewBox="0 0 200 112" className="pointer-events-none w-full overflow-visible" aria-hidden="true">
@@ -139,7 +156,7 @@ export function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlid
         <text x="188" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{Math.round(MAX)}{unit}</text>
       </svg>
       {/* The white dot's touch area: the only place a finger grabs the arc (elsewhere the page scrolls as usual). */}
-      {!disabled && <span className="absolute -translate-x-1/2 -translate-y-1/2 touch-none rounded-full" style={{ ...pct(a), width: GRAB_RADIUS * 2, height: GRAB_RADIUS * 2 }} aria-hidden="true" />}
+      {!disabled && <span className="absolute -translate-x-1/2 -translate-y-1/2 touch-pan-y rounded-full" style={{ ...pct(a), width: GRAB_RADIUS * 2, height: GRAB_RADIUS * 2 }} aria-hidden="true" />}
       {/* The levels, written just outside the arc where their stop is: one touch moves the dot there. */}
       {!disabled && stops.map((s) => (
         <button key={s.id} type="button" tabIndex={-1} aria-pressed={s.on} onPointerDown={(e) => e.stopPropagation()} onClick={() => onStop(s.id)}
