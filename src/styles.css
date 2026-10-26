@@ -2009,7 +2009,15 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 @keyframes intro-twinkle { 50% { opacity: 0.85; } }
 .intro-spark { opacity: 0; animation: intro-rise linear infinite; }
 @keyframes intro-rise { 0% { transform: translateY(0); opacity: 0; } 10% { opacity: 0.9; } 80% { opacity: 0.5; } 100% { transform: translateY(-85vh); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .intro-aurora, .intro-glow, .intro-dot, .intro-spark { animation: none; } .intro-spark { opacity: 0; } }
+/* The horizon: floats up and down, a halo breathes over it, and a glint runs along the line. All by transform and
+   opacity, and the glint is a small streak riding an offset path along the curve. */
+.intro-horizon { will-change: transform; animation: intro-horizon-float 9s ease-in-out infinite alternate; }
+@keyframes intro-horizon-float { from { transform: translateY(0); } to { transform: translateY(-1.8vh); } }
+.intro-halo { will-change: opacity, transform; opacity: 0.5; animation: intro-halo-breathe 6s ease-in-out infinite alternate; }
+@keyframes intro-halo-breathe { from { opacity: 0.45; transform: translateX(-50%) scaleX(0.92); } to { opacity: 1; transform: translateX(-50%) scaleX(1.06); } }
+.intro-glint { will-change: offset-distance, opacity; offset-distance: 0%; opacity: 0; animation: intro-glint-run 7s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+@keyframes intro-glint-run { 0% { offset-distance: 0%; opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { offset-distance: 100%; opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .intro-aurora, .intro-glow, .intro-dot, .intro-spark, .intro-horizon, .intro-halo, .intro-glint { animation: none; } .intro-spark, .intro-glint { opacity: 0; } }
 
 /* v10 tutorial: each drawing draws itself once its step comes into view (shown at once with reduced motion). */
 .intro-draw :is(path, circle):not(.intro-pop) { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 1.4s cubic-bezier(0.45, 0, 0.2, 1); }

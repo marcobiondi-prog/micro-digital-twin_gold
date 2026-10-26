@@ -79,10 +79,33 @@ const SPARKS: Array<[number, number, number, number]> = [[12, 3, 14, 0], [27, 2,
 
 /**
  * The entrance's backdrop, light and airy: an aurora in Twin's turquoise, a cool blue and a warm heat glow, slowly turning and
- * breathing and changing tint every now and then, a sky of twinkling data points and sparks rising from the bottom.
+ * breathing and changing tint every now and then, a curved horizon of light that floats with a glint running along it, a sky of twinkling data points and sparks rising from the bottom.
  * Kept light: the glows are soft gradients (no blur filter, no blending) that only move by transform, so the phone just composites them.
  * Still with reduced motion.
  */
+/**
+ * A short streak of white light that runs along the horizon's curve: it rides an offset path drawn on the same ellipse
+ * (recomputed on resize), so only its position changes and nothing is repainted.
+ */
+function HorizonGlint() {
+  const [path, setPath] = useState<string | null>(null);
+  useEffect(() => {
+    const draw = () => {
+      const vw = window.innerWidth, vh = window.innerHeight;
+      // The ellipse of the horizon: 260 vw wide (200 vw from the sm breakpoint), 60 vh tall, its top at the box's top.
+      const a = (vw >= 640 ? 2 : 2.6) * vw / 2, b = 0.3 * vh, cx = vw / 2;
+      const yAt = (x: number) => b - b * Math.sqrt(Math.max(0, 1 - ((x - cx) / a) ** 2));
+      const x1 = -0.15 * vw, x2 = 1.15 * vw;
+      setPath(`path("M ${x1.toFixed(1)} ${yAt(x1).toFixed(1)} A ${a.toFixed(1)} ${b.toFixed(1)} 0 0 1 ${x2.toFixed(1)} ${yAt(x2).toFixed(1)}")`);
+    };
+    draw();
+    window.addEventListener("resize", draw);
+    return () => window.removeEventListener("resize", draw);
+  }, []);
+  if (!path) return null;
+  return <span className="intro-glint absolute left-0 top-0 h-[3px] w-24 rounded-full bg-[radial-gradient(closest-side,#fff,rgb(200_255_248/0.8)_45%,transparent)] shadow-[0_0_18px_4px_rgb(160_250_240/0.55)]" style={{ offsetPath: path, offsetRotate: "auto" }} />;
+}
+
 function Backdrop() {
   return (
     <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[#05070c]" aria-hidden="true">
@@ -94,6 +117,13 @@ function Backdrop() {
         <div className="intro-glow intro-glow-c absolute bottom-[18%] left-[25%] h-[40vh] w-[60vw] bg-[radial-gradient(closest-side,rgb(255_130_60/0.22),rgb(255_130_60/0.08)_45%,transparent)]" />
       </div>
       {DOTS.map(([x, y, r, d]) => <span key={`${x}-${y}`} className="intro-dot absolute rounded-full bg-white" style={{ left: `${x}%`, top: `${y}%`, width: r, height: r, animationDelay: `${d}s` }} />)}
+      {/* The horizon: a thin curved line of light low on the screen, floating gently, a glint running along it and a soft
+          glow breathing above it, the night below. */}
+      <div className="intro-halo absolute left-1/2 top-[66vh] h-[30vh] w-[150vw] bg-[radial-gradient(closest-side,rgb(120_235_220/0.4),rgb(40_100_230/0.16)_55%,transparent)]" />
+      <div className="intro-horizon absolute inset-x-0 top-[80vh] h-[60vh] sm:top-[78vh]">
+        <div className="absolute left-[-80vw] top-0 h-full w-[260vw] rounded-[50%] border-t border-[rgb(140_240_225/0.85)] bg-[linear-gradient(to_bottom,rgb(5_7_12/0.55),#05070c_30%)] shadow-[0_-10px_50px_rgb(76_201_189/0.5),0_-50px_160px_rgb(40_100_230/0.4)] sm:left-[-50vw] sm:w-[200vw]" />
+        <HorizonGlint />
+      </div>
       {SPARKS.map(([x, r, t, d]) => <span key={x} className="intro-spark absolute bottom-[8vh] rounded-full bg-[rgb(140_240_225)] shadow-[0_0_8px_rgb(76_201_189)]" style={{ left: `${x}%`, width: r, height: r, animationDuration: `${t}s`, animationDelay: `${d}s` }} />)}
       {/* A soft vignette keeps the text readable. */}
       <div className="absolute inset-0 bg-[radial-gradient(120%_90%_at_50%_45%,transparent_55%,rgb(0_0_0/0.55))]" />
