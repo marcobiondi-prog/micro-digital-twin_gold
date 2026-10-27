@@ -1,4 +1,3 @@
-import { ArrowRight, ArrowLeft } from "lucide-react";
 import { useState, useEffect } from "react";
 
 export function NavigationArrows() {
@@ -21,18 +20,36 @@ export function NavigationArrows() {
   };
 
   const isEven = slideIndex % 2 === 0;
-  const Arrow = isEven ? ArrowRight : ArrowLeft;
 
   return (
-    <div className="fixed inset-x-0 bottom-40 z-50 flex justify-center">
-      {/* Forward/Backward arrow */}
+    <div className="fixed inset-x-0 bottom-24 z-50 flex justify-center">
+      {/* Custom arrow with long tail */}
       <button
         onClick={handleClick}
         aria-label={isEven ? "Slide successivo" : "Slide precedente"}
         title={isEven ? "Slide successivo" : "Slide precedente"}
-        className="text-white transition-all hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2"
+        className="p-4 text-white transition-all hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
       >
-        <Arrow className="size-10" strokeWidth={1.5} />
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 48 48"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          style={{ transform: isEven ? "scaleX(1)" : "scaleX(-1)" }}
+        >
+          {/* Long tail */}
+          <line x1="2" y1="24" x2="35" y2="24" stroke="currentColor" strokeWidth="1.5" />
+          {/* Arrow head */}
+          <polyline
+            points="35,24 42,17 42,31"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       </button>
     </div>
   );
