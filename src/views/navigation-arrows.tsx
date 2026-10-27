@@ -1,21 +1,38 @@
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ArrowLeft } from "lucide-react";
+import { useState, useEffect } from "react";
 
 export function NavigationArrows() {
-  const handleNext = () => {
-    const event = new KeyboardEvent("keydown", { key: "ArrowRight" });
+  const [slideIndex, setSlideIndex] = useState(0);
+
+  useEffect(() => {
+    const handleKeydown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        setSlideIndex((prev) => prev + 1);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeydown);
+    return () => window.removeEventListener("keydown", handleKeydown);
+  }, []);
+
+  const handleClick = () => {
+    const event = new KeyboardEvent("keydown", { key: slideIndex % 2 === 0 ? "ArrowRight" : "ArrowLeft" });
     window.dispatchEvent(event);
   };
 
+  const isEven = slideIndex % 2 === 0;
+  const Arrow = isEven ? ArrowRight : ArrowLeft;
+
   return (
-    <div className="fixed inset-x-0 bottom-20 z-50 flex justify-center">
-      {/* Forward arrow */}
+    <div className="fixed inset-x-0 bottom-40 z-50 flex justify-center">
+      {/* Forward/Backward arrow */}
       <button
-        onClick={handleNext}
-        aria-label="Slide successivo"
-        title="Slide successivo"
+        onClick={handleClick}
+        aria-label={isEven ? "Slide successivo" : "Slide precedente"}
+        title={isEven ? "Slide successivo" : "Slide precedente"}
         className="text-white transition-all hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2"
       >
-        <ArrowRight className="size-6" strokeWidth={1.5} />
+        <Arrow className="size-10" strokeWidth={1.5} />
       </button>
     </div>
   );
