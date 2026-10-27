@@ -15,9 +15,10 @@ export function NavigationArrows() {
     return () => window.removeEventListener("keydown", handleKeydown);
   }, []);
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
     const isFirstSlide = slideIndex === 0;
-    const event = new KeyboardEvent("keydown", { key: isFirstSlide ? "ArrowRight" : "ArrowLeft" });
+    const event = new KeyboardEvent("keydown", { key: isFirstSlide ? "ArrowRight" : "ArrowLeft", bubbles: true });
     window.dispatchEvent(event);
   };
 
