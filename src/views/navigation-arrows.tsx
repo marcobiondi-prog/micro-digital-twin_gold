@@ -1,32 +1,40 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useLocation } from "@tanstack/react-router";
 
 export function NavigationArrows() {
-  const handleBack = () => {
-    window.history.back();
+  const location = useLocation();
+  const isIntro = location.pathname === "/" || location.pathname === "/scegli";
+
+  if (!isIntro) return null;
+
+  const handlePrev = () => {
+    const event = new KeyboardEvent("keydown", { key: "ArrowLeft" });
+    window.dispatchEvent(event);
   };
 
-  const handleForward = () => {
-    window.history.forward();
+  const handleNext = () => {
+    const event = new KeyboardEvent("keydown", { key: "ArrowRight" });
+    window.dispatchEvent(event);
   };
 
   return (
     <>
       {/* Back arrow */}
       <button
-        onClick={handleBack}
-        aria-label="Indietro"
-        title="Indietro (freccia sinistra)"
-        className="fixed left-4 top-1/2 z-50 -translate-y-1/2 rounded-full bg-white/40 p-3 text-white shadow-lg transition-all hover:bg-white/60 active:bg-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2"
+        onClick={handlePrev}
+        aria-label="Slide precedente"
+        title="Slide precedente"
+        className="fixed bottom-24 left-6 z-50 rounded-full bg-white/40 p-3 text-white shadow-lg transition-all hover:bg-white/60 active:bg-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2"
       >
         <ChevronLeft className="size-8" strokeWidth={3} />
       </button>
 
       {/* Forward arrow */}
       <button
-        onClick={handleForward}
-        aria-label="Avanti"
-        title="Avanti (freccia destra)"
-        className="fixed right-4 top-1/2 z-50 -translate-y-1/2 rounded-full bg-white/40 p-3 text-white shadow-lg transition-all hover:bg-white/60 active:bg-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2"
+        onClick={handleNext}
+        aria-label="Slide successivo"
+        title="Slide successivo"
+        className="fixed bottom-24 right-6 z-50 rounded-full bg-white/40 p-3 text-white shadow-lg transition-all hover:bg-white/60 active:bg-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2"
       >
         <ChevronRight className="size-8" strokeWidth={3} />
       </button>
