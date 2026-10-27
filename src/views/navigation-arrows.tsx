@@ -1,36 +1,21 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 export function NavigationArrows() {
-  const handlePrev = () => {
-    const event = new KeyboardEvent("keydown", { key: "ArrowLeft" });
-    window.dispatchEvent(event);
-  };
-
   const handleNext = () => {
     const event = new KeyboardEvent("keydown", { key: "ArrowRight" });
     window.dispatchEvent(event);
   };
 
   return (
-    <div className="fixed inset-x-0 bottom-32 z-50 flex justify-center gap-8">
-      {/* Back arrow */}
-      <button
-        onClick={handlePrev}
-        aria-label="Slide precedente"
-        title="Slide precedente"
-        className="rounded-full bg-white/40 p-3 text-white shadow-lg transition-all hover:bg-white/60 active:bg-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2"
-      >
-        <ChevronLeft className="size-8" strokeWidth={3} />
-      </button>
-
+    <div className="fixed inset-x-0 bottom-20 z-50 flex justify-center">
       {/* Forward arrow */}
       <button
         onClick={handleNext}
         aria-label="Slide successivo"
         title="Slide successivo"
-        className="rounded-full bg-white/40 p-3 text-white shadow-lg transition-all hover:bg-white/60 active:bg-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2"
+        className="text-white transition-all hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2"
       >
-        <ChevronRight className="size-8" strokeWidth={3} />
+        <ArrowRight className="size-6" strokeWidth={1.5} />
       </button>
     </div>
   );
