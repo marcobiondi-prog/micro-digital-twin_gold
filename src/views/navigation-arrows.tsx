@@ -18,7 +18,7 @@ export function NavigationArrows() {
   };
 
   return (
-    <div className="fixed inset-x-0 bottom-48 z-50 flex justify-center gap-8">
+    <div className="fixed inset-x-0 bottom-32 z-50 flex justify-center gap-8">
       {/* Back arrow */}
       <button
         onClick={handlePrev}
