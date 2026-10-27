@@ -1,13 +1,6 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useLocation } from "@tanstack/react-router";
 
 export function NavigationArrows() {
-  const location = useLocation();
-  const pathname = location.pathname;
-  const isIntro = pathname === "/" || pathname === "/scegli";
-
-  if (!isIntro) return null;
-
   const handlePrev = () => {
     const event = new KeyboardEvent("keydown", { key: "ArrowLeft" });
     window.dispatchEvent(event);
@@ -17,8 +10,6 @@ export function NavigationArrows() {
     const event = new KeyboardEvent("keydown", { key: "ArrowRight" });
     window.dispatchEvent(event);
   };
-
-  console.log("NavigationArrows rendered", { pathname, isIntro });
 
   return (
     <div className="fixed inset-x-0 bottom-32 z-50 flex justify-center gap-8">

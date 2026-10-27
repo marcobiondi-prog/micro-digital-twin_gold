@@ -455,8 +455,8 @@ function RootComponent() {
       >
         Salta al contenuto principale
       </a>
-      {/* Navigation arrows - shown on intro pages */}
-      <NavigationArrows />
+      {/* Navigation arrows - shown only on intro pages */}
+      {intro && <NavigationArrows />}
       {/* The opening page (/) stands alone: no header, no menus, no footer. */}
       {!intro && <>
       {/* v8: a solid console top bar painted with the page's own ambient light, so it carries the same shades without being see-through. */}
