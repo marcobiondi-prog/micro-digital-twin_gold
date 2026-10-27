@@ -18,13 +18,13 @@ export function NavigationArrows() {
   };
 
   return (
-    <>
+    <div className="fixed inset-x-0 bottom-48 z-50 flex justify-center gap-8">
       {/* Back arrow */}
       <button
         onClick={handlePrev}
         aria-label="Slide precedente"
         title="Slide precedente"
-        className="fixed bottom-24 left-6 z-50 rounded-full bg-white/40 p-3 text-white shadow-lg transition-all hover:bg-white/60 active:bg-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2"
+        className="rounded-full bg-white/40 p-3 text-white shadow-lg transition-all hover:bg-white/60 active:bg-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2"
       >
         <ChevronLeft className="size-8" strokeWidth={3} />
       </button>
@@ -34,10 +34,10 @@ export function NavigationArrows() {
         onClick={handleNext}
         aria-label="Slide successivo"
         title="Slide successivo"
-        className="fixed bottom-24 right-6 z-50 rounded-full bg-white/40 p-3 text-white shadow-lg transition-all hover:bg-white/60 active:bg-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2"
+        className="rounded-full bg-white/40 p-3 text-white shadow-lg transition-all hover:bg-white/60 active:bg-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2"
       >
         <ChevronRight className="size-8" strokeWidth={3} />
       </button>
-    </>
+    </div>
   );
 }
