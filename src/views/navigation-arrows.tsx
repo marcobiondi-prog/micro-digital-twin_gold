@@ -25,7 +25,7 @@ export function NavigationArrows() {
   const Arrow = isFirstSlide ? ArrowRight : ArrowLeft;
 
   return (
-    <div className="fixed inset-x-0 bottom-16 z-50 flex justify-center">
+    <div className="fixed inset-x-0 bottom-32 z-50 flex justify-center">
       {/* Arrow button */}
       <button
         onClick={handleClick}
