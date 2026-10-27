@@ -19,7 +19,7 @@ export function NavigationArrows() {
   const Arrow = isEven ? ArrowRight : ArrowLeft;
 
   return (
-    <div className="fixed inset-x-0 bottom-56 z-50 flex justify-center pointer-events-none">
+    <div className="fixed inset-x-0 bottom-64 z-50 flex justify-center pointer-events-none">
       <div className="text-white">
         <Arrow className="size-14" strokeWidth={1.5} />
       </div>
