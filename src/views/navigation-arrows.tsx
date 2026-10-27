@@ -16,21 +16,21 @@ export function NavigationArrows() {
   }, []);
 
   const handleClick = () => {
-    const isEven = slideIndex % 2 === 0;
-    const event = new KeyboardEvent("keydown", { key: isEven ? "ArrowRight" : "ArrowLeft" });
+    const isFirstSlide = slideIndex === 0;
+    const event = new KeyboardEvent("keydown", { key: isFirstSlide ? "ArrowRight" : "ArrowLeft" });
     window.dispatchEvent(event);
   };
 
-  const isEven = slideIndex % 2 === 0;
-  const Arrow = isEven ? ArrowRight : ArrowLeft;
+  const isFirstSlide = slideIndex === 0;
+  const Arrow = isFirstSlide ? ArrowRight : ArrowLeft;
 
   return (
-    <div className="fixed inset-x-0 bottom-40 z-[999999999] pointer-events-auto flex justify-center">
+    <div className="fixed inset-x-0 bottom-48 z-[999999999] pointer-events-auto flex justify-center">
       {/* Arrow button */}
       <button
         onClick={handleClick}
-        aria-label={isEven ? "Slide successivo" : "Slide precedente"}
-        title={isEven ? "Slide successivo" : "Slide precedente"}
+        aria-label={isFirstSlide ? "Slide successivo" : "Slide precedente"}
+        title={isFirstSlide ? "Slide successivo" : "Slide precedente"}
         className="p-8 text-white transition-all hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white cursor-pointer pointer-events-auto"
       >
         <Arrow className="size-14" strokeWidth={1.5} />
