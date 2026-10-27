@@ -3,7 +3,8 @@ import { useLocation } from "@tanstack/react-router";
 
 export function NavigationArrows() {
   const location = useLocation();
-  const isIntro = location.pathname === "/" || location.pathname === "/scegli";
+  const pathname = location.pathname;
+  const isIntro = pathname === "/" || pathname === "/scegli";
 
   if (!isIntro) return null;
 
@@ -16,6 +17,8 @@ export function NavigationArrows() {
     const event = new KeyboardEvent("keydown", { key: "ArrowRight" });
     window.dispatchEvent(event);
   };
+
+  console.log("NavigationArrows rendered", { pathname, isIntro });
 
   return (
     <div className="fixed inset-x-0 bottom-32 z-50 flex justify-center gap-8">
