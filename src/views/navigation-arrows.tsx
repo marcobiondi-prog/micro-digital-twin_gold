@@ -31,7 +31,7 @@ export function NavigationArrows() {
         onClick={handleClick}
         aria-label={isFirstSlide ? "Slide successivo" : "Slide precedente"}
         title={isFirstSlide ? "Slide successivo" : "Slide precedente"}
-        className="p-2 text-white transition-all hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        className="p-6 text-white transition-all hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white cursor-pointer"
       >
         <Arrow className="size-12" strokeWidth={1.5} />
       </button>
