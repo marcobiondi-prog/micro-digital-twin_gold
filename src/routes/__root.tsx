@@ -11,6 +11,7 @@ import { introSeen } from "@/lib/intro-seen";
 import { THEME_DARK, ThemeToggle, themeBootScript } from "@/views/theme-toggle";
 import { AccountControl } from "@/views/account-control";
 import { CameraDockButton, CameraSheet } from "@/views/CameraDock";
+import { NavigationArrows } from "@/views/navigation-arrows";
 import { syncAppOrientation } from "@/lib/ar-orientation";
 import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
 import { installUiClicks } from "@/lib/ui-sounds";
@@ -456,6 +457,8 @@ function RootComponent() {
       </a>
       {/* The opening page (/) stands alone: no header, no menus, no footer. */}
       {!intro && <>
+      {/* Navigation arrows */}
+      <NavigationArrows />
       {/* v8: a solid console top bar painted with the page's own ambient light, so it carries the same shades without being see-through. */}
       <header id="app-header" className="app-header-tint relative pt-[env(safe-area-inset-top)]">
         <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-2 sm:px-4 sm:py-3">
