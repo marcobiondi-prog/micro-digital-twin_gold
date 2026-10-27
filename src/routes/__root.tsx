@@ -455,10 +455,10 @@ function RootComponent() {
       >
         Salta al contenuto principale
       </a>
+      {/* Navigation arrows - shown on intro pages */}
+      <NavigationArrows />
       {/* The opening page (/) stands alone: no header, no menus, no footer. */}
       {!intro && <>
-      {/* Navigation arrows */}
-      <NavigationArrows />
       {/* v8: a solid console top bar painted with the page's own ambient light, so it carries the same shades without being see-through. */}
       <header id="app-header" className="app-header-tint relative pt-[env(safe-area-inset-top)]">
         <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-2 sm:px-4 sm:py-3">
