@@ -11,7 +11,6 @@ import { introSeen } from "@/lib/intro-seen";
 import { THEME_DARK, ThemeToggle, themeBootScript } from "@/views/theme-toggle";
 import { AccountControl } from "@/views/account-control";
 import { CameraDockButton, CameraSheet } from "@/views/CameraDock";
-import { NavigationArrows } from "@/views/navigation-arrows";
 import { syncAppOrientation } from "@/lib/ar-orientation";
 import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
 import { installUiClicks } from "@/lib/ui-sounds";
@@ -455,8 +454,6 @@ function RootComponent() {
       >
         Salta al contenuto principale
       </a>
-      {/* Navigation arrows - shown only on intro pages (not on choice page) */}
-      {location.pathname === "/" && <NavigationArrows />}
       {/* The opening page (/) stands alone: no header, no menus, no footer. */}
       {!intro && <>
       {/* v8: a solid console top bar painted with the page's own ambient light, so it carries the same shades without being see-through. */}

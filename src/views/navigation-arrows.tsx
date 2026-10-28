@@ -19,9 +19,9 @@ export function NavigationArrows() {
   const Arrow = isEven ? ArrowRight : ArrowLeft;
 
   return (
-    <div className="fixed inset-x-0 bottom-80 z-50 flex justify-center pointer-events-none">
+    <div aria-hidden="true" className="intro-navigation-arrow pointer-events-none flex h-[clamp(1.75rem,8dvh,3.5rem)] w-full shrink-0 justify-center">
       <div className="text-white">
-        <Arrow className="size-14" strokeWidth={1.5} />
+        <Arrow className="size-[clamp(1.75rem,8dvh,3.5rem)]" strokeWidth={1.5} />
       </div>
     </div>
   );

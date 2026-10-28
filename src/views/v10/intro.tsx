@@ -7,6 +7,7 @@ import { useInstalledApp } from "@/lib/installed-app";
 import aiLogo from "@/assets/ai-logo.png";
 import { hapticTick } from "@/lib/haptics";
 import { TwinMascot } from "@/views/TwinMascot";
+import { NavigationArrows } from "@/views/navigation-arrows";
 import { THEME_DARK, THEME_META } from "@/views/theme-toggle";
 import { introSeen, markIntroSeen } from "@/lib/intro-seen";
 
@@ -212,29 +213,30 @@ export function Tutorial() {
         onPointerMove={(e) => { if (e.pointerType === "mouse" && e.buttons) move(e.clientX, e.clientY); }}
         onPointerUp={(e) => { if (e.pointerType === "mouse") up(e.clientX); }}>
       <div className="flex h-full" style={{ transform: `translateX(calc(${-page * 100}% + ${dragX}px))`, transition: dragX || reduceMotion() ? "none" : "transform 380ms cubic-bezier(0.22, 1, 0.36, 1)" }}>
-        <section aria-label="Benvenuto" aria-roledescription="schermata" aria-hidden={page !== 0 || undefined} className="flex w-full shrink-0 select-none flex-col items-center justify-center px-8 text-center">
+        <section aria-label="Benvenuto" aria-roledescription="schermata" aria-hidden={page !== 0 || undefined} className="intro-screen-aligned flex w-full shrink-0 select-none flex-col items-center px-4 text-center sm:px-8">
           <Reveal className="flex flex-col items-center">
-            <span className="block h-36 w-40 sm:h-44 sm:w-48"><TwinMascot className="block h-full w-full drop-shadow-[0_12px_40px_rgb(76_201_189/0.25)]" /></span>
-            <p className="mt-4 font-display text-xl font-semibold uppercase tracking-[0.18em] text-foreground sm:text-2xl">Micro Digital <span className="text-brand-turquoise">Twin</span></p>
-            <h2 className="mt-6 font-display text-[2.6rem] font-extralight leading-[1.02] tracking-tight text-foreground sm:text-6xl">Prova gli interventi<br />prima di farli.</h2>
-            <p className="mt-4 text-[15px] text-foreground/60">Ecco come funziona, in quattro passi.</p>
+            <span className="block h-[clamp(3.5rem,16dvh,9rem)] w-[clamp(3.5rem,16dvh,9rem)]"><TwinMascot className="block h-full w-full drop-shadow-[0_12px_40px_rgb(76_201_189/0.25)]" /></span>
+            <p className="mt-[clamp(0.25rem,1.2dvh,1rem)] font-display text-[clamp(0.75rem,4.2dvh,1.5rem)] font-semibold uppercase tracking-[0.18em] text-foreground">Micro Digital <span className="text-brand-turquoise">Twin</span></p>
+            <h2 className="mt-[clamp(0.375rem,2dvh,1.5rem)] font-display text-[clamp(1.8rem,min(9vw,8dvh),3.75rem)] font-extralight leading-[1.02] tracking-tight text-foreground">Prova gli interventi<br />prima di farli.</h2>
+            <p className="mt-[clamp(0.25rem,1.2dvh,1rem)] text-[clamp(0.75rem,4.1dvh,0.9375rem)] text-foreground/60">Ecco come funziona, in quattro passi.</p>
           </Reveal>
         </section>
         {STEPS.map((st, i) => (
-          <section key={st.title} aria-label={`Passo ${i + 1} di ${STEPS.length}: ${st.title}`} aria-roledescription="schermata" aria-hidden={page !== i + 1 || undefined} className="flex w-full shrink-0 select-none flex-col justify-center px-8">
+          <section key={st.title} aria-label={`Passo ${i + 1} di ${STEPS.length}: ${st.title}`} aria-roledescription="schermata" aria-hidden={page !== i + 1 || undefined} className="intro-screen-aligned flex w-full shrink-0 select-none flex-col px-8">
             <Reveal className="mx-auto w-full max-w-md">
-              <svg viewBox="0 0 160 100" className="intro-draw h-36 w-auto text-foreground sm:h-44" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{st.art}</svg>
-              <p className="mt-8 font-mono text-sm tabular-nums text-foreground/50">0{i + 1} — 0{STEPS.length}</p>
-              <h2 className="mt-2 font-display text-[2.4rem] font-extralight leading-tight tracking-tight text-foreground sm:text-5xl">{st.title}</h2>
-              <p className="mt-3 max-w-sm text-[15px] leading-relaxed text-foreground/60">{st.text}</p>
+              <svg viewBox="0 0 160 100" className="intro-step-art intro-draw h-36 w-auto text-foreground sm:h-44" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{st.art}</svg>
+              <p className="intro-step-index mt-8 font-mono text-sm tabular-nums text-foreground/50">0{i + 1} — 0{STEPS.length}</p>
+              <h2 className="intro-step-title mt-2 font-display text-[2.4rem] font-extralight leading-tight tracking-tight text-foreground sm:text-5xl">{st.title}</h2>
+              <p className="intro-step-text mt-3 max-w-sm text-[15px] leading-relaxed text-foreground/60">{st.text}</p>
             </Reveal>
           </section>
         ))}
       </div>
+      {page === 0 && <NavigationArrows />}
       </div>
       {/* Only the swipe moves between screens; the dots show where you are. The white button appears on the last one only. */}
       <div className="mx-auto flex w-full max-w-md flex-col items-center gap-4 px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-4">
-        <div className={`transition-[opacity,transform] duration-300 motion-reduce:transition-none ${last ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0"}`} aria-hidden={!last}>
+        <div className={`overflow-hidden transition-[height,opacity,transform] duration-300 motion-reduce:transition-none ${last ? "h-14 translate-y-0 opacity-100" : "pointer-events-none h-0 translate-y-2 opacity-0"}`} aria-hidden={!last}>
           <button type="button" onClick={finish} tabIndex={last ? 0 : -1}
             className="inline-flex h-14 items-center gap-2 rounded-full bg-foreground pl-7 pr-2 text-base font-semibold text-background outline-none transition-transform focus-visible:ring-4 focus-visible:ring-ring/50 active:scale-[0.98] motion-reduce:active:scale-100">
             {again ? "Fine" : "Inizia"}
