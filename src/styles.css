@@ -1048,6 +1048,10 @@
     scroll-padding-top: calc(var(--nav-h, 0px) + 0.75rem);
     -webkit-text-size-adjust: 100%;
   }
+  /* The app is not a document: text and images are not selected nor dragged; fields stay editable. */
+  body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-select: text; }
+  img, svg { -webkit-user-drag: none; user-drag: none; }
   body {
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: none;

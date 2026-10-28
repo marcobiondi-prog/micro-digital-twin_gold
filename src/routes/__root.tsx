@@ -15,7 +15,7 @@ import { syncAppOrientation } from "@/lib/ar-orientation";
 import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
 import { installUiClicks } from "@/lib/ui-sounds";
 import { reloadFresh } from "@/router";
-import { MapPin, Building2, Grape, Info, LayoutDashboard } from "lucide-react";
+import { History, Building2, Grape, Info, LayoutDashboard } from "lucide-react";
 
 function NotFoundComponent() {
   return (
@@ -105,7 +105,7 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 const nav = [
-  { to: "/mappa", l: "Mappa" },
+  { to: "/benvenuto", l: "Benvenuto" },
   { to: "/urbano", l: "Simulazione urbana" },
   { to: "/vigneto", l: "Simulazione vigneto" },
   { to: "/dashboard", l: "Dashboard" },
@@ -114,7 +114,7 @@ const nav = [
 const NAV_H = 49;
 
 const bottomItems = [
-  { to: "/mappa", l: "Mappa", I: MapPin },
+  { to: "/benvenuto", l: "Benvenuto", I: History },
   { to: "/urbano", l: "Urbano", I: Building2 },
   { to: "/vigneto", l: "Vigneto", I: Grape },
   { to: "/dashboard", l: "Dashboard", I: LayoutDashboard },
@@ -346,6 +346,17 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const navigate = useNavigate();
   const location = useLocation();
+  const slidePath = useRef<string | null>(null);
+  useEffect(() => {
+    // Each page slides in from the side its menu entry sits on: a later entry from the right, an earlier one from the left.
+    const prev = slidePath.current;
+    slidePath.current = location.pathname;
+    const main = document.getElementById("main-content");
+    if (!prev || prev === location.pathname || !main || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const a = nav.findIndex((n) => n.to === prev), b = nav.findIndex((n) => n.to === location.pathname);
+    const from = a >= 0 && b >= 0 && b < a ? -40 : 40;
+    main.animate([{ opacity: 0, transform: `translateX(${from}px)` }, { opacity: 1, transform: "translateX(0)" }], { duration: 300, easing: "cubic-bezier(0.22, 1, 0.36, 1)" });
+  }, [location.pathname]);
   useEffect(() => {
     // No pinch-zoom on phones or tablets. user-scalable=no is ignored by iPadOS Safari, by
     // Android tablets in desktop mode and by Windows touch (Surface), so pinch is also blocked
@@ -413,7 +424,7 @@ function RootComponent() {
     // the "i" still open the tutorial).
     const params = new URLSearchParams(location.searchStr);
     if (location.pathname === "/" && (params.has("scenario") || params.has("rivedi"))) return;
-    const home = introSeen() ? "/mappa" : "/";
+    const home = introSeen() ? "/benvenuto" : "/";
     if (location.pathname === home || (home === "/" && location.pathname === "/index")) return;
     const id = setTimeout(() => void navigate({ to: home, replace: true }), 250);
     // Unmounted before the move (StrictMode's double mount): let the next mount try again.

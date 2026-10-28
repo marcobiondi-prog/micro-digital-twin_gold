@@ -1,10 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { z } from "zod";
+import { useTabSwipe } from "@/lib/use-tab-swipe";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertTriangle, Download, Plus, Building2, Grape, Copy, Printer, Activity, Trash2, Share2, Mail, LineChart as LineChartIcon, Leaf, NotebookPen, Droplets, Waves } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { addHistory } from "@/lib/use-history";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, Ring, StatusBadge, levelColor } from "@/views/health";
 import { Slider } from "@/components/ui/slider";
@@ -142,7 +144,10 @@ function UrbanRecords() {
   const [approvals, setApprovals] = useState<Record<string, Approval>>({});
   const [draft, setDraft] = useState("");
   const [log, setLog] = useState(DEFAULT_LOG.map((n) => ({ ...n })));
-  const addLog = (t: string) => setLog((p) => [{ d: new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }), t }, ...p].slice(0, 20));
+  const addLog = (t: string) => {
+    setLog((p) => [{ d: new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }), t }, ...p].slice(0, 20));
+    void addHistory("piazza", t, splitLocation(lab.location.label).name);
+  };
   const [uid, setUid] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
@@ -355,11 +360,16 @@ function VineRecords() {
   const notes = useNotes();
   const setNotes = (u: Notes | ((p: Notes) => Notes)) => setNotesStore(typeof u === "function" ? u(vineNotes) : u);
   const [txt, setTxt] = useState("");
+  const place = splitLocation(useLab().vineyard.location.label).name;
+  const addNote = (t: string) => {
+    setNotes((prev) => [{ d: new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }), t }, ...prev]);
+    void addHistory("vigneto", t, place);
+  };
   return (
     <div className="space-y-8">
       <DashSection title="Quaderno di campagna">
         <DashCard>
-          <form className="grid grid-cols-[minmax(0,1fr)_auto] gap-2" onSubmit={(e) => { e.preventDefault(); if (!txt.trim()) return; setNotes([{ d: new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }), t: txt }, ...notes]); setTxt(""); }}>
+          <form className="grid grid-cols-[minmax(0,1fr)_auto] gap-2" onSubmit={(e) => { e.preventDefault(); if (!txt.trim()) return; addNote(txt); setTxt(""); }}>
             <input value={txt} onChange={(e) => setTxt(e.target.value)} placeholder="Nuova operazione…" className="min-w-0 rounded-full bg-muted px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
             <button className="grid size-9 place-items-center rounded-full bg-vine text-primary-foreground"><Plus className="size-4" /></button>
           </form>
@@ -371,7 +381,7 @@ function VineRecords() {
         </DashCard>
       </DashSection>
       <PremiumPart locked={VINE_LOCKED}>
-        <DashSection title="Piano suggerito dall'AI"><FieldAI onAdd={(t) => setNotes((prev) => [{ d: new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }), t }, ...prev])} /></DashSection>
+        <DashSection title="Piano suggerito dall'AI"><FieldAI onAdd={addNote} /></DashSection>
       </PremiumPart>
     </div>
   );
@@ -891,6 +901,7 @@ function Dashboard() {
   const navigate = useNavigate({ from: Route.fullPath });
   const setT = (v: "Piazza" | "Vigneto") =>
     navigate({ search: (prev) => ({ ...prev, tab: v }), replace: true, resetScroll: false });
+  useTabSwipe(["Piazza", "Vigneto"] as const, t, setT);
   const loading = useDashboardLoading(t);
   return (
     <div className="min-w-0">

@@ -21,7 +21,7 @@ export function PageLink({ to, children }: { to: InfoPath; children: ReactNode }
 
 /**
  * A plain reading page opened from the account panel (FAQ, privacy, legal): a back arrow and a title on top,
- * then the text in cards. The arrow goes back to the page it came from (the map when opened directly) with the account panel open.
+ * then the text in cards. The arrow goes back to the page it came from (the welcome page when opened directly) with the account panel open.
  */
 export function InfoPage({ title, intro, children }: { title: string; intro?: ReactNode; children: ReactNode }) {
   const navigate = useNavigate();
@@ -29,7 +29,7 @@ export function InfoPage({ title, intro, children }: { title: string; intro?: Re
   // These pages are opened from the account panel: the arrow goes back and opens the panel again, to pick another one.
   const back = nav ? nav.back : () => {
     if ((window.history.state?.__TSR_index ?? 0) > 0) window.history.back();
-    else void navigate({ to: "/mappa", replace: true });
+    else void navigate({ to: "/benvenuto", replace: true });
     window.setTimeout(openAccount, 350);
   };
   return (

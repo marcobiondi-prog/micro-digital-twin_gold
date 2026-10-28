@@ -42,7 +42,7 @@ function Reveal({ children, className = "" }: { children: ReactNode; className?:
 
 /** The four steps of the tutorial, each with a white line drawing (every stroke has pathLength 1, so it can draw itself). */
 const STEPS: Array<{ title: string; text: string; art: ReactNode }> = [
-  { title: "Trova il luogo", text: "Nella Mappa cerchi la piazza o il vigneto e lo guardi in 2D o in 3D.",
+  { title: "Trova il luogo", text: "Nella simulazione, nella scheda Mappa, cerchi la piazza o il vigneto e lo guardi in 2D o in 3D.",
     art: <>
       <path pathLength={1} d="M20 30 L55 20 L105 30 L140 20 V75 L105 85 L55 75 L20 85 Z" />
       <path pathLength={1} d="M55 20 V75 M105 30 V85" strokeOpacity="0.5" />
@@ -190,7 +190,7 @@ export function Tutorial() {
   const finish = () => {
     markIntroSeen();
     if (again && window.history.length > 1) window.history.back();
-    else void navigate({ to: again ? "/mappa" : "/scegli" });
+    else void navigate({ to: again ? "/benvenuto" : "/scegli" });
   };
   if (skip) return <div className="dark h-dvh bg-background" />;
   return (
@@ -315,7 +315,7 @@ export function Choice() {
             <span>Inizia con {item.name}</span>
             <span className="grid size-10 place-items-center rounded-full bg-background text-foreground"><ArrowRight className="size-5" aria-hidden="true" /></span>
           </button>
-          <Link to="/mappa" className="inline-flex h-12 items-center justify-center rounded-full text-sm font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">Salta, vai alla mappa</Link>
+          <Link to="/benvenuto" className="inline-flex h-12 items-center justify-center rounded-full text-sm font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">Salta, vai al benvenuto</Link>
         </div>
       </section>
     </div>

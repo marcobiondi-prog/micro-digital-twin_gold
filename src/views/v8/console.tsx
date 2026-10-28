@@ -10,12 +10,7 @@ import { THEME_CHANGED, THEME_DARK, THEME_META } from "@/views/theme-toggle";
  */
 
 export type SimKind = "urban" | "vineyard";
-export type SimTab = "simula" | "sensori";
-
-// Which place the Mappa page shows when it opens: the simulator that sent there sets it ("Cambia luogo", the place name).
-let mapPlace: SimKind = "urban";
-export const setMapPlace = (kind: SimKind) => { mapPlace = kind; };
-export const getMapPlace = () => mapPlace;
+export type SimTab = "simula" | "mappa" | "sensori";
 
 // The open tab of each simulator lives at module level, so the ⋯ menu and the camera can switch it.
 const tabs: Record<SimKind, SimTab> = { urban: "simula", vineyard: "simula" };
@@ -133,10 +128,15 @@ export function TabRow<T extends string>({ items, value, onChange, label, fill }
 export function Panels<T extends string>({ value, panels }: { value: T; panels: ReadonlyArray<{ id: T; always?: boolean; content: ReactNode }> }) {
   const [seen, setSeen] = useState<ReadonlySet<T>>(() => new Set([value]));
   useEffect(() => { setSeen((s) => (s.has(value) ? s : new Set([...s, value]))); }, [value]);
+  // The panel slides in from the side of its tab: a later tab comes from the right, an earlier one from the left.
+  const index = panels.findIndex((p) => p.id === value);
+  const last = useRef(index);
+  const dir = index === last.current ? 0 : index > last.current ? 1 : -1;
+  useEffect(() => { last.current = index; }, [index]);
   return (
     <>
       {panels.map((p) => (p.always || seen.has(p.id) || p.id === value) && (
-        <div key={p.id} role="tabpanel" hidden={p.id !== value} className="animate-in fade-in-0 duration-300 motion-reduce:animate-none">{p.content}</div>
+        <div key={p.id} role="tabpanel" hidden={p.id !== value} className={cn("animate-in fade-in-0 duration-300 motion-reduce:animate-none", p.id === value && dir > 0 && "slide-in-from-right-10", p.id === value && dir < 0 && "slide-in-from-left-10")}>{p.content}</div>
       ))}
     </>
   );

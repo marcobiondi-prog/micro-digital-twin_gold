@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as BenvenutoRouteImport } from './routes/benvenuto'
 import { Route as ChiSiamoRouteImport } from './routes/chi-siamo'
 import { Route as ContattiRouteImport } from './routes/contatti'
 import { Route as DashboardRouteImport } from './routes/dashboard'
@@ -37,6 +38,11 @@ const IndexRoute = IndexRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BenvenutoRoute = BenvenutoRouteImport.update({
+  id: '/benvenuto',
+  path: '/benvenuto',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChiSiamoRoute = ChiSiamoRouteImport.update({
@@ -130,6 +136,7 @@ const ApiPublicJobsCaseSourcesRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/benvenuto': typeof BenvenutoRoute
   '/chi-siamo': typeof ChiSiamoRoute
   '/contatti': typeof ContattiRoute
   '/dashboard': typeof DashboardRoute
@@ -151,6 +158,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/benvenuto': typeof BenvenutoRoute
   '/chi-siamo': typeof ChiSiamoRoute
   '/contatti': typeof ContattiRoute
   '/dashboard': typeof DashboardRoute
@@ -173,6 +181,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/benvenuto': typeof BenvenutoRoute
   '/chi-siamo': typeof ChiSiamoRoute
   '/contatti': typeof ContattiRoute
   '/dashboard': typeof DashboardRoute
@@ -196,6 +205,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/benvenuto'
     | '/chi-siamo'
     | '/contatti'
     | '/dashboard'
@@ -217,6 +227,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/benvenuto'
     | '/chi-siamo'
     | '/contatti'
     | '/dashboard'
@@ -238,6 +249,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/benvenuto'
     | '/chi-siamo'
     | '/contatti'
     | '/dashboard'
@@ -260,6 +272,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  BenvenutoRoute: typeof BenvenutoRoute
   ChiSiamoRoute: typeof ChiSiamoRoute
   ContattiRoute: typeof ContattiRoute
   DashboardRoute: typeof DashboardRoute
@@ -293,6 +306,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/benvenuto': {
+      id: '/benvenuto'
+      path: '/benvenuto'
+      fullPath: '/benvenuto'
+      preLoaderRoute: typeof BenvenutoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/chi-siamo': {
@@ -420,6 +440,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  BenvenutoRoute: BenvenutoRoute,
   ChiSiamoRoute: ChiSiamoRoute,
   ContattiRoute: ContattiRoute,
   DashboardRoute: DashboardRoute,
