@@ -105,3 +105,12 @@ describe("mixRows", () => {
     expect(one[0]!.rows[0]).toEqual({ label: "Irrigazione", value: "+2 %" });
   });
 });
+
+describe("season and hour kept in the mix", () => {
+  it("reads them from the mix when the entry's own fields are missing", () => {
+    const e = newEntry("piazza", "Alberi 3", "Piazza", new Date(), { kind: "piazza", trees: 3, permeable: 0, shade: 0 }, { season: "autunno", hour: 18 });
+    expect(e.mix?.when).toEqual({ season: "autunno", hour: 18 });
+    expect(whenOf({ ...e, season: null, hour: null })).toEqual({ season: "autunno", hour: 18 });
+    expect(isHistoryEntry({ ...e, season: null, hour: null })).toBe(true);
+  });
+});

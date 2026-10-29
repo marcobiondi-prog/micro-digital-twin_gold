@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { justSwiped } from "@/lib/use-tab-swipe";
+import { justSwiped, peekStyle } from "@/lib/use-tab-swipe";
 import { THEME_CHANGED, THEME_DARK, THEME_META } from "@/views/theme-toggle";
 
 /**
@@ -126,7 +126,7 @@ export function TabRow<T extends string>({ items, value, onChange, label, fill }
  * One panel at a time. A panel mounts the first time it is opened and then stays mounted (hidden when
  * closed), so maps keep their size and cameras keep their state; `always` panels mount from the start.
  */
-export function Panels<T extends string>({ value, panels }: { value: T; panels: ReadonlyArray<{ id: T; always?: boolean; content: ReactNode }> }) {
+export function Panels<T extends string>({ value, panels, peek = null, peekSide = 1, peekTop = 0 }: { value: T; panels: ReadonlyArray<{ id: T; always?: boolean; content: ReactNode }>; peek?: T | null; peekSide?: 1 | -1; peekTop?: number }) {
   const [seen, setSeen] = useState<ReadonlySet<T>>(() => new Set([value]));
   useEffect(() => { setSeen((s) => (s.has(value) ? s : new Set([...s, value]))); }, [value]);
   // The panel slides in from the side of its tab: a later tab comes from the right, an earlier one from the left.
@@ -137,9 +137,14 @@ export function Panels<T extends string>({ value, panels }: { value: T; panels: 
   useEffect(() => { last.current = index; }, [index]);
   return (
     <>
-      {panels.map((p) => (p.always || seen.has(p.id) || p.id === value) && (
-        <div key={p.id} role="tabpanel" hidden={p.id !== value} className={cn(dir !== 0 && "animate-in fade-in-0 duration-300 motion-reduce:animate-none", p.id === value && dir > 0 && "slide-in-from-right-10", p.id === value && dir < 0 && "slide-in-from-left-10")}>{p.content}</div>
-      ))}
+      {panels.map((p) => {
+        // While a swipe drags, the next tab's panel shows beside the open one (the same instance, mounted if needed).
+        const peeking = p.id === peek && p.id !== value;
+        return (p.always || seen.has(p.id) || p.id === value || peeking) && (
+          <div key={p.id} role="tabpanel" hidden={p.id !== value && !peeking} aria-hidden={peeking || undefined} style={peeking ? peekStyle(peekSide, peekTop) : undefined}
+            className={cn(p.id === value && dir !== 0 && "animate-in fade-in-0 duration-300 motion-reduce:animate-none", p.id === value && dir > 0 && "slide-in-from-right-10", p.id === value && dir < 0 && "slide-in-from-left-10")}>{p.content}</div>
+        );
+      })}
     </>
   );
 }

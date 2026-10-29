@@ -4,6 +4,9 @@ import { simTabSwipeStep, startsOnOwnGesture } from "@/lib/sim-tab-swipe";
 
 /** The tutorial's settle: the same curve and length as the screens of the index. */
 export const SLIDE_EASE = "transform 380ms cubic-bezier(0.22, 1, 0.36, 1)";
+/** Space between the open panel and the next one sliding in beside it. */
+export const PEEK_GAP = 16;
+
 /** When a swipe last turned the tab: that panel already slides in with the finger, so Panels skips its own entrance. */
 let swipedAt = 0;
 export const justSwiped = () => Date.now() - swipedAt < 150;
@@ -15,36 +18,56 @@ export const justSwiped = () => Date.now() - swipedAt < 150;
 let claimed = false;
 const reduced = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
+export type TabSwipe<T extends string> = {
+  /** The track: the open panel, and the next one beside it while dragging. */
+  ref: RefObject<HTMLDivElement | null>;
+  style: CSSProperties;
+  /** The tab coming in while the finger drags, shown beside the open one (null at rest). */
+  peek: T | null;
+  /** Which side it comes from: 1 on the right (next tab), −1 on the left. */
+  peekSide: 1 | -1;
+  /** How far down the track the peeking panel sits, so its top shows just under the tabs even when the page is scrolled. */
+  peekTop: number;
+};
+
+/** Where the visible part of the track starts: under its tab row (sticky or not) or under the pinned header. */
+function visibleTop(track: HTMLElement): number {
+  const bar = track.parentElement?.querySelector('[role="tablist"]');
+  const nav = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--nav-h")) || 0;
+  return Math.max(nav, (bar?.getBoundingClientRect().bottom ?? 0) + 12);
+}
+
 /**
  * Tabs that slide like the tutorial's screens. A sideways swipe (finger, or mouse drag on desktop) anywhere on the
- * page drags the open panel with the finger (only a little past the first and the last tab); past 50 px it turns
- * to the neighbouring tab, whose panel comes in from that side where the finger left it and settles; shorter, it
- * springs back. A mostly vertical move scrolls the page and drags nothing. Returns the style for the panels' track:
- * no transform at rest, so fixed elements inside keep their place. With `scope` (sub-tabs) only swipes starting
- * inside that element count, and they take the gesture from the page's tabs while they can turn.
+ * page drags the open panel with the finger, with the next tab's panel coming in beside it (only a little give past
+ * the first and the last tab); past 50 px it turns to that tab, which settles where the finger left it; shorter, it
+ * springs back. A mostly vertical move scrolls the page and drags nothing. No transform at rest, so fixed elements
+ * inside keep their place. With `scope` (sub-tabs) only swipes starting inside that element count, and they take
+ * the gesture from the page's tabs while they can turn.
  */
-export function useTabSwipe<T extends string>(ids: ReadonlyArray<T>, value: T, onChange: (id: T) => void, scope?: RefObject<HTMLElement | null>): CSSProperties {
+export function useTabSwipe<T extends string>(ids: ReadonlyArray<T>, value: T, onChange: (id: T) => void, scope?: RefObject<HTMLElement | null>): TabSwipe<T> {
   const start = useRef<{ x: number; y: number; axis: "x" | "y" | null } | null>(null);
-  const [slide, setSlide] = useState<{ x: number; animate: boolean }>({ x: 0, animate: false });
+  const track = useRef<HTMLDivElement | null>(null);
+  const [slide, setSlide] = useState<{ x: number; animate: boolean; peek: T | null; side: 1 | -1; top: number }>({ x: 0, animate: false, peek: null, side: 1, top: 0 });
   const latest = useRef({ ids, value, onChange });
   latest.current = { ids, value, onChange };
   useEffect(() => {
-    let frame = 0, rest = 0, dragged = 0;
+    // Sub-tabs listen on their own element, the page's tabs on the document (same events, typed as an element's).
+    const host = (scope ? scope.current : document) as HTMLElement | null;
+    if (!host) return;
+    let frame = 0, rest = 0, dragged = 0, top = 0;
     const stop = () => { cancelAnimationFrame(frame); clearTimeout(rest); };
     const settle = (from: number) => {
       stop();
       dragged = 0;
-      if (from === 0 || reduced()) { setSlide({ x: 0, animate: false }); return; }
-      setSlide({ x: from, animate: false });
+      if (from === 0 || reduced()) { setSlide({ x: 0, animate: false, peek: null, side: 1, top: 0 }); return; }
+      setSlide({ x: from, animate: false, peek: null, side: 1, top: 0 });
       // Two frames: the browser paints the start before the transition to rest begins; then the transform goes away.
       frame = requestAnimationFrame(() => { frame = requestAnimationFrame(() => {
-        setSlide({ x: 0, animate: true });
-        rest = window.setTimeout(() => setSlide({ x: 0, animate: false }), 420);
+        setSlide({ x: 0, animate: true, peek: null, side: 1, top: 0 });
+        rest = window.setTimeout(() => setSlide({ x: 0, animate: false, peek: null, side: 1, top: 0 }), 420);
       }); });
     };
-    // Sub-tabs listen on their own element, the page's tabs on the document (same events, typed as an element's).
-    const host = (scope ? scope.current : document) as HTMLElement | null;
-    if (!host) return;
     const begin = (x: number, y: number, target: EventTarget | null) => {
       claimed = false;
       start.current = document.documentElement.hasAttribute("data-ar-camera") || startsOnOwnGesture(target, scope?.current ?? document.body) ? null : { x, y, axis: null };
@@ -64,12 +87,15 @@ export function useTabSwipe<T extends string>(ids: ReadonlyArray<T>, value: T, o
           if (scope && edge) { start.current = null; return; }
           s.axis = "x";
           if (scope) claimed = true;
+          const t = track.current;
+          top = t ? Math.max(0, visibleTop(t) - t.getBoundingClientRect().top) : 0;
         }
       }
       if (s.axis !== "x") return;
       stop();
       dragged = edge ? dx * 0.25 : dx;
-      setSlide({ x: dragged, animate: false });
+      const side: 1 | -1 = dx < 0 ? 1 : -1;
+      setSlide({ x: dragged, animate: false, peek: edge ? null : (list[i + side] ?? null), side, top });
     };
     const finish = (x: number, y: number) => {
       const s = start.current;
@@ -82,8 +108,9 @@ export function useTabSwipe<T extends string>(ids: ReadonlyArray<T>, value: T, o
         hapticTick();
         swipedAt = Date.now();
         set(to);
-        // The new panel enters from the side the finger moved away from, where the old one's edge was.
-        const w = window.innerWidth;
+        // The page scrolls so the new panel's top sits where its peek was showing, then it settles from where the finger left it.
+        if (top > 0) window.scrollBy({ top: -top, behavior: "instant" as ScrollBehavior });
+        const w = (track.current?.offsetWidth ?? window.innerWidth) + PEEK_GAP;
         settle(next > i ? w + Math.min(0, dx) : -w + Math.max(0, dx));
       } else if (s.axis === "x") settle(dragged); // too short: spring back
     };
@@ -112,6 +139,13 @@ export function useTabSwipe<T extends string>(ids: ReadonlyArray<T>, value: T, o
       host.removeEventListener("pointerup", pu);
     };
   }, []);
-  if (slide.x === 0 && !slide.animate) return {};
-  return { transform: slide.x === 0 ? "translateX(0)" : `translateX(${slide.x}px)`, transition: slide.animate ? SLIDE_EASE : "none", willChange: "transform" };
+  const style: CSSProperties = slide.x === 0 && !slide.animate ? {}
+    : { transform: slide.x === 0 ? "translateX(0)" : `translateX(${slide.x}px)`, transition: slide.animate ? SLIDE_EASE : "none", willChange: "transform" };
+  return { ref: track, style, peek: slide.peek, peekSide: slide.side, peekTop: slide.top };
 }
+
+/** Style for the panel peeking beside the open one: placed one track width (plus the gap) to its side, under the tabs. */
+export const peekStyle = (side: 1 | -1, top: number): CSSProperties => ({
+  position: "absolute", left: 0, right: 0, top, pointerEvents: "none",
+  transform: `translateX(calc(${side * 100}% + ${side * PEEK_GAP}px))`,
+});

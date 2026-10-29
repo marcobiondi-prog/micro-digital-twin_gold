@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { z } from "zod";
-import { useTabSwipe } from "@/lib/use-tab-swipe";
+import { peekStyle, useTabSwipe } from "@/lib/use-tab-swipe";
+import { getSimWhen } from "@/models/sim-when";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertTriangle, Download, Plus, Building2, Grape, Copy, Printer, Activity, Trash2, Share2, Mail, LineChart as LineChartIcon, Leaf, NotebookPen, Droplets, Waves } from "lucide-react";
 import { toast } from "sonner";
@@ -146,7 +147,7 @@ function UrbanRecords() {
   const [log, setLog] = useState(DEFAULT_LOG.map((n) => ({ ...n })));
   const addLog = (t: string) => {
     setLog((p) => [{ d: new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }), t }, ...p].slice(0, 20));
-    void addHistory("piazza", t, splitLocation(lab.location.label).name);
+    void addHistory("piazza", t, splitLocation(lab.location.label).name, null, getSimWhen("urban"));
   };
   const [uid, setUid] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -363,7 +364,7 @@ function VineRecords() {
   const place = splitLocation(useLab().vineyard.location.label).name;
   const addNote = (t: string) => {
     setNotes((prev) => [{ d: new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }), t }, ...prev]);
-    void addHistory("vigneto", t, place);
+    void addHistory("vigneto", t, place, null, getSimWhen("vineyard"));
   };
   return (
     <div className="space-y-8">
@@ -901,7 +902,7 @@ function Dashboard() {
   const navigate = useNavigate({ from: Route.fullPath });
   const setT = (v: "Piazza" | "Vigneto") =>
     navigate({ search: (prev) => ({ ...prev, tab: v }), replace: true, resetScroll: false });
-  const track = useTabSwipe(["Piazza", "Vigneto"] as const, t, setT);
+  const swipe = useTabSwipe(["Piazza", "Vigneto"] as const, t, setT);
   const loading = useDashboardLoading(t);
   return (
     <div className="min-w-0">
@@ -912,9 +913,11 @@ function Dashboard() {
       <div className="sticky top-[var(--nav-h)] transition-[top] duration-300 z-[999999998] isolate mx-[calc(50%-50vw)] mb-5 mt-3 min-w-0 bg-background/80 px-0 py-2 sm:px-[calc(50vw-50%)] backdrop-blur-xl sm:mb-6">
         <TabRow fill label="Dashboard" items={[{ id: "Piazza", label: "Piazza", icon: Building2 }, { id: "Vigneto", label: "Vigneto", icon: Grape }]} value={t} onChange={setT} />
       </div>
-      <div key={t} className="min-w-0" style={track}>{loading
+      <div ref={swipe.ref} key={t} className="relative min-w-0" style={swipe.style}>{loading
         ? <DashboardLoading label={t === "Piazza" ? "dashboard della piazza" : "dashboard del vigneto"} tone={t === "Piazza" ? "urban" : "vine"} />
         : <div className="dashboard-content-enter">{t === "Piazza" ? <PiazzaDashboard records={<UrbanRecords />} /> : <VineDashboard records={<VineRecords />} />}</div>}
+        {/* While the finger drags, the other project's summary comes in beside it (without its records). */}
+        {swipe.peek && <div aria-hidden="true" style={peekStyle(swipe.peekSide, swipe.peekTop)}>{swipe.peek === "Piazza" ? <PiazzaDashboard records={null} /> : <VineDashboard records={null} />}</div>}
       </div>
     </div>
   );

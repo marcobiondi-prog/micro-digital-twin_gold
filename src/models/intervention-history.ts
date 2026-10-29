@@ -6,9 +6,13 @@ import { SEASONS, SEASON_LABEL, type Season } from "./season-climate";
 
 export type HistoryFlow = "piazza" | "vigneto";
 /** What was set when the entry was recorded, so "Riapri" can put it back (older entries have none). */
-export type HistoryMix =
+export type HistoryMix = (
   | { kind: "piazza"; trees: number; permeable: number; shade: number }
-  | { kind: "vigneto"; zones: Array<{ irrigation: number; shade: number; windbreak: number }>; allZones: boolean; selected: number };
+  | { kind: "vigneto"; zones: Array<{ irrigation: number; shade: number; windbreak: number }>; allZones: boolean; selected: number }
+) & {
+  /** A copy of the simulated season and hour, for an account table that lacks their own columns. */
+  when?: { season: string; hour: number } | null;
+};
 /** The season and hour the simulation was set to when the intervention was made (older entries have none). */
 export type HistoryWhen = { season: Season; hour: number };
 export type HistoryEntry = { id: string; at: string; flow: HistoryFlow; place: string; text: string; mix?: HistoryMix | null; season?: Season | null; hour?: number | null };
@@ -29,13 +33,17 @@ function uuid(): string {
 }
 
 export function newEntry(flow: HistoryFlow, text: string, place: string, now: Date = new Date(), mix: HistoryMix | null = null, when: HistoryWhen | null = null): HistoryEntry {
-  return { id: uuid(), at: now.toISOString(), flow, place: place.trim(), text: text.trim().slice(0, MAX_TEXT), mix, season: when?.season ?? null, hour: when?.hour ?? null };
+  return { id: uuid(), at: now.toISOString(), flow, place: place.trim(), text: text.trim().slice(0, MAX_TEXT), mix: mix && when ? { ...mix, when } : mix, season: when?.season ?? null, hour: when?.hour ?? null };
 }
 
 const isSeason = (v: unknown): v is Season => typeof v === "string" && (SEASONS as readonly string[]).includes(v);
 const isHour = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 23;
-/** The entry's simulated season and hour, when both were recorded. */
-export const whenOf = (e: HistoryEntry): HistoryWhen | null => (isSeason(e.season) && isHour(e.hour) ? { season: e.season, hour: e.hour } : null);
+/** The entry's simulated season and hour, when both were recorded (in their own fields, else the copy kept in the mix). */
+export const whenOf = (e: HistoryEntry): HistoryWhen | null => {
+  if (isSeason(e.season) && isHour(e.hour)) return { season: e.season, hour: e.hour };
+  const w = e.mix?.when;
+  return w && isSeason(w.season) && isHour(w.hour) ? { season: w.season, hour: w.hour } : null;
+};
 /** "Estate, ore 15", or "" for an entry without them. */
 export const whenLabel = (e: HistoryEntry): string => { const w = whenOf(e); return w ? `${SEASON_LABEL[w.season]}, ore ${w.hour}` : ""; };
 
