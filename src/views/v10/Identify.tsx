@@ -241,7 +241,7 @@ export function ProfileCard({ kind, go }: { kind: ProKind; go?: () => void }) {
     <div className="fuse-canvas space-y-4 rounded-3xl px-5 py-6">
       <div className="flex items-start justify-between gap-3">
         <p className="flex items-center gap-2 text-lg font-semibold"><BadgeCheck className="size-6 shrink-0 text-emerald-400" aria-hidden="true" />Sei identificato come {KIND_LABEL[kind].toLowerCase()}</p>
-        {mine.kind === "funzionario" ? <TownCrest name={mine.comune} istat={mine.istat} size={52} /> : <TownCrest name={mine.region} region size={52} />}
+        {mine.kind === "funzionario" ? <TownCrest name={mine.comune} istat={mine.istat} size={52} label /> : <TownCrest name={mine.region} region size={52} label />}
       </div>
       <dl className="divide-y divide-foreground/10 rounded-2xl bg-foreground/[0.05] px-4">
         {profileRows(mine).map(([k, v]) => (
