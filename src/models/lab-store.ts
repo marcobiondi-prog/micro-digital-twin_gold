@@ -64,6 +64,8 @@ function subscribe(l: () => void) {
   return () => listeners.delete(l);
 }
 
+/** The current state outside React (tests, one-off reads). */
+export const getLab = () => state;
 export function useLab() { return useSyncExternalStore(subscribe, () => state, () => serverState); }
 
 /** Derived indicators shared by the Decision Lab and the dashboards. */

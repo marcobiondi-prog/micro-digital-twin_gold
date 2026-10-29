@@ -3,16 +3,40 @@
  * Free users keep it on this device (localStorage); signed-in users keep it in their account (see lib/use-history).
  */
 export type HistoryFlow = "piazza" | "vigneto";
-export type HistoryEntry = { id: string; at: string; flow: HistoryFlow; place: string; text: string };
+/** What was set when the entry was recorded, so "Riapri" can put it back (older entries have none). */
+export type HistoryMix =
+  | { kind: "piazza"; trees: number; permeable: number; shade: number }
+  | { kind: "vigneto"; zones: Array<{ irrigation: number; shade: number; windbreak: number }>; allZones: boolean; selected: number };
+export type HistoryEntry = { id: string; at: string; flow: HistoryFlow; place: string; text: string; mix?: HistoryMix | null };
 
 export const MAX_HISTORY = 500;
 export const MAX_TEXT = 300;
 const KEY = "mdt-history-v1";
 
-export function newEntry(flow: HistoryFlow, text: string, place: string, now: Date = new Date()): HistoryEntry {
-  const id = `h-${now.getTime().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-  return { id, at: now.toISOString(), flow, place: place.trim(), text: text.trim().slice(0, MAX_TEXT) };
+/** A UUID, as the account's table expects (its id column is a uuid); a random v4-shaped one where crypto lacks it. */
+function uuid(): string {
+  const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+  if (c?.randomUUID) return c.randomUUID();
+  const hex = (n: number) => Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+  return `${hex(8)}-${hex(4)}-4${hex(3)}-${"89ab"[Math.floor(Math.random() * 4)]}${hex(3)}-${hex(12)}`;
 }
+
+export function newEntry(flow: HistoryFlow, text: string, place: string, now: Date = new Date(), mix: HistoryMix | null = null): HistoryEntry {
+  return { id: uuid(), at: now.toISOString(), flow, place: place.trim(), text: text.trim().slice(0, MAX_TEXT), mix };
+}
+
+const num = (v: unknown) => typeof v === "number" && Number.isFinite(v);
+/** A mix that can be put back: the right numbers for its kind. */
+export const isHistoryMix = (v: unknown): v is HistoryMix => {
+  if (!v || typeof v !== "object") return false;
+  const m = v as { kind?: unknown; trees?: unknown; permeable?: unknown; shade?: unknown; zones?: unknown; allZones?: unknown; selected?: unknown };
+  if (m.kind === "piazza") return num(m.trees) && num(m.permeable) && num(m.shade);
+  if (m.kind !== "vigneto" || !Array.isArray(m.zones) || m.zones.length === 0) return false;
+  return typeof m.allZones === "boolean" && num(m.selected) && m.zones.every((z: unknown) => {
+    const zone = z as { irrigation?: unknown; shade?: unknown; windbreak?: unknown } | null;
+    return !!zone && num(zone.irrigation) && num(zone.shade) && num(zone.windbreak);
+  });
+};
 
 export const sortNewestFirst = (entries: readonly HistoryEntry[]): HistoryEntry[] =>
   [...entries].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
@@ -26,7 +50,8 @@ export const mergeHistory = (...lists: ReadonlyArray<readonly HistoryEntry[]>): 
 export const isHistoryEntry = (v: unknown): v is HistoryEntry => {
   const e = v as Partial<HistoryEntry> | null;
   return !!e && typeof e.id === "string" && typeof e.at === "string" && !Number.isNaN(Date.parse(e.at))
-    && (e.flow === "piazza" || e.flow === "vigneto") && typeof e.place === "string" && typeof e.text === "string";
+    && (e.flow === "piazza" || e.flow === "vigneto") && typeof e.place === "string" && typeof e.text === "string"
+    && (e.mix === undefined || e.mix === null || isHistoryMix(e.mix));
 };
 
 /** Entries grouped by month, newest first: "ottobre 2026". */
@@ -60,6 +85,12 @@ export function localHistory(): HistoryEntry[] {
 export function addLocalHistory(entry: HistoryEntry) {
   local = mergeHistory([entry], localHistory());
   try { storage()?.setItem(KEY, JSON.stringify(local)); } catch { /* quota or private mode: memory only */ }
+  subs.forEach((f) => f());
+}
+/** Empties this device's history. */
+export function clearLocalHistory() {
+  local = [];
+  try { storage()?.removeItem(KEY); } catch { /* nothing saved */ }
   subs.forEach((f) => f());
 }
 export const subscribeLocalHistory = (f: () => void) => { subs.add(f); return () => { subs.delete(f); }; };

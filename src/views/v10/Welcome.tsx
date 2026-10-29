@@ -1,11 +1,12 @@
-import { useEffect, useMemo } from "react";
-import { Link } from "@tanstack/react-router";
-import { ArrowRight, Building2, Grape, History, Play } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
+import { ArrowRight, Building2, Grape, History, Play, RotateCcw, Trash2 } from "lucide-react";
 import { currentMedia, useLabMedia, type MediaItem } from "@/models/lab-media-store";
 import { mediaTime } from "@/models/media-time";
 import { Ambient, PageHero, openSimTab } from "@/views/v8/console";
 import { DashCard, DashSection } from "@/views/v10/Dashboard";
-import { useHistory } from "@/lib/use-history";
+import { clearHistory, reopenHistory, useHistory } from "@/lib/use-history";
 import { groupByMonth, type HistoryEntry } from "@/models/intervention-history";
 
 const TONE = "rgb(40 130 120 / 0.40)";
@@ -39,7 +40,28 @@ function Start({ to, icon: Icon, title, text }: { to: "/urbano" | "/vigneto"; ic
 
 /** The page after the intro: where to start, then every intervention recorded so far. */
 export function Welcome() {
-  const { entries, where, loading, failed } = useHistory();
+  const { entries, where, loading, failed, reload } = useHistory();
+  const navigate = useNavigate();
+  const [confirm, setConfirm] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  // "Riapri": the entry's interventions go back into its simulation, which opens on Simula.
+  const reopen = (e: HistoryEntry) => {
+    if (!e.mix) return;
+    reopenHistory(e.mix);
+    const kind = e.flow === "piazza" ? "urban" : "vineyard";
+    openSimTab(kind, "simula");
+    toast.success("Intervento riaperto", { description: e.text });
+    void navigate({ to: e.flow === "piazza" ? "/urbano" : "/vigneto" });
+  };
+  const clear = async () => {
+    setClearing(true);
+    const ok = await clearHistory();
+    setClearing(false);
+    setConfirm(false);
+    reload();
+    if (ok) toast.success("Cronologia cancellata");
+    else toast.error("Cancellata da questo dispositivo, non dal tuo account: riprova più tardi");
+  };
   const urban = useLabMedia("urban"), vineyard = useLabMedia("vineyard");
   useEffect(() => { void currentMedia("urban"); void currentMedia("vineyard"); }, []);
   const shots = useMemo<Shot[]>(() => [
@@ -81,11 +103,35 @@ export function Welcome() {
                     <p className="break-words text-[15px] leading-snug">{e.text}</p>
                     <p className="mt-0.5 truncate text-xs text-muted-foreground">{e.flow === "piazza" ? "Piazza" : "Vigneto"}{e.place ? ` · ${e.place}` : ""}</p>
                   </div>
+                  {e.mix && (
+                    <button type="button" onClick={() => reopen(e)} aria-label={`Riapri: ${e.text}`}
+                      className="inline-flex h-9 shrink-0 items-center gap-1.5 self-center rounded-full bg-foreground/[0.08] px-3 text-sm font-semibold outline-none hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring">
+                      <RotateCcw className="size-4" aria-hidden="true" />Riapri
+                    </button>
+                  )}
                 </div>
               ))}
             </DashCard>
           </div>
         ))}
+        {entries.length > 0 && (
+          // Asks once in place (no browser dialog): the account's history is gone for good.
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-2" role={confirm ? "alertdialog" : undefined} aria-label={confirm ? "Cancellare la cronologia?" : undefined}>
+            {confirm ? (
+              <>
+                <span className="w-full text-center text-sm text-muted-foreground">{where === "account" ? "Cancello tutta la cronologia, anche dal tuo account?" : "Cancello tutta la cronologia di questo dispositivo?"}</span>
+                <button type="button" onClick={() => setConfirm(false)} disabled={clearing} className="inline-flex h-10 items-center rounded-full bg-foreground/[0.08] px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">Annulla</button>
+                <button type="button" onClick={() => void clear()} disabled={clearing} className="inline-flex h-10 items-center gap-1.5 rounded-full bg-danger px-4 text-sm font-semibold text-danger-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">
+                  <Trash2 className="size-4" aria-hidden="true" />{clearing ? "Cancello…" : "Cancella"}
+                </button>
+              </>
+            ) : (
+              <button type="button" onClick={() => setConfirm(true)} className="inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+                <Trash2 className="size-4" aria-hidden="true" />Cancella cronologia
+              </button>
+            )}
+          </div>
+        )}
       </DashSection>
     </div>
   );

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-  addLocalHistory, groupByMonth, isHistoryEntry, localHistory, MAX_HISTORY, MAX_TEXT, mergeHistory, newEntry, resetLocalHistory,
+  addLocalHistory, clearLocalHistory, groupByMonth, isHistoryEntry, isHistoryMix, localHistory, MAX_HISTORY, MAX_TEXT, mergeHistory, newEntry, resetLocalHistory,
   sortNewestFirst, type HistoryEntry,
 } from "@/models/intervention-history";
 
@@ -47,6 +47,29 @@ describe("intervention-history", () => {
     expect(groups.map((g) => g.key)).toEqual(["2026-10", "2026-09"]);
     expect(groups[0]!.items.map((e) => e.id)).toEqual(["b", "c"]);
     expect(groups[0]!.label).toMatch(/ottobre 2026/i);
+  });
+
+  it("gives entries a uuid id, as the account table expects", () => {
+    expect(newEntry("piazza", "x", "").id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  });
+
+  it("keeps a valid mix and refuses a broken one", () => {
+    const piazza = { kind: "piazza", trees: 6, permeable: 20, shade: 15 } as const;
+    const vigneto = { kind: "vigneto", zones: [{ irrigation: 8, shade: 30, windbreak: 40 }], allZones: true, selected: 0 } as const;
+    expect(isHistoryMix(piazza) && isHistoryMix(vigneto)).toBe(true);
+    expect(isHistoryMix({ kind: "piazza", trees: "6", permeable: 20, shade: 15 })).toBe(false);
+    expect(isHistoryMix({ kind: "vigneto", zones: [], allZones: true, selected: 0 })).toBe(false);
+    expect(isHistoryEntry({ ...newEntry("piazza", "x", "", new Date(), piazza) })).toBe(true);
+    expect(isHistoryEntry({ ...newEntry("piazza", "x", ""), mix: { kind: "altro" } })).toBe(false);
+    expect(isHistoryEntry({ id: "a", at: "2026-10-01T00:00:00Z", flow: "piazza", place: "", text: "x" })).toBe(true);
+  });
+
+  it("empties the device history, also after a reload", () => {
+    addLocalHistory(at("2026-10-01T00:00:00Z", "a"));
+    clearLocalHistory();
+    expect(localHistory()).toEqual([]);
+    resetLocalHistory();
+    expect(localHistory()).toEqual([]);
   });
 
   it("keeps the device history across reloads", () => {

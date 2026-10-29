@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { addHistory } from "@/lib/use-history";
-import { urbanSummary, vineyardSummary } from "@/models/history-summary";
+import { urbanMix, urbanSummary, vineyardMix, vineyardSummary } from "@/models/history-summary";
 import { useLab } from "@/models/lab-store";
 import { splitLocation } from "@/views/SimulationGrid";
 import type { SimKind } from "@/views/v8/console";
@@ -27,7 +27,7 @@ export function useAutoHistory(kind: SimKind) {
       const l = latest.current;
       const text = kind === "urban" ? urbanSummary(l.urban) : vineyardSummary(l.vineyard);
       const place = splitLocation((kind === "urban" ? l.urban : l.vineyard).location.label).name;
-      void addHistory(kind === "urban" ? "piazza" : "vigneto", text, place);
+      void addHistory(kind === "urban" ? "piazza" : "vigneto", text, place, kind === "urban" ? urbanMix(l.urban) : vineyardMix(l.vineyard));
     }, WAIT_MS);
     return () => window.clearTimeout(timer);
   }, [levers, kind]);
