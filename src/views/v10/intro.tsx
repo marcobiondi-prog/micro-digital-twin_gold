@@ -19,8 +19,8 @@ import { introSeen, markIntroSeen } from "@/lib/intro-seen";
 
 type Item = { id: "camera" | "urban" | "vine"; Icon: typeof Building2; name: string; desc: string };
 const items: Item[] = [
-  { id: "urban", Icon: Building2, name: "Piazza", desc: "Metti alberi, prato e ombra: vedi quanti gradi in meno." },
-  { id: "vine", Icon: Grape, name: "Vigneto", desc: "Regola sole, acqua e vento: vedi quanta sete ha la vite." },
+  { id: "urban", Icon: Building2, name: "Piazza", desc: "Per i funzionari del Comune: metti alberi, prato e ombra e vedi quanti gradi in meno." },
+  { id: "vine", Icon: Grape, name: "Vigneto", desc: "Per gli agronomi con il patentino fitosanitario: regola sole, acqua e vento e vedi quanta sete ha la vite." },
   { id: "camera", Icon: ScanLine, name: "Fotocamera AI", desc: "Inquadra una pianta: riconosce la specie e il fresco che regala." },
 ];
 
@@ -40,8 +40,18 @@ function Reveal({ children, className = "" }: { children: ReactNode; className?:
   return <div ref={ref} data-shown={shown || undefined} className={`transition-[opacity,transform] duration-700 ease-out motion-reduce:transition-none ${shown ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"} ${className}`}>{children}</div>;
 }
 
-/** The four steps of the tutorial, each with a white line drawing (every stroke has pathLength 1, so it can draw itself). */
+/** The five steps of the tutorial, each with a white line drawing (every stroke has pathLength 1, so it can draw itself). */
 const STEPS: Array<{ title: string; text: string; art: ReactNode }> = [
+  { title: "Identificati", text: "Agronomo con il patentino fitosanitario: si apre il vigneto. Funzionario del Comune, con il tuo ufficio: si apre la piazza. Un profilo alla volta.",
+    art: <>
+      <rect pathLength={1} x="22" y="20" width="76" height="56" rx="8" />
+      <circle pathLength={1} cx="44" cy="42" r="9" />
+      <path pathLength={1} d="M32 64 C34 56 54 56 56 64" />
+      <path pathLength={1} d="M66 38 H88 M66 48 H84 M66 58 H80" strokeOpacity="0.6" />
+      <rect pathLength={1} x="110" y="48" width="30" height="26" rx="5" />
+      <path pathLength={1} d="M116 48 V40 A9 9 0 0 1 134 40 V48" />
+      <circle cx="125" cy="61" r="3" fill="currentColor" stroke="none" className="intro-pop" />
+    </> },
   { title: "Trova il luogo", text: "Nella simulazione, nella scheda Mappa, cerchi la piazza o il vigneto e lo guardi in 2D o in 3D.",
     art: <>
       <path pathLength={1} d="M20 30 L55 20 L105 30 L140 20 V75 L105 85 L55 75 L20 85 Z" />
@@ -218,7 +228,7 @@ export function Tutorial() {
             <span className="block h-[clamp(3.5rem,16dvh,9rem)] w-[clamp(3.5rem,16dvh,9rem)]"><TwinMascot className="block h-full w-full drop-shadow-[0_12px_40px_rgb(76_201_189/0.25)]" /></span>
             <p className="mt-[clamp(0.25rem,1.2dvh,1rem)] font-display text-[clamp(0.75rem,4.2dvh,1.5rem)] font-semibold uppercase tracking-[0.18em] text-foreground">Micro Digital <span className="text-brand-turquoise">Twin</span></p>
             <h2 className="mt-[clamp(0.375rem,2dvh,1.5rem)] font-display text-[clamp(1.8rem,min(9vw,8dvh),3.75rem)] font-extralight leading-[1.02] tracking-tight text-foreground">Prova gli interventi<br />prima di farli.</h2>
-            <p className="mt-[clamp(0.25rem,1.2dvh,1rem)] text-[clamp(0.75rem,4.1dvh,0.9375rem)] text-foreground/60">Ecco come funziona, in quattro passi.</p>
+            <p className="mt-[clamp(0.25rem,1.2dvh,1rem)] text-[clamp(0.75rem,4.1dvh,0.9375rem)] text-foreground/60">Ecco come funziona, in cinque passi.</p>
           </Reveal>
         </section>
         {STEPS.map((st, i) => (

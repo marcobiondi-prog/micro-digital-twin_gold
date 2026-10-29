@@ -24,6 +24,8 @@ import { Route as ScegliRouteImport } from './routes/scegli'
 import { Route as UrbanoRouteImport } from './routes/urbano'
 import { Route as VignetoRouteImport } from './routes/vigneto'
 import { Route as CronologiaIdRouteImport } from './routes/cronologia_.$id'
+import { Route as IdentificazioneAgronomoRouteImport } from './routes/identificazione.agronomo'
+import { Route as IdentificazioneFunzionarioRouteImport } from './routes/identificazione.funzionario'
 import { Route as LegaleLicenzeRouteImport } from './routes/legale/licenze'
 import { Route as LegaleTerminiRouteImport } from './routes/legale/termini'
 import { Route as PrivacyCookieRouteImport } from './routes/privacy/cookie'
@@ -107,6 +109,17 @@ const CronologiaIdRoute = CronologiaIdRouteImport.update({
   path: '/cronologia/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const IdentificazioneAgronomoRoute = IdentificazioneAgronomoRouteImport.update({
+  id: '/identificazione/agronomo',
+  path: '/identificazione/agronomo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IdentificazioneFunzionarioRoute =
+  IdentificazioneFunzionarioRouteImport.update({
+    id: '/identificazione/funzionario',
+    path: '/identificazione/funzionario',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const LegaleLicenzeRoute = LegaleLicenzeRouteImport.update({
   id: '/legale/licenze',
   path: '/legale/licenze',
@@ -161,6 +174,8 @@ export interface FileRoutesByFullPath {
   '/urbano': typeof UrbanoRoute
   '/vigneto': typeof VignetoRoute
   '/cronologia/$id': typeof CronologiaIdRoute
+  '/identificazione/agronomo': typeof IdentificazioneAgronomoRoute
+  '/identificazione/funzionario': typeof IdentificazioneFunzionarioRoute
   '/legale/licenze': typeof LegaleLicenzeRoute
   '/legale/termini': typeof LegaleTerminiRoute
   '/privacy/cookie': typeof PrivacyCookieRoute
@@ -185,6 +200,8 @@ export interface FileRoutesByTo {
   '/urbano': typeof UrbanoRoute
   '/vigneto': typeof VignetoRoute
   '/cronologia/$id': typeof CronologiaIdRoute
+  '/identificazione/agronomo': typeof IdentificazioneAgronomoRoute
+  '/identificazione/funzionario': typeof IdentificazioneFunzionarioRoute
   '/legale/licenze': typeof LegaleLicenzeRoute
   '/legale/termini': typeof LegaleTerminiRoute
   '/privacy/cookie': typeof PrivacyCookieRoute
@@ -210,6 +227,8 @@ export interface FileRoutesById {
   '/urbano': typeof UrbanoRoute
   '/vigneto': typeof VignetoRoute
   '/cronologia_/$id': typeof CronologiaIdRoute
+  '/identificazione/agronomo': typeof IdentificazioneAgronomoRoute
+  '/identificazione/funzionario': typeof IdentificazioneFunzionarioRoute
   '/legale/licenze': typeof LegaleLicenzeRoute
   '/legale/termini': typeof LegaleTerminiRoute
   '/privacy/cookie': typeof PrivacyCookieRoute
@@ -236,6 +255,8 @@ export interface FileRouteTypes {
     | '/urbano'
     | '/vigneto'
     | '/cronologia/$id'
+    | '/identificazione/agronomo'
+    | '/identificazione/funzionario'
     | '/legale/licenze'
     | '/legale/termini'
     | '/privacy/cookie'
@@ -260,6 +281,8 @@ export interface FileRouteTypes {
     | '/urbano'
     | '/vigneto'
     | '/cronologia/$id'
+    | '/identificazione/agronomo'
+    | '/identificazione/funzionario'
     | '/legale/licenze'
     | '/legale/termini'
     | '/privacy/cookie'
@@ -284,6 +307,8 @@ export interface FileRouteTypes {
     | '/urbano'
     | '/vigneto'
     | '/cronologia_/$id'
+    | '/identificazione/agronomo'
+    | '/identificazione/funzionario'
     | '/legale/licenze'
     | '/legale/termini'
     | '/privacy/cookie'
@@ -309,6 +334,8 @@ export interface RootRouteChildren {
   UrbanoRoute: typeof UrbanoRoute
   VignetoRoute: typeof VignetoRoute
   CronologiaIdRoute: typeof CronologiaIdRoute
+  IdentificazioneAgronomoRoute: typeof IdentificazioneAgronomoRoute
+  IdentificazioneFunzionarioRoute: typeof IdentificazioneFunzionarioRoute
   LegaleLicenzeRoute: typeof LegaleLicenzeRoute
   LegaleTerminiRoute: typeof LegaleTerminiRoute
   PrivacyCookieRoute: typeof PrivacyCookieRoute
@@ -425,6 +452,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CronologiaIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/identificazione/agronomo': {
+      id: '/identificazione/agronomo'
+      path: '/identificazione/agronomo'
+      fullPath: '/identificazione/agronomo'
+      preLoaderRoute: typeof IdentificazioneAgronomoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/identificazione/funzionario': {
+      id: '/identificazione/funzionario'
+      path: '/identificazione/funzionario'
+      fullPath: '/identificazione/funzionario'
+      preLoaderRoute: typeof IdentificazioneFunzionarioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/legale/licenze': {
       id: '/legale/licenze'
       path: '/legale/licenze'
@@ -493,6 +534,8 @@ const rootRouteChildren: RootRouteChildren = {
   UrbanoRoute: UrbanoRoute,
   VignetoRoute: VignetoRoute,
   CronologiaIdRoute: CronologiaIdRoute,
+  IdentificazioneAgronomoRoute: IdentificazioneAgronomoRoute,
+  IdentificazioneFunzionarioRoute: IdentificazioneFunzionarioRoute,
   LegaleLicenzeRoute: LegaleLicenzeRoute,
   LegaleTerminiRoute: LegaleTerminiRoute,
   PrivacyCookieRoute: PrivacyCookieRoute,

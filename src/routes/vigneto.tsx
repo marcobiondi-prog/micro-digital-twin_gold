@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { VineyardFlow } from "@/views/LabFlows";
+import { SectionGate } from "@/views/v10/ProfileGate";
 
 export const Route = createFileRoute("/vigneto")({
   head: () => ({
@@ -15,7 +16,8 @@ export const Route = createFileRoute("/vigneto")({
 function Vigneto() {
   return (
     <div className="lab-page">
-      <VineyardFlow />
+      {/* Open only to its profile (the agronomist): otherwise the lock and the way to identify. */}
+      <SectionGate section="vineyard"><VineyardFlow /></SectionGate>
     </div>
   );
 }

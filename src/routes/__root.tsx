@@ -15,7 +15,9 @@ import { syncAppOrientation } from "@/lib/ar-orientation";
 import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
 import { installUiClicks } from "@/lib/ui-sounds";
 import { reloadFresh } from "@/router";
-import { History, Building2, Grape, Info, LayoutDashboard } from "lucide-react";
+import { History, Building2, Grape, Info, LayoutDashboard, Lock } from "lucide-react";
+import { useProId, useSyncProId } from "@/lib/use-pro-id";
+import { unlocks } from "@/models/professional-id";
 
 function NotFoundComponent() {
   return (
@@ -142,6 +144,7 @@ const PS_LIGHT: Record<number, { left: string; top: string; tilt: string }> = {
 };
 
 function BottomNav() {
+  const proId = useProId();
   const pathname = useLocation({ select: (l) => l.pathname });
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
@@ -183,9 +186,11 @@ function BottomNav() {
   }, [pathname]);
   const item = ({ to, l, I }: (typeof bottomItems)[number], index: number) => {
     const active = pathname === to || (to === "/benvenuto" && pathname.startsWith("/cronologia"));
+    // Piazza and vineyard wear a small lock until the profile that opens them is identified.
+    const locked = (to === "/urbano" || to === "/vigneto") && proId !== undefined && !unlocks(proId, to === "/urbano" ? "urban" : "vineyard");
     return (
       <li key={to}>
-        <Link to={to} replace={pathname !== "/"} aria-current={active ? "page" : undefined} aria-label={l}
+        <Link to={to} replace={pathname !== "/"} aria-current={active ? "page" : undefined} aria-label={locked ? `${l}, bloccato` : l}
           onClick={(e) => {
             if (goHomeBack(e, to, pathname)) return;
             if (!active) return;
@@ -193,7 +198,7 @@ function BottomNav() {
             window.scrollTo({ top: 0, behavior: "instant" });
           }}
           className="ps-nav-item" data-active={active || undefined}>
-          <span className="ps-nav-icon"><I className="size-6" strokeWidth={2} aria-hidden="true" /></span>
+          <span className="ps-nav-icon relative"><I className="size-6" strokeWidth={2} aria-hidden="true" />{locked && <Lock className="absolute -bottom-1 -right-2 size-3.5 rounded-full bg-background p-[1px]" strokeWidth={2.5} aria-hidden="true" />}</span>
         </Link>
       </li>
     );
@@ -239,6 +244,7 @@ function BottomNav() {
 }
 
 function SmartNav() {
+  const proId = useProId();
   const [pinned, setPinned] = useState(false);
   const [placeholderTop, setPlaceholderTop] = useState(0);
   useEffect(() => {
@@ -330,7 +336,7 @@ function SmartNav() {
                   replace={pathname !== "/"}
                   onClick={(e) => { if (goHomeBack(e, n.to, pathname)) return; centerTapped(e.currentTarget, pathname === n.to); }}
                   className={`nav-glass nav-glass-gloss relative shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring ${pathname === n.to ? "nav-glass-on bg-nav-accent text-nav-accent-foreground" : "text-muted-foreground dark:text-nav-accent-foreground"}`}>
-                  {n.l}
+                  {n.l}{(n.to === "/urbano" || n.to === "/vigneto") && proId !== undefined && !unlocks(proId, n.to === "/urbano" ? "urban" : "vineyard") && <Lock className="ml-1 inline size-3.5 align-[-2px]" aria-label="bloccato" />}
                 </Link>
               ))}
             </div>
@@ -345,6 +351,8 @@ function SmartNav() {
 // re-hydration a hot reload performs inside the same document.
 
 function RootComponent() {
+  // The professional profile follows the account: adopted on sign-in, or uploaded to an account without one.
+  useSyncProId();
   const { queryClient } = Route.useRouteContext();
   const navigate = useNavigate();
   const location = useLocation();

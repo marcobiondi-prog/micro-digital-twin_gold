@@ -1,3 +1,5 @@
+import { useProId } from "@/lib/use-pro-id";
+import { proSummary } from "@/models/professional-id";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ComponentType, type FormEvent } from "react";
 import { LogOut, UserRound, Mail, LockKeyhole, Camera, ShieldCheck, ChevronRight } from "lucide-react";
 import { Link } from "@tanstack/react-router";
@@ -76,6 +78,7 @@ const LINK_GROUPS: Array<{ title: string; links: Array<[string, InfoPath]> }> = 
 export function AccountControl() {
   const [open, setOpen] = useState(false);
   const demo = useDemoSignedIn();
+  const proId = useProId();
   // The locked AI option of the camera sheet opens this dialog to sign in.
   useEffect(() => {
     const show = () => setOpen(true);
@@ -373,6 +376,22 @@ export function AccountControl() {
               {DEMO_LOGIN_AVAILABLE && <Button variant="outline" className="w-full border-dashed" onClick={() => { setDemoSignedIn(true); setOpen(false); }}>Simula l’accesso (solo anteprima)</Button>}
             </section>
           )}
+          {/* The professional profile: who is identified (one at a time) and the identification pages that open each simulation. */}
+          <section aria-label="Profilo professionale" className="rounded-3xl bg-foreground/[0.05] px-5 py-3">
+            <h3 className="py-2 text-base font-semibold">Profilo professionale</h3>
+            <p className="pb-2 text-sm text-muted-foreground">{proId ? proSummary(proId) : "Nessun profilo: piazza e vigneto sono bloccati."}</p>
+            <ul>
+              {([["Agronomo · apre il vigneto", "/identificazione/agronomo", "agronomo"], ["Funzionario comunale · apre la piazza", "/identificazione/funzionario", "funzionario"]] as const).map(([label, to, kind]) => (
+                <li key={to}>
+                  <Link to={to} onClick={() => setOpen(false)} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl text-left text-[15px] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+                    <span className="min-w-0 flex-1">{label}</span>
+                    {proId?.kind === kind && <span className="shrink-0 text-sm text-emerald-400">Attivo</span>}
+                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
           {/* Help, privacy and legal, as grouped rows; each opens its own page. */}
           <nav aria-label="Aiuto e informazioni" className="space-y-3 border-t pt-6">
             {LINK_GROUPS.map((g) => (

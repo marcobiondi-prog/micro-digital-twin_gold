@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { UrbanFlow } from "@/views/LabFlows";
+import { SectionGate } from "@/views/v10/ProfileGate";
 
 export const Route = createFileRoute("/urbano")({
   head: () => ({
@@ -15,7 +16,8 @@ export const Route = createFileRoute("/urbano")({
 function Urbano() {
   return (
     <div className="lab-page">
-      <UrbanFlow />
+      {/* Open only to its profile (the municipal officer): otherwise the lock and the way to identify. */}
+      <SectionGate section="urban"><UrbanFlow /></SectionGate>
     </div>
   );
 }

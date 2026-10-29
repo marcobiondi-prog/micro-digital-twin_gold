@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { z } from "zod";
 import { useTabSwipe } from "@/lib/use-tab-swipe";
+import { SectionLockCard, useSectionOpen } from "@/views/v10/ProfileGate";
 import { getSimWhen } from "@/models/sim-when";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertTriangle, Download, Plus, Building2, Grape, Copy, Printer, Activity, Trash2, Share2, Mail, LineChart as LineChartIcon, Leaf, NotebookPen, Droplets, Waves } from "lucide-react";
@@ -904,6 +905,8 @@ function Dashboard() {
     navigate({ search: (prev) => ({ ...prev, tab: v }), replace: true, resetScroll: false });
   const swipe = useTabSwipe(["Piazza", "Vigneto"] as const, t, setT);
   const loading = useDashboardLoading(t);
+  // Each project shows only to its profile (the piazza to the municipal officer, the vineyard to the agronomist).
+  const sectionOpen = useSectionOpen(t === "Piazza" ? "urban" : "vineyard") !== false;
   return (
     <div className="min-w-0">
       <Ambient tone={t === "Piazza" ? "rgb(28 112 210 / 0.38)" : "rgb(150 36 110 / 0.38)"} />
@@ -916,6 +919,7 @@ function Dashboard() {
       {/* The open project follows the finger and the other slides in once it turns; nothing peeks beside it. */}
       <div ref={swipe.ref} key={t} className="relative min-w-0" style={swipe.style}>{loading
         ? <DashboardLoading label={t === "Piazza" ? "dashboard della piazza" : "dashboard del vigneto"} tone={t === "Piazza" ? "urban" : "vine"} />
+        : !sectionOpen ? <SectionLockCard section={t === "Piazza" ? "urban" : "vineyard"} className="dashboard-content-enter" />
         : <div className="dashboard-content-enter">{t === "Piazza" ? <PiazzaDashboard records={<UrbanRecords />} /> : <VineDashboard records={<VineRecords />} />}</div>}
       </div>
     </div>

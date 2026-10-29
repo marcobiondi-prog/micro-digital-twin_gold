@@ -1,0 +1,183 @@
+import { useId, useState, type ReactNode } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
+import { ArrowLeft, ArrowRight, BadgeCheck, Building2, Grape, LogOut, ShieldCheck } from "lucide-react";
+import { saveProId, useProId } from "@/lib/use-pro-id";
+import { cn } from "@/lib/utils";
+import {
+  checkAgronomo, checkFunzionario, KIND_LABEL, OFFICES, REGIONS, ROLES, proSummary,
+  type AgronomoInput, type Errors, type FunzionarioInput, type ProKind,
+} from "@/models/professional-id";
+import { Ambient, PageHero } from "@/views/v8/console";
+import { SECTION_TONE } from "@/views/v10/ProfileGate";
+
+const fieldCls = "h-12 w-full rounded-2xl border border-foreground/10 bg-foreground/[0.05] px-4 text-[15px] outline-none focus-visible:ring-2 focus-visible:ring-ring aria-[invalid=true]:border-danger";
+
+function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string | undefined; children: (id: string, describedBy: string | undefined) => ReactNode }) {
+  const id = useId(), msg = `${id}-msg`;
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor={id} className="block px-1 text-sm font-medium">{label}</label>
+      {children(id, error || hint ? msg : undefined)}
+      {(error || hint) && <p id={msg} className={cn("px-1 text-xs", error ? "text-danger" : "text-muted-foreground")}>{error ?? hint}</p>}
+    </div>
+  );
+}
+
+function Declare({ checked, onChange, error }: { checked: boolean; onChange: (v: boolean) => void; error?: string | undefined }) {
+  return (
+    <div className="space-y-1">
+      <label className="flex items-start gap-3 rounded-2xl bg-foreground/[0.05] px-4 py-3 text-sm">
+        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-current" aria-invalid={!!error} />
+        <span>Dichiaro che i dati sono miei e veri. So che vengono controllati solo nella forma e non con il registro ufficiale.</span>
+      </label>
+      {error && <p className="px-1 text-xs text-danger">{error}</p>}
+    </div>
+  );
+}
+
+const PAGE: Record<ProKind, { title: string; section: "urban" | "vineyard"; opens: string; locks: string; go: "/urbano" | "/vigneto"; intro: string }> = {
+  agronomo: { title: "Agronomo", section: "vineyard", opens: "il vigneto", locks: "la piazza", go: "/vigneto",
+    intro: "Con il patentino fitosanitario si apre la simulazione del vigneto. Un profilo alla volta: la simulazione della piazza si blocca." },
+  funzionario: { title: "Funzionario comunale", section: "urban", opens: "la piazza", locks: "il vigneto", go: "/urbano",
+    intro: "Con il tuo Comune, l'ufficio di appartenenza e l'email del Comune si apre la simulazione della piazza. Un profilo alla volta: la simulazione del vigneto si blocca." },
+};
+
+function AgronomoForm({ onDone }: { onDone: () => void }) {
+  const [v, setV] = useState<AgronomoInput>({ name: "", licenceType: "", licence: "", region: "", expires: "", declared: false });
+  const [errors, setErrors] = useState<Errors<keyof AgronomoInput>>({});
+  // Changing a field clears its message: the rest stay until the next try.
+  const up = <K extends keyof AgronomoInput>(k: K, val: AgronomoInput[K]) => {
+    setV((p) => ({ ...p, [k]: val }));
+    setErrors((e) => { const { [k]: _gone, ...rest } = e; return rest as typeof e; });
+  };
+  const submit = async () => {
+    const { id, errors: e } = checkAgronomo(v);
+    setErrors(e);
+    if (!id) return;
+    await saveProId(id);
+    onDone();
+  };
+  return (
+    <form noValidate onSubmit={(e) => { e.preventDefault(); void submit(); }} className="space-y-4">
+      <Field label="Nome e cognome" error={errors.name}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!errors.name} autoComplete="name" value={v.name} onChange={(e) => up("name", e.target.value)} className={fieldCls} />}</Field>
+      <div className="space-y-1.5" role="radiogroup" aria-label="Tipo di patentino">
+        <p className="px-1 text-sm font-medium">Tipo di patentino</p>
+        <div className="grid grid-cols-2 gap-2">
+          {([["consulente", "Consulente", "per consigliare"], ["utilizzatore", "Utilizzatore", "per acquisto e uso"]] as const).map(([k, l, s]) => (
+            <button key={k} type="button" role="radio" aria-checked={v.licenceType === k} onClick={() => up("licenceType", k)}
+              className={cn("rounded-2xl px-4 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring", v.licenceType === k ? "bg-foreground text-background" : "bg-foreground/[0.05]")}>
+              <span className="block text-[15px] font-semibold">{l}</span><span className={cn("block text-xs", v.licenceType === k ? "text-background/70" : "text-muted-foreground")}>{s}</span>
+            </button>
+          ))}
+        </div>
+        {errors.licenceType && <p className="px-1 text-xs text-danger">{errors.licenceType}</p>}
+      </div>
+      <Field label="Numero del patentino fitosanitario" hint="Come è scritto sul patentino, per esempio MOL/CB/01234." error={errors.licence}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!errors.licence} autoCapitalize="characters" value={v.licence} onChange={(e) => up("licence", e.target.value)} className={fieldCls} />}</Field>
+      <Field label="Regione che l'ha rilasciato" error={errors.region}>{(id, d) => (
+        <select id={id} aria-describedby={d} aria-invalid={!!errors.region} value={v.region} onChange={(e) => up("region", e.target.value)} className={fieldCls}>
+          <option value="">Scegli la regione</option>{REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>)}</Field>
+      <Field label="Scadenza" hint="Il patentino vale 5 anni: deve essere ancora valido." error={errors.expires}>{(id, d) => <input id={id} type="date" aria-describedby={d} aria-invalid={!!errors.expires} value={v.expires} onChange={(e) => up("expires", e.target.value)} className={fieldCls} />}</Field>
+      <Declare checked={v.declared} onChange={(b) => up("declared", b)} error={errors.declared} />
+      <Submit label="Identificati e apri il vigneto" />
+    </form>
+  );
+}
+
+function FunzionarioForm({ onDone }: { onDone: () => void }) {
+  const [v, setV] = useState<FunzionarioInput>({ name: "", comune: "", office: "", otherOffice: "", role: "", email: "", badge: "", declared: false });
+  const [errors, setErrors] = useState<Errors<keyof FunzionarioInput>>({});
+  // Changing a field clears its message: the rest stay until the next try.
+  const up = <K extends keyof FunzionarioInput>(k: K, val: FunzionarioInput[K]) => {
+    setV((p) => ({ ...p, [k]: val }));
+    setErrors((e) => { const { [k]: _gone, ...rest } = e; return rest as typeof e; });
+  };
+  const submit = async () => {
+    const { id, errors: e } = checkFunzionario(v);
+    setErrors(e);
+    if (!id) return;
+    await saveProId(id);
+    onDone();
+  };
+  return (
+    <form noValidate onSubmit={(e) => { e.preventDefault(); void submit(); }} className="space-y-4">
+      <Field label="Nome e cognome" error={errors.name}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!errors.name} autoComplete="name" value={v.name} onChange={(e) => up("name", e.target.value)} className={fieldCls} />}</Field>
+      <Field label="Comune" hint="Il Comune in cui lavori, per esempio Campobasso." error={errors.comune}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!errors.comune} value={v.comune} onChange={(e) => up("comune", e.target.value)} className={fieldCls} />}</Field>
+      <Field label="Ufficio di appartenenza" error={errors.office}>{(id, d) => (
+        <select id={id} aria-describedby={d} aria-invalid={!!errors.office} value={v.office} onChange={(e) => up("office", e.target.value)} className={fieldCls}>
+          <option value="">Scegli l'ufficio</option>{OFFICES.map((o) => <option key={o} value={o}>{o}</option>)}
+        </select>)}</Field>
+      {v.office === "Altro" && <Field label="Nome dell'ufficio" error={errors.otherOffice}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!errors.otherOffice} value={v.otherOffice} onChange={(e) => up("otherOffice", e.target.value)} className={fieldCls} />}</Field>}
+      <Field label="Ruolo" error={errors.role}>{(id, d) => (
+        <select id={id} aria-describedby={d} aria-invalid={!!errors.role} value={v.role} onChange={(e) => up("role", e.target.value)} className={fieldCls}>
+          <option value="">Scegli il ruolo</option>{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>)}</Field>
+      <Field label="Email del Comune" hint="Quella istituzionale, per esempio nome.cognome@comune.campobasso.it." error={errors.email}>{(id, d) => <input id={id} type="email" inputMode="email" autoComplete="email" aria-describedby={d} aria-invalid={!!errors.email} value={v.email} onChange={(e) => up("email", e.target.value)} className={fieldCls} />}</Field>
+      <Field label="Matricola (facoltativa)" hint="Il numero del tuo badge o della matricola, se vuoi aggiungerlo." error={errors.badge}>{(id, d) => <input id={id} aria-describedby={d} value={v.badge} onChange={(e) => up("badge", e.target.value)} className={fieldCls} />}</Field>
+      <Declare checked={v.declared} onChange={(b) => up("declared", b)} error={errors.declared} />
+      <Submit label="Identificati e apri la piazza" />
+    </form>
+  );
+}
+
+function Submit({ label }: { label: string }) {
+  return (
+    <button type="submit" className="flex h-14 w-full items-center justify-between rounded-full bg-foreground pl-6 pr-2 text-base font-semibold text-background outline-none focus-visible:ring-4 focus-visible:ring-ring/50 active:scale-[0.99]">
+      {label}<span className="grid size-10 place-items-center rounded-full bg-background text-foreground"><ArrowRight className="size-5" aria-hidden="true" /></span>
+    </button>
+  );
+}
+
+/**
+ * The identification page of one profile (/identificazione/agronomo, /identificazione/funzionario): what it opens and
+ * locks, then the form; once identified, who you are, the way into the section and "Esci dal profilo".
+ */
+export function IdentifyPage({ kind }: { kind: ProKind }) {
+  const navigate = useNavigate();
+  const id = useProId();
+  const p = PAGE[kind];
+  const Icon = kind === "agronomo" ? Grape : Building2;
+  const back = () => {
+    if ((window.history.state?.__TSR_index ?? 0) > 0) window.history.back();
+    else void navigate({ to: "/benvenuto", replace: true });
+  };
+  const done = () => {
+    toast.success(`Identificato come ${KIND_LABEL[kind].toLowerCase()}`, { description: `Si apre ${p.opens}; ${p.locks} è bloccat${kind === "agronomo" ? "a" : "o"}.` });
+    void navigate({ to: p.go, replace: true });
+  };
+  const leave = async () => {
+    await saveProId(null);
+    toast("Profilo rimosso", { description: "Piazza e vigneto sono bloccati finché non ti identifichi." });
+  };
+  const mine = id?.kind === kind ? id : null;
+  return (
+    <div className="mx-auto max-w-xl space-y-6">
+      <Ambient tone={SECTION_TONE[p.section]} />
+      <button type="button" onClick={back} className="-mb-2 inline-flex h-10 items-center gap-1.5 rounded-full pr-3 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+        <ArrowLeft className="size-5" aria-hidden="true" />Indietro
+      </button>
+      <PageHero kicker="Identificazione" kickerIcon={ShieldCheck} title={p.title} />
+      {mine ? (
+        <div className="fuse-canvas space-y-4 rounded-3xl px-5 py-6">
+          <p className="flex items-center gap-2 text-lg font-semibold"><BadgeCheck className="size-6 text-emerald-400" aria-hidden="true" />Sei identificato</p>
+          <p className="text-[15px]">{mine.name}</p>
+          <p className="text-sm text-muted-foreground">{proSummary(mine)}</p>
+          <button type="button" onClick={() => void navigate({ to: p.go })} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground text-[15px] font-semibold text-background outline-none focus-visible:ring-4 focus-visible:ring-ring/50">
+            <Icon className="size-5" aria-hidden="true" />Vai {kind === "agronomo" ? "al vigneto" : "alla piazza"}
+          </button>
+          <button type="button" onClick={() => void leave()} className="flex h-11 w-full items-center justify-center gap-2 rounded-full text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+            <LogOut className="size-4" aria-hidden="true" />Esci dal profilo
+          </button>
+        </div>
+      ) : (
+        <>
+          <p className="text-[15px] leading-relaxed text-muted-foreground">{p.intro}</p>
+          {id && <p className="rounded-2xl bg-foreground/[0.06] px-4 py-3 text-sm text-muted-foreground">Ora sei identificato come <span className="font-semibold text-foreground">{proSummary(id)}</span>: identificandoti qui, quel profilo viene sostituito e {p.locks} si blocca.</p>}
+          {kind === "agronomo" ? <AgronomoForm onDone={done} /> : <FunzionarioForm onDone={done} />}
+          <p className="px-1 text-xs text-muted-foreground">I dati restano su questo dispositivo e, se hai fatto l'accesso, nel tuo account. Puoi uscire dal profilo quando vuoi.</p>
+        </>
+      )}
+    </div>
+  );
+}
