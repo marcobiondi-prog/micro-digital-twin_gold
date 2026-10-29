@@ -18,7 +18,8 @@ import { reloadFresh } from "@/router";
 import { History, Building2, Grape, Info, LayoutDashboard, Lock } from "lucide-react";
 import { useProId, useSyncProId } from "@/lib/use-pro-id";
 import { unlocks, type ProId } from "@/models/professional-id";
-import { ProfileIcon } from "@/views/ProfileIcon";
+import { AgronomoIcon, FunzionarioIcon } from "@/views/ProfileIcon";
+import { openAccount } from "@/lib/camera-dock";
 
 function NotFoundComponent() {
   return (
@@ -117,12 +118,13 @@ const nav: ReadonlyArray<{ to: "/benvenuto" | "/urbano" | "/vigneto" | "/dashboa
 const navFor = (id: ProId | null | undefined) => {
   if (!id) return nav;
   const locked = id.kind === "agronomo" ? "/urbano" : "/vigneto";
-  return nav.map((n) => (n.to === locked ? { to: "/profilo" as const, l: "Profilo" } : n));
+  return nav.map((n) => (n.to === locked ? { to: "/profilo" as const, l: id.kind === "agronomo" ? "Profilo agronomo" : "Profilo funzionario" } : n));
 };
 
 const NAV_H = 49;
 
 type NavItem = { to: "/benvenuto" | "/urbano" | "/vigneto" | "/dashboard" | "/profilo"; l: string; I: ComponentType<{ className?: string; strokeWidth?: number; "aria-hidden"?: boolean | "true" }> };
+const KIND_ICON = { agronomo: AgronomoIcon, funzionario: FunzionarioIcon } as const;
 const bottomItems: readonly NavItem[] = [
   { to: "/benvenuto", l: "Benvenuto", I: History },
   { to: "/urbano", l: "Urbano", I: Building2 },
@@ -130,13 +132,14 @@ const bottomItems: readonly NavItem[] = [
   { to: "/dashboard", l: "Dashboard", I: LayoutDashboard },
 ];
 /**
- * Once a profile is identified, the section it locks gives its place to Profilo (same column): the agronomist sees
- * Profilo where Urbano was, the municipal officer where Vigneto was. With no profile both sections stay, locked.
+ * Once a profile is identified, the section it locks gives its place to that profile's badge (same column): the
+ * agronomist's leaf badge where Urbano was, the municipal officer's town-hall badge where Vigneto was; it opens the
+ * account panel, which shows the profile on top. With no profile both sections stay, locked.
  */
 function itemsFor(id: ProId | null | undefined): readonly NavItem[] {
   if (!id) return bottomItems;
   const locked = id.kind === "agronomo" ? "/urbano" : "/vigneto";
-  return bottomItems.map((b) => (b.to === locked ? { to: "/profilo", l: "Profilo", I: ProfileIcon } : b));
+  return bottomItems.map((b) => (b.to === locked ? { to: "/profilo", l: id.kind === "agronomo" ? "Agronomo" : "Funzionario", I: KIND_ICON[id.kind] } : b));
 }
 /** Pages that light the Profilo item: the profile page and the identification pages. */
 const isProfilePath = (p: string) => p === "/profilo" || p.startsWith("/identificazione");
@@ -208,6 +211,15 @@ function BottomNav() {
     const active = pathname === to || (to === "/benvenuto" && pathname.startsWith("/cronologia")) || (to === "/profilo" && isProfilePath(pathname));
     // Piazza and vineyard wear a small lock until the profile that opens them is identified.
     const locked = (to === "/urbano" || to === "/vigneto") && proId !== undefined && !unlocks(proId, to === "/urbano" ? "urban" : "vineyard");
+    if (to === "/profilo") {
+      return (
+        <li key={to}>
+          <button type="button" onClick={openAccount} aria-label={`Profilo ${l.toLowerCase()}: apri l'account`} className="ps-nav-item mx-auto" data-active={active || undefined}>
+            <span className="ps-nav-icon"><I className="size-6" strokeWidth={2} aria-hidden="true" /></span>
+          </button>
+        </li>
+      );
+    }
     return (
       <li key={to}>
         <Link to={to} replace={pathname !== "/"} aria-current={active ? "page" : undefined} aria-label={locked ? `${l}, bloccato` : l}
@@ -350,9 +362,14 @@ function SmartNav() {
             className="no-scrollbar min-w-0 touch-pan-x overflow-x-auto"
           >
             <div className="flex items-center gap-1">
-              {navFor(proId).map((n) => (
+              {navFor(proId).map((n) => n.to === "/profilo" ? (
+                <button key={n.to} type="button" onClick={openAccount}
+                  className="nav-glass nav-glass-gloss relative shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-nav-accent-foreground">
+                  {n.l}
+                </button>
+              ) : (
                 <Link key={n.to} to={n.to}
-                  aria-current={pathname === n.to || (n.to === "/profilo" && isProfilePath(pathname)) ? "page" : undefined}
+                  aria-current={pathname === n.to ? "page" : undefined}
                   replace={pathname !== "/"}
                   onClick={(e) => { if (goHomeBack(e, n.to, pathname)) return; centerTapped(e.currentTarget, pathname === n.to); }}
                   className={`nav-glass nav-glass-gloss relative shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring ${pathname === n.to ? "nav-glass-on bg-nav-accent text-nav-accent-foreground" : "text-muted-foreground dark:text-nav-accent-foreground"}`}>

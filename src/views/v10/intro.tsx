@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowRight, Building2, Grape, ScanLine, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, Grape, ScanLine, X } from "lucide-react";
 import { setCameraSheetOpen } from "@/lib/camera-dock";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { useInstalledApp } from "@/lib/installed-app";
@@ -10,6 +10,9 @@ import { TwinMascot } from "@/views/TwinMascot";
 import { NavigationArrows } from "@/views/navigation-arrows";
 import { THEME_DARK, THEME_META } from "@/views/theme-toggle";
 import { introSeen, markIntroSeen } from "@/lib/intro-seen";
+import { useProId } from "@/lib/use-pro-id";
+import { proSummary, type ProKind } from "@/models/professional-id";
+import { IdentifyForm, profileIntro } from "@/views/v10/Identify";
 
 /**
  * v10 entrance, two pages that stand alone (no header, no menus), black and white over slowly turning heat lines:
@@ -17,12 +20,15 @@ import { introSeen, markIntroSeen } from "@/lib/intro-seen";
  * tutorial and ends on the choice; the "i" in the header shows the tutorial only and goes back where it was.
  */
 
-type Item = { id: "camera" | "urban" | "vine"; Icon: typeof Building2; name: string; desc: string };
+type Item = { id: "camera" | "urban" | "vine"; Icon: typeof Building2; name: string; desc: string; cta: string };
 const items: Item[] = [
-  { id: "urban", Icon: Building2, name: "Piazza", desc: "Per i funzionari del Comune: metti alberi, prato e ombra e vedi quanti gradi in meno." },
-  { id: "vine", Icon: Grape, name: "Vigneto", desc: "Per gli agronomi con il patentino fitosanitario: regola sole, acqua e vento e vedi quanta sete ha la vite." },
-  { id: "camera", Icon: ScanLine, name: "Fotocamera AI", desc: "Inquadra una pianta: riconosce la specie e il fresco che regala." },
+  { id: "urban", Icon: Building2, name: "Sei un funzionario urbano?", cta: "Identificati come funzionario",
+    desc: "Ti identifichi con il Comune, l'ufficio e l'email del Comune: si apre la piazza, dove metti alberi, prato e ombra." },
+  { id: "vine", Icon: Grape, name: "Sei un agronomo?", cta: "Identificati come agronomo",
+    desc: "Ti identifichi con il patentino fitosanitario: si apre il vigneto, dove regoli acqua, ombra e vento." },
+  { id: "camera", Icon: ScanLine, name: "Fotocamera AI", cta: "Inizia con Fotocamera AI", desc: "Inquadra una pianta: riconosce la specie e il fresco che regala." },
 ];
+const KIND_OF = { urban: "funzionario", vine: "agronomo" } as const;
 
 const reduceMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -256,7 +262,11 @@ export function Tutorial() {
   );
 }
 
-/** The choice (/scegli): one big question, three numbered ways in, one white button and the way to the map. */
+/**
+ * The choice (/scegli): one big question, three numbered ways in — "Sei un funzionario urbano?", "Sei un agronomo?",
+ * the AI camera — one white button and the way to the welcome page. The identification happens here: the white button
+ * of a profile shows its form in place, and once identified its simulation opens.
+ */
 export function Choice() {
   useDarkChrome();
   useEffect(() => { markIntroSeen(); }, []);
@@ -264,12 +274,36 @@ export function Choice() {
   const ai = useAiReadyHome();
   const [sel, setSel] = useState(0);
   const item = items[sel] ?? items[0]!;
+  const proId = useProId();
+  const [identify, setIdentify] = useState<ProKind | null>(null);
+  const go = (it: Item) => void navigate({ to: it.id === "urban" ? "/urbano" : "/vigneto" });
   const open = (it: Item) => {
-    if (it.id === "camera") setCameraSheetOpen(true);
-    else void navigate({ to: it.id === "urban" ? "/urbano" : "/vigneto" });
+    if (it.id === "camera") { setCameraSheetOpen(true); return; }
+    // Already this profile: straight in. Otherwise its form shows here.
+    if (proId?.kind === KIND_OF[it.id]) go(it);
+    else { setIdentify(KIND_OF[it.id]); window.scrollTo({ top: 0, behavior: "instant" }); }
   };
+  const ctaOf = (it: Item) => (it.id !== "camera" && proId?.kind === KIND_OF[it.id] ? `Entra ${it.id === "urban" ? "nella piazza" : "nel vigneto"}` : it.cta);
   const rows = useRef<Array<HTMLButtonElement | null>>([]);
   const pick = (i: number) => { if (i === sel) return; hapticTick(); setSel(i); };
+  if (identify) {
+    const it = items.find((x) => x.id !== "camera" && KIND_OF[x.id] === identify)!;
+    return (
+      <div className="dark relative isolate min-h-dvh bg-background px-6 text-foreground [color-scheme:dark] sm:px-12">
+        <Backdrop />
+        <section aria-label={it.name} className="mx-auto max-w-xl space-y-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(1.5rem+env(safe-area-inset-top))]">
+          <button type="button" onClick={() => setIdentify(null)} className="-ml-1 inline-flex h-10 items-center gap-1.5 rounded-full pr-3 text-sm font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+            <ArrowLeft className="size-5" aria-hidden="true" />Indietro
+          </button>
+          <h1 className="font-display text-[2.6rem] font-extralight leading-[1] tracking-tight">{it.name}</h1>
+          <p className="text-[15px] leading-relaxed text-foreground/60">{profileIntro(identify)}</p>
+          {proId && <p className="rounded-2xl bg-foreground/[0.06] px-4 py-3 text-sm text-foreground/70">Ora sei identificato come <span className="font-semibold text-foreground">{proSummary(proId)}</span>: identificandoti qui, quel profilo viene sostituito.</p>}
+          <IdentifyForm kind={identify} onDone={() => go(it)} />
+          <p className="px-1 text-xs text-foreground/50">I dati restano su questo dispositivo e, se hai fatto l'accesso, nel tuo account. Puoi uscire dal profilo quando vuoi, dal pannello account.</p>
+        </section>
+      </div>
+    );
+  }
   return (
     <div className="dark relative isolate min-h-dvh bg-background px-6 text-foreground [color-scheme:dark] sm:px-12">
       <Backdrop />
@@ -277,7 +311,7 @@ export function Choice() {
         <h1 className="sr-only">Da dove vuoi iniziare</h1>
         <Reveal>
           <h2 aria-hidden="true" className="font-display text-[3.4rem] font-extralight leading-[0.95] tracking-tight text-foreground sm:text-7xl">Da dove<br />vuoi iniziare?</h2>
-          <p className="mt-5 max-w-xs text-[15px] leading-relaxed text-foreground/60">Scegli una strada: entrando ti identifichi, come agronomo per il vigneto o come funzionario del Comune per la piazza.</p>
+          <p className="mt-5 max-w-xs text-[15px] leading-relaxed text-foreground/60">Dicci chi sei: ti identifichi qui e si apre la tua simulazione. Un profilo alla volta.</p>
         </Reveal>
         <div role="radiogroup" aria-label="Da dove vuoi iniziare" className="mt-10 space-y-1"
           onKeyDown={(e) => {
@@ -312,7 +346,7 @@ export function Choice() {
         <div className="mt-auto flex flex-col items-stretch gap-1 pt-10">
           <button type="button" onClick={() => open(item)}
             className="inline-flex h-14 items-center justify-between rounded-full bg-foreground pl-7 pr-2 text-base font-semibold text-background outline-none transition-transform focus-visible:ring-4 focus-visible:ring-ring/50 active:scale-[0.98] motion-reduce:active:scale-100">
-            <span>Inizia con {item.name}</span>
+            <span>{ctaOf(item)}</span>
             <span className="grid size-10 place-items-center rounded-full bg-background text-foreground"><ArrowRight className="size-5" aria-hidden="true" /></span>
           </button>
           <Link to="/benvenuto" className="inline-flex h-12 items-center justify-center rounded-full text-sm font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">Salta, vai al benvenuto</Link>

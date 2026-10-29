@@ -1,4 +1,5 @@
-import { useProId } from "@/lib/use-pro-id";
+import { saveProId, useProId } from "@/lib/use-pro-id";
+import { ProfileIcon } from "@/views/ProfileIcon";
 import { proSummary } from "@/models/professional-id";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ComponentType, type FormEvent } from "react";
 import { LogOut, UserRound, Mail, LockKeyhole, Camera, ShieldCheck, ChevronRight } from "lucide-react";
@@ -326,6 +327,31 @@ export function AccountControl() {
           <p className="pt-1"><span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${premiumPlan ? "bg-primary text-primary-foreground" : "bg-foreground/[0.08] text-foreground"}`}>Piano {premiumPlan ? "Premium" : "Free"}</span></p>
         </DialogHeader>
         <div className="space-y-6 px-6 py-6">
+          {/* The professional profile first: the bottom bar's profile badge opens this panel. Who is identified (one at a time), and the identification pages that open each simulation. */}
+          <section aria-label="Profilo professionale" className="rounded-3xl bg-foreground/[0.05] px-5 py-3">
+            <h3 className="py-2 text-base font-semibold">Profilo professionale</h3>
+            {proId ? (
+              <div className="flex items-start gap-3 pb-2">
+                <ProfileIcon kind={proId.kind} className="mt-0.5 size-7 shrink-0" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[15px] font-semibold">{proId.name}</p>
+                  <p className="text-sm text-muted-foreground">{proSummary(proId)}</p>
+                  <button type="button" onClick={() => void saveProId(null)} className="mt-1 inline-flex min-h-10 items-center gap-1.5 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"><LogOut className="size-4" aria-hidden="true" />Esci dal profilo</button>
+                </div>
+              </div>
+            ) : <p className="pb-2 text-sm text-muted-foreground">Nessun profilo: piazza e vigneto sono bloccati.</p>}
+            <ul>
+              {([["Agronomo · apre il vigneto", "/identificazione/agronomo", "agronomo"], ["Funzionario comunale · apre la piazza", "/identificazione/funzionario", "funzionario"]] as const).map(([label, to, kind]) => (
+                <li key={to}>
+                  <Link to={to} onClick={() => setOpen(false)} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl text-left text-[15px] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+                    <span className="min-w-0 flex-1">{label}</span>
+                    {proId?.kind === kind && <span className="shrink-0 text-sm text-emerald-400">Attivo</span>}
+                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
           {mode !== "reset" && <section className="space-y-3" aria-label="Immagine account">
             <div className="flex items-center gap-3">
               {avatar("size-14")}
@@ -376,22 +402,6 @@ export function AccountControl() {
               {DEMO_LOGIN_AVAILABLE && <Button variant="outline" className="w-full border-dashed" onClick={() => { setDemoSignedIn(true); setOpen(false); }}>Simula l’accesso (solo anteprima)</Button>}
             </section>
           )}
-          {/* The professional profile: who is identified (one at a time) and the identification pages that open each simulation. */}
-          <section aria-label="Profilo professionale" className="rounded-3xl bg-foreground/[0.05] px-5 py-3">
-            <h3 className="py-2 text-base font-semibold">Profilo professionale</h3>
-            <p className="pb-2 text-sm text-muted-foreground">{proId ? proSummary(proId) : "Nessun profilo: piazza e vigneto sono bloccati."}</p>
-            <ul>
-              {([["Agronomo · apre il vigneto", "/identificazione/agronomo", "agronomo"], ["Funzionario comunale · apre la piazza", "/identificazione/funzionario", "funzionario"]] as const).map(([label, to, kind]) => (
-                <li key={to}>
-                  <Link to={to} onClick={() => setOpen(false)} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl text-left text-[15px] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
-                    <span className="min-w-0 flex-1">{label}</span>
-                    {proId?.kind === kind && <span className="shrink-0 text-sm text-emerald-400">Attivo</span>}
-                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
           {/* Help, privacy and legal, as grouped rows; each opens its own page. */}
           <nav aria-label="Aiuto e informazioni" className="space-y-3 border-t pt-6">
             {LINK_GROUPS.map((g) => (
