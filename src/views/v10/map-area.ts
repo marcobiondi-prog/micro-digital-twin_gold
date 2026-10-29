@@ -1,6 +1,6 @@
 import type { Map as MlMap, GeoJSONSource } from "maplibre-gl";
 import type { Ring } from "@/models/place-area";
-import { TREE_RADIUS_M, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
+import { PERGOLA_COLORS, pergolaParts, TREE_RADIUS_M, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
 
 /** The drawn area on a maplibre map: a turquoise fill and a white outline, from a ring of [lat, lng] pins. */
 export const AREA_SOURCE = "drawn-area";
@@ -42,7 +42,9 @@ export const SIM_TREES_3D = "sim-trees-3d";
 
 /** The vines' thirst as the zone's colour: green, amber, red (the same steps as the arc's verdict). */
 export const thirstColor = (s: number) => (s >= 65 ? "#ef4444" : s >= 35 ? "#eab308" : "#22c55e");
-export const SIM_COLORS = { lawn: "#4caf50", shade: "#475569", cloth: "#334155", drip: "#38bdf8", wind: "#15803d", tree: "#2e7d32" } as const;
+export const SIM_COLORS = { lawn: "#4caf50", shade: PERGOLA_COLORS.slat, cloth: "#334155", drip: "#38bdf8", wind: "#15803d", tree: "#2e7d32" } as const;
+/** The 2D pattern of a pergola seen from above: wooden slats with light between them. */
+export const SLATS_IMAGE = "pergola-slats";
 
 const poly = (ring: Ring, props: Record<string, unknown>) => ({ type: "Feature", properties: props, geometry: { type: "Polygon", coordinates: [[...ring, ring[0]!].map(([la, ln]) => [ln, la])] } });
 const lineF = (ring: Ring, props: Record<string, unknown>) => ({ type: "Feature", properties: props, geometry: { type: "LineString", coordinates: ring.map(([la, ln]) => [ln, la]) } });
@@ -53,7 +55,10 @@ export function simFeatures(sim: SimLayout | null, withTreePoints: boolean) {
   if (!sim) return fc([]);
   const out: unknown[] = [];
   if (sim.kind === "piazza") {
-    for (const p of sim.data.patches) out.push(poly(p.ring, { kind: p.kind, color: SIM_COLORS[p.kind === "lawn" ? "lawn" : "shade"], opacity: p.kind === "lawn" ? 0.55 : 0.5 }));
+    // Shade: in 2D the slatted pergola pattern; in 3D only the shadow it casts on the ground (the pergola stands over it).
+    for (const p of sim.data.patches) out.push(poly(p.ring, p.kind === "lawn"
+      ? { kind: "lawn", color: SIM_COLORS.lawn, opacity: 0.55 }
+      : withTreePoints ? { kind: "shade", color: SIM_COLORS.shade, opacity: 0.9 } : { kind: "shadow", color: "#0b0f15", opacity: 0.35 }));
     if (withTreePoints) for (const t of sim.data.trees) out.push({ type: "Feature", properties: { kind: "tree" }, geometry: { type: "Point", coordinates: [t[1], t[0]] } });
   } else {
     for (const p of sim.data.patches) out.push(poly(p.ring, p.kind === "zone"
@@ -66,10 +71,24 @@ export function simFeatures(sim: SimLayout | null, withTreePoints: boolean) {
   return fc(out);
 }
 
-/** The trees in 3D: each one a trunk and a rounded crown of slabs (models/area-layout treeParts). */
+/** What stands up in 3D: each tree (trunk and pointed crown) and a wooden pergola over each shade strip. */
 export const treeCrowns = (sim: SimLayout | null) => fc(sim?.kind === "piazza"
-  ? sim.data.trees.flatMap((t) => treeParts(t).map((p) => poly(p.ring, { kind: "tree", base: p.base, height: p.height, color: p.color })))
+  ? [
+      ...sim.data.trees.flatMap((t) => treeParts(t)),
+      ...sim.data.patches.filter((p) => p.kind === "shade").flatMap((p) => pergolaParts(p.ring)),
+    ].map((p) => poly(p.ring, { kind: "raised", base: p.base, height: p.height, color: p.color }))
   : []);
+
+/** The slats image for the 2D pergolas: light wood strips with darker gaps, repeated over the shade. */
+function slatsImage(): { width: number; height: number; data: Uint8Array } {
+  const w = 12, h = 12, data = new Uint8Array(w * h * 4);
+  const wood = [0xc9, 0x9a, 0x63], gap = [0x5a, 0x3b, 0x1c];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const c = x % 6 < 4 ? wood : gap, o = (y * w + x) * 4;
+    data[o] = c[0]!; data[o + 1] = c[1]!; data[o + 2] = c[2]!; data[o + 3] = x % 6 < 4 ? 235 : 150;
+  }
+  return { width: w, height: h, data };
+}
 
 /** Pixels for a length in metres at a zoom, around a latitude (so a crown keeps its real size while zooming). */
 const metresToPx = (m: number, lat: number, zoom: number) => m / ((156_543.03 * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom);
@@ -79,7 +98,11 @@ export function addSimLayers(map: MlMap, lat: number, raised = false) {
   if (map.getSource(SIM_SOURCE)) return;
   const before = map.getLayer("drawn-area-line") ? "drawn-area-line" : undefined;
   map.addSource(SIM_SOURCE, { type: "geojson", data: fc([]) });
-  map.addLayer({ id: "sim-fill", type: "fill", source: SIM_SOURCE, filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": ["get", "color"], "fill-opacity": ["get", "opacity"] } }, before);
+  map.addLayer({ id: "sim-fill", type: "fill", source: SIM_SOURCE, filter: ["all", ["==", ["geometry-type"], "Polygon"], ["!=", ["get", "kind"], "shade"]], paint: { "fill-color": ["get", "color"], "fill-opacity": ["get", "opacity"] } }, before);
+  // The pergolas seen from above: slats with light between them, and a wooden frame.
+  if (!map.hasImage(SLATS_IMAGE)) map.addImage(SLATS_IMAGE, slatsImage());
+  map.addLayer({ id: "sim-pergola", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "shade"], paint: { "fill-pattern": SLATS_IMAGE, "fill-opacity": 0.95 } }, before);
+  map.addLayer({ id: "sim-pergola-frame", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "shade"], paint: { "line-color": PERGOLA_COLORS.beam, "line-width": 1.5 } }, before);
   map.addLayer({ id: "sim-line", type: "line", source: SIM_SOURCE, filter: ["==", ["geometry-type"], "LineString"], paint: { "line-color": ["get", "color"], "line-width": ["get", "width"], "line-dasharray": ["case", ["==", ["get", "kind"], "drip"], ["literal", [2, 1.5]], ["literal", [1, 0]]] }, layout: { "line-cap": "round" } }, before);
   if (raised) {
     map.addSource(SIM_TREES_3D, { type: "geojson", data: fc([]) });

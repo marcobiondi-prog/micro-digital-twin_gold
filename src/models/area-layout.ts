@@ -103,7 +103,14 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
   const lawnCells = [...cells].sort(byDist(lawnAt)).slice(0, nLawn);
   const taken = new Set(lawnCells);
   const shadeCells = cells.filter((x) => !taken.has(x)).sort(byDist(shadeAt)).slice(0, nShade);
-  const auto = treeSpots(ring, f, Math.max(0, Math.round(trees)), { minX, maxX, minY, maxY });
+  // Trees stand outside the pergolas: spots under a shade cell are skipped (looked for on a finer grid), unless there is no room.
+  const n = Math.max(0, Math.round(trees)), box = { minX, maxX, minY, maxY };
+  const underShade = (x: number, y: number) => shadeCells.some((sc) => Math.abs(sc.x - x) <= c / 2 + 1 && Math.abs(sc.y - y) <= c / 2 + 1);
+  let auto = treeSpots(ring, f, n, box);
+  if (shadeCells.length && auto.some(([x, y]) => underShade(x, y))) {
+    const free = treeSpots(ring, f, Math.ceil(n / Math.max(0.15, 1 - shadeCells.length / cells.length)) + 4, box).filter(([x, y]) => !underShade(x, y));
+    if (free.length >= n) auto = Array.from({ length: n }, (_, i) => free[Math.floor(((i + 0.5) * free.length) / n)]!);
+  }
   const placed = auto.map((p, i) => edits.trees?.[i] ?? toLL(f, p[0], p[1]));
   return {
     trees: placed, cell: c,
@@ -196,4 +203,33 @@ export function treeParts(at: LatLng, radius = TREE_RADIUS_M, step = 0.5): TreeP
 function tint(hex: string, f: number): string {
   const n = parseInt(hex.slice(1), 16), ch = (v: number) => Math.max(0, Math.min(255, Math.round(v * f))).toString(16).padStart(2, "0");
   return `#${ch(n >> 16)}${ch((n >> 8) & 255)}${ch(n & 255)}`;
+}
+
+/** Pergola wood: posts and beams darker, the slats of the roof lighter. */
+export const PERGOLA_COLORS = { post: "#7a4a22", beam: "#6b4019", slat: "#c99a63" } as const;
+
+/**
+ * A pergola over a shade strip (a row rectangle from piazzaLayout) for the 3D views: posts about every 4 m along both
+ * long sides (0–2.9 m), a beam on top of each long side (2.8–3.1 m) and a roof of slats across it every 0.7 m
+ * (3.1–3.25 m), leaving light between them. Built as slabs like the trees.
+ */
+export function pergolaParts(strip: Ring): TreePart[] {
+  if (strip.length < 4) return [];
+  const f = frameOf(strip);
+  const [a, b, , d] = strip.map((p) => toXY(f, p)) as Array<[number, number]>;
+  // The strip runs from a to b (its length) and from a to d (its depth).
+  const len = dist(a!, b!), dep = dist(a!, d!);
+  if (len < 1 || dep < 1) return [];
+  const ux = [(b![0] - a![0]) / len, (b![1] - a![1]) / len], vy = [(d![0] - a![0]) / dep, (d![1] - a![1]) / dep];
+  const at = (s: number, t: number): [number, number] => [a![0] + ux[0]! * s + vy[0]! * t, a![1] + ux[1]! * s + vy[1]! * t];
+  const box = (s0: number, s1: number, t0: number, t1: number): Ring => [at(s0, t0), at(s1, t0), at(s1, t1), at(s0, t1)].map(([x, y]) => toLL(f, x, y));
+  const inset = 0.3, parts: TreePart[] = [];
+  const posts = Math.max(2, Math.round(len / 4) + 1);
+  for (let i = 0; i < posts; i++) {
+    const s = inset + ((len - 2 * inset) * i) / (posts - 1);
+    for (const t of [inset, dep - inset]) parts.push({ ring: box(s - 0.12, s + 0.12, t - 0.12, t + 0.12), base: 0, height: 2.9, color: PERGOLA_COLORS.post });
+  }
+  for (const t of [inset, dep - inset]) parts.push({ ring: box(0, len, t - 0.14, t + 0.14), base: 2.8, height: 3.1, color: PERGOLA_COLORS.beam });
+  for (let s = 0.35; s < len - 0.2; s += 0.7) parts.push({ ring: box(s - 0.12, s + 0.12, 0, dep), base: 3.1, height: 3.25, color: PERGOLA_COLORS.slat });
+  return parts;
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { treeParts } from "@/models/area-layout";
+import { pergolaParts, treeParts } from "@/models/area-layout";
 import { SIM_COLORS, thirstColor, type SimLayout } from "@/views/v10/map-area";
 import { Crosshair, LoaderCircle } from "lucide-react";
 import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camera";
@@ -83,7 +83,17 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
             map.append(p);
           };
           if (sim?.kind === "piazza") {
-            for (const pt of sim.data.patches) shape(pt.ring, pt.kind === "lawn" ? "rgba(76,175,80,0.6)" : "rgba(71,85,105,0.65)", pt.kind === "lawn" ? null : 3);
+            for (const pt of sim.data.patches) {
+              if (pt.kind === "lawn") { shape(pt.ring, "rgba(76,175,80,0.6)", null); continue; }
+              // Shade: the shadow on the ground, then the wooden pergola over it (posts raised, beams and slats as floating slabs).
+              shape(pt.ring, "rgba(11,15,21,0.35)", null);
+              for (const part of pergolaParts(pt.ring)) {
+                if (part.base === 0) { shape(part.ring, part.color, part.height); continue; }
+                const slab = new Polygon3DElement({ altitudeMode: "RELATIVE_TO_GROUND", extruded: false, fillColor: part.color, strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 }) as HTMLElement & { outerCoordinates?: unknown };
+                slab.outerCoordinates = part.ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: part.height }));
+                map.append(slab);
+              }
+            }
             // Each tree: the trunk raised from the ground, then the crown as stacked discs floating at their heights.
             for (const t of sim.data.trees) for (const part of treeParts(t, undefined, 1)) {
               if (part.base === 0) { shape(part.ring, part.color, part.height); continue; }

@@ -188,7 +188,7 @@ const dot = (color: string, round = true) => <span className={cn("inline-block s
  */
 function SimBar({ sim, arranging, edited, onArrange, onAuto }: { sim: SimLayout; arranging: boolean; edited: boolean; onArrange: () => void; onAuto: () => void }) {
   const legend = sim.kind === "piazza"
-    ? [[dot(SIM_COLORS.tree), `Alberi ${sim.data.trees.length}`], [dot(SIM_COLORS.lawn, false), "Prato"], [dot(SIM_COLORS.shade, false), "Ombra"]] as const
+    ? [[dot(SIM_COLORS.tree), `Alberi ${sim.data.trees.length}`], [dot(SIM_COLORS.lawn, false), "Prato"], [dot(SIM_COLORS.shade, false), "Pergolati (ombra)"]] as const
     : [[dot(thirstColor(10), false), "Zone (colore = sete)"], [dot(SIM_COLORS.drip, false), "Irrigazione"], [dot(SIM_COLORS.cloth, false), "Teli d'ombra"], [dot(SIM_COLORS.wind, false), "Frangivento"]] as const;
   return (
     <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4">

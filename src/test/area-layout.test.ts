@@ -59,3 +59,16 @@ describe("3D tree", () => {
     expect(width(0)).toBeGreaterThan(width(crown.length - 1) * 20);
   });
 });
+
+describe("pergolas", () => {
+  it("raise posts, beams and slats over each shade strip, and keep the trees out from under them", async () => {
+    const { pergolaParts, piazzaLayout: layout } = await import("@/models/area-layout");
+    const l = layout(ring, 10, 0, 30)!;
+    const strips = l.patches.filter((p) => p.kind === "shade");
+    const parts = strips.flatMap((p) => pergolaParts(p.ring));
+    expect(parts.some((p) => p.base === 0 && p.height > 2.5)).toBe(true);
+    expect(parts.filter((p) => p.base >= 3).length).toBeGreaterThan(strips.length * 3);
+    const inShade = (t: [number, number]) => strips.some((p) => ringContains(p.ring, t[0], t[1]));
+    expect(l.trees.filter(inShade)).toHaveLength(0);
+  });
+});
