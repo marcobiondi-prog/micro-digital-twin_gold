@@ -164,6 +164,10 @@ const PS_LIGHT: Record<number, { left: string; top: string; tilt: string }> = {
   4: { left: "90%", top: "81.5px", tilt: "6deg" },
 };
 
+// The icons follow the arch's top edge (M0 22 Q50 2 100 22 on the 108 px bar): the outer columns sit lower by the
+// curve's drop between 10 % and 30 % (≈ 6 px) and each icon tilts with the edge's tangent, like the light on the crescent.
+const ARC: Record<number, { y: number; tilt: number }> = { 0: { y: 6, tilt: -6 }, 1: { y: 0, tilt: -3 }, 3: { y: 0, tilt: 3 }, 4: { y: 6, tilt: 6 } };
+
 function BottomNav() {
   const proId = useProId();
   const pathname = useLocation({ select: (l) => l.pathname });
@@ -210,8 +214,9 @@ function BottomNav() {
     const active = pathname === to || (to === "/benvenuto" && pathname.startsWith("/cronologia")) || (to === "/profilo" && isProfilePath(pathname));
     // Piazza and vineyard wear a small lock until the profile that opens them is identified.
     const locked = (to === "/urbano" || to === "/vigneto") && proId !== undefined && !unlocks(proId, to === "/urbano" ? "urban" : "vineyard");
+    const col = index < 2 ? index : index + 1, arc = ARC[col];
     return (
-      <li key={to}>
+      <li key={to} style={arc ? { transform: `translateY(${arc.y}px) rotate(${arc.tilt}deg)` } : undefined}>
         <Link to={to} replace={pathname !== "/"} aria-current={active ? "page" : undefined} aria-label={to === "/profilo" ? `Profilo ${l.toLowerCase()}` : locked ? `${l}, bloccato` : l}
           onClick={(e) => {
             if (goHomeBack(e, to, pathname)) return;
