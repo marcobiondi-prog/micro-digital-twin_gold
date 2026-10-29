@@ -11,7 +11,9 @@ import {
 import { Ambient, PageHero } from "@/views/v8/console";
 import { SECTION_TONE } from "@/views/v10/ProfileGate";
 
-const fieldCls = "h-12 w-full rounded-2xl border border-foreground/10 bg-foreground/[0.05] px-4 text-[15px] outline-none focus-visible:ring-2 focus-visible:ring-ring aria-[invalid=true]:border-danger";
+const fieldCls = "h-12 w-full rounded-2xl border border-foreground/10 bg-foreground/[0.05] px-4 text-[15px] outline-none focus-visible:ring-2 focus-visible:ring-ring aria-[invalid=true]:border-danger dark:[color-scheme:dark]";
+/** The list a select opens is drawn by the system: its rows get the theme's own colours, else on Windows they read white on white. */
+const optionCls = "bg-background text-foreground";
 
 function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string | undefined; children: (id: string, describedBy: string | undefined) => ReactNode }) {
   const id = useId(), msg = `${id}-msg`;
@@ -76,7 +78,7 @@ function AgronomoForm({ onDone }: { onDone: () => void }) {
       <Field label="Numero del patentino fitosanitario" hint="Come è scritto sul patentino, per esempio MOL/CB/01234." error={errors.licence}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!errors.licence} autoCapitalize="characters" value={v.licence} onChange={(e) => up("licence", e.target.value)} className={fieldCls} />}</Field>
       <Field label="Regione che l'ha rilasciato" error={errors.region}>{(id, d) => (
         <select id={id} aria-describedby={d} aria-invalid={!!errors.region} value={v.region} onChange={(e) => up("region", e.target.value)} className={fieldCls}>
-          <option value="">Scegli la regione</option>{REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+          <option value="" className={optionCls}>Scegli la regione</option>{REGIONS.map((r) => <option key={r} value={r} className={optionCls}>{r}</option>)}
         </select>)}</Field>
       <Field label="Scadenza" hint="Il patentino vale 5 anni: deve essere ancora valido." error={errors.expires}>{(id, d) => <input id={id} type="date" aria-describedby={d} aria-invalid={!!errors.expires} value={v.expires} onChange={(e) => up("expires", e.target.value)} className={fieldCls} />}</Field>
       <Declare checked={v.declared} onChange={(b) => up("declared", b)} error={errors.declared} />
@@ -106,12 +108,12 @@ function FunzionarioForm({ onDone }: { onDone: () => void }) {
       <Field label="Comune" hint="Il Comune in cui lavori, per esempio Campobasso." error={errors.comune}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!errors.comune} value={v.comune} onChange={(e) => up("comune", e.target.value)} className={fieldCls} />}</Field>
       <Field label="Ufficio di appartenenza" error={errors.office}>{(id, d) => (
         <select id={id} aria-describedby={d} aria-invalid={!!errors.office} value={v.office} onChange={(e) => up("office", e.target.value)} className={fieldCls}>
-          <option value="">Scegli l'ufficio</option>{OFFICES.map((o) => <option key={o} value={o}>{o}</option>)}
+          <option value="" className={optionCls}>Scegli l'ufficio</option>{OFFICES.map((o) => <option key={o} value={o} className={optionCls}>{o}</option>)}
         </select>)}</Field>
       {v.office === "Altro" && <Field label="Nome dell'ufficio" error={errors.otherOffice}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!errors.otherOffice} value={v.otherOffice} onChange={(e) => up("otherOffice", e.target.value)} className={fieldCls} />}</Field>}
       <Field label="Ruolo" error={errors.role}>{(id, d) => (
         <select id={id} aria-describedby={d} aria-invalid={!!errors.role} value={v.role} onChange={(e) => up("role", e.target.value)} className={fieldCls}>
-          <option value="">Scegli il ruolo</option>{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+          <option value="" className={optionCls}>Scegli il ruolo</option>{ROLES.map((r) => <option key={r} value={r} className={optionCls}>{r}</option>)}
         </select>)}</Field>
       <Field label="Email del Comune" hint="Quella istituzionale, per esempio nome.cognome@comune.campobasso.it." error={errors.email}>{(id, d) => <input id={id} type="email" inputMode="email" autoComplete="email" aria-describedby={d} aria-invalid={!!errors.email} value={v.email} onChange={(e) => up("email", e.target.value)} className={fieldCls} />}</Field>
       <Field label="Matricola (facoltativa)" hint="Il numero del tuo badge o della matricola, se vuoi aggiungerlo." error={errors.badge}>{(id, d) => <input id={id} aria-describedby={d} value={v.badge} onChange={(e) => up("badge", e.target.value)} className={fieldCls} />}</Field>
