@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { crownRing } from "@/models/area-layout";
+import { treeParts } from "@/models/area-layout";
 import { SIM_COLORS, thirstColor, type SimLayout } from "@/views/v10/map-area";
 import { Crosshair, LoaderCircle } from "lucide-react";
 import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camera";
@@ -84,7 +84,13 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
           };
           if (sim?.kind === "piazza") {
             for (const pt of sim.data.patches) shape(pt.ring, pt.kind === "lawn" ? "rgba(76,175,80,0.6)" : "rgba(71,85,105,0.65)", pt.kind === "lawn" ? null : 3);
-            for (const t of sim.data.trees) shape(crownRing(t), "rgba(46,125,50,0.95)", 9);
+            // Each tree: the trunk raised from the ground, then the crown as stacked discs floating at their heights.
+            for (const t of sim.data.trees) for (const part of treeParts(t, undefined, 1)) {
+              if (part.base === 0) { shape(part.ring, part.color, part.height); continue; }
+              const disc = new Polygon3DElement({ altitudeMode: "RELATIVE_TO_GROUND", extruded: false, fillColor: part.color, strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 }) as HTMLElement & { outerCoordinates?: unknown };
+              disc.outerCoordinates = part.ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: (part.base + part.height) / 2 }));
+              map.append(disc);
+            }
           } else if (sim?.kind === "vigneto") {
             for (const pt of sim.data.patches) shape(pt.ring, pt.kind === "zone" ? `${thirstColor(sim.thirst[pt.zone ?? 0] ?? 0)}55` : "rgba(51,65,85,0.65)", pt.kind === "zone" ? null : 2.5);
             if (Polyline3DElement) for (const l of sim.data.lines) {

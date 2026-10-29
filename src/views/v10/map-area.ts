@@ -1,6 +1,6 @@
 import type { Map as MlMap, GeoJSONSource } from "maplibre-gl";
 import type { Ring } from "@/models/place-area";
-import { crownRing, TREE_RADIUS_M, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
+import { TREE_RADIUS_M, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
 
 /** The drawn area on a maplibre map: a turquoise fill and a white outline, from a ring of [lat, lng] pins. */
 export const AREA_SOURCE = "drawn-area";
@@ -66,8 +66,10 @@ export function simFeatures(sim: SimLayout | null, withTreePoints: boolean) {
   return fc(out);
 }
 
-/** The trees' crowns as small polygons, to raise them in 3D. */
-export const treeCrowns = (sim: SimLayout | null) => fc(sim?.kind === "piazza" ? sim.data.trees.map((t) => poly(crownRing(t), { kind: "tree" })) : []);
+/** The trees in 3D: each one a trunk and a rounded crown of slabs (models/area-layout treeParts). */
+export const treeCrowns = (sim: SimLayout | null) => fc(sim?.kind === "piazza"
+  ? sim.data.trees.flatMap((t) => treeParts(t).map((p) => poly(p.ring, { kind: "tree", base: p.base, height: p.height, color: p.color })))
+  : []);
 
 /** Pixels for a length in metres at a zoom, around a latitude (so a crown keeps its real size while zooming). */
 const metresToPx = (m: number, lat: number, zoom: number) => m / ((156_543.03 * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom);
@@ -81,7 +83,7 @@ export function addSimLayers(map: MlMap, lat: number, raised = false) {
   map.addLayer({ id: "sim-line", type: "line", source: SIM_SOURCE, filter: ["==", ["geometry-type"], "LineString"], paint: { "line-color": ["get", "color"], "line-width": ["get", "width"], "line-dasharray": ["case", ["==", ["get", "kind"], "drip"], ["literal", [2, 1.5]], ["literal", [1, 0]]] }, layout: { "line-cap": "round" } }, before);
   if (raised) {
     map.addSource(SIM_TREES_3D, { type: "geojson", data: fc([]) });
-    map.addLayer({ id: "sim-trees-3d", type: "fill-extrusion", source: SIM_TREES_3D, paint: { "fill-extrusion-color": SIM_COLORS.tree, "fill-extrusion-base": 2.5, "fill-extrusion-height": 9, "fill-extrusion-opacity": 0.95 } });
+    map.addLayer({ id: "sim-trees-3d", type: "fill-extrusion", source: SIM_TREES_3D, paint: { "fill-extrusion-color": ["get", "color"], "fill-extrusion-base": ["get", "base"], "fill-extrusion-height": ["get", "height"], "fill-extrusion-opacity": 1, "fill-extrusion-vertical-gradient": true } });
   } else {
     map.addLayer({ id: "sim-trees", type: "circle", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "tree"], paint: {
       "circle-color": SIM_COLORS.tree, "circle-opacity": 0.9, "circle-stroke-color": "#ffffff", "circle-stroke-width": 1.2,

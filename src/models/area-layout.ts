@@ -163,3 +163,34 @@ export function crownRing([lat, lng]: LatLng, radius = TREE_RADIUS_M, sides = 10
   const k = M * Math.cos((lat * Math.PI) / 180);
   return Array.from({ length: sides }, (_, i) => { const a = (i / sides) * Math.PI * 2; return [lat + (Math.sin(a) * radius) / M, lng + (Math.cos(a) * radius) / k] as LatLng; });
 }
+
+/** One piece of a tree in 3D: a horizontal slab from `base` to `height` metres. */
+export type TreePart = { ring: Ring; base: number; height: number; color: string };
+
+const CROWN_GREENS = ["#2f7d32", "#3a8f3c", "#2b6e2f", "#46963f", "#357a3a"];
+
+/**
+ * A tree for the 3D views: a brown trunk 3.5 m tall and a rounded crown from 3 m to 10 m, built from `step` m slabs whose
+ * radius follows an ellipsoid (widest at mid-height, narrow at the top), slightly darker below; each tree takes its
+ * own green from its place so a row of trees is not uniform.
+ */
+export function treeParts(at: LatLng, radius = TREE_RADIUS_M, step = 0.5): TreePart[] {
+  const seed = Math.abs(Math.round(at[0] * 1e6 + at[1] * 1e6));
+  const green = CROWN_GREENS[seed % CROWN_GREENS.length]!;
+  const r = radius * (0.9 + ((seed >> 3) % 5) * 0.05);
+  const parts: TreePart[] = [{ ring: crownRing(at, 0.4, 8), base: 0, height: 3.6, color: "#6b4f2e" }];
+  const bottom = 3, top = 10, centre = (bottom + top) / 2, half = (top - bottom) / 2;
+  for (let h = bottom; h < top - 1e-6; h += step) {
+    const mid = h + step / 2, k = Math.sqrt(Math.max(0, 1 - ((mid - centre) / half) ** 2));
+    // Darker under the crown, lighter on top, as if lit from above.
+    const shade = 0.8 + 0.3 * ((mid - bottom) / (top - bottom));
+    parts.push({ ring: crownRing(at, Math.max(0.5, r * k), 16), base: h, height: h + step, color: tint(green, shade) });
+  }
+  return parts;
+}
+
+/** A hex colour made darker (< 1) or lighter (> 1). */
+function tint(hex: string, f: number): string {
+  const n = parseInt(hex.slice(1), 16), ch = (v: number) => Math.max(0, Math.min(255, Math.round(v * f))).toString(16).padStart(2, "0");
+  return `#${ch(n >> 16)}${ch((n >> 8) & 255)}${ch(n & 255)}`;
+}
