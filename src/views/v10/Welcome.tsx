@@ -4,6 +4,7 @@ import { useSectionOpen } from "@/views/v10/ProfileGate";
 import { useProId } from "@/lib/use-pro-id";
 import { KIND_LABEL, type ProId } from "@/models/professional-id";
 import { ProfileIcon } from "@/views/ProfileIcon";
+import { useProfileCrest } from "@/views/v10/TownCrest";
 import { Ambient, PageHero, openSimTab } from "@/views/v8/console";
 import { HistoryBlock } from "@/views/v10/HistoryBlock";
 
@@ -25,12 +26,16 @@ function Start({ to, icon: Icon, title, text, who }: { to: "/urbano" | "/vigneto
 
 /** In the place of the locked section, once identified: a round button with the profile's badge, leading to the profile page. */
 function ProfileButton({ id }: { id: ProId }) {
+  const crest = useProfileCrest(id);
   return (
     // It takes the locked tile's half of the row, so the open section's tile keeps its size; the circle sits in the middle.
     <Link to="/profilo" aria-label={`Profilo: ${KIND_LABEL[id.kind].toLowerCase()}, ${id.name}`}
       className="group flex min-h-24 min-w-0 flex-1 flex-col items-center justify-center gap-2 rounded-3xl outline-none focus-visible:ring-2 focus-visible:ring-ring">
-      <span className="grid size-20 place-items-center rounded-full bg-foreground/[0.08] ring-1 ring-foreground/10 transition-colors group-hover:bg-foreground/[0.14]">
-        <ProfileIcon kind={id.kind} className="size-8" aria-hidden="true" />
+      {/* The profile's coat of arms in the circle (the town's for the officer, the region's for the agronomist), else its badge. */}
+      <span className="grid size-20 place-items-center overflow-hidden rounded-full bg-foreground/[0.08] ring-1 ring-foreground/10 transition-colors group-hover:bg-foreground/[0.14]">
+        {crest.src
+          ? <img src={crest.src} alt={crest.alt} referrerPolicy="no-referrer" className="size-14 object-contain drop-shadow-[0_2px_6px_rgb(0_0_0/0.35)]" />
+          : <ProfileIcon kind={id.kind} className="size-8" aria-hidden="true" />}
       </span>
       <span className="text-sm font-semibold">Profilo</span>
     </Link>
