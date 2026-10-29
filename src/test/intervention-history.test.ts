@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  groupByDay,
   mixRows,
   addLocalHistory, clearLocalHistory, groupByMonth, whenLabel, whenOf, isHistoryEntry, isHistoryMix, localHistory, MAX_HISTORY, MAX_TEXT, mergeHistory, newEntry, resetLocalHistory,
   sortNewestFirst, type HistoryEntry,
@@ -112,5 +113,13 @@ describe("season and hour kept in the mix", () => {
     expect(e.mix?.when).toEqual({ season: "autunno", hour: 18 });
     expect(whenOf({ ...e, season: null, hour: null })).toEqual({ season: "autunno", hour: 18 });
     expect(isHistoryEntry({ ...e, season: null, hour: null })).toBe(true);
+  });
+});
+
+describe("groupByDay", () => {
+  it("puts each day's interventions in one group headed gg/mm/aaaa, newest first", () => {
+    const at = (iso: string) => ({ ...newEntry("piazza", "x", "p"), at: new Date(iso).toISOString() });
+    const g = groupByDay([at("2026-10-28T10:00:00"), at("2026-10-29T19:24:00"), at("2026-10-29T18:51:00")]);
+    expect(g.map((d) => [d.label, d.items.length])).toEqual([["29/10/2026", 2], ["28/10/2026", 1]]);
   });
 });

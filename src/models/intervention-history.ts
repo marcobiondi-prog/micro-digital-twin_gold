@@ -78,6 +78,19 @@ export const isHistoryEntry = (v: unknown): v is HistoryEntry => {
     && (e.hour === undefined || e.hour === null || isHour(e.hour));
 };
 
+/** Entries grouped by day on this device's calendar, newest first, each headed "29/10/2026". */
+export function groupByDay<E extends HistoryEntry>(entries: readonly E[]): { key: string; label: string; items: E[] }[] {
+  const groups: { key: string; label: string; items: E[] }[] = [];
+  const two = (n: number) => String(n).padStart(2, "0");
+  for (const e of sortNewestFirst(entries)) {
+    const d = new Date(e.at), label = `${two(d.getDate())}/${two(d.getMonth() + 1)}/${d.getFullYear()}`;
+    const last = groups[groups.length - 1];
+    if (last?.label === label) last.items.push(e);
+    else groups.push({ key: label, label, items: [e] });
+  }
+  return groups;
+}
+
 /** Entries grouped by month, newest first: "ottobre 2026". */
 export function groupByMonth<E extends HistoryEntry>(entries: readonly E[]): { key: string; label: string; items: E[] }[] {
   const groups: { key: string; label: string; items: E[] }[] = [];

@@ -9,9 +9,8 @@ import { peekStyle, useTabSwipe } from "@/lib/use-tab-swipe";
 import { SEASON_LABEL } from "@/models/season-climate";
 import { DashCard, DashSection } from "@/views/v10/Dashboard";
 import { clearHistory, useHistory } from "@/lib/use-history";
-import { groupByMonth, whenOf, type HistoryEntry, type HistoryFlow, type HistorySource } from "@/models/intervention-history";
+import { groupByDay, whenOf, type HistoryEntry, type HistoryFlow, type HistorySource } from "@/models/intervention-history";
 
-const day = (e: HistoryEntry) => new Date(e.at).toLocaleDateString("it-IT", { day: "numeric", month: "short" });
 /** When the intervention was made, on this device's clock: "09:12". */
 const time = (e: HistoryEntry) => new Date(e.at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
 
@@ -86,7 +85,7 @@ export function HistoryBlock({ compact = false }: { compact?: boolean }) {
     const shown = shownIn(f);
     const inTab = all.filter((e) => shown(e.flow));
     const shots = allShots.filter((s) => shown(s.flow));
-    const groups = groupByMonth(compact ? inTab.slice(0, COMPACT_ENTRIES) : inTab);
+    const groups = groupByDay(compact ? inTab.slice(0, COMPACT_ENTRIES) : inTab);
     const visibleShots = compact ? shots.slice(0, COMPACT_SHOTS) : shots;
     return (
       <>
@@ -104,14 +103,12 @@ export function HistoryBlock({ compact = false }: { compact?: boolean }) {
           </DashCard>
         ) : groups.map((g) => (
           <div key={g.key} className="space-y-2">
-            <h3 className="px-1 text-sm font-medium capitalize text-muted-foreground">{g.label}</h3>
+            {/* One card per day: its date on top, then each intervention of that day with its time. */}
+            <h3 className="px-1 text-sm font-semibold tabular-nums text-foreground/90">{g.label}<span className="ml-2 font-medium text-muted-foreground">{g.items.length === 1 ? "1 intervento" : `${g.items.length} interventi`}</span></h3>
             <DashCard className="divide-y divide-foreground/10 py-1 sm:py-1">
               {g.items.map((e) => (
                 <div key={e.id} className="flex gap-3 py-3">
-                  <span className="flex w-14 shrink-0 flex-col text-sm tabular-nums text-muted-foreground">
-                    <span>{day(e)}</span>
-                    <span className="text-xs" aria-label={`alle ${time(e)}`}>{time(e)}</span>
-                  </span>
+                  <span className="w-12 shrink-0 text-sm tabular-nums text-muted-foreground" aria-label={`alle ${time(e)}`}>{time(e)}</span>
                   <div className="min-w-0 flex-1">
                     <p className="break-words text-[15px] leading-snug">{e.text}</p>
                     <WhenLine e={e} />
