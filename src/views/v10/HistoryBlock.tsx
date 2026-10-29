@@ -108,7 +108,7 @@ const COMPACT_DAYS = 5, COMPACT_SHOTS = 6;
  * latest few, then "Apri la cronologia") and the Cronologia page (all of it, filtered by place, with "Cancella cronologia").
  * Each entry offers "Apri", which opens it on its own page to read (/cronologia/$id). Signed in it lives in the account, otherwise on this device.
  */
-export function HistoryBlock({ compact = false }: { compact?: boolean }) {
+export function HistoryBlock({ compact = false, flow }: { compact?: boolean; flow?: HistoryFlow }) {
   const { entries: all, where, loading, failed, reload } = useHistory();
   const [filter, setFilter] = useState<Filter>("tutti");
   // Only the full page has the filter to swipe: on Benvenuto the swipe listens to a ref that stays empty.
@@ -123,7 +123,8 @@ export function HistoryBlock({ compact = false }: { compact?: boolean }) {
     ...urban.map((m): Shot => ({ ...m, flow: "piazza", at: mediaTime(m) })),
     ...vineyard.map((m): Shot => ({ ...m, flow: "vigneto", at: mediaTime(m) })),
   ].sort((a, b) => (b.at ?? 0) - (a.at ?? 0)), [urban, vineyard]);
-  const shownIn = (f: Filter) => (flow: HistoryFlow) => compact || f === "tutti" || f === flow;
+  // On the dashboard one project only (flow); on Benvenuto everything; on the Cronologia page the filter tab.
+  const shownIn = (f: Filter) => (fl: HistoryFlow) => (flow ? fl === flow : compact || f === "tutti" || f === fl);
   const entries = all.filter((e) => shownIn(filter)(e.flow));
   // The photos and interventions of one filter tab: the open one, and the one peeking beside it while swiping.
   const list = (f: Filter) => {
@@ -160,7 +161,7 @@ export function HistoryBlock({ compact = false }: { compact?: boolean }) {
       </>
     );
   };
-  const more = compact && (all.length > 0 || allShots.length > COMPACT_SHOTS);
+  const more = compact && (entries.length > 0 || allShots.length > COMPACT_SHOTS);
   const clear = async () => {
     setClearing(true);
     const ok = await clearHistory(filter === "tutti" ? undefined : filter);
@@ -171,7 +172,7 @@ export function HistoryBlock({ compact = false }: { compact?: boolean }) {
     else toast.error("Cancellata da questo dispositivo, non dal tuo account: riprova più tardi");
   };
   return (
-    <DashSection title={compact ? "Cronologia" : "Tutti gli interventi"} hint={where === "account" ? (all.some((e) => e.source === "device") ? "Account e questo dispositivo" : "Salvata nel tuo account") : "Salvata su questo dispositivo"}>
+    <DashSection title={flow ? `Cronologia ${flow === "piazza" ? "della piazza" : "del vigneto"}` : compact ? "Cronologia" : "Tutti gli interventi"} hint={where === "account" ? (all.some((e) => e.source === "device") ? "Account e questo dispositivo" : "Salvata nel tuo account") : "Salvata su questo dispositivo"}>
       <div ref={area} className="space-y-3">
       {!compact && <TabRow label="Luogo" items={FILTERS} value={filter} onChange={(v) => setFilter(v as Filter)} />}
       {/* Tutti · Piazza · Vigneto turn with a sideways swipe on the list, like the tutorial's screens. */}
@@ -180,7 +181,7 @@ export function HistoryBlock({ compact = false }: { compact?: boolean }) {
       {list(filter)}
       {more && (
         <Link to="/cronologia" className="flex h-12 items-center justify-center gap-2 rounded-full bg-foreground text-sm font-semibold text-background outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          Apri la cronologia{all.length > 0 ? ` · ${all.length} ${all.length === 1 ? "intervento" : "interventi"}` : ""}<ArrowRight className="size-4" aria-hidden="true" />
+          Apri la cronologia{entries.length > 0 ? ` · ${entries.length} ${entries.length === 1 ? "intervento" : "interventi"}` : ""}<ArrowRight className="size-4" aria-hidden="true" />
         </Link>
       )}
       {!compact && entries.length > 0 && (

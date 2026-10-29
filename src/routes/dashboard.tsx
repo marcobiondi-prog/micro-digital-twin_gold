@@ -1,8 +1,12 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { z } from "zod";
 import { useTabSwipe } from "@/lib/use-tab-swipe";
 import { SectionLockCard, useSectionOpen } from "@/views/v10/ProfileGate";
+import { HistoryBlock } from "@/views/v10/HistoryBlock";
+import { ProfileIcon } from "@/views/ProfileIcon";
+import { useProId } from "@/lib/use-pro-id";
+import { proSummary } from "@/models/professional-id";
 import { getSimWhen } from "@/models/sim-when";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertTriangle, Download, Plus, Building2, Grape, Copy, Printer, Activity, Trash2, Share2, Mail, LineChart as LineChartIcon, Leaf, NotebookPen, Droplets, Waves } from "lucide-react";
@@ -18,7 +22,7 @@ import { useLabMedia } from "@/models/lab-media-store";
 import { scanReportRows, useArScans } from "@/models/ar-scan-log";
 import { noise } from "@/models/data";
 import { splitLocation } from "@/views/SimulationGrid";
-import { MapPin } from "lucide-react";
+import { ChevronRight, MapPin } from "lucide-react";
 import { setVineyard, splitLabel, urbanMetrics, useLab, vineMetrics } from "@/models/lab-store";
 import { LabSyncIndicator } from "@/views/LabSyncIndicator";
 import { Fold, FoldTabs } from "@/views/Fold";
@@ -409,6 +413,9 @@ function ProgressRing({ pct }: { pct: number }) {
 /** "Esporta" della scheda aperta: PDF, copia, stampa, GeoJSON e CSV (prima nel cruscotto esecutivo). */
 function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   const labState = useLab();
+  const proId = useProId();
+  // "Maria Rossi · Agronomo · patentino MOL/CB/01234 (Molise)" on the cover and in the copied text.
+  const author = proId ? `${proId.name} · ${proSummary(proId)}` : "";
   const reportMedia = useLabMedia(ctx === "Urbano" ? "urban" : "vineyard");
   // Every AI camera scan of this flow, photo or not.
   const scanRows = scanReportRows(useArScans(ctx === "Urbano" ? "urban" : "vineyard"));
@@ -419,7 +426,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   const step = async (label: string, pct: number) => { setProgress({ label, pct }); await new Promise<void>((r) => requestAnimationFrame(() => setTimeout(r, 16))); };
   const [prepared, setPrepared] = useState(false);
   // Report tenuto in memoria: finché i dati non cambiano, PDF, copia e stampa riusano lo stesso.
-  const cacheKey = () => JSON.stringify([ctx, reportRows, ps.day, reportMedia.map(m => [m.id, m.name, m.size]), scanRows]);
+  const cacheKey = () => JSON.stringify([ctx, reportRows, ps.day, reportMedia.map(m => [m.id, m.name, m.size]), scanRows, author]);
   // Two looks of the same report: the dark one of the app (Salva PDF, Salva in…) and a light one for paper (Stampa).
   const getDoc = (light = false) => {
     const base = cacheKey(), k = `${base}|${light ? "light" : "dark"}`;
@@ -478,7 +485,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
     ...zoneRows,
     ...noteRows.map(([d, t]): [string, string] => [`Quaderno ${d}`, t]),
   ];
-  const text = [`MICRO DIGITAL TWIN`, `Report · ${ctx === "Urbano" ? "Piazza" : "Vigneto"}`, stamp, "", ...reportRows.map(([k, x]) => `- ${k}: ${x}`), ...(scanRows.length ? ["", "Scansioni fotocamera AI:", ...scanRows.map(([k, x]) => `- ${k}: ${x}`)] : []), "", "Valori indicativi, da validare con un tecnico."].join("\n");
+  const text = [`MICRO DIGITAL TWIN`, `Report · ${ctx === "Urbano" ? "Piazza" : "Vigneto"}`, stamp, ...(author ? [`Redatto da ${author}`] : []), "", ...reportRows.map(([k, x]) => `- ${k}: ${x}`), ...(scanRows.length ? ["", "Scansioni fotocamera AI:", ...scanRows.map(([k, x]) => `- ${k}: ${x}`)] : []), "", "Valori indicativi, da validare con un tecnico."].join("\n");
   // Report PDF con intestazione del sito e grafica coerente con l'app (usato da Scarica e Stampa).
   // Report PDF in the app's own look (v10): the dark canvas, slate cards, thin big readings, the half ring of the result.
   async function buildPdfImpl(light = false) {
@@ -593,6 +600,8 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
     doc.text(nameLines, M + 1, y + 14); y += 14 + (nameLines.length - 1) * 11;
     doc.setFontSize(10); doc.setTextColor(...C.muted);
     doc.text(clean([placeName.sub, stamp].filter(Boolean).join(" · ")), M + 1, y + 7); y += 16;
+    // Who wrote it: the professional profile in use.
+    if (author) { doc.setFontSize(9.5); doc.text(clean(`Redatto da ${author}`), M + 1, y - 2); y += 7; }
 
     // The result, read like the dashboard.
     const urban = ctx === "Urbano";
@@ -899,11 +908,17 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
 }
 
 function Dashboard() {
-  const { tab: t } = Route.useSearch();
+  const { tab: asked } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
+  const proId = useProId();
+  // Identified, the dashboard is that profile's project only: the piazza for the municipal officer, the vineyard for the agronomist.
+  const own: "Piazza" | "Vigneto" | null = proId ? (proId.kind === "funzionario" ? "Piazza" : "Vigneto") : null;
+  const t = own ?? asked;
   const setT = (v: "Piazza" | "Vigneto") =>
     navigate({ search: (prev) => ({ ...prev, tab: v }), replace: true, resetScroll: false });
-  const swipe = useTabSwipe(["Piazza", "Vigneto"] as const, t, setT);
+  // One project: no tabs to swipe (the swipe listens to a ref that stays empty).
+  const noSwipe = useRef<HTMLDivElement>(null);
+  const swipe = useTabSwipe(["Piazza", "Vigneto"] as const, t, setT, own ? noSwipe : undefined);
   const loading = useDashboardLoading(t);
   // Each project shows only to its profile (the piazza to the municipal officer, the vineyard to the agronomist).
   const sectionOpen = useSectionOpen(t === "Piazza" ? "urban" : "vineyard") !== false;
@@ -912,15 +927,29 @@ function Dashboard() {
       <Ambient tone={t === "Piazza" ? "rgb(28 112 210 / 0.38)" : "rgb(150 36 110 / 0.38)"} />
       <LabSyncIndicator />
       {/* v8: a big thin title with the report on the right, then the PS pills. */}
-      <PageHero title="Dashboard" actions={<ExportReport ctx={t === "Piazza" ? "Urbano" : "Vitivinicolo"} />} />
-      <div className="sticky top-[var(--nav-h)] transition-[top] duration-300 z-[999999998] isolate mx-[calc(50%-50vw)] mb-5 mt-3 min-w-0 bg-background/80 px-0 py-2 sm:px-[calc(50vw-50%)] backdrop-blur-xl sm:mb-6">
-        <TabRow fill label="Dashboard" items={[{ id: "Piazza", label: "Piazza", icon: Building2 }, { id: "Vigneto", label: "Vigneto", icon: Grape }]} value={t} onChange={setT} />
-      </div>
+      <PageHero title="Dashboard" actions={sectionOpen ? <ExportReport ctx={t === "Piazza" ? "Urbano" : "Vitivinicolo"} /> : undefined} />
+      {proId ? (
+        // Identified: in the place of the tabs, who the dashboard is for, leading to the profile page.
+        <Link to="/profilo" className="mb-5 mt-3 flex min-w-0 items-center gap-3 rounded-3xl bg-foreground/[0.05] px-4 py-3 outline-none hover:bg-foreground/[0.08] focus-visible:ring-2 focus-visible:ring-ring sm:mb-6">
+          <ProfileIcon kind={proId.kind} className="size-7 shrink-0" aria-hidden="true" />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[15px] font-semibold">{own === "Piazza" ? "La tua piazza" : "Il tuo vigneto"} · {proId.name}</span>
+            <span className="block truncate text-sm text-muted-foreground">{proSummary(proId)}</span>
+          </span>
+          <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+        </Link>
+      ) : (
+        <div className="sticky top-[var(--nav-h)] transition-[top] duration-300 z-[999999998] isolate mx-[calc(50%-50vw)] mb-5 mt-3 min-w-0 bg-background/80 px-0 py-2 sm:px-[calc(50vw-50%)] backdrop-blur-xl sm:mb-6">
+          <TabRow fill label="Dashboard" items={[{ id: "Piazza", label: "Piazza", icon: Building2 }, { id: "Vigneto", label: "Vigneto", icon: Grape }]} value={t} onChange={setT} />
+        </div>
+      )}
       {/* The open project follows the finger and the other slides in once it turns; nothing peeks beside it. */}
       <div ref={swipe.ref} key={t} className="relative min-w-0" style={swipe.style}>{loading
         ? <DashboardLoading label={t === "Piazza" ? "dashboard della piazza" : "dashboard del vigneto"} tone={t === "Piazza" ? "urban" : "vine"} />
         : !sectionOpen ? <SectionLockCard section={t === "Piazza" ? "urban" : "vineyard"} className="dashboard-content-enter" />
-        : <div className="dashboard-content-enter">{t === "Piazza" ? <PiazzaDashboard records={<UrbanRecords />} /> : <VineDashboard records={<VineRecords />} />}</div>}
+        : <div className="dashboard-content-enter">{t === "Piazza"
+          ? <PiazzaDashboard records={<><HistoryBlock compact flow="piazza" /><UrbanRecords /></>} />
+          : <VineDashboard records={<><HistoryBlock compact flow="vigneto" /><VineRecords /></>} />}</div>}
       </div>
     </div>
   );
