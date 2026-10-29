@@ -1,6 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Building2, Grape, Lock } from "lucide-react";
 import { useSectionOpen } from "@/views/v10/ProfileGate";
+import { useProId } from "@/lib/use-pro-id";
+import { KIND_LABEL, type ProId } from "@/models/professional-id";
+import { ProfileIcon } from "@/views/ProfileIcon";
 import { Ambient, PageHero, openSimTab } from "@/views/v8/console";
 import { HistoryBlock } from "@/views/v10/HistoryBlock";
 
@@ -20,16 +23,31 @@ function Start({ to, icon: Icon, title, text, who }: { to: "/urbano" | "/vigneto
   );
 }
 
+/** In the place of the locked section, once identified: a round button with the profile's badge, leading to the profile page. */
+function ProfileButton({ id }: { id: ProId }) {
+  return (
+    <Link to="/profilo" aria-label={`Profilo: ${KIND_LABEL[id.kind].toLowerCase()}, ${id.name}`}
+      className="group flex shrink-0 flex-col items-center justify-center gap-2 self-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <span className="grid size-20 place-items-center rounded-full bg-foreground/[0.08] ring-1 ring-foreground/10 transition-colors group-hover:bg-foreground/[0.14]">
+        <ProfileIcon kind={id.kind} className="size-8" aria-hidden="true" />
+      </span>
+      <span className="text-sm font-semibold">Profilo</span>
+    </Link>
+  );
+}
+
 /** The page after the intro: where to start, then the latest interventions, with the whole history one tap away. */
 export function Welcome() {
+  const proId = useProId();
   return (
     <div className="space-y-6">
       <Ambient tone={TONE} />
       <PageHero kicker="Micro Digital Twin" title="Benvenuto" />
       <p className="text-[15px] leading-relaxed text-muted-foreground">Scegli da dove partire. Qui sotto trovi gli ultimi interventi che hai registrato.</p>
-      <div className="flex gap-3">
-        <Start to="/urbano" icon={Building2} title="Piazza" text="Prova gli interventi in città" who="Per i funzionari del Comune" />
-        <Start to="/vigneto" icon={Grape} title="Vigneto" text="Prova gli interventi in vigna" who="Per gli agronomi" />
+      <div className="flex items-stretch gap-4">
+        {/* Identified, the section the profile locks gives its place to the round profile button (the agronomist's where Piazza was, the officer's where Vigneto was). */}
+        {proId?.kind === "agronomo" ? <ProfileButton id={proId} /> : <Start to="/urbano" icon={Building2} title="Piazza" text="Prova gli interventi in città" who="Per i funzionari del Comune" />}
+        {proId?.kind === "funzionario" ? <ProfileButton id={proId} /> : <Start to="/vigneto" icon={Grape} title="Vigneto" text="Prova gli interventi in vigna" who="Per gli agronomi" />}
       </div>
       <HistoryBlock compact />
     </div>
