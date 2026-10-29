@@ -19,7 +19,6 @@ import { History, Building2, Grape, Info, LayoutDashboard, Lock } from "lucide-r
 import { useProId, useSyncProId } from "@/lib/use-pro-id";
 import { unlocks, type ProId } from "@/models/professional-id";
 import { AgronomoIcon, FunzionarioIcon } from "@/views/ProfileIcon";
-import { AmbientPools } from "@/views/v8/console";
 
 function NotFoundComponent() {
   return (
@@ -506,9 +505,8 @@ function RootComponent() {
       {/* The opening page (/) stands alone: no header, no menus, no footer. */}
       {!intro && <>
       {/* v8: a solid console top bar painted with the page's own ambient light, so it carries the same shades without being see-through. */}
-      <header id="app-header" className="app-header-tint relative pt-[env(safe-area-inset-top)]">
-        {/* The page's drifting light also crosses the opaque header (clip-path clips the fixed pools to it). */}
-        <div className="pointer-events-none absolute inset-0 [clip-path:inset(0)]" aria-hidden="true"><AmbientPools /></div>
+      {/* Transparent: the page's light and its drifting pools show through behind the account button, the "i" and the theme switch. */}
+      <header id="app-header" className="relative pt-[env(safe-area-inset-top)]">
         <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-2 sm:px-4 sm:py-3">
           {/* No logo nor name here: the account sits where the logo was, the theme switch on the right. */}
           <div className="flex min-w-0 items-center"><AccountControl /></div>

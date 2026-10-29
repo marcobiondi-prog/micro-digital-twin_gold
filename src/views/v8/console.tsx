@@ -48,7 +48,6 @@ export function Ambient({ tone }: { tone: string }) {
       m.content = `rgb(${r} ${gr} ${b})`;
     };
     paint();
-    // The header paints the same light on its own opaque background (styles.css .app-header-tint).
     document.documentElement.style.setProperty("--ambient-tone", tone);
     // The page colour fades for 0.2 s after a theme switch: read it once it has settled.
     let timer = 0;
@@ -72,8 +71,8 @@ export function Ambient({ tone }: { tone: string }) {
 }
 
 /**
- * The two drifting pools of the page's tint (--ambient-tone, set by Ambient), fixed to the top of the screen. The
- * header draws them too, clipped to itself, so the light moves across it with no seam.
+ * The two drifting pools of the page's tint (--ambient-tone, set by Ambient), fixed to the top of the screen; the
+ * transparent header lets them show through.
  */
 export function AmbientPools({ className }: { className?: string }) {
   return (
