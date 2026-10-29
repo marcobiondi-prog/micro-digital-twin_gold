@@ -5,9 +5,10 @@ import { ArrowLeft, ArrowRight, BadgeCheck, Building2, Grape, LogOut, ShieldChec
 import { saveProId, useProId } from "@/lib/use-pro-id";
 import { loadComuni } from "@/lib/comuni";
 import { findComune, searchComuni, townDomain, type Comune } from "@/models/comuni";
+import { findRegion, searchRegions } from "@/models/professional-id";
 import { cn } from "@/lib/utils";
 import {
-  checkAgronomo, checkFunzionario, KIND_LABEL, OFFICES, REGIONS, ROLES, proSummary,
+  checkAgronomo, checkFunzionario, KIND_LABEL, OFFICES, ROLES, proSummary,
   type AgronomoInput, type Errors, type FunzionarioInput, type ProId, type ProKind,
 } from "@/models/professional-id";
 import { Ambient, PageHero } from "@/views/v8/console";
@@ -56,7 +57,8 @@ function AgronomoForm({ onDone }: { onDone: () => void }) {
     setErrors((e) => { const { [k]: _gone, ...rest } = e; return rest as typeof e; });
   };
   const submit = async () => {
-    const { id, errors: e } = checkAgronomo(v);
+    // "molise", "valle d'aosta": the region is taken with its own spelling from the list.
+    const { id, errors: e } = checkAgronomo({ ...v, region: findRegion(v.region) ?? v.region });
     setErrors(e);
     if (!id) return;
     await saveProId(id);
@@ -78,10 +80,7 @@ function AgronomoForm({ onDone }: { onDone: () => void }) {
         {errors.licenceType && <p className="px-1 text-xs text-danger">{errors.licenceType}</p>}
       </div>
       <Field label="Numero del patentino fitosanitario" hint="Come è scritto sul patentino, per esempio MOL/CB/01234." error={errors.licence}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!errors.licence} autoCapitalize="characters" value={v.licence} onChange={(e) => up("licence", e.target.value)} className={fieldCls} />}</Field>
-      <Field label="Regione che l'ha rilasciato" error={errors.region}>{(id, d) => (
-        <select id={id} aria-describedby={d} aria-invalid={!!errors.region} value={v.region} onChange={(e) => up("region", e.target.value)} className={fieldCls}>
-          <option value="" className={optionCls}>Scegli la regione</option>{REGIONS.map((r) => <option key={r} value={r} className={optionCls}>{r}</option>)}
-        </select>)}</Field>
+      <Field label="Regione che l'ha rilasciato" hint="Scrivi le prime lettere e scegli la regione dall'elenco." error={errors.region}>{(id, d) => <RegionField id={id} describedBy={d} invalid={!!errors.region} value={v.region} onChange={(x) => up("region", x)} />}</Field>
       <Field label="Scadenza" hint="Il patentino vale 5 anni: deve essere ancora valido." error={errors.expires}>{(id, d) => <input id={id} type="date" aria-describedby={d} aria-invalid={!!errors.expires} value={v.expires} onChange={(e) => up("expires", e.target.value)} className={fieldCls} />}</Field>
       <Declare checked={v.declared} onChange={(b) => up("declared", b)} error={errors.declared} />
       <Submit label="Identificati e apri il vigneto" />
@@ -89,50 +88,64 @@ function AgronomoForm({ onDone }: { onDone: () => void }) {
   );
 }
 
+type Suggestion = [label: string, aside: string];
+
 /**
- * The town field: as one types (two letters or more) the Italian towns that match show under it, from the most
- * populated, with their province ("Campobasso · CB"); arrows and Enter pick one, Escape closes the list. The list of
- * towns is loaded the first time the field is used.
+ * A field that suggests as one types: the matching items show under it ([label, aside], e.g. "Campobasso · CB"),
+ * arrows and Enter pick one, Escape closes the list, a tap picks one. `suggest` returns the items for what is typed.
  */
-function ComuneField({ id, describedBy, invalid, value, onChange, onPick }: { id: string; describedBy: string | undefined; invalid: boolean; value: string; onChange: (v: string) => void; onPick: (name: string | null) => void }) {
-  const [list, setList] = useState<readonly Comune[]>([]);
+function SuggestField({ id, describedBy, invalid, value, placeholder, label, suggest, onFocusLoad, onChange, onPick }: {
+  id: string; describedBy: string | undefined; invalid: boolean; value: string; placeholder: string; label: string;
+  suggest: (q: string) => Suggestion[]; onFocusLoad?: () => void; onChange: (v: string) => void; onPick: (label: string | null) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
-  const load = () => { if (!list.length) void loadComuni().then(setList); };
-  const hits = open ? searchComuni(list, value) : [];
-  const exact = hits.length === 1 && hits[0]![0] === value;
-  const shown = exact ? [] : hits;
+  const hits = open ? suggest(value) : [];
+  const shown = hits.length === 1 && hits[0]![0] === value ? [] : hits;
   useEffect(() => { setActive(0); }, [value]);
-  const pick = (c: Comune) => { onChange(c[0]); onPick(c[0]); setOpen(false); };
-  const listId = `${id}-comuni`;
+  const pick = (c: Suggestion) => { onChange(c[0]); onPick(c[0]); setOpen(false); };
+  const listId = `${id}-list`;
   return (
     <div className="relative">
       <input id={id} role="combobox" aria-autocomplete="list" aria-expanded={shown.length > 0} aria-controls={listId}
         aria-activedescendant={shown.length ? `${listId}-${active}` : undefined} aria-describedby={describedBy} aria-invalid={invalid}
-        autoComplete="off" value={value} placeholder="Scrivi il nome del Comune"
-        onFocus={() => { load(); setOpen(true); }} onBlur={() => window.setTimeout(() => setOpen(false), 120)}
-        onChange={(e) => { load(); setOpen(true); onChange(e.target.value); onPick(null); }}
+        autoComplete="off" value={value} placeholder={placeholder}
+        onFocus={() => { onFocusLoad?.(); setOpen(true); }} onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+        onChange={(e) => { onFocusLoad?.(); setOpen(true); onChange(e.target.value); onPick(null); }}
         onKeyDown={(e) => {
           if (!shown.length) return;
-          if (e.key === "ArrowDown") { e.preventDefault(); setActive((a) => (a + 1) % shown.length); }
-          else if (e.key === "ArrowUp") { e.preventDefault(); setActive((a) => (a - 1 + shown.length) % shown.length); }
+          if (e.key === "ArrowDown") { e.preventDefault(); setActive((x) => (x + 1) % shown.length); }
+          else if (e.key === "ArrowUp") { e.preventDefault(); setActive((x) => (x - 1 + shown.length) % shown.length); }
           else if (e.key === "Enter") { e.preventDefault(); const c = shown[active]; if (c) pick(c); }
           else if (e.key === "Escape") setOpen(false);
         }}
         className={fieldCls} />
       {shown.length > 0 && (
-        <ul id={listId} role="listbox" aria-label="Comuni" className="absolute inset-x-0 top-full z-20 mt-1.5 max-h-72 overflow-y-auto rounded-2xl border border-foreground/10 bg-popover p-1 text-popover-foreground shadow-2xl">
+        <ul id={listId} role="listbox" aria-label={label} className="absolute inset-x-0 top-full z-20 mt-1.5 max-h-72 overflow-y-auto rounded-2xl border border-foreground/10 bg-popover p-1 text-popover-foreground shadow-2xl">
           {shown.map((c, i) => (
             <li key={`${c[0]}-${c[1]}`} id={`${listId}-${i}`} role="option" aria-selected={i === active}
               onMouseDown={(e) => { e.preventDefault(); pick(c); }} onMouseEnter={() => setActive(i)}
               className={cn("flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-xl px-3 text-[15px]", i === active && "bg-foreground/[0.08]")}>
-              <span className="truncate">{c[0]}</span><span className="shrink-0 text-sm text-muted-foreground">{c[1]}</span>
+              <span className="truncate">{c[0]}</span>{c[1] && <span className="shrink-0 text-sm text-muted-foreground">{c[1]}</span>}
             </li>
           ))}
         </ul>
       )}
     </div>
   );
+}
+
+/** The town field: from two letters, the Italian towns that match, from the most populated, with their province. The list loads the first time the field is used. */
+function ComuneField(props: { id: string; describedBy: string | undefined; invalid: boolean; value: string; onChange: (v: string) => void; onPick: (name: string | null) => void }) {
+  const [list, setList] = useState<readonly Comune[]>([]);
+  return <SuggestField {...props} label="Comuni" placeholder="Scrivi il nome del Comune" onFocusLoad={() => { if (!list.length) void loadComuni().then(setList); }}
+    suggest={(q) => searchComuni(list, q).map((c): Suggestion => [c[0], c[1]])} />;
+}
+
+/** The region field: every region as soon as it is touched, narrowed as one types (accents and case aside). */
+function RegionField(props: { id: string; describedBy: string | undefined; invalid: boolean; value: string; onChange: (v: string) => void }) {
+  return <SuggestField {...props} label="Regioni" placeholder="Scrivi o scegli la regione" onPick={() => undefined}
+    suggest={(q) => searchRegions(q).map((r): Suggestion => [r, ""])} />;
 }
 
 function FunzionarioForm({ onDone }: { onDone: () => void }) {

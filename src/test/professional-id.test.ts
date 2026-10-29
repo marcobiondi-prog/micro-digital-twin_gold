@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkAgronomo, checkFunzionario, isProId, isTownEmail, isLicenceNumber, proSummary, unlocks } from "@/models/professional-id";
+import { checkAgronomo, checkFunzionario, findRegion, isProId, isTownEmail, isLicenceNumber, proSummary, searchRegions, unlocks } from "@/models/professional-id";
 
 const today = new Date("2026-10-29T12:00:00");
 const agro = { name: "Maria Rossi", licenceType: "consulente", licence: "mol/cb/01234", region: "Molise", expires: "2029-05-31", declared: true };
@@ -42,5 +42,19 @@ describe("professional profile", () => {
     expect(isProId(checkAgronomo(agro, today).id)).toBe(true);
     expect(isProId({ kind: "agronomo", name: "x" })).toBe(false);
     expect(isProId(null)).toBe(false);
+  });
+});
+
+describe("regions", () => {
+  it("lists every region when nothing is typed, and narrows as one types", () => {
+    expect(searchRegions("")).toHaveLength(20);
+    expect(searchRegions("mo")).toEqual(["Molise", "Piemonte"]);
+    expect(searchRegions("li")[0]).toBe("Liguria");
+    expect(searchRegions("li")).toContain("Friuli Venezia Giulia");
+  });
+  it("takes the region's own spelling", () => {
+    expect(findRegion("valle d aosta")).toBe("Valle d'Aosta");
+    expect(findRegion("EMILIA-romagna")).toBe("Emilia-Romagna");
+    expect(findRegion("Padania")).toBeUndefined();
   });
 });

@@ -4,6 +4,8 @@
  * town's email. One profile at a time: identifying as one locks the other section.
  * The data are checked for their form only (no public register can be queried): the user declares they are true.
  */
+import { fold } from "./comuni";
+
 export type Section = "urban" | "vineyard";
 export type ProKind = "agronomo" | "funzionario";
 
@@ -27,6 +29,16 @@ export const REGIONS = [
   "Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagna", "Friuli Venezia Giulia", "Lazio", "Liguria", "Lombardia", "Marche",
   "Molise", "Piemonte", "Puglia", "Sardegna", "Sicilia", "Toscana", "Trentino-Alto Adige", "Umbria", "Valle d'Aosta", "Veneto",
 ] as const;
+/** The regions matching what was typed (all of them when nothing is), names starting with it first; accents and case aside. */
+export function searchRegions(query: string): string[] {
+  const q = fold(query);
+  if (!q) return [...REGIONS];
+  const starts = REGIONS.filter((r) => fold(r).startsWith(q)), inside = REGIONS.filter((r) => !fold(r).startsWith(q) && fold(r).includes(q));
+  return [...starts, ...inside];
+}
+/** The region with exactly this name (accents, case and apostrophes aside), with its own spelling. */
+export const findRegion = (name: string): string | undefined => { const q = fold(name); return q ? REGIONS.find((r) => fold(r) === q) : undefined; };
+
 export const OFFICES = [
   "Ufficio tecnico", "Lavori pubblici", "Urbanistica", "Ambiente e verde pubblico", "Mobilità e traffico", "Polizia locale", "Segreteria e Giunta", "Altro",
 ] as const;
