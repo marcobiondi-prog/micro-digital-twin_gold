@@ -245,7 +245,10 @@ export function ProfileCard({ kind, go }: { kind: ProKind; go?: () => void }) {
       </div>
       <dl className="divide-y divide-foreground/10 rounded-2xl bg-foreground/[0.05] px-4">
         {profileRows(mine).map(([k, v]) => (
-          <div key={k} className="flex items-baseline justify-between gap-4 py-3"><dt className="shrink-0 text-sm text-muted-foreground">{k}</dt><dd className="min-w-0 text-right text-[15px] font-medium [overflow-wrap:anywhere]">{v}</dd></div>
+          // A long value (the email) goes on its own line under its label, whole, instead of breaking mid-word beside it.
+          v.length > 24
+            ? <div key={k} className="py-3"><dt className="text-sm text-muted-foreground">{k}</dt><dd className="mt-1 text-[15px] font-medium [overflow-wrap:anywhere]">{v}</dd></div>
+            : <div key={k} className="flex items-baseline justify-between gap-4 py-3"><dt className="shrink-0 text-sm text-muted-foreground">{k}</dt><dd className="min-w-0 text-right text-[15px] font-medium [overflow-wrap:anywhere]">{v}</dd></div>
         ))}
       </dl>
       {go && (

@@ -9,7 +9,7 @@
 - Lab controls precede grids on phones; top-align compact panels elsewhere; desktop tools use grid gutters without resizing cells.
 - Touch devices (hover: none, coarse pointer) disable text selection and long-press callouts except in fields.
 - No pinch-zoom on phones or tablets: viewport user-scalable=no, base touch-action pan-x pan-y on every element, iOS gesture/scale blocks and ctrl+wheel blocked on touch devices (desktop keeps ctrl+wheel zoom); only [data-map-gestures] maps (the 3D view, gestureHandling GREEDY, one-finger move) keep their own pinch/rotate.
-- Long values in label · value rows (profile, history detail) wrap anywhere so they never push past the screen.
+- Long values in label · value rows (profile, history detail) wrap anywhere so they never push past the screen; in the profile card a value over 24 characters (the email) sits whole on its own line under its label. The page footer note ("I risultati del simulatore sono indicativi…") is text-sm, 15 px from sm up.
 - Semantic tokens keep light/dark legible; explicit document themes persist; the app opens dark (the PlayStation-app canvas: html renders class "dark", themeBootScript drops it before paint only for a saved light choice, theme-color follows); dashboard cards/charts never overflow on mobile/tablet.
 - Header/favicon use optimized transparent robot PNGs.
 - Cases keep dated evidence separate from Query weather and daily source research; authenticated jobs write the public read-only cache.
