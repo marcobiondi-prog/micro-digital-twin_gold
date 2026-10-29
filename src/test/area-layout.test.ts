@@ -49,15 +49,13 @@ describe("vineyard inside the area", () => {
 });
 
 describe("3D tree", () => {
-  it("has a trunk from the ground and a rounded crown, widest in the middle", async () => {
+  it("has a trunk from the ground and a pointed crown, widest low and narrow at the tip", async () => {
     const { treeParts } = await import("@/models/area-layout");
     const parts = treeParts([lat, lng]);
-    expect(parts[0]).toMatchObject({ base: 0, height: 3.6 });
+    expect(parts[0]).toMatchObject({ base: 0, height: 3 });
     const crown = parts.slice(1), width = (i: number) => ringAreaM2(crown[i]!.ring);
-    expect(crown[0]!.base).toBe(3);
-    expect(crown.at(-1)!.height).toBeCloseTo(10);
-    const mid = Math.floor(crown.length / 2);
-    expect(width(mid)).toBeGreaterThan(width(0));
-    expect(width(mid)).toBeGreaterThan(width(crown.length - 1));
+    expect(crown[0]!.base).toBe(2.5);
+    expect(crown.at(-1)!.height).toBeGreaterThan(10);
+    expect(width(0)).toBeGreaterThan(width(crown.length - 1) * 20);
   });
 });

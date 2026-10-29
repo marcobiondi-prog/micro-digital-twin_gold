@@ -170,21 +170,24 @@ export type TreePart = { ring: Ring; base: number; height: number; color: string
 const CROWN_GREENS = ["#2f7d32", "#3a8f3c", "#2b6e2f", "#46963f", "#357a3a"];
 
 /**
- * A tree for the 3D views: a brown trunk 3.5 m tall and a rounded crown from 3 m to 10 m, built from `step` m slabs whose
- * radius follows an ellipsoid (widest at mid-height, narrow at the top), slightly darker below; each tree takes its
- * own green from its place so a row of trees is not uniform.
+ * A tree for the 3D views: a brown trunk and a pointed crown like a fir, three tiers of branches from 2.5 m to 11 m,
+ * each tier a cone wider at its foot, the upper ones narrower, ending in a tip; built from `step` m slabs, darker
+ * below and lighter on top; each tree takes its own green from its place so a row of trees is not uniform.
  */
 export function treeParts(at: LatLng, radius = TREE_RADIUS_M, step = 0.5): TreePart[] {
   const seed = Math.abs(Math.round(at[0] * 1e6 + at[1] * 1e6));
   const green = CROWN_GREENS[seed % CROWN_GREENS.length]!;
-  const r = radius * (0.9 + ((seed >> 3) % 5) * 0.05);
-  const parts: TreePart[] = [{ ring: crownRing(at, 0.4, 8), base: 0, height: 3.6, color: "#6b4f2e" }];
-  const bottom = 3, top = 10, centre = (bottom + top) / 2, half = (top - bottom) / 2;
+  const r = radius * 0.85 * (0.9 + ((seed >> 3) % 5) * 0.05);
+  const parts: TreePart[] = [{ ring: crownRing(at, 0.35, 8), base: 0, height: 3, color: "#6b4f2e" }];
+  const bottom = 2.5, top = 11, tiers = [[2.5, 6], [5, 8.6], [7.6, 11]] as const;
   for (let h = bottom; h < top - 1e-6; h += step) {
-    const mid = h + step / 2, k = Math.sqrt(Math.max(0, 1 - ((mid - centre) / half) ** 2));
-    // Darker under the crown, lighter on top, as if lit from above.
-    const shade = 0.8 + 0.3 * ((mid - bottom) / (top - bottom));
-    parts.push({ ring: crownRing(at, Math.max(0.5, r * k), 16), base: h, height: h + step, color: tint(green, shade) });
+    const mid = h + step / 2;
+    // The widest of the tiers at this height: each tier narrows from its foot to its top, the higher tiers start narrower.
+    let k = 0;
+    tiers.forEach(([a, b], i) => { if (mid >= a && mid <= b) k = Math.max(k, (1 - i * 0.28) * (1 - (mid - a) / (b - a)) ** 0.9); });
+    if (k <= 0.02) continue;
+    const shade = 0.78 + 0.32 * ((mid - bottom) / (top - bottom));
+    parts.push({ ring: crownRing(at, Math.max(0.15, r * k), 16), base: h, height: h + step, color: tint(green, shade) });
   }
   return parts;
 }
