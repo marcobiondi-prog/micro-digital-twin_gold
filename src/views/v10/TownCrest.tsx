@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import type { ProId } from "@/models/professional-id";
 
 /**
- * The coat of arms of a town (by ISTAT code, or found by name in the list of towns), with its credit under it;
+ * The coat of arms of a town (by ISTAT code, or found by name in the list of towns), its credit kept in Licenze;
  * nothing at all while it loads, when the town has none or when it cannot be fetched.
  */
 /** The coat of arms of a town as a picture address (by ISTAT code, or found by name), null while loading or when there is none. */
@@ -44,7 +44,7 @@ export function useProfileCrest(id: ProId | null | undefined): { src: string | n
   return { src: null, alt: "" };
 }
 
-export function TownCrest({ name, istat, region, size = 56, className, caption = true, label = false }: { name: string; istat?: string | undefined; region?: boolean; size?: number; className?: string; caption?: boolean; label?: boolean }) {
+export function TownCrest({ name, istat, region, size = 56, className, label = false }: { name: string; istat?: string | undefined; region?: boolean; size?: number; className?: string; label?: boolean }) {
   // A town's crest, or with `region` the crest of the region called `name`.
   const town = useTownCrest(region ? null : name, istat);
   const reg = useRegionCrest(region ? name : null);
@@ -56,13 +56,8 @@ export function TownCrest({ name, istat, region, size = 56, className, caption =
     <figure className={cn("flex shrink-0 flex-col items-center gap-1", className)}>
       <img src={src} alt={region ? `Stemma della Regione ${name}` : `Stemma del Comune di ${name}`} width={size} height={size} loading="lazy" referrerPolicy="no-referrer"
         onError={() => setBroken(src)} className="object-contain drop-shadow-[0_2px_8px_rgb(0_0_0/0.35)]" style={{ width: size, height: size }} />
-      {/* With `label`, the town's or region's name under the crest, then the credit. */}
-      {(label || caption) && (
-        <figcaption className="flex max-w-[6.5rem] flex-col items-center gap-0.5 text-center">
-          {label && <span className="text-xs font-semibold leading-tight text-foreground">{region ? `Regione ${name}` : `Comune di ${name}`}</span>}
-          {caption && <span className="text-[10px] leading-none text-muted-foreground">Wikimedia Commons</span>}
-        </figcaption>
-      )}
+      {/* With `label`, the town's or region's name under the crest (the crests' credit is in Licenze). */}
+      {label && <figcaption className="max-w-[6.5rem] text-center text-xs font-semibold leading-tight text-foreground">{region ? `Regione ${name}` : `Comune di ${name}`}</figcaption>}
     </figure>
   );
 }
