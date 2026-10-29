@@ -12,6 +12,9 @@ export type HistoryMix =
 /** The season and hour the simulation was set to when the intervention was made (older entries have none). */
 export type HistoryWhen = { season: Season; hour: number };
 export type HistoryEntry = { id: string; at: string; flow: HistoryFlow; place: string; text: string; mix?: HistoryMix | null; season?: Season | null; hour?: number | null };
+/** Where an entry is kept: in the account (recorded signed in) or on this device (recorded without signing in). Not saved, worked out when read. */
+export type HistorySource = "account" | "device";
+export type SourcedEntry = HistoryEntry & { source: HistorySource };
 
 export const MAX_HISTORY = 500;
 export const MAX_TEXT = 300;
@@ -49,7 +52,7 @@ export const isHistoryMix = (v: unknown): v is HistoryMix => {
   });
 };
 
-export const sortNewestFirst = (entries: readonly HistoryEntry[]): HistoryEntry[] =>
+export const sortNewestFirst = <E extends HistoryEntry>(entries: readonly E[]): E[] =>
   [...entries].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
 
 /** Newest first, no duplicate ids (the first occurrence wins), at most MAX_HISTORY. */
@@ -68,8 +71,8 @@ export const isHistoryEntry = (v: unknown): v is HistoryEntry => {
 };
 
 /** Entries grouped by month, newest first: "ottobre 2026". */
-export function groupByMonth(entries: readonly HistoryEntry[]): { key: string; label: string; items: HistoryEntry[] }[] {
-  const groups: { key: string; label: string; items: HistoryEntry[] }[] = [];
+export function groupByMonth<E extends HistoryEntry>(entries: readonly E[]): { key: string; label: string; items: E[] }[] {
+  const groups: { key: string; label: string; items: E[] }[] = [];
   for (const e of sortNewestFirst(entries)) {
     const d = new Date(e.at), key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     const last = groups[groups.length - 1];
@@ -100,10 +103,13 @@ export function addLocalHistory(entry: HistoryEntry) {
   try { storage()?.setItem(KEY, JSON.stringify(local)); } catch { /* quota or private mode: memory only */ }
   subs.forEach((f) => f());
 }
-/** Empties this device's history. */
-export function clearLocalHistory() {
-  local = [];
-  try { storage()?.removeItem(KEY); } catch { /* nothing saved */ }
+/** Empties this device's history, or only one place's entries (piazza or vigneto). */
+export function clearLocalHistory(flow?: HistoryFlow) {
+  local = flow ? localHistory().filter((e) => e.flow !== flow) : [];
+  try {
+    if (local.length) storage()?.setItem(KEY, JSON.stringify(local));
+    else storage()?.removeItem(KEY);
+  } catch { /* nothing saved */ }
   subs.forEach((f) => f());
 }
 export const subscribeLocalHistory = (f: () => void) => { subs.add(f); return () => { subs.delete(f); }; };

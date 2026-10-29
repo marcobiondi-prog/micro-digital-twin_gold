@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { ArrowRight, Building2, Clock3, Grape, History, Play, RotateCcw, Trash2 } from "lucide-react";
+import { ArrowRight, Building2, Clock3, Cloud, Smartphone, Grape, History, Play, Trash2 } from "lucide-react";
 import { currentMedia, useLabMedia, type MediaItem } from "@/models/lab-media-store";
 import { mediaTime } from "@/models/media-time";
 import { TabRow } from "@/views/v8/console";
 import { useTabSwipe } from "@/lib/use-tab-swipe";
 import { DashCard, DashSection } from "@/views/v10/Dashboard";
 import { clearHistory, useHistory } from "@/lib/use-history";
-import { groupByMonth, whenLabel, type HistoryEntry, type HistoryFlow } from "@/models/intervention-history";
+import { groupByMonth, whenLabel, type HistoryEntry, type HistoryFlow, type HistorySource } from "@/models/intervention-history";
 
 const day = (e: HistoryEntry) => new Date(e.at).toLocaleDateString("it-IT", { day: "numeric", month: "short" });
 /** When the intervention was made, on this device's clock: "09:12". */
@@ -27,19 +27,31 @@ function Thumb({ s }: { s: Shot }) {
   );
 }
 
+/** Recorded signed in (kept in the account) or without signing in (kept on this device). */
+export function SourceChip({ source }: { source: HistorySource }) {
+  const account = source === "account";
+  const Icon = account ? Cloud : Smartphone;
+  return (
+    <span className={`mt-1.5 inline-flex h-6 items-center gap-1 rounded-full px-2 text-[11px] font-semibold ${account ? "bg-brand-turquoise/15 text-brand-turquoise" : "bg-foreground/[0.08] text-muted-foreground"}`}>
+      <Icon className="size-3.5" aria-hidden="true" />{account ? "Con accesso · account" : "Senza accesso · dispositivo"}
+    </span>
+  );
+}
+
 type Filter = "tutti" | HistoryFlow;
 const FILTERS = [
   { id: "tutti", label: "Tutti", icon: History },
   { id: "piazza", label: "Piazza", icon: Building2 },
   { id: "vigneto", label: "Vigneto", icon: Grape },
 ] as const;
+const OF: Record<HistoryFlow, string> = { piazza: "della piazza", vigneto: "del vigneto" };
 /** On Benvenuto: the latest interventions and photos only; the Cronologia page shows them all. */
 const COMPACT_ENTRIES = 5, COMPACT_SHOTS = 6;
 
 /**
  * The history of the interventions (and the photos and videos of the simulations), shared by Benvenuto (compact: the
  * latest few, then "Apri la cronologia") and the Cronologia page (all of it, filtered by place, with "Cancella cronologia").
- * Each entry offers "Riapri", which opens it on its own page to read (/cronologia/$id). Signed in it lives in the account, otherwise on this device.
+ * Each entry offers "Apri", which opens it on its own page to read (/cronologia/$id). Signed in it lives in the account, otherwise on this device.
  */
 export function HistoryBlock({ compact = false }: { compact?: boolean }) {
   const { entries: all, where, loading, failed, reload } = useHistory();
@@ -49,6 +61,7 @@ export function HistoryBlock({ compact = false }: { compact?: boolean }) {
   const track = useTabSwipe(FILTERS.map((f) => f.id), filter, setFilter, compact ? none : area);
   const [confirm, setConfirm] = useState(false);
   const [clearing, setClearing] = useState(false);
+  useEffect(() => { setConfirm(false); }, [filter]);
   const urban = useLabMedia("urban"), vineyard = useLabMedia("vineyard");
   useEffect(() => { void currentMedia("urban"); void currentMedia("vineyard"); }, []);
   const allShots = useMemo<Shot[]>(() => [
@@ -63,15 +76,15 @@ export function HistoryBlock({ compact = false }: { compact?: boolean }) {
   const more = compact && (all.length > COMPACT_ENTRIES || allShots.length > COMPACT_SHOTS || all.length > 0);
   const clear = async () => {
     setClearing(true);
-    const ok = await clearHistory();
+    const ok = await clearHistory(filter === "tutti" ? undefined : filter);
     setClearing(false);
     setConfirm(false);
     reload();
-    if (ok) toast.success("Cronologia cancellata");
+    if (ok) toast.success(filter === "tutti" ? "Cronologia cancellata" : `Cronologia ${OF[filter]} cancellata`);
     else toast.error("Cancellata da questo dispositivo, non dal tuo account: riprova più tardi");
   };
   return (
-    <DashSection title={compact ? "Cronologia" : "Tutti gli interventi"} hint={where === "account" ? "Salvata nel tuo account" : "Salvata su questo dispositivo"}>
+    <DashSection title={compact ? "Cronologia" : "Tutti gli interventi"} hint={where === "account" ? (all.some((e) => e.source === "device") ? "Account e questo dispositivo" : "Salvata nel tuo account") : "Salvata su questo dispositivo"}>
       <div ref={area} className="space-y-3">
       {!compact && <TabRow label="Luogo" items={FILTERS} value={filter} onChange={(v) => setFilter(v as Filter)} />}
       {/* Tutti · Piazza · Vigneto turn with a sideways swipe on the list, like the tutorial's screens. */}
@@ -86,7 +99,7 @@ export function HistoryBlock({ compact = false }: { compact?: boolean }) {
       {groups.length === 0 ? visibleShots.length > 0 ? null : (
         <DashCard className="flex flex-col items-center gap-2 py-8 text-center">
           <History className="size-7 text-muted-foreground" aria-hidden="true" />
-          <p className="text-[15px] font-medium">{loading ? "Carico la cronologia…" : filter === "tutti" ? "Ancora nessun intervento" : `Ancora nessun intervento nel ${filter}`}</p>
+          <p className="text-[15px] font-medium">{loading ? "Carico la cronologia…" : filter === "tutti" ? "Ancora nessun intervento" : `Ancora nessun intervento ${filter === "piazza" ? "nella piazza" : "nel vigneto"}`}</p>
           {!loading && <p className="max-w-xs text-sm text-muted-foreground">Quando cambi alberi, prato, ombra o irrigazione nella simulazione, l’intervento si registra da solo e lo trovi qui, con foto e video.</p>}
         </DashCard>
       ) : groups.map((g) => (
@@ -103,10 +116,11 @@ export function HistoryBlock({ compact = false }: { compact?: boolean }) {
                   <p className="break-words text-[15px] leading-snug">{e.text}</p>
                   {whenLabel(e) && <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-foreground/80"><Clock3 className="size-3.5" aria-hidden="true" />Simulato: {whenLabel(e)}</p>}
                   <p className="mt-0.5 truncate text-xs text-muted-foreground">{e.flow === "piazza" ? "Piazza" : "Vigneto"}{e.place ? ` · ${e.place}` : ""}</p>
+                  <SourceChip source={e.source} />
                 </div>
-                <Link to="/cronologia/$id" params={{ id: e.id }} aria-label={`Riapri: ${e.text}`}
-                  className="inline-flex h-9 shrink-0 items-center gap-1.5 self-center rounded-full bg-foreground/[0.08] px-3 text-sm font-semibold outline-none hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring">
-                  <RotateCcw className="size-4" aria-hidden="true" />Riapri
+                <Link to="/cronologia/$id" params={{ id: e.id }} aria-label={`Apri: ${e.text}`}
+                  className="inline-flex h-9 shrink-0 items-center gap-1.5 self-center rounded-full bg-foreground/[0.08] pl-3.5 pr-3 text-sm font-semibold outline-none hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring">
+                  Apri<ArrowRight className="size-4" aria-hidden="true" />
                 </Link>
               </div>
             ))}
@@ -118,12 +132,13 @@ export function HistoryBlock({ compact = false }: { compact?: boolean }) {
           Apri la cronologia{all.length > 0 ? ` · ${all.length} ${all.length === 1 ? "intervento" : "interventi"}` : ""}<ArrowRight className="size-4" aria-hidden="true" />
         </Link>
       )}
-      {!compact && all.length > 0 && (
+      {!compact && entries.length > 0 && (
+        // Only where this tab lists interventions, and it empties just those (all of them on Tutti).
         // Asks once in place (no browser dialog): the account's history is gone for good.
         <div className="flex flex-wrap items-center justify-center gap-2 pt-2" role={confirm ? "alertdialog" : undefined} aria-label={confirm ? "Cancellare la cronologia?" : undefined}>
           {confirm ? (
             <>
-              <span className="w-full text-center text-sm text-muted-foreground">{where === "account" ? "Cancello tutta la cronologia, anche dal tuo account?" : "Cancello tutta la cronologia di questo dispositivo?"}</span>
+              <span className="w-full text-center text-sm text-muted-foreground">{`Cancello ${filter === "tutti" ? "tutta la cronologia" : `la cronologia ${OF[filter]}`}${where === "account" ? ", anche dal tuo account" : " di questo dispositivo"}?`}</span>
               <button type="button" onClick={() => setConfirm(false)} disabled={clearing} className="inline-flex h-10 items-center rounded-full bg-foreground/[0.08] px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">Annulla</button>
               <button type="button" onClick={() => void clear()} disabled={clearing} className="inline-flex h-10 items-center gap-1.5 rounded-full bg-danger px-4 text-sm font-semibold text-danger-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">
                 <Trash2 className="size-4" aria-hidden="true" />{clearing ? "Cancello…" : "Cancella"}
@@ -131,7 +146,7 @@ export function HistoryBlock({ compact = false }: { compact?: boolean }) {
             </>
           ) : (
             <button type="button" onClick={() => setConfirm(true)} className="inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
-              <Trash2 className="size-4" aria-hidden="true" />Cancella cronologia
+              <Trash2 className="size-4" aria-hidden="true" />{filter === "tutti" ? "Cancella cronologia" : `Cancella cronologia ${OF[filter]}`}
             </button>
           )}
         </div>

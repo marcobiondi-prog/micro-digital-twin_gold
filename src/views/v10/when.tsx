@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
  * until one is chosen by hand, and read the place's real year averaged by season and hour (null where it is missing).
  */
 export function useSeasonClock(lat: number, lng: number, kind?: "urban" | "vineyard") {
-  // "Riapri" from the history can ask for the season and hour of a past intervention: the clock then starts there, by hand.
+  // "Riprendi nella simulazione" from the history can ask for the season and hour of a past intervention: the clock then starts there, by hand.
   const [asked] = useState(() => (kind ? peekRequestedWhen(kind) : null));
   const [live, setLive] = useState(!asked);
   const [season, setSeason] = useState<Season>(() => asked?.season ?? seasonOfMonth(new Date().getMonth()));

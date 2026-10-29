@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSignedIn } from "@/lib/use-signed-in";
 import {
   addLocalHistory, clearLocalHistory, isHistoryEntry, localHistory, mergeHistory, newEntry, serverLocalHistory, subscribeLocalHistory,
-  type HistoryEntry, type HistoryFlow, type HistoryMix, type HistoryWhen,
+  type HistoryEntry, type HistoryFlow, type SourcedEntry, type HistoryMix, type HistoryWhen,
 } from "@/models/intervention-history";
 import { requestSimWhen } from "@/models/sim-when";
 import { setUrban, setVineyard } from "@/models/lab-store";
@@ -29,13 +29,17 @@ export async function addHistory(flow: HistoryFlow, text: string, place: string,
   if (error) { addLocalHistory(entry); toast.error("Cronologia non salvata nel tuo account, la tengo su questo dispositivo"); }
 }
 
-/** Empties the history: this device's, and the account's too when signed in. False when the account could not be emptied. */
-export async function clearHistory(): Promise<boolean> {
-  clearLocalHistory();
+/**
+ * Empties the history, or only one place's entries: this device's, and the account's too when signed in.
+ * False when the account could not be emptied.
+ */
+export async function clearHistory(flow?: HistoryFlow): Promise<boolean> {
+  clearLocalHistory(flow);
   const { data } = await supabase.auth.getSession();
   const uid = data.session?.user.id;
   if (!uid) return true;
-  const { error } = await table().delete().eq("user_id", uid);
+  const query = table().delete().eq("user_id", uid);
+  const { error } = await (flow ? query.eq("flow", flow) : query);
   return !error;
 }
 
@@ -57,7 +61,7 @@ export function reopenHistory(mix: HistoryMix, when: HistoryWhen | null = null) 
 }
 
 /** The history to show: the account's for signed-in users (plus what a failed save left here), this device's for the others. */
-export function useHistory(): { entries: HistoryEntry[]; where: "account" | "device"; loading: boolean; failed: boolean; reload: () => void } {
+export function useHistory(): { entries: SourcedEntry[]; where: "account" | "device"; loading: boolean; failed: boolean; reload: () => void } {
   const { signedIn, demo } = useSignedIn();
   const account = signedIn && !demo;
   const device = useSyncExternalStore(subscribeLocalHistory, localHistory, serverLocalHistory);
@@ -82,7 +86,12 @@ export function useHistory(): { entries: HistoryEntry[]; where: "account" | "dev
     window.addEventListener("focus", load);
     return () => window.removeEventListener("focus", load);
   }, [account, load]);
+  // Each entry says where it is kept: signed in, the account's come first and this device's (recorded without signing in) follow.
+  const entries = useMemo<SourcedEntry[]>(() => {
+    const fromAccount = new Set(cloud.map((e) => e.id));
+    return (account ? mergeHistory(cloud, device) : device).map((e) => ({ ...e, source: fromAccount.has(e.id) ? "account" : "device" }));
+  }, [account, cloud, device]);
   return account
-    ? { entries: mergeHistory(cloud, device), where: "account", loading, failed, reload: () => void load() }
-    : { entries: device, where: "device", loading: false, failed: false, reload: () => undefined };
+    ? { entries, where: "account", loading, failed, reload: () => void load() }
+    : { entries, where: "device", loading: false, failed: false, reload: () => undefined };
 }
