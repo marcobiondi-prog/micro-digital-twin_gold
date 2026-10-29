@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-  addLocalHistory, clearLocalHistory, groupByMonth, isHistoryEntry, isHistoryMix, localHistory, MAX_HISTORY, MAX_TEXT, mergeHistory, newEntry, resetLocalHistory,
+  addLocalHistory, clearLocalHistory, groupByMonth, whenLabel, whenOf, isHistoryEntry, isHistoryMix, localHistory, MAX_HISTORY, MAX_TEXT, mergeHistory, newEntry, resetLocalHistory,
   sortNewestFirst, type HistoryEntry,
 } from "@/models/intervention-history";
 
@@ -62,6 +62,16 @@ describe("intervention-history", () => {
     expect(isHistoryEntry({ ...newEntry("piazza", "x", "", new Date(), piazza) })).toBe(true);
     expect(isHistoryEntry({ ...newEntry("piazza", "x", ""), mix: { kind: "altro" } })).toBe(false);
     expect(isHistoryEntry({ id: "a", at: "2026-10-01T00:00:00Z", flow: "piazza", place: "", text: "x" })).toBe(true);
+  });
+
+  it("keeps the simulated season and hour", () => {
+    const e = newEntry("piazza", "x", "", new Date(), null, { season: "estate", hour: 15 });
+    expect(whenOf(e)).toEqual({ season: "estate", hour: 15 });
+    expect(whenLabel(e)).toBe("Estate, ore 15");
+    expect(isHistoryEntry(e)).toBe(true);
+    expect(whenLabel(newEntry("piazza", "x", ""))).toBe("");
+    expect(isHistoryEntry({ ...e, season: "monsone" })).toBe(false);
+    expect(isHistoryEntry({ ...e, hour: 24 })).toBe(false);
   });
 
   it("empties the device history, also after a reload", () => {

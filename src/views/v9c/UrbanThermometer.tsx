@@ -215,7 +215,7 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
   }, []);
   const est = piazzaEstimate(urban.trees, urban.permeable, urban.shade);
   // Season and hour (device clock until chosen by hand) and the place's real year for them; without it, a plain estimate said as such.
-  const clock = useSeasonClock(urban.location.lat, urban.location.lng);
+  const clock = useSeasonClock(urban.location.lat, urban.location.lng, "urban");
   const { season, hour, real: realBefore } = clock;
   const before = realBefore ?? estimatedTemp(season, hour, urban.realTemp ?? 40);
   // Trees, lawn and shade take heat away only when there is heat: all of it at 40 °C, none at 20 °C.

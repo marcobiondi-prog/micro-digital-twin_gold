@@ -93,7 +93,7 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
   // Season and hour (device clock until chosen by hand): they set the air temperature of the zones from the place's real
   // year (else a plain estimate), keeping each zone's difference from the others, and the vine's phase for the season.
   // Applied once per season, hour and place, so a reload keeps the temperature tuned by hand.
-  const clock = useSeasonClock(vine.location.lat, vine.location.lng);
+  const clock = useSeasonClock(vine.location.lat, vine.location.lng, "vineyard");
   const seasonAir = clock.real ?? estimatedTemp(clock.season, clock.hour, 36);
   const climateKey = `${clock.season}-${clock.hour}-${vine.location.lat.toFixed(3)},${vine.location.lng.toFixed(3)}-${clock.real === null ? "stima" : "reale"}`;
   useEffect(() => {

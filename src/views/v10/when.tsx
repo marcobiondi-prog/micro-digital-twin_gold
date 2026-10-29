@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { ChevronDown, ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import { getSeasonalClimate } from "@/controllers/climate.functions";
 import { SEASONS, SEASON_LABEL, seasonOfMonth, type Season } from "@/models/season-climate";
+import { clearRequestedWhen, peekRequestedWhen, setSimWhen } from "@/models/sim-when";
 import { hapticTick } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
@@ -11,10 +12,15 @@ import { cn } from "@/lib/utils";
  * Season and hour of a simulation: they follow the device clock ("Adesso", checked every 30 s and on return to the app)
  * until one is chosen by hand, and read the place's real year averaged by season and hour (null where it is missing).
  */
-export function useSeasonClock(lat: number, lng: number) {
-  const [live, setLive] = useState(true);
-  const [season, setSeason] = useState<Season>(() => seasonOfMonth(new Date().getMonth()));
-  const [hour, setHour] = useState(() => new Date().getHours());
+export function useSeasonClock(lat: number, lng: number, kind?: "urban" | "vineyard") {
+  // "Riapri" from the history can ask for the season and hour of a past intervention: the clock then starts there, by hand.
+  const [asked] = useState(() => (kind ? peekRequestedWhen(kind) : null));
+  const [live, setLive] = useState(!asked);
+  const [season, setSeason] = useState<Season>(() => asked?.season ?? seasonOfMonth(new Date().getMonth()));
+  const [hour, setHour] = useState(() => asked?.hour ?? new Date().getHours());
+  useEffect(() => { if (kind) clearRequestedWhen(kind); }, [kind]);
+  // What the simulation is set to now, for the history to record with an intervention.
+  useEffect(() => { if (kind) setSimWhen(kind, { season, hour }); }, [kind, season, hour]);
   useEffect(() => {
     if (!live) return;
     const sync = () => { const now = new Date(); setSeason(seasonOfMonth(now.getMonth())); setHour(now.getHours()); };

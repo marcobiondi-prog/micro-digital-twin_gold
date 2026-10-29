@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { ArrowRight, Building2, Grape, History, Play, RotateCcw, Trash2 } from "lucide-react";
+import { ArrowRight, Building2, Clock3, Grape, History, Play, RotateCcw, Trash2 } from "lucide-react";
 import { currentMedia, useLabMedia, type MediaItem } from "@/models/lab-media-store";
 import { mediaTime } from "@/models/media-time";
 import { openSimTab, TabRow } from "@/views/v8/console";
 import { DashCard, DashSection } from "@/views/v10/Dashboard";
 import { clearHistory, reopenHistory, useHistory } from "@/lib/use-history";
-import { groupByMonth, type HistoryEntry, type HistoryFlow } from "@/models/intervention-history";
+import { groupByMonth, whenLabel, whenOf, type HistoryEntry, type HistoryFlow } from "@/models/intervention-history";
 
 const day = (e: HistoryEntry) => new Date(e.at).toLocaleDateString("it-IT", { day: "numeric", month: "short" });
+/** When the intervention was made, on this device's clock: "09:12". */
+const time = (e: HistoryEntry) => new Date(e.at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
 
 type Shot = MediaItem & { flow: "piazza" | "vigneto"; at: number | null };
 
@@ -59,7 +61,7 @@ export function HistoryBlock({ compact = false }: { compact?: boolean }) {
   // "Riapri": the entry's interventions go back into its simulation, which opens on Simula.
   const reopen = (e: HistoryEntry) => {
     if (!e.mix) return;
-    reopenHistory(e.mix);
+    reopenHistory(e.mix, whenOf(e));
     openSimTab(e.flow === "piazza" ? "urban" : "vineyard", "simula");
     toast.success("Intervento riaperto", { description: e.text });
     void navigate({ to: e.flow === "piazza" ? "/urbano" : "/vigneto" });
@@ -95,9 +97,13 @@ export function HistoryBlock({ compact = false }: { compact?: boolean }) {
           <DashCard className="divide-y divide-foreground/10 py-1 sm:py-1">
             {g.items.map((e) => (
               <div key={e.id} className="flex gap-3 py-3">
-                <span className="w-14 shrink-0 text-sm tabular-nums text-muted-foreground">{day(e)}</span>
+                <span className="flex w-14 shrink-0 flex-col text-sm tabular-nums text-muted-foreground">
+                  <span>{day(e)}</span>
+                  <span className="text-xs" aria-label={`alle ${time(e)}`}>{time(e)}</span>
+                </span>
                 <div className="min-w-0 flex-1">
                   <p className="break-words text-[15px] leading-snug">{e.text}</p>
+                  {whenLabel(e) && <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-foreground/80"><Clock3 className="size-3.5" aria-hidden="true" />Simulato: {whenLabel(e)}</p>}
                   <p className="mt-0.5 truncate text-xs text-muted-foreground">{e.flow === "piazza" ? "Piazza" : "Vigneto"}{e.place ? ` · ${e.place}` : ""}</p>
                 </div>
                 {e.mix && (

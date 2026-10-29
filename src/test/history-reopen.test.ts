@@ -5,6 +5,7 @@ vi.mock("@/integrations/supabase/client", () => ({ supabase: { auth: { getSessio
 import { urbanMix, vineyardMix } from "@/models/history-summary";
 import { getLab, setUrban, setVineyard } from "@/models/lab-store";
 import { reopenHistory } from "@/lib/use-history";
+import { clearRequestedWhen, peekRequestedWhen } from "@/models/sim-when";
 
 describe("Riapri", () => {
   it("puts a piazza intervention back", () => {
@@ -14,6 +15,15 @@ describe("Riapri", () => {
     const u = getLab().urban;
     expect([u.trees, u.permeable, u.shade]).toEqual([12, 40, 30]);
     expect(u.treeCells).toBeNull();
+  });
+
+  it("asks the simulation to open on the entry's season and hour", () => {
+    clearRequestedWhen("urban");
+    reopenHistory(urbanMix(getLab().urban), { season: "inverno", hour: 7 });
+    expect(peekRequestedWhen("urban")).toEqual({ season: "inverno", hour: 7 });
+    clearRequestedWhen("urban");
+    reopenHistory(urbanMix(getLab().urban));
+    expect(peekRequestedWhen("urban")).toBeNull();
   });
 
   it("puts every vineyard zone and the scope back", () => {

@@ -4,8 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSignedIn } from "@/lib/use-signed-in";
 import {
   addLocalHistory, clearLocalHistory, isHistoryEntry, localHistory, mergeHistory, newEntry, serverLocalHistory, subscribeLocalHistory,
-  type HistoryEntry, type HistoryFlow, type HistoryMix,
+  type HistoryEntry, type HistoryFlow, type HistoryMix, type HistoryWhen,
 } from "@/models/intervention-history";
+import { requestSimWhen } from "@/models/sim-when";
 import { setUrban, setVineyard } from "@/models/lab-store";
 
 // The table comes from supabase/migrations (not in the generated types), like the other late tables.
@@ -15,15 +16,16 @@ const table = () => (supabase as any).from("intervention_history");
  * Records an intervention: in the account when there is a real session, on this device otherwise
  * (and on this device too if the account save fails, so nothing is lost).
  */
-export async function addHistory(flow: HistoryFlow, text: string, place: string, mix: HistoryMix | null = null): Promise<void> {
+export async function addHistory(flow: HistoryFlow, text: string, place: string, mix: HistoryMix | null = null, when: HistoryWhen | null = null): Promise<void> {
   if (!text.trim()) return;
-  const entry = newEntry(flow, text, place, new Date(), mix);
+  const entry = newEntry(flow, text, place, new Date(), mix, when);
   const { data } = await supabase.auth.getSession();
   if (!data.session) { addLocalHistory(entry); return; }
   const row = { id: entry.id, at: entry.at, flow: entry.flow, place: entry.place, text: entry.text };
-  let { error } = await table().insert({ ...row, mix: entry.mix ?? null });
-  // An account table without the mix column yet (its migration not applied): save the entry without it.
-  if (error && entry.mix) ({ error } = await table().insert(row));
+  let { error } = await table().insert({ ...row, mix: entry.mix ?? null, season: entry.season ?? null, hour: entry.hour ?? null });
+  // An account table without the newer columns yet (their migrations not applied): save what it can hold.
+  if (error) ({ error } = await table().insert({ ...row, mix: entry.mix ?? null }));
+  if (error) ({ error } = await table().insert(row));
   if (error) { addLocalHistory(entry); toast.error("Cronologia non salvata nel tuo account, la tengo su questo dispositivo"); }
 }
 
@@ -37,8 +39,12 @@ export async function clearHistory(): Promise<boolean> {
   return !error;
 }
 
-/** Puts an entry's interventions back in its simulation (the place stays the one chosen now). */
-export function reopenHistory(mix: HistoryMix) {
+/**
+ * Puts an entry's interventions back in its simulation (the place stays the one chosen now), and asks it to open on the
+ * entry's season and hour when it has them.
+ */
+export function reopenHistory(mix: HistoryMix, when: HistoryWhen | null = null) {
+  if (when) requestSimWhen(mix.kind === "piazza" ? "urban" : "vineyard", when);
   if (mix.kind === "piazza") {
     setUrban({ trees: mix.trees, permeable: mix.permeable, shade: mix.shade, treeCells: null, permeableCells: null, shadeCells: null });
     return;
@@ -60,9 +66,12 @@ export function useHistory(): { entries: HistoryEntry[]; where: "account" | "dev
   const [failed, setFailed] = useState(false);
   const load = useCallback(async () => {
     setLoading(true);
-    let { data, error } = await table().select("id, at, flow, place, text, mix").order("at", { ascending: false }).limit(500);
-    // Without the mix column yet the entries still show, only without "Riapri".
-    if (error) ({ data, error } = await table().select("id, at, flow, place, text").order("at", { ascending: false }).limit(500));
+    // Without the newer columns yet the entries still show, only without season and hour, or without "Riapri".
+    let data: unknown, error: unknown;
+    for (const columns of ["id, at, flow, place, text, mix, season, hour", "id, at, flow, place, text, mix", "id, at, flow, place, text"]) {
+      ({ data, error } = await table().select(columns).order("at", { ascending: false }).limit(500));
+      if (!error) break;
+    }
     setFailed(!!error);
     if (!error && Array.isArray(data)) setCloud(data.filter(isHistoryEntry));
     setLoading(false);

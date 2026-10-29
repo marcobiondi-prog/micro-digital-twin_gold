@@ -2,12 +2,16 @@
  * History of the interventions made, shown on the Benvenuto page.
  * Free users keep it on this device (localStorage); signed-in users keep it in their account (see lib/use-history).
  */
+import { SEASONS, SEASON_LABEL, type Season } from "./season-climate";
+
 export type HistoryFlow = "piazza" | "vigneto";
 /** What was set when the entry was recorded, so "Riapri" can put it back (older entries have none). */
 export type HistoryMix =
   | { kind: "piazza"; trees: number; permeable: number; shade: number }
   | { kind: "vigneto"; zones: Array<{ irrigation: number; shade: number; windbreak: number }>; allZones: boolean; selected: number };
-export type HistoryEntry = { id: string; at: string; flow: HistoryFlow; place: string; text: string; mix?: HistoryMix | null };
+/** The season and hour the simulation was set to when the intervention was made (older entries have none). */
+export type HistoryWhen = { season: Season; hour: number };
+export type HistoryEntry = { id: string; at: string; flow: HistoryFlow; place: string; text: string; mix?: HistoryMix | null; season?: Season | null; hour?: number | null };
 
 export const MAX_HISTORY = 500;
 export const MAX_TEXT = 300;
@@ -21,9 +25,16 @@ function uuid(): string {
   return `${hex(8)}-${hex(4)}-4${hex(3)}-${"89ab"[Math.floor(Math.random() * 4)]}${hex(3)}-${hex(12)}`;
 }
 
-export function newEntry(flow: HistoryFlow, text: string, place: string, now: Date = new Date(), mix: HistoryMix | null = null): HistoryEntry {
-  return { id: uuid(), at: now.toISOString(), flow, place: place.trim(), text: text.trim().slice(0, MAX_TEXT), mix };
+export function newEntry(flow: HistoryFlow, text: string, place: string, now: Date = new Date(), mix: HistoryMix | null = null, when: HistoryWhen | null = null): HistoryEntry {
+  return { id: uuid(), at: now.toISOString(), flow, place: place.trim(), text: text.trim().slice(0, MAX_TEXT), mix, season: when?.season ?? null, hour: when?.hour ?? null };
 }
+
+const isSeason = (v: unknown): v is Season => typeof v === "string" && (SEASONS as readonly string[]).includes(v);
+const isHour = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 23;
+/** The entry's simulated season and hour, when both were recorded. */
+export const whenOf = (e: HistoryEntry): HistoryWhen | null => (isSeason(e.season) && isHour(e.hour) ? { season: e.season, hour: e.hour } : null);
+/** "Estate, ore 15", or "" for an entry without them. */
+export const whenLabel = (e: HistoryEntry): string => { const w = whenOf(e); return w ? `${SEASON_LABEL[w.season]}, ore ${w.hour}` : ""; };
 
 const num = (v: unknown) => typeof v === "number" && Number.isFinite(v);
 /** A mix that can be put back: the right numbers for its kind. */
@@ -51,7 +62,9 @@ export const isHistoryEntry = (v: unknown): v is HistoryEntry => {
   const e = v as Partial<HistoryEntry> | null;
   return !!e && typeof e.id === "string" && typeof e.at === "string" && !Number.isNaN(Date.parse(e.at))
     && (e.flow === "piazza" || e.flow === "vigneto") && typeof e.place === "string" && typeof e.text === "string"
-    && (e.mix === undefined || e.mix === null || isHistoryMix(e.mix));
+    && (e.mix === undefined || e.mix === null || isHistoryMix(e.mix))
+    && (e.season === undefined || e.season === null || isSeason(e.season))
+    && (e.hour === undefined || e.hour === null || isHour(e.hour));
 };
 
 /** Entries grouped by month, newest first: "ottobre 2026". */
