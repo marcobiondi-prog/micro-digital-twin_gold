@@ -14,6 +14,8 @@ export type AgronomoId = {
 };
 export type FunzionarioId = {
   kind: "funzionario"; name: string; comune: string; office: string; role: string; email: string; badge: string; at: string;
+  /** The town's ISTAT code, for its coat of arms (older profiles have none and find it by name). */
+  istat?: string;
 };
 export type ProId = AgronomoId | FunzionarioId;
 

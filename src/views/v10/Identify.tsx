@@ -6,6 +6,7 @@ import { saveProId, useProId } from "@/lib/use-pro-id";
 import { loadComuni } from "@/lib/comuni";
 import { findComune, searchComuni, townDomain, type Comune } from "@/models/comuni";
 import { findRegion, officeOf, searchOffices, searchRegions } from "@/models/professional-id";
+import { TownCrest } from "@/views/v10/TownCrest";
 import { cn } from "@/lib/utils";
 import {
   checkAgronomo, checkFunzionario, KIND_LABEL, ROLES, proSummary,
@@ -172,7 +173,7 @@ function FunzionarioForm({ onDone }: { onDone: () => void }) {
     const towns = await loadComuni();
     const town = towns.length ? findComune(towns, v.comune) : undefined;
     if (towns.length && !town && !e.comune) e.comune = "Scegli il tuo Comune dall'elenco dei comuni italiani.";
-    if (town && id && id.kind === "funzionario") id.comune = town[0];
+    if (town && id && id.kind === "funzionario") { id.comune = town[0]; id.istat = town[3]; }
     setErrors(e);
     if (Object.keys(e).length) return;
     if (!id) return;
@@ -190,6 +191,13 @@ function FunzionarioForm({ onDone }: { onDone: () => void }) {
         </select>)}</Field>
       <Field label="Email del Comune" hint={`Quella istituzionale, per esempio nome.cognome@${townDomain(town ?? "Campobasso")}.`} error={errors.email}>{(id, d) => <input id={id} type="email" inputMode="email" autoComplete="email" aria-describedby={d} aria-invalid={!!errors.email} value={v.email} onChange={(e) => up("email", e.target.value)} className={fieldCls} />}</Field>
       <Field label="Matricola (facoltativa)" hint="Il numero del tuo badge o della matricola, se vuoi aggiungerlo." error={errors.badge}>{(id, d) => <input id={id} aria-describedby={d} value={v.badge} onChange={(e) => up("badge", e.target.value)} className={fieldCls} />}</Field>
+      {/* At the end, the picked town with its coat of arms. */}
+      {town && (
+        <div className="flex items-center gap-4 rounded-2xl bg-foreground/[0.05] px-4 py-3">
+          <TownCrest name={town} />
+          <p className="min-w-0 text-[15px] font-semibold">Comune di {town}<span className="block text-sm font-normal text-muted-foreground">Il tuo profilo porterà il suo stemma.</span></p>
+        </div>
+      )}
       <Declare checked={v.declared} onChange={(b) => up("declared", b)} error={errors.declared} />
       <Submit label="Identificati e apri la piazza" />
     </form>
@@ -224,7 +232,10 @@ export function ProfileCard({ kind, go }: { kind: ProKind; go?: () => void }) {
   };
   return (
     <div className="fuse-canvas space-y-4 rounded-3xl px-5 py-6">
-      <p className="flex items-center gap-2 text-lg font-semibold"><BadgeCheck className="size-6 text-emerald-400" aria-hidden="true" />Sei identificato come {KIND_LABEL[kind].toLowerCase()}</p>
+      <div className="flex items-start justify-between gap-3">
+        <p className="flex items-center gap-2 text-lg font-semibold"><BadgeCheck className="size-6 shrink-0 text-emerald-400" aria-hidden="true" />Sei identificato come {KIND_LABEL[kind].toLowerCase()}</p>
+        {mine.kind === "funzionario" && <TownCrest name={mine.comune} istat={mine.istat} size={52} />}
+      </div>
       <dl className="divide-y divide-foreground/10 rounded-2xl bg-foreground/[0.05] px-4">
         {profileRows(mine).map(([k, v]) => (
           <div key={k} className="flex items-baseline justify-between gap-4 py-3"><dt className="text-sm text-muted-foreground">{k}</dt><dd className="text-right text-[15px] font-medium">{v}</dd></div>
