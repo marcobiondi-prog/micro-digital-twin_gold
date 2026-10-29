@@ -939,7 +939,7 @@ function Dashboard() {
           <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
         </Link>
       ) : (
-        <div className="sticky top-[var(--nav-h)] transition-[top] duration-300 z-[999999998] isolate mx-[calc(50%-50vw)] mb-5 mt-3 min-w-0 bg-background/80 px-0 py-2 sm:px-[calc(50vw-50%)] backdrop-blur-xl sm:mb-6">
+        <div className="sticky top-[var(--nav-h)] transition-[top] duration-300 z-[999999998] isolate mx-[calc(50%-50vw)] mb-5 mt-3 min-w-0 bg-transparent px-0 py-2 sm:px-[calc(50vw-50%)] backdrop-blur-xl sm:mb-6">
           <TabRow fill label="Dashboard" items={[{ id: "Piazza", label: "Piazza", icon: Building2 }, { id: "Vigneto", label: "Vigneto", icon: Grape }]} value={t} onChange={setT} />
         </div>
       )}

@@ -347,7 +347,7 @@ function SmartNav() {
   return (
     <div id="smart-nav-slot" style={{ height: NAV_H }}>
       <div
-        className={`${pinned ? "fixed inset-x-0 top-0 animate-in slide-in-from-top duration-300 shadow-md" : "relative"} z-[999999999] isolate border-b bg-background motion-reduce:animate-none`}
+        className={`${pinned ? "fixed inset-x-0 top-0 animate-in slide-in-from-top duration-300 backdrop-blur-xl" : "relative"} z-[999999999] isolate bg-transparent motion-reduce:animate-none`}
         style={{ height: NAV_H }}
       >
         <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-1 px-2 sm:px-4">

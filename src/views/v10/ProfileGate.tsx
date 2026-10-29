@@ -68,7 +68,7 @@ export function SectionGate({ section, children }: { section: Section; children:
     <div className="space-y-4">
       <Ambient tone={SECTION_TONE[section]} />
       <PageHero kicker={`Sezione ${SECTION_LABEL[section]} · bloccata`} kickerIcon={Icon} title={WHO[section].title} />
-      <div className="sticky top-[var(--nav-h)] z-[999999997] -mx-4 bg-background/80 px-4 py-2 backdrop-blur-xl">
+      <div className="sticky top-[var(--nav-h)] z-[999999997] -mx-4 bg-transparent px-4 py-2 backdrop-blur-xl">
         <TabRow label="Sezioni" items={[{ id: "profilo", label: "Profilo", icon: UserRound }]} value="profilo" onChange={() => undefined} />
       </div>
       <div className="fuse-canvas space-y-4 rounded-3xl px-4 pb-6 pt-5 sm:px-5">

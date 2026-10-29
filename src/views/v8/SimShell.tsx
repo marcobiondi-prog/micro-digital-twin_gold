@@ -50,7 +50,7 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, medi
             </DropdownMenuContent>
           </DropdownMenu>
         </>} />
-      <div className="sticky top-[var(--nav-h)] z-[999999997] -mx-4 bg-background/80 px-4 py-2 backdrop-blur-xl transition-[top] duration-300">
+      <div className="sticky top-[var(--nav-h)] z-[999999997] -mx-4 bg-transparent px-4 py-2 backdrop-blur-xl transition-[top] duration-300">
         <TabRow label="Sezioni" items={TABS} value={tab} onChange={go} />
       </div>
       {/* The open tab follows the finger and the next slides in once it turns; nothing peeks beside it. */}
