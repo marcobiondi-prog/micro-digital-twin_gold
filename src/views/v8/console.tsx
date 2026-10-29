@@ -33,8 +33,14 @@ export function useSimTab(kind: SimKind): SimTab {
   return useSyncExternalStore((l) => { listeners.add(l); return () => { listeners.delete(l); }; }, () => tabs[kind], () => "simula");
 }
 
-/** Soft coloured light behind the top of the page, like the art behind the PS5 home. The transparent header
- * repaints it on its own solid background, and the phone status bar takes the same tint (the light blended on the page colour). */
+/** The page that last set the light, so a page leaving does not switch it off while the next one is already setting its own. */
+let ambientOwner = 0, ambientClear = 0;
+
+/**
+ * Sets the soft coloured light behind the top of the page (the tint of what it shows) and the phone status bar's
+ * tint. The light itself is drawn once by the root (AmbientLayer), so on a page change it never goes out: the colour
+ * glides from the old page's to the new one's (--ambient-tone is a registered colour property with a transition).
+ */
 export function Ambient({ tone }: { tone: string }) {
   useEffect(() => {
     const meta = () => document.querySelector<HTMLMetaElement>(THEME_META);
@@ -47,6 +53,8 @@ export function Ambient({ tone }: { tone: string }) {
       const [r = 0, gr = 0, b = 0] = g.getImageData(0, 0, 1, 1).data;
       m.content = `rgb(${r} ${gr} ${b})`;
     };
+    const me = ++ambientOwner;
+    window.clearTimeout(ambientClear);
     paint();
     document.documentElement.style.setProperty("--ambient-tone", tone);
     // The page colour fades for 0.2 s after a theme switch: read it once it has settled.
@@ -56,15 +64,26 @@ export function Ambient({ tone }: { tone: string }) {
     return () => {
       window.clearTimeout(timer);
       window.removeEventListener(THEME_CHANGED, later);
-      document.documentElement.style.removeProperty("--ambient-tone");
-      meta()?.setAttribute("content", document.documentElement.classList.contains("dark") ? THEME_DARK : "#ffffff");
+      // Only when no other page has taken the light over shortly after (a page without one): then fade it out.
+      ambientClear = window.setTimeout(() => {
+        if (ambientOwner !== me) return;
+        document.documentElement.style.removeProperty("--ambient-tone");
+        meta()?.setAttribute("content", document.documentElement.classList.contains("dark") ? THEME_DARK : "#ffffff");
+      }, 600);
     };
   }, [tone]);
-  // The still light (the same the header wears), and over it two soft pools of the page's own tint that drift and breathe slowly
-  // (transform and opacity only, like the entrance aurora; still with reduced motion).
+  return null;
+}
+
+/**
+ * The light at the top of every page, drawn once by the root: the still glow and, over it, two soft pools that drift
+ * and breathe slowly (transform and opacity only, like the entrance aurora; still with reduced motion), all in the
+ * --ambient-tone the open page sets.
+ */
+export function AmbientLayer() {
   return (
     <div className="console-ambient pointer-events-none fixed inset-x-0 top-0 -z-10 h-[48vh] overflow-hidden" aria-hidden="true">
-      <div className="absolute inset-0 transition-[background] duration-700 motion-reduce:transition-none" style={{ background: `radial-gradient(130% 85% at 50% -15%, ${tone}, transparent 72%)` }} />
+      <div className="absolute inset-0" style={{ background: "radial-gradient(130% 85% at 50% -15%, var(--ambient-tone), transparent 72%)" }} />
       <AmbientPools />
     </div>
   );

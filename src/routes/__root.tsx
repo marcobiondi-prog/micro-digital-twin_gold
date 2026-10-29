@@ -19,6 +19,7 @@ import { History, Building2, Grape, Info, LayoutDashboard, Lock } from "lucide-r
 import { useProId, useSyncProId } from "@/lib/use-pro-id";
 import { unlocks, type ProId } from "@/models/professional-id";
 import { AgronomoIcon, FunzionarioIcon } from "@/views/ProfileIcon";
+import { AmbientLayer } from "@/views/v8/console";
 
 function NotFoundComponent() {
   return (
@@ -505,6 +506,8 @@ function RootComponent() {
       {/* The opening page (/) stands alone: no header, no menus, no footer. */}
       {!intro && <>
       {/* v8: a solid console top bar painted with the page's own ambient light, so it carries the same shades without being see-through. */}
+      {/* The page's light, drawn once for every page so a page change never shows the bare background. */}
+      {!intro && <AmbientLayer />}
       {/* Transparent: the page's light and its drifting pools show through behind the account button, the "i" and the theme switch. */}
       <header id="app-header" className="relative pt-[env(safe-area-inset-top)]">
         <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-2 sm:px-4 sm:py-3">

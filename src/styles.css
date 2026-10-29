@@ -1985,6 +1985,11 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   .home-art { -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 26%, #000 62%, transparent 100%); mask-image: linear-gradient(180deg, transparent 0%, #000 26%, #000 62%, transparent 100%); }
 }
 
+/* The page's light colour glides from one page's tint to the next (a registered colour can be transitioned). */
+@property --ambient-tone { syntax: "<color>"; inherits: true; initial-value: transparent; }
+:root { transition: --ambient-tone 600ms ease; }
+@media (prefers-reduced-motion: reduce) { :root { transition: none; } }
+
 /* Top of every page: two pools of the page's tint drift and breathe over the still ambient light (transform/opacity only). */
 .ambient-pools { -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent); mask-image: linear-gradient(180deg, #000 55%, transparent); }
 .ambient-pool { position: absolute; width: 80vw; height: 22vh; border-radius: 9999px; opacity: 0.8; background: radial-gradient(closest-side, var(--ambient-tone, transparent), transparent); will-change: transform, opacity; }
