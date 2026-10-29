@@ -19,7 +19,6 @@ import { History, Building2, Grape, Info, LayoutDashboard, Lock } from "lucide-r
 import { useProId, useSyncProId } from "@/lib/use-pro-id";
 import { unlocks, type ProId } from "@/models/professional-id";
 import { AgronomoIcon, FunzionarioIcon } from "@/views/ProfileIcon";
-import { openAccount } from "@/lib/camera-dock";
 
 function NotFoundComponent() {
   return (
@@ -133,8 +132,8 @@ const bottomItems: readonly NavItem[] = [
 ];
 /**
  * Once a profile is identified, the section it locks gives its place to that profile's badge (same column): the
- * agronomist's leaf badge where Urbano was, the municipal officer's town-hall badge where Vigneto was; it opens the
- * account panel, which shows the profile on top. With no profile both sections stay, locked.
+ * agronomist's leaf badge where Urbano was, the municipal officer's town-hall badge where Vigneto was; it opens that
+ * profile's page (/profilo). With no profile both sections stay, locked.
  */
 function itemsFor(id: ProId | null | undefined): readonly NavItem[] {
   if (!id) return bottomItems;
@@ -211,18 +210,9 @@ function BottomNav() {
     const active = pathname === to || (to === "/benvenuto" && pathname.startsWith("/cronologia")) || (to === "/profilo" && isProfilePath(pathname));
     // Piazza and vineyard wear a small lock until the profile that opens them is identified.
     const locked = (to === "/urbano" || to === "/vigneto") && proId !== undefined && !unlocks(proId, to === "/urbano" ? "urban" : "vineyard");
-    if (to === "/profilo") {
-      return (
-        <li key={to}>
-          <button type="button" onClick={openAccount} aria-label={`Profilo ${l.toLowerCase()}: apri l'account`} className="ps-nav-item mx-auto" data-active={active || undefined}>
-            <span className="ps-nav-icon"><I className="size-6" strokeWidth={2} aria-hidden="true" /></span>
-          </button>
-        </li>
-      );
-    }
     return (
       <li key={to}>
-        <Link to={to} replace={pathname !== "/"} aria-current={active ? "page" : undefined} aria-label={locked ? `${l}, bloccato` : l}
+        <Link to={to} replace={pathname !== "/"} aria-current={active ? "page" : undefined} aria-label={to === "/profilo" ? `Profilo ${l.toLowerCase()}` : locked ? `${l}, bloccato` : l}
           onClick={(e) => {
             if (goHomeBack(e, to, pathname)) return;
             if (!active) return;
@@ -362,14 +352,9 @@ function SmartNav() {
             className="no-scrollbar min-w-0 touch-pan-x overflow-x-auto"
           >
             <div className="flex items-center gap-1">
-              {navFor(proId).map((n) => n.to === "/profilo" ? (
-                <button key={n.to} type="button" onClick={openAccount}
-                  className="nav-glass nav-glass-gloss relative shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-nav-accent-foreground">
-                  {n.l}
-                </button>
-              ) : (
+              {navFor(proId).map((n) => (
                 <Link key={n.to} to={n.to}
-                  aria-current={pathname === n.to ? "page" : undefined}
+                  aria-current={pathname === n.to || (n.to === "/profilo" && isProfilePath(pathname)) ? "page" : undefined}
                   replace={pathname !== "/"}
                   onClick={(e) => { if (goHomeBack(e, n.to, pathname)) return; centerTapped(e.currentTarget, pathname === n.to); }}
                   className={`nav-glass nav-glass-gloss relative shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring ${pathname === n.to ? "nav-glass-on bg-nav-accent text-nav-accent-foreground" : "text-muted-foreground dark:text-nav-accent-foreground"}`}>
