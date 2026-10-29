@@ -1985,6 +1985,15 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   .home-art { -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 26%, #000 62%, transparent 100%); mask-image: linear-gradient(180deg, transparent 0%, #000 26%, #000 62%, transparent 100%); }
 }
 
+/* Top of every page: two pools of the page's tint drift and breathe over the still ambient light (transform/opacity only). */
+.ambient-pool { position: absolute; width: 90vw; height: 40vh; border-radius: 9999px; opacity: 0.8; background: radial-gradient(closest-side, var(--ambient-tone, transparent), transparent); will-change: transform, opacity; }
+.ambient-pool-a { left: -30vw; top: -4vh; animation: ambient-drift-a 16s ease-in-out infinite alternate, ambient-breathe 9s ease-in-out infinite; }
+.ambient-pool-b { right: -34vw; top: 6vh; animation: ambient-drift-b 20s ease-in-out infinite alternate, ambient-breathe 11s ease-in-out -4s infinite; }
+@keyframes ambient-drift-a { from { transform: translate3d(0, 0, 0) scale(0.85); } to { transform: translate3d(48vw, 8vh, 0) scale(1.2); } }
+@keyframes ambient-drift-b { from { transform: translate3d(0, 4vh, 0) scale(1.15); } to { transform: translate3d(-50vw, -4vh, 0) scale(0.85); } }
+@keyframes ambient-breathe { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .ambient-pool { animation: none; } }
+
 /* v8: the header is opaque but wears the same light as the page's Ambient (same gradient, same fixed 48vh box), over the page colour. */
 .app-header-tint {
   background-color: var(--background);

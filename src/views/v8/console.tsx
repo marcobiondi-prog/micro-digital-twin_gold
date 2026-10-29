@@ -61,7 +61,27 @@ export function Ambient({ tone }: { tone: string }) {
       meta()?.setAttribute("content", document.documentElement.classList.contains("dark") ? THEME_DARK : "#ffffff");
     };
   }, [tone]);
-  return <div className="console-ambient pointer-events-none fixed inset-x-0 top-0 -z-10 h-[48vh] transition-[background] duration-700 motion-reduce:transition-none" style={{ background: `radial-gradient(130% 85% at 50% -15%, ${tone}, transparent 72%)` }} aria-hidden="true" />;
+  // The still light (the same the header wears), and over it two soft pools of the page's own tint that drift and breathe slowly
+  // (transform and opacity only, like the entrance aurora; still with reduced motion).
+  return (
+    <div className="console-ambient pointer-events-none fixed inset-x-0 top-0 -z-10 h-[48vh] overflow-hidden" aria-hidden="true">
+      <div className="absolute inset-0 transition-[background] duration-700 motion-reduce:transition-none" style={{ background: `radial-gradient(130% 85% at 50% -15%, ${tone}, transparent 72%)` }} />
+      <AmbientPools />
+    </div>
+  );
+}
+
+/**
+ * The two drifting pools of the page's tint (--ambient-tone, set by Ambient), fixed to the top of the screen. The
+ * header draws them too, clipped to itself, so the light moves across it with no seam.
+ */
+export function AmbientPools({ className }: { className?: string }) {
+  return (
+    <div className={cn("pointer-events-none fixed inset-x-0 top-0 h-[48vh] overflow-hidden", className)} aria-hidden="true">
+      <div className="ambient-pool ambient-pool-a" />
+      <div className="ambient-pool ambient-pool-b" />
+    </div>
+  );
 }
 
 export function PageHero({ kicker, kickerIcon: KIcon, onKicker, title, actions }: { kicker?: string; kickerIcon?: LucideIcon; onKicker?: () => void; title: string; actions?: ReactNode }) {
