@@ -5,10 +5,10 @@ import { ArrowLeft, ArrowRight, BadgeCheck, Building2, Grape, LogOut, ShieldChec
 import { saveProId, useProId } from "@/lib/use-pro-id";
 import { loadComuni } from "@/lib/comuni";
 import { findComune, searchComuni, townDomain, type Comune } from "@/models/comuni";
-import { findRegion, searchRegions } from "@/models/professional-id";
+import { findRegion, officeOf, searchOffices, searchRegions } from "@/models/professional-id";
 import { cn } from "@/lib/utils";
 import {
-  checkAgronomo, checkFunzionario, KIND_LABEL, OFFICES, ROLES, proSummary,
+  checkAgronomo, checkFunzionario, KIND_LABEL, ROLES, proSummary,
   type AgronomoInput, type Errors, type FunzionarioInput, type ProId, type ProKind,
 } from "@/models/professional-id";
 import { Ambient, PageHero } from "@/views/v8/console";
@@ -142,6 +142,12 @@ function ComuneField(props: { id: string; describedBy: string | undefined; inval
     suggest={(q) => searchComuni(list, q).map((c): Suggestion => [c[0], c[1]])} />;
 }
 
+/** The office field: every listed office as soon as it is touched, narrowed as one types; an office not listed is written by name. */
+function OfficeField(props: { id: string; describedBy: string | undefined; invalid: boolean; value: string; onChange: (v: string) => void }) {
+  return <SuggestField {...props} label="Uffici" placeholder="Scrivi o scegli l'ufficio" onPick={() => undefined}
+    suggest={(q) => searchOffices(q).map((o): Suggestion => [o, ""])} />;
+}
+
 /** The region field: every region as soon as it is touched, narrowed as one types (accents and case aside). */
 function RegionField(props: { id: string; describedBy: string | undefined; invalid: boolean; value: string; onChange: (v: string) => void }) {
   return <SuggestField {...props} label="Regioni" placeholder="Scrivi o scegli la regione" onPick={() => undefined}
@@ -156,10 +162,12 @@ function FunzionarioForm({ onDone }: { onDone: () => void }) {
   // Changing a field clears its message: the rest stay until the next try.
   const up = <K extends keyof FunzionarioInput>(k: K, val: FunzionarioInput[K]) => {
     setV((p) => ({ ...p, [k]: val }));
-    setErrors((e) => { const { [k]: _gone, ...rest } = e; return rest as typeof e; });
+    // The office field also carries the message about an unlisted office's name.
+    setErrors((e) => { const rest: Errors<keyof FunzionarioInput> = { ...e }; delete rest[k]; if (k === "office") delete rest.otherOffice; return rest; });
   };
   const submit = async () => {
-    const { id, errors: e } = checkFunzionario(v);
+    // The office field holds what was typed: a listed office, or the name of one that is not listed.
+    const { id, errors: e } = checkFunzionario({ ...v, ...officeOf(v.office) });
     // The town must be a real Italian one, written as in the list (its spelling is taken from there).
     const towns = await loadComuni();
     const town = towns.length ? findComune(towns, v.comune) : undefined;
@@ -175,11 +183,7 @@ function FunzionarioForm({ onDone }: { onDone: () => void }) {
     <form noValidate onSubmit={(e) => { e.preventDefault(); void submit(); }} className="space-y-4">
       <Field label="Nome e cognome" error={errors.name}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!errors.name} autoComplete="name" value={v.name} onChange={(e) => up("name", e.target.value)} className={fieldCls} />}</Field>
       <Field label="Comune" hint="Scrivi le prime lettere e scegli il tuo Comune dall'elenco." error={errors.comune}>{(id, d) => <ComuneField id={id} describedBy={d} invalid={!!errors.comune} value={v.comune} onChange={(x) => up("comune", x)} onPick={setTown} />}</Field>
-      <Field label="Ufficio di appartenenza" error={errors.office}>{(id, d) => (
-        <select id={id} aria-describedby={d} aria-invalid={!!errors.office} value={v.office} onChange={(e) => up("office", e.target.value)} className={fieldCls}>
-          <option value="" className={optionCls}>Scegli l'ufficio</option>{OFFICES.map((o) => <option key={o} value={o} className={optionCls}>{o}</option>)}
-        </select>)}</Field>
-      {v.office === "Altro" && <Field label="Nome dell'ufficio" error={errors.otherOffice}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!errors.otherOffice} value={v.otherOffice} onChange={(e) => up("otherOffice", e.target.value)} className={fieldCls} />}</Field>}
+      <Field label="Ufficio di appartenenza" hint="Scegli dall'elenco o scrivi il nome del tuo ufficio." error={errors.office ?? errors.otherOffice}>{(id, d) => <OfficeField id={id} describedBy={d} invalid={!!(errors.office ?? errors.otherOffice)} value={v.office} onChange={(x) => up("office", x)} />}</Field>
       <Field label="Ruolo" error={errors.role}>{(id, d) => (
         <select id={id} aria-describedby={d} aria-invalid={!!errors.role} value={v.role} onChange={(e) => up("role", e.target.value)} className={fieldCls}>
           <option value="" className={optionCls}>Scegli il ruolo</option>{ROLES.map((r) => <option key={r} value={r} className={optionCls}>{r}</option>)}

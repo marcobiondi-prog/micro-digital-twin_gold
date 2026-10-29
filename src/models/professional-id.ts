@@ -40,8 +40,27 @@ export function searchRegions(query: string): string[] {
 export const findRegion = (name: string): string | undefined => { const q = fold(name); return q ? REGIONS.find((r) => fold(r) === q) : undefined; };
 
 export const OFFICES = [
-  "Ufficio tecnico", "Lavori pubblici", "Urbanistica", "Ambiente e verde pubblico", "Mobilità e traffico", "Polizia locale", "Segreteria e Giunta", "Altro",
+  "Ufficio tecnico", "Lavori pubblici", "Urbanistica", "Edilizia privata", "Ambiente e verde pubblico", "Mobilità e traffico", "Patrimonio",
+  "Protezione civile", "Polizia locale", "Sviluppo economico", "Cultura e turismo", "Servizi sociali", "Segreteria e Giunta", "Altro",
 ] as const;
+
+/** The offices matching what was typed (all of them, "Altro" aside, when nothing is), names starting with it first. */
+export function searchOffices(query: string): string[] {
+  const named = OFFICES.filter((o) => o !== "Altro");
+  const q = fold(query);
+  if (!q) return [...named];
+  return [...named.filter((o) => fold(o).startsWith(q)), ...named.filter((o) => !fold(o).startsWith(q) && fold(o).includes(q))];
+}
+/**
+ * What was typed in the office field, as the form expects it: a listed office with its own spelling, or "Altro" with
+ * the typed name for an office that is not listed.
+ */
+export function officeOf(typed: string): { office: string; otherOffice: string } {
+  const q = fold(typed);
+  if (!q) return { office: "", otherOffice: "" };
+  const known = OFFICES.find((o) => o !== "Altro" && fold(o) === q);
+  return known ? { office: known, otherOffice: "" } : { office: "Altro", otherOffice: typed };
+}
 export const ROLES = ["Dirigente", "Funzionario", "Istruttore tecnico", "Assessore o consigliere", "Altro"] as const;
 
 export type Errors<K extends string> = Partial<Record<K, string>>;

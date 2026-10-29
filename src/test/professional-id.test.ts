@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkAgronomo, checkFunzionario, findRegion, isProId, isTownEmail, isLicenceNumber, proSummary, searchRegions, unlocks } from "@/models/professional-id";
+import { checkAgronomo, checkFunzionario, findRegion, officeOf, searchOffices, isProId, isTownEmail, isLicenceNumber, proSummary, searchRegions, unlocks } from "@/models/professional-id";
 
 const today = new Date("2026-10-29T12:00:00");
 const agro = { name: "Maria Rossi", licenceType: "consulente", licence: "mol/cb/01234", region: "Molise", expires: "2029-05-31", declared: true };
@@ -56,5 +56,19 @@ describe("regions", () => {
     expect(findRegion("valle d aosta")).toBe("Valle d'Aosta");
     expect(findRegion("EMILIA-romagna")).toBe("Emilia-Romagna");
     expect(findRegion("Padania")).toBeUndefined();
+  });
+});
+
+describe("offices", () => {
+  it("lists every office but Altro when nothing is typed, and narrows as one types", () => {
+    expect(searchOffices("")).not.toContain("Altro");
+    expect(searchOffices("urb")).toEqual(["Urbanistica"]);
+    expect(searchOffices("pubbl")[0]).toBe("Lavori pubblici");
+  });
+  it("reads a listed office with its spelling, or an unlisted one by name", () => {
+    expect(officeOf("ufficio TECNICO")).toEqual({ office: "Ufficio tecnico", otherOffice: "" });
+    expect(officeOf("Ufficio cimiteri")).toEqual({ office: "Altro", otherOffice: "Ufficio cimiteri" });
+    expect(checkFunzionario({ ...funz, ...officeOf("Ufficio cimiteri") }, today).id?.office).toBe("Ufficio cimiteri");
+    expect(checkFunzionario({ ...funz, ...officeOf("") }, today).errors.office).toBeTruthy();
   });
 });
