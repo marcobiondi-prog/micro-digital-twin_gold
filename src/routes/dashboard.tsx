@@ -463,7 +463,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
       ["Calore percepito", `da ${f1(ps.before)} °C a ${f1(ps.after)} °C (−${f1(ps.before - ps.after)} °C) · ${heatWords(ps.after)}`],
       ["Livello", ps.level ?? "Nessun intervento"],
       ["Costo indicativo", ps.empty ? "Nessun intervento" : euroRange(ps.cost)],
-      ["Superficie", `${grouped(ps.m2)} m² ${ps.measured ? "della piazza" : "di riferimento"}`],
+      ["Superficie", `${grouped(ps.m2)} m² ${ps.drawn ? "disegnati sulla mappa" : ps.measured ? "della piazza" : "di riferimento"}`],
     ]
     : [
       ["Luogo", v.location.label],
@@ -471,7 +471,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
       ["Sete delle viti", `da ${Math.round(vs.before)} a ${Math.round(vs.after)} su 100 · ${thirstWords(vs.after)}`],
       ["Livello", vs.level ?? "Nessun intervento"],
       ["Costo indicativo", vs.empty ? "Nessun intervento" : euroRange(vs.cost)],
-      ["Superficie", vs.measured ? `${grouped(vs.m2)} m² del vigneto` : "1 ettaro di riferimento"],
+      ["Superficie", vs.drawn ? `${grouped(vs.m2)} m² disegnati sulla mappa` : vs.measured ? `${grouped(vs.m2)} m² del vigneto` : "1 ettaro di riferimento"],
     ];
   const benefits: Array<[string, string]> = ctx === "Urbano"
     ? [[`${ps.co2} kg`, "CO2 l'anno"], [`${grouped(ps.water)} m³`, "Pioggia tenuta"], [`${grouped(ps.shadeM2)} m²`, "All'ombra"]]
@@ -682,7 +682,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
 
     await step("Compilazione delle tabelle…", 30);
     rows([...mixRows.map((r): [string, string] => [`${r.label}  ${r.value}`, r.cost]), ["Totale indicativo", (urban ? ps.empty : vs.empty) ? "Nessun intervento" : euroRange(urban ? ps.cost : vs.cost)]],
-      { strongLast: true, head: ["Cosa hai messo", urban ? `${grouped(ps.m2)} m² ${ps.measured ? "della piazza" : "di riferimento"}` : vs.measured ? `${grouped(vs.m2)} m² del vigneto` : "1 ettaro di riferimento"] });
+      { strongLast: true, head: ["Cosa hai messo", urban ? `${grouped(ps.m2)} m² ${ps.drawn ? "disegnati" : ps.measured ? "della piazza" : "di riferimento"}` : vs.drawn ? `${grouped(vs.m2)} m² disegnati` : vs.measured ? `${grouped(vs.m2)} m² del vigneto` : "1 ettaro di riferimento"] });
     if (noteRows.length) rows(noteRows, { head: ["Quaderno di campagna"] });
     // AI camera scans: each one stays in the report even without a photo (indicative estimates).
     if (scanRows.length) rows(scanRows, { head: ["Scansioni della Fotocamera AI"] });

@@ -1,3 +1,4 @@
+import { drawnM2 } from "./drawn-area";
 import type { LabState } from "./lab-store";
 import { vineMetrics } from "./lab-store";
 import { comparison, piazzaEstimate } from "./scenarios";
@@ -21,7 +22,7 @@ const PIAZZA_PRESETS = { zero: [3, 10, 10], mvp: [6, 20, 15], roadmap: [12, 40, 
 export type PiazzaSummary = {
   day: Array<{ h: number; prima: number; dopo: number }>; estimated: boolean;
   hour: number; before: number; after: number; empty: boolean; level: string | null;
-  m2: number; measured: boolean; cost: CostRange;
+  m2: number; measured: boolean; drawn: boolean; cost: CostRange;
   co2: number; water: number; shadeM2: number; lawnM2: number; shadeArea: number;
 };
 
@@ -33,14 +34,16 @@ export function piazzaSummary(urban: LabState["urban"], season: Season, profile:
     return { h, prima: +before.toFixed(1), dopo: +(before - est.dT * coolingShare(before)).toFixed(1) };
   });
   const hot = day.reduce((a, b) => (b.prima > a.prima ? b : a), day[0]!);
-  const m2 = areaM2 ?? REFERENCE_M2;
+  // A surface drawn with pins on the map wins over the measured one, which wins over the reference.
+  const drawn = drawnM2(urban.area, urban.location);
+  const m2 = drawn ?? areaM2 ?? REFERENCE_M2;
   const empty = urban.trees + urban.permeable + urban.shade === 0;
   const preset = (Object.keys(PIAZZA_PRESETS) as Array<keyof typeof PIAZZA_PRESETS>)
     .find((k) => PIAZZA_PRESETS[k][0] === urban.trees && PIAZZA_PRESETS[k][1] === urban.permeable && PIAZZA_PRESETS[k][2] === urban.shade) ?? null;
   return {
     day, estimated: !profile || profile.every((v) => v === null),
     hour: hot.h, before: hot.prima, after: hot.dopo, empty, level: empty ? null : levelName(preset) ?? "Su misura",
-    m2, measured: areaM2 !== null, cost: interventionCost(m2, urban.trees, urban.permeable, urban.shade).total,
+    m2, measured: drawn === null && areaM2 !== null, drawn: drawn !== null, cost: interventionCost(m2, urban.trees, urban.permeable, urban.shade).total,
     co2: Math.round(urban.trees * 22), water: Math.round(m2 * (urban.permeable / 100) * 0.7 * 0.6),
     shadeM2: Math.round(m2 * (urban.shade / 100) + urban.trees * 30),
     lawnM2: Math.round((m2 * urban.permeable) / 100), shadeArea: Math.round((m2 * urban.shade) / 100),
@@ -57,7 +60,7 @@ export const piazzaMix = (urban: LabState["urban"], s: PiazzaSummary) => [
 export type VineSummary = {
   before: number; after: number; zones: Array<{ after: number; plain: number; temp: number; moisture: number }>;
   mix: VineMix; same: boolean; empty: boolean; level: string | null; safe: number;
-  m2: number; measured: boolean; cost: CostRange;
+  m2: number; measured: boolean; drawn: boolean; cost: CostRange;
 };
 
 /** Vineyard: the average thirst of the three zones as left in the simulation, without and with each zone's interventions. */
@@ -65,7 +68,8 @@ export function vineSummary(vine: LabState["vineyard"], areaM2: number | null): 
   const mixes = vine.zones.map((z) => zoneMixOf(z, vineMixOf(vine)));
   const after = vineMetrics({ ...vine, zones: vine.zones.map((z, i) => ({ ...z, ...mixes[i] })) }).results.map((r) => r.s);
   const plain = vineMetrics({ ...vine, zones: vine.zones.map((z) => ({ ...z, ...NO_MIX })) }).results.map((r) => r.s);
-  const m2 = areaM2 ?? VINE_REFERENCE_M2;
+  const drawn = drawnM2(vine.area, vine.location);
+  const m2 = drawn ?? areaM2 ?? VINE_REFERENCE_M2;
   const cost = mixes.reduce((t, m) => { const c = vineCost(m2 / Math.max(1, mixes.length), m).total; return { lo: t.lo + c.lo, hi: t.hi + c.hi }; }, { lo: 0, hi: 0 });
   const empty = mixes.every((m) => m.irrigation + m.shade + m.windbreak === 0);
   const first = mixes[0] ?? NO_MIX;
@@ -76,7 +80,7 @@ export function vineSummary(vine: LabState["vineyard"], areaM2: number | null): 
     zones: vine.zones.map((z, i) => ({ after: after[i] ?? 0, plain: plain[i] ?? 0, temp: z.temperature, moisture: z.moisture })),
     mix: { irrigation: avg(mixes.map((m) => m.irrigation)), shade: avg(mixes.map((m) => m.shade)), windbreak: avg(mixes.map((m) => m.windbreak)) },
     same, empty, level: empty ? null : levelName(preset) ?? "Su misura", safe: after.filter((s) => s < 35).length,
-    m2, measured: areaM2 !== null, cost,
+    m2, measured: drawn === null && areaM2 !== null, drawn: drawn !== null, cost,
   };
 }
 

@@ -7,7 +7,7 @@ import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camer
  * library, billed through Map Tiles API). Loaded only when the user switches to 3D, with
  * the referrer-restricted browser key; the 2D embed stays the default.
  */
-type Maps3D = { Map3DElement: new (options: Record<string, unknown>) => HTMLElement; Marker3DElement: new (options: Record<string, unknown>) => HTMLElement };
+type Maps3D = { Map3DElement: new (options: Record<string, unknown>) => HTMLElement; Marker3DElement: new (options: Record<string, unknown>) => HTMLElement; Polygon3DElement?: new (options: Record<string, unknown>) => HTMLElement };
 type GoogleMaps = { maps: { importLibrary: (name: string) => Promise<unknown> } };
 type Map3D = HTMLElement & Partial<Camera> & { gestureHandling?: string; flyCameraTo?: (options: { endCamera: Camera; durationMillis: number }) => void };
 
@@ -42,7 +42,7 @@ function applyCamera(map: Map3D, camera: Camera, animate: boolean) {
   Object.assign(map, camera);
 }
 
-export function LocationMap3D({ lat, lng, label, apiKey, fallback }: { lat: number; lng: number; label: string; apiKey: string; fallback?: ReactNode }) {
+export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [] }: { lat: number; lng: number; label: string; apiKey: string; fallback?: ReactNode; area?: Array<[number, number]> }) {
   const rejected = useKeyRejected();
   const host = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map3D | null>(null);
@@ -56,7 +56,7 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback }: { lat: numb
     let cancelled = false;
     const el = host.current;
     setState("loading");
-    Promise.all([loadMaps3D(apiKey), groundElevation(lat, lng)]).then(([{ Map3DElement, Marker3DElement }, ground]) => {
+    Promise.all([loadMaps3D(apiKey), groundElevation(lat, lng)]).then(([{ Map3DElement, Marker3DElement, Polygon3DElement }, ground]) => {
       if (cancelled || !el) return;
       altitude.current = ground;
       const map = new Map3DElement({ ...frameCamera(lat, lng, el.clientHeight, ground), mode: "HYBRID" }) as Map3D;
@@ -66,12 +66,20 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback }: { lat: numb
       map.gestureHandling = "GREEDY";
       // On top of the 3D mesh (roofs, trees) and drawn even when occluded: a ground pin in a street disappears behind buildings.
       map.append(new Marker3DElement({ position: { lat, lng, altitude: 0 }, altitudeMode: "RELATIVE_TO_MESH", drawsWhenOccluded: true, label }));
+      // The area drawn with pins on the 2D map, laid on the ground and seen through the buildings.
+      if (Polygon3DElement && area.length >= 3) {
+        try {
+          const poly = new Polygon3DElement({ altitudeMode: "CLAMP_TO_GROUND", fillColor: "rgba(56, 214, 196, 0.35)", strokeColor: "#ffffff", strokeWidth: 3, drawsOccludedSegments: true }) as HTMLElement & { outerCoordinates?: unknown };
+          poly.outerCoordinates = area.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng }));
+          map.append(poly);
+        } catch { /* an older build without polygons: the pin alone */ }
+      }
       el.replaceChildren(map);
       mapRef.current = map;
       setState("ready");
     }).catch(() => { if (!cancelled) setState("error"); });
     return () => { cancelled = true; mapRef.current = null; el?.replaceChildren(); };
-  }, [lat, lng, label, apiKey]);
+  }, [lat, lng, label, apiKey, JSON.stringify(area)]);
   // The panel grows when 3D opens (and on rotation): re-frame the place once the size settles.
   useEffect(() => {
     const el = host.current;

@@ -1,10 +1,13 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { Lock, MapPin } from "lucide-react";
+import { toast } from "sonner";
+import { Check, Lock, MapPin, PenLine, Trash2, Undo2, X } from "lucide-react";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { openAccount } from "@/lib/camera-dock";
 import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn } from "@/lib/demo-login";
 import { cn } from "@/lib/utils";
-import { useLab } from "@/models/lab-store";
+import { setUrban, setVineyard, useLab } from "@/models/lab-store";
+import { drawnAreaFor, MAX_PINS, pinsM2, surfaceText } from "@/models/drawn-area";
+import type { Ring } from "@/models/place-area";
 import type { SimKind } from "@/views/v8/console";
 import { PlaceSearch } from "@/views/SimulationGrid";
 
@@ -33,6 +36,23 @@ export function SimMap({ kind }: { kind: SimKind }) {
   // Always both: with the browser key 3D is the photorealistic view, without it an open map with the buildings raised.
   const show3d = view === "3d" && signedIn;
   const zoom3d = kind === "urban" ? 17 : 15;
+  // The area drawn with pins for this place (kept with the simulation), and the pins being placed while drawing.
+  const saved = drawnAreaFor(kind === "urban" ? lab.urban.area : lab.vineyard.area, loc);
+  const [drawing, setDrawing] = useState(false);
+  const [draft, setDraft] = useState<Ring>([]);
+  useEffect(() => { setDrawing(false); }, [loc.lat, loc.lng]);
+  const ring = drawing ? draft : saved?.ring ?? [];
+  const save = (r: Ring | null) => {
+    const area = r && r.length >= 3 ? { lat: loc.lat, lng: loc.lng, ring: r } : null;
+    if (kind === "urban") setUrban({ area }); else setVineyard({ area });
+  };
+  const startDrawing = () => { setView("2d"); setDraft(saved?.ring ?? []); setDrawing(true); };
+  const finish = () => {
+    if (draft.length < 3) { toast("Servono almeno 3 pin per chiudere l'area"); return; }
+    save(draft); setDrawing(false);
+    toast.success("Area salvata", { description: `${surfaceText(pinsM2(draft))}: la usano i costi e i benefici.` });
+  };
+  const remove = () => { save(null); setDrawing(false); setDraft([]); toast("Area cancellata", { description: "Torna la superficie misurata o di riferimento." }); };
   return (
     <div className="space-y-4">
       <div className="flex items-start gap-3">
@@ -68,11 +88,63 @@ export function SimMap({ kind }: { kind: SimKind }) {
       <div className="-mx-4 h-[52vh] min-h-72 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
         {show3d
           ? <Suspense fallback={<div className="h-full w-full bg-card" />}>{key
-            ? <LocationMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} apiKey={key}
-              fallback={<OpenMap3D lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={zoom3d} />} />
-            : <OpenMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={zoom3d} />}</Suspense>
-          : <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={zoom} /></Suspense>}
+            ? <LocationMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} apiKey={key} area={ring}
+              fallback={<OpenMap3D lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={zoom3d} area={ring} />} />
+            : <OpenMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={zoom3d} area={ring} />}</Suspense>
+          : <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={zoom} area={ring} drawing={drawing} onAreaChange={setDraft} /></Suspense>}
       </div>
+      <AreaBar drawing={drawing} pins={ring.length} m2={ring.length >= 3 ? pinsM2(ring) : null} saved={!!saved} vineyard={kind === "vineyard"}
+        onStart={startDrawing} onUndo={() => setDraft((d) => d.slice(0, -1))} onCancel={() => setDrawing(false)} onFinish={finish} onRemove={remove} />
     </div>
+  );
+}
+
+const barBtn = "inline-flex h-11 items-center gap-1.5 rounded-full px-4 text-[15px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40";
+
+/**
+ * Under the map: the drawn area and what to do with it. Not drawing: "Disegna l'area", or the saved area's surface with
+ * Modifica / Cancella. Drawing (on the 2D map): how many pins and the surface so far, Annulla ultimo pin, Esci, Fine.
+ */
+function AreaBar({ drawing, pins, m2, saved, vineyard, onStart, onUndo, onCancel, onFinish, onRemove }: {
+  drawing: boolean; pins: number; m2: number | null; saved: boolean; vineyard: boolean;
+  onStart: () => void; onUndo: () => void; onCancel: () => void; onFinish: () => void; onRemove: () => void;
+}) {
+  if (drawing) {
+    return (
+      <div role="group" aria-label="Disegna l'area" className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4">
+        <p className="text-[15px] font-semibold">Tocca la mappa sugli angoli dell'area</p>
+        <p className="text-sm text-muted-foreground" aria-live="polite">
+          {pins === 0 ? `Metti un pin su ogni angolo del${vineyard ? " vigneto" : "la piazza"}; trascinali per correggerli.` : `${pins} pin${m2 !== null ? ` · ${surfaceText(m2)}` : " · ne servono almeno 3"}${pins >= MAX_PINS ? " · massimo raggiunto" : ""}`}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={onUndo} disabled={pins === 0} className={cn(barBtn, "bg-foreground/[0.08]")}><Undo2 className="size-4" aria-hidden="true" />Ultimo pin</button>
+          <button type="button" onClick={onCancel} className={cn(barBtn, "bg-foreground/[0.08]")}><X className="size-4" aria-hidden="true" />Esci</button>
+          <button type="button" onClick={onFinish} disabled={pins < 3} className={cn(barBtn, "ml-auto bg-foreground text-background")}><Check className="size-4" aria-hidden="true" />Fine</button>
+        </div>
+      </div>
+    );
+  }
+  if (saved && m2 !== null) {
+    return (
+      <div className="flex flex-wrap items-center gap-3 rounded-3xl bg-foreground/[0.05] p-4">
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-semibold">Area disegnata · {surfaceText(m2)}</span>
+          <span className="block text-sm text-muted-foreground">La usano i costi e i benefici al posto della superficie misurata.</span>
+        </span>
+        <div className="flex gap-2">
+          <button type="button" onClick={onStart} className={cn(barBtn, "bg-foreground/[0.08]")}><PenLine className="size-4" aria-hidden="true" />Modifica</button>
+          <button type="button" onClick={onRemove} aria-label="Cancella l'area disegnata" className={cn(barBtn, "bg-foreground/[0.08] px-3")}><Trash2 className="size-4" aria-hidden="true" /></button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <button type="button" onClick={onStart} className="flex w-full items-center gap-3 rounded-3xl bg-foreground/[0.05] p-4 text-left outline-none hover:bg-foreground/[0.08] focus-visible:ring-2 focus-visible:ring-ring">
+      <span className="grid size-11 shrink-0 place-items-center rounded-full bg-foreground text-background"><PenLine className="size-5" aria-hidden="true" /></span>
+      <span className="min-w-0">
+        <span className="block text-[15px] font-semibold">Disegna l'area</span>
+        <span className="block text-sm text-muted-foreground">Metti i pin sugli angoli del{vineyard ? " vigneto" : "la piazza"}: la superficie si userà nei costi.</span>
+      </span>
+    </button>
   );
 }

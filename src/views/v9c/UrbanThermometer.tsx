@@ -1,3 +1,4 @@
+import { drawnM2 } from "@/models/drawn-area";
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -233,8 +234,10 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
   const fetchArea = useServerFn(getPlaceArea);
   const { lat, lng } = urban.location;
   const area = useQuery({ queryKey: ["place-area", lat, lng], queryFn: () => fetchArea({ data: { lat, lng } }), staleTime: Infinity, retry: 1 });
+  // A surface drawn with pins on the Mappa tab wins over the measured one.
+  const drawn = drawnM2(urban.area, urban.location);
   const measured = area.data?.m2 ?? null;
-  const m2 = measured ?? REFERENCE_M2;
+  const m2 = drawn ?? measured ?? REFERENCE_M2;
   const cost = interventionCost(m2, urban.trees, urban.permeable, urban.shade);
   // Same yearly estimates as the dashboard, on this surface (700 mm of rain, 60 % kept by permeable ground).
   const co2 = Math.round(urban.trees * 22);
@@ -269,7 +272,7 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
     { icon: Sun, value: `${grouped(shadeM2)} m²`, label: "All'ombra" },
   ];
   const surface = area.isPending ? "…" : `${grouped(m2)} m²`;
-  const surfaceNote = area.isPending ? "Misuro la piazza…" : measured ? "Superficie della piazza" : "Superficie di riferimento";
+  const surfaceNote = drawn !== null ? "Superficie disegnata" : area.isPending ? "Misuro la piazza…" : measured ? "Superficie della piazza" : "Superficie di riferimento";
 
   return (
     <section className="fuse-canvas space-y-5 rounded-t-3xl px-3 pb-6 pt-4 text-foreground sm:px-5" aria-label="Termometro della piazza">

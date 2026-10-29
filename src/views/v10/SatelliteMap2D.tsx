@@ -1,4 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import type { Map as MlMap, Marker } from "maplibre-gl";
+import type { Ring } from "@/models/place-area";
+import { MAX_PINS } from "@/models/drawn-area";
+import { addAreaLayers, pinElement, setAreaData } from "@/views/v10/map-area";
 import { Crosshair, LoaderCircle } from "lucide-react";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { StyleSpecification } from "maplibre-gl";
@@ -6,6 +10,7 @@ import type { StyleSpecification } from "maplibre-gl";
 /**
  * 2D view: open satellite imagery with place names over it and a pin on the place, no key needed. One finger moves
  * it, two fingers zoom and turn it, with no "use two fingers" lock ([data-map-gestures] keeps its own gestures).
+ * It shows the area drawn for the place and, while `drawing`, takes a tap as a new pin and lets each pin be dragged.
  */
 const ARCGIS = "https://server.arcgisonline.com/ArcGIS/rest/services";
 const STYLE: StyleSpecification = {
@@ -22,9 +27,16 @@ const STYLE: StyleSpecification = {
 
 type Camera = { center: [number, number]; zoom: number; bearing: number };
 
-export function SatelliteMap2D({ lat, lng, label, zoom }: { lat: number; lng: number; label: string; zoom: number }) {
+export function SatelliteMap2D({ lat, lng, label, zoom, area = [], drawing = false, onAreaChange }: {
+  lat: number; lng: number; label: string; zoom: number; area?: Ring; drawing?: boolean; onAreaChange?: (ring: Ring) => void;
+}) {
   const host = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<{ easeTo: (c: Camera & { duration: number }) => void } | null>(null);
+  const mapRef = useRef<MlMap | null>(null);
+  const libRef = useRef<typeof import("maplibre-gl") | null>(null);
+  const pins = useRef<Marker[]>([]);
+  // The latest pins, mode and callback for the map's own handlers.
+  const live = useRef({ area, drawing, onAreaChange });
+  live.current = { area, drawing, onAreaChange };
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const camera: Camera = { center: [lng, lat], zoom, bearing: 0 };
   useEffect(() => {
@@ -34,15 +46,35 @@ export function SatelliteMap2D({ lat, lng, label, zoom }: { lat: number; lng: nu
       if (cancelled || !host.current) return;
       const map = new maplibregl.Map({ container: host.current, style: STYLE, ...camera, maxZoom: 19, pitchWithRotate: false, cooperativeGestures: false, attributionControl: { compact: true } });
       map.touchPitch.disable();
-      map.on("load", () => { if (!cancelled) setState("ready"); });
+      libRef.current = maplibregl;
+      map.on("load", () => { addAreaLayers(map); if (!cancelled) setState("ready"); });
+      // Drawing: a tap on the map is a new pin at that spot.
+      map.on("click", (e) => {
+        const { area: ring, drawing: on, onAreaChange: set } = live.current;
+        if (on && set && ring.length < MAX_PINS) set([...ring, [e.lngLat.lat, e.lngLat.lng]]);
+      });
       // A tile that does not arrive leaves a gap, not an error: the map stays usable.
       new maplibregl.Marker({ color: "#0b0f15" }).setLngLat([lng, lat]).setPopup(new maplibregl.Popup({ offset: 24 }).setText(label)).addTo(map);
       mapRef.current = map;
       remove = () => map.remove();
     }).catch(() => { if (!cancelled) setState("error"); });
-    return () => { cancelled = true; mapRef.current = null; remove?.(); };
+    return () => { cancelled = true; mapRef.current = null; pins.current = []; remove?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lat, lng, zoom, label]);
+  // The area and its pins follow the props: numbered pins that can be dragged while drawing, small dots otherwise.
+  useEffect(() => {
+    const map = mapRef.current, lib = libRef.current;
+    if (state !== "ready" || !map || !lib) return;
+    setAreaData(map, area, !drawing || area.length >= 3);
+    map.getCanvas().style.cursor = drawing ? "crosshair" : "";
+    pins.current.forEach((m) => m.remove());
+    pins.current = area.map(([pLat, pLng], i) => {
+      const m = new lib.Marker({ element: pinElement(i + 1, drawing), draggable: drawing }).setLngLat([pLng, pLat]).addTo(map);
+      m.on("drag", () => { const p = m.getLngLat(), next = live.current.area.map((q, j): [number, number] => (j === i ? [p.lat, p.lng] : q)); setAreaData(map, next, next.length >= 3); });
+      m.on("dragend", () => { const p = m.getLngLat(); live.current.onAreaChange?.(live.current.area.map((q, j): [number, number] => (j === i ? [p.lat, p.lng] : q))); });
+      return m;
+    });
+  }, [area, drawing, state]);
   const recenter = () => mapRef.current?.easeTo({ ...camera, duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 800 });
   return (
     <div data-map-gestures="" className="relative h-full w-full touch-none overflow-hidden bg-card">

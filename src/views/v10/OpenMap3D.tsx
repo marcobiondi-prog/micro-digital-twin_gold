@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Crosshair, LoaderCircle } from "lucide-react";
 import "maplibre-gl/dist/maplibre-gl.css";
+import type { Ring } from "@/models/place-area";
+import { addAreaLayers, setAreaData } from "@/views/v10/map-area";
 
 /**
  * 3D view without the browser key: an open vector map tilted, with the buildings raised from their heights and a pin
@@ -10,7 +12,7 @@ const STYLE = "https://tiles.openfreemap.org/styles/liberty";
 
 type Camera = { center: [number, number]; zoom: number; pitch: number; bearing: number };
 
-export function OpenMap3D({ lat, lng, label, zoom }: { lat: number; lng: number; label: string; zoom: number }) {
+export function OpenMap3D({ lat, lng, label, zoom, area = [] }: { lat: number; lng: number; label: string; zoom: number; area?: Ring }) {
   const host = useRef<HTMLDivElement>(null);
   const mapRef = useRef<{ easeTo: (c: Camera & { duration: number }) => void } | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -27,6 +29,9 @@ export function OpenMap3D({ lat, lng, label, zoom }: { lat: number; lng: number;
           map.addLayer({ id: "building-3d-raised", type: "fill-extrusion", source: "openmaptiles", "source-layer": "building", minzoom: 14,
             paint: { "fill-extrusion-color": "#c9ccd3", "fill-extrusion-height": ["coalesce", ["get", "render_height"], 8], "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0], "fill-extrusion-opacity": 0.85 } });
         }
+        // The area drawn with pins on the 2D map, on the ground under the raised buildings.
+        addAreaLayers(map);
+        setAreaData(map, area);
         if (!cancelled) setState("ready");
       });
       map.on("error", () => { if (!cancelled && !map.loaded()) setState("error"); });
@@ -36,7 +41,7 @@ export function OpenMap3D({ lat, lng, label, zoom }: { lat: number; lng: number;
     }).catch(() => { if (!cancelled) setState("error"); });
     return () => { cancelled = true; mapRef.current = null; remove?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lat, lng, zoom, label]);
+  }, [lat, lng, zoom, label, JSON.stringify(area)]);
   const recenter = () => mapRef.current?.easeTo({ ...camera, duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 800 });
   return (
     <div data-map-gestures="" className="relative h-full w-full touch-none overflow-hidden bg-card">

@@ -2,6 +2,8 @@ import { useSyncExternalStore } from "react";
 import { applyZoneMix, vineMixOf, zoneMixOf } from "./vine-interventions";
 import { vineModel, type Pheno } from "./data";
 import { piazzaEstimate, vineZones } from "./scenarios";
+/** The area drawn with pins on the simulation's map, kept with the place it was drawn for. */
+import type { DrawnArea } from "./drawn-area";
 
 export type Loc = { label: string; lat: number; lng: number };
 export type VineZoneState = { temperature: number; moisture: number; wind: number; rain: boolean; irrigation?: number; shade?: number; windbreak?: number };
@@ -9,8 +11,8 @@ export type LabState = {
   savedAt?: number | null;
   syncedAt?: number | null;
   syncedTargets?: string[] | null;
-  urban: { trees: number; permeable: number; shade: number; location: Loc; treeCells: number[] | null; permeableCells: number[] | null; shadeCells: number[] | null; realTemp?: number | null };
-  vineyard: { zones: VineZoneState[]; phase: Pheno; selected: number; allZones: boolean; location: Loc; irrigation?: number; shade?: number; windbreak?: number; climateKey?: string };
+  urban: { trees: number; permeable: number; shade: number; location: Loc; treeCells: number[] | null; permeableCells: number[] | null; shadeCells: number[] | null; realTemp?: number | null; area?: DrawnArea | null };
+  vineyard: { zones: VineZoneState[]; phase: Pheno; selected: number; allZones: boolean; location: Loc; irrigation?: number; shade?: number; windbreak?: number; climateKey?: string; area?: DrawnArea | null };
 };
 
 const KEY = "micro-digital-twin-lab";
@@ -47,8 +49,8 @@ export function setVineyard(patch: Partial<LabState["vineyard"]> | ((v: LabState
   state = { ...state, vineyard: { ...state.vineyard, ...p } }; emit("vineyard");
 }
 /** Restore the default scenario (keeps the chosen location). */
-export function resetUrban() { const d = defaults().urban; state = { ...state, urban: { ...d, location: state.urban.location, realTemp: state.urban.realTemp ?? null } }; emit("urban"); }
-export function resetVineyard() { const d = defaults().vineyard; state = { ...state, vineyard: { ...d, location: state.vineyard.location } }; emit("vineyard"); }
+export function resetUrban() { const d = defaults().urban; state = { ...state, urban: { ...d, location: state.urban.location, realTemp: state.urban.realTemp ?? null, area: state.urban.area ?? null } }; emit("urban"); }
+export function resetVineyard() { const d = defaults().vineyard; state = { ...state, vineyard: { ...d, location: state.vineyard.location, area: state.vineyard.area ?? null } }; emit("vineyard"); }
 /** Urban edits refresh Urbana + Esecutivo; vineyard edits refresh Vitivinicola + Esecutivo. */
 const SYNC_TARGETS = { urban: ["Urbana", "Esecutivo"], vineyard: ["Vitivinicola", "Esecutivo"] } as const;
 function emit(target: keyof typeof SYNC_TARGETS) {

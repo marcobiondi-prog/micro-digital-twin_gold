@@ -1,3 +1,4 @@
+import { drawnM2 } from "@/models/drawn-area";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -73,8 +74,10 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
   const fetchArea = useServerFn(getPlaceArea);
   const { lat, lng } = vine.location;
   const area = useQuery({ queryKey: ["vine-area", lat, lng], queryFn: () => fetchArea({ data: { lat, lng, kind: "vigneto" } }), staleTime: Infinity, retry: 1 });
+  // A surface drawn with pins on the Mappa tab wins over the measured one.
+  const drawn = drawnM2(vine.area, vine.location);
   const measured = area.data?.m2 ?? null;
-  const m2 = measured ?? VINE_REFERENCE_M2;
+  const m2 = drawn ?? measured ?? VINE_REFERENCE_M2;
   // Each zone is a third of the vineyard: the cost shown is the one of the scope.
   const zoneCost = (i: number) => vineCost(m2 / Math.max(1, vine.zones.length), mixes[i] ?? NO_MIX).total;
   const cost = { total: targets.reduce((t, i) => ({ lo: t.lo + zoneCost(i).lo, hi: t.hi + zoneCost(i).hi }), { lo: 0, hi: 0 }), perHa: vineCost(m2, mix).perHa };
@@ -128,7 +131,7 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
     { icon: Wind, value: `−${Math.round((mix.windbreak / 100) * 60)}%`, label: "Vento" },
   ];
   const surface = area.isPending ? "…" : `${grouped(m2)} m²`;
-  const surfaceNote = area.isPending ? "misuro il vigneto…" : measured ? "superficie del vigneto" : "superficie di riferimento (1 ettaro)";
+  const surfaceNote = drawn !== null ? "superficie disegnata" : area.isPending ? "misuro il vigneto…" : measured ? "superficie del vigneto" : "superficie di riferimento (1 ettaro)";
 
   return (
     <section className="fuse-canvas space-y-5 rounded-t-3xl px-3 pb-6 pt-4 text-foreground sm:px-5" aria-label="Sete del vigneto">

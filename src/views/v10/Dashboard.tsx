@@ -255,7 +255,7 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
         ]} />
       </DashSection>
 
-      <DashSection title="Cosa hai messo" hint={`${grouped(m2)} m² ${area.data?.m2 ? "della piazza" : "di riferimento"}`}>
+      <DashSection title="Cosa hai messo" hint={`${grouped(m2)} m² ${sum.drawn ? "disegnati" : sum.measured ? "della piazza" : "di riferimento"}`}>
         <MixRows total={empty ? "Nessun intervento" : euroRange(sum.cost)}
           note="Costi indicativi IVA esclusa, da verificare con un preventivo."
           rows={piazzaMix(urban, sum).map((r, i) => ({ ...r, icon: [TreePine, Sun, Umbrella][i]! }))} />
@@ -312,7 +312,7 @@ export function VineDashboard({ records }: { records: ReactNode }) {
         ]} />
       </DashSection>
 
-      <DashSection title="Cosa hai messo" hint={area.data?.m2 ? `${grouped(m2)} m² del vigneto` : "1 ettaro di riferimento"}>
+      <DashSection title="Cosa hai messo" hint={sum.drawn ? `${grouped(m2)} m² disegnati` : sum.measured ? `${grouped(m2)} m² del vigneto` : "1 ettaro di riferimento"}>
         <MixRows total={empty ? "Nessun intervento" : euroRange(sum.cost)}
           note={same ? "Costi indicativi IVA esclusa, da verificare con un preventivo." : "Media delle tre zone (ognuna ha il suo intervento). Costi indicativi IVA esclusa."}
           rows={vineMixRows(sum).map((r, i) => ({ ...r, icon: [Droplets, Umbrella, Wind][i]! }))} />

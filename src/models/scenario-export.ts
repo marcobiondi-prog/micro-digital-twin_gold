@@ -1,10 +1,11 @@
 import { urbanMetrics, vineMetrics, type LabState } from "./lab-store";
+import { drawnAreaFor, pinsM2 } from "./drawn-area";
 
 export type ExportFlow = "urban" | "vineyard";
 type ExportValue = string | number | boolean;
 type ExportRow = Record<string, ExportValue>;
 
-/** Grid cells and vineyard zones have no surveyed geographic boundaries. */
+/** Grid cells and vineyard zones have no surveyed geographic boundaries; only an area drawn by the user is exported as a polygon. */
 export function scenarioExportRows(state: LabState, flow: ExportFlow, exportedAt: string): ExportRow[] {
   const location = state[flow].location;
   const common: ExportRow = {
@@ -32,14 +33,20 @@ export function scenarioExportRows(state: LabState, flow: ExportFlow, exportedAt
 }
 
 export function scenarioGeoJson(state: LabState, flow: ExportFlow, exportedAt: string) {
-  return {
-    type: "FeatureCollection" as const,
-    features: scenarioExportRows(state, flow, exportedAt).map((row) => ({
-      type: "Feature" as const, id: row["record_id"],
-      geometry: { type: "Point" as const, coordinates: [row["longitude"], row["latitude"]] },
-      properties: row,
-    })),
-  };
+  const points = scenarioExportRows(state, flow, exportedAt).map((row) => ({
+    type: "Feature" as const, id: row["record_id"],
+    geometry: { type: "Point" as const, coordinates: [row["longitude"], row["latitude"]] as unknown[] },
+    properties: row as Record<string, ExportValue>,
+  }));
+  // The area drawn with pins on the map, when there is one for this place: a real polygon (closed, [lng, lat]).
+  const place = state[flow].location, area = drawnAreaFor(state[flow].area, place);
+  const drawn = area ? [{
+    type: "Feature" as const, id: `${flow}-drawn-area`,
+    geometry: { type: "Polygon" as const, coordinates: [[...area.ring, area.ring[0]!].map(([lat, lng]) => [lng, lat])] as unknown[] },
+    properties: { flow, record_id: `${flow}-drawn-area`, location: place.label, area_m2: pinsM2(area.ring), pins: area.ring.length,
+      data_type: "drawn_area", georeference: "drawn_by_user", coordinate_reference_system: "EPSG:4326", exported_at: exportedAt } as Record<string, ExportValue>,
+  }] : [];
+  return { type: "FeatureCollection" as const, features: [...points, ...drawn] };
 }
 
 function csvCell(value: ExportValue): string {
