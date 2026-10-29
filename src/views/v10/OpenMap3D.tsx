@@ -39,10 +39,10 @@ export function OpenMap3D({ lat, lng, label, zoom }: { lat: number; lng: number;
   }, [lat, lng, zoom, label]);
   const recenter = () => mapRef.current?.easeTo({ ...camera, duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 800 });
   return (
-    <div className="relative h-full w-full overflow-hidden bg-card">
-      <div ref={host} data-map-gestures="" className="absolute inset-0 touch-none" role="img" aria-label={`Vista 3D di ${label}`} />
+    <div data-map-gestures="" className="relative h-full w-full touch-none overflow-hidden bg-card">
+      <div ref={host} className="h-full w-full" role="img" aria-label={`Vista 3D di ${label}`} />
       {state === "ready" && <button type="button" onClick={recenter} aria-label="Ricentra la vista 3D sul punto" className="absolute left-2 top-2 grid size-9 place-items-center rounded-full border border-border/60 bg-background/90 text-foreground shadow-sm backdrop-blur"><Crosshair className="size-4" aria-hidden="true" /></button>}
-      {state === "loading" && <div className="absolute inset-0 grid place-items-center text-muted-foreground"><LoaderCircle className="size-5 animate-spin" aria-label="Caricamento vista 3D" /></div>}
+      {state === "loading" && <div className="pointer-events-none absolute inset-0 grid place-items-center text-muted-foreground"><LoaderCircle className="size-5 animate-spin" aria-label="Caricamento vista 3D" /></div>}
       {state === "error" && <p role="status" className="absolute inset-0 grid place-items-center px-4 text-center text-sm text-muted-foreground">Vista 3D non disponibile in questo momento.</p>}
     </div>
   );

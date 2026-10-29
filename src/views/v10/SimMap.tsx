@@ -9,6 +9,7 @@ import type { SimKind } from "@/views/v8/console";
 import { PlaceSearch } from "@/views/SimulationGrid";
 
 const OpenMap3D = lazy(() => import("@/views/v10/OpenMap3D").then((m) => ({ default: m.OpenMap3D })));
+const SatelliteMap2D = lazy(() => import("@/views/v10/SatelliteMap2D").then((m) => ({ default: m.SatelliteMap2D })));
 const LocationMap3D = lazy(() => import("@/views/LocationMap3D").then((m) => ({ default: m.LocationMap3D })));
 
 /**
@@ -20,12 +21,10 @@ export function SimMap({ kind }: { kind: SimKind }) {
   const loc = kind === "urban" ? lab.urban.location : lab.vineyard.location;
   const [name, ...rest] = loc.label.split(" · ");
   const key = import.meta.env.VITE_GOOGLE_MAPS_BROWSER_KEY;
-  const q = `${loc.lat},${loc.lng}`;
   const zoom = kind === "urban" ? 17 : 14;
-  // The 2D map is the keyless satellite embed: it needs no key, so it never shows an error when the key does not
-  // allow this address (previews, new domains). Interactive (pan, pinch).
-  const src = `https://maps.google.com/maps?q=${encodeURIComponent(q)}&z=${zoom}&t=k&hl=it&output=embed`;
-  // 2D (the embed) is the default; 3D (photorealistic, needs the browser key) opens only for signed-in users:
+  // The 2D map is open satellite imagery that needs no key (so it never shows an error when the key does not allow this
+  // address), moved with one finger: the embedded map it replaces asked for two fingers on phones and could not be told otherwise.
+  // 2D is the default; 3D (photorealistic, needs the browser key) opens only for signed-in users:
   // guests see the switch with a lock, and touching it offers the sign-in.
   const { signedIn } = useSignedIn();
   const [view, setView] = useState<"2d" | "3d">("2d");
@@ -72,7 +71,7 @@ export function SimMap({ kind }: { kind: SimKind }) {
             ? <LocationMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} apiKey={key}
               fallback={<OpenMap3D lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={zoom3d} />} />
             : <OpenMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={zoom3d} />}</Suspense>
-          : <iframe key={src} data-map-gestures title={`Mappa di ${name}`} src={src} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" className="block h-full w-full border-0" />}
+          : <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={zoom} /></Suspense>}
       </div>
     </div>
   );
