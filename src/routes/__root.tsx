@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Outlet, Link, createRootRouteWithContext, useLocation, useNavigate, HeadContent, Scripts, type ErrorComponentProps } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
@@ -17,7 +17,8 @@ import { installUiClicks } from "@/lib/ui-sounds";
 import { reloadFresh } from "@/router";
 import { History, Building2, Grape, Info, LayoutDashboard, Lock } from "lucide-react";
 import { useProId, useSyncProId } from "@/lib/use-pro-id";
-import { unlocks } from "@/models/professional-id";
+import { unlocks, type ProId } from "@/models/professional-id";
+import { ProfileIcon } from "@/views/ProfileIcon";
 
 function NotFoundComponent() {
   return (
@@ -106,21 +107,39 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
-const nav = [
+const nav: ReadonlyArray<{ to: "/benvenuto" | "/urbano" | "/vigneto" | "/dashboard" | "/profilo"; l: string }> = [
   { to: "/benvenuto", l: "Benvenuto" },
   { to: "/urbano", l: "Simulazione urbana" },
   { to: "/vigneto", l: "Simulazione vigneto" },
   { to: "/dashboard", l: "Dashboard" },
-] as const;
+];
+/** The desktop pills follow the bottom bar: the locked section gives its place to Profilo once a profile is identified. */
+const navFor = (id: ProId | null | undefined) => {
+  if (!id) return nav;
+  const locked = id.kind === "agronomo" ? "/urbano" : "/vigneto";
+  return nav.map((n) => (n.to === locked ? { to: "/profilo" as const, l: "Profilo" } : n));
+};
 
 const NAV_H = 49;
 
-const bottomItems = [
+type NavItem = { to: "/benvenuto" | "/urbano" | "/vigneto" | "/dashboard" | "/profilo"; l: string; I: ComponentType<{ className?: string; strokeWidth?: number; "aria-hidden"?: boolean | "true" }> };
+const bottomItems: readonly NavItem[] = [
   { to: "/benvenuto", l: "Benvenuto", I: History },
   { to: "/urbano", l: "Urbano", I: Building2 },
   { to: "/vigneto", l: "Vigneto", I: Grape },
   { to: "/dashboard", l: "Dashboard", I: LayoutDashboard },
-] as const;
+];
+/**
+ * Once a profile is identified, the section it locks gives its place to Profilo (same column): the agronomist sees
+ * Profilo where Urbano was, the municipal officer where Vigneto was. With no profile both sections stay, locked.
+ */
+function itemsFor(id: ProId | null | undefined): readonly NavItem[] {
+  if (!id) return bottomItems;
+  const locked = id.kind === "agronomo" ? "/urbano" : "/vigneto";
+  return bottomItems.map((b) => (b.to === locked ? { to: "/profilo", l: "Profilo", I: ProfileIcon } : b));
+}
+/** Pages that light the Profilo item: the profile page and the identification pages. */
+const isProfilePath = (p: string) => p === "/profilo" || p.startsWith("/identificazione");
 
 // Keep history flat: sections replace each other, so the back gesture from
 // any section returns to Home instead of the previously visited tab.
@@ -184,8 +203,9 @@ function BottomNav() {
       ro.disconnect();
     };
   }, [pathname]);
-  const item = ({ to, l, I }: (typeof bottomItems)[number], index: number) => {
-    const active = pathname === to || (to === "/benvenuto" && pathname.startsWith("/cronologia"));
+  const items = itemsFor(proId);
+  const item = ({ to, l, I }: NavItem, index: number) => {
+    const active = pathname === to || (to === "/benvenuto" && pathname.startsWith("/cronologia")) || (to === "/profilo" && isProfilePath(pathname));
     // Piazza and vineyard wear a small lock until the profile that opens them is identified.
     const locked = (to === "/urbano" || to === "/vigneto") && proId !== undefined && !unlocks(proId, to === "/urbano" ? "urban" : "vineyard");
     return (
@@ -204,9 +224,9 @@ function BottomNav() {
     );
   };
   // The Cronologia page belongs to Benvenuto: its item stays lit there.
-  const navPath = pathname.startsWith("/cronologia") ? "/benvenuto" : pathname;
-  const index = bottomItems.findIndex((b) => b.to === navPath);
-  const current = bottomItems[index];
+  const navPath = pathname.startsWith("/cronologia") ? "/benvenuto" : isProfilePath(pathname) ? "/profilo" : pathname;
+  const index = items.findIndex((b) => b.to === navPath);
+  const current = items[index];
   // On Home the bar points at the tile selected there: the light slides under Urbano or Vigneto, or the camera lights up.
   const homeFocus = useHomeFocus();
   const focusing = pathname === "/" && homeFocus !== null;
@@ -232,9 +252,9 @@ function BottomNav() {
         </svg>
         {light && <span className="ps-nav-light" style={{ left: light.left, top: light.top, "--ps-tilt": light.tilt } as CSSProperties} aria-hidden="true" />}
         <ul className="relative grid grid-cols-5 items-start pt-6">
-          {bottomItems.slice(0, 2).map((b, i) => item(b, i))}
+          {items.slice(0, 2).map((b, i) => item(b, i))}
           <li className="flex justify-center"><CameraDockButton focused={focusing && homeFocus === "camera"} /></li>
-          {bottomItems.slice(2).map((b, i) => item(b, i + 2))}
+          {items.slice(2).map((b, i) => item(b, i + 2))}
         </ul>
         <p className="relative h-8 text-center text-[13px] font-medium leading-8 tracking-wide text-white/90" aria-hidden="true">{caption}</p>
       </div>
@@ -330,9 +350,9 @@ function SmartNav() {
             className="no-scrollbar min-w-0 touch-pan-x overflow-x-auto"
           >
             <div className="flex items-center gap-1">
-              {nav.map((n) => (
+              {navFor(proId).map((n) => (
                 <Link key={n.to} to={n.to}
-                  aria-current={pathname === n.to ? "page" : undefined}
+                  aria-current={pathname === n.to || (n.to === "/profilo" && isProfilePath(pathname)) ? "page" : undefined}
                   replace={pathname !== "/"}
                   onClick={(e) => { if (goHomeBack(e, n.to, pathname)) return; centerTapped(e.currentTarget, pathname === n.to); }}
                   className={`nav-glass nav-glass-gloss relative shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring ${pathname === n.to ? "nav-glass-on bg-nav-accent text-nav-accent-foreground" : "text-muted-foreground dark:text-nav-accent-foreground"}`}>

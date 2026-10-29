@@ -11,7 +11,7 @@ import { THEME_CHANGED, THEME_DARK, THEME_META } from "@/views/theme-toggle";
  */
 
 export type SimKind = "urban" | "vineyard";
-export type SimTab = "simula" | "mappa" | "sensori" | "profilo";
+export type SimTab = "simula" | "mappa" | "sensori";
 
 // The open tab of each simulator lives at module level, so the ⋯ menu and the camera can switch it.
 const tabs: Record<SimKind, SimTab> = { urban: "simula", vineyard: "simula" };

@@ -76,7 +76,7 @@ export function SectionGate({ section, children }: { section: Section; children:
         <p className="text-[15px] leading-relaxed text-muted-foreground">{profileIntro(need)}</p>
         {id && <p className="rounded-2xl bg-foreground/[0.06] px-4 py-3 text-sm text-muted-foreground">Ora sei identificato come <span className="font-semibold text-foreground">{proSummary(id)}</span>: identificandoti qui, quel profilo viene sostituito e {section === "urban" ? "il vigneto" : "la piazza"} si blocca.</p>}
         <IdentifyForm kind={need} onDone={done} />
-        <p className="px-1 text-xs text-muted-foreground">I dati restano su questo dispositivo e, se hai fatto l'accesso, nel tuo account. Puoi uscire dal profilo quando vuoi, dalla scheda Profilo.</p>
+        <p className="px-1 text-xs text-muted-foreground">I dati restano su questo dispositivo e, se hai fatto l'accesso, nel tuo account. Puoi uscire dal profilo quando vuoi, da Profilo nella barra in basso.</p>
       </div>
     </div>
   );

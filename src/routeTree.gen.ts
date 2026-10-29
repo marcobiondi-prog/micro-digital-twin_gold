@@ -19,6 +19,7 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as MappaRouteImport } from './routes/mappa'
 import { Route as PianiRouteImport } from './routes/piani'
+import { Route as ProfiloRouteImport } from './routes/profilo'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ScegliRouteImport } from './routes/scegli'
 import { Route as UrbanoRouteImport } from './routes/urbano'
@@ -82,6 +83,11 @@ const MappaRoute = MappaRouteImport.update({
 const PianiRoute = PianiRouteImport.update({
   id: '/piani',
   path: '/piani',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfiloRoute = ProfiloRouteImport.update({
+  id: '/profilo',
+  path: '/profilo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -169,6 +175,7 @@ export interface FileRoutesByFullPath {
   '/faq': typeof FaqRoute
   '/mappa': typeof MappaRoute
   '/piani': typeof PianiRoute
+  '/profilo': typeof ProfiloRoute
   '/reset-password': typeof ResetPasswordRoute
   '/scegli': typeof ScegliRoute
   '/urbano': typeof UrbanoRoute
@@ -195,6 +202,7 @@ export interface FileRoutesByTo {
   '/faq': typeof FaqRoute
   '/mappa': typeof MappaRoute
   '/piani': typeof PianiRoute
+  '/profilo': typeof ProfiloRoute
   '/reset-password': typeof ResetPasswordRoute
   '/scegli': typeof ScegliRoute
   '/urbano': typeof UrbanoRoute
@@ -222,6 +230,7 @@ export interface FileRoutesById {
   '/faq': typeof FaqRoute
   '/mappa': typeof MappaRoute
   '/piani': typeof PianiRoute
+  '/profilo': typeof ProfiloRoute
   '/reset-password': typeof ResetPasswordRoute
   '/scegli': typeof ScegliRoute
   '/urbano': typeof UrbanoRoute
@@ -250,6 +259,7 @@ export interface FileRouteTypes {
     | '/faq'
     | '/mappa'
     | '/piani'
+    | '/profilo'
     | '/reset-password'
     | '/scegli'
     | '/urbano'
@@ -276,6 +286,7 @@ export interface FileRouteTypes {
     | '/faq'
     | '/mappa'
     | '/piani'
+    | '/profilo'
     | '/reset-password'
     | '/scegli'
     | '/urbano'
@@ -302,6 +313,7 @@ export interface FileRouteTypes {
     | '/faq'
     | '/mappa'
     | '/piani'
+    | '/profilo'
     | '/reset-password'
     | '/scegli'
     | '/urbano'
@@ -329,6 +341,7 @@ export interface RootRouteChildren {
   FaqRoute: typeof FaqRoute
   MappaRoute: typeof MappaRoute
   PianiRoute: typeof PianiRoute
+  ProfiloRoute: typeof ProfiloRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ScegliRoute: typeof ScegliRoute
   UrbanoRoute: typeof UrbanoRoute
@@ -415,6 +428,13 @@ declare module '@tanstack/react-router' {
       path: '/piani'
       fullPath: '/piani'
       preLoaderRoute: typeof PianiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profilo': {
+      id: '/profilo'
+      path: '/profilo'
+      fullPath: '/profilo'
+      preLoaderRoute: typeof ProfiloRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -529,6 +549,7 @@ const rootRouteChildren: RootRouteChildren = {
   FaqRoute: FaqRoute,
   MappaRoute: MappaRoute,
   PianiRoute: PianiRoute,
+  ProfiloRoute: ProfiloRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ScegliRoute: ScegliRoute,
   UrbanoRoute: UrbanoRoute,
