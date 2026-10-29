@@ -110,3 +110,22 @@ export const subscribeLocalHistory = (f: () => void) => { subs.add(f); return ()
 export const serverLocalHistory = (): HistoryEntry[] => EMPTY;
 /** Test hook: forget the in-memory copy so the next read goes back to storage. */
 export const resetLocalHistory = () => { local = null; };
+
+/** One line of an entry's interventions, in plain words: "Alberi" · "7". */
+export type MixRow = { label: string; value: string };
+/** An entry's interventions as rows to read: the piazza's levers, or the vineyard's scope and each zone's levers. */
+export function mixRows(mix: HistoryMix): { title: string; rows: MixRow[] }[] {
+  if (mix.kind === "piazza") {
+    return [{ title: "Piazza", rows: [
+      { label: "Alberi", value: String(mix.trees) },
+      { label: "Prato", value: `${mix.permeable} %` },
+      { label: "Ombra", value: `${mix.shade} %` },
+    ] }];
+  }
+  const zones = mix.allZones ? mix.zones.map((z, i) => [z, i] as const) : [[mix.zones[mix.selected] ?? mix.zones[0]!, mix.selected] as const];
+  return zones.map(([z, i]) => ({ title: `Zona ${i + 1}`, rows: [
+    { label: "Irrigazione", value: `+${z.irrigation} %` },
+    { label: "Teli d'ombra", value: `${z.shade} %` },
+    { label: "Frangivento", value: `${z.windbreak} %` },
+  ] }));
+}

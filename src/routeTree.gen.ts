@@ -23,6 +23,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ScegliRouteImport } from './routes/scegli'
 import { Route as UrbanoRouteImport } from './routes/urbano'
 import { Route as VignetoRouteImport } from './routes/vigneto'
+import { Route as CronologiaIdRouteImport } from './routes/cronologia_.$id'
 import { Route as LegaleLicenzeRouteImport } from './routes/legale/licenze'
 import { Route as LegaleTerminiRouteImport } from './routes/legale/termini'
 import { Route as PrivacyCookieRouteImport } from './routes/privacy/cookie'
@@ -101,6 +102,11 @@ const VignetoRoute = VignetoRouteImport.update({
   path: '/vigneto',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CronologiaIdRoute = CronologiaIdRouteImport.update({
+  id: '/cronologia_/$id',
+  path: '/cronologia/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LegaleLicenzeRoute = LegaleLicenzeRouteImport.update({
   id: '/legale/licenze',
   path: '/legale/licenze',
@@ -154,6 +160,7 @@ export interface FileRoutesByFullPath {
   '/scegli': typeof ScegliRoute
   '/urbano': typeof UrbanoRoute
   '/vigneto': typeof VignetoRoute
+  '/cronologia/$id': typeof CronologiaIdRoute
   '/legale/licenze': typeof LegaleLicenzeRoute
   '/legale/termini': typeof LegaleTerminiRoute
   '/privacy/cookie': typeof PrivacyCookieRoute
@@ -177,6 +184,7 @@ export interface FileRoutesByTo {
   '/scegli': typeof ScegliRoute
   '/urbano': typeof UrbanoRoute
   '/vigneto': typeof VignetoRoute
+  '/cronologia/$id': typeof CronologiaIdRoute
   '/legale/licenze': typeof LegaleLicenzeRoute
   '/legale/termini': typeof LegaleTerminiRoute
   '/privacy/cookie': typeof PrivacyCookieRoute
@@ -201,6 +209,7 @@ export interface FileRoutesById {
   '/scegli': typeof ScegliRoute
   '/urbano': typeof UrbanoRoute
   '/vigneto': typeof VignetoRoute
+  '/cronologia_/$id': typeof CronologiaIdRoute
   '/legale/licenze': typeof LegaleLicenzeRoute
   '/legale/termini': typeof LegaleTerminiRoute
   '/privacy/cookie': typeof PrivacyCookieRoute
@@ -226,6 +235,7 @@ export interface FileRouteTypes {
     | '/scegli'
     | '/urbano'
     | '/vigneto'
+    | '/cronologia/$id'
     | '/legale/licenze'
     | '/legale/termini'
     | '/privacy/cookie'
@@ -249,6 +259,7 @@ export interface FileRouteTypes {
     | '/scegli'
     | '/urbano'
     | '/vigneto'
+    | '/cronologia/$id'
     | '/legale/licenze'
     | '/legale/termini'
     | '/privacy/cookie'
@@ -272,6 +283,7 @@ export interface FileRouteTypes {
     | '/scegli'
     | '/urbano'
     | '/vigneto'
+    | '/cronologia_/$id'
     | '/legale/licenze'
     | '/legale/termini'
     | '/privacy/cookie'
@@ -296,6 +308,7 @@ export interface RootRouteChildren {
   ScegliRoute: typeof ScegliRoute
   UrbanoRoute: typeof UrbanoRoute
   VignetoRoute: typeof VignetoRoute
+  CronologiaIdRoute: typeof CronologiaIdRoute
   LegaleLicenzeRoute: typeof LegaleLicenzeRoute
   LegaleTerminiRoute: typeof LegaleTerminiRoute
   PrivacyCookieRoute: typeof PrivacyCookieRoute
@@ -405,6 +418,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VignetoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cronologia_/$id': {
+      id: '/cronologia_/$id'
+      path: '/cronologia/$id'
+      fullPath: '/cronologia/$id'
+      preLoaderRoute: typeof CronologiaIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/legale/licenze': {
       id: '/legale/licenze'
       path: '/legale/licenze'
@@ -472,6 +492,7 @@ const rootRouteChildren: RootRouteChildren = {
   ScegliRoute: ScegliRoute,
   UrbanoRoute: UrbanoRoute,
   VignetoRoute: VignetoRoute,
+  CronologiaIdRoute: CronologiaIdRoute,
   LegaleLicenzeRoute: LegaleLicenzeRoute,
   LegaleTerminiRoute: LegaleTerminiRoute,
   PrivacyCookieRoute: PrivacyCookieRoute,

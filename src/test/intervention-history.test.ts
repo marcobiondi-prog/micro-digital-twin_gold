@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  mixRows,
   addLocalHistory, clearLocalHistory, groupByMonth, whenLabel, whenOf, isHistoryEntry, isHistoryMix, localHistory, MAX_HISTORY, MAX_TEXT, mergeHistory, newEntry, resetLocalHistory,
   sortNewestFirst, type HistoryEntry,
 } from "@/models/intervention-history";
@@ -87,5 +88,20 @@ describe("intervention-history", () => {
     addLocalHistory(at("2026-10-02T00:00:00Z", "b"));
     resetLocalHistory();
     expect(localHistory().map((e) => e.id)).toEqual(["b", "a"]);
+  });
+});
+
+describe("mixRows", () => {
+  it("reads the piazza's levers", () => {
+    expect(mixRows({ kind: "piazza", trees: 7, permeable: 20, shade: 15 })).toEqual([{ title: "Piazza", rows: [
+      { label: "Alberi", value: "7" }, { label: "Prato", value: "20 %" }, { label: "Ombra", value: "15 %" }] }]);
+  });
+  it("lists every zone on Tutte, only the chosen one otherwise", () => {
+    const zones = [{ irrigation: 8, shade: 30, windbreak: 40 }, { irrigation: 2, shade: 0, windbreak: 10 }];
+    expect(mixRows({ kind: "vigneto", zones, allZones: true, selected: 0 }).map((g) => g.title)).toEqual(["Zona 1", "Zona 2"]);
+    const one = mixRows({ kind: "vigneto", zones, allZones: false, selected: 1 });
+    expect(one).toHaveLength(1);
+    expect(one[0]!.title).toBe("Zona 2");
+    expect(one[0]!.rows[0]).toEqual({ label: "Irrigazione", value: "+2 %" });
   });
 });

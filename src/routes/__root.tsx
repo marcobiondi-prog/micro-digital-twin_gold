@@ -182,7 +182,7 @@ function BottomNav() {
     };
   }, [pathname]);
   const item = ({ to, l, I }: (typeof bottomItems)[number], index: number) => {
-    const active = pathname === to || (to === "/benvenuto" && pathname === "/cronologia");
+    const active = pathname === to || (to === "/benvenuto" && pathname.startsWith("/cronologia"));
     return (
       <li key={to}>
         <Link to={to} replace={pathname !== "/"} aria-current={active ? "page" : undefined} aria-label={l}
@@ -199,7 +199,7 @@ function BottomNav() {
     );
   };
   // The Cronologia page belongs to Benvenuto: its item stays lit there.
-  const navPath = pathname === "/cronologia" ? "/benvenuto" : pathname;
+  const navPath = pathname.startsWith("/cronologia") ? "/benvenuto" : pathname;
   const index = bottomItems.findIndex((b) => b.to === navPath);
   const current = bottomItems[index];
   // On Home the bar points at the tile selected there: the light slides under Urbano or Vigneto, or the camera lights up.

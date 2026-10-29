@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ArrowRight, Building2, Clock3, Grape, History, Play, RotateCcw, Trash2 } from "lucide-react";
 import { currentMedia, useLabMedia, type MediaItem } from "@/models/lab-media-store";
 import { mediaTime } from "@/models/media-time";
-import { openSimTab, TabRow } from "@/views/v8/console";
+import { TabRow } from "@/views/v8/console";
 import { DashCard, DashSection } from "@/views/v10/Dashboard";
-import { clearHistory, reopenHistory, useHistory } from "@/lib/use-history";
-import { groupByMonth, whenLabel, whenOf, type HistoryEntry, type HistoryFlow } from "@/models/intervention-history";
+import { clearHistory, useHistory } from "@/lib/use-history";
+import { groupByMonth, whenLabel, type HistoryEntry, type HistoryFlow } from "@/models/intervention-history";
 
 const day = (e: HistoryEntry) => new Date(e.at).toLocaleDateString("it-IT", { day: "numeric", month: "short" });
 /** When the intervention was made, on this device's clock: "09:12". */
@@ -38,11 +38,10 @@ const COMPACT_ENTRIES = 5, COMPACT_SHOTS = 6;
 /**
  * The history of the interventions (and the photos and videos of the simulations), shared by Benvenuto (compact: the
  * latest few, then "Apri la cronologia") and the Cronologia page (all of it, filtered by place, with "Cancella cronologia").
- * Each entry recorded by a simulation offers "Riapri". Signed in it lives in the account, otherwise on this device.
+ * Each entry offers "Riapri", which opens it on its own page to read (/cronologia/$id). Signed in it lives in the account, otherwise on this device.
  */
 export function HistoryBlock({ compact = false }: { compact?: boolean }) {
   const { entries: all, where, loading, failed, reload } = useHistory();
-  const navigate = useNavigate();
   const [filter, setFilter] = useState<Filter>("tutti");
   const [confirm, setConfirm] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -58,14 +57,6 @@ export function HistoryBlock({ compact = false }: { compact?: boolean }) {
   const groups = groupByMonth(compact ? entries.slice(0, COMPACT_ENTRIES) : entries);
   const visibleShots = compact ? shots.slice(0, COMPACT_SHOTS) : shots;
   const more = compact && (all.length > COMPACT_ENTRIES || allShots.length > COMPACT_SHOTS || all.length > 0);
-  // "Riapri": the entry's interventions go back into its simulation, which opens on Simula.
-  const reopen = (e: HistoryEntry) => {
-    if (!e.mix) return;
-    reopenHistory(e.mix, whenOf(e));
-    openSimTab(e.flow === "piazza" ? "urban" : "vineyard", "simula");
-    toast.success("Intervento riaperto", { description: e.text });
-    void navigate({ to: e.flow === "piazza" ? "/urbano" : "/vigneto" });
-  };
   const clear = async () => {
     setClearing(true);
     const ok = await clearHistory();
@@ -106,12 +97,10 @@ export function HistoryBlock({ compact = false }: { compact?: boolean }) {
                   {whenLabel(e) && <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-foreground/80"><Clock3 className="size-3.5" aria-hidden="true" />Simulato: {whenLabel(e)}</p>}
                   <p className="mt-0.5 truncate text-xs text-muted-foreground">{e.flow === "piazza" ? "Piazza" : "Vigneto"}{e.place ? ` · ${e.place}` : ""}</p>
                 </div>
-                {e.mix && (
-                  <button type="button" onClick={() => reopen(e)} aria-label={`Riapri: ${e.text}`}
-                    className="inline-flex h-9 shrink-0 items-center gap-1.5 self-center rounded-full bg-foreground/[0.08] px-3 text-sm font-semibold outline-none hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring">
-                    <RotateCcw className="size-4" aria-hidden="true" />Riapri
-                  </button>
-                )}
+                <Link to="/cronologia/$id" params={{ id: e.id }} aria-label={`Riapri: ${e.text}`}
+                  className="inline-flex h-9 shrink-0 items-center gap-1.5 self-center rounded-full bg-foreground/[0.08] px-3 text-sm font-semibold outline-none hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring">
+                  <RotateCcw className="size-4" aria-hidden="true" />Riapri
+                </Link>
               </div>
             ))}
           </DashCard>
