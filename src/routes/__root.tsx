@@ -125,7 +125,7 @@ const NAV_H = 49;
 type NavItem = { to: "/benvenuto" | "/urbano" | "/vigneto" | "/dashboard" | "/profilo"; l: string; I: ComponentType<{ className?: string; strokeWidth?: number; "aria-hidden"?: boolean | "true" }> };
 const KIND_ICON = { agronomo: AgronomoIcon, funzionario: FunzionarioIcon } as const;
 const bottomItems: readonly NavItem[] = [
-  { to: "/benvenuto", l: "Benvenuto", I: History },
+  { to: "/benvenuto", l: "Cronologia", I: History },
   { to: "/urbano", l: "Urbano", I: Building2 },
   { to: "/vigneto", l: "Vigneto", I: Grape },
   { to: "/dashboard", l: "Dashboard", I: LayoutDashboard },
