@@ -53,8 +53,9 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, medi
       <div className="sticky top-[var(--nav-h)] z-[999999997] -mx-4 bg-background/80 px-4 py-2 backdrop-blur-xl transition-[top] duration-300">
         <TabRow label="Sezioni" items={TABS} value={tab} onChange={go} />
       </div>
+      {/* The open tab follows the finger and the next slides in once it turns; nothing peeks beside it. */}
       <div ref={swipe.ref} style={swipe.style} className="relative">
-      <Panels value={tab} peek={swipe.peek} peekSide={swipe.peekSide} peekTop={swipe.peekTop} panels={[
+      <Panels value={tab} panels={[
         // Simula carries the photos and videos under the simulation, so it stays mounted: the camera dock reaches LabMedia from any tab.
         { id: "simula", always: true, content: <div className="space-y-6">{simula}<section id={simMediaId(kind)} aria-label="Foto e video" className="fuse-canvas scroll-mt-[calc(var(--nav-h)+5rem)] rounded-t-3xl px-3 pt-4 pb-6 sm:px-5">{media}</section></div> },
         { id: "mappa", content: <SimMap kind={kind} /> },
