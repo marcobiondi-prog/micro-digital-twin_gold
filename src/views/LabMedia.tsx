@@ -343,7 +343,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
               Foto e video {kind === "urban" ? "della piazza" : "del vigneto"}
             </span>
             {items.length > 0 && (
-              <span className="rounded-full border px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground">
+              <span className="rounded-full border px-1.5 py-0.5 text-[12px] font-medium tabular-nums text-muted-foreground">
                 {items.length}
               </span>
             )}

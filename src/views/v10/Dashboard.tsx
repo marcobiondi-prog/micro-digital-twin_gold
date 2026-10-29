@@ -110,7 +110,7 @@ function Facts({ items }: { items: Array<{ icon: LucideIcon; value: string; labe
         <DashCard key={f.label} className="flex flex-col items-center gap-1 px-2 py-4 text-center sm:px-3">
           <f.icon className="size-5 text-muted-foreground" aria-hidden="true" />
           <span className="font-display text-xl font-light tabular-nums sm:text-2xl">{f.value}</span>
-          <span className="text-[11px] leading-tight text-muted-foreground sm:text-xs">{f.label}</span>
+          <span className="text-[12px] leading-tight text-muted-foreground sm:text-xs">{f.label}</span>
         </DashCard>
       ))}
     </div>
@@ -131,7 +131,7 @@ function MixRows({ rows, total, note }: { rows: Array<{ icon: LucideIcon; label:
         ))}
         <li className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5"><span className="text-sm font-semibold">Totale indicativo</span><span className="text-right text-sm font-semibold">{total}</span></li>
       </ul>
-      <p className="px-4 pb-4 text-[11px] text-muted-foreground sm:px-5">{note}</p>
+      <p className="px-4 pb-4 text-[12px] text-muted-foreground sm:px-5">{note}</p>
     </DashCard>
   );
 }
@@ -142,7 +142,7 @@ function SeasonPills({ value, onChange }: { value: Season; onChange: (s: Season)
     <div className="grid w-full max-w-sm grid-cols-4 gap-1 rounded-full bg-foreground/[0.05] p-1" role="radiogroup" aria-label="Stagione">
       {SEASONS.map((s) => (
         <button key={s} type="button" role="radio" aria-checked={value === s} onClick={() => { hapticTick(); onChange(s); }}
-          className={cn("h-9 min-w-0 truncate rounded-full px-1 text-[13px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", value === s ? "bg-secondary text-secondary-foreground" : "text-foreground/75")}>{SEASON_LABEL[s]}</button>
+          className={cn("h-9 min-w-0 truncate rounded-full px-1 text-[14px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", value === s ? "bg-secondary text-secondary-foreground" : "text-foreground/75")}>{SEASON_LABEL[s]}</button>
       ))}
     </div>
   );
@@ -160,7 +160,7 @@ export function PremiumPart({ locked, children }: { locked: Locked[]; children: 
     <section className="space-y-3" aria-label="Premium">
       <div className="flex items-center gap-2 px-1">
         <h2 className="text-lg font-semibold tracking-tight">Premium</h2>
-        <span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-semibold", signedIn ? "bg-ok/15 text-ok" : "bg-foreground/[0.08] text-muted-foreground")}>{signedIn ? "attivo" : "con l'accesso"}</span>
+        <span className={cn("rounded-full px-2.5 py-0.5 text-[12px] font-semibold", signedIn ? "bg-ok/15 text-ok" : "bg-foreground/[0.08] text-muted-foreground")}>{signedIn ? "attivo" : "con l'accesso"}</span>
       </div>
       {signedIn ? children : (
         <div className="space-y-3">
@@ -297,8 +297,8 @@ export function VineDashboard({ records }: { records: ReactNode }) {
             <DashCard key={i} className="space-y-1 px-3 py-4 text-center">
               <div className="text-xs font-semibold text-muted-foreground">Zona {i + 1}</div>
               <div className={cn("font-display text-3xl font-light tabular-nums", GAIN_TEXT[thirstStep(sum.zones[i]?.after ?? 0)])}>{Math.round(sum.zones[i]?.after ?? 0)}</div>
-              <div className="text-[11px] text-muted-foreground">senza: {Math.round(sum.zones[i]?.plain ?? 0)}</div>
-              <div className="text-[11px] text-muted-foreground">{Math.round(z.temperature)}° · {Math.round(z.moisture)}% acqua</div>
+              <div className="text-[12px] text-muted-foreground">senza: {Math.round(sum.zones[i]?.plain ?? 0)}</div>
+              <div className="text-[12px] text-muted-foreground">{Math.round(z.temperature)}° · {Math.round(z.moisture)}% acqua</div>
             </DashCard>
           ))}
         </div>

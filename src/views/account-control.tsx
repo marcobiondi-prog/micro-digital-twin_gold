@@ -335,7 +335,7 @@ export function AccountControl() {
               <div className="flex items-start gap-3 pb-2">
                 <ProfileIcon kind={proId.kind} className="mt-0.5 size-7 shrink-0" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-[15px] font-semibold">{proId.name}</p>
+                  <p className="text-[16px] font-semibold">{proId.name}</p>
                   <p className="text-sm text-muted-foreground">{proSummary(proId)}</p>
                   <button type="button" onClick={() => void saveProId(null)} className="mt-1 inline-flex min-h-10 items-center gap-1.5 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"><LogOut className="size-4" aria-hidden="true" />Esci dal profilo</button>
                 </div>
@@ -345,7 +345,7 @@ export function AccountControl() {
             {!proId && <ul>
               {([["Agronomo · apre il vigneto", "/identificazione/agronomo"], ["Funzionario comunale · apre la piazza", "/identificazione/funzionario"]] as const).map(([label, to]) => (
                 <li key={to}>
-                  <Link to={to} onClick={() => setOpen(false)} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl text-left text-[15px] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+                  <Link to={to} onClick={() => setOpen(false)} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl text-left text-[16px] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
                     <span className="min-w-0 flex-1">{label}</span>
                     <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                   </Link>
@@ -411,7 +411,7 @@ export function AccountControl() {
                 <ul>
                   {g.links.map(([label, to]) => (
                     <li key={to}>
-                      <button type="button" onClick={() => openPage(to)} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl text-left text-[15px] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+                      <button type="button" onClick={() => openPage(to)} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl text-left text-[16px] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
                         <span className="min-w-0 flex-1">{label}</span>
                         {to === "/piani" && <span className="shrink-0 text-sm text-muted-foreground">Il tuo: {premiumPlan ? "Premium" : "Free"}</span>}
                         <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />

@@ -30,7 +30,7 @@ export function CompareButton({ level, onClick, className }: { level: CompareLev
       <span className="compare-cta-glow" aria-hidden="true" />
       <Scale />
       Confronta
-      <span className="hidden items-center rounded-full bg-primary-foreground px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary sm:inline-flex">
+      <span className="hidden items-center rounded-full bg-primary-foreground px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary sm:inline-flex">
         {levelTag[level]}
       </span>
     </Button>

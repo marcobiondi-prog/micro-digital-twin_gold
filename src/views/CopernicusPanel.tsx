@@ -59,7 +59,7 @@ export function CopernicusPanel({ kind }: { kind: "urban" | "vineyard" }) {
                 {ndvi ? <>
                   <div className="font-display text-2xl font-semibold">{ndvi.value.toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                   <div className="text-sm">{ndviLabel(ndvi.value)}</div>
-                  <div className="mt-1 text-[11px] text-muted-foreground">Immagine del {day(ndvi.date)} · scala da −1 a 1</div>
+                  <div className="mt-1 text-[12px] text-muted-foreground">Immagine del {day(ndvi.date)} · scala da −1 a 1</div>
                 </> : <p className="mt-1 text-sm text-muted-foreground">Nessuna immagine senza nuvole negli ultimi 60 giorni.</p>}
               </div>
               <div className="rounded-xl bg-muted p-3">
@@ -67,12 +67,12 @@ export function CopernicusPanel({ kind }: { kind: "urban" | "vineyard" }) {
                 {temp ? <>
                   <div className="font-display text-2xl font-semibold">{temp.value.toLocaleString("it-IT", { maximumFractionDigits: 1 })} °C</div>
                   <div className="text-sm">Suolo, tetti e asfalto, non l’aria</div>
-                  <div className="mt-1 text-[11px] text-muted-foreground">Passaggio del {day(temp.date)} · temperatura di brillanza, ~1 km</div>
+                  <div className="mt-1 text-[12px] text-muted-foreground">Passaggio del {day(temp.date)} · temperatura di brillanza, ~1 km</div>
                 </> : <p className="mt-1 text-sm text-muted-foreground">Nessun passaggio senza nuvole negli ultimi 14 giorni.</p>}
               </div>
             </div>}
             {result?.errors.map((e) => <p key={e} role="status" className="text-xs text-danger">{e}</p>)}
-            <a href="https://dataspace.copernicus.eu/" target="_blank" rel="noreferrer" className="inline-block text-[11px] text-muted-foreground underline">Fonte: Copernicus Data Space Ecosystem (ESA / Commissione europea)</a>
+            <a href="https://dataspace.copernicus.eu/" target="_blank" rel="noreferrer" className="inline-block text-[12px] text-muted-foreground underline">Fonte: Copernicus Data Space Ecosystem (ESA / Commissione europea)</a>
           </div>
         </div>
       </div>

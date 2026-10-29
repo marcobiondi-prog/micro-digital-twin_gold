@@ -49,7 +49,7 @@ export function Welcome() {
     <div className="space-y-6">
       <Ambient tone={TONE} />
       <PageHero kicker="Micro Digital Twin" title="Benvenuto" />
-      <p className="text-[15px] leading-relaxed text-muted-foreground">Scegli da dove partire. Qui sotto trovi gli ultimi interventi che hai registrato.</p>
+      <p className="text-[16px] leading-relaxed text-muted-foreground">Scegli da dove partire. Qui sotto trovi gli ultimi interventi che hai registrato.</p>
       <div className="flex gap-3">
         {/* Identified, the section the profile locks gives its place to the round profile button (the agronomist's where Piazza was, the officer's where Vigneto was). */}
         {proId?.kind === "agronomo" ? <ProfileButton id={proId} /> : <Start to="/urbano" icon={Building2} title="Piazza" text="Prova gli interventi in città" who="Per i funzionari del Comune" />}
