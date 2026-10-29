@@ -31,6 +31,18 @@ export const REGIONS = [
   "Abruzzo", "Basilicata", "Calabria", "Campania", "Emilia-Romagna", "Friuli Venezia Giulia", "Lazio", "Liguria", "Lombardia", "Marche",
   "Molise", "Piemonte", "Puglia", "Sardegna", "Sicilia", "Toscana", "Trentino-Alto Adige", "Umbria", "Valle d'Aosta", "Veneto",
 ] as const;
+/** Each region's Wikidata item, to find its coat of arms (P94). */
+export const REGION_QID: Record<(typeof REGIONS)[number], string> = {
+  Abruzzo: "Q1284", Basilicata: "Q1452", Calabria: "Q1458", Campania: "Q1438", "Emilia-Romagna": "Q1263", "Friuli Venezia Giulia": "Q1250",
+  Lazio: "Q1282", Liguria: "Q1256", Lombardia: "Q1210", Marche: "Q1279", Molise: "Q1443", Piemonte: "Q1216", Puglia: "Q1447",
+  Sardegna: "Q1462", Sicilia: "Q1460", Toscana: "Q1273", "Trentino-Alto Adige": "Q1237", Umbria: "Q1280", "Valle d'Aosta": "Q1222", Veneto: "Q1243",
+};
+/** The Wikidata query for a region's coat of arms, or null for a name that is not one of the regions. */
+export function regionCrestQuery(region: string): string | null {
+  const qid = (REGION_QID as Record<string, string>)[region];
+  return qid ? `SELECT ?img WHERE { wd:${qid} wdt:P94 ?img } LIMIT 1` : null;
+}
+
 /** The regions matching what was typed (all of them when nothing is), names starting with it first; accents and case aside. */
 export function searchRegions(query: string): string[] {
   const q = fold(query);

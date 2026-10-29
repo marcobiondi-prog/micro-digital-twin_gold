@@ -1,6 +1,6 @@
 import { saveProId, useProId } from "@/lib/use-pro-id";
 import { ProfileIcon } from "@/views/ProfileIcon";
-import { useTownCrest } from "@/views/v10/TownCrest";
+import { useProfileCrest } from "@/views/v10/TownCrest";
 import { proSummary } from "@/models/professional-id";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ComponentType, type FormEvent } from "react";
 import { LogOut, UserRound, Mail, LockKeyhole, Camera, ShieldCheck, ChevronRight } from "lucide-react";
@@ -298,10 +298,11 @@ export function AccountControl() {
 
   const displayedAvatar = (choice === "upload" ? draftPreview ?? avatarUrl : suggestions.find((item) => item.id === choice)?.src ?? account?.googleAvatar) ?? undefined;
   const avatar = (size: string) => <Avatar className={`${size} border border-border bg-muted`}><AvatarImage src={displayedAvatar} alt="Immagine account" referrerPolicy="no-referrer" className="object-cover" /><AvatarFallback><UserRound className="size-1/2" aria-hidden="true" /></AvatarFallback></Avatar>;
-  // A municipal officer's account picture is the town's coat of arms (in the header button and on top of the panel); the picker keeps the chosen image.
-  const crest = useTownCrest(proId?.kind === "funzionario" ? proId.comune : null, proId?.kind === "funzionario" ? proId.istat : undefined);
-  const badge = (size: string) => crest
-    ? <span className={`${size} grid shrink-0 place-items-center overflow-hidden rounded-full border border-border bg-muted p-1`}><img src={crest} alt={`Stemma del Comune di ${proId?.kind === "funzionario" ? proId.comune : ""}`} referrerPolicy="no-referrer" className="size-full object-contain" /></span>
+  // The account picture is the profile's coat of arms — the town's for a municipal officer, the region's for an agronomist —
+  // in the header button and on top of the panel; the picker keeps the chosen image.
+  const crest = useProfileCrest(proId);
+  const badge = (size: string) => crest.src
+    ? <span className={`${size} grid shrink-0 place-items-center overflow-hidden rounded-full border border-border bg-muted p-1`}><img src={crest.src} alt={crest.alt} referrerPolicy="no-referrer" className="size-full object-contain" /></span>
     : avatar(size);
 
   return (

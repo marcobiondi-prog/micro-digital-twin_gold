@@ -83,6 +83,13 @@ function AgronomoForm({ onDone }: { onDone: () => void }) {
       <Field label="Numero del patentino fitosanitario" hint="Come è scritto sul patentino, per esempio MOL/CB/01234." error={errors.licence}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!errors.licence} autoCapitalize="characters" value={v.licence} onChange={(e) => up("licence", e.target.value)} className={fieldCls} />}</Field>
       <Field label="Regione che l'ha rilasciato" hint="Scrivi le prime lettere e scegli la regione dall'elenco." error={errors.region}>{(id, d) => <RegionField id={id} describedBy={d} invalid={!!errors.region} value={v.region} onChange={(x) => up("region", x)} />}</Field>
       <Field label="Scadenza" hint="Il patentino vale 5 anni: deve essere ancora valido." error={errors.expires}>{(id, d) => <input id={id} type="date" aria-describedby={d} aria-invalid={!!errors.expires} value={v.expires} onChange={(e) => up("expires", e.target.value)} className={fieldCls} />}</Field>
+      {/* At the end, the licence's region with its coat of arms. */}
+      {findRegion(v.region) && (
+        <div className="flex items-center gap-4 rounded-2xl bg-foreground/[0.05] px-4 py-3">
+          <TownCrest name={findRegion(v.region)!} region />
+          <p className="min-w-0 text-[15px] font-semibold">Regione {findRegion(v.region)}<span className="block text-sm font-normal text-muted-foreground">Il tuo profilo porterà il suo stemma.</span></p>
+        </div>
+      )}
       <Declare checked={v.declared} onChange={(b) => up("declared", b)} error={errors.declared} />
       <Submit label="Identificati e apri il vigneto" />
     </form>
@@ -234,7 +241,7 @@ export function ProfileCard({ kind, go }: { kind: ProKind; go?: () => void }) {
     <div className="fuse-canvas space-y-4 rounded-3xl px-5 py-6">
       <div className="flex items-start justify-between gap-3">
         <p className="flex items-center gap-2 text-lg font-semibold"><BadgeCheck className="size-6 shrink-0 text-emerald-400" aria-hidden="true" />Sei identificato come {KIND_LABEL[kind].toLowerCase()}</p>
-        {mine.kind === "funzionario" && <TownCrest name={mine.comune} istat={mine.istat} size={52} />}
+        {mine.kind === "funzionario" ? <TownCrest name={mine.comune} istat={mine.istat} size={52} /> : <TownCrest name={mine.region} region size={52} />}
       </div>
       <dl className="divide-y divide-foreground/10 rounded-2xl bg-foreground/[0.05] px-4">
         {profileRows(mine).map(([k, v]) => (

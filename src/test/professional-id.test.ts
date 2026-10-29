@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkAgronomo, checkFunzionario, findRegion, officeOf, searchOffices, isProId, isTownEmail, isLicenceNumber, proSummary, searchRegions, unlocks } from "@/models/professional-id";
+import { REGION_QID, regionCrestQuery, checkAgronomo, checkFunzionario, findRegion, officeOf, searchOffices, isProId, isTownEmail, isLicenceNumber, proSummary, searchRegions, unlocks } from "@/models/professional-id";
 
 const today = new Date("2026-10-29T12:00:00");
 const agro = { name: "Maria Rossi", licenceType: "consulente", licence: "mol/cb/01234", region: "Molise", expires: "2029-05-31", declared: true };
@@ -70,5 +70,13 @@ describe("offices", () => {
     expect(officeOf("Ufficio cimiteri")).toEqual({ office: "Altro", otherOffice: "Ufficio cimiteri" });
     expect(checkFunzionario({ ...funz, ...officeOf("Ufficio cimiteri") }, today).id?.office).toBe("Ufficio cimiteri");
     expect(checkFunzionario({ ...funz, ...officeOf("") }, today).errors.office).toBeTruthy();
+  });
+});
+
+describe("region crest", () => {
+  it("asks Wikidata for each region's coat of arms by its item", () => {
+    expect(regionCrestQuery("Molise")).toBe("SELECT ?img WHERE { wd:Q1443 wdt:P94 ?img } LIMIT 1");
+    expect(Object.keys(REGION_QID)).toHaveLength(20);
+    expect(regionCrestQuery("Padania")).toBeNull();
   });
 });

@@ -190,7 +190,7 @@ export function LicensesPage() {
           <li>Foto di riferimento delle piante: autore e licenza indicati sotto ogni foto (Royal Botanic Gardens, Kew; GBIF).</li>
           <li>Immagini satellitari della mappa 2D © Esri, Maxar, Earthstar Geographics.</li>
           <li>Elenco dei comuni italiani: dati ISTAT (2020) da comuni-json di Matteo Contrini, licenza MIT.</li>
-          <li>Stemmi comunali da Wikimedia Commons (trovati tramite Wikidata): autore e licenza nella pagina di ogni file.</li>
+          <li>Stemmi dei comuni e delle regioni da Wikimedia Commons (trovati tramite Wikidata): autore e licenza nella pagina di ogni file.</li>
         </ul>
       </InfoCard>
       <InfoCard title="Software">
