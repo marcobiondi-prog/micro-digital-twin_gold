@@ -1,5 +1,6 @@
 import { saveProId, useProId } from "@/lib/use-pro-id";
 import { ProfileIcon } from "@/views/ProfileIcon";
+import { useTownCrest } from "@/views/v10/TownCrest";
 import { proSummary } from "@/models/professional-id";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ComponentType, type FormEvent } from "react";
 import { LogOut, UserRound, Mail, LockKeyhole, Camera, ShieldCheck, ChevronRight } from "lucide-react";
@@ -297,11 +298,16 @@ export function AccountControl() {
 
   const displayedAvatar = (choice === "upload" ? draftPreview ?? avatarUrl : suggestions.find((item) => item.id === choice)?.src ?? account?.googleAvatar) ?? undefined;
   const avatar = (size: string) => <Avatar className={`${size} border border-border bg-muted`}><AvatarImage src={displayedAvatar} alt="Immagine account" referrerPolicy="no-referrer" className="object-cover" /><AvatarFallback><UserRound className="size-1/2" aria-hidden="true" /></AvatarFallback></Avatar>;
+  // A municipal officer's account picture is the town's coat of arms (in the header button and on top of the panel); the picker keeps the chosen image.
+  const crest = useTownCrest(proId?.kind === "funzionario" ? proId.comune : null, proId?.kind === "funzionario" ? proId.istat : undefined);
+  const badge = (size: string) => crest
+    ? <span className={`${size} grid shrink-0 place-items-center overflow-hidden rounded-full border border-border bg-muted p-1`}><img src={crest} alt={`Stemma del Comune di ${proId?.kind === "funzionario" ? proId.comune : ""}`} referrerPolicy="no-referrer" className="size-full object-contain" /></span>
+    : avatar(size);
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
         <Button ref={triggerRef} variant="outline" size="icon" className="size-9 shrink-0 rounded-full sm:size-10" aria-label="Apri account" title="Account" onClick={() => setOpen(true)}>
-          {avatar("size-9 sm:size-10")}
+          {badge("size-9 sm:size-10")}
         </Button>
       <DialogContent ref={placePanel} overlayClassName="account-overlay" className="account-panel flex max-h-[min(680px,90dvh)] w-[min(420px,calc(100vw-2rem))] flex-col gap-0 overflow-y-auto rounded-lg border bg-popover p-0 text-popover-foreground shadow-xl sm:rounded-lg">
         {page ? (() => {
@@ -320,7 +326,7 @@ export function AccountControl() {
           );
         })() : (<>
         <DialogHeader className="border-b px-6 py-5 text-left">
-          <div className="mb-2">{avatar("size-10")}</div>
+          <div className="mb-2">{badge("size-10")}</div>
           <DialogTitle className="text-xl">Account</DialogTitle>
           <DialogDescription>{account ? account.email : demo ? "Accesso simulato (solo anteprima)" : "Accedi o continua come ospite."}</DialogDescription>
           {/* The plan in use, at a glance (Premium is free with an account). */}
