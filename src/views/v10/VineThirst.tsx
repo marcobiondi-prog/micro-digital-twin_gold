@@ -145,7 +145,7 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
             <button key={i} type="button" role="radio" aria-checked={on} aria-label={`${i === -1 ? "Tutte le zone" : `Zona ${i + 1}`}, sete ${Math.round(s)} su 100`}
               onClick={() => { if (on) return; hapticTick(); setVineyard(i === -1 ? { allZones: true } : { allZones: false, selected: i }); }}
               className={cn("flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 rounded-[1.25rem] px-1 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", on ? "bg-secondary text-secondary-foreground shadow-[0_0_0_2px_var(--foreground)]" : "text-foreground/75 hover:bg-foreground/[0.06]")}>
-              <span className="truncate text-[13px] font-semibold">{i === -1 ? "Tutte" : `Zona ${i + 1}`}</span>
+              <span className="truncate text-[12.5px] font-semibold">{i === -1 ? "Tutte" : `Zona ${i + 1}`}</span>
               <span className="flex items-center gap-1.5"><span className={cn("size-2 rounded-full", GAIN_BG[stressGain(s)])} aria-hidden="true" /><span className={cn("font-mono text-sm font-semibold tabular-nums", on ? "" : GAIN_TEXT[stressGain(s)])}>{Math.round(s)}</span></span>
             </button>
           );
@@ -167,7 +167,7 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
         <Gauge before={before} after={after} lowest={lowest} min={dialMin} max={dialMax} stops={reach > 1 ? stops : []} onSlide={slideTo} onStop={applyLevel}
           unit="" spoken="su 100" label={`Sete della vite da raggiungere, ${scopeName}`} step={1} />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center" aria-live="polite">
-          <span className={cn("rounded-full px-3 py-0.5 text-[14px] font-semibold text-white transition-colors duration-300", GAIN_BG[gain])}>{verdict(after)}</span>
+          <span className={cn("rounded-full px-3 py-0.5 text-[13.5px] font-semibold text-white transition-colors duration-300", GAIN_BG[gain])}>{verdict(after)}</span>
           <span className="mt-1 font-display text-6xl font-light leading-none tracking-tight tabular-nums">{Math.round(after)}<span className="text-2xl text-muted-foreground">/100</span></span>
           <span className="mt-1.5 font-mono text-sm font-semibold tabular-nums">{any ? euroRange(cost.total) : "Nessun intervento"}</span>
         </div>
@@ -184,14 +184,14 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
               const Icon = PHASE_ICON[p], on = vine.phase === p;
               return (
                 <button key={p} type="button" role="radio" aria-checked={on} onClick={() => { hapticTick(); setVineyard({ phase: p }); }}
-                  className={cn("flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 rounded-[1.25rem] px-1 text-[12px] font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", on ? "bg-secondary text-secondary-foreground" : "text-foreground/70 hover:bg-foreground/[0.06]")}>
+                  className={cn("flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 rounded-[1.25rem] px-1 text-[11.5px] font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", on ? "bg-secondary text-secondary-foreground" : "text-foreground/70 hover:bg-foreground/[0.06]")}>
                   <Icon className="size-5" aria-hidden="true" /><span className="truncate">{PHASE_SHORT[p]}</span>
                 </button>
               );
             })}
           </div>
           <button type="button" aria-pressed={raining} onClick={() => { hapticTick(); setVineyard((v) => ({ zones: v.zones.map((z, i) => (targets.includes(i) ? { ...z, rain: !raining } : z)) })); }}
-            className={cn("flex w-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-3xl text-[12px] font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", raining ? "bg-foreground text-background" : "bg-foreground/[0.06] text-foreground/70")}>
+            className={cn("flex w-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-3xl text-[11.5px] font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", raining ? "bg-foreground text-background" : "bg-foreground/[0.06] text-foreground/70")}>
             <CloudRain className="size-5" aria-hidden="true" />Pioggia
           </button>
         </div>
@@ -224,11 +224,11 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
             {facts.map(({ icon: Icon, value, label }) => (
               <div key={label} className="flex min-w-0 flex-col items-center gap-1 text-center">
                 <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <div className="flex min-w-0 flex-col-reverse"><dt className="truncate text-[12px] text-muted-foreground">{label}</dt><dd className="font-mono text-sm font-semibold tabular-nums">{value}</dd></div>
+                <div className="flex min-w-0 flex-col-reverse"><dt className="truncate text-[11.5px] text-muted-foreground">{label}</dt><dd className="font-mono text-sm font-semibold tabular-nums">{value}</dd></div>
               </div>
             ))}
           </dl>
-          <p className="text-[12px] leading-snug text-muted-foreground">Stima indicativa all'ettaro, IVA esclusa, per l'intervento completo: irrigazione a goccia 3.000–6.000 €, teli d'ombra 4.000–8.000 €, frangivento 6.000–12.000 €.</p>
+          <p className="text-[11.5px] leading-snug text-muted-foreground">Stima indicativa all'ettaro, IVA esclusa, per l'intervento completo: irrigazione a goccia 3.000–6.000 €, teli d'ombra 4.000–8.000 €, frangivento 6.000–12.000 €.</p>
         </div>
       </div>
     </section>

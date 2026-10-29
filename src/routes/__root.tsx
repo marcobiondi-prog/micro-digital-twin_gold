@@ -263,7 +263,7 @@ function BottomNav() {
           <li className="flex justify-center"><CameraDockButton focused={focusing && homeFocus === "camera"} /></li>
           {items.slice(2).map((b, i) => item(b, i + 2))}
         </ul>
-        <p className="relative h-8 text-center text-[14px] font-medium leading-8 tracking-wide text-white/90" aria-hidden="true">{caption}</p>
+        <p className="relative h-8 text-center text-[13.5px] font-medium leading-8 tracking-wide text-white/90" aria-hidden="true">{caption}</p>
       </div>
       <div className="absolute inset-x-0 bottom-0 h-[env(safe-area-inset-bottom)] bg-[#0e1014]" aria-hidden="true" />
     </nav>

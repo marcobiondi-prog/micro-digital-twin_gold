@@ -44,7 +44,7 @@ function EntryRow({ e }: { e: SourcedEntry }) {
     <div className="flex gap-3 py-3">
       <span className="w-12 shrink-0 text-sm tabular-nums text-muted-foreground" aria-label={`alle ${t}`}>{t}</span>
       <div className="min-w-0 flex-1">
-        <p className="break-words text-[16px] leading-snug">{e.text}</p>
+        <p className="break-words text-[15.5px] leading-snug">{e.text}</p>
         <WhenLine e={e} />
         <p className="mt-0.5 truncate text-xs text-muted-foreground">{e.flow === "piazza" ? "Piazza" : "Vigneto"}{e.place ? ` · ${e.place}` : ""}</p>
         <SourceChip source={e.source} />
@@ -72,7 +72,7 @@ function DayTab({ label, items }: { label: string; items: SourcedEntry[] }) {
         className="flex w-full items-center gap-3 rounded-2xl py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <CalendarDays className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
         <span className="min-w-0 flex-1">
-          <span className="block text-[16px] font-semibold tabular-nums">{label}</span>
+          <span className="block text-[15.5px] font-semibold tabular-nums">{label}</span>
           <span className="block truncate text-xs text-muted-foreground">{items.length === 1 ? "1 intervento" : `${items.length} interventi`} · {parts} · {first === last ? first : `${first}–${last}`}</span>
         </span>
         <ChevronDown className={`size-5 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none ${open ? "rotate-180" : ""}`} aria-hidden="true" />
@@ -87,7 +87,7 @@ export function SourceChip({ source }: { source: HistorySource }) {
   const account = source === "account";
   const Icon = account ? Cloud : Smartphone;
   return (
-    <span className={`mt-1.5 inline-flex h-6 items-center gap-1 rounded-full px-2 text-[12px] font-semibold ${account ? "bg-brand-turquoise/15 text-brand-turquoise" : "bg-foreground/[0.08] text-muted-foreground"}`}>
+    <span className={`mt-1.5 inline-flex h-6 items-center gap-1 rounded-full px-2 text-[11.5px] font-semibold ${account ? "bg-brand-turquoise/15 text-brand-turquoise" : "bg-foreground/[0.08] text-muted-foreground"}`}>
       <Icon className="size-3.5" aria-hidden="true" />{account ? "Con accesso · account" : "Senza accesso · dispositivo"}
     </span>
   );
@@ -144,7 +144,7 @@ export function HistoryBlock({ compact = false, flow }: { compact?: boolean; flo
         {groups.length === 0 ? visibleShots.length > 0 ? null : (
           <DashCard className="flex flex-col items-center gap-2 py-8 text-center">
             <History className="size-7 text-muted-foreground" aria-hidden="true" />
-            <p className="text-[16px] font-medium">{loading ? "Carico la cronologia…" : f === "tutti" ? "Ancora nessun intervento" : `Ancora nessun intervento ${f === "piazza" ? "nella piazza" : "nel vigneto"}`}</p>
+            <p className="text-[15.5px] font-medium">{loading ? "Carico la cronologia…" : f === "tutti" ? "Ancora nessun intervento" : `Ancora nessun intervento ${f === "piazza" ? "nella piazza" : "nel vigneto"}`}</p>
             {!loading && <p className="max-w-xs text-sm text-muted-foreground">Quando cambi alberi, prato, ombra o irrigazione nella simulazione, l’intervento si registra da solo e lo trovi qui, con foto e video.</p>}
           </DashCard>
         ) : groups.map((g) => compact

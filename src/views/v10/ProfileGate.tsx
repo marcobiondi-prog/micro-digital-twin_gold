@@ -30,14 +30,14 @@ export function SectionLockCard({ section, className }: { section: Section; clas
       <span className="mx-auto grid size-16 place-items-center rounded-full bg-foreground/[0.08]"><Lock className="size-7" aria-hidden="true" /></span>
       <div className="space-y-1.5">
         <p className="text-lg font-semibold">{WHO[section].who}</p>
-        <p className="text-[16px] text-muted-foreground">{WHO[section].how}</p>
+        <p className="text-[15.5px] text-muted-foreground">{WHO[section].how}</p>
       </div>
       {id && id.kind !== need && (
         <p className="rounded-2xl bg-foreground/[0.06] px-4 py-3 text-sm text-muted-foreground">
           Ora sei identificato come <span className="font-semibold text-foreground">{proSummary(id)}</span>. Un profilo alla volta: se ti identifichi come {KIND_LABEL[need].toLowerCase()}, si blocca la {other === "urban" ? "piazza" : "sezione vigneto"}.
         </p>
       )}
-      <Link to={IDENTIFY_PATH[section]} className="mx-auto inline-flex h-12 items-center gap-2 rounded-full bg-foreground pl-6 pr-2 text-[16px] font-semibold text-background outline-none focus-visible:ring-4 focus-visible:ring-ring/50">
+      <Link to={IDENTIFY_PATH[section]} className="mx-auto inline-flex h-12 items-center gap-2 rounded-full bg-foreground pl-6 pr-2 text-[15.5px] font-semibold text-background outline-none focus-visible:ring-4 focus-visible:ring-ring/50">
         Identificati come {KIND_LABEL[need].toLowerCase()}
         <span className="grid size-8 place-items-center rounded-full bg-background text-foreground"><ArrowRight className="size-4" aria-hidden="true" /></span>
       </Link>
@@ -73,7 +73,7 @@ export function SectionGate({ section, children }: { section: Section; children:
       </div>
       <div className="fuse-canvas space-y-4 rounded-3xl px-4 pb-6 pt-5 sm:px-5">
         <p className="flex items-center gap-2 text-lg font-semibold"><Lock className="size-5" aria-hidden="true" />{WHO[section].who}</p>
-        <p className="text-[16px] leading-relaxed text-muted-foreground">{profileIntro(need)}</p>
+        <p className="text-[15.5px] leading-relaxed text-muted-foreground">{profileIntro(need)}</p>
         {id && <p className="rounded-2xl bg-foreground/[0.06] px-4 py-3 text-sm text-muted-foreground">Ora sei identificato come <span className="font-semibold text-foreground">{proSummary(id)}</span>: identificandoti qui, quel profilo viene sostituito e {section === "urban" ? "il vigneto" : "la piazza"} si blocca.</p>}
         <IdentifyForm kind={need} onDone={done} />
         <p className="px-1 text-xs text-muted-foreground">I dati restano su questo dispositivo e, se hai fatto l'accesso, nel tuo account. Puoi uscire dal profilo quando vuoi, da Profilo nella barra in basso.</p>

@@ -11,7 +11,7 @@ const fmt = (v: number | null | undefined, d = 1, u = "") => (v == null ? "—" 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-muted px-3 py-2 xl:flex xl:items-center xl:justify-between xl:gap-3 xl:px-4 xl:py-5">
-      <div className="text-[12px] text-muted-foreground xl:text-xs">{label}</div>
+      <div className="text-[11.5px] text-muted-foreground xl:text-xs">{label}</div>
       <div className="font-display text-base font-semibold xl:whitespace-nowrap xl:text-right xl:text-2xl">{value}</div>
     </div>
   );
@@ -90,12 +90,12 @@ export function RealClimatePanel({ kind }: { kind: "urban" | "vineyard" }) {
           onClick={() => setTick((t) => t + 1)}
           disabled={refreshing}
           aria-label="Aggiorna dati reali"
-          className="inline-flex min-h-8 items-center gap-1 rounded-full bg-muted px-2.5 text-[12px] text-muted-foreground disabled:opacity-70"
+          className="inline-flex min-h-8 items-center gap-1 rounded-full bg-muted px-2.5 text-[11.5px] text-muted-foreground disabled:opacity-70"
         >
           <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin motion-reduce:animate-none" : ""}`} />
           {updatedAt ? `Aggiornato ${updatedAt.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}` : "Aggiorna"}
         </button>
-        <span className="ml-auto hidden max-w-[46ch] text-right text-[12px] text-muted-foreground lg:block">
+        <span className="ml-auto hidden max-w-[46ch] text-right text-[11.5px] text-muted-foreground lg:block">
           Dati reali informativi; la griglia del Lab resta una simulazione.
         </span>
       </div>
@@ -125,7 +125,7 @@ export function RealClimatePanel({ kind }: { kind: "urban" | "vineyard" }) {
           </Group>
         </div>
       )}
-      <p className="mt-3 text-[12px] text-muted-foreground lg:hidden">Dati reali informativi; la griglia del Lab resta una simulazione.</p>
+      <p className="mt-3 text-[11.5px] text-muted-foreground lg:hidden">Dati reali informativi; la griglia del Lab resta una simulazione.</p>
     </Card>
   );
 }

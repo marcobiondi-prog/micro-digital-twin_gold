@@ -163,7 +163,7 @@ export function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlid
       {!disabled && stops.map((s) => (
         <button key={s.id} type="button" tabIndex={-1} aria-pressed={s.on} onPointerDown={(e) => e.stopPropagation()} onClick={() => onStop(s.id)}
           style={pct(at(s.t, R + 24))}
-          className={cn("absolute w-max max-w-[5rem] -translate-x-1/2 -translate-y-1/2 rounded-xl px-2 py-1 text-center text-[12px] font-semibold leading-tight outline-none transition-[background-color,color,box-shadow,left,top] duration-200 active:scale-95 motion-reduce:transition-none",
+          className={cn("absolute w-max max-w-[5rem] -translate-x-1/2 -translate-y-1/2 rounded-xl px-2 py-1 text-center text-[11.5px] font-semibold leading-tight outline-none transition-[background-color,color,box-shadow,left,top] duration-200 active:scale-95 motion-reduce:transition-none",
             s.on ? "bg-foreground text-background shadow-[0_0_14px_rgb(255_255_255/0.35)]" : s.near ? "bg-foreground/[0.12] text-foreground ring-1 ring-foreground/40" : "bg-foreground/[0.06] text-foreground/80 hover:bg-foreground/[0.1]")}>
           {s.label}
         </button>
@@ -183,7 +183,7 @@ export function Lever({ icon: Icon, label, value, step, max, color, swatch, onCh
       <div className="min-w-0 flex-1" aria-live="polite">
         <div className="flex items-center gap-2">
           <Icon className={cn("size-5 shrink-0", color)} aria-hidden="true" />
-          <span className="truncate text-[16px] font-semibold">{label}</span>
+          <span className="truncate text-[15.5px] font-semibold">{label}</span>
           <span className="ml-auto shrink-0 font-mono text-sm font-semibold tabular-nums">{shown ?? `${value}${step === 1 ? "" : "%"}`}</span>
         </div>
         <div className="mt-1.5 grid grid-cols-10 gap-1" aria-hidden="true">
@@ -294,7 +294,7 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
         <Gauge before={before} after={after} lowest={lowest} min={dialMin} max={dialMax} stops={share > 0.15 ? stops : []} onSlide={slideTo} onStop={applyLevel} />
         {/* Inside the arc: how it feels, the reading and what it costs, all following the dot. */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center" aria-live="polite">
-          <span className={cn("rounded-full px-3 py-0.5 text-[14px] font-semibold text-white transition-colors duration-300", feel.bg ?? GAIN_BG[feel.step])}>{feel.text}</span>
+          <span className={cn("rounded-full px-3 py-0.5 text-[13.5px] font-semibold text-white transition-colors duration-300", feel.bg ?? GAIN_BG[feel.step])}>{feel.text}</span>
           <span className="mt-1 font-display text-6xl font-light leading-none tracking-tight tabular-nums">{fmt(after)}°</span>
           <span className="mt-1.5 font-mono text-sm font-semibold tabular-nums">{est.dT > 0.05 ? euroRange(cost.total) : "Nessun intervento"}</span>
         </div>
@@ -342,11 +342,11 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
             {facts.map(({ icon: Icon, value, label }) => (
               <div key={label} className="flex min-w-0 flex-col items-center gap-1 text-center">
                 <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <div className="flex min-w-0 flex-col-reverse"><dt className="truncate text-[12px] text-muted-foreground">{label}</dt><dd className="font-mono text-sm font-semibold tabular-nums">{value}</dd></div>
+                <div className="flex min-w-0 flex-col-reverse"><dt className="truncate text-[11.5px] text-muted-foreground">{label}</dt><dd className="font-mono text-sm font-semibold tabular-nums">{value}</dd></div>
               </div>
             ))}
           </dl>
-          <p className="text-[12px] leading-snug text-muted-foreground">Stima indicativa, IVA esclusa: albero 600–1.500 € l'uno, prato 60–140 €/m², ombra 120–350 €/m².</p>
+          <p className="text-[11.5px] leading-snug text-muted-foreground">Stima indicativa, IVA esclusa: albero 600–1.500 € l'uno, prato 60–140 €/m², ombra 120–350 €/m².</p>
         </div>
       </div>
     </section>

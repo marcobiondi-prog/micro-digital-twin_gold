@@ -52,7 +52,7 @@ export function WhenPicker({ clock, id, detail, note, children }: { clock: Seaso
         <div className="grid grid-cols-4 gap-1" role="radiogroup" aria-label="Stagione">
           {SEASONS.map((x) => (
             <button key={x} type="button" role="radio" aria-checked={season === x} onClick={() => { hapticTick(); setLive(false); setSeason(x); }}
-              className={cn("h-10 min-w-0 truncate rounded-full px-1 text-[14px] font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", season === x ? "bg-secondary text-secondary-foreground" : "text-foreground/80 hover:bg-foreground/[0.06]")}>{SEASON_LABEL[x]}</button>
+              className={cn("h-10 min-w-0 truncate rounded-full px-1 text-[13.5px] font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", season === x ? "bg-secondary text-secondary-foreground" : "text-foreground/80 hover:bg-foreground/[0.06]")}>{SEASON_LABEL[x]}</button>
           ))}
         </div>
         <div className="flex items-center gap-2">
@@ -65,7 +65,7 @@ export function WhenPicker({ clock, id, detail, note, children }: { clock: Seaso
           <button type="button" aria-pressed={live} onClick={() => { hapticTick(); setLive(true); }}
             className={cn("inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", live ? "bg-foreground text-background" : "bg-foreground/[0.07]")}>Adesso</button>
         </div>
-        <p className="text-center text-[12px] text-muted-foreground">{note}</p>
+        <p className="text-center text-[11.5px] text-muted-foreground">{note}</p>
         {children}
       </div>
     </div>

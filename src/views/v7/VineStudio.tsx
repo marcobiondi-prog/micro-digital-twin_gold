@@ -39,7 +39,7 @@ export function VineStudio({ onZonesEdit }: { onZonesEdit?: () => void }) {
         <Readout icon={Droplets} value={`${result.s}`} unit="/100" tone={GAIN_TEXT[gain]}
           caption={<><span className={cn("size-2 rounded-full", GAIN_BG[gain])} aria-hidden="true" /><span className="text-foreground">Sete della vite · zona {sel + 1}</span></>}>
           <button type="button" onClick={toggleRain} aria-pressed={zone.rain} aria-label={`Pioggia sulla zona ${sel + 1}`}
-            className={cn("ml-auto flex shrink-0 flex-col items-center gap-1 rounded-2xl px-3 py-2 text-[12px] font-semibold uppercase tracking-wide outline-none transition-[background-color,box-shadow,color] duration-150 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
+            className={cn("ml-auto flex shrink-0 flex-col items-center gap-1 rounded-2xl px-3 py-2 text-[11.5px] font-semibold uppercase tracking-wide outline-none transition-[background-color,box-shadow,color] duration-150 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
               zone.rain ? "bg-foreground/[0.12] text-sky-600 dark:text-sky-200 shadow-[0_0_0_2px_var(--foreground),0_0_20px_-2px_color-mix(in_oklab,var(--foreground)_45%,transparent)]" : "bg-foreground/[0.05] text-foreground/60")}>
             <CloudRain className="size-7" aria-hidden="true" />Pioggia
           </button>

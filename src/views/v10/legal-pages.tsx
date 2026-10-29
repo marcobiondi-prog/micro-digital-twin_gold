@@ -251,7 +251,7 @@ function PlanCard({ name, price, lead, features, current, action }: { name: stri
         {current && <span className="shrink-0 rounded-full bg-foreground px-3 py-1 text-xs font-semibold text-background">Il tuo piano</span>}
       </div>
       {lead && <p className="text-sm font-semibold text-foreground">{lead}</p>}
-      <ul className="space-y-2 text-[16px] leading-snug">
+      <ul className="space-y-2 text-[15.5px] leading-snug">
         {features.map((f) => (
           <li key={f} className="flex gap-2.5"><Check className={cn("mt-0.5 size-4 shrink-0 stroke-[3]", current ? "text-ok" : "text-muted-foreground")} aria-hidden="true" />{f}</li>
         ))}
@@ -305,7 +305,7 @@ export function ContactsPage() {
           const body = (
             <>
               <span className="grid size-10 shrink-0 place-items-center rounded-full bg-foreground/[0.08]"><Icon className="size-5" aria-hidden="true" /></span>
-              <span className="min-w-0 flex-1"><span className="block text-xs text-muted-foreground">{label}</span><span className={cn("block truncate text-[16px] font-semibold", !value && "font-normal text-muted-foreground")}>{value || empty}</span></span>
+              <span className="min-w-0 flex-1"><span className="block text-xs text-muted-foreground">{label}</span><span className={cn("block truncate text-[15.5px] font-semibold", !value && "font-normal text-muted-foreground")}>{value || empty}</span></span>
             </>
           );
           return (

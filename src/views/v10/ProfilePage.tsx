@@ -39,7 +39,7 @@ export function ProfilePage() {
         <ProfileCard kind={id.kind} go={() => void navigate({ to: id.kind === "agronomo" ? "/vigneto" : "/urbano" })} />
       ) : (
         <>
-          <p className="text-[16px] leading-relaxed text-muted-foreground">Identificati per aprire la tua simulazione. Un profilo alla volta: l'altra sezione resta bloccata.</p>
+          <p className="text-[15.5px] leading-relaxed text-muted-foreground">Identificati per aprire la tua simulazione. Un profilo alla volta: l'altra sezione resta bloccata.</p>
           <div className="space-y-3"><Way kind="agronomo" /><Way kind="funzionario" /></div>
         </>
       )}
