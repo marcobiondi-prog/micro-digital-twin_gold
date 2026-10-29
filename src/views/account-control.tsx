@@ -340,17 +340,17 @@ export function AccountControl() {
                 </div>
               </div>
             ) : <p className="pb-2 text-sm text-muted-foreground">Nessun profilo: piazza e vigneto sono bloccati.</p>}
-            <ul>
-              {([["Agronomo · apre il vigneto", "/identificazione/agronomo", "agronomo"], ["Funzionario comunale · apre la piazza", "/identificazione/funzionario", "funzionario"]] as const).map(([label, to, kind]) => (
+            {/* Identified, the card shows only that profile: the ways to identify appear when there is none. */}
+            {!proId && <ul>
+              {([["Agronomo · apre il vigneto", "/identificazione/agronomo"], ["Funzionario comunale · apre la piazza", "/identificazione/funzionario"]] as const).map(([label, to]) => (
                 <li key={to}>
                   <Link to={to} onClick={() => setOpen(false)} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl text-left text-[15px] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
                     <span className="min-w-0 flex-1">{label}</span>
-                    {proId?.kind === kind && <span className="shrink-0 text-sm text-emerald-400">Attivo</span>}
                     <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                   </Link>
                 </li>
               ))}
-            </ul>
+            </ul>}
           </section>
           {mode !== "reset" && <section className="space-y-3" aria-label="Immagine account">
             <div className="flex items-center gap-3">
