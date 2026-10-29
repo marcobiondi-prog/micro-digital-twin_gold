@@ -1,8 +1,10 @@
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, BadgeCheck, Building2, Grape, LogOut, ShieldCheck } from "lucide-react";
 import { saveProId, useProId } from "@/lib/use-pro-id";
+import { loadComuni } from "@/lib/comuni";
+import { findComune, searchComuni, townDomain, type Comune } from "@/models/comuni";
 import { cn } from "@/lib/utils";
 import {
   checkAgronomo, checkFunzionario, KIND_LABEL, OFFICES, REGIONS, ROLES, proSummary,
@@ -87,8 +89,56 @@ function AgronomoForm({ onDone }: { onDone: () => void }) {
   );
 }
 
+/**
+ * The town field: as one types (two letters or more) the Italian towns that match show under it, from the most
+ * populated, with their province ("Campobasso · CB"); arrows and Enter pick one, Escape closes the list. The list of
+ * towns is loaded the first time the field is used.
+ */
+function ComuneField({ id, describedBy, invalid, value, onChange, onPick }: { id: string; describedBy: string | undefined; invalid: boolean; value: string; onChange: (v: string) => void; onPick: (name: string | null) => void }) {
+  const [list, setList] = useState<readonly Comune[]>([]);
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const load = () => { if (!list.length) void loadComuni().then(setList); };
+  const hits = open ? searchComuni(list, value) : [];
+  const exact = hits.length === 1 && hits[0]![0] === value;
+  const shown = exact ? [] : hits;
+  useEffect(() => { setActive(0); }, [value]);
+  const pick = (c: Comune) => { onChange(c[0]); onPick(c[0]); setOpen(false); };
+  const listId = `${id}-comuni`;
+  return (
+    <div className="relative">
+      <input id={id} role="combobox" aria-autocomplete="list" aria-expanded={shown.length > 0} aria-controls={listId}
+        aria-activedescendant={shown.length ? `${listId}-${active}` : undefined} aria-describedby={describedBy} aria-invalid={invalid}
+        autoComplete="off" value={value} placeholder="Scrivi il nome del Comune"
+        onFocus={() => { load(); setOpen(true); }} onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+        onChange={(e) => { load(); setOpen(true); onChange(e.target.value); onPick(null); }}
+        onKeyDown={(e) => {
+          if (!shown.length) return;
+          if (e.key === "ArrowDown") { e.preventDefault(); setActive((a) => (a + 1) % shown.length); }
+          else if (e.key === "ArrowUp") { e.preventDefault(); setActive((a) => (a - 1 + shown.length) % shown.length); }
+          else if (e.key === "Enter") { e.preventDefault(); const c = shown[active]; if (c) pick(c); }
+          else if (e.key === "Escape") setOpen(false);
+        }}
+        className={fieldCls} />
+      {shown.length > 0 && (
+        <ul id={listId} role="listbox" aria-label="Comuni" className="absolute inset-x-0 top-full z-20 mt-1.5 max-h-72 overflow-y-auto rounded-2xl border border-foreground/10 bg-popover p-1 text-popover-foreground shadow-2xl">
+          {shown.map((c, i) => (
+            <li key={`${c[0]}-${c[1]}`} id={`${listId}-${i}`} role="option" aria-selected={i === active}
+              onMouseDown={(e) => { e.preventDefault(); pick(c); }} onMouseEnter={() => setActive(i)}
+              className={cn("flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-xl px-3 text-[15px]", i === active && "bg-foreground/[0.08]")}>
+              <span className="truncate">{c[0]}</span><span className="shrink-0 text-sm text-muted-foreground">{c[1]}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function FunzionarioForm({ onDone }: { onDone: () => void }) {
   const [v, setV] = useState<FunzionarioInput>({ name: "", comune: "", office: "", otherOffice: "", role: "", email: "", badge: "", declared: false });
+  // The town picked from the list: the email example follows it.
+  const [town, setTown] = useState<string | null>(null);
   const [errors, setErrors] = useState<Errors<keyof FunzionarioInput>>({});
   // Changing a field clears its message: the rest stay until the next try.
   const up = <K extends keyof FunzionarioInput>(k: K, val: FunzionarioInput[K]) => {
@@ -97,7 +147,13 @@ function FunzionarioForm({ onDone }: { onDone: () => void }) {
   };
   const submit = async () => {
     const { id, errors: e } = checkFunzionario(v);
+    // The town must be a real Italian one, written as in the list (its spelling is taken from there).
+    const towns = await loadComuni();
+    const town = towns.length ? findComune(towns, v.comune) : undefined;
+    if (towns.length && !town && !e.comune) e.comune = "Scegli il tuo Comune dall'elenco dei comuni italiani.";
+    if (town && id && id.kind === "funzionario") id.comune = town[0];
     setErrors(e);
+    if (Object.keys(e).length) return;
     if (!id) return;
     await saveProId(id);
     onDone();
@@ -105,7 +161,7 @@ function FunzionarioForm({ onDone }: { onDone: () => void }) {
   return (
     <form noValidate onSubmit={(e) => { e.preventDefault(); void submit(); }} className="space-y-4">
       <Field label="Nome e cognome" error={errors.name}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!errors.name} autoComplete="name" value={v.name} onChange={(e) => up("name", e.target.value)} className={fieldCls} />}</Field>
-      <Field label="Comune" hint="Il Comune in cui lavori, per esempio Campobasso." error={errors.comune}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!errors.comune} value={v.comune} onChange={(e) => up("comune", e.target.value)} className={fieldCls} />}</Field>
+      <Field label="Comune" hint="Scrivi le prime lettere e scegli il tuo Comune dall'elenco." error={errors.comune}>{(id, d) => <ComuneField id={id} describedBy={d} invalid={!!errors.comune} value={v.comune} onChange={(x) => up("comune", x)} onPick={setTown} />}</Field>
       <Field label="Ufficio di appartenenza" error={errors.office}>{(id, d) => (
         <select id={id} aria-describedby={d} aria-invalid={!!errors.office} value={v.office} onChange={(e) => up("office", e.target.value)} className={fieldCls}>
           <option value="" className={optionCls}>Scegli l'ufficio</option>{OFFICES.map((o) => <option key={o} value={o} className={optionCls}>{o}</option>)}
@@ -115,7 +171,7 @@ function FunzionarioForm({ onDone }: { onDone: () => void }) {
         <select id={id} aria-describedby={d} aria-invalid={!!errors.role} value={v.role} onChange={(e) => up("role", e.target.value)} className={fieldCls}>
           <option value="" className={optionCls}>Scegli il ruolo</option>{ROLES.map((r) => <option key={r} value={r} className={optionCls}>{r}</option>)}
         </select>)}</Field>
-      <Field label="Email del Comune" hint="Quella istituzionale, per esempio nome.cognome@comune.campobasso.it." error={errors.email}>{(id, d) => <input id={id} type="email" inputMode="email" autoComplete="email" aria-describedby={d} aria-invalid={!!errors.email} value={v.email} onChange={(e) => up("email", e.target.value)} className={fieldCls} />}</Field>
+      <Field label="Email del Comune" hint={`Quella istituzionale, per esempio nome.cognome@${townDomain(town ?? "Campobasso")}.`} error={errors.email}>{(id, d) => <input id={id} type="email" inputMode="email" autoComplete="email" aria-describedby={d} aria-invalid={!!errors.email} value={v.email} onChange={(e) => up("email", e.target.value)} className={fieldCls} />}</Field>
       <Field label="Matricola (facoltativa)" hint="Il numero del tuo badge o della matricola, se vuoi aggiungerlo." error={errors.badge}>{(id, d) => <input id={id} aria-describedby={d} value={v.badge} onChange={(e) => up("badge", e.target.value)} className={fieldCls} />}</Field>
       <Declare checked={v.declared} onChange={(b) => up("declared", b)} error={errors.declared} />
       <Submit label="Identificati e apri la piazza" />

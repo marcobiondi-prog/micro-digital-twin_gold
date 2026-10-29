@@ -188,6 +188,8 @@ export function LicensesPage() {
           <li>Dati climatici del progetto NASA POWER.</li>
           <li>Dati dei sensori di Sensor.Community, licenza DbCL/ODbL.</li>
           <li>Foto di riferimento delle piante: autore e licenza indicati sotto ogni foto (Royal Botanic Gardens, Kew; GBIF).</li>
+          <li>Immagini satellitari della mappa 2D © Esri, Maxar, Earthstar Geographics.</li>
+          <li>Elenco dei comuni italiani: dati ISTAT (2020) da comuni-json di Matteo Contrini, licenza MIT.</li>
         </ul>
       </InfoCard>
       <InfoCard title="Software">
