@@ -14,6 +14,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as BenvenutoRouteImport } from './routes/benvenuto'
 import { Route as ChiSiamoRouteImport } from './routes/chi-siamo'
 import { Route as ContattiRouteImport } from './routes/contatti'
+import { Route as CronologiaRouteImport } from './routes/cronologia'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as MappaRouteImport } from './routes/mappa'
@@ -53,6 +54,11 @@ const ChiSiamoRoute = ChiSiamoRouteImport.update({
 const ContattiRoute = ContattiRouteImport.update({
   id: '/contatti',
   path: '/contatti',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CronologiaRoute = CronologiaRouteImport.update({
+  id: '/cronologia',
+  path: '/cronologia',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -139,6 +145,7 @@ export interface FileRoutesByFullPath {
   '/benvenuto': typeof BenvenutoRoute
   '/chi-siamo': typeof ChiSiamoRoute
   '/contatti': typeof ContattiRoute
+  '/cronologia': typeof CronologiaRoute
   '/dashboard': typeof DashboardRoute
   '/faq': typeof FaqRoute
   '/mappa': typeof MappaRoute
@@ -161,6 +168,7 @@ export interface FileRoutesByTo {
   '/benvenuto': typeof BenvenutoRoute
   '/chi-siamo': typeof ChiSiamoRoute
   '/contatti': typeof ContattiRoute
+  '/cronologia': typeof CronologiaRoute
   '/dashboard': typeof DashboardRoute
   '/faq': typeof FaqRoute
   '/mappa': typeof MappaRoute
@@ -184,6 +192,7 @@ export interface FileRoutesById {
   '/benvenuto': typeof BenvenutoRoute
   '/chi-siamo': typeof ChiSiamoRoute
   '/contatti': typeof ContattiRoute
+  '/cronologia': typeof CronologiaRoute
   '/dashboard': typeof DashboardRoute
   '/faq': typeof FaqRoute
   '/mappa': typeof MappaRoute
@@ -208,6 +217,7 @@ export interface FileRouteTypes {
     | '/benvenuto'
     | '/chi-siamo'
     | '/contatti'
+    | '/cronologia'
     | '/dashboard'
     | '/faq'
     | '/mappa'
@@ -230,6 +240,7 @@ export interface FileRouteTypes {
     | '/benvenuto'
     | '/chi-siamo'
     | '/contatti'
+    | '/cronologia'
     | '/dashboard'
     | '/faq'
     | '/mappa'
@@ -252,6 +263,7 @@ export interface FileRouteTypes {
     | '/benvenuto'
     | '/chi-siamo'
     | '/contatti'
+    | '/cronologia'
     | '/dashboard'
     | '/faq'
     | '/mappa'
@@ -275,6 +287,7 @@ export interface RootRouteChildren {
   BenvenutoRoute: typeof BenvenutoRoute
   ChiSiamoRoute: typeof ChiSiamoRoute
   ContattiRoute: typeof ContattiRoute
+  CronologiaRoute: typeof CronologiaRoute
   DashboardRoute: typeof DashboardRoute
   FaqRoute: typeof FaqRoute
   MappaRoute: typeof MappaRoute
@@ -327,6 +340,13 @@ declare module '@tanstack/react-router' {
       path: '/contatti'
       fullPath: '/contatti'
       preLoaderRoute: typeof ContattiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cronologia': {
+      id: '/cronologia'
+      path: '/cronologia'
+      fullPath: '/cronologia'
+      preLoaderRoute: typeof CronologiaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -443,6 +463,7 @@ const rootRouteChildren: RootRouteChildren = {
   BenvenutoRoute: BenvenutoRoute,
   ChiSiamoRoute: ChiSiamoRoute,
   ContattiRoute: ContattiRoute,
+  CronologiaRoute: CronologiaRoute,
   DashboardRoute: DashboardRoute,
   FaqRoute: FaqRoute,
   MappaRoute: MappaRoute,
