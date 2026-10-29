@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { hapticTick } from "@/lib/haptics";
 import { simTabSwipeStep, startsOnOwnGesture } from "@/lib/sim-tab-swipe";
 
@@ -7,6 +7,12 @@ export const SLIDE_EASE = "transform 380ms cubic-bezier(0.22, 1, 0.36, 1)";
 /** When a swipe last turned the tab: that panel already slides in with the finger, so Panels skips its own entrance. */
 let swipedAt = 0;
 export const justSwiped = () => Date.now() - swipedAt < 150;
+/**
+ * A sub-tab row (scoped swipe) that can turn in the swipe's direction claims the gesture, so the page's tabs stay
+ * put; at its first or last sub-tab it lets go and the page's tabs move instead. Its listeners sit on its own
+ * element, so they run before the page's document listeners for the same event.
+ */
+let claimed = false;
 const reduced = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
 /**
@@ -14,9 +20,10 @@ const reduced = () => typeof window !== "undefined" && window.matchMedia?.("(pre
  * page drags the open panel with the finger (only a little past the first and the last tab); past 50 px it turns
  * to the neighbouring tab, whose panel comes in from that side where the finger left it and settles; shorter, it
  * springs back. A mostly vertical move scrolls the page and drags nothing. Returns the style for the panels' track:
- * no transform at rest, so fixed elements inside keep their place.
+ * no transform at rest, so fixed elements inside keep their place. With `scope` (sub-tabs) only swipes starting
+ * inside that element count, and they take the gesture from the page's tabs while they can turn.
  */
-export function useTabSwipe<T extends string>(ids: ReadonlyArray<T>, value: T, onChange: (id: T) => void): CSSProperties {
+export function useTabSwipe<T extends string>(ids: ReadonlyArray<T>, value: T, onChange: (id: T) => void, scope?: RefObject<HTMLElement | null>): CSSProperties {
   const start = useRef<{ x: number; y: number; axis: "x" | "y" | null } | null>(null);
   const [slide, setSlide] = useState<{ x: number; animate: boolean }>({ x: 0, animate: false });
   const latest = useRef({ ids, value, onChange });
@@ -35,21 +42,31 @@ export function useTabSwipe<T extends string>(ids: ReadonlyArray<T>, value: T, o
         rest = window.setTimeout(() => setSlide({ x: 0, animate: false }), 420);
       }); });
     };
+    // Sub-tabs listen on their own element, the page's tabs on the document (same events, typed as an element's).
+    const host = (scope ? scope.current : document) as HTMLElement | null;
+    if (!host) return;
     const begin = (x: number, y: number, target: EventTarget | null) => {
-      start.current = document.documentElement.hasAttribute("data-ar-camera") || startsOnOwnGesture(target, document.body) ? null : { x, y, axis: null };
+      claimed = false;
+      start.current = document.documentElement.hasAttribute("data-ar-camera") || startsOnOwnGesture(target, scope?.current ?? document.body) ? null : { x, y, axis: null };
     };
     const move = (x: number, y: number) => {
       const s = start.current;
       if (!s) return;
       const dx = x - s.x, dy = y - s.y;
-      if (!s.axis) {
-        if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) { s.axis = "y"; return; }
-        if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) s.axis = "x";
-      }
-      if (s.axis !== "x") return;
       const { ids: list, value: cur } = latest.current;
       const i = list.indexOf(cur);
       const edge = (dx > 0 && i <= 0) || (dx < 0 && i >= list.length - 1);
+      if (!scope && claimed) { if (s.axis === "x") settle(dragged); start.current = null; return; }
+      if (!s.axis) {
+        if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) { s.axis = "y"; return; }
+        if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
+          // Sub-tabs at their end in this direction let the page's tabs have the swipe.
+          if (scope && edge) { start.current = null; return; }
+          s.axis = "x";
+          if (scope) claimed = true;
+        }
+      }
+      if (s.axis !== "x") return;
       stop();
       dragged = edge ? dx * 0.25 : dx;
       setSlide({ x: dragged, animate: false });
@@ -77,22 +94,22 @@ export function useTabSwipe<T extends string>(ids: ReadonlyArray<T>, value: T, o
     const pd = (e: PointerEvent) => { if (e.pointerType === "mouse" && e.button === 0) begin(e.clientX, e.clientY, e.target); };
     const pm = (e: PointerEvent) => { if (e.pointerType === "mouse" && e.buttons & 1) move(e.clientX, e.clientY); };
     const pu = (e: PointerEvent) => { if (e.pointerType === "mouse") finish(e.clientX, e.clientY); };
-    document.addEventListener("touchstart", ts, { passive: true });
-    document.addEventListener("touchmove", tm, { passive: true });
-    document.addEventListener("touchend", te, { passive: true });
-    document.addEventListener("touchcancel", cancel, { passive: true });
-    document.addEventListener("pointerdown", pd);
-    document.addEventListener("pointermove", pm);
-    document.addEventListener("pointerup", pu);
+    host.addEventListener("touchstart", ts, { passive: true });
+    host.addEventListener("touchmove", tm, { passive: true });
+    host.addEventListener("touchend", te, { passive: true });
+    host.addEventListener("touchcancel", cancel, { passive: true });
+    host.addEventListener("pointerdown", pd);
+    host.addEventListener("pointermove", pm);
+    host.addEventListener("pointerup", pu);
     return () => {
       stop();
-      document.removeEventListener("touchstart", ts);
-      document.removeEventListener("touchmove", tm);
-      document.removeEventListener("touchend", te);
-      document.removeEventListener("touchcancel", cancel);
-      document.removeEventListener("pointerdown", pd);
-      document.removeEventListener("pointermove", pm);
-      document.removeEventListener("pointerup", pu);
+      host.removeEventListener("touchstart", ts);
+      host.removeEventListener("touchmove", tm);
+      host.removeEventListener("touchend", te);
+      host.removeEventListener("touchcancel", cancel);
+      host.removeEventListener("pointerdown", pd);
+      host.removeEventListener("pointermove", pm);
+      host.removeEventListener("pointerup", pu);
     };
   }, []);
   if (slide.x === 0 && !slide.animate) return {};

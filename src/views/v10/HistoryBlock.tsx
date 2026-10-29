@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ArrowRight, Building2, Clock3, Grape, History, Play, RotateCcw, Trash2 } from "lucide-react";
 import { currentMedia, useLabMedia, type MediaItem } from "@/models/lab-media-store";
 import { mediaTime } from "@/models/media-time";
 import { TabRow } from "@/views/v8/console";
+import { useTabSwipe } from "@/lib/use-tab-swipe";
 import { DashCard, DashSection } from "@/views/v10/Dashboard";
 import { clearHistory, useHistory } from "@/lib/use-history";
 import { groupByMonth, whenLabel, type HistoryEntry, type HistoryFlow } from "@/models/intervention-history";
@@ -43,6 +44,9 @@ const COMPACT_ENTRIES = 5, COMPACT_SHOTS = 6;
 export function HistoryBlock({ compact = false }: { compact?: boolean }) {
   const { entries: all, where, loading, failed, reload } = useHistory();
   const [filter, setFilter] = useState<Filter>("tutti");
+  // Only the full page has the filter to swipe: on Benvenuto the swipe listens to a ref that stays empty.
+  const area = useRef<HTMLDivElement>(null), none = useRef<HTMLDivElement>(null);
+  const track = useTabSwipe(FILTERS.map((f) => f.id), filter, setFilter, compact ? none : area);
   const [confirm, setConfirm] = useState(false);
   const [clearing, setClearing] = useState(false);
   const urban = useLabMedia("urban"), vineyard = useLabMedia("vineyard");
@@ -68,7 +72,10 @@ export function HistoryBlock({ compact = false }: { compact?: boolean }) {
   };
   return (
     <DashSection title={compact ? "Cronologia" : "Tutti gli interventi"} hint={where === "account" ? "Salvata nel tuo account" : "Salvata su questo dispositivo"}>
+      <div ref={area} className="space-y-3">
       {!compact && <TabRow label="Luogo" items={FILTERS} value={filter} onChange={(v) => setFilter(v as Filter)} />}
+      {/* Tutti · Piazza · Vigneto turn with a sideways swipe on the list, like the tutorial's screens. */}
+      <div style={track} className="space-y-3">
       {failed && <DashCard><p className="text-sm text-muted-foreground">Non riesco a leggere la cronologia del tuo account. Vedi solo quella di questo dispositivo.</p></DashCard>}
       {visibleShots.length > 0 && (
         <div className="space-y-2">
@@ -129,6 +136,8 @@ export function HistoryBlock({ compact = false }: { compact?: boolean }) {
           )}
         </div>
       )}
+      </div>
+      </div>
     </DashSection>
   );
 }
