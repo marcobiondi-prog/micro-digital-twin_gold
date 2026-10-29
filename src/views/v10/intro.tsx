@@ -40,18 +40,8 @@ function Reveal({ children, className = "" }: { children: ReactNode; className?:
   return <div ref={ref} data-shown={shown || undefined} className={`transition-[opacity,transform] duration-700 ease-out motion-reduce:transition-none ${shown ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"} ${className}`}>{children}</div>;
 }
 
-/** The five steps of the tutorial, each with a white line drawing (every stroke has pathLength 1, so it can draw itself). */
+/** The four steps of the tutorial, each with a white line drawing (every stroke has pathLength 1, so it can draw itself). */
 const STEPS: Array<{ title: string; text: string; art: ReactNode }> = [
-  { title: "Identificati", text: "Agronomo con il patentino fitosanitario: si apre il vigneto. Funzionario del Comune, con il tuo ufficio: si apre la piazza. Un profilo alla volta.",
-    art: <>
-      <rect pathLength={1} x="22" y="20" width="76" height="56" rx="8" />
-      <circle pathLength={1} cx="44" cy="42" r="9" />
-      <path pathLength={1} d="M32 64 C34 56 54 56 56 64" />
-      <path pathLength={1} d="M66 38 H88 M66 48 H84 M66 58 H80" strokeOpacity="0.6" />
-      <rect pathLength={1} x="110" y="48" width="30" height="26" rx="5" />
-      <path pathLength={1} d="M116 48 V40 A9 9 0 0 1 134 40 V48" />
-      <circle cx="125" cy="61" r="3" fill="currentColor" stroke="none" className="intro-pop" />
-    </> },
   { title: "Trova il luogo", text: "Nella simulazione, nella scheda Mappa, cerchi la piazza o il vigneto e lo guardi in 2D o in 3D.",
     art: <>
       <path pathLength={1} d="M20 30 L55 20 L105 30 L140 20 V75 L105 85 L55 75 L20 85 Z" />
@@ -228,7 +218,7 @@ export function Tutorial() {
             <span className="block h-[clamp(3.5rem,16dvh,9rem)] w-[clamp(3.5rem,16dvh,9rem)]"><TwinMascot className="block h-full w-full drop-shadow-[0_12px_40px_rgb(76_201_189/0.25)]" /></span>
             <p className="mt-[clamp(0.25rem,1.2dvh,1rem)] font-display text-[clamp(0.75rem,4.2dvh,1.5rem)] font-semibold uppercase tracking-[0.18em] text-foreground">Micro Digital <span className="text-brand-turquoise">Twin</span></p>
             <h2 className="mt-[clamp(0.375rem,2dvh,1.5rem)] font-display text-[clamp(1.8rem,min(9vw,8dvh),3.75rem)] font-extralight leading-[1.02] tracking-tight text-foreground">Prova gli interventi<br />prima di farli.</h2>
-            <p className="mt-[clamp(0.25rem,1.2dvh,1rem)] text-[clamp(0.75rem,4.1dvh,0.9375rem)] text-foreground/60">Ecco come funziona, in cinque passi.</p>
+            <p className="mt-[clamp(0.25rem,1.2dvh,1rem)] text-[clamp(0.75rem,4.1dvh,0.9375rem)] text-foreground/60">Ecco come funziona, in quattro passi.</p>
           </Reveal>
         </section>
         {STEPS.map((st, i) => (
@@ -287,7 +277,7 @@ export function Choice() {
         <h1 className="sr-only">Da dove vuoi iniziare</h1>
         <Reveal>
           <h2 aria-hidden="true" className="font-display text-[3.4rem] font-extralight leading-[0.95] tracking-tight text-foreground sm:text-7xl">Da dove<br />vuoi iniziare?</h2>
-          <p className="mt-5 max-w-xs text-[15px] leading-relaxed text-foreground/60">Scegli una strada. Le altre restano a un tocco, nel menu.</p>
+          <p className="mt-5 max-w-xs text-[15px] leading-relaxed text-foreground/60">Scegli una strada: entrando ti identifichi, come agronomo per il vigneto o come funzionario del Comune per la piazza.</p>
         </Reveal>
         <div role="radiogroup" aria-label="Da dove vuoi iniziare" className="mt-10 space-y-1"
           onKeyDown={(e) => {

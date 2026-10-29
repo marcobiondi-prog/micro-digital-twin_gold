@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Building2, Grape, Lock } from "lucide-react";
+import { ArrowRight, Building2, Grape, Lock, UserRound } from "lucide-react";
 import { useProId } from "@/lib/use-pro-id";
 import { KIND_LABEL, SECTION_KIND, SECTION_LABEL, proSummary, unlocks, type Section } from "@/models/professional-id";
-import { Ambient, PageHero } from "@/views/v8/console";
+import { toast } from "sonner";
+import { Ambient, PageHero, TabRow, openSimTab } from "@/views/v8/console";
+import { IdentifyForm, profileIntro } from "@/views/v10/Identify";
 import { cn } from "@/lib/utils";
 
 export const SECTION_TONE: Record<Section, string> = { urban: "rgb(28 112 210 / 0.42)", vineyard: "rgb(150 36 110 / 0.42)" };
@@ -47,19 +49,35 @@ export function SectionLockCard({ section, className }: { section: Section; clas
 }
 
 /**
- * A simulation page behind its profile: open to the right profile, otherwise a locked page that says who it is for
- * and leads to the identification page. Nothing is drawn until the profile is read on the phone, so an open section never flashes the lock.
+ * A simulation page behind its profile: open to the right profile; otherwise the section shows only its "Profilo" tab,
+ * with the identification form of the profile that opens it right there (the agronomist's in the vineyard, the
+ * municipal officer's in the piazza). Nothing is drawn until the profile is read on the phone, so an open section never flashes the lock.
  */
 export function SectionGate({ section, children }: { section: Section; children: ReactNode }) {
-  const open = useSectionOpen(section);
-  if (open === undefined) return <div className="min-h-[60vh]" />;
-  if (open) return <>{children}</>;
+  const id = useProId();
+  if (id === undefined) return <div className="min-h-[60vh]" />;
+  if (unlocks(id, section)) return <>{children}</>;
   const Icon = section === "urban" ? Building2 : Grape;
+  const need = SECTION_KIND[section];
+  const done = () => {
+    toast.success(`Identificato come ${KIND_LABEL[need].toLowerCase()}`, { description: `Si apre ${section === "urban" ? "la piazza" : "il vigneto"}.` });
+    openSimTab(section, "simula");
+    window.scrollTo({ top: 0, behavior: "instant" });
+  };
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Ambient tone={SECTION_TONE[section]} />
       <PageHero kicker={`Sezione ${SECTION_LABEL[section]} · bloccata`} kickerIcon={Icon} title={WHO[section].title} />
-      <SectionLockCard section={section} />
+      <div className="sticky top-[var(--nav-h)] z-[999999997] -mx-4 bg-background/80 px-4 py-2 backdrop-blur-xl">
+        <TabRow label="Sezioni" items={[{ id: "profilo", label: "Profilo", icon: UserRound }]} value="profilo" onChange={() => undefined} />
+      </div>
+      <div className="fuse-canvas space-y-4 rounded-3xl px-4 pb-6 pt-5 sm:px-5">
+        <p className="flex items-center gap-2 text-lg font-semibold"><Lock className="size-5" aria-hidden="true" />{WHO[section].who}</p>
+        <p className="text-[15px] leading-relaxed text-muted-foreground">{profileIntro(need)}</p>
+        {id && <p className="rounded-2xl bg-foreground/[0.06] px-4 py-3 text-sm text-muted-foreground">Ora sei identificato come <span className="font-semibold text-foreground">{proSummary(id)}</span>: identificandoti qui, quel profilo viene sostituito e {section === "urban" ? "il vigneto" : "la piazza"} si blocca.</p>}
+        <IdentifyForm kind={need} onDone={done} />
+        <p className="px-1 text-xs text-muted-foreground">I dati restano su questo dispositivo e, se hai fatto l'accesso, nel tuo account. Puoi uscire dal profilo quando vuoi, dalla scheda Profilo.</p>
+      </div>
     </div>
   );
 }

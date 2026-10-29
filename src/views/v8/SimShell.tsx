@@ -1,16 +1,18 @@
 import { type ReactNode } from "react";
-import { Camera, Images, Map as MapIcon, MapPin, EllipsisVertical, Radar, RotateCcw, Scale, Send, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import { Camera, Images, Map as MapIcon, MapPin, EllipsisVertical, Radar, RotateCcw, Scale, Send, SlidersHorizontal, UserRound, type LucideIcon } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { setCameraSheetOpen } from "@/lib/camera-dock";
 import { useTabSwipe } from "@/lib/use-tab-swipe";
 import { useAutoHistory } from "@/lib/use-auto-history";
 import { SimMap } from "@/views/v10/SimMap";
+import { ProfileCard } from "@/views/v10/Identify";
 import { Ambient, HeroButton, PageHero, Panels, TabRow, openSimTab, showSimMedia, simMediaId, useSimTab, type SimKind, type SimTab } from "./console";
 
 const TABS: ReadonlyArray<{ id: SimTab; label: string; icon: LucideIcon }> = [
   { id: "simula", label: "Simula", icon: SlidersHorizontal },
   { id: "mappa", label: "Mappa", icon: MapIcon },
   { id: "sensori", label: "Sensori AI", icon: Radar },
+  { id: "profilo", label: "Profilo", icon: UserRound },
 ];
 const TONE: Record<SimKind, string> = { urban: "rgb(28 112 210 / 0.42)", vineyard: "rgb(150 36 110 / 0.42)" };
 
@@ -60,6 +62,8 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, medi
         { id: "simula", always: true, content: <div className="space-y-6">{simula}<section id={simMediaId(kind)} aria-label="Foto e video" className="fuse-canvas scroll-mt-[calc(var(--nav-h)+5rem)] rounded-t-3xl px-3 pt-4 pb-6 sm:px-5">{media}</section></div> },
         { id: "mappa", content: <SimMap kind={kind} /> },
         { id: "sensori", content: sensori },
+        // Who is identified (the profile that opens this section) and "Esci dal profilo", which locks it again.
+        { id: "profilo", content: <ProfileCard kind={kind === "urban" ? "funzionario" : "agronomo"} /> },
       ]} />
       </div>
     </div>

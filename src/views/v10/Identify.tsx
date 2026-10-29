@@ -6,7 +6,7 @@ import { saveProId, useProId } from "@/lib/use-pro-id";
 import { cn } from "@/lib/utils";
 import {
   checkAgronomo, checkFunzionario, KIND_LABEL, OFFICES, REGIONS, ROLES, proSummary,
-  type AgronomoInput, type Errors, type FunzionarioInput, type ProKind,
+  type AgronomoInput, type Errors, type FunzionarioInput, type ProId, type ProKind,
 } from "@/models/professional-id";
 import { Ambient, PageHero } from "@/views/v8/console";
 import { SECTION_TONE } from "@/views/v10/ProfileGate";
@@ -129,6 +129,52 @@ function Submit({ label }: { label: string }) {
   );
 }
 
+/** The identification form of one profile: on the identification page and in the "Profilo" tab of a locked section. */
+export function IdentifyForm({ kind, onDone }: { kind: ProKind; onDone: () => void }) {
+  return kind === "agronomo" ? <AgronomoForm onDone={onDone} /> : <FunzionarioForm onDone={onDone} />;
+}
+
+/** What the profile opens and locks, in one line. */
+export const profileIntro = (kind: ProKind) => PAGE[kind].intro;
+
+/** The profile in use, with "Esci dal profilo" (and, on the identification page, the way into its section). */
+export function ProfileCard({ kind, go }: { kind: ProKind; go?: () => void }) {
+  const id = useProId();
+  const mine = id?.kind === kind ? id : null;
+  const Icon = kind === "agronomo" ? Grape : Building2;
+  if (!mine) return null;
+  const leave = async () => {
+    await saveProId(null);
+    toast("Profilo rimosso", { description: "Piazza e vigneto sono bloccati finché non ti identifichi." });
+  };
+  return (
+    <div className="fuse-canvas space-y-4 rounded-3xl px-5 py-6">
+      <p className="flex items-center gap-2 text-lg font-semibold"><BadgeCheck className="size-6 text-emerald-400" aria-hidden="true" />Sei identificato come {KIND_LABEL[kind].toLowerCase()}</p>
+      <dl className="divide-y divide-foreground/10 rounded-2xl bg-foreground/[0.05] px-4">
+        {profileRows(mine).map(([k, v]) => (
+          <div key={k} className="flex items-baseline justify-between gap-4 py-3"><dt className="text-sm text-muted-foreground">{k}</dt><dd className="text-right text-[15px] font-medium">{v}</dd></div>
+        ))}
+      </dl>
+      {go && (
+        <button type="button" onClick={go} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground text-[15px] font-semibold text-background outline-none focus-visible:ring-4 focus-visible:ring-ring/50">
+          <Icon className="size-5" aria-hidden="true" />Vai {kind === "agronomo" ? "al vigneto" : "alla piazza"}
+        </button>
+      )}
+      <button type="button" onClick={() => void leave()} className="flex h-11 w-full items-center justify-center gap-2 rounded-full text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+        <LogOut className="size-4" aria-hidden="true" />Esci dal profilo
+      </button>
+    </div>
+  );
+}
+
+/** The profile's data as label · value rows. */
+function profileRows(id: ProId): Array<[string, string]> {
+  const since = new Date(id.at).toLocaleDateString("it-IT");
+  return id.kind === "agronomo"
+    ? [["Nome", id.name], ["Patentino", `${id.licenceType === "consulente" ? "Consulente" : "Utilizzatore"} · ${id.licence}`], ["Regione", id.region], ["Scadenza", new Date(`${id.expires}T12:00:00`).toLocaleDateString("it-IT")], ["Identificato il", since]]
+    : [["Nome", id.name], ["Comune", id.comune], ["Ufficio", id.office], ["Ruolo", id.role], ["Email", id.email], ...(id.badge ? [["Matricola", id.badge] as [string, string]] : []), ["Identificato il", since]];
+}
+
 /**
  * The identification page of one profile (/identificazione/agronomo, /identificazione/funzionario): what it opens and
  * locks, then the form; once identified, who you are, the way into the section and "Esci dal profilo".
@@ -137,7 +183,6 @@ export function IdentifyPage({ kind }: { kind: ProKind }) {
   const navigate = useNavigate();
   const id = useProId();
   const p = PAGE[kind];
-  const Icon = kind === "agronomo" ? Grape : Building2;
   const back = () => {
     if ((window.history.state?.__TSR_index ?? 0) > 0) window.history.back();
     else void navigate({ to: "/benvenuto", replace: true });
@@ -145,10 +190,6 @@ export function IdentifyPage({ kind }: { kind: ProKind }) {
   const done = () => {
     toast.success(`Identificato come ${KIND_LABEL[kind].toLowerCase()}`, { description: `Si apre ${p.opens}; ${p.locks} è bloccat${kind === "agronomo" ? "a" : "o"}.` });
     void navigate({ to: p.go, replace: true });
-  };
-  const leave = async () => {
-    await saveProId(null);
-    toast("Profilo rimosso", { description: "Piazza e vigneto sono bloccati finché non ti identifichi." });
   };
   const mine = id?.kind === kind ? id : null;
   return (
@@ -159,22 +200,12 @@ export function IdentifyPage({ kind }: { kind: ProKind }) {
       </button>
       <PageHero kicker="Identificazione" kickerIcon={ShieldCheck} title={p.title} />
       {mine ? (
-        <div className="fuse-canvas space-y-4 rounded-3xl px-5 py-6">
-          <p className="flex items-center gap-2 text-lg font-semibold"><BadgeCheck className="size-6 text-emerald-400" aria-hidden="true" />Sei identificato</p>
-          <p className="text-[15px]">{mine.name}</p>
-          <p className="text-sm text-muted-foreground">{proSummary(mine)}</p>
-          <button type="button" onClick={() => void navigate({ to: p.go })} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground text-[15px] font-semibold text-background outline-none focus-visible:ring-4 focus-visible:ring-ring/50">
-            <Icon className="size-5" aria-hidden="true" />Vai {kind === "agronomo" ? "al vigneto" : "alla piazza"}
-          </button>
-          <button type="button" onClick={() => void leave()} className="flex h-11 w-full items-center justify-center gap-2 rounded-full text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
-            <LogOut className="size-4" aria-hidden="true" />Esci dal profilo
-          </button>
-        </div>
+        <ProfileCard kind={kind} go={() => void navigate({ to: p.go })} />
       ) : (
         <>
           <p className="text-[15px] leading-relaxed text-muted-foreground">{p.intro}</p>
           {id && <p className="rounded-2xl bg-foreground/[0.06] px-4 py-3 text-sm text-muted-foreground">Ora sei identificato come <span className="font-semibold text-foreground">{proSummary(id)}</span>: identificandoti qui, quel profilo viene sostituito e {p.locks} si blocca.</p>}
-          {kind === "agronomo" ? <AgronomoForm onDone={done} /> : <FunzionarioForm onDone={done} />}
+          <IdentifyForm kind={kind} onDone={done} />
           <p className="px-1 text-xs text-muted-foreground">I dati restano su questo dispositivo e, se hai fatto l'accesso, nel tuo account. Puoi uscire dal profilo quando vuoi.</p>
         </>
       )}
