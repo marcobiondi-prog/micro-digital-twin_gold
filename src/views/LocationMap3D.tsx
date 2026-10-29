@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { crownRing } from "@/models/area-layout";
+import { SIM_COLORS, thirstColor, type SimLayout } from "@/views/v10/map-area";
 import { Crosshair, LoaderCircle } from "lucide-react";
 import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camera";
 
@@ -7,7 +9,7 @@ import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camer
  * library, billed through Map Tiles API). Loaded only when the user switches to 3D, with
  * the referrer-restricted browser key; the 2D embed stays the default.
  */
-type Maps3D = { Map3DElement: new (options: Record<string, unknown>) => HTMLElement; Marker3DElement: new (options: Record<string, unknown>) => HTMLElement; Polygon3DElement?: new (options: Record<string, unknown>) => HTMLElement };
+type Maps3D = { Map3DElement: new (options: Record<string, unknown>) => HTMLElement; Marker3DElement: new (options: Record<string, unknown>) => HTMLElement; Polygon3DElement?: new (options: Record<string, unknown>) => HTMLElement; Polyline3DElement?: new (options: Record<string, unknown>) => HTMLElement };
 type GoogleMaps = { maps: { importLibrary: (name: string) => Promise<unknown> } };
 type Map3D = HTMLElement & Partial<Camera> & { gestureHandling?: string; flyCameraTo?: (options: { endCamera: Camera; durationMillis: number }) => void };
 
@@ -42,7 +44,7 @@ function applyCamera(map: Map3D, camera: Camera, animate: boolean) {
   Object.assign(map, camera);
 }
 
-export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [] }: { lat: number; lng: number; label: string; apiKey: string; fallback?: ReactNode; area?: Array<[number, number]> }) {
+export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], sim = null }: { lat: number; lng: number; label: string; apiKey: string; fallback?: ReactNode; area?: Array<[number, number]>; sim?: SimLayout | null }) {
   const rejected = useKeyRejected();
   const host = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map3D | null>(null);
@@ -56,7 +58,7 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [] }: 
     let cancelled = false;
     const el = host.current;
     setState("loading");
-    Promise.all([loadMaps3D(apiKey), groundElevation(lat, lng)]).then(([{ Map3DElement, Marker3DElement, Polygon3DElement }, ground]) => {
+    Promise.all([loadMaps3D(apiKey), groundElevation(lat, lng)]).then(([{ Map3DElement, Marker3DElement, Polygon3DElement, Polyline3DElement }, ground]) => {
       if (cancelled || !el) return;
       altitude.current = ground;
       const map = new Map3DElement({ ...frameCamera(lat, lng, el.clientHeight, ground), mode: "HYBRID" }) as Map3D;
@@ -73,13 +75,32 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [] }: 
           poly.outerCoordinates = area.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng }));
           map.append(poly);
         } catch { /* an older build without polygons: the pin alone */ }
+        // The simulation inside the area: lawn and zones on the ground, shade and cloth 3 m up, trees as crowns 9 m tall.
+        try {
+          const shape = (ring: Array<[number, number]>, fill: string, alt: number | null) => {
+            const p = new Polygon3DElement({ altitudeMode: alt === null ? "CLAMP_TO_GROUND" : "RELATIVE_TO_GROUND", extruded: alt !== null, fillColor: fill, strokeColor: "rgba(255,255,255,0)", strokeWidth: 0 }) as HTMLElement & { outerCoordinates?: unknown };
+            p.outerCoordinates = ring.map(([pLat, pLng]) => (alt === null ? { lat: pLat, lng: pLng } : { lat: pLat, lng: pLng, altitude: alt }));
+            map.append(p);
+          };
+          if (sim?.kind === "piazza") {
+            for (const pt of sim.data.patches) shape(pt.ring, pt.kind === "lawn" ? "rgba(76,175,80,0.6)" : "rgba(71,85,105,0.65)", pt.kind === "lawn" ? null : 3);
+            for (const t of sim.data.trees) shape(crownRing(t), "rgba(46,125,50,0.95)", 9);
+          } else if (sim?.kind === "vigneto") {
+            for (const pt of sim.data.patches) shape(pt.ring, pt.kind === "zone" ? `${thirstColor(sim.thirst[pt.zone ?? 0] ?? 0)}55` : "rgba(51,65,85,0.65)", pt.kind === "zone" ? null : 2.5);
+            if (Polyline3DElement) for (const l of sim.data.lines) {
+              const pl = new Polyline3DElement({ altitudeMode: "CLAMP_TO_GROUND", strokeColor: l.kind === "drip" ? SIM_COLORS.drip : SIM_COLORS.wind, strokeWidth: l.kind === "drip" ? 2 : 6, drawsOccludedSegments: true }) as HTMLElement & { coordinates?: unknown };
+              pl.coordinates = l.line.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng }));
+              map.append(pl);
+            }
+          }
+        } catch { /* polygons not supported: the area alone */ }
       }
       el.replaceChildren(map);
       mapRef.current = map;
       setState("ready");
     }).catch(() => { if (!cancelled) setState("error"); });
     return () => { cancelled = true; mapRef.current = null; el?.replaceChildren(); };
-  }, [lat, lng, label, apiKey, JSON.stringify(area)]);
+  }, [lat, lng, label, apiKey, JSON.stringify(area), JSON.stringify(sim)]);
   // The panel grows when 3D opens (and on rotation): re-frame the place once the size settles.
   useEffect(() => {
     const el = host.current;

@@ -1,11 +1,15 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Check, Lock, MapPin, PenLine, Trash2, Undo2, X } from "lucide-react";
+import { Check, Hand, Lock, MapPin, PenLine, RotateCcw, Trash2, Undo2, X } from "lucide-react";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { openAccount } from "@/lib/camera-dock";
 import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn } from "@/lib/demo-login";
 import { cn } from "@/lib/utils";
-import { setUrban, setVineyard, useLab } from "@/models/lab-store";
+import { setUrban, setVineyard, useLab, vineMetrics } from "@/models/lab-store";
+import { piazzaLayout, vineLayout, type LayoutEdits } from "@/models/area-layout";
+import { vineMixOf, zoneMixOf } from "@/models/vine-interventions";
+import { SIM_COLORS, thirstColor, type SimLayout } from "@/views/v10/map-area";
+import type { MovedPart } from "@/views/v10/SatelliteMap2D";
 import { drawnAreaFor, MAX_PINS, pinsM2, surfaceText } from "@/models/drawn-area";
 import type { Ring } from "@/models/place-area";
 import type { SimKind } from "@/views/v8/console";
@@ -43,6 +47,7 @@ export function SimMap({ kind }: { kind: SimKind }) {
   useEffect(() => { setDrawing(false); }, [loc.lat, loc.lng]);
   const ring = drawing ? draft : saved?.ring ?? [];
   const save = (r: Ring | null) => {
+    // A new outline lays the simulation out afresh (hand edits belonged to the old one).
     const area = r && r.length >= 3 ? { lat: loc.lat, lng: loc.lng, ring: r } : null;
     if (kind === "urban") setUrban({ area }); else setVineyard({ area });
   };
@@ -53,6 +58,30 @@ export function SimMap({ kind }: { kind: SimKind }) {
     toast.success("Area salvata", { description: `${surfaceText(pinsM2(draft))}: la usano i costi e i benefici.` });
   };
   const remove = () => { save(null); setDrawing(false); setDraft([]); toast("Area cancellata", { description: "Torna la superficie misurata o di riferimento." }); };
+  // The simulation inside the saved area: automatic from the levers, plus what was moved by hand (kept with the area).
+  const [arranging, setArranging] = useState(false);
+  useEffect(() => { if (!saved) setArranging(false); }, [saved]);
+  const sim = useMemo<SimLayout | null>(() => {
+    if (!saved) return null;
+    const edits = saved.edits ?? {};
+    if (kind === "urban") {
+      const data = piazzaLayout(saved.ring, lab.urban.trees, lab.urban.permeable, lab.urban.shade, edits);
+      return data ? { kind: "piazza", data } : null;
+    }
+    const v = lab.vineyard, fallback = vineMixOf(v);
+    const data = vineLayout(saved.ring, v.zones.map((z) => zoneMixOf(z, fallback)), edits);
+    return data ? { kind: "vigneto", data, thirst: vineMetrics(v).results.map((r) => r.s) } : null;
+  }, [saved, kind, lab.urban, lab.vineyard]);
+  const setEdits = (edits: LayoutEdits) => {
+    if (!saved) return;
+    const area = { ...saved, edits };
+    if (kind === "urban") setUrban({ area }); else setVineyard({ area });
+  };
+  const moved = (m: MovedPart) => {
+    const e = saved?.edits ?? {};
+    if (m.part === "tree") { const trees = [...(e.trees ?? [])]; trees[m.index] = m.at; setEdits({ ...e, trees }); }
+    else setEdits({ ...e, [m.part === "lawn" ? "lawnAt" : m.part === "shade" ? "shadeAt" : "windAt"]: m.at });
+  };
   return (
     <div className="space-y-4">
       <div className="flex items-start gap-3">
@@ -88,13 +117,15 @@ export function SimMap({ kind }: { kind: SimKind }) {
       <div className="-mx-4 h-[52vh] min-h-72 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
         {show3d
           ? <Suspense fallback={<div className="h-full w-full bg-card" />}>{key
-            ? <LocationMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} apiKey={key} area={ring}
-              fallback={<OpenMap3D lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={zoom3d} area={ring} />} />
-            : <OpenMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={zoom3d} area={ring} />}</Suspense>
-          : <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={zoom} area={ring} drawing={drawing} onAreaChange={setDraft} /></Suspense>}
+            ? <LocationMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} apiKey={key} area={ring} sim={sim}
+              fallback={<OpenMap3D lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />} />
+            : <OpenMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />}</Suspense>
+          : <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={zoom} area={ring} drawing={drawing} onAreaChange={setDraft} sim={sim} arranging={arranging} onMove={moved} /></Suspense>}
       </div>
       <AreaBar drawing={drawing} pins={ring.length} m2={ring.length >= 3 ? pinsM2(ring) : null} saved={!!saved} vineyard={kind === "vineyard"}
-        onStart={startDrawing} onUndo={() => setDraft((d) => d.slice(0, -1))} onCancel={() => setDrawing(false)} onFinish={finish} onRemove={remove} />
+        onStart={() => { setArranging(false); startDrawing(); }} onUndo={() => setDraft((d) => d.slice(0, -1))} onCancel={() => setDrawing(false)} onFinish={finish} onRemove={remove} />
+      {sim && !drawing && <SimBar sim={sim} arranging={arranging} edited={!!saved?.edits && Object.keys(saved.edits).length > 0}
+        onArrange={() => { setView("2d"); setArranging((a) => !a); }} onAuto={() => { setEdits({}); toast("Disposizione automatica ripristinata"); }} />}
     </div>
   );
 }
@@ -146,5 +177,34 @@ function AreaBar({ drawing, pins, m2, saved, vineyard, onStart, onUndo, onCancel
         <span className="block text-sm text-muted-foreground">Metti i pin sugli angoli del{vineyard ? " vigneto" : "la piazza"}: la superficie si userà nei costi.</span>
       </span>
     </button>
+  );
+}
+
+const dot = (color: string, round = true) => <span className={cn("inline-block size-3 shrink-0", round ? "rounded-full" : "rounded-[3px]")} style={{ background: color }} aria-hidden="true" />;
+
+/**
+ * Under the area: what the map shows inside it (a small legend that follows the levers) and the hand mode: "Sposta
+ * elementi" makes each tree and the Prato / Ombra (or Frangivento) labels draggable; "Disposizione automatica" undoes the moves.
+ */
+function SimBar({ sim, arranging, edited, onArrange, onAuto }: { sim: SimLayout; arranging: boolean; edited: boolean; onArrange: () => void; onAuto: () => void }) {
+  const legend = sim.kind === "piazza"
+    ? [[dot(SIM_COLORS.tree), `Alberi ${sim.data.trees.length}`], [dot(SIM_COLORS.lawn, false), "Prato"], [dot(SIM_COLORS.shade, false), "Ombra"]] as const
+    : [[dot(thirstColor(10), false), "Zone (colore = sete)"], [dot(SIM_COLORS.drip, false), "Irrigazione"], [dot(SIM_COLORS.cloth, false), "Teli d'ombra"], [dot(SIM_COLORS.wind, false), "Frangivento"]] as const;
+  return (
+    <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4">
+      <p className="text-[15px] font-semibold">{sim.kind === "piazza" ? "La piazza nell'area" : "Il vigneto nell'area"}</p>
+      <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-muted-foreground" aria-label="Legenda">
+        {legend.map(([icon, text]) => <li key={text} className="inline-flex items-center gap-1.5">{icon}{text}</li>)}
+      </ul>
+      <p className="text-sm text-muted-foreground">{arranging
+        ? sim.kind === "piazza" ? "Trascina gli alberi, o le etichette Prato e Ombra per spostare quelle zone." : "Trascina l'etichetta Frangivento verso il lato dove lo vuoi."
+        : "Segue le leve della simulazione: cambia gli alberi o le percentuali e la mappa si aggiorna."}</p>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={onArrange} aria-pressed={arranging} className={cn(barBtn, arranging ? "bg-foreground text-background" : "bg-foreground/[0.08]")}>
+          {arranging ? <><Check className="size-4" aria-hidden="true" />Fatto</> : <><Hand className="size-4" aria-hidden="true" />Sposta elementi</>}
+        </button>
+        {edited && <button type="button" onClick={onAuto} className={cn(barBtn, "bg-foreground/[0.08]")}><RotateCcw className="size-4" aria-hidden="true" />Disposizione automatica</button>}
+      </div>
+    </div>
   );
 }

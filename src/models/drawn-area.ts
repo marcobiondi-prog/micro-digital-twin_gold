@@ -1,11 +1,13 @@
 import { ringAreaM2, type Ring } from "./place-area";
+import type { LayoutEdits } from "./area-layout";
 
 /**
  * An area drawn with pins on the map of a simulation: its corners ([lat, lng]) and the place it was drawn for. It is
  * kept with the simulation and counts only while that same place is chosen; its surface then replaces the measured
  * (or reference) one in costs and benefits.
  */
-export type DrawnArea = { lat: number; lng: number; ring: Ring };
+/** `edits`: the simulation's elements moved by hand inside it (models/area-layout); a new outline starts them afresh. */
+export type DrawnArea = { lat: number; lng: number; ring: Ring; edits?: LayoutEdits };
 
 export const MAX_PINS = 40;
 const SAME_PLACE = 1e-4; // about 10 m

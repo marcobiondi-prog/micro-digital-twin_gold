@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap, Marker } from "maplibre-gl";
 import type { Ring } from "@/models/place-area";
 import { MAX_PINS } from "@/models/drawn-area";
-import { addAreaLayers, pinElement, setAreaData } from "@/views/v10/map-area";
+import { addAreaLayers, addSimLayers, handleElement, tagElement, pinElement, setAreaData, setSimData, type SimLayout } from "@/views/v10/map-area";
+import type { LatLng } from "@/models/area-layout";
+
+/** Something moved by hand on the map: a tree (its index) or the lawn's, the shade's or the windbreak's handle. */
+export type MovedPart = { part: "tree"; index: number; at: LatLng } | { part: "lawn" | "shade" | "wind"; at: LatLng };
 import { Crosshair, LoaderCircle } from "lucide-react";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { StyleSpecification } from "maplibre-gl";
@@ -27,13 +31,18 @@ const STYLE: StyleSpecification = {
 
 type Camera = { center: [number, number]; zoom: number; bearing: number };
 
-export function SatelliteMap2D({ lat, lng, label, zoom, area = [], drawing = false, onAreaChange }: {
+export function SatelliteMap2D({ lat, lng, label, zoom, area = [], drawing = false, onAreaChange, sim = null, arranging = false, onMove }: {
   lat: number; lng: number; label: string; zoom: number; area?: Ring; drawing?: boolean; onAreaChange?: (ring: Ring) => void;
+  /** The simulation drawn inside the area; while `arranging` its trees and handles can be dragged (onMove). */
+  sim?: SimLayout | null; arranging?: boolean; onMove?: (moved: MovedPart) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const libRef = useRef<typeof import("maplibre-gl") | null>(null);
   const pins = useRef<Marker[]>([]);
+  const handles = useRef<Marker[]>([]);
+  const moveRef = useRef(onMove);
+  moveRef.current = onMove;
   // The latest pins, mode and callback for the map's own handlers.
   const live = useRef({ area, drawing, onAreaChange });
   live.current = { area, drawing, onAreaChange };
@@ -47,7 +56,7 @@ export function SatelliteMap2D({ lat, lng, label, zoom, area = [], drawing = fal
       const map = new maplibregl.Map({ container: host.current, style: STYLE, ...camera, maxZoom: 19, pitchWithRotate: false, cooperativeGestures: false, attributionControl: { compact: true } });
       map.touchPitch.disable();
       libRef.current = maplibregl;
-      map.on("load", () => { addAreaLayers(map); if (!cancelled) setState("ready"); });
+      map.on("load", () => { addAreaLayers(map); addSimLayers(map, lat); if (!cancelled) setState("ready"); });
       // Drawing: a tap on the map is a new pin at that spot.
       map.on("click", (e) => {
         const { area: ring, drawing: on, onAreaChange: set } = live.current;
@@ -58,7 +67,7 @@ export function SatelliteMap2D({ lat, lng, label, zoom, area = [], drawing = fal
       mapRef.current = map;
       remove = () => map.remove();
     }).catch(() => { if (!cancelled) setState("error"); });
-    return () => { cancelled = true; mapRef.current = null; pins.current = []; remove?.(); };
+    return () => { cancelled = true; mapRef.current = null; pins.current = []; handles.current = []; remove?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lat, lng, zoom, label]);
   // The area and its pins follow the props: numbered pins that can be dragged while drawing, small dots otherwise.
@@ -75,6 +84,30 @@ export function SatelliteMap2D({ lat, lng, label, zoom, area = [], drawing = fal
       return m;
     });
   }, [area, drawing, state]);
+  // The simulation inside the area (hidden while drawing), and while arranging a handle on each tree and on the lawn,
+  // the shade or the windbreak, to drag them by hand.
+  useEffect(() => {
+    const map = mapRef.current, lib = libRef.current;
+    if (state !== "ready" || !map || !lib) return;
+    setSimData(map, drawing ? null : sim);
+    handles.current.forEach((m) => m.remove());
+    handles.current = [];
+    // The vineyard's zone names on their zones.
+    if (sim?.kind === "vigneto" && !drawing) sim.data.zones.forEach((z, i) => handles.current.push(new lib.Marker({ element: tagElement(`Zona ${i + 1}`) }).setLngLat([z[1], z[0]]).addTo(map)));
+    if (!arranging || drawing || !sim) return;
+    const add = (at: LatLng, label: string | null, done: (to: LatLng) => void) => {
+      const m = new lib.Marker({ element: handleElement(label), draggable: true }).setLngLat([at[1], at[0]]).addTo(map);
+      m.on("dragend", () => { const p = m.getLngLat(); done([p.lat, p.lng]); });
+      handles.current.push(m);
+    };
+    if (sim.kind === "piazza") {
+      sim.data.trees.forEach((t, index) => add(t, null, (to) => moveRef.current?.({ part: "tree", index, at: to })));
+      if (sim.data.patches.some((p) => p.kind === "lawn")) add(sim.data.lawnAt, "Prato", (to) => moveRef.current?.({ part: "lawn", at: to }));
+      if (sim.data.patches.some((p) => p.kind === "shade")) add(sim.data.shadeAt, "Ombra", (to) => moveRef.current?.({ part: "shade", at: to }));
+    } else if (sim.data.lines.some((l) => l.kind === "wind")) {
+      add(sim.data.windAt, "Frangivento", (to) => moveRef.current?.({ part: "wind", at: to }));
+    }
+  }, [sim, arranging, drawing, state]);
   const recenter = () => mapRef.current?.easeTo({ ...camera, duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 800 });
   return (
     <div data-map-gestures="" className="relative h-full w-full touch-none overflow-hidden bg-card">
