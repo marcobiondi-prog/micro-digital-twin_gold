@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { ArrowRight, Building2, Clock3, Cloud, Smartphone, Grape, History, Play, Trash2 } from "lucide-react";
+import { ArrowRight, Building2, CalendarDays, ChevronDown, Clock3, Cloud, Smartphone, Grape, History, Play, Trash2 } from "lucide-react";
 import { currentMedia, useLabMedia, type MediaItem } from "@/models/lab-media-store";
 import { mediaTime } from "@/models/media-time";
 import { TabRow } from "@/views/v8/console";
@@ -9,7 +9,7 @@ import { peekStyle, useTabSwipe } from "@/lib/use-tab-swipe";
 import { SEASON_LABEL } from "@/models/season-climate";
 import { DashCard, DashSection } from "@/views/v10/Dashboard";
 import { clearHistory, useHistory } from "@/lib/use-history";
-import { groupByDay, whenOf, type HistoryEntry, type HistoryFlow, type HistorySource } from "@/models/intervention-history";
+import { groupByDay, whenOf, type HistoryEntry, type HistoryFlow, type HistorySource, type SourcedEntry } from "@/models/intervention-history";
 
 /** When the intervention was made, on this device's clock: "09:12". */
 const time = (e: HistoryEntry) => new Date(e.at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
@@ -37,6 +37,51 @@ function WhenLine({ e }: { e: HistoryEntry }) {
   );
 }
 
+/** One intervention: its time, what was set, the simulated season and hour, the place, where it is kept and "Apri". */
+function EntryRow({ e }: { e: SourcedEntry }) {
+  const t = time(e);
+  return (
+    <div className="flex gap-3 py-3">
+      <span className="w-12 shrink-0 text-sm tabular-nums text-muted-foreground" aria-label={`alle ${t}`}>{t}</span>
+      <div className="min-w-0 flex-1">
+        <p className="break-words text-[15px] leading-snug">{e.text}</p>
+        <WhenLine e={e} />
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">{e.flow === "piazza" ? "Piazza" : "Vigneto"}{e.place ? ` · ${e.place}` : ""}</p>
+        <SourceChip source={e.source} />
+      </div>
+      <Link to="/cronologia/$id" params={{ id: e.id }} aria-label={`Apri: ${e.text}`}
+        className="inline-flex h-9 shrink-0 items-center gap-1.5 self-center rounded-full bg-foreground/[0.08] pl-3.5 pr-3 text-sm font-semibold outline-none hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring">
+        Apri<ArrowRight className="size-4" aria-hidden="true" />
+      </Link>
+    </div>
+  );
+}
+
+/**
+ * Benvenuto: one tab per day, closed, with its date (gg/mm/aaaa), how many interventions, how many in the piazza and
+ * in the vineyard and the span of hours; a tap opens that day's interventions under it.
+ */
+function DayTab({ label, items }: { label: string; items: SourcedEntry[] }) {
+  const [open, setOpen] = useState(false);
+  const piazza = items.filter((e) => e.flow === "piazza").length, vigneto = items.length - piazza;
+  const first = time(items[items.length - 1]!), last = time(items[0]!);
+  const parts = [piazza ? `Piazza ${piazza}` : "", vigneto ? `Vigneto ${vigneto}` : ""].filter(Boolean).join(" · ");
+  return (
+    <DashCard className="py-1 sm:py-1">
+      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-3 rounded-2xl py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <CalendarDays className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-semibold tabular-nums">{label}</span>
+          <span className="block truncate text-xs text-muted-foreground">{items.length === 1 ? "1 intervento" : `${items.length} interventi`} · {parts} · {first === last ? first : `${first}–${last}`}</span>
+        </span>
+        <ChevronDown className={`size-5 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+      </button>
+      {open && <div className="divide-y divide-foreground/10 border-t border-foreground/10">{items.map((e) => <EntryRow key={e.id} e={e} />)}</div>}
+    </DashCard>
+  );
+}
+
 /** Recorded signed in (kept in the account) or without signing in (kept on this device). */
 export function SourceChip({ source }: { source: HistorySource }) {
   const account = source === "account";
@@ -56,7 +101,7 @@ const FILTERS = [
 ] as const;
 const OF: Record<HistoryFlow, string> = { piazza: "della piazza", vigneto: "del vigneto" };
 /** On Benvenuto: the latest interventions and photos only; the Cronologia page shows them all. */
-const COMPACT_ENTRIES = 5, COMPACT_SHOTS = 6;
+const COMPACT_DAYS = 5, COMPACT_SHOTS = 6;
 
 /**
  * The history of the interventions (and the photos and videos of the simulations), shared by Benvenuto (compact: the
@@ -85,7 +130,7 @@ export function HistoryBlock({ compact = false }: { compact?: boolean }) {
     const shown = shownIn(f);
     const inTab = all.filter((e) => shown(e.flow));
     const shots = allShots.filter((s) => shown(s.flow));
-    const groups = groupByDay(compact ? inTab.slice(0, COMPACT_ENTRIES) : inTab);
+    const groups = compact ? groupByDay(inTab).slice(0, COMPACT_DAYS) : groupByDay(inTab);
     const visibleShots = compact ? shots.slice(0, COMPACT_SHOTS) : shots;
     return (
       <>
@@ -101,33 +146,21 @@ export function HistoryBlock({ compact = false }: { compact?: boolean }) {
             <p className="text-[15px] font-medium">{loading ? "Carico la cronologia…" : f === "tutti" ? "Ancora nessun intervento" : `Ancora nessun intervento ${f === "piazza" ? "nella piazza" : "nel vigneto"}`}</p>
             {!loading && <p className="max-w-xs text-sm text-muted-foreground">Quando cambi alberi, prato, ombra o irrigazione nella simulazione, l’intervento si registra da solo e lo trovi qui, con foto e video.</p>}
           </DashCard>
-        ) : groups.map((g) => (
+        ) : groups.map((g) => compact
+          ? <DayTab key={g.key} label={g.label} items={g.items} />
+          : (
           <div key={g.key} className="space-y-2">
             {/* One card per day: its date on top, then each intervention of that day with its time. */}
             <h3 className="px-1 text-sm font-semibold tabular-nums text-foreground/90">{g.label}<span className="ml-2 font-medium text-muted-foreground">{g.items.length === 1 ? "1 intervento" : `${g.items.length} interventi`}</span></h3>
             <DashCard className="divide-y divide-foreground/10 py-1 sm:py-1">
-              {g.items.map((e) => (
-                <div key={e.id} className="flex gap-3 py-3">
-                  <span className="w-12 shrink-0 text-sm tabular-nums text-muted-foreground" aria-label={`alle ${time(e)}`}>{time(e)}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="break-words text-[15px] leading-snug">{e.text}</p>
-                    <WhenLine e={e} />
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{e.flow === "piazza" ? "Piazza" : "Vigneto"}{e.place ? ` · ${e.place}` : ""}</p>
-                    <SourceChip source={e.source} />
-                  </div>
-                  <Link to="/cronologia/$id" params={{ id: e.id }} aria-label={`Apri: ${e.text}`}
-                    className="inline-flex h-9 shrink-0 items-center gap-1.5 self-center rounded-full bg-foreground/[0.08] pl-3.5 pr-3 text-sm font-semibold outline-none hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring">
-                    Apri<ArrowRight className="size-4" aria-hidden="true" />
-                  </Link>
-                </div>
-              ))}
+              {g.items.map((e) => <EntryRow key={e.id} e={e} />)}
             </DashCard>
           </div>
         ))}
       </>
     );
   };
-  const more = compact && (all.length > COMPACT_ENTRIES || allShots.length > COMPACT_SHOTS || all.length > 0);
+  const more = compact && (all.length > 0 || allShots.length > COMPACT_SHOTS);
   const clear = async () => {
     setClearing(true);
     const ok = await clearHistory(filter === "tutti" ? undefined : filter);
