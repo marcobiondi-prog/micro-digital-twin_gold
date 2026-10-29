@@ -77,7 +77,8 @@ export function Ambient({ tone }: { tone: string }) {
  */
 export function AmbientPools({ className }: { className?: string }) {
   return (
-    <div className={cn("pointer-events-none fixed inset-x-0 top-0 h-[48vh] overflow-hidden", className)} aria-hidden="true">
+    // Only the top band of the screen moves: the pools stay in its upper quarter and fade out downwards.
+    <div className={cn("ambient-pools pointer-events-none fixed inset-x-0 top-0 h-[26vh] overflow-hidden", className)} aria-hidden="true">
       <div className="ambient-pool ambient-pool-a" />
       <div className="ambient-pool ambient-pool-b" />
     </div>

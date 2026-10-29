@@ -1986,11 +1986,12 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 }
 
 /* Top of every page: two pools of the page's tint drift and breathe over the still ambient light (transform/opacity only). */
-.ambient-pool { position: absolute; width: 90vw; height: 40vh; border-radius: 9999px; opacity: 0.8; background: radial-gradient(closest-side, var(--ambient-tone, transparent), transparent); will-change: transform, opacity; }
-.ambient-pool-a { left: -30vw; top: -4vh; animation: ambient-drift-a 16s ease-in-out infinite alternate, ambient-breathe 9s ease-in-out infinite; }
-.ambient-pool-b { right: -34vw; top: 6vh; animation: ambient-drift-b 20s ease-in-out infinite alternate, ambient-breathe 11s ease-in-out -4s infinite; }
-@keyframes ambient-drift-a { from { transform: translate3d(0, 0, 0) scale(0.85); } to { transform: translate3d(48vw, 8vh, 0) scale(1.2); } }
-@keyframes ambient-drift-b { from { transform: translate3d(0, 4vh, 0) scale(1.15); } to { transform: translate3d(-50vw, -4vh, 0) scale(0.85); } }
+.ambient-pools { -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent); mask-image: linear-gradient(180deg, #000 55%, transparent); }
+.ambient-pool { position: absolute; width: 80vw; height: 22vh; border-radius: 9999px; opacity: 0.8; background: radial-gradient(closest-side, var(--ambient-tone, transparent), transparent); will-change: transform, opacity; }
+.ambient-pool-a { left: -26vw; top: -8vh; animation: ambient-drift-a 16s ease-in-out infinite alternate, ambient-breathe 9s ease-in-out infinite; }
+.ambient-pool-b { right: -30vw; top: -4vh; animation: ambient-drift-b 20s ease-in-out infinite alternate, ambient-breathe 11s ease-in-out -4s infinite; }
+@keyframes ambient-drift-a { from { transform: translate3d(0, 0, 0) scale(0.85); } to { transform: translate3d(50vw, 3vh, 0) scale(1.15); } }
+@keyframes ambient-drift-b { from { transform: translate3d(0, 2vh, 0) scale(1.1); } to { transform: translate3d(-52vw, -2vh, 0) scale(0.85); } }
 @keyframes ambient-breathe { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .ambient-pool { animation: none; } }
 
