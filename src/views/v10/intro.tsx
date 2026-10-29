@@ -233,7 +233,7 @@ export function Tutorial() {
               <svg viewBox="0 0 160 100" className="intro-step-art intro-draw h-36 w-auto text-foreground sm:h-44" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{st.art}</svg>
               <p className="intro-step-index mt-8 font-mono text-sm tabular-nums text-foreground/50">0{i + 1} — 0{STEPS.length}</p>
               <h2 className="intro-step-title mt-2 font-display text-[2.4rem] font-extralight leading-tight tracking-tight text-foreground sm:text-5xl">{st.title}</h2>
-              <p className="intro-step-text mt-3 max-w-sm text-[15.5px] leading-relaxed text-foreground/60">{st.text}</p>
+              <p className="intro-step-text mt-3 max-w-sm text-[15px] leading-relaxed text-foreground/60">{st.text}</p>
             </Reveal>
           </section>
         ))}
@@ -296,7 +296,7 @@ export function Choice() {
             <ArrowLeft className="size-5" aria-hidden="true" />Indietro
           </button>
           <h1 className="font-display text-[2.6rem] font-extralight leading-[1] tracking-tight">{it.name}</h1>
-          <p className="text-[15.5px] leading-relaxed text-foreground/60">{profileIntro(identify)}</p>
+          <p className="text-[15px] leading-relaxed text-foreground/60">{profileIntro(identify)}</p>
           {proId && <p className="rounded-2xl bg-foreground/[0.06] px-4 py-3 text-sm text-foreground/70">Ora sei identificato come <span className="font-semibold text-foreground">{proSummary(proId)}</span>: identificandoti qui, quel profilo viene sostituito.</p>}
           <IdentifyForm kind={identify} onDone={() => go(it)} />
           <p className="px-1 text-xs text-foreground/50">I dati restano su questo dispositivo e, se hai fatto l'accesso, nel tuo account. Puoi uscire dal profilo quando vuoi, dal pannello account.</p>
@@ -311,7 +311,7 @@ export function Choice() {
         <h1 className="sr-only">Da dove vuoi iniziare</h1>
         <Reveal>
           <h2 aria-hidden="true" className="font-display text-[3.4rem] font-extralight leading-[0.95] tracking-tight text-foreground sm:text-7xl">Da dove<br />vuoi iniziare?</h2>
-          <p className="mt-5 max-w-xs text-[15.5px] leading-relaxed text-foreground/60">Dicci chi sei: ti identifichi qui e si apre la tua simulazione. Un profilo alla volta.</p>
+          <p className="mt-5 max-w-xs text-[15px] leading-relaxed text-foreground/60">Dicci chi sei: ti identifichi qui e si apre la tua simulazione. Un profilo alla volta.</p>
         </Reveal>
         <div role="radiogroup" aria-label="Da dove vuoi iniziare" className="mt-10 space-y-1"
           onKeyDown={(e) => {
@@ -336,7 +336,7 @@ export function Choice() {
                     {it.id === "camera" && ai ? <img src={aiLogo} alt="" aria-hidden="true" className={`size-6 rounded-md bg-white p-0.5 ${on ? "" : "opacity-50 grayscale"}`} /> : <it.Icon className="size-5 opacity-70" strokeWidth={1.5} aria-hidden="true" />}
                   </span>
                   <span className={`grid transition-[grid-template-rows,opacity] duration-300 motion-reduce:transition-none ${on ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
-                    <span className="overflow-hidden text-[15.5px] leading-snug text-foreground/60"><span className="block pt-1">{it.desc}</span></span>
+                    <span className="overflow-hidden text-[15px] leading-snug text-foreground/60"><span className="block pt-1">{it.desc}</span></span>
                   </span>
                 </span>
               </button>

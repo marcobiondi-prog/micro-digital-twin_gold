@@ -99,7 +99,7 @@ function useDashboardLoading(key: string) {
 function Kpi({ value, max, color, center, unit, label, children }: { value: number; max: number; color: string; center: ReactNode; unit: string; label: string; children?: ReactNode }) {
   return (
     <Card className="flex min-w-0 flex-col items-center gap-1.5 p-2.5 text-center sm:p-5">
-      <Ring value={value} max={max} size={84} stroke={8} color={color}><span className="font-display text-xl font-semibold leading-none">{center}</span><span className="text-[10.5px] text-muted-foreground">{unit}</span></Ring>
+      <Ring value={value} max={max} size={84} stroke={8} color={color}><span className="font-display text-xl font-semibold leading-none">{center}</span><span className="text-[10px] text-muted-foreground">{unit}</span></Ring>
       <span className="dashboard-long-label text-xs font-semibold sm:text-sm">{label}</span>
       {children}
     </Card>
@@ -310,7 +310,7 @@ function UrbanRecords() {
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Avanzamento approvazione" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
               <div className={`h-full rounded-full transition-[width] duration-500 motion-reduce:transition-none ${STAGE_TONES[displayedStage]?.dot}`} style={{ width: `${progress}%` }} />
             </div>
-            <ol className="mt-2 grid grid-cols-4 gap-1 text-center text-[10.5px] leading-tight sm:text-[11.5px]" aria-label="Stadi di approvazione">
+            <ol className="mt-2 grid grid-cols-4 gap-1 text-center text-[10px] leading-tight sm:text-[11px]" aria-label="Stadi di approvazione">
               {STAGES.map((s, i) => <li key={s} aria-current={i === displayedStage ? "step" : undefined} className={i === displayedStage ? "font-semibold text-foreground" : "text-muted-foreground"}>{s}</li>)}
             </ol>
             {!uid && <Button type="button" variant="ghost" onClick={simulateEmail} disabled={simBusy} className="mt-2 h-9 w-full rounded-full bg-urban/15 px-3 text-xs font-semibold text-urban"><Mail />{simBusy ? "Ricezione in corso…" : simUnits === null ? "Simula arrivo parere via email" : "Reinvia email simulata"}</Button>}
@@ -334,15 +334,15 @@ function UrbanRecords() {
                     </div>
                     <div className="mt-1.5 grid grid-cols-3 gap-1" role="group" aria-label={`Stato ${e}`}>
                       {APPROVAL_STATES.map(([v, l, tone]) => (
-                        <Button key={v} type="button" variant="ghost" aria-pressed={a.status === v} onClick={() => setApprovalStatus(e, v)} className={`h-8 rounded-full border px-1 text-[11.5px] font-semibold ${a.status === v ? tone : "border-border bg-background text-muted-foreground"}`}>{l}</Button>
+                        <Button key={v} type="button" variant="ghost" aria-pressed={a.status === v} onClick={() => setApprovalStatus(e, v)} className={`h-8 rounded-full border px-1 text-[11px] font-semibold ${a.status === v ? tone : "border-border bg-background text-muted-foreground"}`}>{l}</Button>
                       ))}
                     </div>
-                    {a.status !== "approvato" && <button type="button" onClick={() => void sendRequest(e)} className="mt-1.5 h-8 w-full rounded-full border border-urban/40 text-[11.5px] font-semibold text-urban">✉️ Invia richiesta via email</button>}
+                    {a.status !== "approvato" && <button type="button" onClick={() => void sendRequest(e)} className="mt-1.5 h-8 w-full rounded-full border border-urban/40 text-[11px] font-semibold text-urban">✉️ Invia richiesta via email</button>}
                   </li>
                 );
               })}
             </ul>
-            <p className="mt-2 text-[11.5px] text-muted-foreground">Per passare ad “Approvato” servono tutte le approvazioni esterne.</p>
+            <p className="mt-2 text-[11px] text-muted-foreground">Per passare ad “Approvato” servono tutte le approvazioni esterne.</p>
             {stage === 2 && approvedCount === EXTERNAL.length && <Button type="button" variant="outline" onClick={confirmRealized} className="mt-2 w-full border-ok/40 text-xs text-ok">Conferma intervento realizzato</Button>}
           </>)}
            </div>
@@ -933,7 +933,7 @@ function Dashboard() {
         <Link to="/profilo" className="mb-5 mt-3 flex min-w-0 items-center gap-3 rounded-3xl bg-foreground/[0.05] px-4 py-3 outline-none hover:bg-foreground/[0.08] focus-visible:ring-2 focus-visible:ring-ring sm:mb-6">
           <ProfileIcon kind={proId.kind} className="size-7 shrink-0" aria-hidden="true" />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[15.5px] font-semibold">{own === "Piazza" ? "La tua piazza" : "Il tuo vigneto"} · {proId.name}</span>
+            <span className="block truncate text-[15px] font-semibold">{own === "Piazza" ? "La tua piazza" : "Il tuo vigneto"} · {proId.name}</span>
             <span className="block truncate text-sm text-muted-foreground">{proSummary(proId)}</span>
           </span>
           <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />

@@ -30,14 +30,14 @@ export function Readout({ icon: Icon, value, unit, tone, caption, children }: { 
 export function ToolButton({ icon: Icon, label, active, onClick, swatch, badge, pressed }: { icon: LucideIcon; label: string; active?: boolean; onClick: () => void; swatch?: string; badge?: ReactNode; pressed?: boolean }) {
   return (
     <button type="button" onClick={onClick} aria-pressed={pressed ?? active}
-      className={cn("relative flex min-h-[4.5rem] min-w-0 flex-col items-center justify-center gap-1.5 rounded-2xl px-1 py-2 text-[11.5px] font-semibold uppercase tracking-wide outline-none transition-[background-color,box-shadow,color,transform] duration-150 focus-visible:ring-2 focus-visible:ring-ring active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100",
+      className={cn("relative flex min-h-[4.5rem] min-w-0 flex-col items-center justify-center gap-1.5 rounded-2xl px-1 py-2 text-[11px] font-semibold uppercase tracking-wide outline-none transition-[background-color,box-shadow,color,transform] duration-150 focus-visible:ring-2 focus-visible:ring-ring active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100",
         active ? "bg-foreground/[0.12] text-foreground shadow-[0_0_0_2px_var(--foreground),0_0_20px_-2px_color-mix(in_oklab,var(--foreground)_45%,transparent)]" : "bg-foreground/[0.05] text-foreground/60 hover:bg-foreground/[0.08]")}>
       <span className="relative grid size-8 place-items-center">
         <Icon className="size-7" aria-hidden="true" />
         {swatch && <span className={cn("absolute -bottom-1 -right-1 size-3 rounded-full ring-2 ring-card", swatch)} aria-hidden="true" />}
       </span>
       <span className="max-w-full truncate">{label}</span>
-      {badge != null && <span className="absolute right-1.5 top-1.5 min-w-5 rounded-full bg-foreground/15 px-1 text-center font-mono text-[10.5px] leading-4 text-foreground">{badge}</span>}
+      {badge != null && <span className="absolute right-1.5 top-1.5 min-w-5 rounded-full bg-foreground/15 px-1 text-center font-mono text-[10px] leading-4 text-foreground">{badge}</span>}
     </button>
   );
 }

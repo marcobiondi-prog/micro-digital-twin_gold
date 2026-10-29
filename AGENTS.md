@@ -9,7 +9,7 @@
 - Lab controls precede grids on phones; top-align compact panels elsewhere; desktop tools use grid gutters without resizing cells.
 - Touch devices (hover: none, coarse pointer) disable text selection and long-press callouts except in fields.
 - No pinch-zoom on phones or tablets: viewport user-scalable=no, base touch-action pan-x pan-y on every element, iOS gesture/scale blocks and ctrl+wheel blocked on touch devices (desktop keeps ctrl+wheel zoom); only [data-map-gestures] maps (the 3D view, gestureHandling GREEDY, one-finger move) keep their own pinch/rotate.
-- Text is a hair larger than Tailwind's defaults (styles.css @theme: xs 12.5, sm 14.5, base 16.5, lg 18.5, xl 20.5 px; the fixed text-[…px] sizes half a px up: 11→11.5, 15→15.5 and so on); long values in label · value rows wrap anywhere so they never push past the screen.
+- Long values in label · value rows (profile, history detail) wrap anywhere so they never push past the screen.
 - Semantic tokens keep light/dark legible; explicit document themes persist; the app opens dark (the PlayStation-app canvas: html renders class "dark", themeBootScript drops it before paint only for a saved light choice, theme-color follows); dashboard cards/charts never overflow on mobile/tablet.
 - Header/favicon use optimized transparent robot PNGs.
 - Cases keep dated evidence separate from Query weather and daily source research; authenticated jobs write the public read-only cache.

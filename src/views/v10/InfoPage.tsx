@@ -40,7 +40,7 @@ export function InfoPage({ title, intro, children }: { title: string; intro?: Re
         </button>
         <h1 className={nav ? "min-w-0 font-display text-2xl font-light tracking-tight" : "min-w-0 font-display text-3xl font-light tracking-tight sm:text-4xl"}>{title}</h1>
       </div>
-      {intro && <p className="text-[15.5px] leading-relaxed text-muted-foreground">{intro}</p>}
+      {intro && <p className="text-[15px] leading-relaxed text-muted-foreground">{intro}</p>}
       {children}
     </article>
   );
@@ -49,7 +49,7 @@ export function InfoPage({ title, intro, children }: { title: string; intro?: Re
 /** One card of text with a bold heading. */
 export function InfoCard({ title, children }: { title?: string; children: ReactNode }) {
   return (
-    <section className="space-y-3 rounded-3xl bg-foreground/[0.05] p-5 text-[15.5px] leading-relaxed">
+    <section className="space-y-3 rounded-3xl bg-foreground/[0.05] p-5 text-[15px] leading-relaxed">
       {title && <h2 className="text-base font-semibold">{title}</h2>}
       <div className="space-y-3 text-foreground/85 [&_li]:ml-5 [&_li]:list-disc [&_ul]:space-y-1.5">{children}</div>
     </section>
@@ -64,7 +64,7 @@ export function Faq({ q, children }: { q: string; children: ReactNode }) {
         <span className="min-w-0 flex-1">{q}</span>
         <span className="grid size-7 shrink-0 place-items-center rounded-full bg-foreground/[0.08] text-lg leading-none transition-transform duration-200 group-open:rotate-45 motion-reduce:transition-none" aria-hidden="true">+</span>
       </summary>
-      <div className="space-y-2 px-5 pb-5 text-[15.5px] leading-relaxed text-foreground/85 [&_li]:ml-5 [&_li]:list-disc [&_ul]:space-y-1">{children}</div>
+      <div className="space-y-2 px-5 pb-5 text-[15px] leading-relaxed text-foreground/85 [&_li]:ml-5 [&_li]:list-disc [&_ul]:space-y-1">{children}</div>
     </details>
   );
 }

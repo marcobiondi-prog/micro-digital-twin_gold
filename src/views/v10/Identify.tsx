@@ -15,7 +15,7 @@ import {
 import { Ambient, PageHero } from "@/views/v8/console";
 import { SECTION_TONE } from "@/views/v10/ProfileGate";
 
-const fieldCls = "h-12 w-full rounded-2xl border border-foreground/10 bg-foreground/[0.05] px-4 text-[15.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring aria-[invalid=true]:border-danger dark:[color-scheme:dark]";
+const fieldCls = "h-12 w-full rounded-2xl border border-foreground/10 bg-foreground/[0.05] px-4 text-[15px] outline-none focus-visible:ring-2 focus-visible:ring-ring aria-[invalid=true]:border-danger dark:[color-scheme:dark]";
 /** The list a select opens is drawn by the system: its rows get the theme's own colours, else on Windows they read white on white. */
 const optionCls = "bg-background text-foreground";
 
@@ -74,7 +74,7 @@ function AgronomoForm({ onDone }: { onDone: () => void }) {
           {([["consulente", "Consulente", "per consigliare"], ["utilizzatore", "Utilizzatore", "per acquisto e uso"]] as const).map(([k, l, s]) => (
             <button key={k} type="button" role="radio" aria-checked={v.licenceType === k} onClick={() => up("licenceType", k)}
               className={cn("rounded-2xl px-4 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring", v.licenceType === k ? "bg-foreground text-background" : "bg-foreground/[0.05]")}>
-              <span className="block text-[15.5px] font-semibold">{l}</span><span className={cn("block text-xs", v.licenceType === k ? "text-background/70" : "text-muted-foreground")}>{s}</span>
+              <span className="block text-[15px] font-semibold">{l}</span><span className={cn("block text-xs", v.licenceType === k ? "text-background/70" : "text-muted-foreground")}>{s}</span>
             </button>
           ))}
         </div>
@@ -87,7 +87,7 @@ function AgronomoForm({ onDone }: { onDone: () => void }) {
       {findRegion(v.region) && (
         <div className="flex items-center gap-4 rounded-2xl bg-foreground/[0.05] px-4 py-3">
           <TownCrest name={findRegion(v.region)!} region />
-          <p className="min-w-0 text-[15.5px] font-semibold">Regione {findRegion(v.region)}<span className="block text-sm font-normal text-muted-foreground">Il tuo profilo porterà il suo stemma.</span></p>
+          <p className="min-w-0 text-[15px] font-semibold">Regione {findRegion(v.region)}<span className="block text-sm font-normal text-muted-foreground">Il tuo profilo porterà il suo stemma.</span></p>
         </div>
       )}
       <Declare checked={v.declared} onChange={(b) => up("declared", b)} error={errors.declared} />
@@ -133,7 +133,7 @@ function SuggestField({ id, describedBy, invalid, value, placeholder, label, sug
           {shown.map((c, i) => (
             <li key={`${c[0]}-${c[1]}`} id={`${listId}-${i}`} role="option" aria-selected={i === active}
               onMouseDown={(e) => { e.preventDefault(); pick(c); }} onMouseEnter={() => setActive(i)}
-              className={cn("flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-xl px-3 text-[15.5px]", i === active && "bg-foreground/[0.08]")}>
+              className={cn("flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-xl px-3 text-[15px]", i === active && "bg-foreground/[0.08]")}>
               <span className="truncate">{c[0]}</span>{c[1] && <span className="shrink-0 text-sm text-muted-foreground">{c[1]}</span>}
             </li>
           ))}
@@ -202,7 +202,7 @@ function FunzionarioForm({ onDone }: { onDone: () => void }) {
       {town && (
         <div className="flex items-center gap-4 rounded-2xl bg-foreground/[0.05] px-4 py-3">
           <TownCrest name={town} />
-          <p className="min-w-0 text-[15.5px] font-semibold">Comune di {town}<span className="block text-sm font-normal text-muted-foreground">Il tuo profilo porterà il suo stemma.</span></p>
+          <p className="min-w-0 text-[15px] font-semibold">Comune di {town}<span className="block text-sm font-normal text-muted-foreground">Il tuo profilo porterà il suo stemma.</span></p>
         </div>
       )}
       <Declare checked={v.declared} onChange={(b) => up("declared", b)} error={errors.declared} />
@@ -245,11 +245,11 @@ export function ProfileCard({ kind, go }: { kind: ProKind; go?: () => void }) {
       </div>
       <dl className="divide-y divide-foreground/10 rounded-2xl bg-foreground/[0.05] px-4">
         {profileRows(mine).map(([k, v]) => (
-          <div key={k} className="flex items-baseline justify-between gap-4 py-3"><dt className="shrink-0 text-sm text-muted-foreground">{k}</dt><dd className="min-w-0 text-right text-[15.5px] font-medium [overflow-wrap:anywhere]">{v}</dd></div>
+          <div key={k} className="flex items-baseline justify-between gap-4 py-3"><dt className="shrink-0 text-sm text-muted-foreground">{k}</dt><dd className="min-w-0 text-right text-[15px] font-medium [overflow-wrap:anywhere]">{v}</dd></div>
         ))}
       </dl>
       {go && (
-        <button type="button" onClick={go} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground text-[15.5px] font-semibold text-background outline-none focus-visible:ring-4 focus-visible:ring-ring/50">
+        <button type="button" onClick={go} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground text-[15px] font-semibold text-background outline-none focus-visible:ring-4 focus-visible:ring-ring/50">
           <Icon className="size-5" aria-hidden="true" />Vai {kind === "agronomo" ? "al vigneto" : "alla piazza"}
         </button>
       )}
@@ -296,7 +296,7 @@ export function IdentifyPage({ kind }: { kind: ProKind }) {
         <ProfileCard kind={kind} go={() => void navigate({ to: p.go })} />
       ) : (
         <>
-          <p className="text-[15.5px] leading-relaxed text-muted-foreground">{p.intro}</p>
+          <p className="text-[15px] leading-relaxed text-muted-foreground">{p.intro}</p>
           {id && <p className="rounded-2xl bg-foreground/[0.06] px-4 py-3 text-sm text-muted-foreground">Ora sei identificato come <span className="font-semibold text-foreground">{proSummary(id)}</span>: identificandoti qui, quel profilo viene sostituito e {p.locks} si blocca.</p>}
           <IdentifyForm kind={kind} onDone={done} />
           <p className="px-1 text-xs text-muted-foreground">I dati restano su questo dispositivo e, se hai fatto l'accesso, nel tuo account. Puoi uscire dal profilo quando vuoi.</p>

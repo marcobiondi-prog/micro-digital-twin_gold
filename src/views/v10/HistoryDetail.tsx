@@ -11,7 +11,7 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-4 py-3">
       <dt className="shrink-0 text-sm text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 break-words text-right text-[15.5px] font-medium tabular-nums [overflow-wrap:anywhere]">{value}</dd>
+      <dd className="min-w-0 break-words text-right text-[15px] font-medium tabular-nums [overflow-wrap:anywhere]">{value}</dd>
     </div>
   );
 }
@@ -43,7 +43,7 @@ export function HistoryDetail({ id }: { id: string }) {
       </button>
       <PageHero kicker={e ? `${e.flow === "piazza" ? "Piazza" : "Vigneto"}${e.place ? ` · ${e.place}` : ""}` : "Cronologia"} title="Intervento" />
       {!e || !d ? (
-        <DashCard><p className="text-[15.5px]">{loading ? "Carico l’intervento…" : "Questo intervento non è più nella cronologia."}</p></DashCard>
+        <DashCard><p className="text-[15px]">{loading ? "Carico l’intervento…" : "Questo intervento non è più nella cronologia."}</p></DashCard>
       ) : (
         <>
           <DashSection title="Quando">
@@ -65,7 +65,7 @@ export function HistoryDetail({ id }: { id: string }) {
                   <dl className="divide-y divide-foreground/10">{g.rows.map((r) => <Row key={r.label} {...r} />)}</dl>
                 </DashCard>
               </div>
-            )) : <DashCard><p className="text-[15.5px]">{e.text}</p></DashCard>}
+            )) : <DashCard><p className="text-[15px]">{e.text}</p></DashCard>}
           </DashSection>
           {e.mix && (
             <button type="button" onClick={() => resume(e)} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground/[0.08] text-sm font-semibold outline-none hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring">

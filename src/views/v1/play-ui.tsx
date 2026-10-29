@@ -32,7 +32,7 @@ export function BigButton({ icon: Icon, label, active, onClick, tone, badge, pre
     >
       <span className={cn("grid size-11 place-items-center rounded-full text-white sm:size-12", tone)}><Icon className="size-6 sm:size-7" aria-hidden="true" /></span>
       <span className="max-w-full truncate">{label}</span>
-      {badge != null && <span className="absolute right-1.5 top-1.5 min-w-6 rounded-full bg-foreground px-1.5 text-center text-[11.5px] font-bold leading-5 text-background">{badge}</span>}
+      {badge != null && <span className="absolute right-1.5 top-1.5 min-w-6 rounded-full bg-foreground px-1.5 text-center text-[11px] font-bold leading-5 text-background">{badge}</span>}
     </button>
   );
 }

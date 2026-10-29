@@ -87,7 +87,7 @@ export function SensorAdvisor({ kind, embedded = false }: { kind: "urban" | "vin
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 font-semibold"><Thermometer className="size-4 shrink-0 text-primary" /><span className="break-words">{s.nome}</span></div>
                       {s.luogo && <p className="mt-0.5 break-words text-xs text-muted-foreground">{s.luogo}</p>}
-                      <a className="font-mono text-[11.5px] text-muted-foreground underline" href={`https://www.google.com/maps?q=${s.lat},${s.lng}`} target="_blank" rel="noreferrer">{s.lat.toFixed(5)}, {s.lng.toFixed(5)}</a>
+                      <a className="font-mono text-[11px] text-muted-foreground underline" href={`https://www.google.com/maps?q=${s.lat},${s.lng}`} target="_blank" rel="noreferrer">{s.lat.toFixed(5)}, {s.lng.toFixed(5)}</a>
                     </div>
                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${tone[s.priorita]}`}>{s.priorita}</span>
                   </div>
