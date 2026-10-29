@@ -1,4 +1,5 @@
-const MIN_SWIPE = 60;
+/** Like the tutorial: past 50 px the page turns. */
+export const MIN_SWIPE = 50;
 
 /** The tab a horizontal swipe leads to: left goes to the next one, right to the previous; it stops at the ends. A mostly vertical move changes nothing. */
 export function simTabSwipeStep(index: number, total: number, dx: number, dy: number): number {

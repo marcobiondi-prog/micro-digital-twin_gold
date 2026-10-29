@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { justSwiped } from "@/lib/use-tab-swipe";
 import { THEME_CHANGED, THEME_DARK, THEME_META } from "@/views/theme-toggle";
 
 /**
@@ -131,12 +132,13 @@ export function Panels<T extends string>({ value, panels }: { value: T; panels: 
   // The panel slides in from the side of its tab: a later tab comes from the right, an earlier one from the left.
   const index = panels.findIndex((p) => p.id === value);
   const last = useRef(index);
-  const dir = index === last.current ? 0 : index > last.current ? 1 : -1;
+  // A swipe already slides the panel in with the finger (useTabSwipe): no second entrance then.
+  const dir = index === last.current || justSwiped() ? 0 : index > last.current ? 1 : -1;
   useEffect(() => { last.current = index; }, [index]);
   return (
     <>
       {panels.map((p) => (p.always || seen.has(p.id) || p.id === value) && (
-        <div key={p.id} role="tabpanel" hidden={p.id !== value} className={cn("animate-in fade-in-0 duration-300 motion-reduce:animate-none", p.id === value && dir > 0 && "slide-in-from-right-10", p.id === value && dir < 0 && "slide-in-from-left-10")}>{p.content}</div>
+        <div key={p.id} role="tabpanel" hidden={p.id !== value} className={cn(dir !== 0 && "animate-in fade-in-0 duration-300 motion-reduce:animate-none", p.id === value && dir > 0 && "slide-in-from-right-10", p.id === value && dir < 0 && "slide-in-from-left-10")}>{p.content}</div>
       ))}
     </>
   );

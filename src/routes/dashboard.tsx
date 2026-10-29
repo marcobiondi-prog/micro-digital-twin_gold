@@ -901,7 +901,7 @@ function Dashboard() {
   const navigate = useNavigate({ from: Route.fullPath });
   const setT = (v: "Piazza" | "Vigneto") =>
     navigate({ search: (prev) => ({ ...prev, tab: v }), replace: true, resetScroll: false });
-  useTabSwipe(["Piazza", "Vigneto"] as const, t, setT);
+  const track = useTabSwipe(["Piazza", "Vigneto"] as const, t, setT);
   const loading = useDashboardLoading(t);
   return (
     <div className="min-w-0">
@@ -912,7 +912,7 @@ function Dashboard() {
       <div className="sticky top-[var(--nav-h)] transition-[top] duration-300 z-[999999998] isolate mx-[calc(50%-50vw)] mb-5 mt-3 min-w-0 bg-background/80 px-0 py-2 sm:px-[calc(50vw-50%)] backdrop-blur-xl sm:mb-6">
         <TabRow fill label="Dashboard" items={[{ id: "Piazza", label: "Piazza", icon: Building2 }, { id: "Vigneto", label: "Vigneto", icon: Grape }]} value={t} onChange={setT} />
       </div>
-      <div key={t} className="min-w-0">{loading
+      <div key={t} className="min-w-0" style={track}>{loading
         ? <DashboardLoading label={t === "Piazza" ? "dashboard della piazza" : "dashboard del vigneto"} tone={t === "Piazza" ? "urban" : "vine"} />
         : <div className="dashboard-content-enter">{t === "Piazza" ? <PiazzaDashboard records={<UrbanRecords />} /> : <VineDashboard records={<VineRecords />} />}</div>}
       </div>
