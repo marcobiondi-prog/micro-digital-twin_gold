@@ -88,7 +88,9 @@ export function CameraSheet() {
   // Closing the sheet steps history back: what comes next waits for that Back to land (else it would undo a navigation,
   // and the AI camera would read it as "close").
   const afterClose = (next: () => void) => {
-    const go = () => { window.removeEventListener("popstate", go); window.clearTimeout(timer); next(); };
+    // One more beat after the Back: a panel opened in the same task could still see it and close at once.
+    let done = false;
+    const go = () => { if (done) return; done = true; window.removeEventListener("popstate", go); window.clearTimeout(timer); window.setTimeout(next, 60); };
     const timer = window.setTimeout(go, 400);
     window.addEventListener("popstate", go);
     close();
