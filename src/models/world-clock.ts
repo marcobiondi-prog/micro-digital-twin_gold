@@ -44,3 +44,32 @@ export const sameClock = (ms: number, a: string, b: string): boolean => utcOffse
 
 /** How far the device clock is behind the world time, from a server reading taken between `sent` and `got` (device ms). */
 export const clockOffset = (server: number, sent: number, got: number): number => server - (sent + got) / 2;
+
+/** Minutes ahead of UTC for the zone at that instant. */
+export function offsetMinutes(ms: number, tz: string): number {
+  const m = /UTC([+−])(\d+)(?::(\d{2}))?/.exec(utcOffsetText(ms, tz));
+  return m ? (m[1] === "−" ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3] ?? 0)) : 0;
+}
+
+/**
+ * Ora solare or ora legale at that instant, and when it next changes (within a year): "nessuna" for a zone that keeps
+ * one time all year.
+ */
+export type SummerTime = { kind: "legale" | "solare" | "nessuna"; next: { at: number; to: "legale" | "solare" } | null };
+export function summerTime(ms: number, tz: string): SummerTime {
+  const DAY = 864e5, year = new Date(ms).getUTCFullYear();
+  const jan = offsetMinutes(Date.UTC(year, 0, 1), tz), jul = offsetMinutes(Date.UTC(year, 6, 1), tz);
+  if (jan === jul) return { kind: "nessuna", next: null };
+  const standard = Math.min(jan, jul), now = offsetMinutes(ms, tz);
+  const kind = now > standard ? "legale" : "solare";
+  // Day by day to the change, then to the minute it happens.
+  for (let d = 1; d <= 366; d++) {
+    if (offsetMinutes(ms + d * DAY, tz) === now) continue;
+    let lo = ms + (d - 1) * DAY, hi = ms + d * DAY;
+    while (hi - lo > 60_000) { const mid = Math.floor((lo + hi) / 2); if (offsetMinutes(mid, tz) === now) lo = mid; else hi = mid; }
+    let at = Math.floor(hi / 60_000) * 60_000;
+    if (offsetMinutes(at, tz) === now) at += 60_000;
+    return { kind, next: { at, to: kind === "legale" ? "solare" : "legale" } };
+  }
+  return { kind, next: null };
+}

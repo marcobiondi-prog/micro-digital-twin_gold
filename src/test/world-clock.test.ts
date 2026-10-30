@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clockOffset, placeTime, sameClock, utcOffsetText, validTimeZone, zoneName } from "@/models/world-clock";
+import { clockOffset, placeTime, summerTime, sameClock, utcOffsetText, validTimeZone, zoneName } from "@/models/world-clock";
 
 describe("world-clock", () => {
   const t = Date.UTC(2026, 9, 30, 12, 7); // 30 Oct 2026, 12:07 UTC
@@ -27,5 +27,15 @@ describe("world-clock", () => {
   });
   it("takes half the round trip off the server reading", () => {
     expect(clockOffset(10_100, 1_000, 1_200)).toBe(9_000);
+  });
+  it("tells ora solare from ora legale and when it changes", () => {
+    const rome = summerTime(Date.UTC(2026, 6, 1), "Europe/Rome");
+    expect(rome.kind).toBe("legale");
+    expect(rome.next).toEqual({ at: Date.UTC(2026, 9, 25, 1, 0), to: "solare" }); // 03:00 legale → 02:00 solare
+    const winter = summerTime(Date.UTC(2026, 9, 30, 12), "Europe/Rome");
+    expect(winter.kind).toBe("solare");
+    expect(winter.next).toEqual({ at: Date.UTC(2027, 2, 28, 1, 0), to: "legale" });
+    expect(summerTime(Date.UTC(2026, 6, 1), "Asia/Tokyo")).toEqual({ kind: "nessuna", next: null });
+    expect(summerTime(Date.UTC(2026, 6, 1), "Australia/Sydney").kind).toBe("solare");
   });
 });

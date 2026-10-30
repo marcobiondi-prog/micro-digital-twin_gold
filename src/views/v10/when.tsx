@@ -5,7 +5,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, Clock, Globe } from "lucide-rea
 import { getSeasonalClimate } from "@/controllers/climate.functions";
 import { SEASONS, SEASON_LABEL, seasonOfMonth, type Season } from "@/models/season-climate";
 import { clearRequestedWhen, clockText, peekRequestedWhen, setSimWhen } from "@/models/sim-when";
-import { deviceTimeZone, placeTime, sameClock, utcOffsetText, validTimeZone, zoneName } from "@/models/world-clock";
+import { deviceTimeZone, placeTime, sameClock, summerTime, utcOffsetText, validTimeZone, zoneName } from "@/models/world-clock";
 import { syncWorldTime, worldNow } from "@/lib/world-time";
 import { hapticTick } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
@@ -99,6 +99,24 @@ function ZoneLine({ clock }: { clock: SeasonClock }) {
       <Globe className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
       <span>{clock.placeZone ? "Ora del luogo" : "Ora del tuo dispositivo"} · {zoneName(now, clock.tz)} ({utcOffsetText(now, clock.tz)})</span>
       {away && <span className="text-muted-foreground">· da te sono le {clockText(mine.hour, mine.minute)}</span>}
+      <SummerLine tz={clock.tz} now={now} />
     </p>
+  );
+}
+
+/** "Ora legale · torna l'ora solare domenica 25 ottobre alle 03:00", "Ora solare · …", or that the zone has no summer time. */
+function SummerLine({ tz, now }: { tz: string; now: number }) {
+  const st = summerTime(now, tz);
+  const when = st.next && (() => {
+    // The hands: from the old time (a minute before, plus that minute) to the new one.
+    const before = placeTime(st.next.at - 60_000, tz), after = placeTime(st.next.at, tz);
+    const from = clockText((before.hour + (before.minute === 59 ? 1 : 0)) % 24, (before.minute + 1) % 60);
+    const day = new Date(st.next.at).toLocaleDateString("it-IT", { timeZone: tz, weekday: "long", day: "numeric", month: "long" });
+    return `${st.next.to === "legale" ? "arriva l'ora legale" : "torna l'ora solare"} ${day}: alle ${from} le lancette vanno alle ${clockText(after.hour, after.minute)}`;
+  })();
+  return (
+    <span className="basis-full text-muted-foreground">
+      <b className="font-semibold text-foreground/80">{st.kind === "legale" ? "Ora legale" : st.kind === "solare" ? "Ora solare" : "Nessuna ora legale qui"}</b>{when ? ` · ${when}` : ""}
+    </span>
   );
 }
