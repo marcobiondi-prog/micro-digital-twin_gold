@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { ArrowRight, Building2, CalendarDays, Check, ChevronDown, Clock3, Cloud, Smartphone, Grape, History, Play, Trash2 } from "lucide-react";
+import { ArrowRight, Building2, CalendarDays, Check, Share2, ChevronDown, Clock3, Cloud, Smartphone, Grape, History, Play, Trash2 } from "lucide-react";
 import { currentMedia, removeMedia, useLabMedia, type MediaItem } from "@/models/lab-media-store";
 import { mediaTime } from "@/models/media-time";
 import { TabRow } from "@/views/v8/console";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { forShare } from "@/views/v10/ExportSheet";
 import { peekStyle, useTabSwipe } from "@/lib/use-tab-swipe";
 import { useProId } from "@/lib/use-pro-id";
 import { SEASON_LABEL } from "@/models/season-climate";
@@ -60,14 +61,27 @@ function Thumb({ s, onOpen }: { s: Shot; onOpen: () => void }) {
  */
 function ShotViewer({ shots, start, onClose }: { shots: Shot[]; start: number; onClose: () => void }) {
   const [open, setOpen] = useState(false);
+  // Its own copy: a photo deleted here leaves at once, without waiting for the pile behind to change.
+  const [list, setList] = useState(shots);
   const [i, setI] = useState(start);
+  const [ask, setAsk] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
   const row = useRef<HTMLDivElement>(null);
+  // Each photo's file, fetched as soon as it is shown, so the share opens straight from the tap.
+  const files = useRef(new Map<string, Blob>());
   // Mounted closed, then opened (the shared dialog's history step), at the photo that was tapped.
   useEffect(() => { setOpen(true); }, []);
   useEffect(() => {
     if (!open) return;
     requestAnimationFrame(() => { const r = row.current; if (r) r.scrollLeft = start * r.clientWidth; });
   }, [open, start]);
+  const s = list[Math.min(i, list.length - 1)] ?? list[0]!;
+  useEffect(() => {
+    setAsk(false); setNote("");
+    if (!s || files.current.has(s.url)) return;
+    void fetch(s.url).then((r) => r.blob()).then((b) => { files.current.set(s.url, b); }, () => {});
+  }, [s]);
   const onScroll = () => {
     const r = row.current; if (!r) return;
     const n = Math.round(r.scrollLeft / Math.max(1, r.clientWidth));
@@ -78,33 +92,90 @@ function ShotViewer({ shots, start, onClose }: { shots: Shot[]; start: number; o
     }
   };
   const go = (n: number) => { const r = row.current; if (r) r.scrollTo({ left: n * r.clientWidth, behavior: "smooth" }); };
-  const s = shots[i] ?? shots[0]!;
-  const when = s.at ? new Date(s.at).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+  const close = () => { setOpen(false); setTimeout(onClose, 200); };
+  const when = s?.at ? new Date(s.at).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+  const what = s?.kind === "video" ? "questo video" : "questa foto";
+
+  /** The phone's own share window with this file (WhatsApp, Telegram, Gmail…); else it is saved in Download. */
+  const share = async () => {
+    setNote("");
+    try {
+      const blob = files.current.get(s.url) ?? (await (await fetch(s.url)).blob());
+      const file = forShare(s.name, blob);
+      if (file && typeof navigator.share === "function") {
+        try { await navigator.share({ files: [file], title: s.name }); return; }
+        catch (e) {
+          if ((e as Error)?.name === "AbortError") return;
+          setNote("Il telefono non ha aperto la condivisione: tocca di nuovo.");
+          return;
+        }
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url; a.download = file?.name ?? s.name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      setNote(file ? "Qui la condivisione non c'è: salvata in Download." : "Il telefono non condivide questo tipo di file: salvato in Download.");
+    } catch { setNote("File non raggiungibile: controlla la connessione."); }
+  };
+  /** Deleted for good, from the account or from this device; the viewer moves on to the next one, or closes. */
+  const del = async () => {
+    const gone = s;
+    setBusy(true);
+    try {
+      if (list.length === 1) close();
+      await removeMedia(gone.flow === "piazza" ? "urban" : "vineyard", [gone]);
+      toast.success(gone.kind === "video" ? "Video eliminato" : "Foto eliminata");
+      setList((l) => l.filter((x) => x !== gone));
+      setI((k) => Math.max(0, Math.min(k, list.length - 2)));
+    } catch {
+      setNote("Eliminazione non riuscita: controlla la connessione e riprova.");
+    } finally { setBusy(false); setAsk(false); }
+  };
+  if (!s) return null;
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) { setOpen(false); setTimeout(onClose, 200); } }}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) close(); }}>
       <DialogContent overlayClassName="bg-black" className="!left-0 !top-0 flex h-[100dvh] w-full max-w-none !translate-x-0 !translate-y-0 flex-col gap-0 rounded-none border-0 bg-black p-0 text-white sm:max-h-none sm:rounded-none">
-        <DialogTitle className="sr-only">{s.kind === "video" ? "Video" : "Foto"} {i + 1} di {shots.length}</DialogTitle>
+        <DialogTitle className="sr-only">{s.kind === "video" ? "Video" : "Foto"} {i + 1} di {list.length}</DialogTitle>
         <DialogDescription className="sr-only">{s.flow === "piazza" ? "Piazza" : "Vigneto"}{when ? `, ${when}` : ""}</DialogDescription>
         <div className="flex items-center gap-3 px-4 pb-2 pr-16 pt-[calc(0.85rem+env(safe-area-inset-top))]">
-          <span className="text-[15px] font-semibold tabular-nums">{i + 1} di {shots.length}</span>
+          <span className="text-[15px] font-semibold tabular-nums">{Math.min(i, list.length - 1) + 1} di {list.length}</span>
           <span className="min-w-0 truncate text-sm text-white/65">{s.flow === "piazza" ? "Piazza" : "Vigneto"}{when ? ` · ${when}` : ""}</span>
         </div>
         <div ref={row} onScroll={onScroll} data-map-gestures="" className="no-scrollbar flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden touch-pan-x">
-          {shots.map((x, k) => (
+          {list.map((x, k) => (
             <div key={`${x.flow}-${x.id}`} className="relative grid h-full w-full shrink-0 snap-center place-items-center px-1">
               {Math.abs(k - i) <= 2 && (x.kind === "video"
                 ? <video src={x.url} controls playsInline preload="metadata" className="max-h-full max-w-full" />
-                : <img src={x.url} alt={`Foto ${k + 1} di ${shots.length}`} className="max-h-full max-w-full object-contain" />)}
+                : <img src={x.url} alt={`Foto ${k + 1} di ${list.length}`} className="max-h-full max-w-full object-contain" />)}
             </div>
           ))}
         </div>
-        <div className="flex items-center justify-center gap-6 px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-          <button type="button" onClick={() => go(i - 1)} disabled={i === 0} aria-label="Precedente" className="grid size-11 place-items-center rounded-full bg-white/10 text-xl outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-30">‹</button>
-          <div className="flex max-w-[50vw] gap-1.5 overflow-hidden" aria-hidden="true">
-            {shots.length <= 15 && shots.map((x, k) => <span key={k} className={`h-1.5 rounded-full transition-all ${k === i ? "w-5 bg-white" : "w-1.5 bg-white/35"}`} />)}
+        {note && <p role="status" className="px-6 pt-3 text-center text-[13px] text-brand-turquoise">{note}</p>}
+        {ask ? (
+          <div role="alertdialog" aria-label="Conferma eliminazione" className="mx-4 mt-3 rounded-2xl bg-white/[0.08] p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-center">
+            <p className="text-[15px] font-medium">Eliminare {what}? Non si può recuperare.</p>
+            <div className="mt-3 flex gap-2">
+              <button type="button" onClick={() => setAsk(false)} disabled={busy} className="h-12 flex-1 rounded-full bg-white/10 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-white">Annulla</button>
+              <button type="button" onClick={() => void del()} disabled={busy} className="h-12 flex-1 rounded-full bg-destructive text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-60">{busy ? "Elimino…" : "Elimina"}</button>
+            </div>
           </div>
-          <button type="button" onClick={() => go(i + 1)} disabled={i === shots.length - 1} aria-label="Successiva" className="grid size-11 place-items-center rounded-full bg-white/10 text-xl outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-30">›</button>
-        </div>
+        ) : (
+          <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            <button type="button" onClick={() => void share()} className="flex w-16 flex-col items-center gap-1 text-xs outline-none focus-visible:underline">
+              <span className="grid size-11 place-items-center rounded-full bg-white/10"><Share2 className="size-5" aria-hidden="true" /></span>Condividi
+            </button>
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => go(i - 1)} disabled={i === 0} aria-label="Precedente" className="grid size-10 place-items-center rounded-full bg-white/10 text-xl outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-30">‹</button>
+              <div className="flex max-w-[30vw] gap-1.5 overflow-hidden" aria-hidden="true">
+                {list.length <= 9 && list.map((x, k) => <span key={k} className={`h-1.5 rounded-full transition-all ${k === i ? "w-5 bg-white" : "w-1.5 bg-white/35"}`} />)}
+              </div>
+              <button type="button" onClick={() => go(i + 1)} disabled={i >= list.length - 1} aria-label="Successiva" className="grid size-10 place-items-center rounded-full bg-white/10 text-xl outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-30">›</button>
+            </div>
+            <button type="button" onClick={() => setAsk(true)} className="flex w-16 flex-col items-center gap-1 text-xs outline-none focus-visible:underline">
+              <span className="grid size-11 place-items-center rounded-full bg-destructive/20 text-red-300"><Trash2 className="size-5" aria-hidden="true" /></span>Elimina
+            </button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -156,7 +227,8 @@ function PhotoPiles({ shots }: { shots: Shot[] }) {
             <button key={p.key} type="button" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : p.key)}
               aria-label={`${p.label}: ${countText(p.shots)}`}
               className="group text-left outline-none">
-              <span className={`relative mx-2 mt-2 block aspect-[4/3] transition-transform duration-200 group-active:scale-[0.97] ${isOpen ? "ring-2 ring-foreground ring-offset-4 ring-offset-background rounded-2xl" : ""}`}>
+              <span className="relative mx-2 mt-2 block aspect-[4/3] transition-transform duration-200 group-active:scale-[0.97]">
+                {isOpen && <><span className="pile-glow" aria-hidden="true" /><span className="pile-ring" aria-hidden="true" /></>}
                 {third && <PileCard s={third} className="opacity-70" style={{ transform: "rotate(-8deg) translate(-10px, 6px)" }} />}
                 {second && <PileCard s={second} className="opacity-85" style={{ transform: "rotate(6deg) translate(10px, 3px)" }} />}
                 {top && <PileCard s={top} />}
