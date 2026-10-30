@@ -8,9 +8,15 @@ import { hapticTick } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
 /** The camera's and the gallery's bottom sheet: rises from the bottom on phones, a centred dialog from sm up. */
-const SHEET = "!flex flex-col gap-0 p-5 pt-3 max-h-[92dvh] overflow-hidden max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-[1.75rem] max-sm:border-x-0 max-sm:border-b-0 max-sm:pb-[calc(1.25rem+env(safe-area-inset-bottom))] max-sm:data-[state=open]:slide-in-from-bottom-1/2 max-sm:data-[state=closed]:slide-out-to-bottom-1/2 sm:w-[min(460px,calc(100vw-1.5rem))] sm:rounded-2xl";
+const SHEET = "!flex flex-col gap-0 border-foreground/20 bg-card dark:bg-[oklch(0.25_0.016_258)] shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_-24px_60px_rgb(0_0_0/0.6)] p-5 pt-3 max-h-[92dvh] overflow-hidden max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-[1.75rem] max-sm:border-x-0 max-sm:border-b-0 max-sm:pb-[calc(1.25rem+env(safe-area-inset-bottom))] max-sm:data-[state=open]:slide-in-from-bottom-1/2 max-sm:data-[state=closed]:slide-out-to-bottom-1/2 sm:w-[min(460px,calc(100vw-1.5rem))] sm:rounded-2xl";
 const EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
 const reduced = () => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+const MIME: Record<string, string> = {
+  pdf: "application/pdf", csv: "text/csv", txt: "text/plain", geojson: "application/geo+json", zip: "application/zip",
+  jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif", heic: "image/heic",
+  mp4: "video/mp4", m4v: "video/mp4", webm: "video/webm", mov: "video/quicktime", "3gp": "video/3gpp",
+};
 
 export type ExportFile = { name: string; blob: Blob };
 type Kind = "report" | "table" | "map" | "media" | "text";
@@ -109,7 +115,7 @@ export function ExportSheet({ open, onOpenChange, flow, place, author, media, pr
   useEffect(() => {
     if (!open || (job && !sent)) return;
     runId.current++;
-    setJob(null); setSent(false); setStep("cosa"); setDest(null); setPicked(null);
+    setJob(null); setSent(false); setNote(""); setStep("cosa"); setDest(null); setPicked(null);
     setOn((o) => ({ ...o, media: media.length > 0 }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -186,7 +192,8 @@ export function ExportSheet({ open, onOpenChange, flow, place, author, media, pr
 
   const day = new Date().toISOString().slice(0, 10);
   const slug = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || flow;
-  const placeSlug = slug(place.split(",")[0] ?? place);
+  const placeName = (place.split(/[,·]/)[0] ?? place).trim();
+  const placeSlug = slug(placeName);
   const base = placeSlug.startsWith(flow) ? placeSlug : `${flow}-${placeSlug}`;
 
   /** Prepare every chosen file; the send itself waits for a tap (the phone's share needs a fresh one). */
@@ -236,36 +243,49 @@ export function ExportSheet({ open, onOpenChange, flow, place, author, media, pr
     }
     saveBlob(await zip.generateAsync({ type: "blob" }), zipName);
   };
-  const asFiles = (files: ExportFile[]) => files.map((f) => new File([f.blob], f.name, { type: f.blob.type || "application/octet-stream" }));
-  const subject = `Report ${piazza ? "della piazza" : "del vigneto"} · ${place}`;
+  // The type by the name: a fetched photo can come back typed "application/octet-stream", which the share sheet refuses.
+  const asFiles = (files: ExportFile[]) => files.map((f) => new File([f.blob], f.name, { type: MIME[f.name.split(".").pop()!.toLowerCase()] ?? (f.blob.type || "application/octet-stream") }));
+  const subject = `Report ${piazza ? "della piazza" : "del vigneto"} · ${placeName}`;
   const body = on.text ? text : `In allegato il report ${piazza ? "della piazza" : "del vigneto"} di ${place}${author ? `, redatto da ${author}` : ""}.`;
   const touch = typeof window !== "undefined" && !!window.matchMedia?.("(hover: none) and (pointer: coarse)").matches;
 
+  // Toasts sit under the open sheet: what happened is also written in the sheet itself, under the white button.
+  const [note, setNote] = useState("");
+  const say = (msg: string) => { setNote(msg); toast(msg); };
   const act = async (d: Dest | "print" | "copy") => {
     const files = job?.files ?? [];
+    setNote("");
     if (d === dest) setSent(true);
     try {
-      if (d === "copy") { await navigator.clipboard.writeText(text); toast.success("Testo copiato"); return; }
+      if (d === "copy") { await navigator.clipboard.writeText(text); say("Testo copiato"); return; }
       if (d === "print") { onOpenChange(false); setTimeout(onPrint, 400); return; }
       if (d === "save") {
-        if (!files.length) { await navigator.clipboard.writeText(text); toast.success("Testo copiato"); return; }
-        await saveAll(files); toast.success(files.length === 1 ? "File salvato" : "Cartella zip salvata"); return;
+        if (!files.length) { await navigator.clipboard.writeText(text); say("Testo copiato"); return; }
+        await saveAll(files); say(files.length === 1 ? "File salvato" : "Cartella zip salvata"); return;
       }
-      // Email and share: the phone's share sheet carries the files (pick the email app there).
-      const shareable = asFiles(files);
-      const shareData: ShareData = { title: subject, ...(d === "email" || on.text ? { text: body } : {}), ...(shareable.length ? { files: shareable } : {}) };
-      if ((touch || d === "share") && navigator.share && (!shareable.length || navigator.canShare?.({ files: shareable }))) {
-        await navigator.share(shareData);
-        return;
+      // Email and share: the phone's share sheet carries the files (pick the email app there). It takes only some
+      // kinds of file (no .geojson, no .zip, no .mov…): those are saved apart and said so.
+      const all = asFiles(files);
+      const ok = all.filter((f) => navigator.canShare?.({ files: [f] }));
+      const apart = files.filter((_, i) => !ok.includes(all[i]!));
+      const shareData: ShareData = { title: subject, ...(d === "email" || on.text ? { text: body } : {}), ...(ok.length ? { files: ok } : {}) };
+      if ((touch || d === "share") && navigator.share && (ok.length || !files.length) && (navigator.canShare?.(shareData) ?? true)) {
+        try {
+          await navigator.share(shareData);
+          if (apart.length) { await saveAll(apart); say(apart.length === 1 && apart[0]!.name.endsWith(".geojson") ? "I dati per la mappa sono salvati a parte: il telefono non li condivide." : `${apart.length === 1 ? "1 file salvato" : `${apart.length} file salvati`} a parte: il telefono non li condivide.`); }
+          return;
+        } catch (e) {
+          if ((e as Error)?.name === "AbortError") return;
+          // Refused (too big, or the tap expired): fall back to saving below.
+        }
       }
-      // No share with files here: the files are saved and the email opens to attach them.
-      if (files.length) await saveAll(files);
+      // No share with files here: the email opens and the files are saved to attach them.
       if (d === "email") {
         window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        if (files.length) toast("File scaricati: allegali all'email");
-      } else if (files.length) toast("Condivisione non disponibile qui: file scaricati");
+        if (files.length) { await saveAll(files); say("File salvati: allegali all'email"); }
+      } else if (files.length) { await saveAll(files); say("Condivisione non disponibile qui: file salvati"); }
     } catch (e) {
-      if ((e as Error)?.name !== "AbortError") toast.error("Non riuscito, riprova");
+      if ((e as Error)?.name !== "AbortError") say("Non riuscito, riprova");
     }
   };
 
@@ -328,7 +348,7 @@ export function ExportSheet({ open, onOpenChange, flow, place, author, media, pr
                     <ToggleRow title="Pagine chiare" sub="Report su fondo bianco, per stampare" on={light} onChange={() => setLight((x) => !x)} disabled={!on.report} />
                   </Box>
                   <button type="button" onClick={nextFromCosa} disabled={nothing}
-                    className="sticky bottom-0 mt-4 h-[52px] w-full shadow-[0_-14px_20px_-2px_var(--background)] rounded-full bg-foreground text-[15px] font-bold text-background outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
+                    className="sticky bottom-0 mt-4 h-[52px] w-full shadow-[0_-14px_20px_-2px_var(--card)] dark:shadow-[0_-14px_20px_-2px_oklch(0.25_0.016_258)] rounded-full bg-foreground text-[15px] font-bold text-background outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
                     {nothing ? "Scegli almeno un file" : `Avanti · ${summaryText(fileCount, sendMedia ? countText(chosen) : "", on.text)}${total ? ` · ${sizeText(total)}` : ""}`}
                   </button>
                 </>
@@ -407,6 +427,7 @@ export function ExportSheet({ open, onOpenChange, flow, place, author, media, pr
                   </div>
                   <button type="button" onClick={() => void act(dest)} disabled={job.error}
                     className="mt-4 h-[52px] w-full rounded-full bg-foreground text-[15px] font-bold text-background outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">{destLabel[dest]}</button>
+                  {note && <p role="status" className="mt-2 text-center text-[13px] text-brand-turquoise">{note}</p>}
                   <div className="mt-2 flex justify-center gap-4 text-[13px] font-semibold text-muted-foreground">
                     {on.report && <button type="button" onClick={() => { close(); setTimeout(onOpenReport, 400); }} className="py-2 outline-none focus-visible:underline">Apri il report</button>}
                     <button type="button" onClick={() => { runId.current++; setJob(null); setDest(null); go("cosa", -1); }} className="py-2 outline-none focus-visible:underline">Ricomincia</button>
@@ -452,7 +473,7 @@ function fileRows(files: ExportFile[]) {
 }
 
 function Box({ children }: { children: ReactNode }) {
-  return <div className="rounded-[18px] bg-foreground/[0.05] px-3.5 py-0.5">{children}</div>;
+  return <div className="rounded-[18px] bg-foreground/[0.07] px-3.5 py-0.5">{children}</div>;
 }
 
 function ToggleRow({ icon, title, sub, size, on, onChange, extra, disabled }: { icon?: ReactNode; title: string; sub: ReactNode; size?: string; on: boolean; onChange: () => void; extra?: ReactNode; disabled?: boolean }) {
