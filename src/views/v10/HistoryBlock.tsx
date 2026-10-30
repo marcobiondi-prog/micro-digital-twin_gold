@@ -28,6 +28,77 @@ function Thumb({ s }: { s: Shot }) {
   );
 }
 
+/** Photos and videos of one day, as a pile. */
+type Pile = { key: string; label: string; shots: Shot[] };
+function pilesOf(shots: Shot[]): Pile[] {
+  const out: Pile[] = [];
+  for (const s of shots) {
+    const d = s.at ? new Date(s.at) : null;
+    const key = d ? `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}` : "senza-data";
+    const label = d ? d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }) : "Senza data";
+    const last = out[out.length - 1];
+    if (last?.key === key) last.shots.push(s); else out.push({ key, label, shots: [s] });
+  }
+  return out;
+}
+const countText = (shots: Shot[]) => {
+  const v = shots.filter((s) => s.kind === "video").length, f = shots.length - v;
+  return [f ? `${f} foto` : "", v ? `${v} ${v === 1 ? "video" : "video"}` : ""].filter(Boolean).join(" · ");
+};
+
+/** One picture of a pile: the photo, or the video's first frame with a play mark. */
+function PileCard({ s, className, style }: { s: Shot; className?: string; style?: React.CSSProperties }) {
+  return (
+    <span className={`absolute inset-0 overflow-hidden rounded-2xl bg-[oklch(0.27_0.016_258)] shadow-[0_6px_18px_rgb(0_0_0/0.45)] ring-1 ring-white/10 ${className ?? ""}`} style={style}>
+      {s.kind === "video" ? <video src={`${s.url}#t=0.1`} preload="metadata" muted playsInline className="pointer-events-none size-full object-cover" /> : <img src={s.url} alt="" loading="lazy" className="size-full object-cover" />}
+      {s.kind === "video" && <span className="absolute inset-0 grid place-items-center"><Play className="size-7 text-white drop-shadow" aria-hidden="true" /></span>}
+    </span>
+  );
+}
+
+/**
+ * The photos and videos stacked one on the other like a pile of prints, one pile per day (the newest on top, the next
+ * two peeking out turned a little), with the date and how many; a tap spreads that day's pile into its grid.
+ */
+function PhotoPiles({ shots }: { shots: Shot[] }) {
+  const piles = useMemo(() => pilesOf(shots), [shots]);
+  const [open, setOpen] = useState<string | null>(null);
+  const shown = piles.find((p) => p.key === open) ?? null;
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 md:grid-cols-4">
+        {piles.map((p) => {
+          const [top, second, third] = p.shots;
+          const isOpen = open === p.key;
+          return (
+            <button key={p.key} type="button" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : p.key)}
+              aria-label={`${p.label}: ${countText(p.shots)}`}
+              className="group text-left outline-none">
+              <span className={`relative mx-2 mt-2 block aspect-[4/3] transition-transform duration-200 group-active:scale-[0.97] ${isOpen ? "ring-2 ring-foreground ring-offset-4 ring-offset-background rounded-2xl" : ""}`}>
+                {third && <PileCard s={third} className="opacity-70" style={{ transform: "rotate(-8deg) translate(-10px, 6px)" }} />}
+                {second && <PileCard s={second} className="opacity-85" style={{ transform: "rotate(6deg) translate(10px, 3px)" }} />}
+                {top && <PileCard s={top} />}
+                {p.shots.length > 1 && <span className="absolute -right-2 -top-2 grid h-7 min-w-7 place-items-center rounded-full bg-foreground px-2 text-xs font-bold tabular-nums text-background shadow">{p.shots.length}</span>}
+              </span>
+              <span className="mt-3 block px-1 text-sm font-semibold tabular-nums">{p.label}</span>
+              <span className="block px-1 text-xs text-muted-foreground">{countText(p.shots)}</span>
+            </button>
+          );
+        })}
+      </div>
+      {shown && (
+        <div className="space-y-2 rounded-2xl bg-foreground/[0.05] p-3">
+          <div className="flex items-center justify-between px-1">
+            <h4 className="text-sm font-semibold tabular-nums">{shown.label}<span className="ml-2 font-medium text-muted-foreground">{countText(shown.shots)}</span></h4>
+            <button type="button" onClick={() => setOpen(null)} className="text-sm font-semibold text-muted-foreground outline-none focus-visible:underline">Chiudi</button>
+          </div>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">{shown.shots.map((s) => <Thumb key={`${s.flow}-${s.id}`} s={s} />)}</div>
+        </div>
+      )}
+    </>
+  );
+}
+
 /** The season and hour the simulation was set to, written out; older entries say they were not recorded. */
 function WhenLine({ e }: { e: HistoryEntry }) {
   const w = whenOf(e);
@@ -102,7 +173,7 @@ const FILTERS = [
 ] as const;
 const OF: Record<HistoryFlow, string> = { piazza: "della piazza", vigneto: "del vigneto" };
 /** On Benvenuto: the latest interventions and photos only; the Cronologia page shows them all. */
-const COMPACT_DAYS = 5, COMPACT_SHOTS = 6;
+const COMPACT_DAYS = 5, COMPACT_SHOTS = 12;
 
 /**
  * The history of the interventions (and the photos and videos of the simulations), shared by Benvenuto (compact: the
@@ -143,7 +214,7 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
         {visibleShots.length > 0 && (
           <div className="space-y-2">
             <h3 className="px-1 text-sm font-medium text-muted-foreground">Foto e video{compact && shots.length > visibleShots.length ? ` · ultimi ${visibleShots.length} di ${shots.length}` : ""}</h3>
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">{visibleShots.map((s) => <Thumb key={`${s.flow}-${s.id}`} s={s} />)}</div>
+            <PhotoPiles shots={visibleShots} />
           </div>
         )}
         {groups.length === 0 ? visibleShots.length > 0 ? null : (
