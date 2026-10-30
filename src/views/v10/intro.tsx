@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Building2, Grape, ScanLine, X } from "lucide-react";
 import { setCameraSheetOpen } from "@/lib/camera-dock";
+import { AI_STANDBY } from "@/lib/ai-standby";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { useInstalledApp } from "@/lib/installed-app";
 import aiLogo from "@/assets/ai-logo.png";
@@ -26,7 +27,10 @@ const items: Item[] = [
     desc: "Ti identifichi con il Comune, l'ufficio e l'email del Comune: si apre la piazza, dove metti alberi, prato e ombra." },
   { id: "vine", Icon: Grape, name: "Sei un agronomo?", cta: "Identificati come agronomo",
     desc: "Ti identifichi con il patentino fitosanitario: si apre il vigneto, dove regoli acqua, ombra e vento." },
-  { id: "camera", Icon: ScanLine, name: "Fotocamera AI", cta: "Inizia con Fotocamera AI", desc: "Inquadra una pianta: riconosce la specie e il fresco che regala." },
+  // AI_STANDBY: in development, so nothing says what it will do.
+  AI_STANDBY
+    ? { id: "camera", Icon: ScanLine, name: "Fotocamera AI · in sviluppo", cta: "Apri la fotocamera", desc: "Non è ancora disponibile: arriverà con un prossimo aggiornamento. Intanto puoi scattare foto e video." }
+    : { id: "camera", Icon: ScanLine, name: "Fotocamera AI", cta: "Inizia con Fotocamera AI", desc: "Inquadra una pianta: riconosce la specie e il fresco che regala." },
 ];
 const KIND_OF = { urban: "funzionario", vine: "agronomo" } as const;
 
@@ -62,7 +66,15 @@ const STEPS: Array<{ title: string; text: string; art: ReactNode }> = [
       <circle cx="98" cy="37" r="7" fill="currentColor" stroke="none" className="intro-pop" />
       <path pathLength={1} d="M66 70 H94" strokeOpacity="0.6" />
     </> },
-  { title: "Inquadra una pianta", text: "La fotocamera AI riconosce la specie e ti dice quanto fresco regala.",
+  AI_STANDBY
+    ? { title: "Scatta foto e video", text: "Fotografa il luogo: foto e video restano nella tua simulazione.",
+    art: <>
+      <path pathLength={1} d="M48 34 H62 L68 26 H92 L98 34 H112 A6 6 0 0 1 118 40 V76 A6 6 0 0 1 112 82 H48 A6 6 0 0 1 42 76 V40 A6 6 0 0 1 48 34 Z" />
+      <circle pathLength={1} cx="80" cy="57" r="15" />
+      <circle pathLength={1} cx="80" cy="57" r="7" strokeOpacity="0.6" />
+      <circle cx="106" cy="44" r="2.5" fill="currentColor" stroke="none" className="intro-pop" />
+    </> }
+    : { title: "Inquadra una pianta", text: "La fotocamera AI riconosce la specie e ti dice quanto fresco regala.",
     art: <>
       <path pathLength={1} d="M40 22 V12 H52 M120 22 V12 H108 M40 78 V88 H52 M120 78 V88 H108" />
       <path pathLength={1} d="M80 24 C100 32 104 56 92 68 C84 76 70 74 66 64 C60 50 66 32 80 24 Z" />

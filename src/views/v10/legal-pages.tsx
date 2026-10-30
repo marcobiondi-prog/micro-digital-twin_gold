@@ -8,6 +8,7 @@ import { Check, Mail, MapPin, Phone, type LucideIcon } from "lucide-react";
 import { openAccount } from "@/lib/camera-dock";
 import { cn } from "@/lib/utils";
 import { Faq, InfoCard, InfoNav, InfoPage, PageLink } from "./InfoPage";
+import { AI_STANDBY } from "@/lib/ai-standby";
 
 const eur = (n: number) => `${grouped(n)} €`;
 const level = (id: string) => comparison.find((l) => l.id === id)!;
@@ -231,7 +232,7 @@ const FREE_FEATURES = [
   "Report PDF, dati per le mappe e link di condivisione",
 ];
 const PREMIUM_FEATURES = [
-  "Fotocamera AI: riconosce piante e terreno",
+  AI_STANDBY ? "Fotocamera AI (in sviluppo, arriverà con un prossimo aggiornamento)" : "Fotocamera AI: riconosce piante e terreno",
   "Mappa 3D del luogo e dati da satellite",
   "Meteo reale come punto di partenza",
   "Piano di interventi e posizione dei sensori suggeriti dall'AI",
@@ -343,7 +344,7 @@ export function AboutPage() {
         <ul>
           <li>Simuliamo una piazza e un vigneto con il clima reale del luogo, stagione per stagione.</li>
           <li>Proponiamo tre livelli di intervento, da quello che si può fare subito al progetto completo.</li>
-          <li>Riconosciamo piante e terreno con la fotocamera e raccogliamo tutto in un report da condividere.</li>
+          <li>{AI_STANDBY ? "Raccogliamo foto e video del luogo e mettiamo tutto in un report da condividere." : "Riconosciamo piante e terreno con la fotocamera e raccogliamo tutto in un report da condividere."}</li>
         </ul>
       </InfoCard>
       <InfoCard title="Dove siamo partiti">
