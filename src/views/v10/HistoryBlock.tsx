@@ -228,7 +228,7 @@ function PhotoPiles({ shots }: { shots: Shot[] }) {
               aria-label={`${p.label}: ${countText(p.shots)}`}
               className="group text-left outline-none">
               <span className="relative mx-2 mt-2 block aspect-[4/3] transition-transform duration-200 group-active:scale-[0.97]">
-                {isOpen && <><span className="pile-glow" aria-hidden="true" /><span className="pile-ring" aria-hidden="true" /></>}
+                {isOpen && <span className="pile-ring" aria-hidden="true" />}
                 {third && <PileCard s={third} className="opacity-70" style={{ transform: "rotate(-8deg) translate(-10px, 6px)" }} />}
                 {second && <PileCard s={second} className="opacity-85" style={{ transform: "rotate(6deg) translate(10px, 3px)" }} />}
                 {top && <PileCard s={top} />}
