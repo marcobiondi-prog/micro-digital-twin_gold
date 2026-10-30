@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { pergolaParts, treeParts } from "@/models/area-layout";
+import { hedgeParts, netParts, pergolaParts, treeParts } from "@/models/area-layout";
 import { SIM_COLORS, thirstColor, type SimLayout } from "@/views/v10/map-area";
 import { Crosshair, LoaderCircle } from "lucide-react";
 import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camera";
@@ -102,8 +102,15 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
               map.append(disc);
             }
           } else if (sim?.kind === "vigneto") {
-            for (const pt of sim.data.patches) shape(pt.ring, pt.kind === "zone" ? `${thirstColor(sim.thirst[pt.zone ?? 0] ?? 0)}55` : "rgba(51,65,85,0.65)", pt.kind === "zone" ? null : 2.5);
-            if (Polyline3DElement) for (const l of sim.data.lines) {
+            // Zones tinted by thirst on the ground, shade nets floating on posts, the hedge raised along its edge.
+            for (const pt of sim.data.patches) if (pt.kind === "zone") shape(pt.ring, `${thirstColor(sim.thirst[pt.zone ?? 0] ?? 0)}66`, null);
+            for (const part of [...sim.data.patches.filter((p) => p.kind === "cloth").flatMap((p) => netParts(p.ring)), ...sim.data.lines.filter((l) => l.kind === "wind").flatMap((l) => hedgeParts(l.line, l.strength ?? 0))]) {
+              if (part.base === 0) { shape(part.ring, part.color, part.height); continue; }
+              const slab = new Polygon3DElement({ altitudeMode: "RELATIVE_TO_GROUND", extruded: false, fillColor: part.color, strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 }) as HTMLElement & { outerCoordinates?: unknown };
+              slab.outerCoordinates = part.ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: part.height }));
+              map.append(slab);
+            }
+            if (Polyline3DElement) for (const l of sim.data.lines.filter((x) => x.kind === "drip")) {
               const pl = new Polyline3DElement({ altitudeMode: "CLAMP_TO_GROUND", strokeColor: l.kind === "drip" ? SIM_COLORS.drip : SIM_COLORS.wind, strokeWidth: l.kind === "drip" ? 2 : 6, drawsOccludedSegments: true }) as HTMLElement & { coordinates?: unknown };
               pl.coordinates = l.line.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng }));
               map.append(pl);

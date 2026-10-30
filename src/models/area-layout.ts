@@ -267,3 +267,42 @@ export function pergolaParts(strip: Ring): TreePart[] {
   for (let s = 0.35; s < len - 0.2; s += 0.7) parts.push({ ring: box(s - 0.12, s + 0.12, 0, dep), base: 3.1, height: 3.25, color: PERGOLA_COLORS.slat });
   return parts;
 }
+
+/** Vineyard 3D colours: the hedge of the windbreak and the shade net. */
+export const VINE_3D = { hedge: "#2f6b2a", hedgeTop: "#3d8a35", net: "#1f2933" } as const;
+
+/**
+ * The windbreak in 3D: a hedge along its edge, a 1.6 m wide wall whose height follows its strength (1.8 m at 10 %,
+ * up to 4 m at full), in two slabs, the top a lighter green.
+ */
+export function hedgeParts(edge: Ring, strength: number): TreePart[] {
+  if (edge.length < 2 || strength <= 0) return [];
+  const f = frameOf(edge);
+  const [a, b] = edge.map((p) => toXY(f, p)) as [[number, number], [number, number]];
+  const len = dist(a, b);
+  if (len < 1) return [];
+  const ux = (b[0] - a[0]) / len, uy = (b[1] - a[1]) / len, nx = -uy * 0.8, ny = ux * 0.8;
+  const ring: Ring = [[a[0] + nx, a[1] + ny], [b[0] + nx, b[1] + ny], [b[0] - nx, b[1] - ny], [a[0] - nx, a[1] - ny]].map(([x, y]) => toLL(f, x!, y!));
+  const h = 1.8 + 2.2 * Math.min(1, strength / 100);
+  return [{ ring, base: 0, height: h - 0.5, color: VINE_3D.hedge }, { ring, base: h - 0.5, height: h, color: VINE_3D.hedgeTop }];
+}
+
+/**
+ * The shade net in 3D: a mesh of thin dark threads (every 1.2 m both ways) 2.2 m up over its strip, see-through
+ * between them, held by posts at its corners.
+ */
+export function netParts(strip: Ring): TreePart[] {
+  if (strip.length < 4) return [];
+  const f = frameOf(strip);
+  const [a, b, , d] = strip.map((p) => toXY(f, p)) as Array<[number, number]>;
+  const len = dist(a!, b!), dep = dist(a!, d!);
+  if (len < 1 || dep < 1) return [];
+  const ux = [(b![0] - a![0]) / len, (b![1] - a![1]) / len], vy = [(d![0] - a![0]) / dep, (d![1] - a![1]) / dep];
+  const at = (s2: number, t: number): [number, number] => [a![0] + ux[0]! * s2 + vy[0]! * t, a![1] + ux[1]! * s2 + vy[1]! * t];
+  const box = (s0: number, s1: number, t0: number, t1: number): Ring => [at(s0, t0), at(s1, t0), at(s1, t1), at(s0, t1)].map(([x, y]) => toLL(f, x, y));
+  const parts: TreePart[] = strip.map((p) => ({ ring: crownRing(p, 0.1, 6), base: 0, height: 2.2, color: "#5b4a3a" }));
+  const t = 0.07, step = 1.2;
+  for (let s2 = 0; s2 <= len + 1e-6; s2 += step) parts.push({ ring: box(s2 - t, s2 + t, 0, dep), base: 2.15, height: 2.2, color: VINE_3D.net });
+  for (let t2 = 0; t2 <= dep + 1e-6; t2 += step) parts.push({ ring: box(0, len, t2 - t, t2 + t), base: 2.15, height: 2.2, color: VINE_3D.net });
+  return parts;
+}
