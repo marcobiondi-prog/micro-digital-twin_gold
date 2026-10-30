@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { z } from "zod";
 import { useTabSwipe } from "@/lib/use-tab-swipe";
 import { SectionLockCard, useSectionOpen } from "@/views/v10/ProfileGate";
@@ -28,6 +28,7 @@ import { LabSyncIndicator } from "@/views/LabSyncIndicator";
 import { Fold, FoldTabs } from "@/views/Fold";
 import { Ambient, PageHero, TabRow } from "@/views/v8/console";
 import { FieldAI } from "@/views/FieldAI";
+import { ExportSheet } from "@/views/v10/ExportSheet";
 import { DashCard, DashSection, PiazzaDashboard, PremiumPart, URBAN_LOCKED, VINE_LOCKED, VineDashboard, getDashSeason } from "@/views/v10/Dashboard";
 import { useQueryClient } from "@tanstack/react-query";
 import { heatStep, heatWords, piazzaMix, piazzaSummary, thirstStep, thirstWords, vineMixRows, vineSummary } from "@/models/project-summary";
@@ -425,7 +426,6 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   const [mode, setMode] = useState<"print" | "save">("print");
   const [progress, setProgress] = useState<{ label: string; pct: number } | null>(null);
   const step = async (label: string, pct: number) => { setProgress({ label, pct }); await new Promise<void>((r) => requestAnimationFrame(() => setTimeout(r, 16))); };
-  const [prepared, setPrepared] = useState(false);
   // Report tenuto in memoria: finché i dati non cambiano, PDF, copia e stampa riusano lo stesso.
   const cacheKey = () => JSON.stringify([ctx, reportRows, ps.day, reportMedia.map(m => [m.id, m.name, m.size]), scanRows, author]);
   // Two looks of the same report: the dark one of the app (Salva PDF, Salva in…) and a light one for paper (Stampa).
@@ -439,12 +439,8 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
     }
     return e.doc;
   };
-  /** "Esporta report": anello di avanzamento finché il report non è pronto, poi le opzioni. */
-  const startExport = () => {
-    const cached = reportCache.has(`${cacheKey()}|dark`);
-    setPrepared(false); setProgress({ label: "Preparazione del report…", pct: cached ? 100 : 2 }); setOpen(true);
-    getDoc().then(() => setPrepared(true), () => { setPrepared(true); toast.error("Preparazione non riuscita"); });
-  };
+  /** "Esporta report": the sheet in steps (which files, which photos, where), drawing the report meanwhile. */
+  const startExport = () => setOpen(true);
   const u = labState.urban, v = labState.vineyard;
   // The same summary as the dashboard on screen (season, measured surfaces and the place's real year from the shared cache).
   const qc = useQueryClient();
@@ -843,50 +839,16 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
     try { window.print(); } catch { cleanup(); toast.error("Stampa non disponibile: scarica il PDF"); return; }
     setTimeout(cleanup, 120000);
   };
-  const copy = async () => {
-    try { await navigator.clipboard.writeText(text); toast.success("Report copiato"); }
-    catch { toast.error("Copia non riuscita"); }
-  };
-  const downloadData = (format: "geojson" | "csv") => {
-    const snapshot = labState;
-    const flow = ctx === "Urbano" ? "urban" : "vineyard";
-    const exportedAt = new Date().toISOString();
-    void withExport(`Preparazione ${format === "csv" ? "CSV" : "GeoJSON"}…`, async () => {
-      try {
-        const content = format === "csv" ? scenarioCsv(snapshot, flow, exportedAt)
-          : JSON.stringify(scenarioGeoJson(snapshot, flow, exportedAt), null, 2);
-        const blob = new Blob([content], { type: format === "csv" ? "text/csv;charset=utf-8" : "application/geo+json" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `scenario-${ctx.toLowerCase()}-${exportedAt.slice(0, 10)}.${format}`;
-        document.body.appendChild(link); link.click(); link.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
-        toast.success(`${format === "csv" ? "CSV" : "GeoJSON"} scaricato — ${ctx}`);
-      } catch { toast.error("Esportazione dei dati non riuscita"); }
-    });
-  };
+  const reportBlob = (light: boolean) => getDoc(light).then((d) => d.output("blob") as Blob);
+  const flowKey = ctx === "Urbano" ? "urban" : "vineyard";
+  const tableText = useCallback(() => scenarioCsv(labState, flowKey, new Date().toISOString()), [labState, flowKey]);
+  const mapText = useCallback(() => JSON.stringify(scenarioGeoJson(labState, flowKey, new Date().toISOString()), null, 2), [labState, flowKey]);
   return (
     <>
       <button onClick={startExport} className="inline-flex min-w-0 items-center justify-center gap-2 h-11 rounded-full bg-foreground px-4 text-sm font-semibold text-background transition-colors hover:bg-foreground/90 active:bg-foreground/80"><Download className="size-4 shrink-0" /><span className="truncate">Esporta report</span></button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Esporta report — {ctx}</DialogTitle></DialogHeader>
-          {!prepared ? <div role="status" aria-live="polite" className="flex flex-col items-center gap-3 py-6 text-center text-sm text-muted-foreground"><ProgressRing pct={progress?.pct ?? 2} /><span>{progress?.label ?? "Preparazione del report…"}</span></div> : <div className="flex flex-col gap-2">
-            <button onClick={() => openPreview("save")} className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-medium text-primary-foreground transition-transform hover:scale-105"><Download className="size-4" />Scarica PDF</button>
-            <button onClick={copy} className="inline-flex items-center justify-center gap-2 rounded-full border px-4 py-3 text-sm font-medium transition-transform hover:scale-105"><Copy className="size-4" />Copia</button>
-            <button onClick={() => openPreview("print")} className="inline-flex items-center justify-center gap-2 rounded-full border px-4 py-3 text-sm font-medium transition-transform hover:scale-105"><Printer className="size-4" />Stampa</button>
-            <div className="mt-2 border-t border-border pt-3">
-              <div className="grid grid-cols-2 gap-2">
-                <Button variant="outline" disabled={!!exporting} onClick={() => downloadData("geojson")}><MapPin className="size-4" />GeoJSON</Button>
-                <Button variant="outline" disabled={!!exporting} onClick={() => downloadData("csv")}><Download className="size-4" />CSV</Button>
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">Simulazione · coordinate della località, non confini rilevati delle zone.</p>
-              {exporting && <div role="status" aria-live="polite" className="flex flex-col items-center gap-2 py-3 text-sm"><ProgressRing pct={100} /><span>{exporting}</span></div>}
-            </div>
-          </div>}
-        </DialogContent>
-      </Dialog>
+      <ExportSheet open={open} onOpenChange={setOpen} flow={ctx === "Urbano" ? "piazza" : "vigneto"} place={(ctx === "Urbano" ? u : v).location.label}
+        author={author} media={reportMedia} progress={progress} report={reportBlob} table={tableText} map={mapText} text={text}
+        onPrint={() => void openPreview("print")} onOpenReport={() => void openPreview("save")} />
       <Dialog open={preview !== null} onOpenChange={(o) => { if (!o) setPreview(null); }}>
         <DialogContent className="flex max-h-[90vh] flex-col gap-3">
           <DialogHeader><DialogTitle>{mode === "save" ? "Anteprima PDF" : "Anteprima di stampa"} — {ctx}</DialogTitle></DialogHeader>
