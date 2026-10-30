@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { Building2, Camera, Grape, Images, Lock, Play, Video, type LucideIcon } from "lucide-react";
+import { Building2, Camera, Grape, Images, Lock, MapPin, Video, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useInstalledApp } from "@/lib/installed-app";
@@ -7,7 +7,6 @@ import { useSignedIn } from "@/lib/use-signed-in";
 import { showSimMedia } from "@/views/v8/console";
 import { openAccount, requestCapture, setCameraSheetOpen, useCameraSheetOpen, type CaptureAction } from "@/lib/camera-dock";
 import { cn } from "@/lib/utils";
-import { useLabMedia } from "@/models/lab-media-store";
 import { useProId } from "@/lib/use-pro-id";
 import { useLab } from "@/models/lab-store";
 import { splitLocation } from "@/views/SimulationGrid";
@@ -41,15 +40,12 @@ export function CameraDockButton({ focused = false }: { focused?: boolean }) {
   );
 }
 
-/** One round action of the row: an icon (or the AI logo) in a coloured circle, its name under it. */
-function RoundAction({ icon: Icon, label, tone, locked, onClick }: { icon?: LucideIcon; label: string; tone: string; locked?: boolean; onClick: () => void }) {
+/** One of the three round actions under the AI card. */
+function RoundAction({ icon: Icon, label, tone, onClick }: { icon: LucideIcon; label: string; tone: string; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick}
-      className="flex flex-col items-center gap-2 rounded-2xl p-1.5 text-sm font-semibold outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:active:scale-100">
-      <span className={cn("relative grid size-14 place-items-center rounded-full text-white", tone)}>
-        {Icon ? <Icon className="size-6" aria-hidden="true" /> : <img src={aiLogo} alt="" aria-hidden="true" className="size-7" />}
-        {locked && <span className="absolute -bottom-1 -right-1 grid size-6 place-items-center rounded-full bg-foreground text-background ring-2 ring-card"><Lock className="size-3.5" aria-hidden="true" /></span>}
-      </span>
+      className="flex flex-col items-center gap-2 rounded-2xl p-2 text-sm font-semibold outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:active:scale-100">
+      <span className={cn("grid size-14 place-items-center rounded-full text-white", tone)}><Icon className="size-6" aria-hidden="true" /></span>
       {label}
     </button>
   );
@@ -71,8 +67,8 @@ function LockedSection({ icon: Icon, label, hint, tone, onClick }: { icon: Lucid
 
 /**
  * The camera sheet, mounted once in the app frame. It rises from the bottom on phones. With a professional profile it
- * goes straight to that profile's project (no "where?" question: the other section is locked anyway): "La tua piazza /
- * Il tuo vigneto" with its place, AI, Foto, Video and Galleria in one row, and the project's latest shots. Off the project's page the AI camera
+ * goes straight to that profile's project (no "where?" question: the other section is locked anyway): the big
+ * Fotocamera AI card with the project's place, then Foto, Video and Galleria. Off the project's page the AI camera
  * opens there by itself; Foto, Video and Galleria open the page and the sheet again (the phone's camera needs a tap on
  * the page that shows the photos). With no profile it shows the two sections locked, each leading to its identification.
  */
@@ -123,66 +119,44 @@ export function CameraSheet() {
     close();
   };
   const identify = (to: "/identificazione/funzionario" | "/identificazione/agronomo") => afterClose(() => void navigate({ to }));
-  const media = useLabMedia(kind ?? "urban");
-  // The latest shots open the project's photos (on its page when elsewhere).
-  const showShots = () => {
-    if (!kind) return;
-    if (here) { showSimMedia(kind); close(); return; }
-    afterClose(() => { openPage(); window.setTimeout(() => showSimMedia(kind), 400); });
-  };
 
   return (
     <Dialog open={open} onOpenChange={setCameraSheetOpen}>
       <DialogContent className="gap-4 p-5 max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-[1.75rem] max-sm:border-x-0 max-sm:border-b-0 max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-sm:data-[state=open]:slide-in-from-bottom-1/2 max-sm:data-[state=closed]:slide-out-to-bottom-1/2 sm:w-[min(440px,calc(100vw-1.5rem))] sm:rounded-2xl">
         <span className="mx-auto -mt-1 h-1.5 w-10 rounded-full bg-foreground/20 sm:hidden" aria-hidden="true" />
-        {kind ? (
+        <DialogHeader className="text-left">
+          <DialogTitle>Fotocamera</DialogTitle>
+          <DialogDescription>{kind ? (kind === "urban" ? "Foto e video della tua piazza" : "Foto e video del tuo vigneto") : "Per scattare, dicci chi sei"}</DialogDescription>
+        </DialogHeader>
+        {!kind ? (
           <>
-            {/* Proposal 7: the project first (badge, "La tua piazza / Il tuo vigneto", its place), then the four actions in one row, then its latest shots. */}
-            <DialogHeader className="text-left">
-              <DialogTitle className="flex items-center gap-2.5">
-                <span className={cn("grid size-8 shrink-0 place-items-center rounded-full text-white", kind === "urban" ? "bg-urban" : "bg-vine")}>
-                  {kind === "urban" ? <Building2 className="size-4" aria-hidden="true" /> : <Grape className="size-4" aria-hidden="true" />}
-                </span>
-                {kind === "urban" ? "La tua piazza" : "Il tuo vigneto"}
-              </DialogTitle>
-              <DialogDescription className="truncate">{place || "Fotocamera"}</DialogDescription>
-            </DialogHeader>
-            <div className="grid grid-cols-4">
-              {aiReady || !signedIn
-                ? <RoundAction label="AI" tone="border-[3px] border-brand-turquoise bg-background" locked={!aiReady} onClick={() => (aiReady ? start("ai") : (close(), openAccount()))} />
-                : <RoundAction label="AI" tone="border-[3px] border-muted-foreground/40 bg-background opacity-50" onClick={() => toast("La fotocamera AI è nell’app installata sul telefono")} />}
-              <RoundAction icon={Camera} label="Foto" tone="bg-primary" onClick={() => start("photo")} />
-              <RoundAction icon={Video} label="Video" tone="bg-danger" onClick={() => start("video")} />
-              <RoundAction icon={Images} label="Galleria" tone="bg-ok" onClick={() => start("gallery")} />
-            </div>
-            <div>
-              <div className="mb-2 flex items-baseline justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">Ultimi scatti</h3>
-                {media.length > 0 && <button type="button" onClick={showShots} className="text-sm font-semibold text-brand-turquoise outline-none focus-visible:underline">Vedi tutti · {media.length}</button>}
-              </div>
-              {media.length ? (
-                <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5 touch-pan-x" data-map-gestures="">
-                  {media.slice(0, 10).map((m) => (
-                    <button key={m.id} type="button" onClick={showShots} aria-label={`${m.kind === "video" ? "Video" : "Foto"} ${m.name}`}
-                      className="relative size-[4.5rem] shrink-0 overflow-hidden rounded-xl bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                      {m.kind === "video" ? <><video src={m.url} muted playsInline preload="metadata" className="h-full w-full object-cover" /><Play className="absolute inset-0 m-auto size-5 text-white drop-shadow" aria-hidden="true" /></> : <img src={m.url} alt="" loading="lazy" className="h-full w-full object-cover" />}
-                    </button>
-                  ))}
-                </div>
-              ) : <p className="rounded-xl bg-muted/60 px-3 py-3 text-sm text-muted-foreground">Ancora nessuno scatto: quelli che fai qui finiscono nella {kind === "urban" ? "simulazione della piazza" : "simulazione del vigneto"}.</p>}
-            </div>
-          </>
-        ) : (
-          <>
-            <DialogHeader className="text-left">
-              <DialogTitle>Fotocamera</DialogTitle>
-              <DialogDescription>Per scattare, dicci chi sei</DialogDescription>
-            </DialogHeader>
             <div className="grid grid-cols-2 gap-2">
               <LockedSection icon={Building2} label="Piazza" hint="Per i funzionari del Comune" tone="bg-urban" onClick={() => identify("/identificazione/funzionario")} />
               <LockedSection icon={Grape} label="Vigneto" hint="Per gli agronomi" tone="bg-vine" onClick={() => identify("/identificazione/agronomo")} />
             </div>
             <p className="text-center text-xs text-muted-foreground">Tocca una sezione per identificarti: ci vuole un minuto.</p>
+          </>
+        ) : (
+          <>
+            {(aiReady || !signedIn) && (
+              <button type="button" onClick={() => (aiReady ? start("ai") : (close(), openAccount()))}
+                className="relative flex items-center gap-4 overflow-hidden rounded-[1.25rem] border border-brand-turquoise/40 bg-[radial-gradient(120%_120%_at_0%_0%,color-mix(in_oklch,var(--brand-turquoise)_32%,transparent),transparent_60%)] bg-muted/60 p-4 text-left outline-none transition-transform active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-ring motion-reduce:active:scale-100">
+                <span className="relative grid size-16 shrink-0 place-items-center rounded-full border-[3px] border-brand-turquoise bg-background shadow-[0_0_22px_color-mix(in_oklch,var(--brand-turquoise)_45%,transparent)]">
+                  <img src={aiLogo} alt="" aria-hidden="true" className="size-8" />
+                  {!aiReady && <span className="absolute -bottom-1 -right-1 grid size-6 place-items-center rounded-full bg-foreground text-background ring-2 ring-card"><Lock className="size-3.5" aria-hidden="true" /></span>}
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-lg font-bold">Fotocamera AI</span>
+                  <span className="block text-sm text-muted-foreground">{aiReady ? "Inquadra una pianta: la riconosce e calcola il fresco" : "Accedi per usarla"}</span>
+                  {place && <span className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-full bg-brand-turquoise/15 px-2.5 py-1 text-xs font-semibold text-brand-turquoise"><MapPin className="size-3.5 shrink-0" aria-hidden="true" /><span className="truncate">{place}</span></span>}
+                </span>
+              </button>
+            )}
+            <div className="grid grid-cols-3">
+              <RoundAction icon={Camera} label="Foto" tone="bg-primary" onClick={() => start("photo")} />
+              <RoundAction icon={Video} label="Video" tone="bg-danger" onClick={() => start("video")} />
+              <RoundAction icon={Images} label="Galleria" tone="bg-ok" onClick={() => start("gallery")} />
+            </div>
           </>
         )}
       </DialogContent>
