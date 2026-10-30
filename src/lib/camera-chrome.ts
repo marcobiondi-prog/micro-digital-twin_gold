@@ -5,7 +5,8 @@
 // 2) Always, as the fallback when fullscreen is refused: a dark theme-color, so at least the status
 //    bar turns dark. Both are undone on close. In fullscreen only Android rotates (cameraRotatesNatively).
 // Android Back first only leaves fullscreen (no popstate): a fullscreen exit that does not follow a
-// rotation is that Back and closes the camera at once, so one Back is enough (fullscreenExitIsBack).
+// rotation is that Back and closes the camera at once, so one Back is enough (fullscreenExitIsBack). An exit
+// that came with a turn (the camera stays open) goes back to fullscreen: at once, or on the next tap.
 
 import { syncAppOrientation } from "@/lib/ar-orientation";
 
@@ -35,10 +36,43 @@ function allowNativeRotation() {
     window.dispatchEvent(new Event("ar-orientation-change"));
   });
 }
+/** While the camera is open (between enterCameraChrome and exitCameraChrome). */
+let cameraOpen = false;
+let regainTimer = 0;
+/** The next tap anywhere, carrying the user activation fullscreen needs. */
+let regainOnTap: (() => void) | null = null;
+const TAP_EVENTS = ["pointerup", "touchend", "click", "keydown"] as const;
+function clearRegainOnTap() {
+  if (!regainOnTap) return;
+  for (const t of TAP_EVENTS) document.removeEventListener(t, regainOnTap, true);
+  regainOnTap = null;
+}
+function requestCameraFullscreen(): Promise<boolean> {
+  return document.documentElement.requestFullscreen({ navigationUI: "hide" })
+    .then(() => { enteredFullscreen = true; allowNativeRotation(); return true; })
+    .catch(() => false);
+}
+/**
+ * Back to fullscreen after Android dropped it while turning the phone (the camera stayed open, so it was not a
+ * Back): at once when the browser allows it, else on the next tap anywhere, which carries the activation it needs.
+ */
+function regainFullscreen() {
+  if (!cameraOpen || document.fullscreenElement || cameraChromeMode(document) !== "fullscreen") return;
+  void requestCameraFullscreen().then((ok) => {
+    if (ok || !cameraOpen || regainOnTap) return;
+    regainOnTap = () => { clearRegainOnTap(); if (cameraOpen && !document.fullscreenElement) void requestCameraFullscreen(); };
+    for (const t of TAP_EVENTS) document.addEventListener(t, regainOnTap, true);
+  });
+}
 const onFullscreenChange = () => {
-  if (document.fullscreenElement || !nativeRotation) return;
-  nativeRotation = false;
-  window.dispatchEvent(new Event("ar-orientation-change"));
+  if (document.fullscreenElement) { clearRegainOnTap(); return; }
+  if (nativeRotation) {
+    nativeRotation = false;
+    window.dispatchEvent(new Event("ar-orientation-change"));
+  }
+  // A Back closes the camera at once (fullscreenExitIsBack); still open a moment later, the exit came with a turn.
+  window.clearTimeout(regainTimer);
+  regainTimer = window.setTimeout(regainFullscreen, ROTATION_EXIT_WINDOW_MS / 2);
 };
 
 /**
@@ -56,6 +90,7 @@ export function fullscreenExitIsBack(now: number, lastTurnAt: number = lastTurn)
 
 /** Resolves true when the camera went fullscreen (Chrome shows its own notice). */
 export function enterCameraChrome(): Promise<boolean> {
+  cameraOpen = true;
   if (!cameraMeta) {
     cameraMeta = document.createElement("meta");
     cameraMeta.name = "theme-color";
@@ -70,12 +105,14 @@ export function enterCameraChrome(): Promise<boolean> {
   screen.orientation?.addEventListener?.("change", markTurn);
   document.addEventListener("fullscreenchange", onFullscreenChange);
   if (cameraChromeMode(document) !== "fullscreen" || document.fullscreenElement) return Promise.resolve(false);
-  return document.documentElement.requestFullscreen({ navigationUI: "hide" })
-    .then(() => { enteredFullscreen = true; allowNativeRotation(); return true; })
-    .catch(() => false /* Refused (no user activation, WebView, policy): dark bars stay. */);
+  // Refused (no user activation, WebView, policy): dark bars stay.
+  return requestCameraFullscreen();
 }
 
 export function exitCameraChrome() {
+  cameraOpen = false;
+  window.clearTimeout(regainTimer);
+  clearRegainOnTap();
   headWatch?.disconnect();
   headWatch = null;
   cameraMeta?.remove();
