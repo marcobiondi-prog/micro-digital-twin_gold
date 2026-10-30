@@ -18,6 +18,29 @@ const MIME: Record<string, string> = {
   mp4: "video/mp4", m4v: "video/mp4", webm: "video/webm", mov: "video/quicktime", "3gp": "video/3gpp",
 };
 
+/**
+ * What Chrome's share window takes, file by file (its own lists): a file of any other kind makes the phone refuse the
+ * whole share with "NotAllowedError: Permission denied", and canShare() does not tell beforehand.
+ */
+const SHARE_EXT = new Set(["avif", "bmp", "css", "csv", "ehtml", "flac", "gif", "htm", "html", "ico", "jfif", "jpeg", "jpg", "m4a", "m4v", "mp3", "mp4", "mpeg", "mpg", "oga", "ogg", "ogm", "ogv", "opus", "pdf", "pjp", "pjpeg", "png", "shtm", "shtml", "svg", "svgz", "text", "tif", "tiff", "txt", "wav", "weba", "webm", "webp", "xbm"]);
+const SHARE_MIME = new Set(["application/pdf", "audio/flac", "audio/mp3", "audio/mpeg", "audio/ogg", "audio/wav", "audio/webm", "audio/x-m4a", "image/avif", "image/bmp", "image/gif", "image/jpeg", "image/png", "image/svg+xml", "image/tiff", "image/webp", "image/x-icon", "text/comma-separated-values", "text/css", "text/csv", "text/html", "text/plain", "video/mp4", "video/mpeg", "video/ogg", "video/webm"]);
+const EXT_OF: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp", "video/mp4": "mp4", "video/webm": "webm", "application/pdf": "pdf", "text/csv": "csv", "text/plain": "txt" };
+/** The file as the share window takes it, or null when it cannot go (a .mov or .heic video or photo, say). */
+export function forShare(name: string, blob: Blob): File | null {
+  let ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
+  // The map data is plain text: it goes as "….geojson.txt", which a map program still reads once renamed.
+  if (ext === "geojson" || ext === "json") { name += ".txt"; ext = "txt"; }
+  let type = MIME[ext] ?? blob.type.split(";")[0]!.trim();
+  if (!SHARE_EXT.has(ext)) {
+    const e = EXT_OF[blob.type.split(";")[0]!.trim()];
+    if (!e) return null;
+    name = `${name}.${e}`; ext = e; type = blob.type.split(";")[0]!.trim();
+  }
+  if (ext === "txt" || ext === "text") type = "text/plain";
+  if (ext === "jpg" || ext === "jpeg") type = "image/jpeg";
+  return SHARE_MIME.has(type) ? new File([blob], name, { type }) : null;
+}
+
 export type ExportFile = { name: string; blob: Blob };
 type Kind = "report" | "table" | "map" | "media" | "text";
 type Dest = "email" | "share" | "save";
@@ -252,17 +275,16 @@ export function ExportSheet({ open, onOpenChange, flow, place, author, media, pr
     if (files.length === 1) { saveBlob(files[0]!.blob, files[0]!.name); return; }
     saveBlob(zip ?? (await makeZip(files)), zipName);
   };
-  // The type by the name: a fetched photo can come back typed "application/octet-stream", which the share sheet refuses.
-  const asFiles = (files: ExportFile[]) => files.map((f) => new File([f.blob], f.name, { type: MIME[f.name.split(".").pop()!.toLowerCase()] ?? (f.blob.type || "application/octet-stream") }));
   const subject = `Report ${piazza ? "della piazza" : "del vigneto"} · ${placeName}`;
   const body = on.text ? text : `Report ${piazza ? "della piazza" : "del vigneto"} di ${place}${author ? `, redatto da ${author}` : ""}.`;
 
   // What the phone's share window takes: each file checked on its own (no .geojson, .zip, .mov…), then in turns of
   // at most 10 files and 45 MB.
   const shareable = useMemo(() => {
-    const all = asFiles(job?.files ?? []);
-    const ok = typeof navigator !== "undefined" && navigator.canShare ? all.filter((f) => navigator.canShare!({ files: [f] })) : [];
-    const apart = (job?.files ?? []).filter((_, i) => !ok.includes(all[i]!));
+    const list = job?.files ?? [];
+    const mapped = list.map((f) => forShare(f.name, f.blob));
+    const ok = mapped.filter((f): f is File => !!f);
+    const apart = list.filter((_, i) => !mapped[i]);
     const turns: File[][] = [];
     let cur: File[] = [], bytes = 0;
     for (const f of ok) {
@@ -319,7 +341,7 @@ export function ExportSheet({ open, onOpenChange, flow, place, author, media, pr
       setTurn(0);
       if (apart.length) {
         await saveAll(apart);
-        say(apart.length === 1 && apart[0]!.name.endsWith(".geojson") ? "I dati per la mappa sono salvati in Download: il telefono non li condivide." : `${apart.length === 1 ? "1 file salvato" : `${apart.length} file salvati`} in Download: il telefono non li condivide.`);
+        say(`${apart.length === 1 ? `${apart[0]!.name} è salvato` : `${apart.length} file sono salvati`} in Download: il telefono non condivide questo tipo di file.`);
       }
     } catch (e) {
       if ((e as Error)?.name !== "AbortError") say("Non riuscito, riprova");
