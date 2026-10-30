@@ -174,7 +174,7 @@ const LIBS: Array<[string, string]> = [
   ["React", "MIT"], ["TanStack Router, Start e Query", "MIT"], ["Tailwind CSS", "MIT"], ["Radix UI", "MIT"], ["Lucide", "ISC"],
   ["Recharts", "MIT"], ["MapLibre GL JS", "BSD-3-Clause"], ["three.js", "MIT"], ["D3", "ISC"], ["jsPDF", "MIT"], ["JSZip", "MIT"],
   ["PDF.js", "Apache-2.0"], ["Supabase JS", "MIT"], ["Zod", "MIT"], ["date-fns", "MIT"], ["Sonner", "MIT"], ["Vaul", "MIT"],
-  ["class-variance-authority", "Apache-2.0"], ["React Hook Form", "MIT"], ["Embla Carousel", "MIT"],
+  ["class-variance-authority", "Apache-2.0"], ["React Hook Form", "MIT"], ["Embla Carousel", "MIT"], ["tz-lookup (fusi orari dalla posizione)", "CC0-1.0"],
 ];
 
 export function LicensesPage() {

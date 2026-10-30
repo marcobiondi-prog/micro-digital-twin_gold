@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changeCalendar, changeHands, changeNotice, clockOffset, dstShift, placeTime, shiftHour, summerTime, zoneOptions, sameClock, utcOffsetText, validTimeZone, zoneName } from "@/models/world-clock";
+import { changeCalendar, changeHands, changeNotice, clockOffset, dstShift, placeTime, shiftHour, summerTime, sameClock, utcOffsetText, validTimeZone, zoneName } from "@/models/world-clock";
 
 describe("world-clock", () => {
   const t = Date.UTC(2026, 9, 30, 12, 7); // 30 Oct 2026, 12:07 UTC
@@ -38,13 +38,8 @@ describe("world-clock", () => {
     expect(summerTime(Date.UTC(2026, 6, 1), "Asia/Tokyo")).toEqual({ kind: "nessuna", next: null });
     expect(summerTime(Date.UTC(2026, 6, 1), "Australia/Sydney").kind).toBe("solare");
   });
-  it("lists zones by offset and moves an hour between zones", () => {
+  it("moves an hour between zones", () => {
     const t = Date.UTC(2026, 9, 30, 12);
-    const list = zoneOptions(t);
-    expect(list.find((o) => o.tz === "Europe/Rome")?.label).toBe("UTC+1 · Rome (Europa)");
-    expect(list.find((o) => o.tz === "UTC")?.label).toBe("UTC · Tempo universale");
-    expect(list.every((o, i) => i === 0 || list[i - 1]!.offset <= o.offset)).toBe(true);
-    expect(list.some((o) => o.tz.startsWith("Etc/"))).toBe(false);
     expect(shiftHour(13, t, "Europe/Rome", "Asia/Tokyo")).toBe(21);
     expect(shiftHour(2, t, "Europe/Rome", "America/New_York")).toBe(21);
   });
@@ -77,5 +72,14 @@ describe("world-clock", () => {
     expect(ics).toContain("DTSTART:20261025T010000Z");
     expect(ics).toContain("TRIGGER:-PT6H");
     expect(ics).toContain("SUMMARY:Torna l'ora solare");
+  });
+});
+
+describe("place-zone", () => {
+  it("finds the zone from the position", async () => {
+    const { placeZoneOf } = await import("@/lib/place-zone");
+    expect(await placeZoneOf(41.5603, 14.6627)).toBe("Europe/Rome"); // Campobasso
+    expect(await placeZoneOf(35.68, 139.69)).toBe("Asia/Tokyo");
+    expect(await placeZoneOf(40.71, -74.0)).toBe("America/New_York");
   });
 });
