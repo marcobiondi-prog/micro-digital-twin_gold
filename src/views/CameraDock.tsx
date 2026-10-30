@@ -139,7 +139,7 @@ export function CameraSheet() {
         ) : (
           <>
             {(aiReady || !signedIn) && (
-              <button type="button" onClick={() => (aiReady ? start("ai") : (close(), openAccount()))}
+              <button type="button" onClick={() => (aiReady ? start("ai") : afterClose(openAccount))}
                 className="relative flex items-center gap-4 overflow-hidden rounded-[1.25rem] border border-brand-turquoise/40 bg-[radial-gradient(120%_120%_at_0%_0%,color-mix(in_oklch,var(--brand-turquoise)_32%,transparent),transparent_60%)] bg-muted/60 p-4 text-left outline-none transition-transform active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-ring motion-reduce:active:scale-100">
                 <span className="relative grid size-16 shrink-0 place-items-center rounded-full border-[3px] border-brand-turquoise bg-background shadow-[0_0_22px_color-mix(in_oklch,var(--brand-turquoise)_45%,transparent)]">
                   <img src={aiLogo} alt="" aria-hidden="true" className="size-8" />
