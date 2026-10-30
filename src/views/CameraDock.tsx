@@ -1,15 +1,13 @@
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { Building2, Camera, Grape, Lock, type LucideIcon } from "lucide-react";
+import { Building2, Camera, Grape, Images, Lock, Play, Video, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useInstalledApp } from "@/lib/installed-app";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { showSimMedia } from "@/views/v8/console";
-import { deliverFiles, openAccount, requestCapture, setCameraSheetOpen, useCameraSheetOpen } from "@/lib/camera-dock";
-import { useEffect } from "react";
-import { useLabMedia } from "@/models/lab-media-store";
-import { QuickCamera } from "@/views/QuickCamera";
+import { openAccount, requestCapture, setCameraSheetOpen, useCameraSheetOpen, type CaptureAction } from "@/lib/camera-dock";
 import { cn } from "@/lib/utils";
+import { useLabMedia } from "@/models/lab-media-store";
 import { useProId } from "@/lib/use-pro-id";
 import { useLab } from "@/models/lab-store";
 import { splitLocation } from "@/views/SimulationGrid";
@@ -43,6 +41,20 @@ export function CameraDockButton({ focused = false }: { focused?: boolean }) {
   );
 }
 
+/** One round action of the row: an icon (or the AI logo) in a coloured circle, its name under it. */
+function RoundAction({ icon: Icon, label, tone, locked, onClick }: { icon?: LucideIcon; label: string; tone: string; locked?: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick}
+      className="flex flex-col items-center gap-2 rounded-2xl p-1.5 text-sm font-semibold outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:active:scale-100">
+      <span className={cn("relative grid size-14 place-items-center rounded-full text-white", tone)}>
+        {Icon ? <Icon className="size-6" aria-hidden="true" /> : <img src={aiLogo} alt="" aria-hidden="true" className="size-7" />}
+        {locked && <span className="absolute -bottom-1 -right-1 grid size-6 place-items-center rounded-full bg-foreground text-background ring-2 ring-card"><Lock className="size-3.5" aria-hidden="true" /></span>}
+      </span>
+      {label}
+    </button>
+  );
+}
+
 /** A section card with its lock (no profile yet): a tap leads to that profile's identification. */
 function LockedSection({ icon: Icon, label, hint, tone, onClick }: { icon: LucideIcon; label: string; hint: string; tone: string; onClick: () => void }) {
   return (
@@ -58,10 +70,11 @@ function LockedSection({ icon: Icon, label, hint, tone, onClick }: { icon: Lucid
 }
 
 /**
- * The camera of the central button, mounted once in the app frame. With a professional profile it opens straight on
- * the live camera (views/QuickCamera) for that profile's project — no "where?" question, the other section is locked
- * anyway — and moves to the project's page underneath, whose photos keep what is shot. With no profile it is a sheet
- * rising from the bottom on phones with the two sections locked, each leading to its identification.
+ * The camera sheet, mounted once in the app frame. It rises from the bottom on phones. With a professional profile it
+ * goes straight to that profile's project (no "where?" question: the other section is locked anyway): "La tua piazza /
+ * Il tuo vigneto" with its place, AI, Foto, Video and Galleria in one row, and the project's latest shots. Off the project's page the AI camera
+ * opens there by itself; Foto, Video and Galleria open the page and the sheet again (the phone's camera needs a tap on
+ * the page that shows the photos). With no profile it shows the two sections locked, each leading to its identification.
  */
 export function CameraSheet() {
   const open = useCameraSheetOpen();
@@ -70,58 +83,108 @@ export function CameraSheet() {
   const proId = useProId();
   const lab = useLab();
   const kind: Kind | null = proId ? (proId.kind === "funzionario" ? "urban" : "vineyard") : null;
-  const media = useLabMedia(kind ?? "urban");
+  const page = kind === "urban" ? "/urbano" : "/vigneto";
+  const here = kind !== null && kindOf(pathname) === kind;
+  const place = kind ? splitLocation((kind === "urban" ? lab.urban : lab.vineyard).location.label).name : "";
   const { signedIn, aiReady } = useAiReady();
   const close = () => setCameraSheetOpen(false);
-  // Closing steps history back: what comes next waits for that Back to land (else it would undo a navigation, and the
-  // AI camera would read it as "close").
+  const openPage = () => void navigate({ to: page, replace: pathname !== "/" && pathname !== "/benvenuto" });
+  // Closing the sheet steps history back: what comes next waits for that Back to land (else it would undo a navigation,
+  // and the AI camera would read it as "close").
   const afterClose = (next: () => void) => {
     const go = () => { window.removeEventListener("popstate", go); window.clearTimeout(timer); next(); };
     const timer = window.setTimeout(go, 400);
     window.addEventListener("popstate", go);
     close();
   };
-  // With a profile the camera opens over the project's page, so its photos are there to take what is shot.
-  useEffect(() => {
-    if (!open || !kind || kindOf(pathname) === kind) return;
-    void navigate({ to: kind === "urban" ? "/urbano" : "/vigneto", replace: pathname !== "/" && pathname !== "/benvenuto" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, kind]);
-
-  if (kind) {
-    const place = splitLocation((kind === "urban" ? lab.urban : lab.vineyard).location.label).name;
-    const last = media[0];
-    return (
-      <QuickCamera open={open} place={place} aiReady={aiReady} signedIn={signedIn}
-        lastShot={last ? { url: last.url, video: last.kind === "video" } : null}
-        onFile={(file) => {
-          // The page's photos may still be mounting right after the camera opened it: try again for a few seconds.
-          const t0 = Date.now();
-          const hand = () => { if (deliverFiles(kind, [file])) return; if (Date.now() - t0 < 5000) window.setTimeout(hand, 200); else toast.error("Scatto non salvato, riprova"); };
-          hand();
-        }}
-        onAi={() => afterClose(() => { if (!requestCapture(kind, "ai")) toast.error("Fotocamera non pronta, riprova tra un attimo"); })}
-        // Inside the tap: the phone's file picker needs it.
-        onGallery={() => { if (!requestCapture(kind, "gallery")) toast.error("Galleria non pronta, riprova tra un attimo"); showSimMedia(kind); close(); }}
-        onLogin={() => { close(); openAccount(); }}
-        onShowShots={() => { showSimMedia(kind); close(); }}
-        onClose={close} />
-    );
-  }
+  // Called inside the tap: the system camera and the file picker need the user gesture.
+  const start = (action: CaptureAction) => {
+    if (!kind) return;
+    if (action === "ai") {
+      // The AI camera opens only once the sheet's history entry is gone (its fullscreen falls back to the dark bars).
+      afterClose(() => {
+        if (here) { if (!requestCapture(kind, "ai")) toast.error("Fotocamera non pronta, riprova tra un attimo"); return; }
+        // Off the project's page: open it, then the AI camera once its media are ready (up to 4 s).
+        openPage();
+        const t0 = Date.now();
+        const tryStart = () => { if (requestCapture(kind, "ai")) return; if (Date.now() - t0 < 4000) window.setTimeout(tryStart, 150); else toast.error("Fotocamera non pronta, riprova tra un attimo"); };
+        window.setTimeout(tryStart, 150);
+      });
+      return;
+    }
+    if (!here) {
+      // The phone's camera and file picker open only from a tap on the page that keeps the photos: go there and ask again.
+      afterClose(() => { openPage(); window.setTimeout(() => setCameraSheetOpen(true), 350); });
+      return;
+    }
+    if (!requestCapture(kind, action)) toast.error("Fotocamera non pronta, riprova tra un attimo");
+    // The new photo or video lands under the simulation: show it.
+    showSimMedia(kind);
+    close();
+  };
   const identify = (to: "/identificazione/funzionario" | "/identificazione/agronomo") => afterClose(() => void navigate({ to }));
+  const media = useLabMedia(kind ?? "urban");
+  // The latest shots open the project's photos (on its page when elsewhere).
+  const showShots = () => {
+    if (!kind) return;
+    if (here) { showSimMedia(kind); close(); return; }
+    afterClose(() => { openPage(); window.setTimeout(() => showSimMedia(kind), 400); });
+  };
+
   return (
     <Dialog open={open} onOpenChange={setCameraSheetOpen}>
       <DialogContent className="gap-4 p-5 max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-[1.75rem] max-sm:border-x-0 max-sm:border-b-0 max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-sm:data-[state=open]:slide-in-from-bottom-1/2 max-sm:data-[state=closed]:slide-out-to-bottom-1/2 sm:w-[min(440px,calc(100vw-1.5rem))] sm:rounded-2xl">
         <span className="mx-auto -mt-1 h-1.5 w-10 rounded-full bg-foreground/20 sm:hidden" aria-hidden="true" />
-        <DialogHeader className="text-left">
-          <DialogTitle>Fotocamera</DialogTitle>
-          <DialogDescription>Per scattare, dicci chi sei</DialogDescription>
-        </DialogHeader>
-        <div className="grid grid-cols-2 gap-2">
-          <LockedSection icon={Building2} label="Piazza" hint="Per i funzionari del Comune" tone="bg-urban" onClick={() => identify("/identificazione/funzionario")} />
-          <LockedSection icon={Grape} label="Vigneto" hint="Per gli agronomi" tone="bg-vine" onClick={() => identify("/identificazione/agronomo")} />
-        </div>
-        <p className="text-center text-xs text-muted-foreground">Tocca una sezione per identificarti: ci vuole un minuto.</p>
+        {kind ? (
+          <>
+            {/* Proposal 7: the project first (badge, "La tua piazza / Il tuo vigneto", its place), then the four actions in one row, then its latest shots. */}
+            <DialogHeader className="text-left">
+              <DialogTitle className="flex items-center gap-2.5">
+                <span className={cn("grid size-8 shrink-0 place-items-center rounded-full text-white", kind === "urban" ? "bg-urban" : "bg-vine")}>
+                  {kind === "urban" ? <Building2 className="size-4" aria-hidden="true" /> : <Grape className="size-4" aria-hidden="true" />}
+                </span>
+                {kind === "urban" ? "La tua piazza" : "Il tuo vigneto"}
+              </DialogTitle>
+              <DialogDescription className="truncate">{place || "Fotocamera"}</DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-4">
+              {aiReady || !signedIn
+                ? <RoundAction label="AI" tone="border-[3px] border-brand-turquoise bg-background" locked={!aiReady} onClick={() => (aiReady ? start("ai") : (close(), openAccount()))} />
+                : <RoundAction label="AI" tone="border-[3px] border-muted-foreground/40 bg-background opacity-50" onClick={() => toast("La fotocamera AI è nell’app installata sul telefono")} />}
+              <RoundAction icon={Camera} label="Foto" tone="bg-primary" onClick={() => start("photo")} />
+              <RoundAction icon={Video} label="Video" tone="bg-danger" onClick={() => start("video")} />
+              <RoundAction icon={Images} label="Galleria" tone="bg-ok" onClick={() => start("gallery")} />
+            </div>
+            <div>
+              <div className="mb-2 flex items-baseline justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">Ultimi scatti</h3>
+                {media.length > 0 && <button type="button" onClick={showShots} className="text-sm font-semibold text-brand-turquoise outline-none focus-visible:underline">Vedi tutti · {media.length}</button>}
+              </div>
+              {media.length ? (
+                <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5 touch-pan-x" data-map-gestures="">
+                  {media.slice(0, 10).map((m) => (
+                    <button key={m.id} type="button" onClick={showShots} aria-label={`${m.kind === "video" ? "Video" : "Foto"} ${m.name}`}
+                      className="relative size-[4.5rem] shrink-0 overflow-hidden rounded-xl bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      {m.kind === "video" ? <><video src={m.url} muted playsInline preload="metadata" className="h-full w-full object-cover" /><Play className="absolute inset-0 m-auto size-5 text-white drop-shadow" aria-hidden="true" /></> : <img src={m.url} alt="" loading="lazy" className="h-full w-full object-cover" />}
+                    </button>
+                  ))}
+                </div>
+              ) : <p className="rounded-xl bg-muted/60 px-3 py-3 text-sm text-muted-foreground">Ancora nessuno scatto: quelli che fai qui finiscono nella {kind === "urban" ? "simulazione della piazza" : "simulazione del vigneto"}.</p>}
+            </div>
+          </>
+        ) : (
+          <>
+            <DialogHeader className="text-left">
+              <DialogTitle>Fotocamera</DialogTitle>
+              <DialogDescription>Per scattare, dicci chi sei</DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-2 gap-2">
+              <LockedSection icon={Building2} label="Piazza" hint="Per i funzionari del Comune" tone="bg-urban" onClick={() => identify("/identificazione/funzionario")} />
+              <LockedSection icon={Grape} label="Vigneto" hint="Per gli agronomi" tone="bg-vine" onClick={() => identify("/identificazione/agronomo")} />
+            </div>
+            <p className="text-center text-xs text-muted-foreground">Tocca una sezione per identificarti: ci vuole un minuto.</p>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
