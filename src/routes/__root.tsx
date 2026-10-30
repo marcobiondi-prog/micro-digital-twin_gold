@@ -18,6 +18,7 @@ import { reloadFresh } from "@/router";
 import { History, Building2, Grape, Info, LayoutDashboard, Lock } from "lucide-react";
 import { useProId, useSyncProId } from "@/lib/use-pro-id";
 import { useDstNotice } from "@/lib/dst-notice";
+import { hidePreloader, preloaderScript } from "@/lib/preloader";
 import { unlocks, type ProId } from "@/models/professional-id";
 import { AgronomoIcon, FunzionarioIcon } from "@/views/ProfileIcon";
 import { AmbientLayer } from "@/views/v8/console";
@@ -102,6 +103,7 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="it" className="dark" style={{ colorScheme: "dark" }} suppressHydrationWarning>
       <head><HeadContent /><script dangerouslySetInnerHTML={{ __html: themeBootScript }} /></head>
       <body>
+        <script dangerouslySetInnerHTML={{ __html: preloaderScript }} />
         {children}
         <Scripts />
       </body>
@@ -383,6 +385,11 @@ function RootComponent() {
   // The professional profile follows the account: adopted on sign-in, or uploaded to an account without one.
   useSyncProId();
   useDstNotice();
+  // The index's preloader goes once the app has started and its fonts are in.
+  useEffect(() => {
+    const fonts = (document as Document & { fonts?: { ready: Promise<unknown> } }).fonts?.ready ?? Promise.resolve();
+    void Promise.race([fonts, new Promise((r) => setTimeout(r, 1500))]).then(() => requestAnimationFrame(hidePreloader));
+  }, []);
   const { queryClient } = Route.useRouteContext();
   const navigate = useNavigate();
   const location = useLocation();
