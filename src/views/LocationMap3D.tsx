@@ -84,7 +84,7 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
           };
           if (sim?.kind === "piazza") {
             for (const pt of sim.data.patches) {
-              if (pt.kind === "lawn") { shape(pt.ring, "rgba(76,175,80,0.6)", null); continue; }
+              if (pt.kind === "lawn") { shape(pt.ring, "rgba(98,176,66,0.85)", null); continue; }
               // Shade: the shadow on the ground, then the wooden pergola over it (posts raised, beams and slats as floating slabs).
               shape(pt.ring, "rgba(11,15,21,0.35)", null);
               for (const part of pergolaParts(pt.ring)) {

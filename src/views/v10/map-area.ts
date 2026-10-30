@@ -58,9 +58,11 @@ export const SIM_TREES_3D = "sim-trees-3d";
 
 /** The vines' thirst as the zone's colour: green, amber, red (the same steps as the arc's verdict). */
 export const thirstColor = (s: number) => (s >= 65 ? "#ef4444" : s >= 35 ? "#eab308" : "#22c55e");
-export const SIM_COLORS = { lawn: "#4caf50", shade: PERGOLA_COLORS.slat, cloth: "#334155", drip: "#38bdf8", wind: "#15803d", tree: "#2e7d32" } as const;
+export const SIM_COLORS = { lawn: "#62ac42", shade: PERGOLA_COLORS.slat, cloth: "#334155", drip: "#38bdf8", wind: "#15803d", tree: "#2e7d32" } as const;
 /** The 2D pattern of a pergola seen from above: wooden slats with light between them. */
 export const SLATS_IMAGE = "pergola-slats";
+/** The 2D pattern of a lawn: mowing stripes in two greens with blades of grass, so it reads as grass, not a flat green. */
+export const LAWN_IMAGE = "lawn-grass";
 
 const poly = (ring: Ring, props: Record<string, unknown>) => ({ type: "Feature", properties: props, geometry: { type: "Polygon", coordinates: [[...ring, ring[0]!].map(([la, ln]) => [ln, la])] } });
 const lineF = (ring: Ring, props: Record<string, unknown>) => ({ type: "Feature", properties: props, geometry: { type: "LineString", coordinates: ring.map(([la, ln]) => [ln, la]) } });
@@ -105,6 +107,30 @@ export const treeCrowns = (sim: SimLayout | null) => fc(sim?.kind === "piazza"
   : []);
 
 /** The slats image for the 2D pergolas: light wood strips with darker gaps, repeated over the shade. */
+/**
+ * The lawn image: two bands of green (a mown lawn's stripes) with short blades scattered lighter and darker,
+ * picked by a fixed pseudo-random sequence so it is the same on every device.
+ */
+function lawnImage(): { width: number; height: number; data: Uint8Array } {
+  const w = 32, h = 32, data = new Uint8Array(w * h * 4);
+  const light = [0x6c, 0xb8, 0x4a], dark = [0x58, 0xa0, 0x3a];
+  let seed = 7;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const c = y < h / 2 ? light : dark, o = (y * w + x) * 4;
+    data[o] = c[0]!; data[o + 1] = c[1]!; data[o + 2] = c[2]!; data[o + 3] = 255;
+  }
+  // Blades: short vertical strokes, a little lighter or darker than their band.
+  for (let i = 0; i < 70; i++) {
+    const x = Math.floor(rnd() * w), y0 = Math.floor(rnd() * h), len = 2 + Math.floor(rnd() * 3), k = rnd() < 0.5 ? 1.18 : 0.82;
+    for (let d = 0; d < len; d++) {
+      const y = (y0 + d) % h, o = (y * w + x) * 4;
+      for (let ch = 0; ch < 3; ch++) data[o + ch] = Math.max(0, Math.min(255, Math.round(data[o + ch]! * k)));
+    }
+  }
+  return { width: w, height: h, data };
+}
+
 function slatsImage(): { width: number; height: number; data: Uint8Array } {
   const w = 12, h = 12, data = new Uint8Array(w * h * 4);
   const wood = [0xc9, 0x9a, 0x63], gap = [0x5a, 0x3b, 0x1c];
@@ -123,7 +149,10 @@ export function addSimLayers(map: MlMap, lat: number, raised = false) {
   if (map.getSource(SIM_SOURCE)) return;
   const before = map.getLayer("drawn-area-line") ? "drawn-area-line" : undefined;
   map.addSource(SIM_SOURCE, { type: "geojson", data: fc([]) });
-  map.addLayer({ id: "sim-fill", type: "fill", source: SIM_SOURCE, filter: ["all", ["==", ["geometry-type"], "Polygon"], ["!=", ["get", "kind"], "shade"]], paint: { "fill-color": ["get", "color"], "fill-opacity": ["get", "opacity"] } }, before);
+  map.addLayer({ id: "sim-fill", type: "fill", source: SIM_SOURCE, filter: ["all", ["==", ["geometry-type"], "Polygon"], ["!=", ["get", "kind"], "shade"], ["!=", ["get", "kind"], "lawn"]], paint: { "fill-color": ["get", "color"], "fill-opacity": ["get", "opacity"] } }, before);
+  // The lawn: mowing stripes and blades of grass, without the hairlines between its row strips.
+  if (!map.hasImage(LAWN_IMAGE)) map.addImage(LAWN_IMAGE, lawnImage());
+  map.addLayer({ id: "sim-lawn", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "lawn"], paint: { "fill-pattern": LAWN_IMAGE, "fill-opacity": 0.95, "fill-antialias": false } }, before);
   // The pergolas seen from above: slats with light between them, and a wooden frame.
   if (!map.hasImage(SLATS_IMAGE)) map.addImage(SLATS_IMAGE, slatsImage());
   map.addLayer({ id: "sim-pergola", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "shade"], paint: { "fill-pattern": SLATS_IMAGE, "fill-opacity": 0.95 } }, before);
