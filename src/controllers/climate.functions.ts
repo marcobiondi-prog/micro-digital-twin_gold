@@ -57,16 +57,16 @@ export const getRealClimate = createServerFn({ method: "POST" })
  */
 export const getSeasonalClimate = createServerFn({ method: "POST" })
   .inputValidator((d) => input.parse(d))
-  .handler(async ({ data }): Promise<{ profile: SeasonProfile; from: string; to: string } | null> => {
+  .handler(async ({ data }): Promise<{ profile: SeasonProfile; from: string; to: string; timezone: string | null } | null> => {
     const end = new Date(Date.now() - 6 * 864e5), start = new Date(end.getTime() - 364 * 864e5);
     const day = (d: Date) => d.toISOString().slice(0, 10);
     const u = `https://archive-api.open-meteo.com/v1/archive?latitude=${data.lat}&longitude=${data.lng}&start_date=${day(start)}&end_date=${day(end)}&hourly=apparent_temperature&timezone=auto`;
     try {
       const r = await fetch(u, { headers: { "User-Agent": "MicroDigitalTwin/1.0" } });
       if (!r.ok) { console.error(`Seasonal climate failed [${r.status}]`); return null; }
-      const j = (await r.json()) as { hourly?: { time?: string[]; apparent_temperature?: Array<number | null> } };
+      const j = (await r.json()) as { timezone?: string; hourly?: { time?: string[]; apparent_temperature?: Array<number | null> } };
       const times = j.hourly?.time ?? [], values = j.hourly?.apparent_temperature ?? [];
       if (!times.length) return null;
-      return { profile: seasonalProfile(times, values), from: day(start), to: day(end) };
+      return { profile: seasonalProfile(times, values), from: day(start), to: day(end), timezone: typeof j.timezone === "string" ? j.timezone : null };
     } catch { return null; }
   });

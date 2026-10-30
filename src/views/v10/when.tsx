@@ -1,41 +1,51 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronDown, ChevronLeft, ChevronRight, Clock } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Clock, Globe } from "lucide-react";
 import { getSeasonalClimate } from "@/controllers/climate.functions";
 import { SEASONS, SEASON_LABEL, seasonOfMonth, type Season } from "@/models/season-climate";
 import { clearRequestedWhen, clockText, peekRequestedWhen, setSimWhen } from "@/models/sim-when";
+import { deviceTimeZone, placeTime, sameClock, utcOffsetText, validTimeZone, zoneName } from "@/models/world-clock";
+import { syncWorldTime, worldNow } from "@/lib/world-time";
 import { hapticTick } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
 /**
- * Season and hour of a simulation: they follow the device clock ("Adesso", checked every 30 s and on return to the app)
- * until one is chosen by hand, and read the place's real year averaged by season and hour (null where it is missing).
+ * Season and hour of a simulation: they follow the world time read in the place's own time zone ("Adesso", checked
+ * every 30 s and on return to the app; the device clock corrected against the server's, the zone the one the place's
+ * weather year comes in, else the device's) until one is chosen by hand, and read the place's real year averaged by
+ * season and hour (null where it is missing).
  */
 export function useSeasonClock(lat: number, lng: number, kind?: "urban" | "vineyard") {
   // "Riprendi nella simulazione" from the history can ask for the season and hour of a past intervention: the clock then starts there, by hand.
   const [asked] = useState(() => (kind ? peekRequestedWhen(kind) : null));
   const [live, setLive] = useState(!asked);
-  const [season, setSeason] = useState<Season>(() => asked?.season ?? seasonOfMonth(new Date().getMonth()));
-  const [hour, setHourOnly] = useState(() => asked?.hour ?? new Date().getHours());
+  const fetchSeasons = useServerFn(getSeasonalClimate);
+  const climate = useQuery({ queryKey: ["season-climate", lat, lng], queryFn: () => fetchSeasons({ data: { lat, lng } }), staleTime: Infinity, retry: 1 });
+  // The place's time zone (its weather year comes in it), else the device's.
+  const placeZone = validTimeZone(climate.data?.timezone);
+  const tz = placeZone ?? deviceTimeZone();
+  const [season, setSeason] = useState<Season>(() => asked?.season ?? seasonOfMonth(placeTime(worldNow(), tz).month));
+  const [hour, setHourOnly] = useState(() => asked?.hour ?? placeTime(worldNow(), tz).hour);
   // The minutes follow the clock while live; an hour chosen by hand starts on the hour.
-  const [minute, setMinute] = useState(() => (asked ? asked.minute ?? 0 : new Date().getMinutes()));
+  const [minute, setMinute] = useState(() => (asked ? asked.minute ?? 0 : placeTime(worldNow(), tz).minute));
   const setHour = (h: number | ((h: number) => number)) => { setHourOnly(h); setMinute(0); };
   useEffect(() => { if (kind) clearRequestedWhen(kind); }, [kind]);
   // What the simulation is set to now, for the history to record with an intervention.
   useEffect(() => { if (kind) setSimWhen(kind, { season, hour, minute }); }, [kind, season, hour, minute]);
   useEffect(() => {
     if (!live) return;
-    const sync = () => { const now = new Date(); setSeason(seasonOfMonth(now.getMonth())); setHourOnly(now.getHours()); setMinute(now.getMinutes()); };
+    let on = true;
+    const sync = () => { if (!on) return; const now = placeTime(worldNow(), tz); setSeason(seasonOfMonth(now.month)); setHourOnly(now.hour); setMinute(now.minute); };
     sync();
+    // Once the world time is known, again (a phone whose clock is off moves to the right minute).
+    void syncWorldTime().then(sync);
     const id = window.setInterval(sync, 30_000);
     document.addEventListener("visibilitychange", sync);
-    return () => { window.clearInterval(id); document.removeEventListener("visibilitychange", sync); };
-  }, [live]);
-  const fetchSeasons = useServerFn(getSeasonalClimate);
-  const climate = useQuery({ queryKey: ["season-climate", lat, lng], queryFn: () => fetchSeasons({ data: { lat, lng } }), staleTime: Infinity, retry: 1 });
+    return () => { on = false; window.clearInterval(id); document.removeEventListener("visibilitychange", sync); };
+  }, [live, tz]);
   const real = climate.data?.profile[season][hour] ?? null;
-  return { live, setLive, season, setSeason, hour, setHour, minute, pending: climate.isPending, real };
+  return { live, setLive, season, setSeason, hour, setHour, minute, tz, placeZone: !!placeZone, pending: climate.isPending, real };
 }
 export type SeasonClock = ReturnType<typeof useSeasonClock>;
 
@@ -68,9 +78,27 @@ export function WhenPicker({ clock, id, detail, note, children }: { clock: Seaso
           <button type="button" aria-pressed={live} onClick={() => { hapticTick(); setLive(true); }}
             className={cn("inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", live ? "bg-foreground text-background" : "bg-foreground/[0.07]")}>Adesso</button>
         </div>
+        <ZoneLine clock={clock} />
         <p className="text-center text-[11px] text-muted-foreground">{note}</p>
         {children}
       </div>
     </div>
+  );
+}
+
+/**
+ * Whose hour it is: the place's own (its zone and UTC offset, on world time), and the hour where the phone is when
+ * that differs; while the place's zone is not known yet, the phone's.
+ */
+function ZoneLine({ clock }: { clock: SeasonClock }) {
+  const now = worldNow(), here = deviceTimeZone();
+  const away = clock.placeZone && !sameClock(now, clock.tz, here);
+  const mine = placeTime(now, here);
+  return (
+    <p className="flex flex-wrap items-center justify-center gap-x-1.5 text-center text-xs text-foreground/80">
+      <Globe className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+      <span>{clock.placeZone ? "Ora del luogo" : "Ora del tuo dispositivo"} · {zoneName(now, clock.tz)} ({utcOffsetText(now, clock.tz)})</span>
+      {away && <span className="text-muted-foreground">· da te sono le {clockText(mine.hour, mine.minute)}</span>}
+    </p>
   );
 }
