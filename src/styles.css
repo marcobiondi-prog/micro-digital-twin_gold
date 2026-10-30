@@ -2084,7 +2084,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   background: conic-gradient(from var(--pile-angle), rgb(45 212 191 / 0.1) 0deg, rgb(45 212 191) 70deg, #fff 95deg, rgb(45 212 191) 120deg, rgb(45 212 191 / 0.1) 190deg, rgb(255 255 255 / 0.2) 360deg);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
-  animation: pile-turn 2.6s linear infinite, pile-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: pile-turn 4s linear infinite, pile-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 @keyframes pile-turn { to { --pile-angle: 360deg; } }
 @keyframes pile-in { from { opacity: 0; transform: scale(0.92); } }
