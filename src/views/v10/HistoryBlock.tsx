@@ -5,6 +5,7 @@ import { ArrowRight, Building2, CalendarDays, Check, ChevronDown, Clock3, Cloud,
 import { currentMedia, removeMedia, useLabMedia, type MediaItem } from "@/models/lab-media-store";
 import { mediaTime } from "@/models/media-time";
 import { TabRow } from "@/views/v8/console";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { peekStyle, useTabSwipe } from "@/lib/use-tab-swipe";
 import { useProId } from "@/lib/use-pro-id";
 import { SEASON_LABEL } from "@/models/season-climate";
@@ -41,14 +42,71 @@ function ShotMedia({ s }: { s: Shot }) {
   );
 }
 
-function Thumb({ s }: { s: Shot }) {
+function Thumb({ s, onOpen }: { s: Shot; onOpen: () => void }) {
   const when = s.at ? new Date(s.at).toLocaleDateString("it-IT", { day: "numeric", month: "short" }) : "";
   return (
-    <a href={s.url} target="_blank" rel="noreferrer" aria-label={`${s.kind === "video" ? "Video" : "Foto"} ${s.flow}${when ? `, ${when}` : ""}`} className="relative block aspect-square overflow-hidden rounded-2xl bg-foreground/[0.08] outline-none focus-visible:ring-2 focus-visible:ring-ring">
+    <button type="button" onClick={onOpen} aria-label={`Apri ${s.kind === "video" ? "il video" : "la foto"} ${s.flow}${when ? `, ${when}` : ""}`} className="relative block aspect-square w-full overflow-hidden rounded-2xl bg-foreground/[0.08] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
       <ShotMedia s={s} />
       {s.kind === "video" && <span className="absolute inset-0 grid place-items-center"><Play className="size-7 text-white drop-shadow" aria-hidden="true" /></span>}
       <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-2 pb-1.5 pt-5 text-xs text-white">{s.flow === "piazza" ? "Piazza" : "Vigneto"}{when ? ` · ${when}` : ""}</span>
-    </a>
+    </button>
+  );
+}
+
+/**
+ * The photos and videos of a day opened inside the app, on a black full-screen page: one at a time, fitted whole,
+ * slid sideways to the next (a snapping row of its own, so the page's tabs stay put; ‹ › on larger screens), with
+ * "n di N", the place and the date; videos play with their controls. The phone's Back or ✕ closes it.
+ */
+function ShotViewer({ shots, start, onClose }: { shots: Shot[]; start: number; onClose: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [i, setI] = useState(start);
+  const row = useRef<HTMLDivElement>(null);
+  // Mounted closed, then opened (the shared dialog's history step), at the photo that was tapped.
+  useEffect(() => { setOpen(true); }, []);
+  useEffect(() => {
+    if (!open) return;
+    requestAnimationFrame(() => { const r = row.current; if (r) r.scrollLeft = start * r.clientWidth; });
+  }, [open, start]);
+  const onScroll = () => {
+    const r = row.current; if (!r) return;
+    const n = Math.round(r.scrollLeft / Math.max(1, r.clientWidth));
+    if (n !== i) {
+      setI(n);
+      // A video slid away stops playing.
+      r.querySelectorAll("video").forEach((v, k) => { if (k !== n) v.pause(); });
+    }
+  };
+  const go = (n: number) => { const r = row.current; if (r) r.scrollTo({ left: n * r.clientWidth, behavior: "smooth" }); };
+  const s = shots[i] ?? shots[0]!;
+  const when = s.at ? new Date(s.at).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { setOpen(false); setTimeout(onClose, 200); } }}>
+      <DialogContent overlayClassName="bg-black" className="!left-0 !top-0 flex h-[100dvh] w-full max-w-none !translate-x-0 !translate-y-0 flex-col gap-0 rounded-none border-0 bg-black p-0 text-white sm:max-h-none sm:rounded-none">
+        <DialogTitle className="sr-only">{s.kind === "video" ? "Video" : "Foto"} {i + 1} di {shots.length}</DialogTitle>
+        <DialogDescription className="sr-only">{s.flow === "piazza" ? "Piazza" : "Vigneto"}{when ? `, ${when}` : ""}</DialogDescription>
+        <div className="flex items-center gap-3 px-4 pb-2 pr-16 pt-[calc(0.85rem+env(safe-area-inset-top))]">
+          <span className="text-[15px] font-semibold tabular-nums">{i + 1} di {shots.length}</span>
+          <span className="min-w-0 truncate text-sm text-white/65">{s.flow === "piazza" ? "Piazza" : "Vigneto"}{when ? ` · ${when}` : ""}</span>
+        </div>
+        <div ref={row} onScroll={onScroll} data-map-gestures="" className="no-scrollbar flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden touch-pan-x">
+          {shots.map((x, k) => (
+            <div key={`${x.flow}-${x.id}`} className="relative grid h-full w-full shrink-0 snap-center place-items-center px-1">
+              {Math.abs(k - i) <= 2 && (x.kind === "video"
+                ? <video src={x.url} controls playsInline preload="metadata" className="max-h-full max-w-full" />
+                : <img src={x.url} alt={`Foto ${k + 1} di ${shots.length}`} className="max-h-full max-w-full object-contain" />)}
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center justify-center gap-6 px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          <button type="button" onClick={() => go(i - 1)} disabled={i === 0} aria-label="Precedente" className="grid size-11 place-items-center rounded-full bg-white/10 text-xl outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-30">‹</button>
+          <div className="flex max-w-[50vw] gap-1.5 overflow-hidden" aria-hidden="true">
+            {shots.length <= 15 && shots.map((x, k) => <span key={k} className={`h-1.5 rounded-full transition-all ${k === i ? "w-5 bg-white" : "w-1.5 bg-white/35"}`} />)}
+          </div>
+          <button type="button" onClick={() => go(i + 1)} disabled={i === shots.length - 1} aria-label="Successiva" className="grid size-11 place-items-center rounded-full bg-white/10 text-xl outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-30">›</button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -121,6 +179,7 @@ function PhotoPiles({ shots }: { shots: Shot[] }) {
  */
 function OpenPile({ pile, onClose }: { pile: Pile; onClose: () => void }) {
   const [selecting, setSelecting] = useState(false);
+  const [viewing, setViewing] = useState<number | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [ask, setAsk] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -163,8 +222,9 @@ function OpenPile({ pile, onClose }: { pile: Pile; onClose: () => void }) {
             <ShotMedia s={s} />
             <span className={`absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full border-2 ${picked.has(keyOf(s)) ? "border-destructive bg-destructive text-white" : "border-white bg-black/35"}`}>{picked.has(keyOf(s)) && <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />}</span>
           </button>
-        ) : <Thumb s={s} />}</div>)}
+        ) : <Thumb s={s} onOpen={() => setViewing(pile.shots.indexOf(s))} />}</div>)}
       </div>
+      {viewing !== null && <ShotViewer shots={pile.shots} start={viewing} onClose={() => setViewing(null)} />}
       {selecting && (ask ? (
         <div role="alertdialog" aria-label="Conferma eliminazione" className="rounded-xl bg-destructive/10 p-3">
           <p className="text-sm font-medium">{chosen.length === 1 ? "Eliminare questo file?" : `Eliminare ${chosen.length} file?`} Non si possono recuperare.</p>
