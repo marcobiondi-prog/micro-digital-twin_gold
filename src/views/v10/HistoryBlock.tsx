@@ -131,14 +131,15 @@ function OpenPile({ pile, onClose }: { pile: Pile; onClose: () => void }) {
               <button type="button" onClick={onClose} className="text-sm font-semibold text-muted-foreground outline-none focus-visible:underline">Chiudi</button>
             </>}
       </div>
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
-        {pile.shots.map((s) => selecting ? (
-          <button key={keyOf(s)} type="button" role="checkbox" aria-checked={picked.has(keyOf(s))} aria-label={`${s.kind === "video" ? "Video" : "Foto"} ${s.name}`} onClick={() => flip(s)}
+      {/* One row that slides sideways (the card keeps its height however many there are); its own move, not the page's tabs. */}
+      <div className="no-scrollbar -mx-3 flex snap-x snap-mandatory gap-2 overflow-x-auto scroll-px-3 px-3 py-1 touch-pan-x" data-map-gestures="">
+        {pile.shots.map((s) => <div key={keyOf(s)} className="w-[7.5rem] shrink-0 snap-start sm:w-36">{selecting ? (
+          <button type="button" role="checkbox" aria-checked={picked.has(keyOf(s))} aria-label={`${s.kind === "video" ? "Video" : "Foto"} ${s.name}`} onClick={() => flip(s)}
             className={`relative block aspect-square overflow-hidden rounded-2xl bg-foreground/[0.08] outline-none transition focus-visible:ring-2 focus-visible:ring-ring ${picked.has(keyOf(s)) ? "ring-2 ring-destructive" : "opacity-80"}`}>
             {s.kind === "video" ? <video src={`${s.url}#t=0.1`} preload="metadata" muted playsInline className="pointer-events-none size-full object-cover" /> : <img src={s.url} alt="" loading="lazy" className="size-full object-cover" />}
             <span className={`absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full border-2 ${picked.has(keyOf(s)) ? "border-destructive bg-destructive text-white" : "border-white bg-black/35"}`}>{picked.has(keyOf(s)) && <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />}</span>
           </button>
-        ) : <Thumb key={keyOf(s)} s={s} />)}
+        ) : <Thumb s={s} />}</div>)}
       </div>
       {selecting && (ask ? (
         <div role="alertdialog" aria-label="Conferma eliminazione" className="rounded-xl bg-destructive/10 p-3">
