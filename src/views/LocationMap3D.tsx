@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { hedgeParts, netParts, pergolaParts, treeParts } from "@/models/area-layout";
-import { SIM_COLORS, thirstColor, type SimLayout } from "@/views/v10/map-area";
+import { SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import { Crosshair, LoaderCircle } from "lucide-react";
 import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camera";
 
@@ -103,19 +103,21 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
             }
           } else if (sim?.kind === "vigneto") {
             // Zones tinted by thirst on the ground, shade nets floating on posts, the hedge raised along its edge.
-            for (const pt of sim.data.patches) if (pt.kind === "zone") shape(pt.ring, `${thirstColor(sim.thirst[pt.zone ?? 0] ?? 0)}66`, null);
+            for (const pt of sim.data.patches) if (pt.kind === "zone") shape(pt.ring, `${thirstColor(sim.thirst[pt.zone ?? 0] ?? 0)}59`, null);
             for (const part of [...sim.data.patches.filter((p) => p.kind === "cloth").flatMap((p) => netParts(p.ring)), ...sim.data.lines.filter((l) => l.kind === "wind").flatMap((l) => hedgeParts(l.line, l.strength ?? 0))]) {
               if (part.base === 0) { shape(part.ring, part.color, part.height); continue; }
               const slab = new Polygon3DElement({ altitudeMode: "RELATIVE_TO_GROUND", extruded: false, fillColor: part.color, strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 }) as HTMLElement & { outerCoordinates?: unknown };
               slab.outerCoordinates = part.ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: part.height }));
               map.append(slab);
             }
-            if (Polyline3DElement) for (const l of sim.data.lines.filter((x) => x.kind === "drip")) {
-              const pl = new Polyline3DElement({ altitudeMode: "CLAMP_TO_GROUND", strokeColor: l.kind === "drip" ? SIM_COLORS.drip : SIM_COLORS.wind, strokeWidth: l.kind === "drip" ? 2 : 6, drawsOccludedSegments: true }) as HTMLElement & { coordinates?: unknown };
+            if (Polyline3DElement) for (const l of sim.data.lines.filter((x) => x.kind !== "wind")) {
+              const pl = new Polyline3DElement({ altitudeMode: "CLAMP_TO_GROUND", strokeColor: l.kind === "drip" ? SIM_COLORS.drip : "#ffffff", strokeWidth: l.kind === "drip" ? 2 : 3, drawsOccludedSegments: true }) as HTMLElement & { coordinates?: unknown };
               pl.coordinates = l.line.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng }));
               map.append(pl);
             }
           }
+          // The zones drawn inside the area: a see-through veil of their colour on the ground (a free zone greyed).
+          for (const z of sim?.inner ?? []) if (z.ring.length >= 3) shape(z.ring, z.kind === "libera" ? "rgba(71,85,105,0.6)" : `${ZONE_COLORS[z.kind]}44`, null);
         } catch { /* polygons not supported: the area alone */ }
       }
       el.replaceChildren(map);

@@ -83,14 +83,18 @@ export function simFeatures(sim: SimLayout | null, withTreePoints: boolean) {
     for (const p of sim.data.patches) out.push(poly(p.ring, p.kind === "zone"
       ? { kind: "zone", pattern: VINE_IMAGES[thirstStepOf(sim.thirst[p.zone ?? 0] ?? 0)], color: thirstColor(sim.thirst[p.zone ?? 0] ?? 0), opacity: 0.9 }
       : { kind: "cloth", color: SIM_COLORS.cloth, opacity: 0.55 }));
+    // Each zone also gets a see-through veil of its thirst colour on top, so the three zones stand apart at a glance.
+    for (const p of sim.data.patches) if (p.kind === "zone") out.push(poly(p.ring, { kind: "tint", color: thirstColor(sim.thirst[p.zone ?? 0] ?? 0), opacity: 0.3 }));
     for (const l of sim.data.lines) out.push(lineF(l.line, l.kind === "drip"
       ? { kind: "drip", color: SIM_COLORS.drip, width: 2 }
+      : l.kind === "seam" ? { kind: "seam", color: "#ffffff", width: 2.5 }
       : { kind: "wind", color: SIM_COLORS.wind, width: 6 + (l.strength ?? 0) / 10 }));
   }
   // The inner zones: a free zone greyed, every zone outlined with a dashed line of its colour.
   for (const z of sim.inner ?? []) {
     if (z.ring.length < 3) continue;
-    if (z.kind === "libera") out.push(poly(z.ring, { kind: "free", color: "#475569", opacity: 0.55 }));
+    // A free zone greyed; the others a see-through veil of their colour.
+    out.push(z.kind === "libera" ? poly(z.ring, { kind: "free", color: "#475569", opacity: 0.55 }) : poly(z.ring, { kind: "tint", color: ZONE_COLORS[z.kind], opacity: 0.22 }));
     out.push(lineF([...z.ring, z.ring[0]!], { kind: "zoneline", color: ZONE_COLORS[z.kind], width: 2.5 }));
   }
   return fc(out);
@@ -185,13 +189,15 @@ export function addSimLayers(map: MlMap, lat: number, raised = false) {
   if (map.getSource(SIM_SOURCE)) return;
   const before = map.getLayer("drawn-area-line") ? "drawn-area-line" : undefined;
   map.addSource(SIM_SOURCE, { type: "geojson", data: fc([]) });
-  map.addLayer({ id: "sim-fill", type: "fill", source: SIM_SOURCE, filter: ["all", ["==", ["geometry-type"], "Polygon"], ["!=", ["get", "kind"], "shade"], ["!=", ["get", "kind"], "lawn"], ["!=", ["get", "kind"], "zone"], ["!=", ["get", "kind"], "cloth"]], paint: { "fill-color": ["get", "color"], "fill-opacity": ["get", "opacity"] } }, before);
+  map.addLayer({ id: "sim-fill", type: "fill", source: SIM_SOURCE, filter: ["all", ["==", ["geometry-type"], "Polygon"], ["!=", ["get", "kind"], "shade"], ["!=", ["get", "kind"], "lawn"], ["!=", ["get", "kind"], "zone"], ["!=", ["get", "kind"], "cloth"], ["!=", ["get", "kind"], "tint"]], paint: { "fill-color": ["get", "color"], "fill-opacity": ["get", "opacity"] } }, before);
   // The vineyard: rows of vines on soil tinted by each zone's thirst, a white seam around each zone, the shade nets.
   const thirstTints = [[0x6f, 0x8f, 0x4a], [0x9a, 0x85, 0x3c], [0x9c, 0x5a, 0x3a]] as const;
   VINE_IMAGES.forEach((id, i) => { if (!map.hasImage(id)) map.addImage(id, vineImage(thirstTints[i]!)); });
   if (!map.hasImage(NET_IMAGE)) map.addImage(NET_IMAGE, netImage());
   if (!map.hasImage(HEDGE_IMAGE)) map.addImage(HEDGE_IMAGE, hedgeImage());
   map.addLayer({ id: "sim-vine", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "zone"], paint: { "fill-pattern": ["get", "pattern"], "fill-opacity": 0.92, "fill-antialias": false } }, before);
+  // The veils over the zones, without seams between their row strips.
+  map.addLayer({ id: "sim-tint", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "tint"], paint: { "fill-color": ["get", "color"], "fill-opacity": ["get", "opacity"], "fill-antialias": false } }, before);
   map.addLayer({ id: "sim-net", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "cloth"], paint: { "fill-pattern": NET_IMAGE, "fill-opacity": 0.9, "fill-antialias": false } }, before);
   // The lawn: mowing stripes and blades of grass, without the hairlines between its row strips.
   if (!map.hasImage(LAWN_IMAGE)) map.addImage(LAWN_IMAGE, lawnImage());
@@ -229,6 +235,7 @@ export function setSimGhost(map: MlMap, ghost: boolean) {
   set("sim-pergola-frame", "line-opacity", k);
   set("sim-line", "line-opacity", k);
   set("sim-vine", "fill-opacity", 0.92 * k);
+  set("sim-tint", "fill-opacity", ["*", ["get", "opacity"], k]);
   set("sim-net", "fill-opacity", 0.9 * k);
   set("sim-drip-pipe", "line-opacity", k);
   set("sim-drip-dots", "line-opacity", k);

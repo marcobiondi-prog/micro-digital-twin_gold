@@ -9,7 +9,7 @@ export type LatLng = [number, number];
 export type LayoutEdits = { trees?: Array<LatLng | null>; lawnAt?: LatLng | null; shadeAt?: LatLng | null; windAt?: LatLng | null };
 
 export type Patch = { ring: Ring; kind: "lawn" | "shade" | "zone" | "cloth"; zone?: number };
-export type Line = { line: Ring; kind: "drip" | "wind"; zone?: number; strength?: number };
+export type Line = { line: Ring; kind: "drip" | "wind" | "seam"; zone?: number; strength?: number };
 export type PiazzaLayout = { trees: LatLng[]; patches: Patch[]; lawnAt: LatLng; shadeAt: LatLng; cell: number };
 export type VineLayout = { patches: Patch[]; lines: Line[]; windAt: LatLng; zones: LatLng[] };
 
@@ -189,6 +189,24 @@ export function vineLayout(ring: Ring, mixes: ZoneMix[], edits: LayoutEdits = {}
         lines.push({ kind: "drip", zone: z, line: [toLL(f, x0, row[0]!.y), toLL(f, x1, row[0]!.y)] });
       }
     }
+  }
+  // Seams between neighbouring zones (white in the maps): on every row, a short line where one zone ends and the next begins.
+  const rows = new Map<number, Cell[]>();
+  for (const cell of cells) rows.set(cell.j, [...(rows.get(cell.j) ?? []), cell]);
+  for (const row of rows.values()) {
+    row.sort((p, q) => p.i - q.i);
+    for (let k = 1; k < row.length; k++) {
+      const p = row[k - 1]!, q = row[k]!;
+      if (zoneOf.get(p) === zoneOf.get(q) || q.i !== p.i + 1) continue;
+      const x = p.x + c / 2;
+      lines.push({ kind: "seam", line: [toLL(f, x, p.y - c / 2), toLL(f, x, p.y + c / 2)] });
+    }
+  }
+  // Where the border steps from one row to the next, the short horizontal piece that joins it.
+  const at = new Map(cells.map((cell) => [`${cell.i},${cell.j}`, cell]));
+  for (const cell of cells) {
+    const up = at.get(`${cell.i},${cell.j + 1}`);
+    if (up && zoneOf.get(up) !== zoneOf.get(cell)) lines.push({ kind: "seam", line: [toLL(f, cell.x - c / 2, cell.y + c / 2), toLL(f, cell.x + c / 2, cell.y + c / 2)] });
   }
   // Windbreak: the edge nearest its handle (by default the westernmost edge), when there is any windbreak.
   const strength = mixes.reduce((s, m) => s + m.windbreak, 0) / n;
