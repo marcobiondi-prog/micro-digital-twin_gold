@@ -46,9 +46,15 @@ import {
 import { enqueueUploads, useLabUploads } from "@/models/lab-media-uploader";
 import { prewarmShare, shareFiles, shareSelectedNow, shareOne, useShareProgress } from "@/models/lab-media-sender";
 
-/** Su Android l'input con selezione multipla apre il gestore file invece della galleria. */
+/**
+ * Su Android il vecchio Chrome, con la selezione multipla, apriva il gestore file invece della galleria. Da Chrome 120
+ * l'input foto/video apre il selettore di foto di Android (la griglia stile Google Foto) anche con la selezione
+ * multipla: lì si possono scegliere più foto e video insieme; sui Chrome più vecchi resta la scelta singola.
+ */
 const isAndroid =
   typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+const chromeMajor = typeof navigator !== "undefined" ? Number(/Chrome\/(\d+)/.exec(navigator.userAgent)?.[1] ?? 0) : 0;
+const galleryMultiple = !isAndroid || chromeMajor >= 120;
 
 const fmtSize = (b: number) =>
   b <= 0
@@ -402,7 +408,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
       {input(cameraVideo, "video/*", "environment")}
       {/* Su Android la selezione multipla apre il gestore file; con un file alla volta si apre
           la galleria di sistema (Google Foto). Altrove resta la scelta multipla. */}
-      {input(gallery, "image/*,video/*", undefined, !isAndroid)}
+      {input(gallery, "image/*,video/*", undefined, galleryMultiple)}
       </>)}
       <div
         id={bodyId}
