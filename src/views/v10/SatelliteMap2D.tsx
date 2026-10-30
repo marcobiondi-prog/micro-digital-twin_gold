@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap, Marker } from "maplibre-gl";
 import type { Ring } from "@/models/place-area";
 import { MAX_PINS } from "@/models/drawn-area";
-import { addAreaLayers, addSimLayers, handleElement, ringCentre, tagElement, zoneTag, pinElement, setAreaData, setOutlineData, setSimData, type SimLayout } from "@/views/v10/map-area";
+import { addAreaLayers, addSimLayers, handleElement, ringCentre, tagElement, zoneTag, pinElement, setAreaData, setOutlineData, setSimData, setSimGhost, type SimLayout } from "@/views/v10/map-area";
 import { ringContains } from "@/models/place-area";
 import type { LatLng } from "@/models/area-layout";
 
@@ -15,7 +15,8 @@ import type { StyleSpecification } from "maplibre-gl";
 /**
  * 2D view: open satellite imagery with place names over it and a pin on the place, no key needed. One finger moves
  * it, two fingers zoom and turn it, with no "use two fingers" lock ([data-map-gestures] keeps its own gestures).
- * It shows the area drawn for the place and, while `drawing`, takes a tap as a new pin and lets each pin be dragged.
+ * It shows the area drawn for the place and, while `drawing`, takes a tap as a new pin and lets each pin be dragged,
+ * the rest of the simulation faded behind.
  */
 const ARCGIS = "https://server.arcgisonline.com/ArcGIS/rest/services";
 const STYLE: StyleSpecification = {
@@ -96,7 +97,9 @@ export function SatelliteMap2D({ lat, lng, label, zoom, area = [], drawing = fal
   useEffect(() => {
     const map = mapRef.current, lib = libRef.current;
     if (state !== "ready" || !map || !lib) return;
-    setSimData(map, drawing ? null : sim);
+    // Drawing or editing: the rest stays visible, faded behind the pins.
+    setSimData(map, sim);
+    setSimGhost(map, drawing);
     handles.current.forEach((m) => m.remove());
     handles.current = [];
     // The vineyard's zone names on their zones, and every inner zone's name ("Libera", "Lotto A", "Alberi"…).

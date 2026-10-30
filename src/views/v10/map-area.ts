@@ -169,6 +169,22 @@ export function addSimLayers(map: MlMap, lat: number, raised = false) {
   }
 }
 
+/**
+ * While the area or a zone is being drawn or edited the rest of the simulation stays in view, faded (about a third of
+ * its strength), so the pins are placed knowing what is around them; back to full strength afterwards.
+ */
+export function setSimGhost(map: MlMap, ghost: boolean) {
+  const k = ghost ? 0.35 : 1;
+  const set = (layer: string, prop: string, value: unknown) => { if (map.getLayer(layer)) map.setPaintProperty(layer, prop as never, value as never); };
+  set("sim-fill", "fill-opacity", ["*", ["get", "opacity"], k]);
+  set("sim-lawn", "fill-opacity", 0.95 * k);
+  set("sim-pergola", "fill-opacity", 0.95 * k);
+  set("sim-pergola-frame", "line-opacity", k);
+  set("sim-line", "line-opacity", k);
+  set("sim-trees", "circle-opacity", 0.9 * k);
+  set("sim-trees", "circle-stroke-opacity", k);
+}
+
 export function setSimData(map: MlMap, sim: SimLayout | null, raised = false) {
   (map.getSource(SIM_SOURCE) as GeoJSONSource | undefined)?.setData(simFeatures(sim, !raised));
   if (raised) (map.getSource(SIM_TREES_3D) as GeoJSONSource | undefined)?.setData(treeCrowns(sim));
