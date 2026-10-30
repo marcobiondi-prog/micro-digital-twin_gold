@@ -8,6 +8,7 @@ import { useLab } from "@/models/lab-store";
 import { heatStep, heatWords, piazzaMix, piazzaSummary, thirstStep, thirstWords, vineMixRows, vineSummary } from "@/models/project-summary";
 import { euroRange, grouped } from "@/models/intervention-cost";
 import { SEASONS, SEASON_LABEL, type Season } from "@/models/season-climate";
+import { clockText } from "@/models/sim-when";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { zoneSummaryRows } from "@/models/drawn-area";
 import { getSeasonalClimate } from "@/controllers/climate.functions";
@@ -232,7 +233,7 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
     <div className="space-y-8" data-testid="dashboard-urbana">
       <ResultCard kind="urban" place={place.name}
         when={<SeasonPills value={season} onChange={setDashSeason} />}>
-        <p className="text-center text-sm text-muted-foreground">Nell'ora più calda · {SEASON_LABEL[season].toLowerCase()}, ore {sum.hour}</p>
+        <p className="text-center text-sm text-muted-foreground">Nell'ora più calda · {SEASON_LABEL[season].toLowerCase()}, ore {clockText(sum.hour)}</p>
         <ResultArc before={before} after={after} min={Math.floor(Math.min(after, before) - 3)} max={Math.ceil(before + 2)} unit="°"
           value={`${fmt1(after)}°`} words={heatWords(after)} step={heatStep(after)} level={sum.level} cost={empty ? "0 €" : euroRange(sum.cost)} />
         <p className="text-center text-sm">

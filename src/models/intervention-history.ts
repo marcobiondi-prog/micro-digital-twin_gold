@@ -3,6 +3,7 @@
  * Free users keep it on this device (localStorage); signed-in users keep it in their account (see lib/use-history).
  */
 import { SEASONS, SEASON_LABEL, type Season } from "./season-climate";
+import { clockText } from "./sim-when";
 
 export type HistoryFlow = "piazza" | "vigneto";
 /** What was set when the entry was recorded, so "Riapri" can put it back (older entries have none). */
@@ -11,11 +12,11 @@ export type HistoryMix = (
   | { kind: "vigneto"; zones: Array<{ irrigation: number; shade: number; windbreak: number }>; allZones: boolean; selected: number }
 ) & {
   /** A copy of the simulated season and hour, for an account table that lacks their own columns. */
-  when?: { season: string; hour: number } | null;
+  when?: { season: string; hour: number; minute?: number } | null;
 };
 /** The season and hour the simulation was set to when the intervention was made (older entries have none). */
-export type HistoryWhen = { season: Season; hour: number };
-export type HistoryEntry = { id: string; at: string; flow: HistoryFlow; place: string; text: string; mix?: HistoryMix | null; season?: Season | null; hour?: number | null };
+export type HistoryWhen = { season: Season; hour: number; minute?: number };
+export type HistoryEntry = { id: string; at: string; flow: HistoryFlow; place: string; text: string; mix?: HistoryMix | null; season?: Season | null; hour?: number | null; minute?: number | null };
 /** Where an entry is kept: in the account (recorded signed in) or on this device (recorded without signing in). Not saved, worked out when read. */
 export type HistorySource = "account" | "device";
 export type SourcedEntry = HistoryEntry & { source: HistorySource };
@@ -33,19 +34,25 @@ function uuid(): string {
 }
 
 export function newEntry(flow: HistoryFlow, text: string, place: string, now: Date = new Date(), mix: HistoryMix | null = null, when: HistoryWhen | null = null): HistoryEntry {
-  return { id: uuid(), at: now.toISOString(), flow, place: place.trim(), text: text.trim().slice(0, MAX_TEXT), mix: mix && when ? { ...mix, when } : mix, season: when?.season ?? null, hour: when?.hour ?? null };
+  return { id: uuid(), at: now.toISOString(), flow, place: place.trim(), text: text.trim().slice(0, MAX_TEXT), mix: mix && when ? { ...mix, when } : mix, season: when?.season ?? null, hour: when?.hour ?? null, minute: when?.minute ?? null };
 }
 
 const isSeason = (v: unknown): v is Season => typeof v === "string" && (SEASONS as readonly string[]).includes(v);
 const isHour = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 23;
+const isMinute = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 59;
 /** The entry's simulated season and hour, when both were recorded (in their own fields, else the copy kept in the mix). */
 export const whenOf = (e: HistoryEntry): HistoryWhen | null => {
-  if (isSeason(e.season) && isHour(e.hour)) return { season: e.season, hour: e.hour };
   const w = e.mix?.when;
-  return w && isSeason(w.season) && isHour(w.hour) ? { season: w.season, hour: w.hour } : null;
+  // The minutes: the entry's own (on this device), else the mix's copy (the account table keeps whole hours).
+  const m = isMinute(e.minute) ? e.minute : w && isMinute(w.minute) && (!isHour(e.hour) || e.hour === w.hour) ? w.minute : null;
+  const minute = m === null ? {} : { minute: m };
+  if (isSeason(e.season) && isHour(e.hour)) return { season: e.season, hour: e.hour, ...minute };
+  return w && isSeason(w.season) && isHour(w.hour) ? { season: w.season, hour: w.hour, ...minute } : null;
 };
-/** "Estate, ore 15", or "" for an entry without them. */
-export const whenLabel = (e: HistoryEntry): string => { const w = whenOf(e); return w ? `${SEASON_LABEL[w.season]}, ore ${w.hour}` : ""; };
+/** "15:42" for an entry's simulated time ("15:00" when only the hour was recorded). */
+export const whenClock = (w: HistoryWhen): string => clockText(w.hour, w.minute);
+/** "Estate, ore 15:42", or "" for an entry without them. */
+export const whenLabel = (e: HistoryEntry): string => { const w = whenOf(e); return w ? `${SEASON_LABEL[w.season]}, ore ${whenClock(w)}` : ""; };
 
 const num = (v: unknown) => typeof v === "number" && Number.isFinite(v);
 /** A mix that can be put back: the right numbers for its kind. */
@@ -75,7 +82,8 @@ export const isHistoryEntry = (v: unknown): v is HistoryEntry => {
     && (e.flow === "piazza" || e.flow === "vigneto") && typeof e.place === "string" && typeof e.text === "string"
     && (e.mix === undefined || e.mix === null || isHistoryMix(e.mix))
     && (e.season === undefined || e.season === null || isSeason(e.season))
-    && (e.hour === undefined || e.hour === null || isHour(e.hour));
+    && (e.hour === undefined || e.hour === null || isHour(e.hour))
+    && (e.minute === undefined || e.minute === null || isMinute(e.minute));
 };
 
 /** Entries grouped by day on this device's calendar, newest first, each headed "29/10/2026". */

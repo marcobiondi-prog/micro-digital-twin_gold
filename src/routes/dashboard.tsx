@@ -7,7 +7,7 @@ import { HistoryBlock } from "@/views/v10/HistoryBlock";
 import { ProfileIcon } from "@/views/ProfileIcon";
 import { useProId } from "@/lib/use-pro-id";
 import { proSummary } from "@/models/professional-id";
-import { getSimWhen } from "@/models/sim-when";
+import { clockText, getSimWhen } from "@/models/sim-when";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertTriangle, Download, Plus, Building2, Grape, Copy, Printer, Activity, Trash2, Share2, Mail, LineChart as LineChartIcon, Leaf, NotebookPen, Droplets, Waves } from "lucide-react";
 import { toast } from "sonner";
@@ -460,7 +460,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   const resultRows: [string, string][] = ctx === "Urbano"
     ? [
       ["Luogo", u.location.label],
-      ["Quando", `Ora più calda · ${SEASON_LABEL[season].toLowerCase()}, ore ${ps.hour}${ps.estimated ? " (stima indicativa)" : ""}`],
+      ["Quando", `Ora più calda · ${SEASON_LABEL[season].toLowerCase()}, ore ${clockText(ps.hour)}${ps.estimated ? " (stima indicativa)" : ""}`],
       ["Calore percepito", `da ${f1(ps.before)} °C a ${f1(ps.after)} °C (−${f1(ps.before - ps.after)} °C) · ${heatWords(ps.after)}`],
       ["Livello", ps.level ?? "Nessun intervento"],
       ["Costo indicativo", ps.empty ? "Nessun intervento" : euroRange(ps.cost)],
@@ -618,7 +618,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
     const cost = (urban ? ps.empty : vs.empty) ? "0 €" : euroRange(urban ? ps.cost : vs.cost);
     card(M, y, CW, 92);
     doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...C.muted);
-    doc.text(clean(urban ? `Nell'ora più calda · ${SEASON_LABEL[season].toLowerCase()}, ore ${ps.hour}` : "Sete delle viti · media delle tre zone"), W / 2, y + 10, { align: "center" });
+    doc.text(clean(urban ? `Nell'ora più calda · ${SEASON_LABEL[season].toLowerCase()}, ore ${clockText(ps.hour)}` : "Sete delle viti · media delle tre zone"), W / 2, y + 10, { align: "center" });
     const cy = y + 60;
     arc(W / 2, cy, 38, before, after, min, max);
     pill(words, W / 2, cy - 25, STEP[stepIx]!);

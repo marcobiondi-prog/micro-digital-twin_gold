@@ -5,7 +5,7 @@ import { SEASON_LABEL } from "@/models/season-climate";
 import { Ambient, PageHero, openSimTab } from "@/views/v8/console";
 import { DashCard, DashSection } from "@/views/v10/Dashboard";
 import { reopenHistory, useHistory } from "@/lib/use-history";
-import { mixRows, whenOf, type HistoryEntry, type SourcedEntry } from "@/models/intervention-history";
+import { mixRows, whenClock, whenOf, type HistoryEntry, type SourcedEntry } from "@/models/intervention-history";
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -52,7 +52,7 @@ export function HistoryDetail({ id }: { id: string }) {
                 <Row label="Registrato il" value={d.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} />
                 <Row label="Ora di registrazione" value={d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })} />
                 <Row label="Stagione simulata" value={w ? SEASON_LABEL[w.season] : "Non registrata"} />
-                <Row label="Ora simulata" value={w ? `ore ${w.hour}` : "Non registrata"} />
+                <Row label="Ora simulata" value={w ? `ore ${whenClock(w)}` : "Non registrata"} />
                 <Row label="Salvato" value={e.source === "account" ? "Con accesso, nel tuo account" : "Senza accesso, su questo dispositivo"} />
               </dl>
             </DashCard>

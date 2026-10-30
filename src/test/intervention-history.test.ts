@@ -69,7 +69,12 @@ describe("intervention-history", () => {
   it("keeps the simulated season and hour", () => {
     const e = newEntry("piazza", "x", "", new Date(), null, { season: "estate", hour: 15 });
     expect(whenOf(e)).toEqual({ season: "estate", hour: 15 });
-    expect(whenLabel(e)).toBe("Estate, ore 15");
+    expect(whenLabel(e)).toBe("Estate, ore 15:00");
+    const m = newEntry("piazza", "x", "", new Date(), { kind: "piazza", trees: 1, permeable: 0, shade: 0 }, { season: "estate", hour: 9, minute: 5 });
+    expect(whenLabel(m)).toBe("Estate, ore 09:05");
+    // An account row keeps only the hour: the minutes come back from the mix's copy.
+    expect(whenLabel({ ...m, minute: null })).toBe("Estate, ore 09:05");
+    expect(isHistoryEntry({ ...m, minute: 60 })).toBe(false);
     expect(isHistoryEntry(e)).toBe(true);
     expect(whenLabel(newEntry("piazza", "x", ""))).toBe("");
     expect(isHistoryEntry({ ...e, season: "monsone" })).toBe(false);
