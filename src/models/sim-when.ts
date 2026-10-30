@@ -4,7 +4,8 @@ import type { Season } from "./season-climate";
  * The season and hour each simulation is set to (its "when" chip), kept at module level so the history can record them
  * with an intervention, and so "Riapri" can ask the simulation to open on the season and hour of a past entry.
  */
-export type SimWhen = { season: Season; hour: number; minute?: number };
+/** With the ora the clock was read in ("legale" / "solare"; none in a zone without ora legale). */
+export type SimWhen = { season: Season; hour: number; minute?: number; dst?: "solare" | "legale" };
 
 /** "15:42" ("15:00" without minutes). */
 export const clockText = (hour: number, minute = 0) => `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;

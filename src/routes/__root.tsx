@@ -17,6 +17,7 @@ import { installUiClicks } from "@/lib/ui-sounds";
 import { reloadFresh } from "@/router";
 import { History, Building2, Grape, Info, LayoutDashboard, Lock } from "lucide-react";
 import { useProId, useSyncProId } from "@/lib/use-pro-id";
+import { useDstNotice } from "@/lib/dst-notice";
 import { unlocks, type ProId } from "@/models/professional-id";
 import { AgronomoIcon, FunzionarioIcon } from "@/views/ProfileIcon";
 import { AmbientLayer } from "@/views/v8/console";
@@ -381,6 +382,7 @@ function SmartNav() {
 function RootComponent() {
   // The professional profile follows the account: adopted on sign-in, or uploaded to an account without one.
   useSyncProId();
+  useDstNotice();
   const { queryClient } = Route.useRouteContext();
   const navigate = useNavigate();
   const location = useLocation();

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronDown, ChevronLeft, ChevronRight, Clock, Globe } from "lucide-react";
+import { Bell, CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, Clock, Globe } from "lucide-react";
 import { getSeasonalClimate } from "@/controllers/climate.functions";
 import { SEASONS, SEASON_LABEL, seasonOfMonth, type Season } from "@/models/season-climate";
 import { clearRequestedWhen, clockText, peekRequestedWhen, setSimWhen } from "@/models/sim-when";
-import { deviceTimeZone, placeTime, sameClock, shiftHour, summerTime, utcOffsetText, validTimeZone, zoneName, zoneOptions } from "@/models/world-clock";
+import { changeCalendar, changeHands, deviceTimeZone, dstShift, placeTime, sameClock, shiftHour, summerTime, utcOffsetText, validTimeZone, zoneName, zoneOffsets, zoneOptions, type DstMode } from "@/models/world-clock";
+import { askChangeNotifications, changeNotificationsOn } from "@/lib/dst-notice";
 import { syncWorldTime, worldNow } from "@/lib/world-time";
 import { hapticTick } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
@@ -27,30 +28,41 @@ export function useSeasonClock(lat: number, lng: number, kind?: "urban" | "viney
   const [chosenZone, setChosen] = useState<string | null>(() => readChosenZone(kind));
   const autoZone = placeZone ?? deviceTimeZone();
   const tz = chosenZone ?? autoZone;
-  const setZone = (z: string | null) => { setChosen(z); saveChosenZone(kind, z); };
-  const [season, setSeason] = useState<Season>(() => asked?.season ?? seasonOfMonth(placeTime(worldNow(), tz).month));
-  const [hour, setHourOnly] = useState(() => asked?.hour ?? placeTime(worldNow(), tz).hour);
+  const setZone = (z: string | null) => { setChosen(z); saveChoice(ZONE_KEY, kind, z); };
+  // Ora solare or legale by hand ("auto" follows the calendar): the clock reads that many minutes on.
+  const [dstMode, setDstModeState] = useState<DstMode>(() => readDstMode(kind));
+  const setDstMode = (m: DstMode) => { setDstModeState(m); saveChoice(DST_KEY, kind, m === "auto" ? null : m); };
+  const at = (ms: number) => placeTime(ms + dstShift(ms, tz, dstMode) * 60_000, tz);
+  const [season, setSeason] = useState<Season>(() => asked?.season ?? seasonOfMonth(at(worldNow()).month));
+  const [hour, setHourOnly] = useState(() => asked?.hour ?? at(worldNow()).hour);
   // The minutes follow the clock while live; an hour chosen by hand starts on the hour.
-  const [minute, setMinute] = useState(() => (asked ? asked.minute ?? 0 : placeTime(worldNow(), tz).minute));
+  const [minute, setMinute] = useState(() => (asked ? asked.minute ?? 0 : at(worldNow()).minute));
+  // The ora the clock is read in: the one chosen by hand, else the calendar's (none where there is no ora legale).
+  const calendar = summerTime(worldNow(), tz).kind;
+  const dst = zoneOffsets(worldNow(), tz) ? (dstMode === "auto" ? (calendar === "nessuna" ? undefined : calendar) : dstMode) : undefined;
   const setHour = (h: number | ((h: number) => number)) => { setHourOnly(h); setMinute(0); };
   useEffect(() => { if (kind) clearRequestedWhen(kind); }, [kind]);
   // What the simulation is set to now, for the history to record with an intervention.
-  useEffect(() => { if (kind) setSimWhen(kind, { season, hour, minute }); }, [kind, season, hour, minute]);
+  useEffect(() => { if (kind) setSimWhen(kind, { season, hour, minute, ...(dst ? { dst } : {}) }); }, [kind, season, hour, minute, dst]);
   useEffect(() => {
     if (!live) return;
     let on = true;
-    const sync = () => { if (!on) return; const now = placeTime(worldNow(), tz); setSeason(seasonOfMonth(now.month)); setHourOnly(now.hour); setMinute(now.minute); };
+    const sync = () => { if (!on) return; const now = at(worldNow()); setSeason(seasonOfMonth(now.month)); setHourOnly(now.hour); setMinute(now.minute); };
     sync();
     // Once the world time is known, again (a phone whose clock is off moves to the right minute).
     void syncWorldTime().then(sync);
     const id = window.setInterval(sync, 30_000);
     document.addEventListener("visibilitychange", sync);
     return () => { on = false; window.clearInterval(id); document.removeEventListener("visibilitychange", sync); };
-  }, [live, tz]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live, tz, dstMode]);
   // The place's year is hour by hour in its own zone: a zone chosen by hand reads the place's hour at that moment.
-  const placeHour = chosenZone && placeZone ? shiftHour(hour, worldNow(), chosenZone, placeZone) : hour;
+  // An ora chosen by hand is undone first: the year is in the calendar's ora.
+  const shift = Math.round(dstShift(worldNow(), tz, dstMode) / 60);
+  const calHour = (((hour - shift) % 24) + 24) % 24;
+  const placeHour = chosenZone && placeZone ? shiftHour(calHour, worldNow(), chosenZone, placeZone) : calHour;
   const real = climate.data?.profile[season][placeHour] ?? null;
-  return { live, setLive, season, setSeason, hour, setHour, minute, tz, placeZone: !!placeZone, autoZone, chosenZone, setZone, pending: climate.isPending, real };
+  return { live, setLive, season, setSeason, hour, setHour, minute, tz, placeZone: !!placeZone, autoZone, chosenZone, setZone, dstMode, setDstMode, dst, pending: climate.isPending, real };
 }
 export type SeasonClock = ReturnType<typeof useSeasonClock>;
 
@@ -109,9 +121,11 @@ function ZoneLine({ clock }: { clock: SeasonClock }) {
         <span>{whose} · {zoneName(now, clock.tz)} ({utcOffsetText(now, clock.tz)})</span>
         {offPlace && <span className="text-muted-foreground">· nel luogo sono le {clockText(place.hour, place.minute)}</span>}
         {away && <span className="text-muted-foreground">· da te sono le {clockText(mine.hour, mine.minute)}</span>}
-        <SummerLine tz={clock.tz} now={now} />
+        <SummerLine tz={clock.tz} now={now} mode={clock.dstMode} />
       </p>
       <ZoneSelect clock={clock} />
+      <DstChoice clock={clock} />
+      <ChangeReminders tz={clock.tz} now={now} />
     </div>
   );
 }
@@ -134,34 +148,72 @@ function ZoneSelect({ clock }: { clock: SeasonClock }) {
   );
 }
 
-const ZONE_KEY = "mdt-zone-v1";
-/** The zone chosen by hand for each simulation, kept on this device. */
-function readChosenZone(kind: string | undefined): string | null {
+const ZONE_KEY = "mdt-zone-v1", DST_KEY = "mdt-dst-v1";
+/** A choice made by hand for each simulation (the zone, the ora), kept on this device. */
+function readChoice(key: string, kind: string | undefined): unknown {
   if (!kind || typeof window === "undefined") return null;
-  try { return validTimeZone((JSON.parse(localStorage.getItem(ZONE_KEY) ?? "{}") as Record<string, unknown>)[kind]); } catch { return null; }
+  try { return (JSON.parse(localStorage.getItem(key) ?? "{}") as Record<string, unknown>)[kind] ?? null; } catch { return null; }
 }
-function saveChosenZone(kind: string | undefined, tz: string | null) {
+const readChosenZone = (kind: string | undefined) => validTimeZone(readChoice(ZONE_KEY, kind));
+const readDstMode = (kind: string | undefined): DstMode => { const v = readChoice(DST_KEY, kind); return v === "solare" || v === "legale" ? v : "auto"; };
+function saveChoice(key: string, kind: string | undefined, value: string | null) {
   if (!kind) return;
   try {
-    const all = JSON.parse(localStorage.getItem(ZONE_KEY) ?? "{}") as Record<string, string>;
-    if (tz) all[kind] = tz; else delete all[kind];
-    localStorage.setItem(ZONE_KEY, JSON.stringify(all));
+    const all = JSON.parse(localStorage.getItem(key) ?? "{}") as Record<string, string>;
+    if (value) all[kind] = value; else delete all[kind];
+    localStorage.setItem(key, JSON.stringify(all));
   } catch { /* storage off: the choice lasts this visit */ }
 }
 
+/** Ora solare or legale by hand, also out of season (only in a zone that has ora legale). */
+function DstChoice({ clock }: { clock: SeasonClock }) {
+  if (!zoneOffsets(worldNow(), clock.tz)) return null;
+  const items: Array<[DstMode, string]> = [["auto", "Come il calendario"], ["solare", "Ora solare"], ["legale", "Ora legale"]];
+  return (
+    <div className="grid grid-cols-3 gap-1" role="radiogroup" aria-label="Ora solare o legale">
+      {items.map(([m, label]) => (
+        <button key={m} type="button" role="radio" aria-checked={clock.dstMode === m} onClick={() => { hapticTick(); clock.setDstMode(m); clock.setLive(true); }}
+          className={cn("h-10 min-w-0 truncate rounded-full px-1 text-[12px] font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", clock.dstMode === m ? "bg-secondary text-secondary-foreground" : "text-foreground/80 hover:bg-foreground/[0.06]")}>{label}</button>
+      ))}
+    </div>
+  );
+}
+
+/** Reminders of the next change: a calendar event that rings the evening before, and the phone's notifications. */
+function ChangeReminders({ tz, now }: { tz: string; now: number }) {
+  const next = summerTime(now, tz).next;
+  const [notify, setNotify] = useState(changeNotificationsOn);
+  if (!next) return null;
+  const save = () => {
+    const ics = changeCalendar(next.at, next.to, changeHands(next.at, tz));
+    const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar;charset=utf-8" }));
+    const a = Object.assign(document.createElement("a"), { href: url, download: next.to === "solare" ? "torna-ora-solare.ics" : "arriva-ora-legale.ics" });
+    document.body.append(a); a.click(); a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const btn = "inline-flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-full bg-foreground/[0.07] px-3 text-[12px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60";
+  return (
+    <div className="grid grid-cols-2 gap-1.5">
+      <button type="button" onClick={save} className={btn}><CalendarPlus className="size-4 shrink-0" aria-hidden="true" /><span className="truncate">Promemoria in calendario</span></button>
+      <button type="button" disabled={notify === "on" || notify === "denied" || notify === "unsupported"} onClick={() => void askChangeNotifications().then(setNotify)} className={btn}>
+        <Bell className="size-4 shrink-0" aria-hidden="true" />
+        <span className="truncate">{notify === "on" ? "Notifiche attive" : notify === "denied" ? "Notifiche bloccate" : notify === "unsupported" ? "Notifiche non disponibili" : "Avvisami sul telefono"}</span>
+      </button>
+    </div>
+  );
+}
+
 /** "Ora legale · torna l'ora solare domenica 25 ottobre alle 03:00", "Ora solare · …", or that the zone has no summer time. */
-function SummerLine({ tz, now }: { tz: string; now: number }) {
+function SummerLine({ tz, now, mode }: { tz: string; now: number; mode: DstMode }) {
   const st = summerTime(now, tz);
   const when = st.next && (() => {
-    // The hands: from the old time (a minute before, plus that minute) to the new one.
-    const before = placeTime(st.next.at - 60_000, tz), after = placeTime(st.next.at, tz);
-    const from = clockText((before.hour + (before.minute === 59 ? 1 : 0)) % 24, (before.minute + 1) % 60);
+    const h = changeHands(st.next.at, tz);
     const day = new Date(st.next.at).toLocaleDateString("it-IT", { timeZone: tz, weekday: "long", day: "numeric", month: "long" });
-    return `${st.next.to === "legale" ? "arriva l'ora legale" : "torna l'ora solare"} ${day}: alle ${from} le lancette vanno alle ${clockText(after.hour, after.minute)}`;
+    return `${st.next.to === "legale" ? "arriva l'ora legale" : "torna l'ora solare"} ${day}: alle ${h.from} le lancette vanno alle ${h.to}`;
   })();
   return (
     <span className="basis-full text-muted-foreground">
-      <b className="font-semibold text-foreground/80">{st.kind === "legale" ? "Ora legale" : st.kind === "solare" ? "Ora solare" : "Nessuna ora legale qui"}</b>{when ? ` · ${when}` : ""}
+      <b className="font-semibold text-foreground/80">{st.kind === "nessuna" ? "Nessuna ora legale qui" : mode !== "auto" ? `Ora ${mode}, scelta da te (il calendario dice ora ${st.kind})` : st.kind === "legale" ? "Ora legale" : "Ora solare"}</b>{when ? ` · ${when}` : ""}
     </span>
   );
 }

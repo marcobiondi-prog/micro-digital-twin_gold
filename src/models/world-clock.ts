@@ -105,3 +105,58 @@ export function shiftHour(hour: number, ms: number, from: string, to: string): n
   const d = Math.floor((offsetMinutes(ms, to) - offsetMinutes(ms, from)) / 60);
   return (((hour + d) % 24) + 24) % 24;
 }
+
+/** The zone's ora solare and ora legale offsets that year (minutes), or null where it keeps one time all year. */
+export function zoneOffsets(ms: number, tz: string): { solare: number; legale: number } | null {
+  const year = new Date(ms).getUTCFullYear();
+  const jan = offsetMinutes(Date.UTC(year, 0, 1), tz), jul = offsetMinutes(Date.UTC(year, 6, 1), tz);
+  return jan === jul ? null : { solare: Math.min(jan, jul), legale: Math.max(jan, jul) };
+}
+
+/** Ora solare or legale by hand: "auto" follows the calendar. */
+export type DstMode = "auto" | "solare" | "legale";
+/** Minutes to add to the zone's clock to read it in the chosen ora (0 on "auto" or in a zone without ora legale). */
+export function dstShift(ms: number, tz: string, mode: DstMode): number {
+  const o = mode === "auto" ? null : zoneOffsets(ms, tz);
+  return o ? o[mode as "solare" | "legale"] - offsetMinutes(ms, tz) : 0;
+}
+
+/** The hands at a change: the time the clocks show just before it and the one they jump to ("03:00" → "02:00"). */
+export function changeHands(at: number, tz: string): { from: string; to: string } {
+  const before = placeTime(at - 60_000, tz), after = placeTime(at, tz);
+  const total = (before.hour * 60 + before.minute + 1) % 1440;
+  const two = (n: number) => String(n).padStart(2, "0");
+  return { from: `${two(Math.floor(total / 60))}:${two(total % 60)}`, to: `${two(after.hour)}:${two(after.minute)}` };
+}
+
+/**
+ * What to tell about the change of ora around now: from 36 hours before it ("Stanotte torna l'ora solare…") to 12
+ * hours after ("Stanotte è tornata…"), with a key so each change is told once; null otherwise.
+ */
+export function changeNotice(ms: number, tz: string): { key: string; at: number; text: string; ahead: boolean } | null {
+  const H = 3_600_000;
+  const past = summerTime(ms - 12 * H, tz).next;
+  if (past && past.at <= ms) {
+    const h = changeHands(past.at, tz);
+    return { key: `${tz}@${past.at}`, at: past.at, ahead: false, text: `Stanotte ${past.to === "solare" ? "è tornata l'ora solare" : "è arrivata l'ora legale"}: le lancette sono passate dalle ${h.from} alle ${h.to}. L'ora dell'app è già giusta.` };
+  }
+  const next = summerTime(ms, tz).next;
+  if (!next || next.at - ms > 36 * H) return null;
+  const h = changeHands(next.at, tz);
+  const when = next.at - ms <= 24 * H ? "Stanotte" : "Domani notte";
+  return { key: `${tz}@${next.at}`, at: next.at, ahead: true, text: `${when} ${next.to === "solare" ? "torna l'ora solare" : "arriva l'ora legale"}: alle ${h.from} le lancette vanno alle ${h.to}.` };
+}
+
+/** A calendar file with a reminder the evening before the change (the alarm rings 6 hours before it). */
+export function changeCalendar(at: number, to: "solare" | "legale", hands: { from: string; to: string }, now = Date.now()): string {
+  const stamp = (t: number) => new Date(t).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const title = to === "solare" ? "Torna l'ora solare" : "Arriva l'ora legale";
+  const note = `Alle ${hands.from} le lancette vanno alle ${hands.to}.`;
+  return [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Micro Digital Twin//Cambio ora//IT", "CALSCALE:GREGORIAN", "BEGIN:VEVENT",
+    `UID:cambio-ora-${at}@micro-digital-twin`, `DTSTAMP:${stamp(now)}`, `DTSTART:${stamp(at)}`, `DTEND:${stamp(at + 60_000)}`,
+    `SUMMARY:${title}`, `DESCRIPTION:${note}`,
+    "BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${title}. ${note}`, "TRIGGER:-PT6H", "END:VALARM",
+    "END:VEVENT", "END:VCALENDAR", "",
+  ].join("\r\n");
+}

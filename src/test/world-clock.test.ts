@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clockOffset, placeTime, shiftHour, summerTime, zoneOptions, sameClock, utcOffsetText, validTimeZone, zoneName } from "@/models/world-clock";
+import { changeCalendar, changeHands, changeNotice, clockOffset, dstShift, placeTime, shiftHour, summerTime, zoneOptions, sameClock, utcOffsetText, validTimeZone, zoneName } from "@/models/world-clock";
 
 describe("world-clock", () => {
   const t = Date.UTC(2026, 9, 30, 12, 7); // 30 Oct 2026, 12:07 UTC
@@ -47,5 +47,35 @@ describe("world-clock", () => {
     expect(list.some((o) => o.tz.startsWith("Etc/"))).toBe(false);
     expect(shiftHour(13, t, "Europe/Rome", "Asia/Tokyo")).toBe(21);
     expect(shiftHour(2, t, "Europe/Rome", "America/New_York")).toBe(21);
+  });
+  it("reads the clock in the ora chosen by hand", () => {
+    const winter = Date.UTC(2026, 9, 30, 12);
+    expect(dstShift(winter, "Europe/Rome", "legale")).toBe(60);
+    expect(dstShift(winter, "Europe/Rome", "solare")).toBe(0);
+    expect(dstShift(Date.UTC(2026, 6, 1), "Europe/Rome", "solare")).toBe(-60);
+    expect(dstShift(winter, "Asia/Tokyo", "legale")).toBe(0);
+    expect(dstShift(winter, "Europe/Rome", "auto")).toBe(0);
+  });
+  it("tells the change around it, once before and once after", () => {
+    const at = Date.UTC(2026, 9, 25, 1); // 03:00 legale → 02:00 solare in Rome
+    expect(changeHands(at, "Europe/Rome")).toEqual({ from: "03:00", to: "02:00" });
+    expect(changeHands(Date.UTC(2027, 2, 28, 1), "Europe/Rome")).toEqual({ from: "02:00", to: "03:00" });
+    expect(changeNotice(at - 40 * 3_600_000, "Europe/Rome")).toBeNull();
+    expect(changeNotice(at - 30 * 3_600_000, "Europe/Rome")?.text).toBe("Domani notte torna l'ora solare: alle 03:00 le lancette vanno alle 02:00.");
+    const before = changeNotice(at - 5 * 3_600_000, "Europe/Rome");
+    expect(before?.ahead).toBe(true);
+    expect(before?.text.startsWith("Stanotte torna l'ora solare")).toBe(true);
+    const after = changeNotice(at + 6 * 3_600_000, "Europe/Rome");
+    expect(after?.ahead).toBe(false);
+    expect(after?.key).toBe(before?.key);
+    expect(after?.text).toContain("è tornata l'ora solare");
+    expect(changeNotice(at + 13 * 3_600_000, "Europe/Rome")).toBeNull();
+    expect(changeNotice(at, "Asia/Tokyo")).toBeNull();
+  });
+  it("writes a calendar reminder the evening before", () => {
+    const ics = changeCalendar(Date.UTC(2026, 9, 25, 1), "solare", { from: "03:00", to: "02:00" }, Date.UTC(2026, 9, 20));
+    expect(ics).toContain("DTSTART:20261025T010000Z");
+    expect(ics).toContain("TRIGGER:-PT6H");
+    expect(ics).toContain("SUMMARY:Torna l'ora solare");
   });
 });

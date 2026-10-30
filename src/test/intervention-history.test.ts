@@ -75,6 +75,9 @@ describe("intervention-history", () => {
     // An account row keeps only the hour: the minutes come back from the mix's copy.
     expect(whenLabel({ ...m, minute: null })).toBe("Estate, ore 09:05");
     expect(isHistoryEntry({ ...m, minute: 60 })).toBe(false);
+    const l = newEntry("vigneto", "x", "", new Date(), null, { season: "estate", hour: 15, minute: 42, dst: "legale" });
+    expect(whenLabel(l)).toBe("Estate, ore 15:42 · ora legale");
+    expect(isHistoryEntry({ ...l, dst: "estiva" })).toBe(false);
     expect(isHistoryEntry(e)).toBe(true);
     expect(whenLabel(newEntry("piazza", "x", ""))).toBe("");
     expect(isHistoryEntry({ ...e, season: "monsone" })).toBe(false);
