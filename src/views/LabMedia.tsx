@@ -20,6 +20,9 @@ import { registerCaptureHandler } from "@/lib/camera-dock";
 import { AI_STANDBY } from "@/lib/ai-standby";
 import { openSystemCamera, prepareSystemCamera, supportsSystemCapture } from "@/lib/system-camera";
 import { SystemCamera } from "@/views/SystemCamera";
+import { GalleryReview } from "@/views/GalleryReview";
+import { useLab } from "@/models/lab-store";
+import { ZONE_LABEL, drawnAreaFor } from "@/models/drawn-area";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/views/health";
 import { Button } from "@/components/ui/button";
@@ -204,7 +207,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
             },
           ],
         });
-        void add(await Promise.all(handles.map((h) => h.getFile())));
+        review(await Promise.all(handles.map((h) => h.getFile())));
         return;
       } catch (e) {
         // "Annulla" nel selettore: nessun file scelto, nessun avviso.
@@ -298,6 +301,13 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
 
   const sendFiles = () => void shareFiles(kind, items);
   const sendOne = (it: MediaItem) => void shareOne(kind, it);
+  // Photos and videos picked from the gallery wait in the review sheet; "+" there adds more to the same pick.
+  const [reviewing, setReviewing] = useState<File[] | null>(null);
+  const review = (list: FileList | File[] | null) => { const f = Array.from(list ?? []); if (f.length) setReviewing((p) => [...(p ?? []), ...f]); };
+  const lab = useLab();
+  const project = kind === "urban" ? lab.urban : lab.vineyard;
+  const area = drawnAreaFor(project.area, project.location);
+  const zoneNames = [...new Set((area?.zones ?? []).filter((z) => z.kind !== "libera").map((z) => z.name ?? ZONE_LABEL[z.kind]))];
 
   const input = (
     ref: React.RefObject<HTMLInputElement | null>,
@@ -313,7 +323,9 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
       multiple={multi ?? !capture}
       className="hidden"
       onChange={(e) => {
-        void add(
+        // From the gallery: first the sheet to look them over (GalleryReview); from the camera: straight in.
+        if (ref === gallery) review(e.target.files);
+        else void add(
           e.target.files,
           accept === "image/*" ? "image" : accept === "video/*" ? "video" : undefined,
           !capture,
@@ -381,6 +393,12 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
       />
       {input(cameraPhoto, "image/*", "environment")}
       <SystemCamera mode={systemCamera} onCapture={(file) => add([file])} onClose={() => setSystemCamera(null)} />
+      <GalleryReview kind={kind} files={reviewing} zones={zoneNames} onAddMore={() => void pickGallery()} onClose={() => setReviewing(null)}
+        onConfirm={(files, zone) => {
+          // The zone rides in the name ("Lotto A - foto.jpg"), so the list and the report show where it was taken.
+          void add(zone ? files.map((f) => new File([f], `${zone} - ${f.name}`, { type: f.type, lastModified: f.lastModified })) : files);
+          setReviewing(null);
+        }} />
       {input(cameraVideo, "video/*", "environment")}
       {/* Su Android la selezione multipla apre il gestore file; con un file alla volta si apre
           la galleria di sistema (Google Foto). Altrove resta la scelta multipla. */}
