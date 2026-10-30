@@ -6,6 +6,7 @@ import { currentMedia, useLabMedia, type MediaItem } from "@/models/lab-media-st
 import { mediaTime } from "@/models/media-time";
 import { TabRow } from "@/views/v8/console";
 import { peekStyle, useTabSwipe } from "@/lib/use-tab-swipe";
+import { useProId } from "@/lib/use-pro-id";
 import { SEASON_LABEL } from "@/models/season-climate";
 import { DashCard, DashSection } from "@/views/v10/Dashboard";
 import { clearHistory, useHistory } from "@/lib/use-history";
@@ -108,12 +109,16 @@ const COMPACT_DAYS = 5, COMPACT_SHOTS = 6;
  * latest few, then "Apri la cronologia") and the Cronologia page (all of it, filtered by place, with "Cancella cronologia").
  * Each entry offers "Apri", which opens it on its own page to read (/cronologia/$id). Signed in it lives in the account, otherwise on this device.
  */
-export function HistoryBlock({ compact = false, flow }: { compact?: boolean; flow?: HistoryFlow }) {
+export function HistoryBlock({ compact = false, flow: asked }: { compact?: boolean; flow?: HistoryFlow }) {
   const { entries: all, where, loading, failed, reload } = useHistory();
-  const [filter, setFilter] = useState<Filter>("tutti");
-  // Only the full page has the filter to swipe: on Benvenuto the swipe listens to a ref that stays empty.
+  // Identified, the history is that profile's project only: the piazza for the municipal officer, the vineyard for the agronomist.
+  const proId = useProId();
+  const flow: HistoryFlow | undefined = asked ?? (proId ? (proId.kind === "funzionario" ? "piazza" : "vigneto") : undefined);
+  const [chosen, setFilter] = useState<Filter>("tutti");
+  const filter: Filter = flow ?? chosen;
+  // Only the full page without a profile has the filter to swipe: otherwise the swipe listens to a ref that stays empty.
   const area = useRef<HTMLDivElement>(null), none = useRef<HTMLDivElement>(null);
-  const swipe = useTabSwipe(FILTERS.map((f) => f.id), filter, setFilter, compact ? none : area);
+  const swipe = useTabSwipe(FILTERS.map((f) => f.id), filter, setFilter, compact || flow ? none : area);
   const [confirm, setConfirm] = useState(false);
   const [clearing, setClearing] = useState(false);
   useEffect(() => { setConfirm(false); }, [filter]);
@@ -123,7 +128,7 @@ export function HistoryBlock({ compact = false, flow }: { compact?: boolean; flo
     ...urban.map((m): Shot => ({ ...m, flow: "piazza", at: mediaTime(m) })),
     ...vineyard.map((m): Shot => ({ ...m, flow: "vigneto", at: mediaTime(m) })),
   ].sort((a, b) => (b.at ?? 0) - (a.at ?? 0)), [urban, vineyard]);
-  // On the dashboard one project only (flow); on Benvenuto everything; on the Cronologia page the filter tab.
+  // One project only with a profile (or on the dashboard); otherwise everything on Benvenuto and the filter tab on the Cronologia page.
   const shownIn = (f: Filter) => (fl: HistoryFlow) => (flow ? fl === flow : compact || f === "tutti" || f === fl);
   const entries = all.filter((e) => shownIn(filter)(e.flow));
   // The photos and interventions of one filter tab: the open one, and the one peeking beside it while swiping.
@@ -174,7 +179,7 @@ export function HistoryBlock({ compact = false, flow }: { compact?: boolean; flo
   return (
     <DashSection title={flow ? `Cronologia ${flow === "piazza" ? "della piazza" : "del vigneto"}` : compact ? "Cronologia" : "Tutti gli interventi"} hint={where === "account" ? (all.some((e) => e.source === "device") ? "Account e questo dispositivo" : "Salvata nel tuo account") : "Salvata su questo dispositivo"}>
       <div ref={area} className="space-y-3">
-      {!compact && <TabRow label="Luogo" items={FILTERS} value={filter} onChange={(v) => setFilter(v as Filter)} />}
+      {!compact && !flow && <TabRow label="Luogo" items={FILTERS} value={filter} onChange={(v) => setFilter(v as Filter)} />}
       {/* Tutti · Piazza · Vigneto turn with a sideways swipe on the list, like the tutorial's screens. */}
       <div ref={swipe.ref} style={swipe.style} className="relative space-y-3">
       {failed && <DashCard><p className="text-sm text-muted-foreground">Non riesco a leggere la cronologia del tuo account. Vedi solo quella di questo dispositivo.</p></DashCard>}
