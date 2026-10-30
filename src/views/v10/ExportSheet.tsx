@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import type { MediaItem } from "@/models/lab-media-store";
 import { hapticTick } from "@/lib/haptics";
+import { isAndroidWebView, systemShareLink, uploadLink } from "@/models/lab-media-sender";
 import { cn } from "@/lib/utils";
 
 /** The camera's and the gallery's bottom sheet: rises from the bottom on phones, a centred dialog from sm up. */
@@ -252,6 +253,25 @@ export function ExportSheet({ open, onOpenChange, flow, place, author, media, pr
   // Toasts sit under the open sheet: what happened is also written in the sheet itself, under the white button.
   const [note, setNote] = useState("");
   const say = (msg: string) => { setNote(msg); toast(msg); };
+  /** Through the system's share menu with a link to the files (one file, or a zip of them), valid 7 days. */
+  const shareByLink = async (files: ExportFile[]) => {
+    if (!files.length) { systemShareLink(subject, body, ""); return; }
+    setNote("Preparo il link da condividere…");
+    let file: File;
+    if (files.length === 1) file = asFiles(files)[0]!;
+    else {
+      const { default: JSZip } = await import("jszip");
+      const zip = new JSZip();
+      files.forEach((f) => zip.file(f.name, f.blob));
+      file = new File([await zip.generateAsync({ type: "blob" })], zipName, { type: "application/zip" });
+    }
+    const url = await uploadLink(file, piazza ? "urban" : "vineyard");
+    if (url) { setNote(""); systemShareLink(subject, `${body}\n${files.length === 1 ? "File" : "File (cartella zip)"}, valido 7 giorni:`, url); return; }
+    // Without an account there is nowhere to put them: saved on the phone, the message still goes.
+    await saveAll(files);
+    say("Senza accesso i file non si possono mandare come link: li ho salvati in Download, allegali al messaggio.");
+    systemShareLink(subject, body, "");
+  };
   const act = async (d: Dest | "print" | "copy") => {
     const files = job?.files ?? [];
     setNote("");
@@ -263,7 +283,10 @@ export function ExportSheet({ open, onOpenChange, flow, place, author, media, pr
         if (!files.length) { await navigator.clipboard.writeText(text); say("Testo copiato"); return; }
         await saveAll(files); say(files.length === 1 ? "File salvato" : "Cartella zip salvata"); return;
       }
-      // Email and share: the phone's share sheet carries the files (pick the email app there). It takes only some
+      // The installed Android app runs in a WebView, where the browser's share of files does not work: the files
+      // go up to the account's private space and the system's share menu (Gmail, WhatsApp…) gets a 7-day link.
+      if (isAndroidWebView()) { await shareByLink(files); return; }
+      // Elsewhere the phone's share sheet carries the files (pick the email app there). It takes only some
       // kinds of file (no .geojson, no .zip, no .mov…): those are saved apart and said so.
       const all = asFiles(files);
       const ok = all.filter((f) => navigator.canShare?.({ files: [f] }));
@@ -276,7 +299,8 @@ export function ExportSheet({ open, onOpenChange, flow, place, author, media, pr
           return;
         } catch (e) {
           if ((e as Error)?.name === "AbortError") return;
-          // Refused (too big, or the tap expired): fall back to saving below.
+          // Refused by the browser: on a phone try the link, else save below.
+          if (touch && /Android/i.test(navigator.userAgent)) { await shareByLink(files); return; }
         }
       }
       // No share with files here: the email opens and the files are saved to attach them.

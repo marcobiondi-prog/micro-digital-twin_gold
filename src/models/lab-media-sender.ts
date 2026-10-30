@@ -95,7 +95,7 @@ async function uploadZipLink(zip: File, kind: MediaKind) {
 }
 
 /** Carica un file qualsiasi nello spazio privato e restituisce un link scaricabile per 7 giorni. */
-async function uploadLink(zip: File, kind: MediaKind) {
+export async function uploadLink(zip: File, kind: MediaKind) {
   try {
     const { supabase } = await import("@/integrations/supabase/client");
     const { data } = await supabase.auth.getUser();
@@ -195,7 +195,7 @@ type Bridges = {
 };
 
 /** Menu «Condividi» di sistema dall'app installata: ponti nativi noti, altrimenti intent Android. */
-function systemShareLink(title: string, text: string, url: string) {
+export function systemShareLink(title: string, text: string, url: string) {
   const w = window as unknown as Bridges;
   const full = `${text}\n${url}`;
   try {
