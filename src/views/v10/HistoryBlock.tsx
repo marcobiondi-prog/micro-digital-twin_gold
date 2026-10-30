@@ -17,11 +17,35 @@ const time = (e: HistoryEntry) => new Date(e.at).toLocaleTimeString("it-IT", { h
 
 type Shot = MediaItem & { flow: "piazza" | "vigneto"; at: number | null };
 
+/**
+ * A photo, or a video's first frame, with a turning ring while it loads; the picture fades in once it is there.
+ * A picture already in the browser's memory shows at once (checked on mount, as its load may come before React).
+ */
+function ShotMedia({ s }: { s: Shot }) {
+  const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const fade = `size-full object-cover transition-opacity duration-300 motion-reduce:transition-none ${ready ? "opacity-100" : "opacity-0"}`;
+  return (
+    <>
+      {!ready && !failed && (
+        <span className="absolute inset-0 grid place-items-center" role="status" aria-label="Caricamento">
+          <span className="size-8 animate-spin rounded-full border-[3px] border-white/15 border-t-brand-turquoise motion-reduce:animate-none" />
+        </span>
+      )}
+      {s.kind === "video"
+        ? <video ref={(v) => { if (v && v.readyState >= 2) setReady(true); }} src={`${s.url}#t=0.1`} preload="metadata" muted playsInline
+            onLoadedData={() => setReady(true)} onError={() => setFailed(true)} className={`pointer-events-none ${fade}`} />
+        : <img ref={(i) => { if (i?.complete && i.naturalWidth) setReady(true); }} src={s.url} alt="" loading="lazy"
+            onLoad={() => setReady(true)} onError={() => setFailed(true)} className={fade} />}
+    </>
+  );
+}
+
 function Thumb({ s }: { s: Shot }) {
   const when = s.at ? new Date(s.at).toLocaleDateString("it-IT", { day: "numeric", month: "short" }) : "";
   return (
     <a href={s.url} target="_blank" rel="noreferrer" aria-label={`${s.kind === "video" ? "Video" : "Foto"} ${s.flow}${when ? `, ${when}` : ""}`} className="relative block aspect-square overflow-hidden rounded-2xl bg-foreground/[0.08] outline-none focus-visible:ring-2 focus-visible:ring-ring">
-      {s.kind === "video" ? <video src={s.url} preload="metadata" muted playsInline className="size-full object-cover" /> : <img src={s.url} alt="" loading="lazy" className="size-full object-cover" />}
+      <ShotMedia s={s} />
       {s.kind === "video" && <span className="absolute inset-0 grid place-items-center"><Play className="size-7 text-white drop-shadow" aria-hidden="true" /></span>}
       <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-2 pb-1.5 pt-5 text-xs text-white">{s.flow === "piazza" ? "Piazza" : "Vigneto"}{when ? ` · ${when}` : ""}</span>
     </a>
@@ -50,7 +74,7 @@ const countText = (shots: Shot[]) => {
 function PileCard({ s, className, style }: { s: Shot; className?: string; style?: React.CSSProperties }) {
   return (
     <span className={`absolute inset-0 overflow-hidden rounded-2xl bg-[oklch(0.27_0.016_258)] shadow-[0_6px_18px_rgb(0_0_0/0.45)] ring-1 ring-white/10 ${className ?? ""}`} style={style}>
-      {s.kind === "video" ? <video src={`${s.url}#t=0.1`} preload="metadata" muted playsInline className="pointer-events-none size-full object-cover" /> : <img src={s.url} alt="" loading="lazy" className="size-full object-cover" />}
+      <ShotMedia s={s} />
       {s.kind === "video" && <span className="absolute inset-0 grid place-items-center"><Play className="size-7 text-white drop-shadow" aria-hidden="true" /></span>}
     </span>
   );
@@ -136,7 +160,7 @@ function OpenPile({ pile, onClose }: { pile: Pile; onClose: () => void }) {
         {pile.shots.map((s) => <div key={keyOf(s)} className="w-[7.5rem] shrink-0 snap-start sm:w-36">{selecting ? (
           <button type="button" role="checkbox" aria-checked={picked.has(keyOf(s))} aria-label={`${s.kind === "video" ? "Video" : "Foto"} ${s.name}`} onClick={() => flip(s)}
             className={`relative block aspect-square overflow-hidden rounded-2xl bg-foreground/[0.08] outline-none transition focus-visible:ring-2 focus-visible:ring-ring ${picked.has(keyOf(s)) ? "ring-2 ring-destructive" : "opacity-80"}`}>
-            {s.kind === "video" ? <video src={`${s.url}#t=0.1`} preload="metadata" muted playsInline className="pointer-events-none size-full object-cover" /> : <img src={s.url} alt="" loading="lazy" className="size-full object-cover" />}
+            <ShotMedia s={s} />
             <span className={`absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full border-2 ${picked.has(keyOf(s)) ? "border-destructive bg-destructive text-white" : "border-white bg-black/35"}`}>{picked.has(keyOf(s)) && <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />}</span>
           </button>
         ) : <Thumb s={s} />}</div>)}
