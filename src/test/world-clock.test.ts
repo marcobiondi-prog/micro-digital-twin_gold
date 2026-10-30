@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clockOffset, placeTime, summerTime, sameClock, utcOffsetText, validTimeZone, zoneName } from "@/models/world-clock";
+import { clockOffset, placeTime, shiftHour, summerTime, zoneOptions, sameClock, utcOffsetText, validTimeZone, zoneName } from "@/models/world-clock";
 
 describe("world-clock", () => {
   const t = Date.UTC(2026, 9, 30, 12, 7); // 30 Oct 2026, 12:07 UTC
@@ -37,5 +37,15 @@ describe("world-clock", () => {
     expect(winter.next).toEqual({ at: Date.UTC(2027, 2, 28, 1, 0), to: "legale" });
     expect(summerTime(Date.UTC(2026, 6, 1), "Asia/Tokyo")).toEqual({ kind: "nessuna", next: null });
     expect(summerTime(Date.UTC(2026, 6, 1), "Australia/Sydney").kind).toBe("solare");
+  });
+  it("lists zones by offset and moves an hour between zones", () => {
+    const t = Date.UTC(2026, 9, 30, 12);
+    const list = zoneOptions(t);
+    expect(list.find((o) => o.tz === "Europe/Rome")?.label).toBe("UTC+1 · Rome (Europa)");
+    expect(list.find((o) => o.tz === "UTC")?.label).toBe("UTC · Tempo universale");
+    expect(list.every((o, i) => i === 0 || list[i - 1]!.offset <= o.offset)).toBe(true);
+    expect(list.some((o) => o.tz.startsWith("Etc/"))).toBe(false);
+    expect(shiftHour(13, t, "Europe/Rome", "Asia/Tokyo")).toBe(21);
+    expect(shiftHour(2, t, "Europe/Rome", "America/New_York")).toBe(21);
   });
 });

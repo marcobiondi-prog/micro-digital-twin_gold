@@ -1,11 +1,11 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ChevronDown, ChevronLeft, ChevronRight, Clock, Globe } from "lucide-react";
 import { getSeasonalClimate } from "@/controllers/climate.functions";
 import { SEASONS, SEASON_LABEL, seasonOfMonth, type Season } from "@/models/season-climate";
 import { clearRequestedWhen, clockText, peekRequestedWhen, setSimWhen } from "@/models/sim-when";
-import { deviceTimeZone, placeTime, sameClock, summerTime, utcOffsetText, validTimeZone, zoneName } from "@/models/world-clock";
+import { deviceTimeZone, placeTime, sameClock, shiftHour, summerTime, utcOffsetText, validTimeZone, zoneName, zoneOptions } from "@/models/world-clock";
 import { syncWorldTime, worldNow } from "@/lib/world-time";
 import { hapticTick } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
@@ -22,9 +22,12 @@ export function useSeasonClock(lat: number, lng: number, kind?: "urban" | "viney
   const [live, setLive] = useState(!asked);
   const fetchSeasons = useServerFn(getSeasonalClimate);
   const climate = useQuery({ queryKey: ["season-climate", lat, lng], queryFn: () => fetchSeasons({ data: { lat, lng } }), staleTime: Infinity, retry: 1 });
-  // The place's time zone (its weather year comes in it), else the device's.
+  // The place's time zone (its weather year comes in it), else the device's; or the one chosen by hand.
   const placeZone = validTimeZone(climate.data?.timezone);
-  const tz = placeZone ?? deviceTimeZone();
+  const [chosenZone, setChosen] = useState<string | null>(() => readChosenZone(kind));
+  const autoZone = placeZone ?? deviceTimeZone();
+  const tz = chosenZone ?? autoZone;
+  const setZone = (z: string | null) => { setChosen(z); saveChosenZone(kind, z); };
   const [season, setSeason] = useState<Season>(() => asked?.season ?? seasonOfMonth(placeTime(worldNow(), tz).month));
   const [hour, setHourOnly] = useState(() => asked?.hour ?? placeTime(worldNow(), tz).hour);
   // The minutes follow the clock while live; an hour chosen by hand starts on the hour.
@@ -44,8 +47,10 @@ export function useSeasonClock(lat: number, lng: number, kind?: "urban" | "viney
     document.addEventListener("visibilitychange", sync);
     return () => { on = false; window.clearInterval(id); document.removeEventListener("visibilitychange", sync); };
   }, [live, tz]);
-  const real = climate.data?.profile[season][hour] ?? null;
-  return { live, setLive, season, setSeason, hour, setHour, minute, tz, placeZone: !!placeZone, pending: climate.isPending, real };
+  // The place's year is hour by hour in its own zone: a zone chosen by hand reads the place's hour at that moment.
+  const placeHour = chosenZone && placeZone ? shiftHour(hour, worldNow(), chosenZone, placeZone) : hour;
+  const real = climate.data?.profile[season][placeHour] ?? null;
+  return { live, setLive, season, setSeason, hour, setHour, minute, tz, placeZone: !!placeZone, autoZone, chosenZone, setZone, pending: climate.isPending, real };
 }
 export type SeasonClock = ReturnType<typeof useSeasonClock>;
 
@@ -92,16 +97,56 @@ export function WhenPicker({ clock, id, detail, note, children }: { clock: Seaso
  */
 function ZoneLine({ clock }: { clock: SeasonClock }) {
   const now = worldNow(), here = deviceTimeZone();
-  const away = clock.placeZone && !sameClock(now, clock.tz, here);
-  const mine = placeTime(now, here);
+  const away = (clock.placeZone || clock.chosenZone) && !sameClock(now, clock.tz, here);
+  const mine = placeTime(now, here), place = placeTime(now, clock.autoZone);
+  // A zone chosen by hand that shows another hour than the place's.
+  const offPlace = clock.chosenZone && clock.placeZone && !sameClock(now, clock.tz, clock.autoZone);
+  const whose = clock.chosenZone ? "Fuso scelto da te" : clock.placeZone ? "Ora del luogo" : "Ora del tuo dispositivo";
   return (
-    <p className="flex flex-wrap items-center justify-center gap-x-1.5 text-center text-xs text-foreground/80">
-      <Globe className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-      <span>{clock.placeZone ? "Ora del luogo" : "Ora del tuo dispositivo"} · {zoneName(now, clock.tz)} ({utcOffsetText(now, clock.tz)})</span>
-      {away && <span className="text-muted-foreground">· da te sono le {clockText(mine.hour, mine.minute)}</span>}
-      <SummerLine tz={clock.tz} now={now} />
-    </p>
+    <div className="space-y-2">
+      <p className="flex flex-wrap items-center justify-center gap-x-1.5 text-center text-xs text-foreground/80">
+        <Globe className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <span>{whose} · {zoneName(now, clock.tz)} ({utcOffsetText(now, clock.tz)})</span>
+        {offPlace && <span className="text-muted-foreground">· nel luogo sono le {clockText(place.hour, place.minute)}</span>}
+        {away && <span className="text-muted-foreground">· da te sono le {clockText(mine.hour, mine.minute)}</span>}
+        <SummerLine tz={clock.tz} now={now} />
+      </p>
+      <ZoneSelect clock={clock} />
+    </div>
   );
+}
+
+/** The time zone by hand: "Automatico" (the place's, else the device's) or any zone, by UTC offset. */
+function ZoneSelect({ clock }: { clock: SeasonClock }) {
+  // The list is built once per hour (offsets change only with summer time).
+  const hourKey = Math.floor(worldNow() / 3_600_000);
+  const options = useMemo(() => zoneOptions(hourKey * 3_600_000), [hourKey]);
+  const auto = `Automatico · ${clock.placeZone ? "fuso del luogo" : "fuso del dispositivo"} (${utcOffsetText(worldNow(), clock.autoZone)})`;
+  return (
+    <div className="flex items-center gap-2">
+      <label htmlFor={`zone-${clock.autoZone}`} className="shrink-0 text-xs font-semibold text-muted-foreground">Fuso orario</label>
+      <select id={`zone-${clock.autoZone}`} value={clock.chosenZone ?? ""} onChange={(e) => { hapticTick(); clock.setZone(e.target.value || null); clock.setLive(true); }}
+        className="h-10 min-w-0 flex-1 truncate rounded-full border-0 bg-foreground/[0.07] px-3 text-[13px] font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <option value="">{auto}</option>
+        {options.map((o) => <option key={o.tz} value={o.tz}>{o.label}</option>)}
+      </select>
+    </div>
+  );
+}
+
+const ZONE_KEY = "mdt-zone-v1";
+/** The zone chosen by hand for each simulation, kept on this device. */
+function readChosenZone(kind: string | undefined): string | null {
+  if (!kind || typeof window === "undefined") return null;
+  try { return validTimeZone((JSON.parse(localStorage.getItem(ZONE_KEY) ?? "{}") as Record<string, unknown>)[kind]); } catch { return null; }
+}
+function saveChosenZone(kind: string | undefined, tz: string | null) {
+  if (!kind) return;
+  try {
+    const all = JSON.parse(localStorage.getItem(ZONE_KEY) ?? "{}") as Record<string, string>;
+    if (tz) all[kind] = tz; else delete all[kind];
+    localStorage.setItem(ZONE_KEY, JSON.stringify(all));
+  } catch { /* storage off: the choice lasts this visit */ }
 }
 
 /** "Ora legale · torna l'ora solare domenica 25 ottobre alle 03:00", "Ora solare · …", or that the zone has no summer time. */

@@ -73,3 +73,35 @@ export function summerTime(ms: number, tz: string): SummerTime {
   }
   return { kind, next: null };
 }
+
+const AREA: Record<string, string> = {
+  Europe: "Europa", America: "America", Asia: "Asia", Africa: "Africa", Australia: "Australia", Pacific: "Pacifico",
+  Atlantic: "Atlantico", Indian: "Oceano Indiano", Antarctica: "Antartide", Arctic: "Artico",
+};
+/** A few zones for engines that cannot list them all. */
+const FALLBACK_ZONES = ["UTC", "Europe/London", "Europe/Lisbon", "Europe/Rome", "Europe/Athens", "Europe/Moscow", "Asia/Dubai", "Asia/Kolkata", "Asia/Shanghai", "Asia/Tokyo", "Australia/Sydney", "Pacific/Auckland", "America/Sao_Paulo", "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "Pacific/Honolulu", "Africa/Cairo", "Africa/Johannesburg"];
+
+export type ZoneOption = { tz: string; label: string; offset: number };
+/**
+ * Every time zone the browser knows (cities only: no Etc/ aliases), as "UTC+1 · Rome (Europa)", ordered by offset at
+ * that instant, then by name.
+ */
+export function zoneOptions(ms: number): ZoneOption[] {
+  let all: string[];
+  try { all = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.("timeZone") ?? FALLBACK_ZONES; } catch { all = FALLBACK_ZONES; }
+  const list = all.filter((tz) => tz === "UTC" || (tz.includes("/") && AREA[tz.split("/")[0]!] !== undefined));
+  if (!list.includes("UTC")) list.unshift("UTC");
+  return list
+    .map((tz) => {
+      const parts = tz.split("/"), city = (parts[parts.length - 1] ?? tz).replace(/_/g, " ");
+      const place = tz === "UTC" ? "Tempo universale" : `${city} (${AREA[parts[0]!]})`;
+      return { tz, offset: offsetMinutes(ms, tz), label: `${utcOffsetText(ms, tz)} · ${place}` };
+    })
+    .sort((a, b) => a.offset - b.offset || a.label.localeCompare(b.label, "it"));
+}
+
+/** The hour in zone `to` when it is `hour` in zone `from` (whole hours; half-hour zones round down). */
+export function shiftHour(hour: number, ms: number, from: string, to: string): number {
+  const d = Math.floor((offsetMinutes(ms, to) - offsetMinutes(ms, from)) / 60);
+  return (((hour + d) % 24) + 24) % 24;
+}
