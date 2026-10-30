@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { Building2, Camera, Grape, Images, Lock, MapPin, Pause, Video, type LucideIcon } from "lucide-react";
+import { Building2, Camera, Grape, Images, Lock, MapPin, Video, Wrench, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useInstalledApp } from "@/lib/installed-app";
@@ -26,16 +26,21 @@ function useAiReady() {
 /** Fotocamera al centro della barra ad arco, rialzata e luminosa (logo AI dopo l'accesso); apre il pannello con tutte le opzioni. */
 /** `focused`: Home has the camera tile selected, so the button glows brighter to show where it leads. */
 export function CameraDockButton({ focused = false }: { focused?: boolean }) {
-  const { aiReady } = useAiReady();
+  const { aiReady, signedIn } = useAiReady();
+  // Signed in while the AI camera is still being built: its logo, dimmed, with an amber "in development" badge.
+  const building = AI_STANDBY && signedIn;
   return (
     <button
       type="button"
       onClick={() => setCameraSheetOpen(true)}
-      aria-label={aiReady ? "Fotocamera AI e altre opzioni" : "Fotocamera: foto, video e galleria"}
+      aria-label={aiReady ? "Fotocamera AI e altre opzioni" : building ? "Fotocamera: foto, video e galleria (fotocamera AI in sviluppo)" : "Fotocamera: foto, video e galleria"}
       className="ps-nav-camera camera-dock-button" data-ai={aiReady || undefined} data-focus={focused || undefined}
     >
-      {aiReady
-        ? <img src={aiLogo} alt="" aria-hidden="true" draggable={false} className="size-8 select-none" />
+      {aiReady || building
+        ? <span className="relative grid place-items-center">
+            <img src={aiLogo} alt="" aria-hidden="true" draggable={false} className={cn("size-8 select-none", building && "opacity-55 grayscale-[35%]")} />
+            {building && <span className="absolute -bottom-1.5 -right-2 grid size-[18px] place-items-center rounded-full bg-amber-400 text-black ring-2 ring-[#1b2029]" aria-hidden="true"><Wrench className="size-2.5" strokeWidth={3} /></span>}
+          </span>
         : <Camera className="size-7" aria-hidden="true" />}
     </button>
   );
@@ -146,11 +151,11 @@ export function CameraSheet() {
                 className="relative flex items-center gap-4 overflow-hidden rounded-[1.25rem] border border-brand-turquoise/40 bg-[radial-gradient(120%_120%_at_0%_0%,color-mix(in_oklch,var(--brand-turquoise)_32%,transparent),transparent_60%)] bg-muted/60 p-4 text-left outline-none transition-transform active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 disabled:active:scale-100 motion-reduce:active:scale-100">
                 <span className="relative grid size-16 shrink-0 place-items-center rounded-full border-[3px] border-brand-turquoise bg-background shadow-[0_0_22px_color-mix(in_oklch,var(--brand-turquoise)_45%,transparent)]">
                   <img src={aiLogo} alt="" aria-hidden="true" className="size-8" />
-                  {!aiReady && <span className="absolute -bottom-1 -right-1 grid size-6 place-items-center rounded-full bg-foreground text-background ring-2 ring-card">{signedIn && AI_STANDBY ? <Pause className="size-3.5" aria-hidden="true" /> : <Lock className="size-3.5" aria-hidden="true" />}</span>}
+                  {!aiReady && <span className={cn("absolute -bottom-1 -right-1 grid size-6 place-items-center rounded-full ring-2 ring-card", signedIn && AI_STANDBY ? "bg-amber-400 text-black" : "bg-foreground text-background")}>{signedIn && AI_STANDBY ? <Wrench className="size-3.5" aria-hidden="true" /> : <Lock className="size-3.5" aria-hidden="true" />}</span>}
                 </span>
                 <span className="min-w-0">
-                  <span className="flex items-center gap-2 text-lg font-bold">Fotocamera AI{signedIn && AI_STANDBY && <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">In pausa</span>}</span>
-                  <span className="block text-sm text-muted-foreground">{aiReady ? "Inquadra una pianta: la riconosce e calcola il fresco" : signedIn && AI_STANDBY ? "In pausa per ora: tornerà presto" : "Accedi per usarla"}</span>
+                  <span className="flex items-center gap-2 text-lg font-bold">Fotocamera AI{signedIn && AI_STANDBY && <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-400">In sviluppo</span>}</span>
+                  <span className="block text-sm text-muted-foreground">{aiReady ? "Inquadra una pianta: la riconosce e calcola il fresco" : signedIn && AI_STANDBY ? "La stiamo costruendo: presto riconoscerà le piante e il fresco che regalano. Intanto scatta foto e video." : "Accedi per usarla"}</span>
                   {place && <span className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-full bg-brand-turquoise/15 px-2.5 py-1 text-xs font-semibold text-brand-turquoise"><MapPin className="size-3.5 shrink-0" aria-hidden="true" /><span className="truncate">{place}</span></span>}
                 </span>
               </button>
