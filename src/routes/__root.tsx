@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Outlet, Link, createRootRouteWithContext, useLocation, useNavigate, HeadContent, Scripts, type ErrorComponentProps } from "@tanstack/react-router";
+import { Outlet, Link, createRootRouteWithContext, useLocation, useNavigate, useRouter, HeadContent, Scripts, type ErrorComponentProps } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
@@ -390,6 +390,20 @@ function RootComponent() {
     const fonts = (document as Document & { fonts?: { ready: Promise<unknown> } }).fonts?.ready ?? Promise.resolve();
     void Promise.race([fonts, new Promise((r) => setTimeout(r, 1500))]).then(() => requestAnimationFrame(hidePreloader));
   }, []);
+  // The other pages' code is fetched once the app is idle, so moving between them never waits for the network
+  // (on a first open, before the offline worker has cached anything, a page appeared in jumps while its file came in).
+  const router = useRouter();
+  useEffect(() => {
+    const warm = () => {
+      for (const id of ["/benvenuto", "/urbano", "/vigneto", "/dashboard", "/cronologia", "/profilo", "/scegli", "/"]) {
+        const route = (router.routesById as unknown as Record<string, unknown>)[id];
+        if (route) void router.loadRouteChunk(route as Parameters<typeof router.loadRouteChunk>[0])?.catch(() => {});
+      }
+    };
+    const w = window as Window & { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number };
+    const t = w.requestIdleCallback ? w.requestIdleCallback(warm, { timeout: 2500 }) : window.setTimeout(warm, 1200);
+    return () => { if (!w.requestIdleCallback) window.clearTimeout(t); };
+  }, [router]);
   const { queryClient } = Route.useRouteContext();
   const navigate = useNavigate();
   const location = useLocation();

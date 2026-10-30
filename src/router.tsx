@@ -44,6 +44,8 @@ export const getRouter = () => {
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
+    // A link's page starts loading on touch or hover, before the tap ends.
+    defaultPreload: "intent",
     defaultPreloadStaleTime: 0,
   });
 
