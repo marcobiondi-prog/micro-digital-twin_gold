@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import type { MediaItem } from "@/models/lab-media-store";
 import { hapticTick } from "@/lib/haptics";
-import { isAndroidWebView, systemShareLink, uploadLink } from "@/models/lab-media-sender";
 import { cn } from "@/lib/utils";
 
 /** The camera's and the gallery's bottom sheet: rises from the bottom on phones, a centred dialog from sm up. */
@@ -89,7 +88,9 @@ export function ExportSheet({ open, onOpenChange, flow, place, author, media, pr
   const [picked, setPicked] = useState<Set<string> | null>(null);
   const [step, setStep] = useState<Step>("cosa");
   const [dest, setDest] = useState<Dest | null>(null);
-  const [job, setJob] = useState<{ files: ExportFile[]; done: boolean; mediaDone: number; error?: boolean } | null>(null);
+  const [job, setJob] = useState<{ files: ExportFile[]; done: boolean; mediaDone: number; error?: boolean; zip?: Blob } | null>(null);
+  // The phone's share takes at most 10 files (and about 50 MB) at a time: more go in turns, one tap each.
+  const [turn, setTurn] = useState(0);
   const [reportSize, setReportSize] = useState<number | null>(null);
   // Sent once with the main button: the pill goes away and the next open starts again.
   const [sent, setSent] = useState(false);
@@ -222,8 +223,11 @@ export function ExportSheet({ open, onOpenChange, flow, place, author, media, pr
         }
       }
       if (d === "save" && on.text) files.push({ name: `riassunto-${base}.txt`, blob: new Blob([text], { type: "text/plain;charset=utf-8" }) });
+      // Several files are saved as one zip, made now so the tap saves it at once (and the email can open in the same tap).
+      const zip = files.length > 1 ? await makeZip(files) : undefined;
       if (id !== runId.current) return;
-      setJob({ files, done: true, mediaDone: chosen.length });
+      setTurn(0);
+      setJob({ files, done: true, mediaDone: chosen.length, ...(zip ? { zip } : {}) });
       hapticTick([10, 40, 10]);
       setStep("fatto");
     } catch {
@@ -232,8 +236,7 @@ export function ExportSheet({ open, onOpenChange, flow, place, author, media, pr
   };
 
   const zipName = `micro-digital-twin-${base}-${day}.zip`;
-  const saveAll = async (files: ExportFile[]) => {
-    if (files.length === 1) { saveBlob(files[0]!.blob, files[0]!.name); return; }
+  const makeZip = async (files: ExportFile[]) => {
     const { default: JSZip } = await import("jszip");
     const zip = new JSZip();
     const names = new Set<string>();
@@ -242,78 +245,88 @@ export function ExportSheet({ open, onOpenChange, flow, place, author, media, pr
       while (names.has(n)) n = f.name.replace(/(\.[^.]+)?$/, ` (${k++})$1`);
       names.add(n); zip.file(n, f.blob);
     }
-    saveBlob(await zip.generateAsync({ type: "blob" }), zipName);
+    return zip.generateAsync({ type: "blob", compression: "STORE" });
+  };
+  /** Saved in Download: one file as it is, several as the zip made while preparing. */
+  const saveAll = async (files: ExportFile[], zip?: Blob) => {
+    if (files.length === 1) { saveBlob(files[0]!.blob, files[0]!.name); return; }
+    saveBlob(zip ?? (await makeZip(files)), zipName);
   };
   // The type by the name: a fetched photo can come back typed "application/octet-stream", which the share sheet refuses.
   const asFiles = (files: ExportFile[]) => files.map((f) => new File([f.blob], f.name, { type: MIME[f.name.split(".").pop()!.toLowerCase()] ?? (f.blob.type || "application/octet-stream") }));
   const subject = `Report ${piazza ? "della piazza" : "del vigneto"} · ${placeName}`;
-  const body = on.text ? text : `In allegato il report ${piazza ? "della piazza" : "del vigneto"} di ${place}${author ? `, redatto da ${author}` : ""}.`;
-  const touch = typeof window !== "undefined" && !!window.matchMedia?.("(hover: none) and (pointer: coarse)").matches;
+  const body = on.text ? text : `Report ${piazza ? "della piazza" : "del vigneto"} di ${place}${author ? `, redatto da ${author}` : ""}.`;
+
+  // What the phone's share window takes: each file checked on its own (no .geojson, .zip, .mov…), then in turns of
+  // at most 10 files and 45 MB.
+  const shareable = useMemo(() => {
+    const all = asFiles(job?.files ?? []);
+    const ok = typeof navigator !== "undefined" && navigator.canShare ? all.filter((f) => navigator.canShare!({ files: [f] })) : [];
+    const apart = (job?.files ?? []).filter((_, i) => !ok.includes(all[i]!));
+    const turns: File[][] = [];
+    let cur: File[] = [], bytes = 0;
+    for (const f of ok) {
+      if (cur.length && (cur.length >= 10 || bytes + f.size > 45e6)) { turns.push(cur); cur = []; bytes = 0; }
+      cur.push(f); bytes += f.size;
+    }
+    if (cur.length) turns.push(cur);
+    return { turns, apart };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job]);
 
   // Toasts sit under the open sheet: what happened is also written in the sheet itself, under the white button.
   const [note, setNote] = useState("");
   const say = (msg: string) => { setNote(msg); toast(msg); };
-  /** Through the system's share menu with a link to the files (one file, or a zip of them), valid 7 days. */
-  const shareByLink = async (files: ExportFile[]) => {
-    if (!files.length) { systemShareLink(subject, body, ""); return; }
-    setNote("Preparo il link da condividere…");
-    let file: File;
-    if (files.length === 1) file = asFiles(files)[0]!;
-    else {
-      const { default: JSZip } = await import("jszip");
-      const zip = new JSZip();
-      files.forEach((f) => zip.file(f.name, f.blob));
-      file = new File([await zip.generateAsync({ type: "blob" })], zipName, { type: "application/zip" });
-    }
-    const url = await uploadLink(file, piazza ? "urban" : "vineyard");
-    if (url) { setNote(""); systemShareLink(subject, `${body}\n${files.length === 1 ? "File" : "File (cartella zip)"}, valido 7 giorni:`, url); return; }
-    // Without an account there is nowhere to put them: saved on the phone, the message still goes.
-    await saveAll(files);
-    say("Senza accesso i file non si possono mandare come link: li ho salvati in Download, allegali al messaggio.");
-    systemShareLink(subject, body, "");
-  };
   const act = async (d: Dest | "print" | "copy") => {
     const files = job?.files ?? [];
     setNote("");
-    if (d === dest) setSent(true);
     try {
       if (d === "copy") { await navigator.clipboard.writeText(text); say("Testo copiato"); return; }
       if (d === "print") { onOpenChange(false); setTimeout(onPrint, 400); return; }
       if (d === "save") {
+        if (dest === "save") setSent(true);
         if (!files.length) { await navigator.clipboard.writeText(text); say("Testo copiato"); return; }
-        await saveAll(files); say(files.length === 1 ? "File salvato" : "Cartella zip salvata"); return;
+        await saveAll(files, job?.zip); say(files.length === 1 ? "File salvato in Download" : "Cartella zip salvata in Download"); return;
       }
-      // The installed Android app runs in a WebView, where the browser's share of files does not work: the files
-      // go up to the account's private space and the system's share menu (Gmail, WhatsApp…) gets a 7-day link.
-      if (isAndroidWebView()) { await shareByLink(files); return; }
-      // Elsewhere the phone's share sheet carries the files (pick the email app there). It takes only some
-      // kinds of file (no .geojson, no .zip, no .mov…): those are saved apart and said so.
-      const all = asFiles(files);
-      const ok = all.filter((f) => navigator.canShare?.({ files: [f] }));
-      const apart = files.filter((_, i) => !ok.includes(all[i]!));
-      const shareData: ShareData = { title: subject, ...(d === "email" || on.text ? { text: body } : {}), ...(ok.length ? { files: ok } : {}) };
-      if ((touch || d === "share") && navigator.share && (ok.length || !files.length) && (navigator.canShare?.(shareData) ?? true)) {
-        try {
-          await navigator.share(shareData);
-          if (apart.length) { await saveAll(apart); say(apart.length === 1 && apart[0]!.name.endsWith(".geojson") ? "I dati per la mappa sono salvati a parte: il telefono non li condivide." : `${apart.length === 1 ? "1 file salvato" : `${apart.length} file salvati`} a parte: il telefono non li condivide.`); }
-          return;
-        } catch (e) {
-          if ((e as Error)?.name === "AbortError") return;
-          // Refused by the browser: on a phone try the link, else save below.
-          if (touch && /Android/i.test(navigator.userAgent)) { await shareByLink(files); return; }
-        }
-      }
-      // No share with files here: the email opens and the files are saved to attach them.
       if (d === "email") {
+        // The default email app (Gmail…) opens with the subject and the message. A web page cannot attach files to
+        // it: they are saved in Download, in the same tap, to attach with the paper clip.
+        if (dest === "email") setSent(true);
+        if (files.length) await saveAll(files, job?.zip);
         window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        if (files.length) { await saveAll(files); say("File salvati: allegali all'email"); }
-      } else if (files.length) { await saveAll(files); say("Condivisione non disponibile qui: file salvati"); }
+        if (files.length) say(files.length === 1 ? "Il file è in Download: allegalo all'email con la graffetta." : "I file sono in Download (cartella zip): allegali all'email con la graffetta.");
+        return;
+      }
+      // Share: the phone's own window with every app (WhatsApp, Telegram, Drive, Gmail…), the files attached.
+      if (typeof navigator.share !== "function") {
+        if (files.length) { await saveAll(files, job?.zip); say("Qui la condivisione non c'è: file salvati in Download."); }
+        return;
+      }
+      const { turns, apart } = shareable;
+      const i = Math.min(turn, Math.max(0, turns.length - 1));
+      const batch = turns[i] ?? [];
+      const data: ShareData = { title: subject, text: body, ...(batch.length ? { files: batch } : {}) };
+      try {
+        await navigator.share(data);
+      } catch (e) {
+        const name = (e as Error)?.name;
+        if (name === "AbortError") return;
+        say(`Il telefono non ha aperto la condivisione${name ? ` (${name}${(e as Error).message ? `: ${(e as Error).message}` : ""})` : ""}. Tocca di nuovo, oppure usa Salva.`);
+        return;
+      }
+      if (i + 1 < turns.length) { setTurn(i + 1); say(`Parte ${i + 1} di ${turns.length} condivisa: tocca per la prossima.`); return; }
+      if (dest === "share") setSent(true);
+      setTurn(0);
+      if (apart.length) {
+        await saveAll(apart);
+        say(apart.length === 1 && apart[0]!.name.endsWith(".geojson") ? "I dati per la mappa sono salvati in Download: il telefono non li condivide." : `${apart.length === 1 ? "1 file salvato" : `${apart.length} file salvati`} in Download: il telefono non li condivide.`);
+      }
     } catch (e) {
       if ((e as Error)?.name !== "AbortError") say("Non riuscito, riprova");
     }
   };
 
-  const destLabel: Record<Dest, string> = { email: piazza ? "Invia agli enti" : "Invia per email", share: "Condividi", save: (job?.files.length ?? 0) > 1 ? "Salva la cartella zip" : "Salva sul telefono" };
+  const destLabel: Record<Dest, string> = { email: "Apri l'email", share: shareable.turns.length > 1 ? `Condividi · parte ${Math.min(turn + 1, shareable.turns.length)} di ${shareable.turns.length}` : "Condividi", save: (job?.files.length ?? 0) > 1 ? "Salva la cartella zip" : "Salva sul telefono" };
   const prepPct = (() => {
     if (!job) return 0;
     const parts = (on.report ? 1 : 0) + (sendMedia ? 1 : 0) + 0.2;
@@ -398,8 +411,8 @@ export function ExportSheet({ open, onOpenChange, flow, place, author, media, pr
                     {on.text && <Chip icon={<Copy />} label="Testo" />}
                   </div>
                   <Box>
-                    <DestRow icon={<Mail />} accent title={piazza ? "Agli enti" : "Per email"} sub={piazza ? "Comune, Soprintendenza, Ufficio tecnico" : "Un messaggio con i file allegati"} onClick={() => void prepare("email")} />
-                    <DestRow icon={<Share2 />} title="Condividi" sub="WhatsApp, Telegram, Drive… dal telefono" onClick={() => void prepare("share")} />
+                    <DestRow icon={<Mail />} accent title={piazza ? "Agli enti" : "Per email"} sub={piazza ? "Apre la tua email (Gmail…) per Comune, Soprintendenza, Ufficio tecnico" : "Apre la tua email (Gmail…) con il messaggio"} onClick={() => void prepare("email")} />
+                    <DestRow icon={<Share2 />} title="Condividi" sub="WhatsApp, Telegram, Drive, Gmail… con i file allegati" onClick={() => void prepare("share")} />
                     <DestRow icon={<Download />} title="Salva sul telefono" sub={fileCount + (sendMedia ? chosen.length : 0) + (on.text ? 1 : 0) > 1 ? "Una cartella zip in Download" : "Nella cartella Download"} onClick={() => void prepare("save")} />
                     {on.report && <DestRow icon={<Printer />} title="Stampa" sub="Solo il report, su pagine chiare" onClick={() => void act("print")} />}
                   </Box>
