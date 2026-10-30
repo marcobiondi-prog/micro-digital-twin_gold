@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { ArrowRight, Building2, CalendarDays, ChevronDown, Clock3, Cloud, Smartphone, Grape, History, Play, Trash2 } from "lucide-react";
-import { currentMedia, useLabMedia, type MediaItem } from "@/models/lab-media-store";
+import { ArrowRight, Building2, CalendarDays, Check, ChevronDown, Clock3, Cloud, Smartphone, Grape, History, Play, Trash2 } from "lucide-react";
+import { currentMedia, removeMedia, useLabMedia, type MediaItem } from "@/models/lab-media-store";
 import { mediaTime } from "@/models/media-time";
 import { TabRow } from "@/views/v8/console";
 import { peekStyle, useTabSwipe } from "@/lib/use-tab-swipe";
@@ -86,16 +86,75 @@ function PhotoPiles({ shots }: { shots: Shot[] }) {
           );
         })}
       </div>
-      {shown && (
-        <div className="space-y-2 rounded-2xl bg-foreground/[0.05] p-3">
-          <div className="flex items-center justify-between px-1">
-            <h4 className="text-sm font-semibold tabular-nums">{shown.label}<span className="ml-2 font-medium text-muted-foreground">{countText(shown.shots)}</span></h4>
-            <button type="button" onClick={() => setOpen(null)} className="text-sm font-semibold text-muted-foreground outline-none focus-visible:underline">Chiudi</button>
-          </div>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">{shown.shots.map((s) => <Thumb key={`${s.flow}-${s.id}`} s={s} />)}</div>
-        </div>
-      )}
+      {shown && <OpenPile key={shown.key} pile={shown} onClose={() => setOpen(null)} />}
     </>
+  );
+}
+
+/**
+ * A day's pile spread into its grid. "Seleziona" turns the thumbnails into checkboxes (with "Tutte"), and "Elimina n"
+ * asks once in place before deleting them for good — from the account when uploaded, from this device otherwise.
+ */
+function OpenPile({ pile, onClose }: { pile: Pile; onClose: () => void }) {
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [ask, setAsk] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const keyOf = (s: Shot) => `${s.flow}-${s.id}`;
+  const flip = (s: Shot) => setPicked((p) => { const n = new Set(p); if (n.has(keyOf(s))) n.delete(keyOf(s)); else n.add(keyOf(s)); return n; });
+  const all = picked.size === pile.shots.length;
+  const stop = () => { setSelecting(false); setPicked(new Set()); setAsk(false); };
+  const chosen = pile.shots.filter((s) => picked.has(keyOf(s)));
+  const del = async () => {
+    setBusy(true);
+    try {
+      const urban = chosen.filter((s) => s.flow === "piazza"), vine = chosen.filter((s) => s.flow === "vigneto");
+      if (urban.length) await removeMedia("urban", urban);
+      if (vine.length) await removeMedia("vineyard", vine);
+      toast.success(chosen.length === 1 ? "File eliminato" : `${chosen.length} file eliminati`);
+      if (chosen.length === pile.shots.length) onClose(); else stop();
+    } catch {
+      toast.error("Eliminazione non riuscita: controlla la connessione e riprova");
+    } finally { setBusy(false); setAsk(false); }
+  };
+  return (
+    <div className="space-y-3 rounded-2xl bg-foreground/[0.05] p-3">
+      <div className="flex items-center gap-3 px-1">
+        <h4 className="min-w-0 flex-1 text-sm font-semibold tabular-nums">{pile.label}<span className="ml-2 font-medium text-muted-foreground">{selecting ? (picked.size ? `${picked.size} scelti` : "Tocca per scegliere") : countText(pile.shots)}</span></h4>
+        {selecting
+          ? <>
+              <button type="button" onClick={() => setPicked(all ? new Set() : new Set(pile.shots.map(keyOf)))} className="text-sm font-semibold text-foreground outline-none focus-visible:underline">{all ? "Nessuna" : "Tutte"}</button>
+              <button type="button" onClick={stop} className="text-sm font-semibold text-muted-foreground outline-none focus-visible:underline">Annulla</button>
+            </>
+          : <>
+              <button type="button" onClick={() => setSelecting(true)} className="text-sm font-semibold text-foreground outline-none focus-visible:underline">Seleziona</button>
+              <button type="button" onClick={onClose} className="text-sm font-semibold text-muted-foreground outline-none focus-visible:underline">Chiudi</button>
+            </>}
+      </div>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+        {pile.shots.map((s) => selecting ? (
+          <button key={keyOf(s)} type="button" role="checkbox" aria-checked={picked.has(keyOf(s))} aria-label={`${s.kind === "video" ? "Video" : "Foto"} ${s.name}`} onClick={() => flip(s)}
+            className={`relative block aspect-square overflow-hidden rounded-2xl bg-foreground/[0.08] outline-none transition focus-visible:ring-2 focus-visible:ring-ring ${picked.has(keyOf(s)) ? "ring-2 ring-destructive" : "opacity-80"}`}>
+            {s.kind === "video" ? <video src={`${s.url}#t=0.1`} preload="metadata" muted playsInline className="pointer-events-none size-full object-cover" /> : <img src={s.url} alt="" loading="lazy" className="size-full object-cover" />}
+            <span className={`absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full border-2 ${picked.has(keyOf(s)) ? "border-destructive bg-destructive text-white" : "border-white bg-black/35"}`}>{picked.has(keyOf(s)) && <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />}</span>
+          </button>
+        ) : <Thumb key={keyOf(s)} s={s} />)}
+      </div>
+      {selecting && (ask ? (
+        <div role="alertdialog" aria-label="Conferma eliminazione" className="rounded-xl bg-destructive/10 p-3">
+          <p className="text-sm font-medium">{chosen.length === 1 ? "Eliminare questo file?" : `Eliminare ${chosen.length} file?`} Non si possono recuperare.</p>
+          <div className="mt-3 flex gap-2">
+            <button type="button" onClick={() => setAsk(false)} disabled={busy} className="h-11 flex-1 rounded-full bg-foreground/10 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">Annulla</button>
+            <button type="button" onClick={() => void del()} disabled={busy} className="h-11 flex-1 rounded-full bg-destructive text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">{busy ? "Elimino…" : "Elimina"}</button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" onClick={() => setAsk(true)} disabled={!picked.size}
+          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-destructive text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
+          <Trash2 className="size-4" aria-hidden="true" />{picked.size ? `Elimina ${picked.size === 1 ? "1 file" : `${picked.size} file`}` : "Scegli cosa eliminare"}
+        </button>
+      ))}
+    </div>
   );
 }
 

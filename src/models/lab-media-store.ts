@@ -52,6 +52,18 @@ export async function deleteGuestFile(k: MediaKind, id: string) {
   try { await withStore("readwrite", (s) => s.delete(`${k}:${id}`)); } catch { /* ignora */ }
 }
 
+/** Deletes these photos and videos for good: from the account's storage when uploaded, from the device otherwise. */
+export async function removeMedia(k: MediaKind, items: MediaItem[]) {
+  const paths = items.flatMap((i) => (i.path ? [i.path] : []));
+  if (paths.length) {
+    const { error } = await supabase.storage.from(MEDIA_BUCKET).remove(paths);
+    if (error) throw error;
+  }
+  for (const i of items) if (!i.path) { URL.revokeObjectURL(i.url); await deleteGuestFile(k, i.id); }
+  const gone = new Set(items.map((i) => i.id));
+  setMedia(k, (p) => p.filter((x) => !gone.has(x.id)));
+}
+
 export async function deleteAllGuestFiles(k: MediaKind) {
   try {
     const recs = await withStore<GuestRecord[]>("readonly", (s) => s.getAll() as IDBRequest<GuestRecord[]>);
