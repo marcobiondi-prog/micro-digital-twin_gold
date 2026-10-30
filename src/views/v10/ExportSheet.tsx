@@ -329,7 +329,7 @@ export function ExportSheet({ open, onOpenChange, flow, place, author, media, pr
                   </Box>
                   <button type="button" onClick={nextFromCosa} disabled={nothing}
                     className="sticky bottom-0 mt-4 h-[52px] w-full shadow-[0_-14px_20px_-2px_var(--background)] rounded-full bg-foreground text-[15px] font-bold text-background outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
-                    {nothing ? "Scegli almeno un file" : `Avanti · ${summaryText(fileCount, sendMedia ? chosen.length : 0, on.text)}${total ? ` · ${sizeText(total)}` : ""}`}
+                    {nothing ? "Scegli almeno un file" : `Avanti · ${summaryText(fileCount, sendMedia ? countText(chosen) : "", on.text)}${total ? ` · ${sizeText(total)}` : ""}`}
                   </button>
                 </>
               )}
@@ -435,8 +435,8 @@ const countText = (items: MediaItem[]) => {
   if (!items.length) return "Nessuna scelta";
   return [p ? `${p} ${p === 1 ? "foto" : "foto"}` : "", v ? `${v} ${v === 1 ? "video" : "video"}` : ""].filter(Boolean).join(" e ");
 };
-const summaryText = (files: number, media: number, text: boolean) =>
-  [files ? `${files} ${files === 1 ? "file" : "file"}` : "", media ? `${media} foto e video` : "", !files && !media && text ? "il testo" : ""].filter(Boolean).join(" e ");
+const summaryText = (files: number, media: string, text: boolean) =>
+  [files ? `${files} file` : "", media, !files && !media && text ? "il testo" : ""].filter(Boolean).join(" e ");
 
 function fileRows(files: ExportFile[]) {
   const docs = files.filter((f) => !/\.(jpe?g|png|webp|heic|gif|mp4|mov|webm|3gp|m4v)$/i.test(f.name));
