@@ -17,6 +17,7 @@ import { prepareArOrientation } from "@/lib/ar-orientation";
 import { useInstalledApp } from "@/lib/installed-app";
 import { useDemoSignedIn } from "@/lib/demo-login";
 import { registerCaptureHandler } from "@/lib/camera-dock";
+import { AI_STANDBY } from "@/lib/ai-standby";
 import { openSystemCamera, prepareSystemCamera, supportsSystemCapture } from "@/lib/system-camera";
 import { SystemCamera } from "@/views/SystemCamera";
 import { supabase } from "@/integrations/supabase/client";
@@ -217,7 +218,8 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
   // (the preview-only simulated sign-in shows it in a tab too, to try the interface).
   const installedApp = useInstalledApp();
   const demo = useDemoSignedIn();
-  const aiReady = (Boolean(userId) || demo) && (installedApp || demo);
+  // AI_STANDBY: the AI camera is paused for now.
+  const aiReady = !AI_STANDBY && (Boolean(userId) || demo) && (installedApp || demo);
   // The central camera button of the menu starts captures here, inside the same tap.
   const captureRef = useRef<(action: "ai" | "photo" | "video" | "gallery") => void>(() => undefined);
   captureRef.current = (action) => {

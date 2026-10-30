@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { Building2, Camera, Grape, Images, Lock, MapPin, Video, type LucideIcon } from "lucide-react";
+import { Building2, Camera, Grape, Images, Lock, MapPin, Pause, Video, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useInstalledApp } from "@/lib/installed-app";
@@ -11,6 +11,7 @@ import { useProId } from "@/lib/use-pro-id";
 import { useLab } from "@/models/lab-store";
 import { splitLocation } from "@/views/SimulationGrid";
 import aiLogo from "@/assets/ai-logo.png";
+import { AI_STANDBY } from "@/lib/ai-standby";
 
 type Kind = "urban" | "vineyard";
 const kindOf = (pathname: string): Kind | null => (pathname === "/urbano" ? "urban" : pathname === "/vigneto" ? "vineyard" : null);
@@ -19,7 +20,7 @@ const kindOf = (pathname: string): Kind | null => (pathname === "/urbano" ? "urb
 function useAiReady() {
   const { signedIn, demo } = useSignedIn();
   const installed = useInstalledApp();
-  return { signedIn, aiReady: signedIn && (installed || demo) };
+  return { signedIn, aiReady: !AI_STANDBY && signedIn && (installed || demo) };
 }
 
 /** Fotocamera al centro della barra ad arco, rialzata e luminosa (logo AI dopo l'accesso); apre il pannello con tutte le opzioni. */
@@ -140,16 +141,16 @@ export function CameraSheet() {
           </>
         ) : (
           <>
-            {(aiReady || !signedIn) && (
-              <button type="button" onClick={() => (aiReady ? start("ai") : afterClose(openAccount))}
-                className="relative flex items-center gap-4 overflow-hidden rounded-[1.25rem] border border-brand-turquoise/40 bg-[radial-gradient(120%_120%_at_0%_0%,color-mix(in_oklch,var(--brand-turquoise)_32%,transparent),transparent_60%)] bg-muted/60 p-4 text-left outline-none transition-transform active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-ring motion-reduce:active:scale-100">
+            {(aiReady || !signedIn || AI_STANDBY) && (
+              <button type="button" disabled={signedIn && AI_STANDBY} onClick={() => (aiReady ? start("ai") : afterClose(openAccount))}
+                className="relative flex items-center gap-4 overflow-hidden rounded-[1.25rem] border border-brand-turquoise/40 bg-[radial-gradient(120%_120%_at_0%_0%,color-mix(in_oklch,var(--brand-turquoise)_32%,transparent),transparent_60%)] bg-muted/60 p-4 text-left outline-none transition-transform active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 disabled:active:scale-100 motion-reduce:active:scale-100">
                 <span className="relative grid size-16 shrink-0 place-items-center rounded-full border-[3px] border-brand-turquoise bg-background shadow-[0_0_22px_color-mix(in_oklch,var(--brand-turquoise)_45%,transparent)]">
                   <img src={aiLogo} alt="" aria-hidden="true" className="size-8" />
-                  {!aiReady && <span className="absolute -bottom-1 -right-1 grid size-6 place-items-center rounded-full bg-foreground text-background ring-2 ring-card"><Lock className="size-3.5" aria-hidden="true" /></span>}
+                  {!aiReady && <span className="absolute -bottom-1 -right-1 grid size-6 place-items-center rounded-full bg-foreground text-background ring-2 ring-card">{signedIn && AI_STANDBY ? <Pause className="size-3.5" aria-hidden="true" /> : <Lock className="size-3.5" aria-hidden="true" />}</span>}
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-lg font-bold">Fotocamera AI</span>
-                  <span className="block text-sm text-muted-foreground">{aiReady ? "Inquadra una pianta: la riconosce e calcola il fresco" : "Accedi per usarla"}</span>
+                  <span className="flex items-center gap-2 text-lg font-bold">Fotocamera AI{signedIn && AI_STANDBY && <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">In pausa</span>}</span>
+                  <span className="block text-sm text-muted-foreground">{aiReady ? "Inquadra una pianta: la riconosce e calcola il fresco" : signedIn && AI_STANDBY ? "In pausa per ora: tornerà presto" : "Accedi per usarla"}</span>
                   {place && <span className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-full bg-brand-turquoise/15 px-2.5 py-1 text-xs font-semibold text-brand-turquoise"><MapPin className="size-3.5 shrink-0" aria-hidden="true" /><span className="truncate">{place}</span></span>}
                 </span>
               </button>
