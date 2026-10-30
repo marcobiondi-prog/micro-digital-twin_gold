@@ -1132,10 +1132,12 @@ export function ArCamera({
         style={{
           // Finestra sempre stabile a tutto schermo: nessuna rotazione CSS, così l'interfaccia
           // non si sposta né scompare quando il telefono ruota.
+          // Sized by its four edges only: 100vw / 100dvh lag behind an Android rotation in fullscreen (one side
+          // updated, the other not), which left the camera square.
           position: "fixed",
           inset: 0,
-          width: "100vw",
-          height: "100dvh",
+          width: "auto",
+          height: "auto",
           maxWidth: "none",
           maxHeight: "none",
           transform: "none",
@@ -1145,7 +1147,7 @@ export function ArCamera({
           borderRadius: 0,
           display: "block",
         }}
-        overlayClassName="!animate-none !fixed !inset-0 !h-dvh bg-camera-surface"
+        overlayClassName="!animate-none !fixed !inset-0 !h-auto bg-camera-surface"
         className="camera-hud ar-pill-hud !animate-none overflow-hidden border-0 bg-camera-surface text-camera-ink p-0 shadow-none sm:max-h-none sm:rounded-none [&>button]:hidden"
       >
         <DialogTitle className="sr-only">
