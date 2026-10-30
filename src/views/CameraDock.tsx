@@ -34,12 +34,13 @@ export function CameraDockButton({ focused = false }: { focused?: boolean }) {
       type="button"
       onClick={() => setCameraSheetOpen(true)}
       aria-label={aiReady ? "Fotocamera AI e altre opzioni" : building ? "Fotocamera: foto, video e galleria (fotocamera AI in sviluppo, non ancora disponibile)" : "Fotocamera: foto, video e galleria"}
-      className="ps-nav-camera camera-dock-button" data-ai={aiReady || undefined} data-focus={focused || undefined}
+      className="ps-nav-camera camera-dock-button" data-ai={aiReady || undefined} data-building={building || undefined} data-focus={focused || undefined}
     >
+      {/* In development: a turquoise ring filled about halfway, like something still loading. */}
+      {building && <span className="camera-dev-ring" aria-hidden="true" />}
       {aiReady || building
         ? <span className="relative grid place-items-center">
             <img src={aiLogo} alt="" aria-hidden="true" draggable={false} className={cn("size-8 select-none", building && "opacity-55 grayscale-[35%]")} />
-            {building && <span className="absolute -bottom-1.5 -right-2 grid size-[18px] place-items-center rounded-full bg-amber-400 text-black ring-2 ring-[#1b2029]" aria-hidden="true"><Wrench className="size-2.5" strokeWidth={3} /></span>}
           </span>
         : <Camera className="size-7" aria-hidden="true" />}
     </button>
@@ -149,7 +150,7 @@ export function CameraSheet() {
             {(aiReady || !signedIn || AI_STANDBY) && (
               <button type="button" disabled={signedIn && AI_STANDBY} onClick={() => (aiReady ? start("ai") : afterClose(openAccount))}
                 className="relative flex items-center gap-4 overflow-hidden rounded-[1.25rem] border border-brand-turquoise/40 bg-[radial-gradient(120%_120%_at_0%_0%,color-mix(in_oklch,var(--brand-turquoise)_32%,transparent),transparent_60%)] bg-muted/60 p-4 text-left outline-none transition-transform active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 disabled:active:scale-100 motion-reduce:active:scale-100">
-                <span className="relative grid size-16 shrink-0 place-items-center rounded-full border-[3px] border-brand-turquoise bg-background shadow-[0_0_22px_color-mix(in_oklch,var(--brand-turquoise)_45%,transparent)]">
+                <span className={cn("relative grid size-16 shrink-0 place-items-center rounded-full bg-background", signedIn && AI_STANDBY ? "camera-dev-ring-card" : "border-[3px] border-brand-turquoise shadow-[0_0_22px_color-mix(in_oklch,var(--brand-turquoise)_45%,transparent)]")}>
                   <img src={aiLogo} alt="" aria-hidden="true" className="size-8" />
                   {!aiReady && <span className={cn("absolute -bottom-1 -right-1 grid size-6 place-items-center rounded-full ring-2 ring-card", signedIn && AI_STANDBY ? "bg-amber-400 text-black" : "bg-foreground text-background")}>{signedIn && AI_STANDBY ? <Wrench className="size-3.5" aria-hidden="true" /> : <Lock className="size-3.5" aria-hidden="true" />}</span>}
                 </span>

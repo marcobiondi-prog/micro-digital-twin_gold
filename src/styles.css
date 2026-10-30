@@ -1966,6 +1966,13 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .ps-nav-camera::after { content: ""; position: absolute; inset: -6px; border-radius: inherit; box-shadow: 0 0 0 1.5px rgb(140 190 255 / 0.55); animation: ps-camera-halo 2.8s ease-out infinite; pointer-events: none; }
 @keyframes ps-camera-halo { 0% { transform: scale(0.92); opacity: 0.9; } 70%, 100% { transform: scale(1.18); opacity: 0; } }
 .ps-nav-camera:active { transform: scale(0.94); }
+/* AI camera in development (AI_STANDBY): the button's white rim gives way to a turquoise ring filled about halfway. */
+.ps-nav-camera[data-building] { box-shadow: 0 0 18px 2px rgb(120 180 255 / 0.4), 0 10px 22px rgb(0 0 0 / 0.45); }
+.camera-dev-ring, .camera-dev-ring-card::before { content: ""; position: absolute; inset: -3px; border-radius: 999px; pointer-events: none;
+  background: conic-gradient(var(--brand-turquoise) 0 60%, rgb(255 255 255 / 0.22) 60% 100%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px)); mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px)); }
+.camera-dev-ring-card::before { inset: 0; }
+.ps-nav-camera[data-building] img { opacity: 0.6; }
 .ps-nav-camera:focus-visible { box-shadow: 0 0 0 3px #fff, 0 0 26px 4px rgb(103 232 249 / 0.6); }
 @media (prefers-reduced-motion: reduce) { .ps-nav-camera { transition: none; } .ps-nav-camera::after { animation: none; opacity: 0; } .ps-nav-camera:active { transform: none; } }
 
