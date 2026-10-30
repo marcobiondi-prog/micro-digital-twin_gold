@@ -14,7 +14,7 @@ import { CameraDockButton, CameraSheet } from "@/views/CameraDock";
 import { syncAppOrientation } from "@/lib/ar-orientation";
 import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
 import { installUiClicks } from "@/lib/ui-sounds";
-import { reloadFresh } from "@/router";
+import { isChunkError, reloadFresh } from "@/router";
 import { History, Building2, Grape, Info, LayoutDashboard, Lock } from "lucide-react";
 import { useProId, useSyncProId } from "@/lib/use-pro-id";
 import { useDstNotice } from "@/lib/dst-notice";
@@ -41,7 +41,7 @@ function ErrorComponent({ error }: ErrorComponentProps) {
   console.error(error);
   useEffect(() => {
     const msg = String((error as Error)?.message ?? error);
-    if (/Failed to fetch dynamically imported module|Importing a module script failed/i.test(msg)) {
+    if (isChunkError(msg)) {
       const last = Number(sessionStorage.getItem("chunk-reload-at") ?? 0);
       if (Date.now() - last > 10_000) {
         sessionStorage.setItem("chunk-reload-at", String(Date.now()));

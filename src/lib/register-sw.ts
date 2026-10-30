@@ -18,7 +18,8 @@ export async function registerServiceWorker() {
   const reloadOnce = () => {
     if (sessionStorage.getItem("sw-reloaded")) return;
     sessionStorage.setItem("sw-reloaded", "1");
-    window.location.reload();
+    // Clean, not a plain reload: the old worker would serve the same mixed versions again.
+    void import("@/router").then((m) => m.reloadFresh(), () => window.location.reload());
   };
   const stale = (msg: string) =>
     /reading 'component'|dynamically imported module|Importing a module script failed|routeId/.test(msg);

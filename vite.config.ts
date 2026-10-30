@@ -50,7 +50,9 @@ export default defineConfig(({ command }) => ({
             urlPattern: ({ request, url }) =>
               request.mode === "navigate" && !url.pathname.startsWith("/auth/"),
             handler: "NetworkFirst",
-            options: { cacheName: "pages", networkTimeoutSeconds: 4, expiration: { maxEntries: 30 } },
+            // Pages wait for the network and fall back to the saved copy only offline: with a timeout, a slow start of the
+            // server made the worker serve a page of an older version with the new files ("reading 'component'").
+            options: { cacheName: "pages-v2", expiration: { maxEntries: 30 } },
           },
           {
             urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith("/assets/"),
