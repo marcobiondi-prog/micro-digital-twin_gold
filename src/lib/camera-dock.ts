@@ -20,6 +20,20 @@ export function requestCapture(kind: Kind, action: CaptureAction): boolean {
   return true;
 }
 
+// The media panel also takes files shot by the quick camera of the central button (views/QuickCamera).
+const fileHandlers = new Map<Kind, (files: File[]) => void>();
+export function registerFileHandler(kind: Kind, handler: (files: File[]) => void) {
+  fileHandlers.set(kind, handler);
+  return () => { if (fileHandlers.get(kind) === handler) fileHandlers.delete(kind); };
+}
+/** Hands shot files to that simulation's media panel; false while it is not mounted yet. */
+export function deliverFiles(kind: Kind, files: File[]): boolean {
+  const handler = fileHandlers.get(kind);
+  if (!handler) return false;
+  handler(files);
+  return true;
+}
+
 let sheetOpen = false;
 const listeners = new Set<() => void>();
 export function setCameraSheetOpen(open: boolean) { sheetOpen = open; listeners.forEach((l) => l()); }

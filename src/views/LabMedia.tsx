@@ -16,7 +16,7 @@ import { ArCamera } from "@/views/ArCamera";
 import { prepareArOrientation } from "@/lib/ar-orientation";
 import { useInstalledApp } from "@/lib/installed-app";
 import { useDemoSignedIn } from "@/lib/demo-login";
-import { registerCaptureHandler } from "@/lib/camera-dock";
+import { registerCaptureHandler, registerFileHandler } from "@/lib/camera-dock";
 import { openSystemCamera, prepareSystemCamera, supportsSystemCapture } from "@/lib/system-camera";
 import { SystemCamera } from "@/views/SystemCamera";
 import { supabase } from "@/integrations/supabase/client";
@@ -226,6 +226,9 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
     else openCamera(action);
   };
   useEffect(() => registerCaptureHandler(kind, (action) => captureRef.current(action)), [kind]);
+  const addRef = useRef<(files: File[]) => void>(() => undefined);
+  addRef.current = (files) => add(files);
+  useEffect(() => registerFileHandler(kind, (files) => addRef.current(files)), [kind]);
 
   useEffect(() => {
     void supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
