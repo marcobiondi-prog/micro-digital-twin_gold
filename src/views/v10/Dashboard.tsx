@@ -9,6 +9,7 @@ import { heatStep, heatWords, piazzaMix, piazzaSummary, thirstStep, thirstWords,
 import { euroRange, grouped } from "@/models/intervention-cost";
 import { SEASONS, SEASON_LABEL, type Season } from "@/models/season-climate";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
+import { zoneSummaryRows } from "@/models/drawn-area";
 import { getSeasonalClimate } from "@/controllers/climate.functions";
 import { GAIN_BG, GAIN_TEXT } from "@/views/v7/studio-ui";
 import { openSimTab, type SimKind } from "@/views/v8/console";
@@ -199,6 +200,22 @@ export const URBAN_LOCKED: Locked[] = [
 ];
 
 /** Piazza: the summary of the project, then its records (the free log, then the Premium approvals and AI plan). */
+/** The zones drawn inside the area (free zones, zones for one intervention, lots with their share of the cost), if any. */
+function ZoneRows({ rows }: { rows: Array<[string, string]> }) {
+  if (!rows.length) return null;
+  return (
+    <DashSection title="Zone dell'area">
+      <DashCard className="py-1 sm:py-1">
+        <dl className="divide-y divide-foreground/10">
+          {rows.map(([k, v]) => (
+            <div key={k} className="flex items-baseline justify-between gap-4 py-3"><dt className="text-sm text-muted-foreground">{k}</dt><dd className="text-right text-[15px] font-medium tabular-nums">{v}</dd></div>
+          ))}
+        </dl>
+      </DashCard>
+    </DashSection>
+  );
+}
+
 export function PiazzaDashboard({ records }: { records: ReactNode }) {
   const urban = useLab().urban;
   const reduce = useReducedMotion();
@@ -260,6 +277,7 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
           note="Costi indicativi IVA esclusa, da verificare con un preventivo."
           rows={piazzaMix(urban, sum).map((r, i) => ({ ...r, icon: [TreePine, Sun, Umbrella][i]! }))} />
       </DashSection>
+      <ZoneRows rows={zoneSummaryRows(urban.area, urban.location, sum.cost, empty, euroRange)} />
 
       {records}
     </div>
@@ -317,6 +335,7 @@ export function VineDashboard({ records }: { records: ReactNode }) {
           note={same ? "Costi indicativi IVA esclusa, da verificare con un preventivo." : "Media delle tre zone (ognuna ha il suo intervento). Costi indicativi IVA esclusa."}
           rows={vineMixRows(sum).map((r, i) => ({ ...r, icon: [Droplets, Umbrella, Wind][i]! }))} />
       </DashSection>
+      <ZoneRows rows={zoneSummaryRows(vine.area, vine.location, sum.cost, empty, euroRange)} />
 
       {records}
     </div>

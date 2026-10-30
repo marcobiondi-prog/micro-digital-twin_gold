@@ -33,6 +33,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { heatStep, heatWords, piazzaMix, piazzaSummary, thirstStep, thirstWords, vineMixRows, vineSummary } from "@/models/project-summary";
 import { SEASON_LABEL, type Season } from "@/models/season-climate";
 import { euroRange, grouped } from "@/models/intervention-cost";
+import { zoneSummaryRows } from "@/models/drawn-area";
 import climateTwinLogo from "@/assets/climate-twin-logo-final.png";
 import climateTwinLogoCompact from "@/assets/climate-twin-logo-compact.png";
 
@@ -464,6 +465,8 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
       ["Livello", ps.level ?? "Nessun intervento"],
       ["Costo indicativo", ps.empty ? "Nessun intervento" : euroRange(ps.cost)],
       ["Superficie", `${grouped(ps.m2)} m² ${ps.drawn ? "disegnati sulla mappa" : ps.measured ? "della piazza" : "di riferimento"}`],
+      // The zones drawn inside the area: free ones, zones for one intervention, lots with their share of the cost.
+      ...zoneSummaryRows(u.area, u.location, ps.cost, ps.empty, euroRange),
     ]
     : [
       ["Luogo", v.location.label],
@@ -472,6 +475,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
       ["Livello", vs.level ?? "Nessun intervento"],
       ["Costo indicativo", vs.empty ? "Nessun intervento" : euroRange(vs.cost)],
       ["Superficie", vs.drawn ? `${grouped(vs.m2)} m² disegnati sulla mappa` : vs.measured ? `${grouped(vs.m2)} m² del vigneto` : "1 ettaro di riferimento"],
+      ...zoneSummaryRows(v.area, v.location, vs.cost, vs.empty, euroRange),
     ];
   const benefits: Array<[string, string]> = ctx === "Urbano"
     ? [[`${ps.co2} kg`, "CO2 l'anno"], [`${grouped(ps.water)} m³`, "Pioggia tenuta"], [`${grouped(ps.shadeM2)} m²`, "All'ombra"]]

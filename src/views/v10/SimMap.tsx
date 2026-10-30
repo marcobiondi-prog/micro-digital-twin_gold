@@ -8,9 +8,9 @@ import { cn } from "@/lib/utils";
 import { setUrban, setVineyard, useLab, vineMetrics } from "@/models/lab-store";
 import { piazzaLayout, vineLayout, type LayoutEdits } from "@/models/area-layout";
 import { vineMixOf, zoneMixOf } from "@/models/vine-interventions";
-import { SIM_COLORS, thirstColor, type SimLayout } from "@/views/v10/map-area";
+import { SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import type { MovedPart } from "@/views/v10/SatelliteMap2D";
-import { drawnAreaFor, MAX_PINS, pinsM2, surfaceText } from "@/models/drawn-area";
+import { drawnAreaFor, freeM2, lotsOf, MAX_PINS, pinsM2, surfaceText, usableM2, ZONE_KINDS, ZONE_LABEL, zoneName, zonesOfArea, type DrawnArea, type SubArea, type ZoneKind } from "@/models/drawn-area";
 import type { Ring } from "@/models/place-area";
 import type { SimKind } from "@/views/v8/console";
 import { PlaceSearch } from "@/views/SimulationGrid";
@@ -45,10 +45,15 @@ export function SimMap({ kind }: { kind: SimKind }) {
   const [drawing, setDrawing] = useState(false);
   const [draft, setDraft] = useState<Ring>([]);
   useEffect(() => { setDrawing(false); }, [loc.lat, loc.lng]);
-  const ring = drawing ? draft : saved?.ring ?? [];
+  // Drawing a smaller zone inside the saved area: its kind and pins (the big outline stays shown, taps outside are refused).
+  const [zoneKind, setZoneKind] = useState<ZoneKind | null>(null);
+  const [zoneDraft, setZoneDraft] = useState<Ring>([]);
+  useEffect(() => { setZoneKind(null); }, [loc.lat, loc.lng]);
+  const drawingZone = zoneKind !== null && !!saved;
+  const ring = drawing ? draft : drawingZone ? zoneDraft : saved?.ring ?? [];
   const save = (r: Ring | null) => {
-    // A new outline lays the simulation out afresh (hand edits belonged to the old one).
-    const area = r && r.length >= 3 ? { lat: loc.lat, lng: loc.lng, ring: r } : null;
+    // A new outline lays the simulation out afresh (hand edits belonged to the old one); the zones inside it stay.
+    const area = r && r.length >= 3 ? { lat: loc.lat, lng: loc.lng, ring: r, ...(saved?.zones?.length ? { zones: saved.zones } : {}) } : null;
     if (kind === "urban") setUrban({ area }); else setVineyard({ area });
   };
   const startDrawing = () => { setView("2d"); setDraft(saved?.ring ?? []); setDrawing(true); };
@@ -63,15 +68,28 @@ export function SimMap({ kind }: { kind: SimKind }) {
   useEffect(() => { if (!saved) setArranging(false); }, [saved]);
   const sim = useMemo<SimLayout | null>(() => {
     if (!saved) return null;
-    const edits = saved.edits ?? {};
+    const edits = saved.edits ?? {}, inner = zonesOfArea(saved);
     if (kind === "urban") {
-      const data = piazzaLayout(saved.ring, lab.urban.trees, lab.urban.permeable, lab.urban.shade, edits);
-      return data ? { kind: "piazza", data } : null;
+      const data = piazzaLayout(saved.ring, lab.urban.trees, lab.urban.permeable, lab.urban.shade, edits, inner);
+      return data ? { kind: "piazza", data, inner } : null;
     }
     const v = lab.vineyard, fallback = vineMixOf(v);
-    const data = vineLayout(saved.ring, v.zones.map((z) => zoneMixOf(z, fallback)), edits);
-    return data ? { kind: "vigneto", data, thirst: vineMetrics(v).results.map((r) => r.s) } : null;
+    const data = vineLayout(saved.ring, v.zones.map((z) => zoneMixOf(z, fallback)), edits, inner);
+    return data ? { kind: "vigneto", data, thirst: vineMetrics(v).results.map((r) => r.s), inner } : null;
   }, [saved, kind, lab.urban, lab.vineyard]);
+  const setZones = (zones: SubArea[]) => {
+    if (!saved) return;
+    const area = { ...saved, zones };
+    if (kind === "urban") setUrban({ area }); else setVineyard({ area });
+  };
+  const startZone = (k: ZoneKind) => { setArranging(false); setView("2d"); setZoneDraft([]); setZoneKind(k); };
+  const finishZone = () => {
+    if (!saved || !zoneKind) return;
+    if (zoneDraft.length < 3) { toast("Servono almeno 3 pin per chiudere la zona"); return; }
+    const z: SubArea = { id: crypto.randomUUID?.() ?? String(Date.now()), kind: zoneKind, ring: zoneDraft, name: zoneName(saved, zoneKind) };
+    setZones([...zonesOfArea(saved), z]); setZoneKind(null);
+    toast.success(`${z.name} aggiunta`, { description: `${surfaceText(pinsM2(zoneDraft))}${zoneKind === "libera" ? ": tolti dalla superficie dei costi." : "."}` });
+  };
   const setEdits = (edits: LayoutEdits) => {
     if (!saved) return;
     const area = { ...saved, edits };
@@ -120,12 +138,20 @@ export function SimMap({ kind }: { kind: SimKind }) {
             ? <LocationMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} apiKey={key} area={ring} sim={sim}
               fallback={<OpenMap3D lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />} />
             : <OpenMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />}</Suspense>
-          : <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={zoom} area={ring} drawing={drawing} onAreaChange={setDraft} sim={sim} arranging={arranging} onMove={moved} /></Suspense>}
+          : <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={zoom} area={ring} drawing={drawing || drawingZone}
+            onAreaChange={drawingZone ? setZoneDraft : setDraft} sim={sim} arranging={arranging} onMove={moved}
+            outline={drawingZone ? saved?.ring ?? null : null} onOutside={() => toast("La zona va dentro l'area disegnata")} /></Suspense>}
       </div>
+      {drawingZone ? (
+        <ZoneDrawBar kind={zoneKind!} pins={zoneDraft.length} m2={zoneDraft.length >= 3 ? pinsM2(zoneDraft) : null}
+          onUndo={() => setZoneDraft((d) => d.slice(0, -1))} onCancel={() => setZoneKind(null)} onFinish={finishZone} />
+      ) : <>
       <AreaBar drawing={drawing} pins={ring.length} m2={ring.length >= 3 ? pinsM2(ring) : null} saved={!!saved} vineyard={kind === "vineyard"}
         onStart={() => { setArranging(false); startDrawing(); }} onUndo={() => setDraft((d) => d.slice(0, -1))} onCancel={() => setDrawing(false)} onFinish={finish} onRemove={remove} />
       {sim && !drawing && <SimBar sim={sim} arranging={arranging} edited={!!saved?.edits && Object.keys(saved.edits).length > 0}
         onArrange={() => { setView("2d"); setArranging((a) => !a); }} onAuto={() => { setEdits({}); toast("Disposizione automatica ripristinata"); }} />}
+      {saved && !drawing && <ZonesBar area={saved} flow={kind === "urban" ? "piazza" : "vigneto"} onAdd={startZone} onRemove={(id) => setZones(zonesOfArea(saved).filter((z) => z.id !== id))} />}
+      </>}
     </div>
   );
 }
@@ -205,6 +231,71 @@ function SimBar({ sim, arranging, edited, onArrange, onAuto }: { sim: SimLayout;
         </button>
         {edited && <button type="button" onClick={onAuto} className={cn(barBtn, "bg-foreground/[0.08]")}><RotateCcw className="size-4" aria-hidden="true" />Disposizione automatica</button>}
       </div>
+    </div>
+  );
+}
+
+const ZONE_HINT: Record<ZoneKind, string> = {
+  libera: "Resta vuota (una fontana, una strada, un parcheggio) e la sua superficie si toglie dai costi.",
+  alberi: "Gli alberi della simulazione vanno qui dentro.",
+  prato: "Qui c'è prato, poi il resto della percentuale dove c'è posto.",
+  ombra: "Qui c'è un pergolato, poi il resto della percentuale dove c'è posto.",
+  lotto: "Una parte del progetto, con la sua superficie e la sua quota di costo.",
+};
+
+/** Drawing a zone inside the area: what it is, its pins and surface so far, Ultimo pin, Esci, Fine. */
+function ZoneDrawBar({ kind, pins, m2, onUndo, onCancel, onFinish }: { kind: ZoneKind; pins: number; m2: number | null; onUndo: () => void; onCancel: () => void; onFinish: () => void }) {
+  return (
+    <div role="group" aria-label={`Disegna la zona: ${ZONE_LABEL[kind]}`} className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4">
+      <p className="flex items-center gap-2 text-[15px] font-semibold"><span className="size-3 rounded-[3px]" style={{ background: ZONE_COLORS[kind] }} aria-hidden="true" />Zona: {ZONE_LABEL[kind]}</p>
+      <p className="text-sm text-muted-foreground" aria-live="polite">{pins === 0 ? `Tocca dentro l'area sugli angoli della zona. ${ZONE_HINT[kind]}` : `${pins} pin${m2 !== null ? ` · ${surfaceText(m2)}` : " · ne servono almeno 3"}`}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={onUndo} disabled={pins === 0} className={cn(barBtn, "bg-foreground/[0.08]")}><Undo2 className="size-4" aria-hidden="true" />Ultimo pin</button>
+        <button type="button" onClick={onCancel} className={cn(barBtn, "bg-foreground/[0.08]")}><X className="size-4" aria-hidden="true" />Esci</button>
+        <button type="button" onClick={onFinish} disabled={pins < 3} className={cn(barBtn, "ml-auto bg-foreground text-background")}><Check className="size-4" aria-hidden="true" />Fine</button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The smaller zones inside the area: each with its colour, name and surface (lots with their share), a bin to remove
+ * it, the surface left free and the one that takes interventions; "Aggiungi zona" offers the kinds of this simulation.
+ */
+function ZonesBar({ area, flow, onAdd, onRemove }: { area: DrawnArea; flow: "piazza" | "vigneto"; onAdd: (k: ZoneKind) => void; onRemove: (id: string) => void }) {
+  const [choosing, setChoosing] = useState(false);
+  const zones = zonesOfArea(area), lots = lotsOf(area), free = freeM2(area);
+  const shareOf = (id: string) => lots.find((l) => l.id === id)?.share;
+  return (
+    <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4">
+      <p className="text-[15px] font-semibold">Zone dentro l'area</p>
+      {zones.length > 0 ? (
+        <ul className="divide-y divide-foreground/10">
+          {zones.map((z) => (
+            <li key={z.id} className="flex items-center gap-3 py-2.5">
+              <span className="size-3 shrink-0 rounded-[3px]" style={{ background: ZONE_COLORS[z.kind] }} aria-hidden="true" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[15px] font-medium">{z.kind === "lotto" ? z.name : ZONE_LABEL[z.kind]}</span>
+                <span className="block text-sm text-muted-foreground">{surfaceText(pinsM2(z.ring))}{z.kind === "lotto" && shareOf(z.id) !== undefined ? ` · ${Math.round(shareOf(z.id)! * 100)}% del costo` : z.kind === "libera" ? " · esclusa dai costi" : ""}</span>
+              </span>
+              <button type="button" onClick={() => onRemove(z.id)} aria-label={`Cancella la zona ${z.name ?? ZONE_LABEL[z.kind]}`} className="grid size-10 shrink-0 place-items-center rounded-full bg-foreground/[0.08] outline-none focus-visible:ring-2 focus-visible:ring-ring"><Trash2 className="size-4" aria-hidden="true" /></button>
+            </li>
+          ))}
+        </ul>
+      ) : <p className="text-sm text-muted-foreground">Disegna dentro l'area le parti da lasciare libere, quelle con un intervento preciso o i lotti del progetto.</p>}
+      {free > 0 && <p className="text-sm text-muted-foreground">Superficie per gli interventi: <span className="font-semibold text-foreground">{surfaceText(usableM2(area))}</span> ({surfaceText(free)} lasciati liberi)</p>}
+      {choosing ? (
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Che zona vuoi disegnare?">
+          {ZONE_KINDS[flow].map((k) => (
+            <button key={k} type="button" onClick={() => { setChoosing(false); onAdd(k); }} className={cn(barBtn, "bg-foreground/[0.08]")}>
+              <span className="size-3 rounded-[3px]" style={{ background: ZONE_COLORS[k] }} aria-hidden="true" />{ZONE_LABEL[k]}
+            </button>
+          ))}
+          <button type="button" onClick={() => setChoosing(false)} className={cn(barBtn, "text-muted-foreground")}><X className="size-4" aria-hidden="true" />Annulla</button>
+        </div>
+      ) : (
+        <button type="button" onClick={() => setChoosing(true)} className={cn(barBtn, "bg-foreground/[0.08]")}><PenLine className="size-4" aria-hidden="true" />Aggiungi zona</button>
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { urbanMetrics, vineMetrics, type LabState } from "./lab-store";
-import { drawnAreaFor, pinsM2 } from "./drawn-area";
+import { drawnAreaFor, pinsM2, usableM2, zonesOfArea } from "./drawn-area";
 
 export type ExportFlow = "urban" | "vineyard";
 type ExportValue = string | number | boolean;
@@ -43,10 +43,17 @@ export function scenarioGeoJson(state: LabState, flow: ExportFlow, exportedAt: s
   const drawn = area ? [{
     type: "Feature" as const, id: `${flow}-drawn-area`,
     geometry: { type: "Polygon" as const, coordinates: [[...area.ring, area.ring[0]!].map(([lat, lng]) => [lng, lat])] as unknown[] },
-    properties: { flow, record_id: `${flow}-drawn-area`, location: place.label, area_m2: pinsM2(area.ring), pins: area.ring.length,
+    properties: { flow, record_id: `${flow}-drawn-area`, location: place.label, area_m2: pinsM2(area.ring), usable_m2: usableM2(area), pins: area.ring.length,
       data_type: "drawn_area", georeference: "drawn_by_user", coordinate_reference_system: "EPSG:4326", exported_at: exportedAt } as Record<string, ExportValue>,
   }] : [];
-  return { type: "FeatureCollection" as const, features: [...points, ...drawn] };
+  // The smaller zones drawn inside it, each a polygon with its kind (libera, alberi, prato, ombra, lotto).
+  const inner = area ? zonesOfArea(area).map((z) => ({
+    type: "Feature" as const, id: `${flow}-zone-${z.id}`,
+    geometry: { type: "Polygon" as const, coordinates: [[...z.ring, z.ring[0]!].map(([lat, lng]) => [lng, lat])] as unknown[] },
+    properties: { flow, record_id: `${flow}-zone-${z.id}`, zone_kind: z.kind, zone_name: z.name ?? z.kind, area_m2: pinsM2(z.ring),
+      data_type: "drawn_zone", georeference: "drawn_by_user", coordinate_reference_system: "EPSG:4326", exported_at: exportedAt } as Record<string, ExportValue>,
+  })) : [];
+  return { type: "FeatureCollection" as const, features: [...points, ...drawn, ...inner] };
 }
 
 function csvCell(value: ExportValue): string {

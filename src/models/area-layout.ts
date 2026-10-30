@@ -72,10 +72,10 @@ const dist = (a: [number, number], b: [number, number]) => Math.hypot(a[0] - b[0
 const nearestCell = (cells: Cell[], p: [number, number]) => cells.reduce((b, c) => (dist([c.x, c.y], p) < dist([b.x, b.y], p) ? c : b), cells[0]!);
 
 /** Up to `n` tree spots spread evenly inside the area, kept 2 m from its edge. */
-function treeSpots(ring: Ring, f: Frame, n: number, box: { minX: number; maxX: number; minY: number; maxY: number }): Array<[number, number]> {
+function treeSpots(ring: Ring, f: Frame, n: number, box: { minX: number; maxX: number; minY: number; maxY: number }, allowed: (x: number, y: number) => boolean = () => true, room = ringAreaM2(ring)): Array<[number, number]> {
   if (n <= 0) return [];
-  const area = ringAreaM2(ring);
-  const fits = (x: number, y: number) => [[0, 0], [2, 0], [-2, 0], [0, 2], [0, -2]].every(([dx, dy]) => inside(ring, f, x + dx!, y + dy!));
+  const area = room;
+  const fits = (x: number, y: number) => allowed(x, y) && [[0, 0], [2, 0], [-2, 0], [0, 2], [0, -2]].every(([dx, dy]) => inside(ring, f, x + dx!, y + dy!));
   let t = Math.sqrt(area / n), spots: Array<[number, number]> = [];
   for (let k = 0; k < 40; k++) {
     spots = [];
@@ -88,10 +88,24 @@ function treeSpots(ring: Ring, f: Frame, n: number, box: { minX: number; maxX: n
   return Array.from({ length: n }, (_, i) => spots[Math.floor(((i + 0.5) * spots.length) / n)]!);
 }
 
-/** The piazza inside the area: `trees` trees, `lawn` % of it lawn, `shade` % of it under shade, with the hand edits. */
-export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: number, edits: LayoutEdits = {}): PiazzaLayout | null {
+/** A smaller area inside the big one (models/drawn-area SubArea, its kind only matters here). */
+export type InnerZone = { kind: string; ring: Ring };
+
+const inZone = (f: Frame, zones: InnerZone[], kind: string) => {
+  const rings = zones.filter((z) => z.kind === kind && z.ring.length >= 3).map((z) => z.ring);
+  return (x: number, y: number) => { if (!rings.length) return false; const [lat, lng] = toLL(f, x, y); return rings.some((r) => ringContains(r, lat, lng)); };
+};
+
+/**
+ * The piazza inside the area: `trees` trees, `lawn` % of it lawn, `shade` % of it under shade, with the hand edits and
+ * the smaller zones inside it: nothing goes in a zone left free (and its cells do not count); a "prato" or "ombra" zone
+ * is lawn or pergola first, the rest of the lever's share placed automatically; with "alberi" zones the trees go in them.
+ */
+export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: number, edits: LayoutEdits = {}, zones: InnerZone[] = []): PiazzaLayout | null {
   if (ring.length < 3) return null;
-  const { f, c, cells, minX, maxX, minY, maxY } = cellsOf(ring);
+  const grid = cellsOf(ring), { f, c, minX, maxX, minY, maxY } = grid;
+  const isFree = inZone(f, zones, "libera"), isLawn = inZone(f, zones, "prato"), isShade = inZone(f, zones, "ombra"), isTrees = inZone(f, zones, "alberi");
+  const cells = grid.cells.filter((x) => !isFree(x.x, x.y));
   if (!cells.length) return null;
   const cy = (minY + maxY) / 2;
   // By default the lawn gathers on the west side and the shade on the east; a hand edit moves either centre.
@@ -100,23 +114,40 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
   const byDist = (p: [number, number]) => (a: Cell, b: Cell) => dist([a.x, a.y], p) - dist([b.x, b.y], p);
   const nLawn = Math.round((Math.max(0, Math.min(100, lawn)) / 100) * cells.length);
   const nShade = Math.round((Math.max(0, Math.min(100, shade)) / 100) * cells.length);
-  const lawnCells = [...cells].sort(byDist(lawnAt)).slice(0, nLawn);
-  const taken = new Set(lawnCells);
-  const shadeCells = cells.filter((x) => !taken.has(x)).sort(byDist(shadeAt)).slice(0, nShade);
-  // Trees stand outside the pergolas: spots under a shade cell are skipped (looked for on a finer grid), unless there is no room.
+  // The zones drawn for lawn or pergola come first (only while the lever has some), then the rest of the share around its centre.
+  const fixedLawn = nLawn ? cells.filter((x) => isLawn(x.x, x.y)) : [];
+  const fixedShade = nShade ? cells.filter((x) => isShade(x.x, x.y) && !fixedLawn.includes(x)) : [];
+  const reserved = new Set([...fixedLawn, ...fixedShade]);
+  // The automatic lawn and pergolas keep off the zones drawn for trees, unless there is no other room.
+  const forTrees = new Set(cells.filter((x) => isTrees(x.x, x.y)));
+  const pool = (skip: Set<Cell>, need: number) => {
+    const open = cells.filter((x) => !skip.has(x) && !forTrees.has(x));
+    return open.length >= need ? open : cells.filter((x) => !skip.has(x));
+  };
+  const lawnNeed = Math.max(0, nLawn - fixedLawn.length);
+  const lawnCells = [...fixedLawn, ...pool(reserved, lawnNeed).sort(byDist(lawnAt)).slice(0, lawnNeed)];
+  const taken = new Set([...lawnCells, ...fixedShade]);
+  const shadeNeed = Math.max(0, nShade - fixedShade.length);
+  const shadeCells = [...fixedShade, ...pool(taken, shadeNeed).sort(byDist(shadeAt)).slice(0, shadeNeed)];
+  // Trees stand outside the pergolas and the free zones, inside the "alberi" zones when there are any; spots under a
+  // shade cell are skipped (looked for on a finer grid), unless there is no room.
   const n = Math.max(0, Math.round(trees)), box = { minX, maxX, minY, maxY };
+  const treeZones = zones.filter((z) => z.kind === "alberi" && z.ring.length >= 3);
+  const room = treeZones.length ? treeZones.reduce((s2, z) => s2 + ringAreaM2(z.ring), 0) : ringAreaM2(ring);
+  const allowed = (x: number, y: number) => !isFree(x, y) && (!treeZones.length || isTrees(x, y));
   const underShade = (x: number, y: number) => shadeCells.some((sc) => Math.abs(sc.x - x) <= c / 2 + 1 && Math.abs(sc.y - y) <= c / 2 + 1);
-  let auto = treeSpots(ring, f, n, box);
+  let auto = treeSpots(ring, f, n, box, allowed, room);
   if (shadeCells.length && auto.some(([x, y]) => underShade(x, y))) {
-    const free = treeSpots(ring, f, Math.ceil(n / Math.max(0.15, 1 - shadeCells.length / cells.length)) + 4, box).filter(([x, y]) => !underShade(x, y));
+    const free = treeSpots(ring, f, Math.ceil(n / Math.max(0.15, 1 - shadeCells.length / cells.length)) + 4, box, allowed, room).filter(([x, y]) => !underShade(x, y));
     if (free.length >= n) auto = Array.from({ length: n }, (_, i) => free[Math.floor(((i + 0.5) * free.length) / n)]!);
   }
   const placed = auto.map((p, i) => edits.trees?.[i] ?? toLL(f, p[0], p[1]));
+  const rest = cells.filter((x) => !new Set(lawnCells).has(x));
   return {
     trees: placed, cell: c,
     patches: [...strips(f, c, lawnCells, "lawn"), ...strips(f, c, shadeCells, "shade")],
-    lawnAt: toLL(f, ...(nLawn ? (() => { const n = nearestCell(cells, lawnAt); return [n.x, n.y] as [number, number]; })() : lawnAt)),
-    shadeAt: toLL(f, ...(nShade ? (() => { const n = nearestCell(cells.filter((x) => !taken.has(x)).length ? cells.filter((x) => !taken.has(x)) : cells, shadeAt); return [n.x, n.y] as [number, number]; })() : shadeAt)),
+    lawnAt: toLL(f, ...(nLawn ? (() => { const m = nearestCell(cells, lawnAt); return [m.x, m.y] as [number, number]; })() : lawnAt)),
+    shadeAt: toLL(f, ...(nShade ? (() => { const m = nearestCell(rest.length ? rest : cells, shadeAt); return [m.x, m.y] as [number, number]; })() : shadeAt)),
   };
 }
 
@@ -127,9 +158,12 @@ export type ZoneMix = { irrigation: number; shade: number; windbreak: number };
  * with more irrigation), its shade cloth (that share of its cells, from the north) and a windbreak along the side
  * nearest `windAt` (the west side by default), as thick as its strength.
  */
-export function vineLayout(ring: Ring, mixes: ZoneMix[], edits: LayoutEdits = {}): VineLayout | null {
+export function vineLayout(ring: Ring, mixes: ZoneMix[], edits: LayoutEdits = {}, inner: InnerZone[] = []): VineLayout | null {
   if (ring.length < 3) return null;
-  const { f, c, cells, xy } = cellsOf(ring);
+  const grid = cellsOf(ring), { f, c, xy } = grid;
+  // Nothing grows in a zone left free: its cells are not part of the vineyard's zones.
+  const isFree = inZone(f, inner, "libera");
+  const cells = grid.cells.filter((x) => !isFree(x.x, x.y));
   if (!cells.length) return null;
   const n = Math.max(1, mixes.length);
   const sorted = [...cells].sort((a, b) => a.x - b.x || a.y - b.y);

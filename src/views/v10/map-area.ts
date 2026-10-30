@@ -1,5 +1,6 @@
 import type { Map as MlMap, GeoJSONSource } from "maplibre-gl";
 import type { Ring } from "@/models/place-area";
+import { ZONE_LABEL, type SubArea, type ZoneKind } from "@/models/drawn-area";
 import { PERGOLA_COLORS, pergolaParts, TREE_RADIUS_M, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
 
 /** The drawn area on a maplibre map: a turquoise fill and a white outline, from a ring of [lat, lng] pins. */
@@ -21,6 +22,16 @@ export function addAreaLayers(map: MlMap) {
   map.addLayer({ id: "drawn-area-line", type: "line", source: AREA_SOURCE, filter: ["==", ["geometry-type"], "LineString"], paint: { "line-color": "#ffffff", "line-width": 2.5 }, layout: { "line-join": "round", "line-cap": "round" } });
 }
 
+/** While drawing a zone inside it: the big area's outline, white and still, around the zone being drawn. */
+export const OUTLINE_SOURCE = "drawn-outline";
+export function setOutlineData(map: MlMap, ring: Ring | null) {
+  if (!map.getSource(OUTLINE_SOURCE)) {
+    map.addSource(OUTLINE_SOURCE, { type: "geojson", data: areaGeoJson([]) });
+    map.addLayer({ id: "drawn-outline-line", type: "line", source: OUTLINE_SOURCE, filter: ["==", ["geometry-type"], "LineString"], paint: { "line-color": "#ffffff", "line-width": 2, "line-opacity": 0.7 } });
+  }
+  (map.getSource(OUTLINE_SOURCE) as GeoJSONSource | undefined)?.setData(areaGeoJson(ring ?? []));
+}
+
 export function setAreaData(map: MlMap, ring: Ring, closed = true) {
   (map.getSource(AREA_SOURCE) as GeoJSONSource | undefined)?.setData(areaGeoJson(ring, closed));
 }
@@ -36,7 +47,12 @@ export function pinElement(n: number, drawing: boolean): HTMLElement {
 
 // ——— The simulation drawn inside the area (models/area-layout) ———
 
-export type SimLayout = { kind: "piazza"; data: PiazzaLayout } | { kind: "vigneto"; data: VineLayout; thirst: number[] };
+/** `inner`: the smaller areas drawn inside the big one (free zones, zones for one intervention, lots). */
+export type SimLayout = ({ kind: "piazza"; data: PiazzaLayout } | { kind: "vigneto"; data: VineLayout; thirst: number[] }) & { inner?: SubArea[] };
+/** The outline colour of each kind of inner zone. */
+export const ZONE_COLORS: Record<ZoneKind, string> = { libera: "#cbd5e1", alberi: "#4ade80", prato: "#86efac", ombra: PERGOLA_COLORS.slat, lotto: "#fbbf24" };
+/** A zone's short name on the map. */
+export const zoneTag = (z: SubArea) => (z.kind === "lotto" ? z.name ?? "Lotto" : z.kind === "libera" ? "Libera" : ZONE_LABEL[z.kind]);
 export const SIM_SOURCE = "sim-layout";
 export const SIM_TREES_3D = "sim-trees-3d";
 
@@ -68,8 +84,17 @@ export function simFeatures(sim: SimLayout | null, withTreePoints: boolean) {
       ? { kind: "drip", color: SIM_COLORS.drip, width: 2 }
       : { kind: "wind", color: SIM_COLORS.wind, width: 3 + (l.strength ?? 0) / 14 }));
   }
+  // The inner zones: a free zone greyed, every zone outlined with a dashed line of its colour.
+  for (const z of sim.inner ?? []) {
+    if (z.ring.length < 3) continue;
+    if (z.kind === "libera") out.push(poly(z.ring, { kind: "free", color: "#475569", opacity: 0.55 }));
+    out.push(lineF([...z.ring, z.ring[0]!], { kind: "zoneline", color: ZONE_COLORS[z.kind], width: 2.5 }));
+  }
   return fc(out);
 }
+
+/** The centre of a ring (mean of its pins), for a zone's tag. */
+export const ringCentre = (ring: Ring): [number, number] => [ring.reduce((a, p) => a + p[0], 0) / ring.length, ring.reduce((a, p) => a + p[1], 0) / ring.length];
 
 /** What stands up in 3D: each tree (trunk and pointed crown) and a wooden pergola over each shade strip. */
 export const treeCrowns = (sim: SimLayout | null) => fc(sim?.kind === "piazza"
@@ -103,7 +128,7 @@ export function addSimLayers(map: MlMap, lat: number, raised = false) {
   if (!map.hasImage(SLATS_IMAGE)) map.addImage(SLATS_IMAGE, slatsImage());
   map.addLayer({ id: "sim-pergola", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "shade"], paint: { "fill-pattern": SLATS_IMAGE, "fill-opacity": 0.95 } }, before);
   map.addLayer({ id: "sim-pergola-frame", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "shade"], paint: { "line-color": PERGOLA_COLORS.beam, "line-width": 1.5 } }, before);
-  map.addLayer({ id: "sim-line", type: "line", source: SIM_SOURCE, filter: ["==", ["geometry-type"], "LineString"], paint: { "line-color": ["get", "color"], "line-width": ["get", "width"], "line-dasharray": ["case", ["==", ["get", "kind"], "drip"], ["literal", [2, 1.5]], ["literal", [1, 0]]] }, layout: { "line-cap": "round" } }, before);
+  map.addLayer({ id: "sim-line", type: "line", source: SIM_SOURCE, filter: ["==", ["geometry-type"], "LineString"], paint: { "line-color": ["get", "color"], "line-width": ["get", "width"], "line-dasharray": ["case", ["==", ["get", "kind"], "drip"], ["literal", [2, 1.5]], ["==", ["get", "kind"], "zoneline"], ["literal", [2.5, 1.5]], ["literal", [1, 0]]] }, layout: { "line-cap": "round" } }, before);
   if (raised) {
     map.addSource(SIM_TREES_3D, { type: "geojson", data: fc([]) });
     map.addLayer({ id: "sim-trees-3d", type: "fill-extrusion", source: SIM_TREES_3D, paint: { "fill-extrusion-color": ["get", "color"], "fill-extrusion-base": ["get", "base"], "fill-extrusion-height": ["get", "height"], "fill-extrusion-opacity": 1, "fill-extrusion-vertical-gradient": true } });

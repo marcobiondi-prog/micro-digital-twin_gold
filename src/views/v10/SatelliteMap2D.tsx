@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap, Marker } from "maplibre-gl";
 import type { Ring } from "@/models/place-area";
 import { MAX_PINS } from "@/models/drawn-area";
-import { addAreaLayers, addSimLayers, handleElement, tagElement, pinElement, setAreaData, setSimData, type SimLayout } from "@/views/v10/map-area";
+import { addAreaLayers, addSimLayers, handleElement, ringCentre, tagElement, zoneTag, pinElement, setAreaData, setOutlineData, setSimData, type SimLayout } from "@/views/v10/map-area";
+import { ringContains } from "@/models/place-area";
 import type { LatLng } from "@/models/area-layout";
 
 /** Something moved by hand on the map: a tree (its index) or the lawn's, the shade's or the windbreak's handle. */
@@ -31,8 +32,10 @@ const STYLE: StyleSpecification = {
 
 type Camera = { center: [number, number]; zoom: number; bearing: number };
 
-export function SatelliteMap2D({ lat, lng, label, zoom, area = [], drawing = false, onAreaChange, sim = null, arranging = false, onMove }: {
+export function SatelliteMap2D({ lat, lng, label, zoom, area = [], drawing = false, onAreaChange, sim = null, arranging = false, onMove, outline = null, onOutside }: {
   lat: number; lng: number; label: string; zoom: number; area?: Ring; drawing?: boolean; onAreaChange?: (ring: Ring) => void;
+  /** Drawing a zone inside the big area: its outline, shown still, and taps outside it refused (onOutside). */
+  outline?: Ring | null; onOutside?: () => void;
   /** The simulation drawn inside the area; while `arranging` its trees and handles can be dragged (onMove). */
   sim?: SimLayout | null; arranging?: boolean; onMove?: (moved: MovedPart) => void;
 }) {
@@ -44,8 +47,8 @@ export function SatelliteMap2D({ lat, lng, label, zoom, area = [], drawing = fal
   const moveRef = useRef(onMove);
   moveRef.current = onMove;
   // The latest pins, mode and callback for the map's own handlers.
-  const live = useRef({ area, drawing, onAreaChange });
-  live.current = { area, drawing, onAreaChange };
+  const live = useRef({ area, drawing, onAreaChange, outline, onOutside });
+  live.current = { area, drawing, onAreaChange, outline, onOutside };
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const camera: Camera = { center: [lng, lat], zoom, bearing: 0 };
   useEffect(() => {
@@ -59,8 +62,11 @@ export function SatelliteMap2D({ lat, lng, label, zoom, area = [], drawing = fal
       map.on("load", () => { addAreaLayers(map); addSimLayers(map, lat); if (!cancelled) setState("ready"); });
       // Drawing: a tap on the map is a new pin at that spot.
       map.on("click", (e) => {
-        const { area: ring, drawing: on, onAreaChange: set } = live.current;
-        if (on && set && ring.length < MAX_PINS) set([...ring, [e.lngLat.lat, e.lngLat.lng]]);
+        const { area: ring, drawing: on, onAreaChange: set, outline: big, onOutside: out } = live.current;
+        if (!on || !set || ring.length >= MAX_PINS) return;
+        // A zone stays inside the big area.
+        if (big && big.length >= 3 && !ringContains(big, e.lngLat.lat, e.lngLat.lng)) { out?.(); return; }
+        set([...ring, [e.lngLat.lat, e.lngLat.lng]]);
       });
       // A tile that does not arrive leaves a gap, not an error: the map stays usable.
       new maplibregl.Marker({ color: "#0b0f15" }).setLngLat([lng, lat]).setPopup(new maplibregl.Popup({ offset: 24 }).setText(label)).addTo(map);
@@ -75,6 +81,7 @@ export function SatelliteMap2D({ lat, lng, label, zoom, area = [], drawing = fal
     const map = mapRef.current, lib = libRef.current;
     if (state !== "ready" || !map || !lib) return;
     setAreaData(map, area, !drawing || area.length >= 3);
+    setOutlineData(map, drawing ? outline : null);
     map.getCanvas().style.cursor = drawing ? "crosshair" : "";
     pins.current.forEach((m) => m.remove());
     pins.current = area.map(([pLat, pLng], i) => {
@@ -83,7 +90,7 @@ export function SatelliteMap2D({ lat, lng, label, zoom, area = [], drawing = fal
       m.on("dragend", () => { const p = m.getLngLat(); live.current.onAreaChange?.(live.current.area.map((q, j): [number, number] => (j === i ? [p.lat, p.lng] : q))); });
       return m;
     });
-  }, [area, drawing, state]);
+  }, [area, drawing, state, outline]);
   // The simulation inside the area (hidden while drawing), and while arranging a handle on each tree and on the lawn,
   // the shade or the windbreak, to drag them by hand.
   useEffect(() => {
@@ -92,8 +99,9 @@ export function SatelliteMap2D({ lat, lng, label, zoom, area = [], drawing = fal
     setSimData(map, drawing ? null : sim);
     handles.current.forEach((m) => m.remove());
     handles.current = [];
-    // The vineyard's zone names on their zones.
+    // The vineyard's zone names on their zones, and every inner zone's name ("Libera", "Lotto A", "Alberi"…).
     if (sim?.kind === "vigneto" && !drawing) sim.data.zones.forEach((z, i) => handles.current.push(new lib.Marker({ element: tagElement(`Zona ${i + 1}`) }).setLngLat([z[1], z[0]]).addTo(map)));
+    if (sim && !drawing) for (const z of sim.inner ?? []) { if (z.ring.length < 3) continue; const c = ringCentre(z.ring); handles.current.push(new lib.Marker({ element: tagElement(zoneTag(z)) }).setLngLat([c[1], c[0]]).addTo(map)); }
     if (!arranging || drawing || !sim) return;
     const add = (at: LatLng, label: string | null, done: (to: LatLng) => void) => {
       const m = new lib.Marker({ element: handleElement(label), draggable: true }).setLngLat([at[1], at[0]]).addTo(map);
