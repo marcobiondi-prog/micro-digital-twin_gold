@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ArrowRight, Building2, CalendarDays, Check, Share2, ChevronDown, Clock3, Cloud, Smartphone, Grape, History, Archive, ArchiveRestore, Camera, FolderClosed, Layers, Play, Sparkles, Trash2, Video } from "lucide-react";
@@ -395,13 +395,23 @@ function PhotoPiles({ shots, by = "giorno" }: { shots: Shot[]; by?: PileView }) 
   const piles = useMemo(() => (by === "gruppo" ? groupPilesOf(shots, numbers) : pilesOf(shots)), [shots, by, numbers]);
   const [open, setOpen] = useState<string | null>(null);
   const shown = piles.find((p) => p.key === open) ?? null;
+  // The opened pile shows right under the row of the pile tapped (not under every pile, where it fell out of
+  // sight with many groups), and the page brings it into view.
+  const cols = useGridColumns();
+  const openAt = shown ? piles.indexOf(shown) : -1;
+  const rowEnd = openAt < 0 ? -1 : Math.min(piles.length - 1, Math.floor(openAt / cols) * cols + cols - 1);
+  const panel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const t = window.setTimeout(() => panel.current?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "nearest" }), 60);
+    return () => window.clearTimeout(t);
+  }, [open]);
   return (
-    <>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 md:grid-cols-4">
-        {piles.map((p) => {
+    <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 md:grid-cols-4">
+      {piles.map((p, idx) => {
           const [top, second, third] = p.shots;
           const isOpen = open === p.key;
-          return (
+          const tile = (
             <button key={p.key} type="button" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : p.key)}
               aria-label={`${p.label}: ${countText(p.shots)}`}
               className="group text-left outline-none">
@@ -417,11 +427,28 @@ function PhotoPiles({ shots, by = "giorno" }: { shots: Shot[]; by?: PileView }) 
               <span className="block px-1 text-xs text-muted-foreground">{countText(p.shots)}</span>
             </button>
           );
+          return (
+            <Fragment key={p.key}>
+              {tile}
+              {idx === rowEnd && shown && <div ref={panel} className="col-span-full scroll-mb-28"><OpenPile key={shown.key} pile={shown} onClose={() => setOpen(null)} /></div>}
+            </Fragment>
+          );
         })}
-      </div>
-      {shown && <OpenPile key={shown.key} pile={shown} onClose={() => setOpen(null)} />}
-    </>
+    </div>
   );
+}
+
+/** How many piles a row holds now: 2 on phones, 3 from 640 px, 4 from 768 px (the grid's own breakpoints). */
+function useGridColumns() {
+  const read = () => (typeof window === "undefined" ? 2 : matchMedia("(min-width: 768px)").matches ? 4 : matchMedia("(min-width: 640px)").matches ? 3 : 2);
+  const [cols, setCols] = useState(2);
+  useEffect(() => {
+    const update = () => setCols(read());
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+  return cols;
 }
 
 /**

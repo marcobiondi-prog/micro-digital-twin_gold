@@ -49,14 +49,16 @@ function videoThumb(url: string): Promise<string | null> {
     const end = (out: string | null) => { if (settled) return; settled = true; window.clearTimeout(timer); v.removeAttribute("src"); v.load(); resolve(out); };
     const timer = window.setTimeout(() => end(null), 10_000);
     v.muted = true; v.playsInline = true; v.preload = "auto"; v.crossOrigin = "anonymous";
-    v.onloadeddata = () => { v.currentTime = Math.min(0.1, v.duration || 0); };
-    v.onseeked = () => {
+    const draw = () => {
       try {
         const c = fitCanvas(v.videoWidth, v.videoHeight);
         c.getContext("2d")?.drawImage(v, 0, 0, c.width, c.height);
         void toJpeg(c).then(end, () => end(null));
       } catch { end(null); }
     };
+    // A seek to the same time fires no "seeked": a very short or unknown-length video draws its first frame at once.
+    v.onloadeddata = () => { if ((v.duration || 0) > 0.2) v.currentTime = 0.1; else draw(); };
+    v.onseeked = draw;
     v.onerror = () => end(null);
     v.src = url;
   });
@@ -70,8 +72,12 @@ export function mediaThumb(id: string, url: string, kind: "image" | "video"): Pr
   const p = new Promise<string | null>((resolve) => {
     queue.push(async () => {
       let out: string | null;
-      try { out = kind === "video" ? await videoThumb(url) : await photoThumb(url); }
-      catch { out = kind === "video" ? null : url; }
+      // Never longer than 12 s: a slow file gives way (the original photo, or the video's dark tile) so the queue goes on.
+      const late = new Promise<"late">((r) => window.setTimeout(() => r("late"), 12_000));
+      try {
+        const made = await Promise.race([kind === "video" ? videoThumb(url) : photoThumb(url), late]);
+        out = made === "late" ? (kind === "video" ? null : url) : made;
+      } catch { out = kind === "video" ? null : url; }
       done.set(id, out);
       waiting.delete(id);
       resolve(out);
