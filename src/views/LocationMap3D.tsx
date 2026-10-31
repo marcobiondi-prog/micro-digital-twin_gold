@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { crownRing, hedgeParts, netParts, PERGOLA_COLORS, pergolaParts, TREE_RADIUS_M, treeParts } from "@/models/area-layout";
+import { crownRing, hedgeParts, netParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, TREE_RADIUS_M, treeParts } from "@/models/area-layout";
 import { SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import { Crosshair, LoaderCircle } from "lucide-react";
 import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camera";
@@ -87,7 +87,7 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
         // Lawn: a fresh green with a darker edge; under a pergola its soft shadow, then posts, beams and a framed roof.
         if (pt.kind === "lawn") { ground(pt.ring, "rgba(104,182,70,0.78)", "#3d7f2a", 2); continue; }
         ground(pt.ring, "rgba(11,15,21,0.3)");
-        for (const p of pergolaParts(pt.ring, true)) {
+        for (const p of pt.exact ? pergolaRingParts(pt.ring, true) : pergolaParts(pt.ring, true)) {
           if (p.base === 0) part({ ...p, color: "#5c3a1c" });
           else if (p.height < 3.2) part(p, p.height, "#4a2e14", 1);
           else part(p, p.height, PERGOLA_COLORS.beam, 3);

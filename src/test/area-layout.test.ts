@@ -71,4 +71,18 @@ describe("pergolas", () => {
     const inShade = (t: [number, number]) => strips.some((p) => ringContains(p.ring, t[0], t[1]));
     expect(l.trees.filter(inShade)).toHaveLength(0);
   });
+  it("cover a Pergolato zone with one pergola of exactly its drawn outline", async () => {
+    const { pergolaRingParts, piazzaLayout: layout } = await import("@/models/area-layout");
+    const lats = ring.map((p) => p[0]), lngs = ring.map((p) => p[1]);
+    const mLat = (Math.min(...lats) + Math.max(...lats)) / 2, mLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+    const dLat = (Math.max(...lats) - Math.min(...lats)) / 8, dLng = (Math.max(...lngs) - Math.min(...lngs)) / 8;
+    const zone: Array<[number, number]> = [[mLat - dLat, mLng - dLng], [mLat - dLat, mLng + dLng], [mLat + dLat, mLng + dLng + dLng / 2], [mLat + dLat, mLng - dLng]];
+    const l = layout(ring, 0, 0, 30, {}, [{ kind: "ombra", ring: zone }])!;
+    const exact = l.patches.filter((p) => p.kind === "shade" && p.exact);
+    expect(exact).toHaveLength(1);
+    expect(exact[0]!.ring).toEqual(zone);
+    const parts = pergolaRingParts(zone);
+    expect(parts.at(-1)!.ring).toEqual(zone);
+    expect(parts.filter((p) => p.base === 0).length).toBeGreaterThanOrEqual(4);
+  });
 });

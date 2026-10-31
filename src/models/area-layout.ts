@@ -8,7 +8,8 @@ import { ringAreaM2, ringContains, type Ring } from "./place-area";
 export type LatLng = [number, number];
 export type LayoutEdits = { trees?: Array<LatLng | null>; lawnAt?: LatLng | null; shadeAt?: LatLng | null; windAt?: LatLng | null };
 
-export type Patch = { ring: Ring; kind: "lawn" | "shade" | "zone" | "cloth"; zone?: number };
+/** `exact`: the very ring of a zone drawn by hand (a Prato or Pergolato zone), not a strip of grid cells. */
+export type Patch = { ring: Ring; kind: "lawn" | "shade" | "zone" | "cloth"; zone?: number; exact?: boolean };
 export type Line = { line: Ring; kind: "drip" | "wind" | "seam"; zone?: number; strength?: number };
 export type PiazzaLayout = { trees: LatLng[]; patches: Patch[]; lawnAt: LatLng; shadeAt: LatLng; cell: number };
 export type VineLayout = { patches: Patch[]; lines: Line[]; windAt: LatLng; zones: LatLng[] };
@@ -101,6 +102,9 @@ const inZone = (f: Frame, zones: InnerZone[], kind: string) => {
  * the smaller zones inside it: nothing goes in a zone left free (and its cells do not count); a "prato" or "ombra" zone
  * is lawn or pergola first, the rest of the lever's share placed automatically; with "alberi" zones the trees go in them.
  */
+const exactRings = (zones: InnerZone[], kind: string, as: "lawn" | "shade"): Patch[] =>
+  zones.filter((z) => z.kind === kind && z.ring.length >= 3).map((z) => ({ ring: z.ring, kind: as, exact: true }));
+
 export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: number, edits: LayoutEdits = {}, zones: InnerZone[] = []): PiazzaLayout | null {
   if (ring.length < 3) return null;
   const grid = cellsOf(ring), { f, c, minX, maxX, minY, maxY } = grid;
@@ -145,7 +149,12 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
   const rest = cells.filter((x) => !new Set(lawnCells).has(x));
   return {
     trees: placed, cell: c,
-    patches: [...strips(f, c, lawnCells, "lawn"), ...strips(f, c, shadeCells, "shade")],
+    // A Prato or Pergolato zone is drawn as its own outline, exactly as big as it was drawn; only the rest of the
+    // lever's share is made of grid strips.
+    patches: [
+      ...(fixedLawn.length ? exactRings(zones, "prato", "lawn") : []), ...strips(f, c, lawnCells.filter((x) => !fixedLawn.includes(x)), "lawn"),
+      ...(fixedShade.length ? exactRings(zones, "ombra", "shade") : []), ...strips(f, c, shadeCells.filter((x) => !fixedShade.includes(x)), "shade"),
+    ],
     lawnAt: toLL(f, ...(nLawn ? (() => { const m = nearestCell(cells, lawnAt); return [m.x, m.y] as [number, number]; })() : lawnAt)),
     shadeAt: toLL(f, ...(nShade ? (() => { const m = nearestCell(rest.length ? rest : cells, shadeAt); return [m.x, m.y] as [number, number]; })() : shadeAt)),
   };
@@ -285,6 +294,32 @@ export function pergolaParts(strip: Ring, lite = false): TreePart[] {
   for (const t of [inset, dep - inset]) parts.push({ ring: box(0, len, t - 0.14, t + 0.14), base: 2.8, height: 3.1, color: PERGOLA_COLORS.beam });
   if (lite) { parts.push({ ring: box(0, len, 0, dep), base: 3.1, height: 3.25, color: `${PERGOLA_COLORS.slat}b3` }); return parts; }
   for (let s = 0.35; s < len - 0.2; s += 0.7) parts.push({ ring: box(s - 0.12, s + 0.12, 0, dep), base: 3.1, height: 3.25, color: PERGOLA_COLORS.slat });
+  return parts;
+}
+
+/**
+ * A pergola over any outline (a Pergolato zone as drawn): posts at every corner and along every edge (about every 4 m,
+ * 8 m when `lite`), a beam along each edge (2.8–3.1 m) and a roof of the outline's very shape (3.1–3.25 m), light wood
+ * and see-through so the shade under it shows.
+ */
+export function pergolaRingParts(ring: Ring, lite = false): TreePart[] {
+  if (ring.length < 3) return [];
+  const f = frameOf(ring), pts = ring.map((p) => toXY(f, p));
+  const parts: TreePart[] = [];
+  const square = (x: number, y: number, r: number): Ring => [[x - r, y - r], [x + r, y - r], [x + r, y + r], [x - r, y + r]].map(([a, b]) => toLL(f, a!, b!));
+  pts.forEach((a, i) => {
+    const b = pts[(i + 1) % pts.length]!, len = dist(a, b);
+    const n = Math.max(1, Math.round(len / (lite ? 8 : 4)));
+    for (let k = 0; k < n; k++) {
+      const t = k / n;
+      parts.push({ ring: square(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, 0.12), base: 0, height: 2.9, color: PERGOLA_COLORS.post });
+    }
+    if (!lite && len > 0.5) {
+      const nx = (-(b[1] - a[1]) / len) * 0.14, ny = ((b[0] - a[0]) / len) * 0.14;
+      parts.push({ ring: [[a[0] + nx, a[1] + ny], [b[0] + nx, b[1] + ny], [b[0] - nx, b[1] - ny], [a[0] - nx, a[1] - ny]].map(([x, y]) => toLL(f, x!, y!)), base: 2.8, height: 3.1, color: PERGOLA_COLORS.beam });
+    }
+  });
+  parts.push({ ring, base: 3.1, height: 3.25, color: `${PERGOLA_COLORS.slat}b3` });
   return parts;
 }
 
