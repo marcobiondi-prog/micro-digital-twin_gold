@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { UpdatePill } from "@/views/UpdatePill";
 import { Outlet, Link, createRootRouteWithContext, useLocation, useNavigate, useRouter, HeadContent, Scripts, type ErrorComponentProps } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
 
@@ -561,7 +562,7 @@ function RootComponent() {
       <div className="hidden sm:block"><SmartNav /></div>
       </>}
 
-      <main id="main-content" tabIndex={-1} className={intro ? "focus:outline-none" : "app-main mx-auto max-w-7xl px-4 pb-8 pt-6 focus:outline-none sm:pt-8"}><Outlet /></main><Toaster />
+      <main id="main-content" tabIndex={-1} className={intro ? "focus:outline-none" : "app-main mx-auto max-w-7xl px-4 pb-8 pt-6 focus:outline-none sm:pt-8"}><Outlet /></main><Toaster /><UpdatePill />
       {!intro && <footer className="mx-auto max-w-7xl px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] text-sm leading-relaxed text-muted-foreground sm:pb-10 sm:text-[15px]">
         I risultati del simulatore sono indicativi e non sostituiscono modelli fisici calibrati.
       </footer>}

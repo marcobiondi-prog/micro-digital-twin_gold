@@ -41,6 +41,14 @@ export async function registerServiceWorker() {
   });
   try {
     const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+    // A new version installing (an update, not the first install): its progress shows as a bar.
+    const follow = () => {
+      if (!navigator.serviceWorker.controller || !reg.installing) return;
+      const worker = reg.installing;
+      void import("@/lib/update-progress").then((m) => m.followInstall(worker));
+    };
+    reg.addEventListener("updatefound", follow);
+    follow();
     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") void reg.update().catch(() => undefined); });
     window.setInterval(() => void reg.update().catch(() => undefined), 15 * 60_000);
   } catch {

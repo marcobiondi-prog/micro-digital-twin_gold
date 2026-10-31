@@ -2148,3 +2148,8 @@ html[data-sys-camera] body > :not([data-sys-camera-root]):not(:has([data-sys-cam
 .map-reading { animation: map-reading .45s cubic-bezier(0.22, 1, 0.36, 1); }
 @keyframes map-reading { 0% { transform: translateX(-50%) scale(1); } 35% { transform: translateX(-50%) scale(1.08); } 100% { transform: translateX(-50%) scale(1); } }
 @media (prefers-reduced-motion: reduce) { .map-reading { animation: none; } }
+
+/* The update pill drops in from the top. */
+@keyframes update-pill-in { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.update-pill { animation: update-pill-in 0.25s ease-out; }
+@media (prefers-reduced-motion: reduce) { .update-pill { animation: none; } }
