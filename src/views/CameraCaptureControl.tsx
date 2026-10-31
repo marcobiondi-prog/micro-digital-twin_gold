@@ -26,7 +26,7 @@ export function CameraCaptureControl({ mode, recording, disabled, onCapture, onH
   }, [recording]);
   const label = mode === "photo" ? `Scatta foto${ar ? " AR" : ""}` : recording ? "Termina e salva" : `Avvia registrazione${ar ? " AR" : ""}`;
   return <div className="camera-capture-dock" data-camera-controls>
-    <div className="camera-capture-status" role="status" hidden={ar && !recording}>
+    <div className="camera-capture-status" role="status" hidden={(ar || mode === "photo") && !recording}>
       {recording ? <><span className="camera-rec-dot" />REC · {String(Math.floor(seconds / 60)).padStart(2, "0")}:{String(seconds % 60).padStart(2, "0")}</> : mode === "photo" ? "FOTO" : "VIDEO"}
     </div>
     <div className="camera-capture-row">
