@@ -9,7 +9,24 @@ const done = new Map<string, string | null>();
 const waiting = new Map<string, Promise<string | null>>();
 const queue: Array<() => Promise<void>> = [];
 let running = 0;
-const PARALLEL = 2;
+const PARALLEL = 4;
+/** Thumbnails are kept on the phone (Cache Storage), so each file is made small once per device, not once per opening. */
+const THUMB_CACHE = "mdt-thumbs-v1";
+const cacheKey = (id: string) => `/__thumb/${encodeURIComponent(id)}`;
+async function storedThumb(id: string): Promise<string | null> {
+  try {
+    if (typeof caches === "undefined") return null;
+    const hit = await (await caches.open(THUMB_CACHE)).match(cacheKey(id));
+    return hit ? URL.createObjectURL(await hit.blob()) : null;
+  } catch { return null; }
+}
+async function keepThumb(id: string, objectUrl: string) {
+  try {
+    if (typeof caches === "undefined") return;
+    const blob = await (await fetch(objectUrl)).blob();
+    await (await caches.open(THUMB_CACHE)).put(cacheKey(id), new Response(blob, { headers: { "Content-Type": "image/jpeg" } }));
+  } catch { /* kept for this session only */ }
+}
 
 function pump() {
   while (running < PARALLEL && queue.length) {
@@ -72,12 +89,15 @@ export function mediaThumb(id: string, url: string, kind: "image" | "video"): Pr
   const p = new Promise<string | null>((resolve) => {
     queue.push(async () => {
       let out: string | null;
+      const stored = await storedThumb(id);
+      if (stored) { done.set(id, stored); waiting.delete(id); resolve(stored); return; }
       // Never longer than 12 s: a slow file gives way (the original photo, or the video's dark tile) so the queue goes on.
       const late = new Promise<"late">((r) => window.setTimeout(() => r("late"), 12_000));
       try {
         const made = await Promise.race([kind === "video" ? videoThumb(url) : photoThumb(url), late]);
         out = made === "late" ? (kind === "video" ? null : url) : made;
       } catch { out = kind === "video" ? null : url; }
+      if (out && out.startsWith("blob:") && out !== url) void keepThumb(id, out);
       done.set(id, out);
       waiting.delete(id);
       resolve(out);
