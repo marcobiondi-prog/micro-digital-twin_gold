@@ -28,8 +28,21 @@ export async function registerServiceWorker() {
   window.setTimeout(() => sessionStorage.removeItem("sw-reloaded"), 10000);
   // No reload on controllerchange: the new worker serves the next visit, so
   // the opening page is never loaded twice.
+  // A new version is fetched on every return to the app (not only at a cold start), and once it has taken over the
+  // app says so with a button that loads it — never by itself, so a photo being taken or an upload is never cut off.
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController) return;
+    void import("sonner").then(({ toast }) => toast("Nuova versione dell'app pronta", {
+      description: "Tocca Aggiorna per usarla subito.",
+      duration: Infinity,
+      action: { label: "Aggiorna", onClick: () => window.location.reload() },
+    }));
+  });
   try {
-    await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+    const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") void reg.update().catch(() => undefined); });
+    window.setInterval(() => void reg.update().catch(() => undefined), 15 * 60_000);
   } catch {
     /* offline support is optional */
   }
