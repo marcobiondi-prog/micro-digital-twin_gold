@@ -12,6 +12,7 @@ import { AI_STANDBY } from "@/lib/ai-standby";
 import { GNSS } from "@/models/gnss";
 import { LIBRARIES, SERVICES } from "@/models/credit-logos";
 import { LogoTiles } from "./LogoTiles";
+import { DeviceCacheCard } from "./DeviceCache";
 
 const eur = (n: number) => `${grouped(n)} €`;
 const level = (id: string) => comparison.find((l) => l.id === id)!;
@@ -158,6 +159,9 @@ export function PrivacyPrefsPage() {
           <input type="checkbox" className="size-6 accent-current" checked={tutorial}
             onChange={(e) => { setTutorial(e.target.checked); try { if (e.target.checked) window.localStorage.removeItem("mdt-intro-seen"); else window.localStorage.setItem("mdt-intro-seen", "1"); } catch { /* storage blocked */ } }} />
         </label>
+      </InfoCard>
+      <InfoCard title="Cache">
+        <DeviceCacheCard />
       </InfoCard>
       <InfoCard title="Dati su questo dispositivo">
         <p>Cancella simulazioni, preferenze, foto e video salvati come ospite e la sessione di accesso su questo dispositivo. I dati del tuo account online non vengono toccati.</p>
