@@ -41,6 +41,7 @@ import {
   deleteAllGuestFiles,
   deleteGuestFile,
   ensureMedia,
+  removeMedia,
   setMedia,
   useLabMedia,
   type MediaItem,
@@ -312,6 +313,23 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
     setLeaving(new Set());
   }
 
+  // A whole group goes in one go, after a confirm in place under its header.
+  const [askGroup, setAskGroup] = useState<number | null>(null);
+  async function removeGroup(n: number, files: MediaItem[]) {
+    setAskGroup(null);
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    justRemoved.current = true;
+    setLeaving((p) => new Set([...p, ...files.map((f) => f.id)]));
+    await new Promise((r) => setTimeout(r, reduce ? 0 : 220));
+    try {
+      await removeMedia(kind, files);
+      toast.success(`Gruppo ${n} eliminato`, { description: files.length === 1 ? "1 file tolto." : `${files.length} file tolti.` });
+    } catch {
+      toast.error("Gruppo non eliminato", { description: "Controlla la connessione e riprova." });
+    }
+    setLeaving((p) => { const next = new Set(p); files.forEach((f) => next.delete(f.id)); return next; });
+  }
+
   const sendFiles = () => void shareFiles(kind, items);
   const sendOne = (it: MediaItem) => void shareOne(kind, it);
   // Photos and videos picked from the gallery wait in the review sheet; "+" there adds more to the same pick.
@@ -581,11 +599,12 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
                 const videos = group.length - photos;
                 return (
                   <section key={g} className="mt-3">
+                    <div className="flex items-stretch gap-1.5">
                       <button
                         type="button"
                         aria-expanded={shown}
                         onClick={() => setOpenGroups((p) => { const n = new Set(p ?? [all[0]!.n]); if (n.has(g)) n.delete(g); else n.add(g); return n; })}
-                        className="flex w-full items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-left text-sm hover:bg-muted"
+                        className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-left text-sm hover:bg-muted"
                       >
                         <Images className="size-4 shrink-0 text-primary" />
                         <span className="min-w-0 flex-1">
@@ -597,6 +616,30 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
                         </span>
                         <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none ${shown ? "rotate-180" : ""}`} />
                       </button>
+                      <button
+                        type="button"
+                        aria-label={`Elimina il gruppo ${g}`}
+                        aria-expanded={askGroup === g}
+                        onClick={() => setAskGroup((p) => (p === g ? null : g))}
+                        className={`grid w-11 shrink-0 place-items-center rounded-lg border ${askGroup === g ? "border-destructive/60 bg-destructive/15 text-destructive" : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    </div>
+                    {askGroup === g && (
+                      <div role="alertdialog" aria-label={`Eliminare il gruppo ${g}?`} className="mt-1.5 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
+                        <p className="font-medium">Eliminare il Gruppo {g}?</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {group.length === 1 ? "1 file" : `${group.length} file`}{[photos && `${photos} foto`, videos && `${videos} video`].filter(Boolean).length ? ` (${[photos && `${photos} foto`, videos && `${videos} video`].filter(Boolean).join(", ")})` : ""}: non si possono recuperare.
+                        </p>
+                        <div className="mt-2.5 flex justify-end gap-2">
+                          <Button type="button" size="sm" variant="ghost" onClick={() => setAskGroup(null)}>Annulla</Button>
+                          <Button type="button" size="sm" variant="destructive" onClick={() => void removeGroup(g, group)}>
+                            <Trash2 className="size-3.5" /> Elimina {group.length}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                     {shown && (
               <ul className="mt-1.5 divide-y rounded-lg border">
                 {group.map((it, i) => (
