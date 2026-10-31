@@ -84,6 +84,8 @@ function SwipeRow({
   const [dx, setDx] = useState(0);
   const [dragging, setDragging] = useState(false);
   const start = useRef<number | null>(null);
+  const startY = useRef(0);
+  const axis = useRef<"x" | "y" | null>(null);
   const THRESHOLD = 90;
   const danger = Math.min(1, Math.abs(dx) / THRESHOLD);
 
@@ -95,22 +97,34 @@ function SwipeRow({
       <div
         className={`lab-media-swipe-row ${dragging ? "" : "lab-media-swipe-anim"} ${disabled ? "lab-media-swipe-danger" : ""}`}
         style={{ transform: `translateX(${dx}px)`, "--lab-danger": danger } as React.CSSProperties}
+        // The row keeps its own sideways drag: a swipe on it deletes and never turns the page's tabs
+        // (data-map-gestures); a mostly vertical move still scrolls the page.
+        data-map-gestures={disabled ? undefined : ""}
         onTouchStart={(e) => {
           if (!disabled) {
             start.current = e.touches[0]!.clientX;
-            setDragging(true);
+            startY.current = e.touches[0]!.clientY;
+            axis.current = null;
           }
         }}
         onTouchMove={(e) => {
           if (start.current == null) return;
           const d = e.touches[0]!.clientX - start.current;
+          const dy = e.touches[0]!.clientY - startY.current;
+          if (axis.current == null) {
+            if (Math.abs(d) < 8 && Math.abs(dy) < 8) return;
+            axis.current = Math.abs(d) > Math.abs(dy) ? "x" : "y";
+            if (axis.current === "x") setDragging(true);
+          }
+          if (axis.current !== "x") return;
           setDx(Math.min(0, d));
         }}
+        onTouchCancel={() => { start.current = null; setDragging(false); setDx(0); }}
         onTouchEnd={() => {
           if (start.current == null) return;
           start.current = null;
           setDragging(false);
-          if (Math.abs(dx) >= THRESHOLD) {
+          if (axis.current === "x" && Math.abs(dx) >= THRESHOLD) {
             setDx(-600);
             setTimeout(onDelete, 200);
           } else setDx(0);
@@ -245,8 +259,9 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
     if ((action === "ai" || action === "burst") && !guardUse("fotocamera")) return;
     if (action === "ai") { if (aiReady) void prepareArOrientation().then(() => setAr("photo")); }
     else if (action === "gallery") void pickGallery();
-    // The multiple shot keeps the camera open between shots, which the phone's own camera cannot do: the live camera.
-    else if (action === "burst") void prepareSystemCamera().then(() => setSystemCamera("burst"));
+    // The app's own camera (the dock's Foto): Singolo or Multiplo without closing, and a held shutter shoots in a row,
+    // which the phone's own camera cannot do. It opens on Singolo.
+    else if (action === "burst") void prepareSystemCamera().then(() => setSystemCamera("photo"));
     else openCamera(action);
   };
   useEffect(() => registerCaptureHandler(kind, (action) => captureRef.current(action)), [kind]);

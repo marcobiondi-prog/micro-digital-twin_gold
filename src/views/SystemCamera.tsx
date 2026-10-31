@@ -151,10 +151,21 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
         }, "image/jpeg", 0.92);
         return;
       }
+      // A single photo: the camera's own full-resolution photo where the phone offers it, else the frame.
+      const track = stream.getVideoTracks()[0];
+      const Capture = (window as unknown as { ImageCapture?: new (t: MediaStreamTrack) => { takePhoto: () => Promise<Blob> } }).ImageCapture;
+      setPending((n) => n + 1);
       canvas.toBlob((blob) => {
-        if (!blob || !activeRef.current) return;
-        onCapture([new File([blob], `foto-${Date.now()}.jpg`, { type: "image/jpeg" })]);
-        onClose();
+        const save = (photo: Blob | null) => {
+          setPending((n) => n - 1);
+          const best = photo && (!blob || photo.size > blob.size) ? photo : blob;
+          if (!best || !activeRef.current) return;
+          onCapture([new File([best], `foto-${Date.now()}.jpg`, { type: best.type || "image/jpeg" })]);
+          onClose();
+        };
+        if (!Capture || !track) { save(null); return; }
+        Promise.race([new Capture(track).takePhoto(), new Promise<never>((_, no) => window.setTimeout(() => no(new Error("slow")), 4000))])
+          .then(save, () => save(null));
       }, "image/jpeg", 0.92);
       return;
     }
@@ -249,7 +260,7 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
               <button type="button" role="radio" aria-checked={burst} onClick={() => setMulti(true)} className={`h-8 rounded-full px-3 ${burst ? "bg-white text-black" : ""}`}>Multiplo</button>
             </div>
           )}
-          <CameraCaptureControl mode={mode === "video" ? "video" : "photo"} recording={recording} disabled={!ready || !!error} onCapture={capture} {...(mode !== "video" ? { onHold } : {})} />
+          <CameraCaptureControl mode={mode === "video" ? "video" : "photo"} recording={recording} disabled={!ready || !!error || (!burst && pending > 0)} onCapture={capture} {...(mode !== "video" ? { onHold } : {})} />
         </div>
         </CameraCloseGestures>
       </DialogContent>

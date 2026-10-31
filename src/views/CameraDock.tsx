@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { Building2, Camera, Grape, Images, Layers, Lock, MapPin, Video, Wrench, type LucideIcon } from "lucide-react";
+import { Building2, Camera, Grape, Images, Lock, MapPin, Video, Wrench, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useInstalledApp } from "@/lib/installed-app";
@@ -150,7 +150,7 @@ export function CameraSheet() {
     // The new photo or video lands under the simulation: show it now, before the camera covers the page.
     showSimMediaNow(kind);
     if (action === "burst") {
-      // The multiple shot is the app's own camera (no user gesture needed): it opens once the sheet's Back has landed,
+      // Foto is the app's own camera (Singolo | Multiplo, hold for a row of shots) (no user gesture needed): it opens once the sheet's Back has landed,
       // else that Back would close it at once.
       afterClose(() => { if (!requestCapture(kind, "burst")) toast.error("Fotocamera non pronta, riprova tra un attimo"); });
       return;
@@ -192,9 +192,8 @@ export function CameraSheet() {
                 </span>
               </button>
             )}
-            <div className="grid grid-cols-4">
-              <RoundAction icon={Camera} label="Foto" tone="bg-primary" onClick={() => start("photo")} />
-              <RoundAction icon={Layers} label="Multiplo" tone="bg-brand-turquoise" onClick={() => start("burst")} />
+            <div className="grid grid-cols-3">
+              <RoundAction icon={Camera} label="Foto" tone="bg-primary" onClick={() => start("burst")} />
               <RoundAction icon={Video} label="Video" tone="bg-danger" onClick={() => start("video")} />
               <RoundAction icon={Images} label="Galleria" tone="bg-ok" onClick={() => start("gallery")} />
             </div>
