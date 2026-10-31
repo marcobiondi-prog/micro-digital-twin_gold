@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { ArrowRight, Building2, CalendarDays, Check, Share2, ChevronDown, Clock3, Cloud, Smartphone, Grape, History, Archive, ArchiveRestore, Camera, FolderClosed, Layers, Play, Sparkles, Trash2, Video } from "lucide-react";
 import { currentMedia, removeMedia, useLabMedia, type MediaItem } from "@/models/lab-media-store";
 import { mediaTime } from "@/models/media-time";
+import { uploadGroups } from "@/models/media-groups";
 import { SHOT_KINDS, kindCountText, shotKind, shotLabel, type ShotKind } from "@/models/shot-kind";
 import { TabRow } from "@/views/v8/console";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -364,6 +365,33 @@ function PhotoPiles({ shots }: { shots: Shot[] }) {
 }
 
 /**
+ * The simulation's group of every photo and video ("piazza-<id>" → n): the same Gruppo n as in the simulation, counted
+ * on the project's whole list by upload (20 a group), so a day's photos read under the group they were loaded in.
+ */
+function useGroupNumbers() {
+  const urban = useLabMedia("urban"), vineyard = useLabMedia("vineyard");
+  return useMemo(() => {
+    const map = new Map<string, number>();
+    for (const g of uploadGroups(urban)) for (const f of g.files) map.set(`piazza-${f.id}`, g.n);
+    for (const g of uploadGroups(vineyard)) for (const f of g.files) map.set(`vigneto-${f.id}`, g.n);
+    return map;
+  }, [urban, vineyard]);
+}
+type ShotGroup = { key: string; flow: Shot["flow"]; n: number | null; shots: Shot[] };
+/** A day's shots by project and group, newest group first, keeping each group's files in the day's order. */
+function dayGroups(shots: Shot[], numbers: Map<string, number>): ShotGroup[] {
+  const out = new Map<string, ShotGroup>();
+  for (const s of shots) {
+    const n = numbers.get(`${s.flow}-${s.id}`) ?? null;
+    const key = `${s.flow}-${n ?? "x"}`;
+    const g = out.get(key) ?? { key, flow: s.flow, n, shots: [] };
+    g.shots.push(s);
+    out.set(key, g);
+  }
+  return [...out.values()].sort((a, b) => (a.flow === b.flow ? (b.n ?? 0) - (a.n ?? 0) : a.flow === "piazza" ? -1 : 1));
+}
+
+/**
  * A day's pile spread into its grid. "Seleziona" turns the thumbnails into checkboxes (with "Tutte"), and "Elimina n"
  * asks once in place before deleting them for good — from the account when uploaded, from this device otherwise.
  */
@@ -374,6 +402,11 @@ function OpenPile({ pile, onClose, archived = false }: { pile: Pile; onClose: ()
   const [ask, setAsk] = useState(false);
   const [busy, setBusy] = useState(false);
   const keyOf = (s: Shot) => `${s.flow}-${s.id}`;
+  const numbers = useGroupNumbers();
+  const groups = useMemo(() => dayGroups(pile.shots, numbers), [pile.shots, numbers]);
+  const bothFlows = new Set(groups.map((g) => g.flow)).size > 1;
+  const groupTitle = (g: ShotGroup) => `${bothFlows ? (g.flow === "piazza" ? "Piazza · " : "Vigneto · ") : ""}${g.n ? `Gruppo ${g.n}` : "Sul telefono"}`;
+  const [folded, setFolded] = useState<Set<string>>(new Set());
   const flip = (s: Shot) => setPicked((p) => { const n = new Set(p); if (n.has(keyOf(s))) n.delete(keyOf(s)); else n.add(keyOf(s)); return n; });
   const all = picked.size === pile.shots.length;
   const stop = () => { setSelecting(false); setPicked(new Set()); setAsk(false); };
@@ -399,7 +432,7 @@ function OpenPile({ pile, onClose, archived = false }: { pile: Pile; onClose: ()
     } finally { setBusy(false); setAsk(false); }
   };
   return (
-    <div className="space-y-3 rounded-2xl bg-foreground/[0.05] p-3">
+    <div className="pile-open space-y-3 rounded-2xl bg-foreground/[0.05] p-3">
       <div className="flex items-center gap-3 px-1">
         <h4 className="min-w-0 flex-1 text-sm font-semibold tabular-nums">{pile.label}<span className="ml-2 font-medium text-muted-foreground">{selecting ? (picked.size ? `${picked.size} scelti` : "Tocca per scegliere") : countText(pile.shots)}</span></h4>
         {selecting
@@ -413,9 +446,19 @@ function OpenPile({ pile, onClose, archived = false }: { pile: Pile; onClose: ()
               <button type="button" onClick={onClose} className="text-sm font-semibold text-muted-foreground outline-none focus-visible:underline">Chiudi</button>
             </>}
       </div>
-      {/* One row that slides sideways (the card keeps its height however many there are); its own move, not the page's tabs. */}
+      {/* The day's photos by the simulation's groups (Gruppo n, 20 a group), each one row that slides sideways (the card
+          keeps its height however many there are; its own move, not the page's tabs). Opening deals them out of the pile. */}
+      {groups.map((g, gi) => (
+      <section key={g.key} className="pile-group" style={{ animationDelay: `${Math.min(gi, 4) * 70}ms` }} aria-label={groupTitle(g)}>
+      <button type="button" aria-expanded={!folded.has(g.key)} onClick={() => setFolded((p) => { const n = new Set(p); if (n.has(g.key)) n.delete(g.key); else n.add(g.key); return n; })}
+        className="flex w-full items-center gap-2 px-1 py-1 text-left outline-none focus-visible:underline">
+        <Layers className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <span className="min-w-0 flex-1 text-sm font-semibold">{groupTitle(g)}<span className="ml-2 font-medium text-muted-foreground">{countText(g.shots)}</span></span>
+        <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform duration-300 ${folded.has(g.key) ? "-rotate-90" : ""}`} aria-hidden="true" />
+      </button>
+      <div className="pile-fold" data-folded={folded.has(g.key) || undefined}><div className="min-h-0">
       <div className="no-scrollbar -mx-3 flex snap-x snap-mandatory gap-2 overflow-x-auto scroll-px-3 px-3 py-1 touch-pan-x" data-map-gestures="">
-        {pile.shots.map((s) => <div key={keyOf(s)} className="w-[7.5rem] shrink-0 snap-start sm:w-36">{selecting ? (
+        {g.shots.map((s, i) => <div key={keyOf(s)} className="pile-deal w-[7.5rem] shrink-0 snap-start sm:w-36" style={{ animationDelay: `${Math.min(gi, 4) * 70 + Math.min(i, 7) * 45}ms` }}>{selecting ? (
           <button type="button" role="checkbox" aria-checked={picked.has(keyOf(s))} aria-label={`${s.kind === "video" ? "Video" : "Foto"} ${s.name}`} onClick={() => flip(s)}
             className={`relative block aspect-square overflow-hidden rounded-2xl bg-foreground/[0.08] outline-none transition focus-visible:ring-2 focus-visible:ring-ring ${picked.has(keyOf(s)) ? "ring-2 ring-destructive" : "opacity-80"}`}>
             <ShotMedia s={s} />
@@ -423,6 +466,9 @@ function OpenPile({ pile, onClose, archived = false }: { pile: Pile; onClose: ()
           </button>
         ) : <Thumb s={s} onOpen={() => setViewing(pile.shots.indexOf(s))} />}</div>)}
       </div>
+      </div></div>
+      </section>
+      ))}
       {viewing !== null && <ShotViewer shots={pile.shots} start={viewing} onClose={() => setViewing(null)} />}
       {selecting && (ask ? (
         <div role="alertdialog" aria-label="Conferma eliminazione" className="rounded-xl bg-destructive/10 p-3">

@@ -2116,3 +2116,17 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .zoom-ruler-mark { position: absolute; left: 50%; top: 1.15rem; bottom: .1rem; width: 1.5px; margin-left: -.75px; border-radius: 2px; background: oklch(0.86 0.17 90); }
 @keyframes zoom-ruler-in { from { opacity: 0; transform: translateX(-50%) translateY(4px); } }
 @media (prefers-reduced-motion: reduce) { .zoom-ruler { animation: none; } .zoom-ruler-track { transition: none; } }
+
+/* Cronologia: a day's pile opening. The panel unrolls from the pile, its groups fade in one after the other and the
+   photos are dealt out of the pile like prints (a short slide with a little turn, one after the other); a group header
+   folds its row up and down. All still with reduced motion. */
+.pile-open { animation: pile-open .34s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes pile-open { from { opacity: 0; transform: translateY(-10px) scale(.98); clip-path: inset(0 0 100% 0 round 1rem); } to { clip-path: inset(0 0 0 0 round 1rem); } }
+.pile-group { animation: pile-group .3s ease-out both; }
+@keyframes pile-group { from { opacity: 0; transform: translateY(6px); } }
+.pile-deal { animation: pile-deal .44s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes pile-deal { from { opacity: 0; transform: translate(-30px, -12px) rotate(-8deg) scale(.8); } }
+.pile-fold { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .32s cubic-bezier(0.22, 1, 0.36, 1), opacity .25s ease; }
+.pile-fold[data-folded] { grid-template-rows: 0fr; opacity: 0; }
+.pile-fold > div { overflow: hidden; }
+@media (prefers-reduced-motion: reduce) { .pile-open, .pile-group, .pile-deal { animation: none; } .pile-fold { transition: none; } }
