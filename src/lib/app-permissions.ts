@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { askChangeNotifications } from "@/lib/dst-notice";
 
@@ -56,10 +56,12 @@ export async function askPermission(kind: PermKind): Promise<PermState> {
   }
   if (kind === "posizione") {
     if (!("geolocation" in navigator)) return "unsupported";
+    setAppAllowed("posizione", true);
     await new Promise<void>((done) => navigator.geolocation.getCurrentPosition(() => done(), () => done(), { timeout: 15_000, maximumAge: 600_000 }));
     return permState(kind);
   }
   if (!navigator.mediaDevices?.getUserMedia) return "unsupported";
+  setAppAllowed("fotocamera", true);
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
     stream.getTracks().forEach((t) => t.stop());
@@ -119,4 +121,65 @@ export function usePermissions(announce = false) {
     return () => { live = false; document.removeEventListener("visibilitychange", onVis); statuses.forEach((s) => s.removeEventListener("change", onChange)); };
   }, [refresh]);
   return { states, refresh, setStates };
+}
+
+/* ============ Revoked inside the app ============
+ * A web page cannot take back a permission the phone gave it, so position and camera can be revoked inside the app:
+ * while revoked the app never asks the phone for them (geolocation and getUserMedia refuse at once, the phone's
+ * camera and the GPS button stop with a message), until switched back on. The phone keeps its own permission. */
+export type AppKind = "posizione" | "fotocamera";
+const OFF_KEY = "mdt-app-perm-off-v1";
+let off: Partial<Record<AppKind, boolean>> | null = null;
+const offSubs = new Set<() => void>();
+function readOff(): Partial<Record<AppKind, boolean>> {
+  if (off) return off;
+  try { off = JSON.parse(localStorage.getItem(OFF_KEY) ?? "{}") as Partial<Record<AppKind, boolean>>; } catch { off = {}; }
+  return off;
+}
+export function appAllowed(kind: AppKind): boolean { return typeof window === "undefined" || !readOff()[kind]; }
+export function setAppAllowed(kind: AppKind, on: boolean) {
+  off = { ...readOff(), [kind]: !on };
+  try { localStorage.setItem(OFF_KEY, JSON.stringify(off)); } catch { /* memory only */ }
+  if (!on && kind === "fotocamera") { live.forEach((st) => st.getVideoTracks().forEach((t) => t.stop())); live.clear(); }
+  offSubs.forEach((f) => f());
+}
+export function useAppAllowed(kind: AppKind): boolean {
+  return useSyncExternalStore((f) => { offSubs.add(f); return () => { offSubs.delete(f); }; }, () => appAllowed(kind), () => true);
+}
+export const revokedMessage = (kind: AppKind) => kind === "posizione"
+  ? "La posizione è revocata per l'app: riattivala in Account → Autorizzazioni."
+  : "La fotocamera è revocata per l'app: riattivala in Account → Autorizzazioni.";
+/** At a place that would use it: true when allowed, else says so with a "Riattiva" and returns false. */
+export function guardUse(kind: AppKind): boolean {
+  if (appAllowed(kind)) return true;
+  toast(revokedMessage(kind), {
+    action: { label: "Riattiva", onClick: () => { setAppAllowed(kind, true); toast(kind === "posizione" ? "Posizione di nuovo consentita all'app." : "Fotocamera di nuovo consentita all'app."); } },
+    duration: 8000,
+  });
+  return false;
+}
+
+const live = new Set<MediaStream>();
+let installed = false;
+/** In the root, once: the browser's geolocation and camera refuse while revoked in the app, whoever asks for them. */
+export function installAppPermissionGuards() {
+  if (installed || typeof navigator === "undefined") return;
+  installed = true;
+  const md = navigator.mediaDevices;
+  if (md?.getUserMedia) {
+    const original = md.getUserMedia.bind(md);
+    md.getUserMedia = async (c?: MediaStreamConstraints) => {
+      if (c?.video && !appAllowed("fotocamera")) throw new DOMException(revokedMessage("fotocamera"), "NotAllowedError");
+      const stream = await original(c);
+      if (c?.video) { live.add(stream); stream.getVideoTracks()[0]?.addEventListener("ended", () => live.delete(stream)); }
+      return stream;
+    };
+  }
+  const geo = navigator.geolocation;
+  if (geo) {
+    const denied = (fail?: PositionErrorCallback | null) => window.setTimeout(() => fail?.({ code: 1, message: revokedMessage("posizione"), PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 } as GeolocationPositionError), 0);
+    const get = geo.getCurrentPosition.bind(geo), watch = geo.watchPosition.bind(geo);
+    geo.getCurrentPosition = (ok, fail, o) => { if (!appAllowed("posizione")) { denied(fail); return; } get(ok, fail, o); };
+    geo.watchPosition = (ok, fail, o) => { if (!appAllowed("posizione")) { denied(fail); return -1; } return watch(ok, fail, o); };
+  }
 }

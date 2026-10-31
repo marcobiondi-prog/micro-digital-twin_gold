@@ -13,6 +13,7 @@ import { useLab } from "@/models/lab-store";
 import { splitLocation } from "@/views/SimulationGrid";
 import aiLogo from "@/assets/ai-logo.png";
 import { AI_STANDBY } from "@/lib/ai-standby";
+import { appAllowed, guardUse } from "@/lib/app-permissions";
 
 type Kind = "urban" | "vineyard";
 const kindOf = (pathname: string): Kind | null => (pathname === "/urbano" ? "urban" : pathname === "/vigneto" ? "vineyard" : null);
@@ -126,6 +127,8 @@ export function CameraSheet() {
   // Called inside the tap: the system camera and the file picker need the user gesture.
   const start = (action: CaptureAction) => {
     if (!kind) return;
+    // The camera revoked inside the app: the sheet closes and the message says how to turn it back on (toasts sit under the sheet).
+    if (action !== "gallery" && !appAllowed("fotocamera")) { afterClose(() => guardUse("fotocamera")); return; }
     if (action === "ai") {
       // The AI camera opens only once the sheet's history entry is gone (its fullscreen falls back to the dark bars).
       afterClose(() => {

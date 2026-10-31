@@ -21,7 +21,7 @@ import { useProId, useSyncProId } from "@/lib/use-pro-id";
 import { useSyncMediaArchive } from "@/models/media-archive";
 import { useMediaSync } from "@/lib/use-media-sync";
 import { useDstNotice } from "@/lib/dst-notice";
-import { usePermissions } from "@/lib/app-permissions";
+import { installAppPermissionGuards, usePermissions } from "@/lib/app-permissions";
 import { hidePreloader, preloaderScript } from "@/lib/preloader";
 import { unlocks, type ProId } from "@/models/professional-id";
 import { AgronomoIcon, FunzionarioIcon } from "@/views/ProfileIcon";
@@ -393,6 +393,8 @@ function RootComponent() {
   useDstNotice();
   // A permission changed in the phone's settings is said once on return to the app.
   usePermissions(true);
+  // Position and camera revoked inside the app are refused whoever asks for them.
+  useEffect(() => { installAppPermissionGuards(); }, []);
   // The index's preloader goes once the app has started and its fonts are in.
   useEffect(() => {
     const fonts = (document as Document & { fonts?: { ready: Promise<unknown> } }).fonts?.ready ?? Promise.resolve();

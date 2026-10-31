@@ -4,8 +4,8 @@ import { Bell, Camera, Check, Loader2, Lock, MapPin, type LucideIcon } from "luc
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
-  PERMS, STATE_LABEL, askPermission, changeMessage, howToChange, markPermsAsked, permsAsked, usePermissions,
-  type PermKind, type PermState,
+  PERMS, STATE_LABEL, askPermission, changeMessage, howToChange, markPermsAsked, permsAsked, setAppAllowed, useAppAllowed, usePermissions,
+  type AppKind, type PermKind, type PermState,
 } from "@/lib/app-permissions";
 import { InfoCard, InfoPage, PageLink } from "./InfoPage";
 
@@ -15,28 +15,43 @@ const CHIP: Record<PermState, string> = {
 };
 
 /** One permission: what it is for, its state, the button to ask it and, once given or blocked, where to change it. */
-function PermRow({ kind, title, why, state, busy, note, onAsk }: {
+function PermRow({ kind, title, why, state, busy, note, onAsk, app }: {
   kind: PermKind; title: string; why: string; state: PermState | undefined; busy: boolean; note: string | null; onAsk: () => void;
+  /** Position and camera on the Autorizzazioni page: the switch that revokes them inside the app. */
+  app?: { on: boolean; onToggle: (on: boolean) => void } | undefined;
 }) {
   const Icon = ICON[kind];
+  const revoked = app && !app.on;
   return (
     <div className="flex gap-3 rounded-2xl bg-foreground/[0.05] p-3.5">
-      <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-turquoise/15 text-brand-turquoise"><Icon className="size-5" aria-hidden="true" /></span>
+      <span className={cn("grid size-10 shrink-0 place-items-center rounded-full", revoked ? "bg-foreground/10 text-muted-foreground" : "bg-brand-turquoise/15 text-brand-turquoise")}><Icon className="size-5" aria-hidden="true" /></span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-semibold">{title}</span>
-          {state && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide", CHIP[state])}>{STATE_LABEL[state]}</span>}
+          {revoked
+            ? <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-400">Revocato nell'app</span>
+            : state && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide", CHIP[state])}>{STATE_LABEL[state]}</span>}
         </div>
         <p className="mt-0.5 text-sm text-muted-foreground">{why}</p>
+        {app && state !== "unsupported" && (
+          <button type="button" role="switch" aria-checked={app.on} onClick={() => app.onToggle(!app.on)}
+            className="mt-2.5 flex w-full items-center gap-3 rounded-xl bg-foreground/[0.06] px-3 py-2.5 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <span className="min-w-0 flex-1 font-medium">{app.on ? "L'app può usarla" : "L'app non la usa"}</span>
+            <span className={cn("relative h-7 w-12 shrink-0 rounded-full transition-colors motion-reduce:transition-none", app.on ? "bg-brand-turquoise" : "bg-foreground/20")} aria-hidden="true">
+              <span className={cn("absolute top-0.5 size-6 rounded-full bg-white shadow transition-transform motion-reduce:transition-none", app.on ? "translate-x-[1.375rem]" : "translate-x-0.5")} />
+            </span>
+          </button>
+        )}
         {note && <p className="mt-1.5 text-sm font-medium" role="status">{note}</p>}
-        {(state === "granted" || state === "denied") && <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{howToChange(state)}</p>}
-        {state === "prompt" && (
+        {revoked && <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">Il telefono conserva comunque il suo permesso{state === "granted" ? `. ${howToChange("granted")}` : "."}</p>}
+        {!revoked && (state === "granted" || state === "denied") && <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{howToChange(state)}</p>}
+        {!revoked && state === "prompt" && (
           <button type="button" onClick={onAsk} disabled={busy}
             className="mt-2.5 inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-black disabled:opacity-70">
             {busy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Check className="size-4" aria-hidden="true" />} Consenti
           </button>
         )}
-        {state === "denied" && (
+        {!revoked && state === "denied" && (
           <span className="mt-2 inline-flex items-center gap-1.5 text-xs text-danger"><Lock className="size-3.5" aria-hidden="true" /> L'app non può più chiederlo da sola</span>
         )}
       </div>
@@ -57,7 +72,8 @@ function usePermRows() {
     setBusy(null);
     return s;
   };
-  return { states, refresh, busy, notes, ask };
+  const setNote = (kind: PermKind, text: string) => setNotes((n) => ({ ...n, [kind]: text }));
+  return { states, refresh, busy, notes, ask, setNote };
 }
 
 /**
@@ -117,7 +133,17 @@ const readFlag = (key: string, on: string) => { try { return localStorage.getIte
 
 /** Account → Autorizzazioni: each permission's state, to ask it or to see where to change it, plus the app's own switches. */
 export function PermissionsPage() {
-  const { states, refresh, busy, notes, ask } = usePermRows();
+  const { states, refresh, busy, notes, ask, setNote } = usePermRows();
+  const posOn = useAppAllowed("posizione"), camOn = useAppAllowed("fotocamera");
+  const toggleApp = (kind: AppKind) => (on: boolean) => {
+    setAppAllowed(kind, on);
+    const what = kind === "posizione" ? "Posizione" : "Fotocamera";
+    setNote(kind, on
+      ? `${what} di nuovo consentita all'app.`
+      : kind === "posizione" ? "Posizione revocata: l'app non la chiede più e il GPS della mappa si spegne." : "Fotocamera revocata: l'app non apre più foto, video né scatto multiplo. La galleria resta.");
+    if (on && states?.[kind] === "prompt") void ask(kind);
+  };
+  const appOf = (kind: PermKind) => (kind === "posizione" ? { on: posOn, onToggle: toggleApp("posizione") } : kind === "fotocamera" ? { on: camOn, onToggle: toggleApp("fotocamera") } : undefined);
   const [gps, setGps] = useState(false);
   const [notify, setNotify] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -141,10 +167,10 @@ export function PermissionsPage() {
   };
   const row = "flex min-h-14 w-full items-center gap-3 rounded-2xl px-1 text-left";
   return (
-    <InfoPage title="Autorizzazioni" intro="Cosa può usare l'app sul tuo telefono. Puoi cambiarlo quando vuoi.">
+    <InfoPage title="Autorizzazioni" intro="Cosa può usare l'app sul tuo telefono. Posizione e fotocamera le revochi qui quando vuoi, con l'interruttore.">
       <div className="space-y-2">
         {PERMS.map((p) => (
-          <PermRow key={p.kind} {...p} state={states?.[p.kind]} busy={busy === p.kind} note={notes[p.kind] ?? null} onAsk={() => void ask(p.kind)} />
+          <PermRow key={p.kind} {...p} state={states?.[p.kind]} busy={busy === p.kind} note={notes[p.kind] ?? null} onAsk={() => void ask(p.kind)} app={appOf(p.kind)} />
         ))}
       </div>
       <button type="button" onClick={() => void refresh().then(() => setMsg("Stato aggiornato."))} className="h-11 w-full rounded-full bg-foreground/[0.08] text-sm font-semibold">
@@ -152,8 +178,8 @@ export function PermissionsPage() {
       </button>
       <InfoCard title="Nell'app">
         <label className={row}>
-          <span className="min-w-0 flex-1">GPS sempre attivo sulla mappa<span className="block text-sm text-muted-foreground">La mappa segue la tua posizione quando ti sposti.</span></span>
-          <input type="checkbox" className="size-6 accent-current" checked={gps} onChange={(e) => toggleGps(e.target.checked)} />
+          <span className="min-w-0 flex-1">GPS sempre attivo sulla mappa<span className="block text-sm text-muted-foreground">{posOn ? "La mappa segue la tua posizione quando ti sposti." : "Spento finché la posizione è revocata."}</span></span>
+          <input type="checkbox" className="size-6 accent-current" checked={gps && posOn} disabled={!posOn} onChange={(e) => toggleGps(e.target.checked)} />
         </label>
         <label className={row}>
           <span className="min-w-0 flex-1">Avvisi del cambio dell'ora sul telefono<span className="block text-sm text-muted-foreground">La sera prima, anche con l'app in sottofondo.</span></span>

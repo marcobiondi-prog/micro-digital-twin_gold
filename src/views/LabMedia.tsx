@@ -22,6 +22,7 @@ import { AI_STANDBY } from "@/lib/ai-standby";
 import { openSystemCamera, prepareSystemCamera, supportsSystemCapture } from "@/lib/system-camera";
 import { SystemCamera } from "@/views/SystemCamera";
 import { GalleryReview } from "@/views/GalleryReview";
+import { guardUse } from "@/lib/app-permissions";
 import { useLab } from "@/models/lab-store";
 import { ZONE_LABEL, drawnAreaFor } from "@/models/drawn-area";
 import { MEDIA_GROUP, uploadGroups } from "@/models/media-groups";
@@ -155,6 +156,8 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
   const closeSystemCamera = useCallback(() => setSystemCamera(null), []);
   /** Fotocamera di sistema diretta: un input per tipo con capture, perché capture con foto+video insieme non apre nulla su molti Android. */
   const openCamera = (m: "photo" | "video") => {
+    // Revoked inside the app (Account → Autorizzazioni): no camera, the phone's own included.
+    if (!guardUse("fotocamera")) return;
     if (supportsSystemCapture(navigator.userAgent, navigator.platform, navigator.maxTouchPoints)) {
       pick(m === "photo" ? cameraPhoto.current : cameraVideo.current, m);
     } else {
@@ -238,6 +241,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
   // The central camera button of the menu starts captures here, inside the same tap.
   const captureRef = useRef<(action: "ai" | "photo" | "video" | "burst" | "gallery") => void>(() => undefined);
   captureRef.current = (action) => {
+    if ((action === "ai" || action === "burst") && !guardUse("fotocamera")) return;
     if (action === "ai") { if (aiReady) void prepareArOrientation().then(() => setAr("photo")); }
     else if (action === "gallery") void pickGallery();
     // The multiple shot keeps the camera open between shots, which the phone's own camera cannot do: the live camera.
@@ -457,7 +461,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
                   variant="secondary"
                   disabled={busy}
                   onClick={() => {
-                    void prepareArOrientation().then(() => setAr("photo"));
+                    if (guardUse("fotocamera")) void prepareArOrientation().then(() => setAr("photo"));
                   }}
                   className="lab-media-action lab-media-ai ai-cta"
                   aria-label="Foto in realtà aumentata"

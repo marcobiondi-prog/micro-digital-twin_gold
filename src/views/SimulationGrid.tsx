@@ -1,4 +1,5 @@
 import { FormEvent, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from "react";
+import { appAllowed, guardUse, useAppAllowed } from "@/lib/app-permissions";
 import { useServerFn } from "@tanstack/react-start";
 import { CloudSun, Droplets, Grape, LoaderCircle, LocateFixed, Lock, MapPin, Search, Sprout, Thermometer, TreePine, TrendingDown, Umbrella } from "lucide-react";
 import { Card, StatusBadge } from "@/views/health";
@@ -138,7 +139,10 @@ function LocationSearch({ initial, onSelect, bare = false }: { initial: Searched
   // the place moves with it when it has gone more than 100 m — until tapped off.
   const [gps, setGps] = useState(false);
   // Read after mounting, so the server's page and the first render agree.
-  useEffect(() => { if (readGps()) { setLocating(true); setGps(true); } }, []);
+  useEffect(() => { if (readGps() && appAllowed("posizione")) { setLocating(true); setGps(true); } }, []);
+  // Position revoked inside the app (Account → Autorizzazioni): the GPS goes off at once.
+  const positionAllowed = useAppAllowed("posizione");
+  useEffect(() => { if (!positionAllowed) { setGps(false); setLocating(false); } }, [positionAllowed]);
   const placeRef = useRef(initial); placeRef.current = initial;
   const selectRef = useRef(onSelect); selectRef.current = onSelect;
   useEffect(() => {
@@ -162,6 +166,7 @@ function LocationSearch({ initial, onSelect, bare = false }: { initial: Searched
   }, [gps, reverseGoogle]);
   const locate = () => {
     if (gps) { setGps(false); saveGps(false); setLocating(false); return; }
+    if (!guardUse("posizione")) return;
     setError(null); setLocating(true); setGps(true); saveGps(true);
   };
   const [loading, setLoading] = useState(false);
