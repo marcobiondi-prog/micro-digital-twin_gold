@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Check, Trash2, X } from "lucide-react";
+import { Camera, Check, Trash2, X, Zap, ZapOff } from "lucide-react";
+import { setCameraTorch, supportsCameraTorch } from "@/lib/camera-torch";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { releaseSystemCamera } from "@/lib/system-camera";
@@ -57,7 +58,18 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
   const [ready, setReady] = useState(false);
   const [recording, setRecording] = useState(false);
   const [error, setError] = useState("");
-  // Zoom like the AI camera: pinch on the preview or the lens chips 1·2·3·5; the camera's own (hardware) zoom first,
+  // Flash: the camera's own light (torch) where the phone offers it, never a simulated one; it goes off with the camera.
+  const [torch, setTorch] = useState<"none" | "off" | "on">("none");
+  const torchOnRef = useRef(false);
+  torchOnRef.current = torch === "on";
+  const torchTimer = useRef<number | undefined>(undefined);
+  const [torchNote, setTorchNote] = useState("");
+  const toggleTorch = async () => {
+    const next = torch !== "on";
+    const ok = await setCameraTorch(streamRef.current?.getVideoTracks()[0], next);
+    if (ok) { setTorch(next ? "on" : "off"); setTorchNote(""); }
+    else setTorchNote("Impossibile accendere il flash su questo telefono.");
+  };  // Zoom like the AI camera: pinch on the preview or the lens chips 1·2·3·5; the camera's own (hardware) zoom first,
   // the rest a centred digital crop shown on the preview and kept in the photos. Videos zoom only in hardware (a crop
   // would not reach the recording), so without it they have no zoom.
   const [zoom, setZoomState] = useState(1);
@@ -68,12 +80,17 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
   const zoomerRef = useRef<((value: number) => void) | null>(null);
   const pinchFrom = useRef(1);
   const [canZoom, setCanZoom] = useState(false);
+
   const setZoom = (value: number) => {
     const range = zoomRangeRef.current;
     const max = mode === "video" ? (range ? range.max / range.min : 1) : ZOOM_MAX;
     const next = Math.min(max, Math.max(ZOOM_MIN, Math.round(value * 10) / 10));
     const { hardware, digital: rest } = splitZoom(next, range);
-    if (hardware !== null) zoomerRef.current?.(hardware);
+    if (hardware !== null) {
+      zoomerRef.current?.(hardware);
+      // Some phones drop the torch when the zoom constraint is applied: turn it back on once the zoom settles.
+      if (torchOnRef.current) { window.clearTimeout(torchTimer.current); torchTimer.current = window.setTimeout(() => void setCameraTorch(streamRef.current?.getVideoTracks()[0], true), 350); }
+    }
     const d = mode === "video" ? 1 : rest;
     digitalRef.current = d;
     setDigital(d);
@@ -129,6 +146,7 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
         zoomerRef.current = zoomRangeRef.current ? createTrackZoomer(track) : null;
         zoomRef.current = 1; digitalRef.current = 1; setZoomState(1); setDigital(1);
         setCanZoom(mode !== "video" || !!zoomRangeRef.current);
+        setTorch(supportsCameraTorch(track) ? "off" : "none"); setTorchNote("");
         if (!cancelled) setReady(true);
       } catch (cause) {
         if (cancelled) return;
@@ -258,9 +276,15 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
                 <Check className="size-4" aria-hidden="true" /> Fine · {shots.length} foto
               </button>
             )}
+            {torch !== "none" && (
+              <Button variant="ghost" size="icon" onClick={() => void toggleTorch()} aria-pressed={torch === "on"} aria-label={torch === "on" ? "Spegni flash" : "Accendi flash"} title={torch === "on" ? "Spegni flash" : "Accendi flash"} className={torch === "on" ? "camera-tool !bg-amber-400 !text-black" : "camera-tool"}>
+                {torch === "on" ? <Zap /> : <ZapOff />}
+              </Button>
+            )}
             <Button variant="ghost" size="icon" onClick={() => (burst && shots.length ? setAsking(true) : onClose())} aria-label="Chiudi fotocamera" title="Chiudi fotocamera" className="camera-tool"><X /></Button>
           </span>
         </div>
+        {torchNote && <p role="status" className="absolute inset-x-6 top-20 z-10 mx-auto max-w-sm rounded-full bg-black/70 px-4 py-2 text-center text-sm text-white">{torchNote}</p>}
         {asking && (
           <div className="absolute inset-0 z-20 grid place-items-center bg-black/60 p-6 backdrop-blur-sm" role="alertdialog" aria-labelledby="burst-ask">
             <div className="w-full max-w-xs rounded-3xl bg-[oklch(0.25_0.016_258)] p-5 text-white shadow-2xl ring-1 ring-white/15">
