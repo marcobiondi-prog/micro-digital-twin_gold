@@ -11,6 +11,7 @@ import { introSeen } from "@/lib/intro-seen";
 import { THEME_DARK, ThemeToggle, themeBootScript } from "@/views/theme-toggle";
 import { AccountControl } from "@/views/account-control";
 import { CameraDockButton, CameraSheet } from "@/views/CameraDock";
+import { PermissionsSheet } from "@/views/v10/Permissions";
 import { syncAppOrientation } from "@/lib/ar-orientation";
 import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
 import { installUiClicks } from "@/lib/ui-sounds";
@@ -20,6 +21,7 @@ import { useProId, useSyncProId } from "@/lib/use-pro-id";
 import { useSyncMediaArchive } from "@/models/media-archive";
 import { useMediaSync } from "@/lib/use-media-sync";
 import { useDstNotice } from "@/lib/dst-notice";
+import { usePermissions } from "@/lib/app-permissions";
 import { hidePreloader, preloaderScript } from "@/lib/preloader";
 import { unlocks, type ProId } from "@/models/professional-id";
 import { AgronomoIcon, FunzionarioIcon } from "@/views/ProfileIcon";
@@ -389,6 +391,8 @@ function RootComponent() {
   useSyncMediaArchive();
   useMediaSync();
   useDstNotice();
+  // A permission changed in the phone's settings is said once on return to the app.
+  usePermissions(true);
   // The index's preloader goes once the app has started and its fonts are in.
   useEffect(() => {
     const fonts = (document as Document & { fonts?: { ready: Promise<unknown> } }).fonts?.ready ?? Promise.resolve();
@@ -559,6 +563,7 @@ function RootComponent() {
       </footer>}
       {!intro && <BottomNav />}
       <CameraSheet />
+      <PermissionsSheet />
     </QueryClientProvider>
   );
 }

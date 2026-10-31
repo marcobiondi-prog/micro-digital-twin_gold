@@ -29,6 +29,7 @@ import { Route as IdentificazioneAgronomoRouteImport } from './routes/identifica
 import { Route as IdentificazioneFunzionarioRouteImport } from './routes/identificazione.funzionario'
 import { Route as LegaleLicenzeRouteImport } from './routes/legale/licenze'
 import { Route as LegaleTerminiRouteImport } from './routes/legale/termini'
+import { Route as PrivacyAutorizzazioniRouteImport } from './routes/privacy/autorizzazioni'
 import { Route as PrivacyCookieRouteImport } from './routes/privacy/cookie'
 import { Route as PrivacyInformativaRouteImport } from './routes/privacy/informativa'
 import { Route as PrivacyPreferenzeRouteImport } from './routes/privacy/preferenze'
@@ -136,6 +137,11 @@ const LegaleTerminiRoute = LegaleTerminiRouteImport.update({
   path: '/legale/termini',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacyAutorizzazioniRoute = PrivacyAutorizzazioniRouteImport.update({
+  id: '/privacy/autorizzazioni',
+  path: '/privacy/autorizzazioni',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PrivacyCookieRoute = PrivacyCookieRouteImport.update({
   id: '/privacy/cookie',
   path: '/privacy/cookie',
@@ -185,6 +191,7 @@ export interface FileRoutesByFullPath {
   '/identificazione/funzionario': typeof IdentificazioneFunzionarioRoute
   '/legale/licenze': typeof LegaleLicenzeRoute
   '/legale/termini': typeof LegaleTerminiRoute
+  '/privacy/autorizzazioni': typeof PrivacyAutorizzazioniRoute
   '/privacy/cookie': typeof PrivacyCookieRoute
   '/privacy/informativa': typeof PrivacyInformativaRoute
   '/privacy/preferenze': typeof PrivacyPreferenzeRoute
@@ -212,6 +219,7 @@ export interface FileRoutesByTo {
   '/identificazione/funzionario': typeof IdentificazioneFunzionarioRoute
   '/legale/licenze': typeof LegaleLicenzeRoute
   '/legale/termini': typeof LegaleTerminiRoute
+  '/privacy/autorizzazioni': typeof PrivacyAutorizzazioniRoute
   '/privacy/cookie': typeof PrivacyCookieRoute
   '/privacy/informativa': typeof PrivacyInformativaRoute
   '/privacy/preferenze': typeof PrivacyPreferenzeRoute
@@ -240,6 +248,7 @@ export interface FileRoutesById {
   '/identificazione/funzionario': typeof IdentificazioneFunzionarioRoute
   '/legale/licenze': typeof LegaleLicenzeRoute
   '/legale/termini': typeof LegaleTerminiRoute
+  '/privacy/autorizzazioni': typeof PrivacyAutorizzazioniRoute
   '/privacy/cookie': typeof PrivacyCookieRoute
   '/privacy/informativa': typeof PrivacyInformativaRoute
   '/privacy/preferenze': typeof PrivacyPreferenzeRoute
@@ -269,6 +278,7 @@ export interface FileRouteTypes {
     | '/identificazione/funzionario'
     | '/legale/licenze'
     | '/legale/termini'
+    | '/privacy/autorizzazioni'
     | '/privacy/cookie'
     | '/privacy/informativa'
     | '/privacy/preferenze'
@@ -296,6 +306,7 @@ export interface FileRouteTypes {
     | '/identificazione/funzionario'
     | '/legale/licenze'
     | '/legale/termini'
+    | '/privacy/autorizzazioni'
     | '/privacy/cookie'
     | '/privacy/informativa'
     | '/privacy/preferenze'
@@ -323,6 +334,7 @@ export interface FileRouteTypes {
     | '/identificazione/funzionario'
     | '/legale/licenze'
     | '/legale/termini'
+    | '/privacy/autorizzazioni'
     | '/privacy/cookie'
     | '/privacy/informativa'
     | '/privacy/preferenze'
@@ -351,6 +363,7 @@ export interface RootRouteChildren {
   IdentificazioneFunzionarioRoute: typeof IdentificazioneFunzionarioRoute
   LegaleLicenzeRoute: typeof LegaleLicenzeRoute
   LegaleTerminiRoute: typeof LegaleTerminiRoute
+  PrivacyAutorizzazioniRoute: typeof PrivacyAutorizzazioniRoute
   PrivacyCookieRoute: typeof PrivacyCookieRoute
   PrivacyInformativaRoute: typeof PrivacyInformativaRoute
   PrivacyPreferenzeRoute: typeof PrivacyPreferenzeRoute
@@ -500,6 +513,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LegaleTerminiRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacy/autorizzazioni': {
+      id: '/privacy/autorizzazioni'
+      path: '/privacy/autorizzazioni'
+      fullPath: '/privacy/autorizzazioni'
+      preLoaderRoute: typeof PrivacyAutorizzazioniRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/privacy/cookie': {
       id: '/privacy/cookie'
       path: '/privacy/cookie'
@@ -559,6 +579,7 @@ const rootRouteChildren: RootRouteChildren = {
   IdentificazioneFunzionarioRoute: IdentificazioneFunzionarioRoute,
   LegaleLicenzeRoute: LegaleLicenzeRoute,
   LegaleTerminiRoute: LegaleTerminiRoute,
+  PrivacyAutorizzazioniRoute: PrivacyAutorizzazioniRoute,
   PrivacyCookieRoute: PrivacyCookieRoute,
   PrivacyInformativaRoute: PrivacyInformativaRoute,
   PrivacyPreferenzeRoute: PrivacyPreferenzeRoute,
