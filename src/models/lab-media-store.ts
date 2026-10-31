@@ -137,13 +137,23 @@ export async function ensureMedia(k: MediaKind, userId: string | null) {
     const now = Date.now();
     const fresh = (p: string) => { const l = signedAt.get(p); return l && now - l.at < 50 * 60_000 ? l.url : null; };
     const stale = paths.filter((p) => !fresh(p));
-    for (let i = 0; i < stale.length; i += 500) {
-      const part = stale.slice(i, i + 500);
-      const { data: signed } = await supabase.storage.from(MEDIA_BUCKET).createSignedUrls(part, 3600);
-      (signed ?? []).forEach((x, j) => { if (x.signedUrl) signedAt.set(part[j]!, { url: x.signedUrl, at: now }); });
+    for (let i = 0; i < stale.length; i += 100) {
+      const part = stale.slice(i, i + 100);
+      const { data: signed, error: signError } = await supabase.storage.from(MEDIA_BUCKET).createSignedUrls(part, 3600);
+      if (signError) console.warn("Lab media: signing links failed", signError);
+      (signed ?? []).forEach((x) => { if (x.signedUrl && x.path) signedAt.set(x.path, { url: x.signedUrl, at: now }); });
+      // A batch refused as a whole: each file is signed on its own, so one odd file never hides the others.
+      for (const p of part.filter((q) => !fresh(q))) {
+        const one = await supabase.storage.from(MEDIA_BUCKET).createSignedUrl(p, 3600);
+        if (one.data?.signedUrl) signedAt.set(p, { url: one.data.signedUrl, at: now });
+      }
     }
-    account = files.map((f, i) => ({ f, p: paths[i]!, url: fresh(paths[i]!) })).filter((x) => x.url).map(({ f, p, url }) => ({
-      id: p, path: p, url: url!, name: f.name.replace(/^\d+-/, ""), size: Number(f.metadata?.["size"] ?? 0),
+    // A file whose link could not be signed now stays listed with the link it had (or none, shown as a dark tile) and
+    // the list is read again next time: a refused signature never makes the photos vanish from the history.
+    const before = new Map(state[k].filter((i) => i.path).map((i) => [i.path!, i.url]));
+    if (paths.some((p) => !fresh(p))) loadedFor[k] = null;
+    account = files.map((f, i) => ({ f, p: paths[i]!, url: fresh(paths[i]!) ?? before.get(paths[i]!) ?? "" })).map(({ f, p, url }) => ({
+      id: p, path: p, url, name: f.name.replace(/^\d+-/, ""), size: Number(f.metadata?.["size"] ?? 0),
       kind: isVideo(f.name, f.metadata?.["mimetype"] as string | undefined) ? "video" : "image",
     }));
   }

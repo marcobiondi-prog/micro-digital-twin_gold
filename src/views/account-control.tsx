@@ -88,7 +88,7 @@ function StorageRing({ share }: { share: number }) {
   return (
     <svg viewBox="0 0 48 48" className="pointer-events-none absolute -inset-[4px] size-[calc(100%+8px)] -rotate-90" aria-hidden="true">
       <circle cx="24" cy="24" r={r} fill="none" stroke="currentColor" strokeOpacity="0.15" strokeWidth="2.5" />
-      <circle cx="24" cy="24" r={r} fill="none" stroke={usageTone(share)} strokeWidth="2.5" strokeLinecap="round" strokeDasharray={`${shown * c} ${c}`} className="transition-[stroke-dasharray] duration-700 motion-reduce:transition-none" />
+      {shown > 0 && <circle cx="24" cy="24" r={r} fill="none" stroke={usageTone(share)} strokeWidth="2.5" strokeLinecap="round" strokeDasharray={`${shown * c} ${c}`} className="transition-[stroke-dasharray] duration-700 motion-reduce:transition-none" />}
     </svg>
   );
 }
