@@ -298,19 +298,18 @@ function KindMark({ s }: { s: Shot }) {
 }
 
 /**
- * The kinds as one row of pills — Tutti, then only the kinds present, each with how many — to see one kind at a time:
+ * The kinds as one row of pills — Tutti, then all four kinds, each with how many (an empty one dimmed) — to see one kind at a time:
  * single photos, multiple shots, AI shots or videos.
  */
 function KindPills({ shots, value, onChange }: { shots: Shot[]; value: ShotKind | "tutti"; onChange: (k: ShotKind | "tutti") => void }) {
   const counts = useMemo(() => { const n: Record<ShotKind, number> = { foto: 0, multiplo: 0, ai: 0, video: 0 }; for (const s of shots) n[shotKind(s)]++; return n; }, [shots]);
-  const present = SHOT_KINDS.filter((k) => counts[k.id]);
-  if (present.length < 2) return null;
+  if (!shots.length) return null;
   const pill = (on: boolean) => `inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring ${on ? "bg-foreground text-background" : "bg-foreground/[0.07] text-foreground/85"}`;
   return (
     <div role="radiogroup" aria-label="Tipo di foto e video" data-map-gestures className="-mx-1 flex touch-pan-x gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
       <button type="button" role="radio" aria-checked={value === "tutti"} onClick={() => onChange("tutti")} className={pill(value === "tutti")}>Tutti<span className="tabular-nums opacity-70">{shots.length}</span></button>
-      {present.map((k) => (
-        <button key={k.id} type="button" role="radio" aria-checked={value === k.id} onClick={() => onChange(k.id)} className={pill(value === k.id)}>
+      {SHOT_KINDS.map((k) => (
+        <button key={k.id} type="button" role="radio" aria-checked={value === k.id} disabled={!counts[k.id]} onClick={() => onChange(k.id)} className={`${pill(value === k.id)} disabled:opacity-40`}>
           {k.label}<span className="tabular-nums opacity-70">{counts[k.id]}</span>
         </button>
       ))}
