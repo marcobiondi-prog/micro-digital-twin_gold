@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ArrowRight, Building2, CalendarDays, Check, Share2, ChevronDown, Clock3, Cloud, Smartphone, Grape, History, Archive, ArchiveRestore, Camera, FolderClosed, Layers, Play, Sparkles, Trash2, Video } from "lucide-react";
-import { currentMedia, removeMedia, useLabMedia, type MediaItem } from "@/models/lab-media-store";
+import { currentMedia, refreshMedia, removeMedia, useLabMedia, useMediaListError, type MediaItem } from "@/models/lab-media-store";
 import { mediaTime } from "@/models/media-time";
 import { uploadGroups } from "@/models/media-groups";
 import { mediaThumb, readyThumb } from "@/lib/media-thumbs";
@@ -778,6 +778,10 @@ export function ArchiveOnly() {
   const urban = useLabMedia("urban"), vineyard = useLabMedia("vineyard");
   const archive = useMediaArchive();
   useEffect(() => { void currentMedia("urban"); void currentMedia("vineyard"); }, []);
+  // The account's files could not be read: said plainly with the reason and a retry, never an empty silence.
+  const urbanError = useMediaListError("urban"), vineError = useMediaListError("vineyard");
+  const [retrying, setRetrying] = useState(false);
+  const retryMedia = async () => { setRetrying(true); try { await Promise.all([refreshMedia("urban"), refreshMedia("vineyard")]); } finally { setRetrying(false); } };
   const inFlow = (f: HistoryFlow) => !flow || f === flow;
   const shots = useMemo<Shot[]>(() => [
     ...urban.map((m): Shot => ({ ...m, flow: "piazza", at: mediaTime(m) })),
@@ -842,6 +846,10 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
   const urban = useLabMedia("urban"), vineyard = useLabMedia("vineyard");
   const archive = useMediaArchive();
   useEffect(() => { void currentMedia("urban"); void currentMedia("vineyard"); }, []);
+  // The account's files could not be read: said plainly with the reason and a retry, never an empty silence.
+  const urbanError = useMediaListError("urban"), vineError = useMediaListError("vineyard");
+  const [retrying, setRetrying] = useState(false);
+  const retryMedia = async () => { setRetrying(true); try { await Promise.all([refreshMedia("urban"), refreshMedia("vineyard")]); } finally { setRetrying(false); } };
   const allShots = useMemo<Shot[]>(() => [
     ...urban.map((m): Shot => ({ ...m, flow: "piazza", at: mediaTime(m) })),
     ...vineyard.map((m): Shot => ({ ...m, flow: "vigneto", at: mediaTime(m) })),
@@ -864,6 +872,12 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
     const visibleShots = compact ? shots.slice(0, COMPACT_SHOTS) : ofKind;
     return (
       <>
+        {(flow !== "vigneto" && urbanError || flow !== "piazza" && vineError) && (
+          <div role="alert" className="flex items-center gap-3 rounded-2xl bg-amber-500/10 px-4 py-3 text-sm ring-1 ring-amber-500/30">
+            <span className="flex-1">Non riesco a leggere le foto e i video del tuo account<span className="block text-xs text-muted-foreground">{urbanError ?? vineError} · riprovo da solo tra poco</span></span>
+            <button type="button" onClick={() => void retryMedia()} disabled={retrying} className="h-9 shrink-0 rounded-full bg-foreground/10 px-3 text-sm font-semibold disabled:opacity-60">{retrying ? "Riprovo…" : "Riprova"}</button>
+          </div>
+        )}
         {shots.length > 0 && (
           <div className="space-y-2">
             <h3 className="px-1 text-sm font-medium text-muted-foreground">Foto e video{compact && shots.length > visibleShots.length ? ` · ultimi ${visibleShots.length} di ${shots.length}` : ` · ${countText(shots)}`}</h3>

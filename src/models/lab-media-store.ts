@@ -12,6 +12,13 @@ const loadedFor: Record<MediaKind, string | null> = { urban: null, vineyard: nul
 const signedAt = new Map<string, { url: string; at: number }>();
 const subs = new Set<() => void>();
 const emit = () => subs.forEach((f) => f());
+/** Why the account's files could not be read last time (null when they were): shown in the history with a retry. */
+const listError: Record<MediaKind, string | null> = { urban: null, vineyard: null };
+export const mediaListError = (k: MediaKind) => listError[k];
+export function useMediaListError(k: MediaKind) {
+  return useSyncExternalStore((f) => { subs.add(f); return () => subs.delete(f); }, () => listError[k], () => null);
+}
+const retryTimer: Record<MediaKind, ReturnType<typeof setTimeout> | undefined> = { urban: undefined, vineyard: undefined };
 
 export const isVideo = (name: string, type?: string) => (type ? type.startsWith("video/") : /\.(mp4|mov|webm|3gp|m4v)$/i.test(name));
 export const getMedia = (k: MediaKind) => state[k];
@@ -125,10 +132,17 @@ export async function ensureMedia(k: MediaKind, userId: string | null) {
   // never vanish from the list while the connection is down.
   if (error) {
     loadedFor[k] = null;
+    const e = error as { message?: string; statusCode?: string | number; status?: number };
+    listError[k] = [e.statusCode ?? e.status, e.message].filter(Boolean).join(" · ") || "errore sconosciuto";
+    console.warn("Lab media: listing failed", k, error);
     state[k] = [...state[k].filter((i) => i.path), ...device];
     emit();
+    // Tried again by itself a little later (and on every return to the app, through the sync).
+    clearTimeout(retryTimer[k]);
+    retryTimer[k] = setTimeout(() => { if (loadedFor[k] === null) void ensureMedia(k, userId); }, 8000);
     return state[k];
   }
+  listError[k] = null;
   const files = data.filter((f) => f.id);
   let account: MediaItem[] = [];
   if (files.length) {

@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { readMarks, takeLegacyMarks, writeMarks } from "@/lib/account-marks";
 import { useLabMedia, type MediaItem, type MediaKind } from "@/models/lab-media-store";
 
 /**
  * Photos and videos taken out of a simulation, by key ("piazza-<id>"), with when. Deleting in the simulation (a row,
  * a group, Elimina tutti) only takes the file out of the simulation's list (and of its report): it stays in the
  * Cronologia, where it can still be seen, archived or deleted for good. Kept on this device (localStorage
- * mdt-sim-hidden-v1) and, signed in, in the account's user data (sim_hidden), merged on sign-in like the archive.
+ * mdt-sim-hidden-v1) and, signed in, in the account's media storage (<user>/meta/sim-hidden.json, lib/account-marks), merged on sign-in like the archive.
  */
 const KEY = "mdt-sim-hidden-v1";
 let state: Record<string, string> = {};
@@ -18,26 +19,26 @@ const load = () => {
   try { const raw = JSON.parse(localStorage.getItem(KEY) ?? "{}"); if (raw && typeof raw === "object") state = raw; } catch { /* unreadable: start empty */ }
 };
 const keep = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* storage unavailable */ } subs.forEach((f) => f()); };
-const upload = async () => {
-  const { data } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
-  if (data.session) await supabase.auth.updateUser({ data: { sim_hidden: state } }).catch(() => undefined);
-};
+const upload = () => writeMarks("sim-hidden", state);
 const save = () => { keep(); void upload(); };
 const isMarks = (v: unknown): v is Record<string, string> => !!v && typeof v === "object" && !Array.isArray(v) && Object.values(v).every((x) => typeof x === "string");
 
 /** Mounted once by the root: on sign-in the account's marks and this device's are merged (never replaced). */
 export function useSyncSimHidden() {
   useEffect(() => {
-    const adopt = (meta: unknown) => {
+    // The account's marks (its file, plus what an older version kept in the user data, moved out of it) and this
+    // device's are merged, never replaced.
+    const adopt = async (uid: string, meta: unknown) => {
       load();
-      const saved = (meta as { sim_hidden?: unknown } | null)?.sim_hidden;
-      const merged = { ...(isMarks(saved) ? saved : {}), ...state };
-      const changed = !isMarks(saved) || Object.keys(merged).length !== Object.keys(saved).length;
+      const legacy = await takeLegacyMarks("sim_hidden", meta);
+      const saved = await readMarks(uid, "sim-hidden");
+      const merged = { ...legacy, ...saved, ...state };
+      const changed = Object.keys(merged).length !== Object.keys(saved).length;
       state = merged; keep();
-      if (changed && Object.keys(merged).length) void upload();
+      if (changed && Object.keys(merged).length) upload();
     };
-    void supabase.auth.getSession().then(({ data }) => { if (data.session) adopt(data.session.user.user_metadata); });
-    const { data } = supabase.auth.onAuthStateChange((event, s) => { if (event === "SIGNED_IN" && s) adopt(s.user.user_metadata); });
+    void supabase.auth.getSession().then(({ data }) => { if (data.session) void adopt(data.session.user.id, data.session.user.user_metadata); });
+    const { data } = supabase.auth.onAuthStateChange((event, s) => { if (event === "SIGNED_IN" && s) void adopt(s.user.id, s.user.user_metadata); });
     return () => data.subscription.unsubscribe();
   }, []);
 }
