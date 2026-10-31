@@ -121,6 +121,11 @@ function SwipeRow({
 /** Foto e video del sopralluogo come pannello a soffietto: l'intestazione apre e chiude caricamento ed elenco. */
 /** `embedded`: inside a page section (Fold) that brings its own title, so no own toggle; the cameras
  * then mount on document.body, since a closed section would hide them with it. */
+/** Photos and videos listed in the simulation are folded in groups of this many. */
+export const MEDIA_GROUP = 20;
+export const groupsOf = <T,>(list: T[], size = MEDIA_GROUP) =>
+  Array.from({ length: Math.ceil(list.length / size) }, (_, g) => list.slice(g * size, g * size + size));
+
 export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | "vineyard"; context?: string; embedded?: boolean }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -141,6 +146,8 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
   const [view, setView] = useState<MediaItem | null>(null);
   const [open, setOpen] = useState(true);
   const [leaving, setLeaving] = useState<Set<string>>(new Set());
+  // The list is folded in groups of MEDIA_GROUP files, newest first; only the newest group starts open.
+  const [openGroups, setOpenGroups] = useState<Set<number>>(() => new Set([0]));
   /** Cascata identica al caricamento: ogni riga aspetta più della precedente, come le pillole. */
   const cascade = (index: number) => Math.min(400, index * 60 + index * (index - 1) * 4);
   const gallery = useRef<HTMLInputElement>(null);
@@ -569,8 +576,34 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
           )}
           {items.length > 0 ? (
             <>
-              <ul className="mt-3 divide-y rounded-lg border">
-                {items.map((it, i) => (
+              {groupsOf(items).map((group, g) => {
+                const first = g * MEDIA_GROUP;
+                const shown = items.length <= MEDIA_GROUP || openGroups.has(g);
+                const photos = group.filter((x) => x.kind === "image").length;
+                const videos = group.length - photos;
+                return (
+                  <section key={g} className="mt-3">
+                    {items.length > MEDIA_GROUP && (
+                      <button
+                        type="button"
+                        aria-expanded={shown}
+                        onClick={() => setOpenGroups((p) => { const n = new Set(p); if (n.has(g)) n.delete(g); else n.add(g); return n; })}
+                        className="flex w-full items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-left text-sm hover:bg-muted"
+                      >
+                        <Images className="size-4 shrink-0 text-primary" />
+                        <span className="min-w-0 flex-1">
+                          <span className="font-medium">Gruppo {g + 1}</span>
+                          <span className="text-muted-foreground"> · {first + 1}–{first + group.length} di {items.length}</span>
+                          <span className="block text-xs text-muted-foreground">
+                            {[photos && `${photos} foto`, videos && `${videos} video`].filter(Boolean).join(" · ")}
+                          </span>
+                        </span>
+                        <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none ${shown ? "rotate-180" : ""}`} />
+                      </button>
+                    )}
+                    {shown && (
+              <ul className={`${items.length > MEDIA_GROUP ? "mt-1.5" : ""} divide-y rounded-lg border`}>
+                {group.map((it, j) => { const i = first + j; return (
                   <SwipeRow
                     key={it.id}
                     disabled={leaving.has(it.id)}
@@ -623,8 +656,12 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
                       </button>
                     </div>
                   </SwipeRow>
-                ))}
+                ); })}
               </ul>
+                    )}
+                  </section>
+                );
+              })}
             </>
           ) : (
             uploads.length === 0 && (
