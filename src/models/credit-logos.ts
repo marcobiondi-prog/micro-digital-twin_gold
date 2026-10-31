@@ -29,8 +29,6 @@ export const SERVICES: CreditItem[] = [
   item("istat", "ISTAT", "Elenco dei comuni", undefined, ["Istat", "Italian National Institute of Statistics"]),
   item("wikidata", "Wikidata", "Stemmi e loghi", si("wikidata")),
   item("commons", "Wikimedia Commons", "Immagini di stemmi e loghi", si("wikimediacommons")),
-  item("supabase", "Supabase", "Account, salvataggi e foto", si("supabase")),
-  item("vercel", "Vercel", "Pubblicazione dell'app", si("vercel")),
 ];
 
 /** The open-source libraries with their licences (the tile's second line). */
@@ -47,7 +45,7 @@ export const LIBRARIES: CreditItem[] = [
   item("jspdf", "jsPDF", "MIT"),
   item("jszip", "JSZip", "MIT"),
   item("pdfjs", "PDF.js", "Apache-2.0", si("mozilla")),
-  item("supabasejs", "Supabase JS", "MIT", si("supabase")),
+  item("supabasejs", "Supabase JS", "MIT"),
   item("zod", "Zod", "MIT", si("zod")),
   item("datefns", "date-fns", "MIT", si("datefns")),
   item("sonner", "Sonner", "MIT"),

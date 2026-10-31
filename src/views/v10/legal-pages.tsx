@@ -180,7 +180,7 @@ export function LicensesPage() {
   return (
     <InfoPage title="Licenze" intro="Il software aperto e i dati che rendono possibile l'app, con le loro licenze.">
       <InfoCard title="Servizi usati dall'app">
-        <p>I servizi da cui arrivano mappe, meteo, dati, intelligenza artificiale e il tuo account.</p>
+        <p>I servizi da cui arrivano mappe, meteo, dati e intelligenza artificiale.</p>
         <LogoTiles items={SERVICES} cacheKey="mdt-service-logo-v1" label="Servizi" />
         <p className="text-sm text-muted-foreground">I loghi sono di Simple Icons (licenza CC0) o di Wikimedia Commons; i marchi appartengono ai rispettivi titolari e sono mostrati solo come riconoscimento.</p>
       </InfoCard>
