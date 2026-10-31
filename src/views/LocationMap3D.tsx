@@ -42,9 +42,9 @@ function loadMaps3D(key: string): Promise<Maps3D> {
 type Shape = HTMLElement & { outerCoordinates?: unknown; coordinates?: unknown };
 /**
  * The drawn area and the simulation as Google 3D shapes, kept few so the camera moves smoothly: every shape is drawn
- * again on each frame. Only the area's outline and the zones drawn by hand are drawn through the photographed mesh
- * (drawsOccludedSegments costs a second pass); trees are a trunk and three crown discs, a pergola its posts, beams and
- * one see-through roof, a shade net one see-through sheet.
+ * again on each frame: trees are a trunk and three crown discs, a pergola its posts, beams and one see-through roof, a
+ * shade net one see-through sheet. Heights start from the photographed mesh and every shape is drawn through it, so
+ * nothing ends up buried under the photographed ground.
  */
 function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: Array<[number, number]>, sim: SimLayout | null): HTMLElement[] {
   const out: HTMLElement[] = [];
@@ -55,15 +55,29 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
     out.push(poly);
   } catch { return out; /* an older build without polygons: the pin alone */ }
   try {
+    // Ground shapes are drawn through the photographed mesh: the terrain they clamp to often lies under the mesh.
     const ground = (ring: Array<[number, number]>, fill: string) => {
-      const p = new Polygon3DElement({ altitudeMode: "CLAMP_TO_GROUND", fillColor: fill, strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 }) as Shape;
+      const p = new Polygon3DElement({ altitudeMode: "CLAMP_TO_GROUND", fillColor: fill, strokeColor: "rgba(0,0,0,0)", strokeWidth: 0, drawsOccludedSegments: true }) as Shape;
       p.outerCoordinates = ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng }));
       out.push(p);
     };
-    // A part from the ground is raised (extruded); a higher one floats as a flat slab at its height.
+    // Heights are measured from the photographed mesh (RELATIVE_TO_MESH), not from the terrain model, which in a town
+    // can lie metres below the mesh and buried the pergolas and crowns. A trunk or a post is a vertical line from the
+    // mesh up; a slab (crown disc, roof, beam, net) floats at its height; the hedge, a wide wall, stays extruded.
     const part = (pt: { ring: Array<[number, number]>; base: number; height: number; color: string }, at = pt.height) => {
+      const lats = pt.ring.map((q) => q[0]), lngs = pt.ring.map((q) => q[1]);
+      const spanM = Math.max(Math.max(...lats) - Math.min(...lats), (Math.max(...lngs) - Math.min(...lngs)) * Math.cos((lats[0]! * Math.PI) / 180)) * 111_320;
+      if (pt.base === 0 && spanM < 1.2 && Polyline3DElement) {
+        const c = { lat: lats.reduce((x, y) => x + y, 0) / lats.length, lng: lngs.reduce((x, y) => x + y, 0) / lngs.length };
+        const pl = new Polyline3DElement({ altitudeMode: "RELATIVE_TO_MESH", strokeColor: pt.color, strokeWidth: spanM > 0.5 ? 7 : 4, drawsOccludedSegments: true }) as Shape;
+        pl.coordinates = [{ ...c, altitude: 0 }, { ...c, altitude: pt.height }];
+        out.push(pl);
+        return;
+      }
       const raised = pt.base === 0;
-      const p = new Polygon3DElement({ altitudeMode: "RELATIVE_TO_GROUND", extruded: raised, fillColor: pt.color, strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 }) as Shape;
+      const make = (mode: string) => new Polygon3DElement({ altitudeMode: mode, extruded: raised, fillColor: pt.color, strokeColor: "rgba(0,0,0,0)", strokeWidth: 0, drawsOccludedSegments: true }) as Shape;
+      let p: Shape;
+      try { p = make(raised ? "RELATIVE_TO_GROUND" : "RELATIVE_TO_MESH"); } catch { p = make("RELATIVE_TO_GROUND"); }
       p.outerCoordinates = pt.ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: raised ? pt.height : at }));
       out.push(p);
     };
@@ -79,7 +93,7 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
       for (const p of sim.data.patches.filter((x) => x.kind === "cloth").flatMap((x) => netParts(x.ring, true))) part(p);
       for (const p of sim.data.lines.filter((l) => l.kind === "wind").flatMap((l) => hedgeParts(l.line, l.strength ?? 0))) part(p);
       if (Polyline3DElement) for (const l of sim.data.lines.filter((x) => x.kind !== "wind")) {
-        const pl = new Polyline3DElement({ altitudeMode: "CLAMP_TO_GROUND", strokeColor: l.kind === "drip" ? SIM_COLORS.drip : "#ffffff", strokeWidth: l.kind === "drip" ? 2 : 3 }) as Shape;
+        const pl = new Polyline3DElement({ altitudeMode: "CLAMP_TO_GROUND", strokeColor: l.kind === "drip" ? SIM_COLORS.drip : "#ffffff", strokeWidth: l.kind === "drip" ? 2 : 3, drawsOccludedSegments: true }) as Shape;
         pl.coordinates = l.line.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng }));
         out.push(pl);
       }
