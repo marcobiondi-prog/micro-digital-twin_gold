@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { ArrowRight, Building2, CalendarDays, Check, Share2, ChevronDown, Clock3, Cloud, Smartphone, Grape, History, Pause, Play, Repeat, Trash2, Volume2, VolumeX } from "lucide-react";
+import { ArrowRight, Building2, CalendarDays, Check, Share2, ChevronDown, Clock3, Cloud, Smartphone, Grape, History, Archive, ArchiveRestore, FolderClosed, Pause, Play, Repeat, Trash2, Volume2, VolumeX } from "lucide-react";
 import { currentMedia, removeMedia, useLabMedia, type MediaItem } from "@/models/lab-media-store";
 import { mediaTime } from "@/models/media-time";
 import { TabRow } from "@/views/v8/console";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { forShare, zoneOfName } from "@/views/v10/ExportSheet";
 import { useLab } from "@/models/lab-store";
+import { archiveMedia, restoreMedia, useMediaArchive } from "@/models/media-archive";
 import { drawnAreaFor, ZONE_LABEL, type DrawnArea, type SubArea } from "@/models/drawn-area";
 import type { Ring } from "@/models/place-area";
 import { ZONE_COLORS } from "@/views/v10/map-area";
@@ -429,7 +430,7 @@ function PhotoPiles({ shots }: { shots: Shot[] }) {
  * A day's pile spread into its grid. "Seleziona" turns the thumbnails into checkboxes (with "Tutte"), and "Elimina n"
  * asks once in place before deleting them for good — from the account when uploaded, from this device otherwise.
  */
-function OpenPile({ pile, onClose }: { pile: Pile; onClose: () => void }) {
+function OpenPile({ pile, onClose, archived = false }: { pile: Pile; onClose: () => void; archived?: boolean }) {
   const [selecting, setSelecting] = useState(false);
   const [viewing, setViewing] = useState<number | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -440,6 +441,14 @@ function OpenPile({ pile, onClose }: { pile: Pile; onClose: () => void }) {
   const all = picked.size === pile.shots.length;
   const stop = () => { setSelecting(false); setPicked(new Set()); setAsk(false); };
   const chosen = pile.shots.filter((s) => picked.has(keyOf(s)));
+  /** Into the archive (or back out of it): the whole day, or the ones chosen. */
+  const shelve = (items: Shot[]) => {
+    const keys = items.map(keyOf);
+    if (archived) restoreMedia(keys); else archiveMedia(keys);
+    const n = items.length === 1 ? "1 file" : `${items.length} file`;
+    toast.success(archived ? `${n} di nuovo in Foto e video` : `${n} in Archivio · ${pile.label}`);
+    if (items.length === pile.shots.length) onClose(); else stop();
+  };
   const del = async () => {
     setBusy(true);
     try {
@@ -462,6 +471,7 @@ function OpenPile({ pile, onClose }: { pile: Pile; onClose: () => void }) {
               <button type="button" onClick={stop} className="text-sm font-semibold text-muted-foreground outline-none focus-visible:underline">Annulla</button>
             </>
           : <>
+              <button type="button" onClick={() => shelve(pile.shots)} className="inline-flex items-center gap-1 text-sm font-semibold text-foreground outline-none focus-visible:underline">{archived ? <ArchiveRestore className="size-4" aria-hidden="true" /> : <Archive className="size-4" aria-hidden="true" />}{archived ? "Ripristina" : "Archivia"}</button>
               <button type="button" onClick={() => setSelecting(true)} className="text-sm font-semibold text-foreground outline-none focus-visible:underline">Seleziona</button>
               <button type="button" onClick={onClose} className="text-sm font-semibold text-muted-foreground outline-none focus-visible:underline">Chiudi</button>
             </>}
@@ -486,11 +496,75 @@ function OpenPile({ pile, onClose }: { pile: Pile; onClose: () => void }) {
           </div>
         </div>
       ) : (
-        <button type="button" onClick={() => setAsk(true)} disabled={!picked.size}
-          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-destructive text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
-          <Trash2 className="size-4" aria-hidden="true" />{picked.size ? `Elimina ${picked.size === 1 ? "1 file" : `${picked.size} file`}` : "Scegli cosa eliminare"}
-        </button>
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" onClick={() => shelve(chosen)} disabled={!picked.size}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-foreground/10 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
+            {archived ? <ArchiveRestore className="size-4" aria-hidden="true" /> : <Archive className="size-4" aria-hidden="true" />}{archived ? "Ripristina" : "Archivia"}{picked.size ? ` ${picked.size}` : ""}
+          </button>
+          <button type="button" onClick={() => setAsk(true)} disabled={!picked.size}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-destructive text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
+            <Trash2 className="size-4" aria-hidden="true" />Elimina{picked.size ? ` ${picked.size}` : ""}
+          </button>
+        </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * The archive: the photos and videos put away, as folders named by their day (gg/mm/aaaa) under month headings, newest
+ * first, with a date field to go straight to one day; a folder opens like a pile, with Ripristina instead of Archivia.
+ */
+function ArchiveBlock({ shots }: { shots: Shot[] }) {
+  const [open, setOpen] = useState(false);
+  const [day, setDay] = useState("");
+  const [shown, setShown] = useState<string | null>(null);
+  const piles = useMemo(() => pilesOf(shots), [shots]);
+  const isoOf = (p: Pile) => { const s0 = p.shots[0]; if (!s0?.at) return ""; const d = new Date(s0.at); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  const list = day ? piles.filter((p) => isoOf(p) === day) : piles;
+  const months: Array<{ name: string; piles: Pile[] }> = [];
+  for (const p of list) {
+    const at = p.shots[0]?.at;
+    const name = at ? new Date(at).toLocaleDateString("it-IT", { month: "long", year: "numeric" }) : "Senza data";
+    const last = months[months.length - 1];
+    if (last?.name === name) last.piles.push(p); else months.push({ name, piles: [p] });
+  }
+  const current = piles.find((p) => p.key === shown) ?? null;
+  return (
+    <div className="rounded-2xl bg-foreground/[0.04]">
+      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-3 px-4 py-3.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-2xl">
+        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-foreground/[0.08]"><Archive className="size-5" aria-hidden="true" /></span>
+        <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Archivio</span><span className="block text-xs text-muted-foreground">{piles.length === 1 ? "1 giorno" : `${piles.length} giorni`} · {countText(shots)}</span></span>
+        <ChevronDown className={`size-5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+      </button>
+      {open && (
+        <div className="space-y-3 px-3 pb-3">
+          <label className="flex items-center gap-2 rounded-xl bg-foreground/[0.06] px-3 py-2 text-sm">
+            <CalendarDays className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span className="shrink-0 text-muted-foreground">Vai al giorno</span>
+            <input type="date" lang="it" aria-label="Giorno gg/mm/aaaa" value={day} onChange={(e) => { setDay(e.target.value); setShown(null); }} className="min-w-0 flex-1 bg-transparent text-right font-semibold tabular-nums outline-none [color-scheme:dark]" />
+            {day && <button type="button" onClick={() => setDay("")} className="shrink-0 text-xs font-semibold text-muted-foreground">Tutti</button>}
+          </label>
+          {list.length === 0 && <p className="px-1 text-sm text-muted-foreground">Niente in archivio per quel giorno.</p>}
+          {months.map((m) => (
+            <div key={m.name}>
+              <p className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{m.name}</p>
+              <div className="overflow-hidden rounded-xl bg-foreground/[0.05]">
+                {m.piles.map((p) => (
+                  <button key={p.key} type="button" aria-expanded={shown === p.key} onClick={() => setShown(shown === p.key ? null : p.key)}
+                    className="flex w-full items-center gap-3 border-b border-foreground/[0.06] px-3 py-2.5 text-left outline-none last:border-0 focus-visible:bg-foreground/[0.06]">
+                    <FolderClosed className="size-5 shrink-0 text-brand-turquoise" aria-hidden="true" />
+                    <span className="flex-1 text-[15px] font-semibold tabular-nums">{p.label}</span>
+                    <span className="text-xs text-muted-foreground">{countText(p.shots)}</span>
+                    <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform ${shown === p.key ? "rotate-180" : ""}`} aria-hidden="true" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+          {current && <OpenPile key={current.key} pile={current} archived onClose={() => setShown(null)} />}
+        </div>
+      )}
     </div>
   );
 }
@@ -590,6 +664,7 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
   const [clearing, setClearing] = useState(false);
   useEffect(() => { setConfirm(false); }, [filter]);
   const urban = useLabMedia("urban"), vineyard = useLabMedia("vineyard");
+  const archive = useMediaArchive();
   useEffect(() => { void currentMedia("urban"); void currentMedia("vineyard"); }, []);
   const allShots = useMemo<Shot[]>(() => [
     ...urban.map((m): Shot => ({ ...m, flow: "piazza", at: mediaTime(m) })),
@@ -602,7 +677,9 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
   const list = (f: Filter) => {
     const shown = shownIn(f);
     const inTab = all.filter((e) => shown(e.flow));
-    const shots = allShots.filter((s) => shown(s.flow));
+    const inFlow = allShots.filter((s) => shown(s.flow));
+    const shots = inFlow.filter((s) => !archive[`${s.flow}-${s.id}`]);
+    const archivedShots = compact ? [] : inFlow.filter((s) => archive[`${s.flow}-${s.id}`]);
     const groups = compact ? groupByDay(inTab).slice(0, COMPACT_DAYS) : groupByDay(inTab);
     const visibleShots = compact ? shots.slice(0, COMPACT_SHOTS) : shots;
     return (
@@ -613,6 +690,7 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
             <PhotoPiles shots={visibleShots} />
           </div>
         )}
+        {archivedShots.length > 0 && <ArchiveBlock shots={archivedShots} />}
         {groups.length === 0 ? visibleShots.length > 0 ? null : (
           <DashCard className="flex flex-col items-center gap-2 py-8 text-center">
             <History className="size-7 text-muted-foreground" aria-hidden="true" />
