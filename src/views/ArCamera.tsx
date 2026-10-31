@@ -47,6 +47,7 @@ import { CameraCloseGestures } from "@/views/CameraCloseGestures";
 import { tutorialSwipeStep } from "@/lib/ar-tutorial-swipe";
 import { CameraCenterCapture } from "@/views/CameraCenterCapture";
 import { CameraCaptureControl } from "@/views/CameraCaptureControl";
+import { useHoldBurst } from "@/lib/hold-burst";
 import { playAiShutter, playCameraSound, preloadAiShutter, startScanLoop } from "@/lib/camera-sounds";
 import { useLab } from "@/models/lab-store";
 import { createTrackZoomer, pinchZoom, splitZoom, trackZoomRange, zoomHaptic, zoomLabel, ZOOM_LENSES, ZOOM_MAX, ZOOM_MIN } from "@/lib/camera-zoom";
@@ -1092,7 +1093,7 @@ export function ArCamera({
     wrapped.forEach((line, i) => g.fillText(line, fontSize, source.height + (i + 1.2) * fontSize * 1.5));
     // The photo is already frozen in `saved`: close the camera at once and let the JPEG encode
     // (the slow part on phones) finish in the background, then hand the file to the Lab queue.
-    if (burst) {
+    if (burst || arHolding.current) {
       // Still an AI shot (its kind in the history), marked as one of a multiple shot; the camera stays open.
       const id = Date.now();
       setBurstFlash((n) => n + 1);
@@ -1112,6 +1113,9 @@ export function ArCamera({
       0.88,
     );
   };
+
+  // Holding the shutter shoots a multiple shot until the finger lifts, without touching the switch first.
+  const { holding: arHolding, onHold: arHold } = useHoldBurst(() => shoot(), () => setBurst(true));
 
   const record = () => {
     if (recording) {
@@ -1461,7 +1465,7 @@ export function ArCamera({
                   {side(higher, "Aumenta zoom")}
                 </div>;
               })()}
-               <CameraCaptureControl mode={mode ?? "photo"} recording={recording} ar disabled={!ready || scanning || xrActive} onCapture={mode === "photo" ? shoot : record} left={<div className="camera-labelled-tool ar-scan-tools">
+               <CameraCaptureControl mode={mode ?? "photo"} recording={recording} ar disabled={!ready || scanning || xrActive} onCapture={mode === "photo" ? shoot : record} {...(mode !== "video" ? { onHold: arHold } : {})} left={<div className="camera-labelled-tool ar-scan-tools">
                 <Button variant="ghost" size="icon"
                   type="button"
                   data-no-ui-click

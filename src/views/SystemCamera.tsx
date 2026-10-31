@@ -8,6 +8,7 @@ import { CameraCenterCapture } from "@/views/CameraCenterCapture";
 import { CameraCaptureControl } from "@/views/CameraCaptureControl";
 import { playCameraSound } from "@/lib/camera-sounds";
 import { hapticTick } from "@/lib/haptics";
+import { useHoldBurst } from "@/lib/hold-burst";
 
 /**
  * Live capture for hosts without native HTML capture, such as Windows tablets, and for the multiple shot ("burst"):
@@ -28,6 +29,10 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
   const [pending, setPending] = useState(0);
   const [asking, setAsking] = useState(false);
   const stripRef = useRef<HTMLDivElement>(null);
+  // The photo camera turns into the multiple shot without closing: the Singolo | Multiplo switch, or holding the shutter.
+  const [multi, setMulti] = useState(mode === "burst");
+  useEffect(() => { setMulti(mode === "burst"); }, [mode]);
+  const burst = mode !== "video" && mode !== null && multi;
   const finish = useCallback((keep: boolean) => {
     const taken = shotsRef.current;
     if (taken.length && keep) onCapture(taken.map((s) => s.file));
@@ -107,6 +112,7 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
     };
   }, [mode]);
 
+  const { holding, onHold } = useHoldBurst(() => capture(), () => setMulti(true));
   function capture() {
     const video = videoRef.current;
     const stream = streamRef.current;
@@ -119,7 +125,7 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
       if (!context || !canvas.width || !canvas.height) return;
       context.drawImage(video, 0, 0);
       playCameraSound("shutter");
-      if (mode === "burst") {
+      if (burst || holding.current) {
         setFlash((n) => n + 1);
         hapticTick(30);
         const id = Date.now();
@@ -132,7 +138,8 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
           // The camera's own photo, at full resolution where the phone offers it (Chrome on Android), replaces the frame.
           const Capture = (window as unknown as { ImageCapture?: new (t: MediaStreamTrack) => { takePhoto: () => Promise<Blob> } }).ImageCapture;
           const done = () => setPending((n) => n - 1);
-          if (!Capture || !track) { done(); return; }
+          // While the shutter is held the frames come too fast for the full-resolution photo: the frame stays.
+          if (!Capture || !track || holding.current) { done(); return; }
           Promise.race([new Capture(track).takePhoto(), new Promise<never>((_, no) => window.setTimeout(() => no(new Error("slow")), 4000))])
             .then((photo) => {
               if (!activeRef.current || photo.size <= blob.size) return;
@@ -185,7 +192,7 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
   return (
     <Dialog open={mode !== null} onOpenChange={(open) => { if (!open) onClose(); }} modal>
       <DialogContent data-no-ui-click className="camera-hud inset-0 left-0 top-0 block h-dvh w-screen max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 bg-camera-surface p-0 text-camera-ink shadow-none duration-0 data-[state=open]:animate-none data-[state=closed]:animate-none sm:max-h-none sm:overflow-hidden sm:rounded-none [&>button]:hidden" aria-describedby={undefined}>
-        <DialogTitle className="sr-only">{mode === "video" ? "Registra video" : mode === "burst" ? "Scatto multiplo" : "Scatta foto"}</DialogTitle>
+        <DialogTitle className="sr-only">{mode === "video" ? "Registra video" : burst ? "Scatto multiplo" : "Scatta foto"}</DialogTitle>
         <CameraCloseGestures onClose={onClose}>
         <div className="absolute inset-0">
           <video ref={videoRef} autoPlay muted playsInline className="h-full w-full object-cover" />
@@ -196,14 +203,14 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
         {flash > 0 && <div key={flash} className="burst-flash pointer-events-none absolute inset-0 bg-white" aria-hidden="true" />}
         <CameraCenterCapture onCapture={capture} disabled={!ready || !!error} label={mode === "video" ? (recording ? "Termina e salva" : "Avvia registrazione") : "Scatta foto"} />
         <div className="camera-topbar">
-          <span className="camera-title"><Camera className="size-4" /> {mode === "burst" ? "Scatto multiplo" : "Fotocamera"}</span>
+          <span className="camera-title"><Camera className="size-4" /> {burst ? "Scatto multiplo" : "Fotocamera"}</span>
           <span className="ml-auto flex items-center gap-2">
-            {mode === "burst" && shots.length > 0 && (
+            {burst && shots.length > 0 && (
               <button type="button" onClick={() => finish(true)} disabled={pending > 0} className="inline-flex h-10 items-center gap-1.5 rounded-full bg-white px-4 text-sm font-semibold text-black disabled:opacity-80">
                 {pending > 0 ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Check className="size-4" aria-hidden="true" />} Fine · {shots.length} foto
               </button>
             )}
-            <Button variant="ghost" size="icon" onClick={() => (mode === "burst" && shots.length ? setAsking(true) : onClose())} aria-label="Chiudi fotocamera" title="Chiudi fotocamera" className="camera-tool"><X /></Button>
+            <Button variant="ghost" size="icon" onClick={() => (burst && shots.length ? setAsking(true) : onClose())} aria-label="Chiudi fotocamera" title="Chiudi fotocamera" className="camera-tool"><X /></Button>
           </span>
         </div>
         {asking && (
@@ -220,12 +227,12 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
           </div>
         )}
         <div className="camera-bottom">
-          {mode === "burst" && (
+          {burst && (
             <p className="mb-2 text-center text-xs text-white/85 [text-shadow:0_1px_3px_rgb(0_0_0/0.7)]" role="status" aria-live="polite">
-              {shots.length ? `${shots.length} ${shots.length === 1 ? "foto scattata" : "foto scattate"} · il cestino ne toglie una` : "Scatta quante foto vuoi, poi tocca Fine"}
+              {shots.length ? `${shots.length} ${shots.length === 1 ? "foto scattata" : "foto scattate"} · il cestino ne toglie una` : "Tocca per una foto o tieni premuto per scattarne di fila, poi Fine"}
             </p>
           )}
-          {mode === "burst" && shots.length > 0 && (
+          {burst && shots.length > 0 && (
             <div ref={stripRef} data-map-gestures className="mx-auto mb-3 flex max-w-md touch-pan-x snap-x gap-2 overflow-x-auto px-1 pt-2 [scrollbar-width:none]">
               {shots.map((s, i) => (
                 <span key={s.id} className="relative shrink-0 snap-end">
@@ -236,7 +243,13 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
               ))}
             </div>
           )}
-          <CameraCaptureControl mode={mode === "video" ? "video" : "photo"} recording={recording} disabled={!ready || !!error} onCapture={capture} />
+          {mode !== "video" && (
+            <div className="mx-auto mb-2 flex w-fit rounded-full bg-black/55 p-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur" role="radiogroup" aria-label="Tipo di scatto">
+              <button type="button" role="radio" aria-checked={!burst} disabled={shots.length > 0} onClick={() => setMulti(false)} className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""} disabled:opacity-50`}>Singolo</button>
+              <button type="button" role="radio" aria-checked={burst} onClick={() => setMulti(true)} className={`h-8 rounded-full px-3 ${burst ? "bg-white text-black" : ""}`}>Multiplo</button>
+            </div>
+          )}
+          <CameraCaptureControl mode={mode === "video" ? "video" : "photo"} recording={recording} disabled={!ready || !!error} onCapture={capture} {...(mode !== "video" ? { onHold } : {})} />
         </div>
         </CameraCloseGestures>
       </DialogContent>
