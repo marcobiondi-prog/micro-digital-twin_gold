@@ -10,7 +10,8 @@ import { CameraCaptureControl } from "@/views/CameraCaptureControl";
 import { playCameraSound } from "@/lib/camera-sounds";
 import { hapticTick } from "@/lib/haptics";
 import { useHoldBurst } from "@/lib/hold-burst";
-import { createTrackZoomer, pinchZoom, splitZoom, trackZoomRange, zoomHaptic, zoomLabel, ZOOM_LENSES, ZOOM_MAX, ZOOM_MIN } from "@/lib/camera-zoom";
+import { createTrackZoomer, pinchZoom, splitZoom, trackZoomRange, zoomHaptic, ZOOM_MAX, ZOOM_MIN } from "@/lib/camera-zoom";
+import { ZoomDial } from "@/views/ZoomDial";
 
 /**
  * Live capture for hosts without native HTML capture, such as Windows tablets, and for the multiple shot ("burst"):
@@ -49,6 +50,17 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
   }, [close, onCapture]);
   // Closing a multiple shot by Back or a swipe keeps what was taken: nothing shot is ever lost.
   const onClose = useCallback(() => finish(true), [finish]);
+  // Back to Singolo at any time: the shots of the multiple shot go to the simulation at once (none is lost) and the
+  // camera stays open for single photos.
+  const backToSingle = () => {
+    const taken = shotsRef.current;
+    if (taken.length) {
+      void Promise.all(taken.map((s) => s.file)).then((files) => { const ready = files.filter((f): f is File => !!f); if (ready.length) onCapture(ready); });
+      shotsRef.current = [];
+      setShots([]);
+    }
+    setMulti(false);
+  };
   const dropShot = (id: number) => setShots((p) => p.filter((s) => s.id !== id));
   useEffect(() => { const el = stripRef.current; if (el) el.scrollTo({ left: el.scrollWidth, behavior: "smooth" }); }, [shots.length]);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -312,21 +324,10 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
               ))}
             </div>
           )}
-          {canZoom && ready && (() => {
-            const lower = [...ZOOM_LENSES].reverse().find((l) => l < zoom - 0.05);
-            const higher = ZOOM_LENSES.find((l) => l > zoom + 0.05 && (mode !== "video" || !zoomRangeRef.current || l <= zoomRangeRef.current.max / zoomRangeRef.current.min));
-            const side = (lens: number | undefined, label: string) => <button type="button" className="ar-zoom-lens"
-              aria-label={lens === undefined ? label : `${label}: ${zoomLabel(lens)}`} disabled={lens === undefined}
-              onClick={() => lens !== undefined && setZoom(lens)}>{lens ?? "·"}</button>;
-            return <div className="ar-zoom-lenses mb-2 w-fit" role="group" aria-label="Zoom della fotocamera" data-camera-controls>
-              {side(lower, "Riduci zoom")}
-              <button type="button" className="ar-zoom-lens" data-active aria-label={`Zoom ${zoomLabel(zoom)}: tocca per tornare a 1×`} onClick={() => setZoom(1)}>{zoomLabel(zoom)}</button>
-              {side(higher, "Aumenta zoom")}
-            </div>;
-          })()}
+          {canZoom && ready && <ZoomDial className="mb-2" zoom={zoom} max={mode === "video" && zoomRangeRef.current ? zoomRangeRef.current.max / zoomRangeRef.current.min : ZOOM_MAX} onZoom={setZoom} />}
           {mode !== "video" && (
             <div className="mx-auto mb-2 flex w-fit rounded-full bg-black/55 p-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur" role="radiogroup" aria-label="Tipo di scatto">
-              <button type="button" role="radio" aria-checked={!burst} disabled={shots.length > 0} onClick={() => setMulti(false)} className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""} disabled:opacity-50`}>Singolo</button>
+              <button type="button" role="radio" aria-checked={!burst} onClick={backToSingle} className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""} disabled:opacity-50`}>Singolo</button>
               <button type="button" role="radio" aria-checked={burst} onClick={() => setMulti(true)} className={`h-8 rounded-full px-3 ${burst ? "bg-white text-black" : ""}`}>Multiplo</button>
             </div>
           )}

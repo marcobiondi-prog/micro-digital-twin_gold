@@ -48,9 +48,10 @@ import { tutorialSwipeStep } from "@/lib/ar-tutorial-swipe";
 import { CameraCenterCapture } from "@/views/CameraCenterCapture";
 import { CameraCaptureControl } from "@/views/CameraCaptureControl";
 import { useHoldBurst } from "@/lib/hold-burst";
+import { ZoomDial } from "@/views/ZoomDial";
 import { playAiShutter, playCameraSound, preloadAiShutter, startScanLoop } from "@/lib/camera-sounds";
 import { useLab } from "@/models/lab-store";
-import { createTrackZoomer, pinchZoom, splitZoom, trackZoomRange, zoomHaptic, zoomLabel, ZOOM_LENSES, ZOOM_MAX, ZOOM_MIN } from "@/lib/camera-zoom";
+import { createTrackZoomer, pinchZoom, splitZoom, trackZoomRange, zoomHaptic, ZOOM_MAX, ZOOM_MIN } from "@/lib/camera-zoom";
 import { hapticTick } from "@/lib/haptics";
 import { satelliteContext, satelliteLine, type SatelliteContext } from "@/models/copernicus";
 import { loadCopernicus } from "@/views/copernicus-client";
@@ -113,6 +114,12 @@ export function ArCamera({
     setBurst(false);
     closeCamera();
   }, [closeCamera, onCapture]);
+  // Back to Singolo at any time: the multiple shot's photos go to the simulation at once and the camera stays open.
+  const backToSingle = () => {
+    const taken = burstRef.current;
+    if (taken.length) { onCapture(taken.map((s) => s.file)); taken.forEach((s) => URL.revokeObjectURL(s.url)); burstRef.current = []; setBurstShots([]); }
+    setBurst(false);
+  };
   const dropBurstShot = (id: number) => setBurstShots((p) => { const gone = p.find((s) => s.id === id); if (gone) URL.revokeObjectURL(gone.url); return p.filter((s) => s.id !== id); });
   // Copernicus area context (signed-in camera): read once per place, shared with the Lab panel.
   const lab = useLab();
@@ -1451,20 +1458,9 @@ export function ArCamera({
               </div>}
               </div>
                {!toolsOpen && specimenDock}
-               {!toolsOpen && (() => {
-                // Three chips: the neighbouring lenses on the sides, the live value in the centre (tap = back to 1×).
-                const lower = [...ZOOM_LENSES].reverse().find((l) => l < zoom - 0.05);
-                const higher = ZOOM_LENSES.find((l) => l > zoom + 0.05);
-                const side = (lens: number | undefined, label: string) => <button type="button" className="ar-zoom-lens"
-                  aria-label={lens === undefined ? label : `${label}: ${zoomLabel(lens)}`} disabled={lens === undefined || !ready || scanning}
-                  onClick={() => lens !== undefined && setZoom(lens)}>{lens ?? "·"}</button>;
-                return <div className="ar-zoom-lenses" role="group" aria-label="Zoom della fotocamera" data-camera-controls>
-                  {side(lower, "Riduci zoom")}
-                  <button type="button" className="ar-zoom-lens" data-active aria-label={`Zoom ${zoomLabel(zoom)}: tocca per tornare a 1×`}
-                    disabled={!ready || scanning} onClick={() => setZoom(1)}>{zoomLabel(zoom)}</button>
-                  {side(higher, "Aumenta zoom")}
-                </div>;
-              })()}
+               {/* Three chips (the neighbouring lenses on the sides, the live value in the centre, tap = 1×) and a sideways
+                   swipe on them for the Xperia-style ruler. */}
+               {!toolsOpen && <ZoomDial zoom={zoom} max={ZOOM_MAX} disabled={!ready || scanning} onZoom={setZoom} />}
                <CameraCaptureControl mode={mode ?? "photo"} recording={recording} ar disabled={!ready || scanning || xrActive} onCapture={mode === "photo" ? shoot : record} {...(mode !== "video" ? { onHold: arHold } : {})} left={<div className="camera-labelled-tool ar-scan-tools">
                 <Button variant="ghost" size="icon"
                   type="button"
@@ -1516,7 +1512,7 @@ export function ArCamera({
             )}
             <div className="flex items-center gap-2">
               <div role="radiogroup" aria-label="Tipo di scatto" className="flex rounded-full bg-black/55 p-0.5 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur">
-                <button type="button" role="radio" aria-checked={!burst} disabled={burstShots.length > 0} onClick={() => setBurst(false)} className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""} disabled:opacity-50`}>Singolo</button>
+                <button type="button" role="radio" aria-checked={!burst} onClick={backToSingle} className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""} disabled:opacity-50`}>Singolo</button>
                 <button type="button" role="radio" aria-checked={burst} onClick={() => setBurst(true)} className={`h-8 rounded-full px-3 ${burst ? "bg-white text-black" : ""}`}>Multiplo</button>
               </div>
               {burst && burstShots.length > 0 && (
