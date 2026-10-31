@@ -186,8 +186,8 @@ export function CameraSheet() {
                   {!aiReady && <span className={cn("absolute -bottom-1 -right-1 grid size-6 place-items-center rounded-full ring-2 ring-card", signedIn && AI_STANDBY ? "bg-amber-400 text-black" : "bg-foreground text-background")}>{signedIn && AI_STANDBY ? <Wrench className="size-3.5" aria-hidden="true" /> : <Lock className="size-3.5" aria-hidden="true" />}</span>}
                 </span>
                 <span className="min-w-0">
-                  <span className="flex items-center gap-2 text-lg font-bold">Fotocamera AI{signedIn && AI_STANDBY && <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-400">In sviluppo</span>}</span>
-                  <span className="block text-sm text-muted-foreground">{aiReady ? "Inquadra una pianta: la riconosce e calcola il fresco" : signedIn && AI_STANDBY ? "Non è ancora disponibile: la stiamo sviluppando e arriverà con un prossimo aggiornamento. Per ora puoi usare Foto, Video e Galleria." : "Accedi per usarla"}</span>
+                  <span className="flex items-center gap-2 text-lg font-bold">Fotocamera AI{AI_STANDBY && <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-400">In sviluppo</span>}</span>
+                  <span className="block text-sm text-muted-foreground">{aiReady ? "Inquadra una pianta: la riconosce e calcola il fresco" : AI_STANDBY ? `Non è ancora disponibile: la stiamo sviluppando e arriverà con un prossimo aggiornamento. Per ora puoi usare Foto, Video e Galleria.${signedIn ? "" : " Quando sarà pronta, accedi per usarla."}` : "Accedi per usarla"}</span>
                   {place && <span className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-full bg-brand-turquoise/15 px-2.5 py-1 text-xs font-semibold text-brand-turquoise"><MapPin className="size-3.5 shrink-0" aria-hidden="true" /><span className="truncate">{place}</span></span>}
                 </span>
               </button>
