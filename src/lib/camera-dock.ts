@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 
 /** What the central camera button can start. */
-export type CaptureAction = "ai" | "photo" | "video" | "gallery";
+export type CaptureAction = "ai" | "photo" | "video" | "burst" | "gallery";
 type Kind = "urban" | "vineyard";
 
 // The media panel of each simulation page registers how to start a capture; the camera sheet

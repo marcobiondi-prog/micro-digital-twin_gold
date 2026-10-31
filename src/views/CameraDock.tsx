@@ -1,10 +1,11 @@
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { Building2, Camera, Grape, Images, Lock, MapPin, Video, Wrench, type LucideIcon } from "lucide-react";
+import { Building2, Camera, Grape, Images, Layers, Lock, MapPin, Video, Wrench, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useInstalledApp } from "@/lib/installed-app";
 import { useSignedIn } from "@/lib/use-signed-in";
-import { showSimMedia } from "@/views/v8/console";
+import { showSimMediaNow } from "@/views/v8/console";
+import { pushBackGuard } from "@/hooks/use-back-close";
 import { openAccount, requestCapture, setCameraSheetOpen, useCameraSheetOpen, type CaptureAction } from "@/lib/camera-dock";
 import { cn } from "@/lib/utils";
 import { useProId } from "@/lib/use-pro-id";
@@ -102,6 +103,26 @@ export function CameraSheet() {
     window.addEventListener("popstate", go);
     close();
   };
+  // Moves to the project's page while the sheet stays on screen: its own history step is taken back (a guard keeps the
+  // sheet open on that Back), the page replaces it, and the sheet's step is put back on top of the new page.
+  const carryTo = () => {
+    const release = pushBackGuard(() => true);
+    let done = false;
+    const go = () => {
+      if (done) return;
+      done = true;
+      window.removeEventListener("popstate", go);
+      window.clearTimeout(timer);
+      release();
+      void navigate({ to: page, replace: pathname !== "/" && pathname !== "/benvenuto" }).then(() => {
+        if (kind) showSimMediaNow(kind);
+        window.history.pushState({ ...(window.history.state ?? {}), __panel: true }, "");
+      });
+    };
+    const timer = window.setTimeout(go, 400);
+    window.addEventListener("popstate", go);
+    window.history.back();
+  };
   // Called inside the tap: the system camera and the file picker need the user gesture.
   const start = (action: CaptureAction) => {
     if (!kind) return;
@@ -118,13 +139,20 @@ export function CameraSheet() {
       return;
     }
     if (!here) {
-      // The phone's camera and file picker open only from a tap on the page that keeps the photos: go there and ask again.
-      afterClose(() => { openPage(); window.setTimeout(() => setCameraSheetOpen(true), 350); });
+      // The phone's camera and file picker open only from a tap on the page that keeps the photos: go there with the
+      // sheet still open (it never closes and comes back), then the next tap starts the capture.
+      carryTo();
+      return;
+    }
+    // The new photo or video lands under the simulation: show it now, before the camera covers the page.
+    showSimMediaNow(kind);
+    if (action === "burst") {
+      // The multiple shot is the app's own camera (no user gesture needed): it opens once the sheet's Back has landed,
+      // else that Back would close it at once.
+      afterClose(() => { if (!requestCapture(kind, "burst")) toast.error("Fotocamera non pronta, riprova tra un attimo"); });
       return;
     }
     if (!requestCapture(kind, action)) toast.error("Fotocamera non pronta, riprova tra un attimo");
-    // The new photo or video lands under the simulation: show it.
-    showSimMedia(kind);
     close();
   };
   const identify = (to: "/identificazione/funzionario" | "/identificazione/agronomo") => afterClose(() => void navigate({ to }));
@@ -161,8 +189,9 @@ export function CameraSheet() {
                 </span>
               </button>
             )}
-            <div className="grid grid-cols-3">
+            <div className="grid grid-cols-4">
               <RoundAction icon={Camera} label="Foto" tone="bg-primary" onClick={() => start("photo")} />
+              <RoundAction icon={Layers} label="Multiplo" tone="bg-brand-turquoise" onClick={() => start("burst")} />
               <RoundAction icon={Video} label="Video" tone="bg-danger" onClick={() => start("video")} />
               <RoundAction icon={Images} label="Galleria" tone="bg-ok" onClick={() => start("gallery")} />
             </div>

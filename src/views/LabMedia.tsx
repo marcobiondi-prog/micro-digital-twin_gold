@@ -1,5 +1,5 @@
 import { VideoPlayer } from "@/views/v10/VideoPlayer";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   Camera,
@@ -153,8 +153,9 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
   const gallery = useRef<HTMLInputElement>(null);
   const cameraPhoto = useRef<HTMLInputElement>(null);
   const cameraVideo = useRef<HTMLInputElement>(null);
-  const [systemCamera, setSystemCamera] = useState<"photo" | "video" | null>(null);
+  const [systemCamera, setSystemCamera] = useState<"photo" | "video" | "burst" | null>(null);
   const bodyId = `lab-media-body-${kind}`;
+  const closeSystemCamera = useCallback(() => setSystemCamera(null), []);
   /** Fotocamera di sistema diretta: un input per tipo con capture, perché capture con foto+video insieme non apre nulla su molti Android. */
   const openCamera = (m: "photo" | "video") => {
     if (supportsSystemCapture(navigator.userAgent, navigator.platform, navigator.maxTouchPoints)) {
@@ -238,10 +239,12 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
   // AI_STANDBY: the AI camera is paused for now.
   const aiReady = !AI_STANDBY && (Boolean(userId) || demo) && (installedApp || demo);
   // The central camera button of the menu starts captures here, inside the same tap.
-  const captureRef = useRef<(action: "ai" | "photo" | "video" | "gallery") => void>(() => undefined);
+  const captureRef = useRef<(action: "ai" | "photo" | "video" | "burst" | "gallery") => void>(() => undefined);
   captureRef.current = (action) => {
     if (action === "ai") { if (aiReady) void prepareArOrientation().then(() => setAr("photo")); }
     else if (action === "gallery") void pickGallery();
+    // The multiple shot keeps the camera open between shots, which the phone's own camera cannot do: the live camera.
+    else if (action === "burst") void prepareSystemCamera().then(() => setSystemCamera("burst"));
     else openCamera(action);
   };
   useEffect(() => registerCaptureHandler(kind, (action) => captureRef.current(action)), [kind]);
@@ -406,7 +409,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
         }}
       />
       {input(cameraPhoto, "image/*", "environment")}
-      <SystemCamera mode={systemCamera} onCapture={(file) => add([file])} onClose={() => setSystemCamera(null)} />
+      <SystemCamera mode={systemCamera} onCapture={(files) => add(files)} onClose={closeSystemCamera} />
       <GalleryReview kind={kind} files={reviewing} zones={zoneNames} onAddMore={() => void pickGallery()} onClose={() => setReviewing(null)}
         onConfirm={(files, zone) => {
           // The zone rides in the name ("Lotto A - foto.jpg"), so the list and the report show where it was taken.

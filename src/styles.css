@@ -2097,3 +2097,8 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   .pile-ring { animation: none; background: rgb(45 212 191); }
   .pile-glow { animation: none; }
 }
+
+/* Multiple shot: a short white flash for each photo kept. */
+.burst-flash { animation: burst-flash 0.22s ease-out forwards; opacity: 0; }
+@keyframes burst-flash { from { opacity: 0.55; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .burst-flash { animation: none; } }

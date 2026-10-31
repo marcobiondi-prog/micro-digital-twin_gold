@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { justSwiped, peekStyle } from "@/lib/use-tab-swipe";
@@ -24,6 +25,18 @@ export function openSimTab(kind: SimKind, tab: SimTab) {
 /** Id of the photo and video block under a simulator, which the camera and the ⋮ menu bring into view. */
 export const simMediaId = (kind: SimKind) => `sim-media-${kind}`;
 /** Opens Simula and scrolls to its photos and videos, once the panel shows and the closing menu or sheet has handed focus back. */
+/** A switch made for the camera sheet happens at once: no panel entrance, no sliding pill, no smooth scroll. */
+let quietUntil = 0;
+const quiet = () => Date.now() < quietUntil;
+/**
+ * Opens Simula and brings its photos into view at once, inside the tap that starts a capture: the page is settled before
+ * the phone's camera or picker covers it, so nothing slides or reappears on the way back.
+ */
+export function showSimMediaNow(kind: SimKind) {
+  quietUntil = Date.now() + 700;
+  flushSync(() => openSimTab(kind, "simula"));
+  document.getElementById(simMediaId(kind))?.scrollIntoView({ behavior: "auto", block: "start" });
+}
 export function showSimMedia(kind: SimKind) {
   openSimTab(kind, "simula");
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -142,7 +155,7 @@ export function TabRow<T extends string>({ items, value, onChange, label, fill }
     const r = row.current, a = active.current;
     if (!r || !a) return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    r.scrollTo({ left: a.offsetLeft - (r.clientWidth - a.offsetWidth) / 2, behavior: reduce ? "auto" : "smooth" });
+    r.scrollTo({ left: a.offsetLeft - (r.clientWidth - a.offsetWidth) / 2, behavior: reduce || quiet() ? "auto" : "smooth" });
   }, [value]);
   return (
     <div ref={row} role="tablist" aria-label={label} className={cn("no-scrollbar relative flex gap-1.5", fill ? "w-full" : "-mx-4 snap-x overflow-x-auto px-4 touch-pan-x")}>
@@ -172,7 +185,7 @@ export function Panels<T extends string>({ value, panels, peek = null, peekSide 
   const index = panels.findIndex((p) => p.id === value);
   const last = useRef(index);
   // A swipe already slides the panel in with the finger (useTabSwipe): no second entrance then.
-  const dir = index === last.current || justSwiped() ? 0 : index > last.current ? 1 : -1;
+  const dir = index === last.current || justSwiped() || quiet() ? 0 : index > last.current ? 1 : -1;
   useEffect(() => { last.current = index; }, [index]);
   return (
     <>
