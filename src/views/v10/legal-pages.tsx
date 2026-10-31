@@ -224,6 +224,15 @@ export function LicensesPage() {
           <li>Stemmi dei comuni e delle regioni e loghi dei sistemi satellitari da Wikimedia Commons (trovati tramite Wikidata): autore e licenza nella pagina di ogni file. I loghi appartengono ai rispettivi titolari e sono mostrati solo come riconoscimento.</li>
         </ul>
       </InfoCard>
+      <InfoCard title="Permessi del telefono">
+        <p>L'app usa queste funzioni del telefono solo con il tuo permesso, e solo mentre la usi:</p>
+        <ul>
+          <li>Posizione: per trovare il luogo sulla mappa e per il GPS che ti segue. La posizione arriva dai sistemi satellitari qui sopra e non viene condivisa con altri.</li>
+          <li>Fotocamera e microfono: per scattare foto, lo scatto multiplo e i video con l'audio. Foto e video restano nella tua simulazione, sul telefono o nel tuo account.</li>
+          <li>Notifiche: per avvisarti del cambio dell'ora, anche con l'app in sottofondo.</li>
+        </ul>
+        <p>Il permesso vero lo dà e lo toglie il telefono. Posizione e fotocamera le puoi revocare anche dentro l'app, in qualsiasi momento, in <PageLink to="/privacy/autorizzazioni">Autorizzazioni</PageLink>: lì trovi anche dove toglierle dalle impostazioni del telefono.</p>
+      </InfoCard>
       <InfoCard title="Software">
         <ul>{LIBS.map(([n, l]) => <li key={n}>{n} — {l}</li>)}</ul>
       </InfoCard>
