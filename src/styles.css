@@ -2130,3 +2130,11 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .pile-fold[data-folded] { grid-template-rows: 0fr; opacity: 0; }
 .pile-fold > div { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) { .pile-open, .pile-group, .pile-deal { animation: none; } .pile-fold { transition: none; } }
+
+/* The opened pile stands out from the page: a lighter slate card (the sheets' slate in dark), a turquoise edge, a
+   light top edge and a deep shadow, with a notch pointing up at the pile it belongs to. */
+.pile-panel > .pile-open { background: var(--color-card); border: 1px solid color-mix(in oklab, var(--color-brand-turquoise) 45%, transparent); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12), 0 18px 40px -12px rgb(0 0 0 / 0.55), 0 0 0 4px color-mix(in oklab, var(--color-brand-turquoise) 10%, transparent); }
+.dark .pile-panel > .pile-open { background: oklch(0.25 0.016 258); }
+.pile-notch { position: absolute; top: calc(.5rem - 7px); left: var(--notch-x, 25%); width: 14px; height: 14px; transform: translateX(-50%) rotate(45deg); background: var(--color-card); border-left: 1px solid color-mix(in oklab, var(--color-brand-turquoise) 45%, transparent); border-top: 1px solid color-mix(in oklab, var(--color-brand-turquoise) 45%, transparent); z-index: 1; animation: pile-group .3s ease-out both; }
+.dark .pile-notch { background: oklch(0.25 0.016 258); }
+@media (prefers-reduced-motion: reduce) { .pile-notch { animation: none; } }

@@ -430,7 +430,13 @@ function PhotoPiles({ shots, by = "giorno" }: { shots: Shot[]; by?: PileView }) 
           return (
             <Fragment key={p.key}>
               {tile}
-              {idx === rowEnd && shown && <div ref={panel} className="col-span-full scroll-mb-28"><OpenPile key={shown.key} pile={shown} onClose={() => setOpen(null)} /></div>}
+              {idx === rowEnd && shown && (
+                // Set apart from the page: a lighter slate card with a turquoise edge, and a notch pointing up at the pile it came from.
+                <div ref={panel} className="pile-panel relative col-span-full scroll-mb-28 pt-2" style={{ "--notch-x": `${((openAt % cols) + 0.5) / cols * 100}%` } as React.CSSProperties}>
+                  <span className="pile-notch" aria-hidden="true" />
+                  <OpenPile key={shown.key} pile={shown} onClose={() => setOpen(null)} />
+                </div>
+              )}
             </Fragment>
           );
         })}
