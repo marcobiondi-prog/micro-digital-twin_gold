@@ -527,7 +527,6 @@ export function AccountControl() {
   );
 }
 
-/** Twin drawn still, with smiling eyes: the account panel's sign-off (no animation, no name). */
 /** Which version is running (its build date) and a button to look for a newer one now. */
 function AppVersion() {
   const [state, setState] = useState<"idle" | "checking" | "latest" | "updated" | "offline">("idle");
@@ -545,13 +544,15 @@ function AppVersion() {
         <RefreshCw className={`size-4 ${state === "checking" || state === "updated" ? "animate-spin" : ""}`} aria-hidden="true" />
         {state === "checking" ? "Cerco…" : state === "updated" ? "Aggiorno…" : "Cerca aggiornamenti"}
       </button>
-      <p role="status" className="text-xs text-muted-foreground">
+      {/* Its line keeps its height even empty, so the answer never moves Twin below. */}
+      <p role="status" className="min-h-4 text-xs leading-4 text-muted-foreground">
         {state === "latest" ? "Hai già l'ultima versione." : state === "offline" ? "Senza rete: riprova quando sei connesso." : ""}
       </p>
     </div>
   );
 }
 
+/** Twin drawn still, with smiling eyes: the account panel's sign-off (no animation, no name). */
 function TwinStill({ className = "" }: { className?: string }) {
   return (
     <svg viewBox="0 0 512 452" className={className} role="img" aria-label="Twin">
