@@ -276,12 +276,9 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
                 <Check className="size-4" aria-hidden="true" /> Fine · {shots.length} foto
               </button>
             )}
-            {torch !== "none" && (
-              <Button variant="ghost" size="icon" onClick={() => void toggleTorch()} aria-pressed={torch === "on"} aria-label={torch === "on" ? "Spegni flash" : "Accendi flash"} title={torch === "on" ? "Spegni flash" : "Accendi flash"} className={torch === "on" ? "camera-tool !bg-amber-400 !text-black" : "camera-tool"}>
-                {torch === "on" ? <Zap /> : <ZapOff />}
-              </Button>
-            )}
-            <Button variant="ghost" size="icon" onClick={() => (burst && shots.length ? setAsking(true) : onClose())} aria-label="Chiudi fotocamera" title="Chiudi fotocamera" className="camera-tool"><X /></Button>
+            {/* The same flash button as the AI camera's: a round glass tool, lit like a pressed tool while on. */}
+            {torch !== "none" && <Button variant="ghost" size="icon" className="camera-tool size-11 aria-pressed:border-camera-ink aria-pressed:bg-camera-surface" aria-pressed={torch === "on"} aria-label={torch === "on" ? "Disattiva flash" : "Attiva flash"} title={torch === "on" ? "Disattiva flash" : "Attiva flash"} onClick={() => void toggleTorch()}>{torch === "on" ? <Zap className="size-4" /> : <ZapOff className="size-4" />}</Button>}
+            <Button variant="ghost" size="icon" onClick={() => (burst && shots.length ? setAsking(true) : onClose())} aria-label="Chiudi fotocamera" title="Chiudi fotocamera" className="camera-tool size-11"><X className="size-4" /></Button>
           </span>
         </div>
         {torchNote && <p role="status" className="absolute inset-x-6 top-20 z-10 mx-auto max-w-sm rounded-full bg-black/70 px-4 py-2 text-center text-sm text-white">{torchNote}</p>}
