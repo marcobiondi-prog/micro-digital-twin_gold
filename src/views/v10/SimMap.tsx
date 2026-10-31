@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Check, Hand, Lock, MapPin, PenLine, RotateCcw, Trash2, Undo2, X } from "lucide-react";
+import { Check, Hand, Lock, MapPin, Minus, PenLine, Plus, RotateCcw, Trash2, Undo2, X } from "lucide-react";
+import { hapticTick } from "@/lib/haptics";
+import { NO_MIX, type VineMix } from "@/models/vine-interventions";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { openAccount } from "@/lib/camera-dock";
 import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn } from "@/lib/demo-login";
@@ -150,7 +152,7 @@ export function SimMap({ kind }: { kind: SimKind }) {
       <PlaceSearch kind={kind} />
       <div className="relative -mx-4 h-[52vh] min-h-72 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
         {/* The temperature the interventions bring, on the map itself (2D and 3D), following the levers live. */}
-        {!drawing && !drawingZone && <MapReading kind={kind} />}
+        <MapReading kind={kind} />
         {show3d
           ? <Suspense fallback={<div className="h-full w-full bg-card" />}>{key
             ? <LocationMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} apiKey={key} area={ring} sim={sim}
@@ -160,6 +162,9 @@ export function SimMap({ kind }: { kind: SimKind }) {
             onAreaChange={drawingZone ? setZoneDraft : setDraft} sim={editingZone && sim ? { ...sim, inner: (sim.inner ?? []).filter((z) => z.id !== editingZone) } : sim} arranging={arranging} onMove={moved}
             outline={drawingZone ? saved?.ring ?? null : null} onOutside={() => toast("La zona va dentro l'area disegnata")} /></Suspense>}
       </div>
+      {/* The elements put on the map right here, with or without a drawn area: each step redraws the map and moves the
+          temperature pill on it. */}
+      {!drawing && !drawingZone && <MapLevers kind={kind === "urban" ? "piazza" : "vigneto"} />}
       {drawingZone ? (
         <ZoneDrawBar kind={zoneKind!} pins={zoneDraft.length} m2={zoneDraft.length >= 3 ? pinsM2(zoneDraft) : null} editing={editingZone !== null}
           kinds={ZONE_KINDS[kind === "urban" ? "piazza" : "vigneto"]} onKind={setZoneKind}
@@ -187,7 +192,8 @@ const deg = (t: number) => `${t.toLocaleString("it-IT", { minimumFractionDigits:
  */
 function MapReading({ kind }: { kind: SimKind }) {
   const piazza = usePiazzaReading();
-  const vine = useLab().vineyard;
+  const lab = useLab();
+  const vine = lab.vineyard;
   let before: number, after: number, what: string;
   if (kind === "urban") {
     if (!piazza) return null;
@@ -202,8 +208,10 @@ function MapReading({ kind }: { kind: SimKind }) {
     what = "Temperatura sulle foglie · media delle zone";
   }
   const gain = +(before - after).toFixed(1);
+  // Something is in place but takes nothing off now (no heat at this hour or season): said, so the pill is not mute.
+  const placed = kind === "urban" ? lab.urban.trees + lab.urban.permeable + lab.urban.shade > 0 : true;
   return (
-    <div role="status" aria-live="polite" className="pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-full bg-black/20 px-2.5 py-1 text-white ring-1 ring-white/20 backdrop-blur-[2px] [text-shadow:0_1px_2px_rgb(0_0_0/0.8)]">
+    <div key={after} role="status" aria-live="polite" className="map-reading pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-full bg-black/20 px-2.5 py-1 text-white ring-1 ring-white/20 backdrop-blur-[2px] [text-shadow:0_1px_2px_rgb(0_0_0/0.8)]">
       <p className="flex items-center justify-center gap-1 whitespace-nowrap text-[13px] font-medium tabular-nums leading-tight">
         <Thermometer className="size-3.5 shrink-0" style={{ color: heatTone(after) }} aria-hidden="true" />
         {gain > 0.05 ? <>
@@ -211,7 +219,7 @@ function MapReading({ kind }: { kind: SimKind }) {
           <span aria-hidden="true" className="text-white/50">→</span>
           <span style={{ color: heatTone(after) }}>{deg(after)}</span>
           <span className="ml-0.5 text-[11px] font-semibold text-emerald-300">−{gain.toLocaleString("it-IT")}°</span>
-        </> : <span style={{ color: heatTone(after) }}>{deg(after)}</span>}
+        </> : <><span style={{ color: heatTone(after) }}>{deg(after)}</span>{placed && kind === "urban" && <span className="ml-1 text-[11px] font-normal text-white/75">· a quest'ora non serve</span>}</>}
       </p>
       <span className="sr-only">{gain > 0.05 ? what : `${what} · senza interventi`}</span>
     </div>
@@ -293,6 +301,52 @@ function SimBar({ sim, arranging, edited, onArrange, onAuto }: { sim: SimLayout;
         </button>
         {edited && <button type="button" onClick={onAuto} className={cn(barBtn, "bg-foreground/[0.08]")}><RotateCcw className="size-4" aria-hidden="true" />Disposizione automatica</button>}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The simulation's levers under its map (the same as on Simula): piazza trees, lawn and shade; vineyard irrigation,
+ * shade cloth and windbreak on the scope chosen in the simulation (every zone, or the one picked). − / + by the
+ * simulation's own steps.
+ */
+function MapLevers({ kind }: { kind: "piazza" | "vigneto" }) {
+  const lab = useLab();
+  const step = (label: string, value: string, onMinus: (() => void) | null, onPlus: (() => void) | null) => (
+    <div key={label} className="flex items-center gap-1.5 rounded-full bg-foreground/[0.06] p-1">
+      <button type="button" aria-label={`Togli ${label.toLowerCase()}`} disabled={!onMinus} onClick={() => { hapticTick(); onMinus?.(); }} className="grid size-9 place-items-center rounded-full bg-foreground/10 outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-30"><Minus className="size-4" aria-hidden="true" /></button>
+      <span className="min-w-0 flex-1 text-center text-sm leading-tight"><span className="block font-semibold tabular-nums">{value}</span><span className="block text-xs text-muted-foreground">{label}</span></span>
+      <button type="button" aria-label={`Aggiungi ${label.toLowerCase()}`} disabled={!onPlus} onClick={() => { hapticTick(); onPlus?.(); }} className="grid size-9 place-items-center rounded-full bg-foreground/10 outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-30"><Plus className="size-4" aria-hidden="true" /></button>
+    </div>
+  );
+  if (kind === "piazza") {
+    const u = lab.urban;
+    // Totals change: the placed squares follow the default layout again, as on Simula.
+    const set = (patch: { trees?: number; permeable?: number; shade?: number }) => setUrban({ ...patch, treeCells: null, permeableCells: null, shadeCells: null });
+    return (
+      <div className="grid grid-cols-3 gap-2" role="group" aria-label="Elementi sulla mappa">
+        {step("Alberi", `${u.trees}`, u.trees > 0 ? () => set({ trees: u.trees - 1 }) : null, u.trees < 30 ? () => set({ trees: u.trees + 1 }) : null)}
+        {step("Prato", `${u.permeable}%`, u.permeable > 0 ? () => set({ permeable: Math.max(0, u.permeable - 10) }) : null, u.permeable < 100 ? () => set({ permeable: Math.min(100, u.permeable + 10) }) : null)}
+        {step("Ombra", `${u.shade}%`, u.shade > 0 ? () => set({ shade: Math.max(0, u.shade - 10) }) : null, u.shade < 100 ? () => set({ shade: Math.min(100, u.shade + 10) }) : null)}
+      </div>
+    );
+  }
+  const v = lab.vineyard;
+  const legacy = vineMixOf(v);
+  const mixes = v.zones.map((z) => zoneMixOf(z, legacy));
+  const targets = v.allZones ? v.zones.map((_, i) => i) : [v.selected];
+  const avgOf = (k: keyof VineMix) => Math.round(targets.reduce((t, i) => t + (mixes[i]?.[k] ?? 0), 0) / Math.max(1, targets.length));
+  const mix: VineMix = { irrigation: avgOf("irrigation"), shade: avgOf("shade"), windbreak: avgOf("windbreak") };
+  const change = (patch: Partial<VineMix>) => setVineyard((vv) => ({
+    zones: vv.zones.map((z, i) => ({ ...z, ...(mixes[i] ?? NO_MIX), ...(targets.includes(i) ? { ...mix, ...patch } : {}) })),
+  }));
+  const lever = (label: string, k: keyof VineMix, by: number, max: number, unit: string) =>
+    step(label, `${k === "irrigation" ? "+" : ""}${mix[k]}${unit}`, mix[k] > 0 ? () => change({ [k]: Math.max(0, mix[k] - by) }) : null, mix[k] < max ? () => change({ [k]: Math.min(max, mix[k] + by) }) : null);
+  return (
+    <div className="grid grid-cols-3 gap-2" role="group" aria-label={v.allZones ? "Elementi sulla mappa, tutte le zone" : `Elementi sulla mappa, zona ${v.selected + 1}`}>
+      {lever("Irrigazione", "irrigation", 2, 20, "%")}
+      {lever("Teli d'ombra", "shade", 10, 100, "%")}
+      {lever("Frangivento", "windbreak", 10, 100, "%")}
     </div>
   );
 }

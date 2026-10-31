@@ -2143,3 +2143,8 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
    the phone to itself. */
 html[data-sys-camera] body > :not([data-sys-camera-root]):not(:has([data-sys-camera-root])) { visibility: hidden; }
 html[data-sys-camera] body > :not([data-sys-camera-root]):not(:has([data-sys-camera-root])) * { animation-play-state: paused !important; }
+
+/* The map's temperature pill answers each change of the elements with a short pulse. */
+.map-reading { animation: map-reading .45s cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes map-reading { 0% { transform: translateX(-50%) scale(1); } 35% { transform: translateX(-50%) scale(1.08); } 100% { transform: translateX(-50%) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .map-reading { animation: none; } }
