@@ -1,5 +1,5 @@
 import { saveProId, useProId } from "@/lib/use-pro-id";
-import { getMedia, removeMedia } from "@/models/lab-media-store";
+import { getMedia, removeMedia, useLabMedia } from "@/models/lab-media-store";
 import { CLOUD_QUOTA, bytesText, usageTone, useCloudUsage } from "@/lib/use-cloud-usage";
 import { ProfileIcon } from "@/views/ProfileIcon";
 import { proSummary } from "@/models/professional-id";
@@ -92,8 +92,16 @@ function StorageRing({ share }: { share: number }) {
 }
 
 /** In the account panel: the cloud space as a bar, how much is used of 50 GB and how much is left. */
-function StorageBar({ used, share, files }: { used: number; share: number; files: number }) {
+function StorageBar({ used, share }: { used: number; share: number; files: number }) {
   const pct = share * 100;
+  // The profile's project only: the piazza for the municipal officer, the vineyard for the agronomist; both without one.
+  const proId = useProId();
+  const kinds: Array<"urban" | "vineyard"> = proId ? [proId.kind === "funzionario" ? "urban" : "vineyard"] : ["urban", "vineyard"];
+  const ofWhat = proId ? (proId.kind === "funzionario" ? "della piazza" : "del vigneto") : "della piazza e del vigneto";
+  const urban = useLabMedia("urban"), vineyard = useLabMedia("vineyard");
+  const mine = kinds.flatMap((k) => (k === "urban" ? urban : vineyard)).filter((m) => m.path);
+  const files = mine.length;
+  const mineBytes = mine.reduce((t, m) => t + (m.size || 0), 0);
   // "Svuota": every photo and video of the account deleted from the cloud, after one confirm in place (toasts sit under the panel).
   const [ask, setAsk] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -101,11 +109,11 @@ function StorageBar({ used, share, files }: { used: number; share: number; files
   const empty = async () => {
     setBusy(true);
     try {
-      for (const k of ["urban", "vineyard"] as const) {
+      for (const k of kinds) {
         const inCloud = getMedia(k).filter((m) => m.path);
         if (inCloud.length) await removeMedia(k, inCloud);
       }
-      setMsg(`Spazio liberato: ${files === 1 ? "1 file eliminato" : `${files} file eliminati`} dal cloud.`);
+      setMsg(`Spazio liberato: ${files === 1 ? "1 file eliminato" : `${files} file eliminati`} ${ofWhat} dal cloud.`);
     } catch {
       setMsg("Non sono riuscito a svuotare tutto: controlla la connessione e riprova.");
     }
@@ -128,7 +136,7 @@ function StorageBar({ used, share, files }: { used: number; share: number; files
         <div className="h-full rounded-full transition-[width] duration-700 motion-reduce:transition-none" style={{ width: `${used > 0 ? Math.max(pct, 1.5) : 0}%`, background: usageTone(share) }} />
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        {files === 1 ? "1 foto o video" : `${files} foto e video`} nel tuo account · liberi {bytesText(Math.max(0, CLOUD_QUOTA - used))}
+        {files === 1 ? "1 foto o video" : `${files} foto e video`} {ofWhat} nel tuo account · liberi {bytesText(Math.max(0, CLOUD_QUOTA - used))}
       </p>
       {share >= 0.95 && (
         <p className="mt-1.5 text-xs font-semibold" style={{ color: usageTone(share) }} role="status">
@@ -136,9 +144,9 @@ function StorageBar({ used, share, files }: { used: number; share: number; files
         </p>
       )}
       {ask && (
-        <div role="alertdialog" aria-label="Svuotare lo spazio nel cloud?" className="mt-3 rounded-md border border-danger/40 bg-danger/10 p-3 text-sm">
-          <p className="font-semibold">Svuotare lo spazio nel cloud?</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">Elimino dal tuo account {files === 1 ? "1 foto o video" : `tutte le ${files} foto e video`} della piazza e del vigneto ({bytesText(used)}), anche quelli archiviati. Non si possono recuperare.</p>
+        <div role="alertdialog" aria-label={`Svuotare lo spazio ${ofWhat}?`} className="mt-3 rounded-md border border-danger/40 bg-danger/10 p-3 text-sm">
+          <p className="font-semibold">Svuotare lo spazio {ofWhat}?</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Elimino dal tuo account {files === 1 ? "1 foto o video" : `tutte le ${files} foto e video`} {ofWhat} ({bytesText(mineBytes)}), anche quelli archiviati. Non si possono recuperare.</p>
           <div className="mt-3 flex gap-2">
             <button type="button" onClick={() => setAsk(false)} disabled={busy} className="h-10 flex-1 rounded-full bg-foreground/[0.08] text-sm font-semibold">Annulla</button>
             <button type="button" onClick={() => void empty()} disabled={busy} className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full bg-danger text-sm font-semibold text-white disabled:opacity-70">
