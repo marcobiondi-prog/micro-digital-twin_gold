@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { hedgeParts, netParts, pergolaParts, treeParts } from "@/models/area-layout";
+import { crownRing, hedgeParts, netParts, PERGOLA_COLORS, pergolaParts, TREE_RADIUS_M, treeParts } from "@/models/area-layout";
 import { SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import { Crosshair, LoaderCircle } from "lucide-react";
 import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camera";
@@ -56,15 +56,16 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
   } catch { return out; /* an older build without polygons: the pin alone */ }
   try {
     // Ground shapes are drawn through the photographed mesh: the terrain they clamp to often lies under the mesh.
-    const ground = (ring: Array<[number, number]>, fill: string) => {
-      const p = new Polygon3DElement({ altitudeMode: "CLAMP_TO_GROUND", fillColor: fill, strokeColor: "rgba(0,0,0,0)", strokeWidth: 0, drawsOccludedSegments: true }) as Shape;
+    // An outline (stroke) costs no extra shape and gives each piece a crisp edge, so it reads as an object, not a smear.
+    const ground = (ring: Array<[number, number]>, fill: string, stroke = "rgba(0,0,0,0)", width = 0) => {
+      const p = new Polygon3DElement({ altitudeMode: "CLAMP_TO_GROUND", fillColor: fill, strokeColor: stroke, strokeWidth: width, drawsOccludedSegments: true }) as Shape;
       p.outerCoordinates = ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng }));
       out.push(p);
     };
     // Heights are measured from the photographed mesh (RELATIVE_TO_MESH), not from the terrain model, which in a town
     // can lie metres below the mesh and buried the pergolas and crowns. A trunk or a post is a vertical line from the
     // mesh up; a slab (crown disc, roof, beam, net) floats at its height; the hedge, a wide wall, stays extruded.
-    const part = (pt: { ring: Array<[number, number]>; base: number; height: number; color: string }, at = pt.height) => {
+    const part = (pt: { ring: Array<[number, number]>; base: number; height: number; color: string }, at = pt.height, stroke = "rgba(0,0,0,0)", width = 0) => {
       const lats = pt.ring.map((q) => q[0]), lngs = pt.ring.map((q) => q[1]);
       const spanM = Math.max(Math.max(...lats) - Math.min(...lats), (Math.max(...lngs) - Math.min(...lngs)) * Math.cos((lats[0]! * Math.PI) / 180)) * 111_320;
       if (pt.base === 0 && spanM < 1.2 && Polyline3DElement) {
@@ -75,7 +76,7 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
         return;
       }
       const raised = pt.base === 0;
-      const make = (mode: string) => new Polygon3DElement({ altitudeMode: mode, extruded: raised, fillColor: pt.color, strokeColor: "rgba(0,0,0,0)", strokeWidth: 0, drawsOccludedSegments: true }) as Shape;
+      const make = (mode: string) => new Polygon3DElement({ altitudeMode: mode, extruded: raised, fillColor: pt.color, strokeColor: stroke, strokeWidth: width, drawsOccludedSegments: true }) as Shape;
       let p: Shape;
       try { p = make(raised ? "RELATIVE_TO_GROUND" : "RELATIVE_TO_MESH"); } catch { p = make("RELATIVE_TO_GROUND"); }
       p.outerCoordinates = pt.ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: raised ? pt.height : at }));
@@ -83,15 +84,28 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
     };
     if (sim?.kind === "piazza") {
       for (const pt of sim.data.patches) {
-        if (pt.kind === "lawn") { ground(pt.ring, "rgba(98,176,66,0.85)"); continue; }
-        ground(pt.ring, "rgba(11,15,21,0.35)");
-        for (const p of pergolaParts(pt.ring, true)) part(p);
+        // Lawn: a fresh green with a darker edge; under a pergola its soft shadow, then posts, beams and a framed roof.
+        if (pt.kind === "lawn") { ground(pt.ring, "rgba(104,182,70,0.78)", "#3d7f2a", 2); continue; }
+        ground(pt.ring, "rgba(11,15,21,0.3)");
+        for (const p of pergolaParts(pt.ring, true)) {
+          if (p.base === 0) part({ ...p, color: "#5c3a1c" });
+          else if (p.height < 3.2) part(p, p.height, "#4a2e14", 1);
+          else part(p, p.height, PERGOLA_COLORS.beam, 3);
+        }
       }
-      for (const t of sim.data.trees) for (const p of treeParts(t, undefined, 2.85)) part(p, (p.base + p.height) / 2);
+      // Each tree: a soft shadow cast north on the ground, a dark trunk, then three crown discs each ringed a deeper green,
+      // so the layers read as foliage — five shapes a tree.
+      for (const t of sim.data.trees) {
+        ground(crownRing([t[0] + 1.4 / 111_320, t[1]], TREE_RADIUS_M * 0.85, 12), "rgba(5,12,8,0.28)");
+        for (const p of treeParts(t, undefined, 2.85)) {
+          if (p.base === 0) part({ ...p, color: "#4e341c" });
+          else part(p, (p.base + p.height) / 2, "rgba(14,52,20,0.75)", 1.5);
+        }
+      }
     } else if (sim?.kind === "vigneto") {
       for (const pt of sim.data.patches) if (pt.kind === "zone") ground(pt.ring, `${thirstColor(sim.thirst[pt.zone ?? 0] ?? 0)}59`);
-      for (const p of sim.data.patches.filter((x) => x.kind === "cloth").flatMap((x) => netParts(x.ring, true))) part(p);
-      for (const p of sim.data.lines.filter((l) => l.kind === "wind").flatMap((l) => hedgeParts(l.line, l.strength ?? 0))) part(p);
+      for (const p of sim.data.patches.filter((x) => x.kind === "cloth").flatMap((x) => netParts(x.ring, true))) part(p, p.height, "#0b1220", 2);
+      for (const p of sim.data.lines.filter((l) => l.kind === "wind").flatMap((l) => hedgeParts(l.line, l.strength ?? 0))) part(p, p.height, "#1d4a1b", 1);
       if (Polyline3DElement) for (const l of sim.data.lines.filter((x) => x.kind !== "wind")) {
         const pl = new Polyline3DElement({ altitudeMode: "CLAMP_TO_GROUND", strokeColor: l.kind === "drip" ? SIM_COLORS.drip : "#ffffff", strokeWidth: l.kind === "drip" ? 2 : 3, drawsOccludedSegments: true }) as Shape;
         pl.coordinates = l.line.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng }));
