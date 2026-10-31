@@ -2080,7 +2080,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
    sharp, no glow; still, plain ring with reduced motion. */
 @property --pile-angle { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
 .pile-ring {
-  position: absolute; inset: -6px; border-radius: 1.2rem; pointer-events: none; padding: 2px;
+  position: absolute; inset: -3px; border-radius: 1.1rem; pointer-events: none; padding: 1.5px;
   background: conic-gradient(from var(--pile-angle), rgb(45 212 191 / 0.1) 0deg, rgb(45 212 191) 70deg, #fff 95deg, rgb(45 212 191) 120deg, rgb(45 212 191 / 0.1) 190deg, rgb(255 255 255 / 0.2) 360deg);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
