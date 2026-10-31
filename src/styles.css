@@ -2107,12 +2107,12 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .ar-burst-bar { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom) + 10.5rem); z-index: 30; display: grid; justify-items: center; gap: .5rem; }
 
 /* Xperia-style zoom ruler: shown while swiping on the lens chips, it slides under a fixed centre mark. */
-.zoom-ruler { position: absolute; left: 50%; bottom: calc(100% + .5rem); width: min(16rem, 80vw); height: 2.75rem; transform: translateX(-50%); overflow: hidden; border-radius: 999px; background: oklch(0.12 0.005 255 / 60%); border: 1.5px solid oklch(0.98 0 0 / 35%); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent); -webkit-mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent); animation: zoom-ruler-in .16s ease-out; pointer-events: none; }
+.zoom-ruler { position: absolute; left: 50%; bottom: calc(100% + .375rem); width: min(15rem, 76vw); height: 2rem; transform: translateX(-50%); overflow: hidden; background: transparent; mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent); -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent); animation: zoom-ruler-in .16s ease-out; pointer-events: none; filter: drop-shadow(0 1px 2px oklch(0 0 0 / 55%)); }
 .zoom-ruler-track { position: absolute; left: 50%; top: 0; bottom: 0; transition: transform .12s ease-out; }
 .zoom-ruler[data-dialing] .zoom-ruler-track { transition: none; }
-.zoom-ruler-tick { position: absolute; bottom: .4rem; width: 1px; height: .3rem; background: oklch(0.98 0 0 / 55%); }
-.zoom-ruler-tick[data-major] { height: .6rem; background: oklch(0.98 0 0 / 90%); }
-.zoom-ruler-label { position: absolute; bottom: .75rem; left: 50%; transform: translateX(-50%); font-size: .6875rem; font-weight: 600; color: oklch(0.98 0 0 / 90%); font-variant-numeric: tabular-nums; }
-.zoom-ruler-mark { position: absolute; left: 50%; top: 1.45rem; bottom: .25rem; width: 2px; margin-left: -1px; border-radius: 2px; background: oklch(0.86 0.17 90); box-shadow: 0 0 6px oklch(0.86 0.17 90 / 70%); }
+.zoom-ruler-tick { position: absolute; bottom: .2rem; width: 1px; height: .2rem; background: oklch(0.98 0 0 / 45%); }
+.zoom-ruler-tick[data-major] { height: .4rem; background: oklch(0.98 0 0 / 80%); }
+.zoom-ruler-label { position: absolute; bottom: .55rem; left: 50%; transform: translateX(-50%); font-size: .625rem; font-weight: 500; color: oklch(0.98 0 0 / 85%); font-variant-numeric: tabular-nums; }
+.zoom-ruler-mark { position: absolute; left: 50%; top: 1.15rem; bottom: .1rem; width: 1.5px; margin-left: -.75px; border-radius: 2px; background: oklch(0.86 0.17 90); }
 @keyframes zoom-ruler-in { from { opacity: 0; transform: translateX(-50%) translateY(4px); } }
 @media (prefers-reduced-motion: reduce) { .zoom-ruler { animation: none; } .zoom-ruler-track { transition: none; } }
