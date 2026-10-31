@@ -17,6 +17,7 @@ import { installUiClicks } from "@/lib/ui-sounds";
 import { isChunkError, reloadFresh } from "@/router";
 import { History, Building2, Grape, Info, LayoutDashboard, Lock } from "lucide-react";
 import { useProId, useSyncProId } from "@/lib/use-pro-id";
+import { useSyncMediaArchive } from "@/models/media-archive";
 import { useDstNotice } from "@/lib/dst-notice";
 import { hidePreloader, preloaderScript } from "@/lib/preloader";
 import { unlocks, type ProId } from "@/models/professional-id";
@@ -384,6 +385,7 @@ function SmartNav() {
 function RootComponent() {
   // The professional profile follows the account: adopted on sign-in, or uploaded to an account without one.
   useSyncProId();
+  useSyncMediaArchive();
   useDstNotice();
   // The index's preloader goes once the app has started and its fonts are in.
   useEffect(() => {

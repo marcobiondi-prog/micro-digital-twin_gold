@@ -8,6 +8,7 @@ import { TabRow } from "@/views/v8/console";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { forShare, zoneOfName } from "@/views/v10/ExportSheet";
 import { useLab } from "@/models/lab-store";
+import { useSignedIn } from "@/lib/use-signed-in";
 import { archiveMedia, restoreMedia, useMediaArchive } from "@/models/media-archive";
 import { drawnAreaFor, ZONE_LABEL, type DrawnArea, type SubArea } from "@/models/drawn-area";
 import type { Ring } from "@/models/place-area";
@@ -516,6 +517,7 @@ function OpenPile({ pile, onClose, archived = false }: { pile: Pile; onClose: ()
  * first, with a date field to go straight to one day; a folder opens like a pile, with Ripristina instead of Archivia.
  */
 function ArchiveBlock({ shots }: { shots: Shot[] }) {
+  const { signedIn } = useSignedIn();
   const [open, setOpen] = useState(false);
   const [day, setDay] = useState("");
   const [shown, setShown] = useState<string | null>(null);
@@ -534,7 +536,7 @@ function ArchiveBlock({ shots }: { shots: Shot[] }) {
     <div className="rounded-2xl bg-foreground/[0.04]">
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-3 px-4 py-3.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-2xl">
         <span className="grid size-10 shrink-0 place-items-center rounded-full bg-foreground/[0.08]"><Archive className="size-5" aria-hidden="true" /></span>
-        <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Archivio</span><span className="block text-xs text-muted-foreground">{piles.length === 1 ? "1 giorno" : `${piles.length} giorni`} · {countText(shots)}</span></span>
+        <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Archivio</span><span className="block text-xs text-muted-foreground">{piles.length === 1 ? "1 giorno" : `${piles.length} giorni`} · {countText(shots)} · {signedIn ? "nell'account" : "su questo dispositivo"}</span></span>
         <ChevronDown className={`size-5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
       {open && (
