@@ -2138,3 +2138,8 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .pile-notch { position: absolute; top: calc(.5rem - 7px); left: var(--notch-x, 25%); width: 14px; height: 14px; transform: translateX(-50%) rotate(45deg); background: var(--color-card); border-left: 1px solid color-mix(in oklab, var(--color-brand-turquoise) 45%, transparent); border-top: 1px solid color-mix(in oklab, var(--color-brand-turquoise) 45%, transparent); z-index: 1; animation: pile-group .3s ease-out both; }
 .dark .pile-notch { background: oklch(0.25 0.016 258); }
 @media (prefers-reduced-motion: reduce) { .pile-notch { animation: none; } }
+
+/* The in-app camera open: everything behind it stops drawing — not painted, its animations paused — so the camera has
+   the phone to itself. */
+html[data-sys-camera] body > :not([data-sys-camera-root]):not(:has([data-sys-camera-root])) { visibility: hidden; }
+html[data-sys-camera] body > :not([data-sys-camera-root]):not(:has([data-sys-camera-root])) * { animation-play-state: paused !important; }

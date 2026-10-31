@@ -130,6 +130,11 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
 
   useEffect(() => {
     if (!mode) releaseSystemCamera();
+    // While the camera is open the page behind it stops drawing (no paint, animations paused): nothing competes with
+    // the camera for the phone's power.
+    if (mode) document.documentElement.setAttribute("data-sys-camera", "");
+    else document.documentElement.removeAttribute("data-sys-camera");
+    return () => document.documentElement.removeAttribute("data-sys-camera");
   }, [mode]);
 
   useEffect(() => {
@@ -144,7 +149,9 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
         if (!navigator.mediaDevices?.getUserMedia) throw new Error("unavailable");
         // Photos ask for the camera's sharpest stream (the phone gives the closest it has).
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: mode === "video" ? { facingMode: { ideal: "environment" } } : { facingMode: { ideal: "environment" }, width: { ideal: 4096 }, height: { ideal: 3072 } },
+          // A light live stream (about 2,8 MP at most 30 fps): a 12 MP preview kept phones busy and warm. A single photo is
+          // still the camera's own full-resolution picture (takePhoto); the multiple shot keeps the stream's frames.
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1440 }, frameRate: { ideal: 30, max: 30 } },
           audio: mode === "video",
         });
         if (cancelled) { stream.getTracks().forEach((track) => track.stop()); return; }
@@ -269,7 +276,7 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
 
   return (
     <Dialog open={mode !== null} onOpenChange={(open) => { if (!open) onClose(); }} modal>
-      <DialogContent data-no-ui-click className="camera-hud inset-0 left-0 top-0 block h-dvh w-screen max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 bg-camera-surface p-0 text-camera-ink shadow-none duration-0 data-[state=open]:animate-none data-[state=closed]:animate-none sm:max-h-none sm:overflow-hidden sm:rounded-none [&>button]:hidden" aria-describedby={undefined}>
+      <DialogContent data-no-ui-click data-sys-camera-root className="camera-hud inset-0 left-0 top-0 block h-dvh w-screen max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 bg-camera-surface p-0 text-camera-ink shadow-none duration-0 data-[state=open]:animate-none data-[state=closed]:animate-none sm:max-h-none sm:overflow-hidden sm:rounded-none [&>button]:hidden" aria-describedby={undefined}>
         <DialogTitle className="sr-only">{mode === "video" ? "Registra video" : burst ? "Scatto multiplo" : "Scatta foto"}</DialogTitle>
         <CameraCloseGestures onClose={onClose} onPinch={canZoom ? onPinch : undefined}>
         <div className="absolute inset-0">
