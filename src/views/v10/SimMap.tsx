@@ -203,17 +203,17 @@ function MapReading({ kind }: { kind: SimKind }) {
   }
   const gain = +(before - after).toFixed(1);
   return (
-    <div role="status" aria-live="polite" className="pointer-events-none absolute left-1/2 top-3 z-10 max-w-[calc(100%-7.5rem)] -translate-x-1/2 rounded-2xl bg-black/25 px-3.5 py-2 text-white ring-1 ring-white/25 backdrop-blur-[3px] [text-shadow:0_1px_3px_rgb(0_0_0/0.8)]">
-      <p className="flex items-center justify-center gap-1.5 whitespace-nowrap text-lg font-semibold tabular-nums leading-tight">
-        <Thermometer className="size-4 shrink-0" style={{ color: heatTone(after) }} aria-hidden="true" />
+    <div role="status" aria-live="polite" className="pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-full bg-black/20 px-2.5 py-1 text-white ring-1 ring-white/20 backdrop-blur-[2px] [text-shadow:0_1px_2px_rgb(0_0_0/0.8)]">
+      <p className="flex items-center justify-center gap-1 whitespace-nowrap text-[13px] font-medium tabular-nums leading-tight">
+        <Thermometer className="size-3.5 shrink-0" style={{ color: heatTone(after) }} aria-hidden="true" />
         {gain > 0.05 ? <>
           <span className="text-white/60 line-through decoration-white/40">{deg(before)}</span>
           <span aria-hidden="true" className="text-white/50">→</span>
           <span style={{ color: heatTone(after) }}>{deg(after)}</span>
-          <span className="ml-1 rounded-full bg-black/30 px-1.5 text-xs font-semibold text-emerald-300">−{gain.toLocaleString("it-IT")}°</span>
+          <span className="ml-0.5 text-[11px] font-semibold text-emerald-300">−{gain.toLocaleString("it-IT")}°</span>
         </> : <span style={{ color: heatTone(after) }}>{deg(after)}</span>}
       </p>
-      <p className="truncate text-center text-[11px] text-white/70">{gain > 0.05 ? what : `${what} · senza interventi`}</p>
+      <span className="sr-only">{gain > 0.05 ? what : `${what} · senza interventi`}</span>
     </div>
   );
 }
