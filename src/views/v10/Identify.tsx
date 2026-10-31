@@ -247,7 +247,7 @@ export function ProfileCard({ kind, go }: { kind: ProKind; go?: () => void }) {
         {profileRows(mine).map(([k, v]) => {
           // The email opens the phone's email app, written to that address.
           const val = k === "Email" && v
-            ? <a href={`mailto:${v}`} className="text-[var(--brand-turquoise)] underline decoration-[var(--brand-turquoise)]/40 underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm">{v}</a>
+            ? <a href={`mailto:${v}`} className="rounded-sm underline decoration-foreground/25 decoration-1 underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring">{v}</a>
             : v;
           // A long value (the email) goes on its own line under its label, whole, instead of breaking mid-word beside it.
           return v.length > 24
