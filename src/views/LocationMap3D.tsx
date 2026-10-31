@@ -78,7 +78,8 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
         // The simulation inside the area: lawn and zones on the ground, shade and cloth 3 m up, trees as crowns 9 m tall.
         try {
           const shape = (ring: Array<[number, number]>, fill: string, alt: number | null) => {
-            const p = new Polygon3DElement({ altitudeMode: alt === null ? "CLAMP_TO_GROUND" : "RELATIVE_TO_GROUND", extruded: alt !== null, fillColor: fill, strokeColor: "rgba(255,255,255,0)", strokeWidth: 0 }) as HTMLElement & { outerCoordinates?: unknown };
+            // Ground shapes are drawn even where the photographed mesh (trees, roofs, kiosks) would cover them.
+            const p = new Polygon3DElement({ altitudeMode: alt === null ? "CLAMP_TO_GROUND" : "RELATIVE_TO_GROUND", extruded: alt !== null, fillColor: fill, strokeColor: "rgba(255,255,255,0)", strokeWidth: 0, ...(alt === null ? { drawsOccludedSegments: true } : {}) }) as HTMLElement & { outerCoordinates?: unknown };
             p.outerCoordinates = ring.map(([pLat, pLng]) => (alt === null ? { lat: pLat, lng: pLng } : { lat: pLat, lng: pLng, altitude: alt }));
             map.append(p);
           };
@@ -116,8 +117,14 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
               map.append(pl);
             }
           }
-          // The zones drawn inside the area: a see-through veil of their colour on the ground (a free zone greyed).
-          for (const z of sim?.inner ?? []) if (z.ring.length >= 3) shape(z.ring, z.kind === "libera" ? "rgba(71,85,105,0.6)" : `${ZONE_COLORS[z.kind]}44`, null);
+          // The zones drawn by hand inside the area: a veil of their colour on the ground with an outline of the same colour,
+          // both drawn through the photographed mesh (a free zone greyed) — a faint veil alone was lost on the 3D ground.
+          for (const z of sim?.inner ?? []) if (z.ring.length >= 3) {
+            const color = z.kind === "libera" ? "#94a3b8" : ZONE_COLORS[z.kind];
+            const zp = new Polygon3DElement({ altitudeMode: "CLAMP_TO_GROUND", fillColor: z.kind === "libera" ? "rgba(71,85,105,0.6)" : `${color}66`, strokeColor: color, strokeWidth: 4, drawsOccludedSegments: true }) as HTMLElement & { outerCoordinates?: unknown };
+            zp.outerCoordinates = z.ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng }));
+            map.append(zp);
+          }
         } catch { /* polygons not supported: the area alone */ }
       }
       el.replaceChildren(map);

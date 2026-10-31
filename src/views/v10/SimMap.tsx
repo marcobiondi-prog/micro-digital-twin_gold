@@ -1,8 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Check, Hand, Lock, MapPin, Minus, PenLine, Plus, RotateCcw, Trash2, Undo2, X } from "lucide-react";
-import { hapticTick } from "@/lib/haptics";
-import { NO_MIX, type VineMix } from "@/models/vine-interventions";
+import { Check, Hand, Lock, MapPin, PenLine, RotateCcw, Trash2, Undo2, X } from "lucide-react";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { openAccount } from "@/lib/camera-dock";
 import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn } from "@/lib/demo-login";
@@ -162,9 +160,6 @@ export function SimMap({ kind }: { kind: SimKind }) {
             onAreaChange={drawingZone ? setZoneDraft : setDraft} sim={editingZone && sim ? { ...sim, inner: (sim.inner ?? []).filter((z) => z.id !== editingZone) } : sim} arranging={arranging} onMove={moved}
             outline={drawingZone ? saved?.ring ?? null : null} onOutside={() => toast("La zona va dentro l'area disegnata")} /></Suspense>}
       </div>
-      {/* The elements put on the map right here, with or without a drawn area: each step redraws the map and moves the
-          temperature pill on it. */}
-      {!drawing && !drawingZone && <MapLevers kind={kind === "urban" ? "piazza" : "vigneto"} />}
       {drawingZone ? (
         <ZoneDrawBar kind={zoneKind!} pins={zoneDraft.length} m2={zoneDraft.length >= 3 ? pinsM2(zoneDraft) : null} editing={editingZone !== null}
           kinds={ZONE_KINDS[kind === "urban" ? "piazza" : "vigneto"]} onKind={setZoneKind}
@@ -301,52 +296,6 @@ function SimBar({ sim, arranging, edited, onArrange, onAuto }: { sim: SimLayout;
         </button>
         {edited && <button type="button" onClick={onAuto} className={cn(barBtn, "bg-foreground/[0.08]")}><RotateCcw className="size-4" aria-hidden="true" />Disposizione automatica</button>}
       </div>
-    </div>
-  );
-}
-
-/**
- * The simulation's levers under its map (the same as on Simula): piazza trees, lawn and shade; vineyard irrigation,
- * shade cloth and windbreak on the scope chosen in the simulation (every zone, or the one picked). − / + by the
- * simulation's own steps.
- */
-function MapLevers({ kind }: { kind: "piazza" | "vigneto" }) {
-  const lab = useLab();
-  const step = (label: string, value: string, onMinus: (() => void) | null, onPlus: (() => void) | null) => (
-    <div key={label} className="flex items-center gap-1.5 rounded-full bg-foreground/[0.06] p-1">
-      <button type="button" aria-label={`Togli ${label.toLowerCase()}`} disabled={!onMinus} onClick={() => { hapticTick(); onMinus?.(); }} className="grid size-9 place-items-center rounded-full bg-foreground/10 outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-30"><Minus className="size-4" aria-hidden="true" /></button>
-      <span className="min-w-0 flex-1 text-center text-sm leading-tight"><span className="block font-semibold tabular-nums">{value}</span><span className="block text-xs text-muted-foreground">{label}</span></span>
-      <button type="button" aria-label={`Aggiungi ${label.toLowerCase()}`} disabled={!onPlus} onClick={() => { hapticTick(); onPlus?.(); }} className="grid size-9 place-items-center rounded-full bg-foreground/10 outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-30"><Plus className="size-4" aria-hidden="true" /></button>
-    </div>
-  );
-  if (kind === "piazza") {
-    const u = lab.urban;
-    // Totals change: the placed squares follow the default layout again, as on Simula.
-    const set = (patch: { trees?: number; permeable?: number; shade?: number }) => setUrban({ ...patch, treeCells: null, permeableCells: null, shadeCells: null });
-    return (
-      <div className="grid grid-cols-3 gap-2" role="group" aria-label="Elementi sulla mappa">
-        {step("Alberi", `${u.trees}`, u.trees > 0 ? () => set({ trees: u.trees - 1 }) : null, u.trees < 30 ? () => set({ trees: u.trees + 1 }) : null)}
-        {step("Prato", `${u.permeable}%`, u.permeable > 0 ? () => set({ permeable: Math.max(0, u.permeable - 10) }) : null, u.permeable < 100 ? () => set({ permeable: Math.min(100, u.permeable + 10) }) : null)}
-        {step("Ombra", `${u.shade}%`, u.shade > 0 ? () => set({ shade: Math.max(0, u.shade - 10) }) : null, u.shade < 100 ? () => set({ shade: Math.min(100, u.shade + 10) }) : null)}
-      </div>
-    );
-  }
-  const v = lab.vineyard;
-  const legacy = vineMixOf(v);
-  const mixes = v.zones.map((z) => zoneMixOf(z, legacy));
-  const targets = v.allZones ? v.zones.map((_, i) => i) : [v.selected];
-  const avgOf = (k: keyof VineMix) => Math.round(targets.reduce((t, i) => t + (mixes[i]?.[k] ?? 0), 0) / Math.max(1, targets.length));
-  const mix: VineMix = { irrigation: avgOf("irrigation"), shade: avgOf("shade"), windbreak: avgOf("windbreak") };
-  const change = (patch: Partial<VineMix>) => setVineyard((vv) => ({
-    zones: vv.zones.map((z, i) => ({ ...z, ...(mixes[i] ?? NO_MIX), ...(targets.includes(i) ? { ...mix, ...patch } : {}) })),
-  }));
-  const lever = (label: string, k: keyof VineMix, by: number, max: number, unit: string) =>
-    step(label, `${k === "irrigation" ? "+" : ""}${mix[k]}${unit}`, mix[k] > 0 ? () => change({ [k]: Math.max(0, mix[k] - by) }) : null, mix[k] < max ? () => change({ [k]: Math.min(max, mix[k] + by) }) : null);
-  return (
-    <div className="grid grid-cols-3 gap-2" role="group" aria-label={v.allZones ? "Elementi sulla mappa, tutte le zone" : `Elementi sulla mappa, zona ${v.selected + 1}`}>
-      {lever("Irrigazione", "irrigation", 2, 20, "%")}
-      {lever("Teli d'ombra", "shade", 10, 100, "%")}
-      {lever("Frangivento", "windbreak", 10, 100, "%")}
     </div>
   );
 }
