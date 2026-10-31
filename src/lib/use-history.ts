@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSignedIn } from "@/lib/use-signed-in";
 import {
-  addLocalHistory, clearLocalHistory, isHistoryEntry, localHistory, mergeHistory, newEntry, serverLocalHistory, subscribeLocalHistory,
+  addLocalHistory, clearLocalHistory, removeLocalHistory, isHistoryEntry, localHistory, mergeHistory, newEntry, serverLocalHistory, subscribeLocalHistory,
   type HistoryEntry, type HistoryFlow, type SourcedEntry, type HistoryMix, type HistoryWhen,
 } from "@/models/intervention-history";
 import { requestSimWhen } from "@/models/sim-when";
@@ -21,12 +21,55 @@ export async function addHistory(flow: HistoryFlow, text: string, place: string,
   const entry = newEntry(flow, text, place, new Date(), mix, when);
   const { data } = await supabase.auth.getSession();
   if (!data.session) { addLocalHistory(entry); return; }
-  const row = { id: entry.id, at: entry.at, flow: entry.flow, place: entry.place, text: entry.text };
-  let { error } = await table().insert({ ...row, mix: entry.mix ?? null, season: entry.season ?? null, hour: entry.hour ?? null });
+  // Signed in without a connection: kept on the phone, and sent to the account as soon as the connection is back.
+  if (typeof navigator !== "undefined" && navigator.onLine === false) { addLocalHistory(entry); saidOffline(); return; }
+  const error = await saveRows([entry]);
+  if (error) {
+    addLocalHistory(entry);
+    if (typeof navigator !== "undefined" && navigator.onLine === false) saidOffline();
+    else toast.error("Cronologia non salvata nel tuo account, la tengo su questo dispositivo");
+  }
+}
+
+/** Saves entries in the account (an existing id is left as it is), with what the table can hold. */
+async function saveRows(entries: HistoryEntry[]): Promise<unknown> {
+  const rows = entries.map((e) => ({ id: e.id, at: e.at, flow: e.flow, place: e.place, text: e.text }));
+  const full = entries.map((e, i) => ({ ...rows[i], mix: e.mix ?? null, season: e.season ?? null, hour: e.hour ?? null }));
+  const opts = { onConflict: "id", ignoreDuplicates: true };
+  let { error } = await table().upsert(full, opts);
   // An account table without the newer columns yet (their migrations not applied): save what it can hold.
-  if (error) ({ error } = await table().insert({ ...row, mix: entry.mix ?? null }));
-  if (error) ({ error } = await table().insert(row));
-  if (error) { addLocalHistory(entry); toast.error("Cronologia non salvata nel tuo account, la tengo su questo dispositivo"); }
+  if (error) ({ error } = await table().upsert(entries.map((e, i) => ({ ...rows[i], mix: e.mix ?? null })), opts));
+  if (error) ({ error } = await table().upsert(rows, opts));
+  return error;
+}
+
+// Said once per time offline, not at every recorded change.
+let offlineSaid = false;
+function saidOffline() {
+  if (offlineSaid) return;
+  offlineSaid = true;
+  toast("Senza rete: la cronologia resta sul telefono", { description: "La porto nel tuo account appena torna la connessione." });
+}
+
+/** Tells the history lists to read the account again. */
+export const HISTORY_SYNCED = "mdt-history-synced";
+
+/**
+ * Signed in and online, the interventions kept on this device (recorded offline or before signing in) go up to the
+ * account and leave the device once saved. Returns how many went up.
+ */
+export async function syncDeviceHistory(): Promise<number> {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return 0;
+  offlineSaid = false;
+  const pending = localHistory();
+  if (!pending.length) return 0;
+  const { data } = await supabase.auth.getSession();
+  if (!data.session) return 0;
+  const error = await saveRows(pending);
+  if (error) return 0;
+  removeLocalHistory(pending.map((e) => e.id));
+  window.dispatchEvent(new Event(HISTORY_SYNCED));
+  return pending.length;
 }
 
 /**
@@ -84,7 +127,9 @@ export function useHistory(): { entries: SourcedEntry[]; where: "account" | "dev
     if (!account) { setCloud([]); setFailed(false); return; }
     void load();
     window.addEventListener("focus", load);
-    return () => window.removeEventListener("focus", load);
+    window.addEventListener("online", load);
+    window.addEventListener(HISTORY_SYNCED, load);
+    return () => { window.removeEventListener("focus", load); window.removeEventListener("online", load); window.removeEventListener(HISTORY_SYNCED, load); };
   }, [account, load]);
   // Each entry says where it is kept: signed in, the account's come first and this device's (recorded without signing in) follow.
   const entries = useMemo<SourcedEntry[]>(() => {

@@ -1,4 +1,5 @@
 import { saveProId, useProId } from "@/lib/use-pro-id";
+import { CLOUD_QUOTA, bytesText, usageTone, useCloudUsage } from "@/lib/use-cloud-usage";
 import { ProfileIcon } from "@/views/ProfileIcon";
 import { proSummary } from "@/models/professional-id";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ComponentType, type FormEvent } from "react";
@@ -76,6 +77,37 @@ const LINK_GROUPS: Array<{ title: string; links: Array<[string, InfoPath]> }> = 
   { title: "Privacy", links: [["Informativa sui cookie", "/privacy/cookie"], ["Informativa sulla privacy", "/privacy/informativa"], ["Preferenze privacy", "/privacy/preferenze"], ["Autorizzazioni", "/privacy/autorizzazioni"]] },
   { title: "Legale", links: [["Licenze", "/legale/licenze"], ["Termini di servizio", "/legale/termini"]] },
 ];
+
+/** The ring round the account picture: a faint track and the share of the 50 GB in use (always a sliver once something is stored). */
+function StorageRing({ share }: { share: number }) {
+  const r = 22, c = 2 * Math.PI * r;
+  const shown = share > 0 ? Math.max(share, 0.03) : 0;
+  return (
+    <svg viewBox="0 0 48 48" className="pointer-events-none absolute -inset-[4px] size-[calc(100%+8px)] -rotate-90" aria-hidden="true">
+      <circle cx="24" cy="24" r={r} fill="none" stroke="currentColor" strokeOpacity="0.15" strokeWidth="2.5" />
+      <circle cx="24" cy="24" r={r} fill="none" stroke={usageTone(share)} strokeWidth="2.5" strokeLinecap="round" strokeDasharray={`${shown * c} ${c}`} className="transition-[stroke-dasharray] duration-700 motion-reduce:transition-none" />
+    </svg>
+  );
+}
+
+/** In the account panel: the cloud space as a bar, how much is used of 50 GB and how much is left. */
+function StorageBar({ used, share, files }: { used: number; share: number; files: number }) {
+  const pct = share * 100;
+  return (
+    <div className="rounded-md border bg-muted/40 p-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-sm font-semibold">Spazio nel cloud</p>
+        <p className="text-xs tabular-nums text-muted-foreground">{bytesText(used)} di 50 GB</p>
+      </div>
+      <div className="mt-2.5 h-2.5 overflow-hidden rounded-full bg-foreground/10" role="progressbar" aria-label="Spazio nel cloud usato" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)} aria-valuetext={`${bytesText(used)} di 50 GB`}>
+        <div className="h-full rounded-full transition-[width] duration-700 motion-reduce:transition-none" style={{ width: `${used > 0 ? Math.max(pct, 1.5) : 0}%`, background: usageTone(share) }} />
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {files === 1 ? "1 foto o video" : `${files} foto e video`} nel tuo account · liberi {bytesText(Math.max(0, CLOUD_QUOTA - used))}
+      </p>
+    </div>
+  );
+}
 
 export function AccountControl() {
   const [open, setOpen] = useState(false);
@@ -294,6 +326,9 @@ export function AccountControl() {
   const swipe = useRef<{ x: number; y: number } | null>(null);
   const [dragX, setDragX] = useState(0);
   const premiumPlan = demo || Boolean(account && !account.guest);
+  // A real account has cloud space for its photos and videos: 50 GB, shown round the picture and as a bar in the panel.
+  const cloudAccount = Boolean(account && !account.guest);
+  const usage = useCloudUsage(cloudAccount);
   const changeMode = (next: typeof mode) => { setMode(next); setNotice(""); setPassword(""); };
 
   const displayedAvatar = (choice === "upload" ? draftPreview ?? avatarUrl : suggestions.find((item) => item.id === choice)?.src ?? account?.googleAvatar) ?? undefined;
@@ -302,9 +337,13 @@ export function AccountControl() {
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
-        <Button ref={triggerRef} variant="outline" size="icon" className="size-9 shrink-0 rounded-full sm:size-10" aria-label="Apri account" title="Account" onClick={() => setOpen(true)}>
-          {avatar("size-9 sm:size-10")}
-        </Button>
+        <span className="relative inline-grid shrink-0 place-items-center">
+          <Button ref={triggerRef} variant="outline" size="icon" className="size-9 shrink-0 rounded-full sm:size-10" aria-label={cloudAccount ? `Apri account · spazio nel cloud ${bytesText(usage.used)} di 50 GB` : "Apri account"} title="Account" onClick={() => setOpen(true)}>
+            {avatar("size-9 sm:size-10")}
+          </Button>
+          {/* Signed in, a ring round the picture fills with the cloud space in use, out of 50 GB. */}
+          {cloudAccount && <StorageRing share={usage.share} />}
+        </span>
       <DialogContent ref={placePanel} overlayClassName="account-overlay" className="account-panel flex max-h-[min(680px,90dvh)] w-[min(420px,calc(100vw-2rem))] flex-col gap-0 overflow-y-auto rounded-lg border bg-popover p-0 text-popover-foreground shadow-xl sm:rounded-lg">
         {page ? (() => {
           const Page = PAGES[page];
@@ -379,6 +418,7 @@ export function AccountControl() {
                 <p className="text-sm font-semibold">{account.guest ? "Sessione ospite" : account.email}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{account.guest ? "Accesso di base su questo dispositivo. Non è un account e non salva dati online." : "Accesso effettuato"}</p>
               </div>
+              {cloudAccount && <StorageBar used={usage.used} share={usage.share} files={usage.files} />}
               {account.guest && <Button variant="outline" className="w-full" onClick={() => { sessionStorage.removeItem(guestKey); setAccount(null); changeMode("signup"); }}>Crea un account</Button>}
               {account && notice && <p role="status" className="text-sm text-muted-foreground">{notice}</p>}
               {isAdmin && <Button asChild variant="outline" className="w-full justify-start"><Link to="/admin" onClick={() => setOpen(false)}><ShieldCheck />Pannello di controllo</Link></Button>}

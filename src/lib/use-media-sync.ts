@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { refreshMedia, syncDeviceMedia } from "@/models/lab-media-store";
+import { syncDeviceHistory } from "@/lib/use-history";
 
 /** Every minute while the app is in front, and whenever it comes back: another device's photos appear, signed links stay fresh. */
 const EVERY_MS = 60_000;
@@ -20,6 +21,9 @@ export function useMediaSync() {
       const { data } = await supabase.auth.getSession();
       const user = data.session?.user.id;
       if (!user) return;
+      // The interventions kept on the phone go up first (they are light), then the photos and videos.
+      const sent = await syncDeviceHistory();
+      if (sent) toast.success(sent === 1 ? "1 intervento ora è nel tuo account" : `${sent} interventi ora sono nel tuo account`);
       let id: string | number | undefined;
       const moved = await syncDeviceMedia(user, (n) => { id = toast.loading(n === 1 ? "Porto 1 foto o video nel tuo account…" : `Porto ${n} foto e video nel tuo account…`); });
       if (id !== undefined) {

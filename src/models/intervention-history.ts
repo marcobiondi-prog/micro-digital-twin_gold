@@ -135,6 +135,16 @@ export function addLocalHistory(entry: HistoryEntry) {
   try { storage()?.setItem(KEY, JSON.stringify(local)); } catch { /* quota or private mode: memory only */ }
   subs.forEach((f) => f());
 }
+/** Takes these entries off this device (once they are safely in the account). */
+export function removeLocalHistory(ids: string[]) {
+  const gone = new Set(ids);
+  local = localHistory().filter((e) => !gone.has(e.id));
+  try {
+    if (local.length) storage()?.setItem(KEY, JSON.stringify(local));
+    else storage()?.removeItem(KEY);
+  } catch { /* nothing saved */ }
+  subs.forEach((f) => f());
+}
 /** Empties this device's history, or only one place's entries (piazza or vigneto). */
 export function clearLocalHistory(flow?: HistoryFlow) {
   local = flow ? localHistory().filter((e) => e.flow !== flow) : [];
