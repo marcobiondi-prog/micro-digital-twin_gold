@@ -1,3 +1,5 @@
+import { logoQuery, logosFrom } from "@/models/credit-logos";
+
 /**
  * The satellite navigation systems behind the phone's position (the map's GPS button), credited in Licenze with their
  * logos. Each logo is the system's Wikidata "logo image" (P154), found through its English Wikipedia article so no
@@ -14,17 +16,5 @@ export const GNSS: Gnss[] = [
   { id: "navic", name: "NavIC", country: "India", articles: ["Indian Regional Navigation Satellite System", "NavIC"] },
 ];
 
-const quote = (s: string) => `"${s.replace(/["\\]/g, "\\$&")}"@en`;
-
-/** One query for every system: the article titles and their items' logo files. */
-export function gnssLogoQuery(): string {
-  const titles = GNSS.flatMap((g) => g.articles).map(quote).join(" ");
-  return `SELECT ?title ?img WHERE { VALUES ?title { ${titles} } ?article schema:name ?title; schema:isPartOf <https://en.wikipedia.org/>; schema:about ?item. ?item wdt:P154 ?img. }`;
-}
-
-/** The query's rows as one logo file per system (the first article that has one wins, in the listed order). */
-export function gnssLogosFrom(rows: Array<{ title?: { value?: string }; img?: { value?: string } }>): Record<string, string | null> {
-  const byTitle = new Map<string, string>();
-  for (const r of rows) { const t = r.title?.value, i = r.img?.value; if (t && i && !byTitle.has(t)) byTitle.set(t, i); }
-  return Object.fromEntries(GNSS.map((g) => [g.id, g.articles.map((a) => byTitle.get(a)).find(Boolean) ?? null]));
-}
+export const gnssLogoQuery = () => logoQuery(GNSS);
+export const gnssLogosFrom = (rows: Parameters<typeof logosFrom>[1]) => logosFrom(GNSS, rows);

@@ -1,30 +1,34 @@
 import { crestUrl } from "@/models/comuni";
-import { GNSS, gnssLogoQuery, gnssLogosFrom } from "@/models/gnss";
+import { logoQuery, logosFrom } from "@/models/credit-logos";
 
 /**
- * The satellite systems' logos, looked up once on Wikidata (8 s at most) and kept on the device; a failed lookup is not
- * kept, so the next visit asks again, and nothing is drawn meanwhile.
+ * Logos looked up once on Wikidata (8 s at most) and kept on the device under their own key; a failed lookup is not
+ * kept, so the next visit asks again, and nothing is drawn meanwhile. Used for the satellite systems and the services
+ * without a bundled mark.
  */
-const KEY = "mdt-gnss-logo-v1";
-let pending: Promise<Record<string, string | null>> | null = null;
+const pending = new Map<string, Promise<Record<string, string | null>>>();
 
-export function gnssLogos(): Promise<Record<string, string | null>> {
+export function wikiLogos(key: string, items: Array<{ id: string; articles?: string[] }>): Promise<Record<string, string | null>> {
+  const asked = items.filter((g) => g.articles?.length);
+  if (!asked.length) return Promise.resolve({});
   try {
-    const known = JSON.parse(localStorage.getItem(KEY) ?? "null") as Record<string, string | null> | null;
-    if (known && GNSS.every((g) => g.id in known)) return Promise.resolve(known);
+    const known = JSON.parse(localStorage.getItem(key) ?? "null") as Record<string, string | null> | null;
+    if (known && asked.every((g) => g.id in known)) return Promise.resolve(known);
   } catch { /* ask again */ }
-  if (pending) return pending;
+  const running = pending.get(key);
+  if (running) return running;
   const ctrl = new AbortController();
   const timer = window.setTimeout(() => ctrl.abort(), 8000);
-  pending = fetch(`https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(gnssLogoQuery())}`, { signal: ctrl.signal, headers: { Accept: "application/sparql-results+json" } })
+  const p = fetch(`https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(logoQuery(asked))}`, { signal: ctrl.signal, headers: { Accept: "application/sparql-results+json" } })
     .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
     .then((j: { results?: { bindings?: Array<{ title?: { value?: string }; img?: { value?: string } }> } }) => {
-      const files = gnssLogosFrom(j.results?.bindings ?? []);
+      const files = logosFrom(asked, j.results?.bindings ?? []);
       const urls = Object.fromEntries(Object.entries(files).map(([id, f]) => [id, f ? crestUrl(f, 200) : null]));
-      try { localStorage.setItem(KEY, JSON.stringify(urls)); } catch { /* memory only */ }
+      try { localStorage.setItem(key, JSON.stringify(urls)); } catch { /* memory only */ }
       return urls;
     })
     .catch(() => ({}) as Record<string, string | null>)
-    .finally(() => { window.clearTimeout(timer); pending = null; });
-  return pending;
+    .finally(() => { window.clearTimeout(timer); pending.delete(key); });
+  pending.set(key, p);
+  return p;
 }
