@@ -421,9 +421,9 @@ function OpenPile({ pile, onClose, archived = false }: { pile: Pile; onClose: ()
  * The archive: the photos and videos put away, as folders named by their day (gg/mm/aaaa) under month headings, newest
  * first, with a date field to go straight to one day; a folder opens like a pile, with Ripristina instead of Archivia.
  */
-function ArchiveBlock({ shots, keys }: { shots: Shot[]; keys: string[] }) {
+function ArchiveBlock({ shots, keys, defaultOpen = false }: { shots: Shot[]; keys: string[]; defaultOpen?: boolean }) {
   const { signedIn } = useSignedIn();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [day, setDay] = useState("");
   const [shown, setShown] = useState<string | null>(null);
   const piles = useMemo(() => pilesOf(shots), [shots]);
@@ -537,6 +537,32 @@ function DayTab({ label, items }: { label: string; items: SourcedEntry[] }) {
   );
 }
 
+/**
+ * The archive alone, on its own page (/archivio, from Benvenuto's "Archivio · … · tocca per recuperarle"): only the
+ * archived photos and videos, already open, never the interventions. Identified, only that profile's project.
+ */
+export function ArchiveOnly() {
+  const proId = useProId();
+  const flow: HistoryFlow | undefined = proId ? (proId.kind === "funzionario" ? "piazza" : "vigneto") : undefined;
+  const urban = useLabMedia("urban"), vineyard = useLabMedia("vineyard");
+  const archive = useMediaArchive();
+  useEffect(() => { void currentMedia("urban"); void currentMedia("vineyard"); }, []);
+  const inFlow = (f: HistoryFlow) => !flow || f === flow;
+  const shots = useMemo<Shot[]>(() => [
+    ...urban.map((m): Shot => ({ ...m, flow: "piazza", at: mediaTime(m) })),
+    ...vineyard.map((m): Shot => ({ ...m, flow: "vigneto", at: mediaTime(m) })),
+  ].filter((s) => inFlow(s.flow) && archive[`${s.flow}-${s.id}`]).sort((a, b) => (b.at ?? 0) - (a.at ?? 0)), [urban, vineyard, archive, flow]); // eslint-disable-line react-hooks/exhaustive-deps
+  const keys = Object.keys(archive).filter((k) => inFlow(k.startsWith("vigneto-") ? "vigneto" : "piazza"));
+  if (keys.length === 0) return (
+    <div className="flex flex-col items-center gap-3 rounded-2xl bg-foreground/[0.04] px-6 py-10 text-center">
+      <Archive className="size-8 text-muted-foreground" aria-hidden="true" />
+      <p className="font-semibold">L'archivio è vuoto</p>
+      <p className="text-sm text-muted-foreground">Le foto e i video che archivi dalla cronologia finiscono qui, divisi per giorno.</p>
+    </div>
+  );
+  return <ArchiveBlock shots={shots} keys={keys} defaultOpen />;
+}
+
 /** Recorded signed in (kept in the account) or without signing in (kept on this device). */
 export function SourceChip({ source }: { source: HistorySource }) {
   const account = source === "account";
@@ -608,7 +634,7 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
         )}
         {!compact && archKeys.length > 0 && <ArchiveBlock shots={archivedShots} keys={archKeys} />}
         {compact && archKeys.length > 0 && (
-          <Link to="/cronologia" className="flex items-center gap-3 rounded-2xl bg-foreground/[0.04] px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Link to="/archivio" className="flex items-center gap-3 rounded-2xl bg-foreground/[0.04] px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <Archive className="size-5 text-muted-foreground" aria-hidden="true" />
             <span className="flex-1 text-sm"><span className="font-semibold">Archivio</span><span className="text-muted-foreground"> · {archivedAll.length ? countText(archivedAll) : `${archKeys.length} file`} · tocca per recuperarle</span></span>
             <ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />

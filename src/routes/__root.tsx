@@ -219,7 +219,7 @@ function BottomNav() {
   }, [pathname]);
   const items = itemsFor(proId);
   const item = ({ to, l, I }: NavItem, index: number) => {
-    const active = pathname === to || (to === "/benvenuto" && pathname.startsWith("/cronologia")) || (to === "/profilo" && isProfilePath(pathname));
+    const active = pathname === to || (to === "/benvenuto" && (pathname.startsWith("/cronologia") || pathname === "/archivio")) || (to === "/profilo" && isProfilePath(pathname));
     // Piazza and vineyard wear a small lock until the profile that opens them is identified.
     const locked = (to === "/urbano" || to === "/vigneto") && proId !== undefined && !unlocks(proId, to === "/urbano" ? "urban" : "vineyard");
     const col = index < 2 ? index : index + 1, arc = ARC[col];
@@ -239,7 +239,7 @@ function BottomNav() {
     );
   };
   // The Cronologia page belongs to Benvenuto: its item stays lit there.
-  const navPath = pathname.startsWith("/cronologia") ? "/benvenuto" : isProfilePath(pathname) ? "/profilo" : pathname;
+  const navPath = pathname.startsWith("/cronologia") || pathname === "/archivio" ? "/benvenuto" : isProfilePath(pathname) ? "/profilo" : pathname;
   const index = items.findIndex((b) => b.to === navPath);
   const current = items[index];
   // On Home the bar points at the tile selected there: the light slides under Urbano or Vigneto, or the camera lights up.
@@ -403,7 +403,7 @@ function RootComponent() {
   const router = useRouter();
   useEffect(() => {
     const warm = () => {
-      for (const id of ["/benvenuto", "/urbano", "/vigneto", "/dashboard", "/cronologia", "/profilo", "/scegli", "/"]) {
+      for (const id of ["/benvenuto", "/urbano", "/vigneto", "/dashboard", "/cronologia", "/archivio", "/profilo", "/scegli", "/"]) {
         const route = (router.routesById as unknown as Record<string, unknown>)[id];
         if (route) void router.loadRouteChunk(route as Parameters<typeof router.loadRouteChunk>[0])?.catch(() => {});
       }
