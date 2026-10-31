@@ -30,8 +30,11 @@ export function useSyncMediaArchive() {
     const adopt = (meta: unknown) => {
       load();
       const saved = (meta as { media_archive?: unknown } | null)?.media_archive;
-      if (isArchive(saved)) { state = saved; keep(); }
-      else if (Object.keys(state).length) void upload();
+      // Merged, never replaced: what this device archived and what the account archived both stay in the archive.
+      const merged = { ...(isArchive(saved) ? saved : {}), ...state };
+      const changed = !isArchive(saved) || Object.keys(merged).length !== Object.keys(saved).length;
+      state = merged; keep();
+      if (changed && Object.keys(merged).length) void upload();
     };
     void supabase.auth.getSession().then(({ data }) => { if (data.session) adopt(data.session.user.user_metadata); });
     const { data } = supabase.auth.onAuthStateChange((event, s) => { if (event === "SIGNED_IN" && s) adopt(s.user.user_metadata); });

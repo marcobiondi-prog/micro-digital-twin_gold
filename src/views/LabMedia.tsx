@@ -1,3 +1,4 @@
+import { VideoPlayer } from "@/views/v10/VideoPlayer";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -637,13 +638,9 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
           <DialogTitle className="truncate pr-6 text-sm">{view?.name}</DialogTitle>
           {view &&
             (view.kind === "video" ? (
-              <video
-                src={view.url}
-                controls
-                autoPlay
-                playsInline
-                className="max-h-[70vh] w-full rounded-lg bg-muted"
-              />
+              <div className="h-[70vh] overflow-hidden rounded-lg bg-black">
+                <VideoPlayer src={view.url} autoPlay />
+              </div>
             ) : (
               <img
                 src={view.url}
