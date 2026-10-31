@@ -244,12 +244,16 @@ export function ProfileCard({ kind, go }: { kind: ProKind; go?: () => void }) {
         {mine.kind === "funzionario" ? <TownCrest name={mine.comune} istat={mine.istat} size={52} label /> : <TownCrest name={mine.region} region size={52} label />}
       </div>
       <dl className="divide-y divide-foreground/10 rounded-2xl bg-foreground/[0.05] px-4">
-        {profileRows(mine).map(([k, v]) => (
+        {profileRows(mine).map(([k, v]) => {
+          // The email opens the phone's email app, written to that address.
+          const val = k === "Email" && v
+            ? <a href={`mailto:${v}`} className="text-[var(--brand-turquoise)] underline decoration-[var(--brand-turquoise)]/40 underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm">{v}</a>
+            : v;
           // A long value (the email) goes on its own line under its label, whole, instead of breaking mid-word beside it.
-          v.length > 24
-            ? <div key={k} className="py-3"><dt className="text-sm text-muted-foreground">{k}</dt><dd className="mt-1 text-[15px] font-medium [overflow-wrap:anywhere]">{v}</dd></div>
-            : <div key={k} className="flex items-baseline justify-between gap-4 py-3"><dt className="shrink-0 text-sm text-muted-foreground">{k}</dt><dd className="min-w-0 text-right text-[15px] font-medium [overflow-wrap:anywhere]">{v}</dd></div>
-        ))}
+          return v.length > 24
+            ? <div key={k} className="py-3"><dt className="text-sm text-muted-foreground">{k}</dt><dd className="mt-1 text-[15px] font-medium [overflow-wrap:anywhere]">{val}</dd></div>
+            : <div key={k} className="flex items-baseline justify-between gap-4 py-3"><dt className="shrink-0 text-sm text-muted-foreground">{k}</dt><dd className="min-w-0 text-right text-[15px] font-medium [overflow-wrap:anywhere]">{val}</dd></div>;
+        })}
       </dl>
       {go && (
         <button type="button" onClick={go} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground text-[15px] font-semibold text-background outline-none focus-visible:ring-4 focus-visible:ring-ring/50">
