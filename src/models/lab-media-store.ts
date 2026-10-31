@@ -57,13 +57,26 @@ export async function deleteGuestFile(k: MediaKind, id: string) {
 /** Deletes these photos and videos for good: from the account's storage when uploaded, from the device otherwise. */
 export async function removeMedia(k: MediaKind, items: MediaItem[]) {
   const paths = items.flatMap((i) => (i.path ? [i.path] : []));
+  const deleted = new Set<string>();
   if (paths.length) {
-    const { error } = await supabase.storage.from(MEDIA_BUCKET).remove(paths);
-    if (error) throw error;
+    // The storage answers without an error even when it deleted nothing (a file it would not let go): only the files
+    // it lists back are gone, so the others stay listed (and in the history) instead of coming back at the next
+    // refresh.
+    for (let i = 0; i < paths.length; i += 500) {
+      const { data, error } = await supabase.storage.from(MEDIA_BUCKET).remove(paths.slice(i, i + 500));
+      if (error) throw error;
+      (data ?? []).forEach((o) => deleted.add(o.name));
+    }
   }
   for (const i of items) if (!i.path) { URL.revokeObjectURL(i.url); await deleteGuestFile(k, i.id); }
-  const gone = new Set(items.map((i) => i.id));
+  const removed = items.filter((i) => !i.path || deleted.has(i.path));
+  const gone = new Set(removed.map((i) => i.id));
   setMedia(k, (p) => p.filter((x) => !gone.has(x.id)));
+  // A deleted file leaves the archive too, so the Cronologia and the Archivio never count it again.
+  const flow = k === "urban" ? "piazza" : "vigneto";
+  const { restoreMedia } = await import("@/models/media-archive");
+  restoreMedia(removed.map((i) => `${flow}-${i.id}`));
+  if (removed.length < items.length) throw new Error(`not-deleted:${items.length - removed.length}`);
 }
 
 export async function deleteAllGuestFiles(k: MediaKind) {

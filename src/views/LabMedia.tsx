@@ -39,12 +39,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  MEDIA_BUCKET,
-  deleteAllGuestFiles,
-  deleteGuestFile,
   ensureMedia,
   removeMedia,
-  setMedia,
   useLabMedia,
   type MediaItem,
 } from "@/models/lab-media-store";
@@ -303,9 +299,10 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
     justRemoved.current = true;
     setLeaving((p) => new Set(p).add(item.id));
     await new Promise((r) => setTimeout(r, 200));
-    if (item.path) await supabase.storage.from(MEDIA_BUCKET).remove([item.path]);
-    else { URL.revokeObjectURL(item.url); void deleteGuestFile(kind, item.id); }
-    setMedia(kind, (p) => p.filter((x) => x.id !== item.id));
+    // The same deletion as the Cronologia's: from the account or the device, and out of the archive, so the file
+    // leaves the history too.
+    try { await removeMedia(kind, [item]); }
+    catch { toast.error("File non eliminato", { description: "Controlla la connessione e riprova." }); }
     setLeaving((p) => {
       const n = new Set(p);
       n.delete(item.id);
@@ -323,13 +320,8 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
       setTimeout(() => setLeaving((p) => new Set(p).add(it.id)), d);
     });
     await new Promise((r) => setTimeout(r, total + 200));
-    const paths = items.flatMap((i) => (i.path ? [i.path] : []));
-    if (paths.length) await supabase.storage.from(MEDIA_BUCKET).remove(paths);
-    items.forEach((i) => {
-      if (!i.path) URL.revokeObjectURL(i.url);
-    });
-    void deleteAllGuestFiles(kind);
-    setMedia(kind, () => []);
+    try { await removeMedia(kind, items); }
+    catch { toast.error("Non tutti i file sono stati eliminati", { description: "Controlla la connessione e riprova." }); }
     setLeaving(new Set());
   }
 
