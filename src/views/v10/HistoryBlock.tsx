@@ -159,7 +159,7 @@ function ShotViewer({ shots, start, onClose }: { shots: Shot[]; start: number; o
           {s.kind === "image" && <img src={s.url} alt="" aria-hidden="true" className="absolute inset-0 size-full scale-125 object-cover opacity-60 blur-2xl" />}
           <div ref={row} onScroll={onScroll} data-map-gestures="" className="no-scrollbar relative flex h-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden touch-pan-x">
             {list.map((x, k) => (
-              <div key={`${x.flow}-${x.id}`} className="relative grid h-full w-full shrink-0 snap-center place-items-center">
+              <div key={`${x.flow}-${x.id}`} className="relative flex h-full w-full shrink-0 snap-center items-center justify-center">
                 {Math.abs(k - i) <= 2 && (x.kind === "video"
                   ? (k === i ? <VideoPlayer src={x.url} /> : <video src={`${x.url}#t=0.1`} playsInline preload="metadata" muted className="max-h-full max-w-full" />)
                   : <img src={x.url} alt={`Foto ${k + 1} di ${list.length}`} className="max-h-full max-w-full object-contain" />)}
