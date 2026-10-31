@@ -6,7 +6,11 @@ import { currentMedia, removeMedia, useLabMedia, type MediaItem } from "@/models
 import { mediaTime } from "@/models/media-time";
 import { TabRow } from "@/views/v8/console";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { forShare } from "@/views/v10/ExportSheet";
+import { forShare, zoneOfName } from "@/views/v10/ExportSheet";
+import { useLab } from "@/models/lab-store";
+import { drawnAreaFor, ZONE_LABEL, type DrawnArea, type SubArea } from "@/models/drawn-area";
+import type { Ring } from "@/models/place-area";
+import { ZONE_COLORS } from "@/views/v10/map-area";
 import { peekStyle, useTabSwipe } from "@/lib/use-tab-swipe";
 import { useProId } from "@/lib/use-pro-id";
 import { SEASON_LABEL } from "@/models/season-climate";
@@ -70,6 +74,8 @@ function ShotViewer({ shots, start, onClose }: { shots: Shot[]; start: number; o
   const row = useRef<HTMLDivElement>(null);
   // Each photo's file, fetched as soon as it is shown, so the share opens straight from the tap.
   const files = useRef(new Map<string, Blob>());
+  const lab = useLab();
+  const { entries: history } = useHistory();
   // Mounted closed, then opened (the shared dialog's history step), at the photo that was tapped.
   useEffect(() => { setOpen(true); }, []);
   useEffect(() => {
@@ -132,52 +138,130 @@ function ShotViewer({ shots, start, onClose }: { shots: Shot[]; start: number; o
     } finally { setBusy(false); setAsk(false); }
   };
   if (!s) return null;
+  const flowKey = s.flow === "piazza" ? "urban" : "vineyard";
+  const place = lab[flowKey].location;
+  const area = drawnAreaFor(lab[flowKey].area, place);
+  const zone = zoneOfName(s.name);
+  // The simulation as it was set nearest to the shot (within three hours), from the history of that project.
+  const near = s.at ? history.filter((e) => e.flow === s.flow && whenOf(e)).map((e) => ({ e, d: Math.abs(new Date(e.at).getTime() - s.at!) })).filter((x) => x.d < 3 * 3600_000).sort((x, y) => x.d - y.d)[0]?.e : undefined;
+  const nearWhen = near ? whenOf(near) : null;
+  const [placeName, placeSub] = [place.label.split(/[,·]/)[0]!.trim(), place.label.split(/[,·]/).slice(1).map((x) => x.trim()).filter(Boolean).join(" · ")];
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) close(); }}>
-      <DialogContent overlayClassName="bg-black" className="!left-0 !top-0 flex h-[100dvh] w-full max-w-none !translate-x-0 !translate-y-0 flex-col gap-0 rounded-none border-0 bg-black p-0 text-white sm:max-h-none sm:rounded-none">
+      <DialogContent overlayClassName="bg-black" className="!left-0 !top-0 flex h-[100dvh] w-full max-w-none !translate-x-0 !translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 bg-background p-0 text-foreground sm:max-h-none sm:rounded-none">
         <DialogTitle className="sr-only">{s.kind === "video" ? "Video" : "Foto"} {i + 1} di {list.length}</DialogTitle>
-        <DialogDescription className="sr-only">{s.flow === "piazza" ? "Piazza" : "Vigneto"}{when ? `, ${when}` : ""}</DialogDescription>
-        <div className="flex items-center gap-3 px-4 pb-2 pr-16 pt-[calc(0.85rem+env(safe-area-inset-top))]">
-          <span className="text-[15px] font-semibold tabular-nums">{Math.min(i, list.length - 1) + 1} di {list.length}</span>
-          <span className="min-w-0 truncate text-sm text-white/65">{s.flow === "piazza" ? "Piazza" : "Vigneto"}{when ? ` · ${when}` : ""}</span>
-        </div>
-        <div ref={row} onScroll={onScroll} data-map-gestures="" className="no-scrollbar flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden touch-pan-x">
-          {list.map((x, k) => (
-            <div key={`${x.flow}-${x.id}`} className="relative grid h-full w-full shrink-0 snap-center place-items-center px-1">
-              {Math.abs(k - i) <= 2 && (x.kind === "video"
-                ? <video src={x.url} controls playsInline preload="metadata" className="max-h-full max-w-full" />
-                : <img src={x.url} alt={`Foto ${k + 1} di ${list.length}`} className="max-h-full max-w-full object-contain" />)}
-            </div>
-          ))}
-        </div>
-        {note && <p role="status" className="px-6 pt-3 text-center text-[13px] text-brand-turquoise">{note}</p>}
-        {ask ? (
-          <div role="alertdialog" aria-label="Conferma eliminazione" className="mx-4 mt-3 rounded-2xl bg-white/[0.08] p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-center">
-            <p className="text-[15px] font-medium">Eliminare {what}? Non si può recuperare.</p>
-            <div className="mt-3 flex gap-2">
-              <button type="button" onClick={() => setAsk(false)} disabled={busy} className="h-12 flex-1 rounded-full bg-white/10 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-white">Annulla</button>
-              <button type="button" onClick={() => void del()} disabled={busy} className="h-12 flex-1 rounded-full bg-destructive text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-60">{busy ? "Elimino…" : "Elimina"}</button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-            <button type="button" onClick={() => void share()} className="flex w-16 flex-col items-center gap-1 text-xs outline-none focus-visible:underline">
-              <span className="grid size-11 place-items-center rounded-full bg-white/10"><Share2 className="size-5" aria-hidden="true" /></span>Condividi
-            </button>
-            <div className="flex items-center gap-3">
-              <button type="button" onClick={() => go(i - 1)} disabled={i === 0} aria-label="Precedente" className="grid size-10 place-items-center rounded-full bg-white/10 text-xl outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-30">‹</button>
-              <div className="flex max-w-[30vw] gap-1.5 overflow-hidden" aria-hidden="true">
-                {list.length <= 9 && list.map((x, k) => <span key={k} className={`h-1.5 rounded-full transition-all ${k === i ? "w-5 bg-white" : "w-1.5 bg-white/35"}`} />)}
+        <DialogDescription className="sr-only">{placeName}{when ? `, ${when}` : ""}</DialogDescription>
+        {/* The photo on top, fitted whole over a blurred copy of itself; sideways to the next one. */}
+        <div className="relative h-[54dvh] shrink-0 overflow-hidden bg-black">
+          {s.kind === "image" && <img src={s.url} alt="" aria-hidden="true" className="absolute inset-0 size-full scale-125 object-cover opacity-60 blur-2xl" />}
+          <div ref={row} onScroll={onScroll} data-map-gestures="" className="no-scrollbar relative flex h-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden touch-pan-x">
+            {list.map((x, k) => (
+              <div key={`${x.flow}-${x.id}`} className="relative grid h-full w-full shrink-0 snap-center place-items-center">
+                {Math.abs(k - i) <= 2 && (x.kind === "video"
+                  ? <video src={x.url} controls playsInline preload="metadata" className="max-h-full max-w-full" />
+                  : <img src={x.url} alt={`Foto ${k + 1} di ${list.length}`} className="max-h-full max-w-full object-contain" />)}
               </div>
-              <button type="button" onClick={() => go(i + 1)} disabled={i >= list.length - 1} aria-label="Successiva" className="grid size-10 place-items-center rounded-full bg-white/10 text-xl outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-30">›</button>
-            </div>
-            <button type="button" onClick={() => setAsk(true)} className="flex w-16 flex-col items-center gap-1 text-xs outline-none focus-visible:underline">
-              <span className="grid size-11 place-items-center rounded-full bg-destructive/20 text-red-300"><Trash2 className="size-5" aria-hidden="true" /></span>Elimina
-            </button>
+            ))}
           </div>
-        )}
+          <span className="absolute left-4 top-[calc(0.9rem+env(safe-area-inset-top))] rounded-full bg-black/40 px-3 py-1.5 text-[13px] font-semibold tabular-nums text-white backdrop-blur-md">{Math.min(i, list.length - 1) + 1} / {list.length}</span>
+          <span className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-b from-transparent to-background" />
+        </div>
+        {/* What the photo is about: the place, when, where on the drawn area, the simulation of that moment. */}
+        <div className="relative -mt-6 min-h-0 flex-1 overflow-y-auto rounded-t-[1.6rem] bg-background px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-5">
+          <h3 className="font-display text-[22px] font-light leading-tight">{placeName}</h3>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">{[placeSub, when].filter(Boolean).join(" · ") || "Data non registrata"}</p>
+          <MiniMap center={place} area={area} highlight={zone} />
+          <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto touch-pan-x" data-map-gestures="">
+            {zone && <span className="shrink-0 rounded-full bg-foreground/[0.07] px-3 py-1.5 text-[12.5px]">Zona: {zone}</span>}
+            {nearWhen && <span className="shrink-0 rounded-full bg-foreground/[0.07] px-3 py-1.5 text-[12.5px]">{SEASON_LABEL[nearWhen.season]} · {whenClock(nearWhen)}</span>}
+            <span className="shrink-0 rounded-full bg-foreground/[0.07] px-3 py-1.5 text-[12.5px]">{s.flow === "piazza" ? "Piazza" : "Vigneto"} · {s.kind === "video" ? "video" : "foto"}</span>
+          </div>
+          {note && <p role="status" className="mt-3 text-center text-[13px] text-brand-turquoise">{note}</p>}
+          {ask ? (
+            <div role="alertdialog" aria-label="Conferma eliminazione" className="mt-4 rounded-2xl bg-destructive/10 p-4 text-center">
+              <p className="text-[15px] font-medium">Eliminare {what}? Non si può recuperare.</p>
+              <div className="mt-3 flex gap-2">
+                <button type="button" onClick={() => setAsk(false)} disabled={busy} className="h-12 flex-1 rounded-full bg-foreground/10 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">Annulla</button>
+                <button type="button" onClick={() => void del()} disabled={busy} className="h-12 flex-1 rounded-full bg-destructive text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">{busy ? "Elimino…" : "Elimina"}</button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => void share()} className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-foreground/[0.08] text-[15px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"><Share2 className="size-5" aria-hidden="true" />Condividi</button>
+              <button type="button" onClick={() => setAsk(true)} className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-foreground/[0.08] text-[15px] font-semibold text-red-400 outline-none focus-visible:ring-2 focus-visible:ring-ring"><Trash2 className="size-5" aria-hidden="true" />Elimina</button>
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+const TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile";
+const MAP_H = 190;
+/** Web Mercator pixel of a point at zoom z. */
+const worldPx = (lat: number, lng: number, z: number): [number, number] => {
+  const size = 256 * 2 ** z, r = (lat * Math.PI) / 180;
+  return [((lng + 180) / 360) * size, ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * size];
+};
+
+/**
+ * A small still map under the photo: the satellite picture of the place, the drawn area in white, its zones dashed in
+ * their colours (the photo's own zone stronger, the others faded) and the place's pin. Without a drawn area, the place
+ * alone; without connection, a dark ground with the same drawing.
+ */
+function MiniMap({ center, area, highlight }: { center: { lat: number; lng: number }; area: DrawnArea | null; highlight: string | null }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [w, setW] = useState(340);
+  useEffect(() => {
+    const el = box.current; if (!el) return;
+    const ro = new ResizeObserver(() => setW(el.clientWidth || 340));
+    ro.observe(el); setW(el.clientWidth || 340);
+    return () => ro.disconnect();
+  }, []);
+  const ring = area?.ring ?? null;
+  const zones = (area?.zones ?? []).filter((z) => Array.isArray(z.ring) && z.ring.length >= 3);
+  // The zoom that fits the area with a margin, fractional (the tiles of the zoom below, scaled up); the place alone at 17.
+  let zf = 17;
+  if (ring && ring.length >= 3) {
+    const ps = ring.map(([la, ln]) => worldPx(la, ln, 0));
+    const dx = Math.max(...ps.map((q) => q[0])) - Math.min(...ps.map((q) => q[0])), dy = Math.max(...ps.map((q) => q[1])) - Math.min(...ps.map((q) => q[1]));
+    zf = Math.min(19, Math.max(12, Math.log2(Math.min((w * 0.86) / Math.max(dx, 1e-9), (MAP_H * 0.8) / Math.max(dy, 1e-9)))));
+  }
+  const z = Math.floor(zf), k = 2 ** (zf - z), T = 256 * k;
+  const at = (lat: number, lng: number): [number, number] => { const [x, y] = worldPx(lat, lng, z); return [x * k, y * k]; };
+  let cx: number, cy: number;
+  if (ring && ring.length >= 3) {
+    const ps = ring.map(([la, ln]) => at(la, ln));
+    cx = (Math.min(...ps.map((q) => q[0])) + Math.max(...ps.map((q) => q[0]))) / 2; cy = (Math.min(...ps.map((q) => q[1])) + Math.max(...ps.map((q) => q[1]))) / 2;
+  } else [cx, cy] = at(center.lat, center.lng);
+  const ox = cx - w / 2, oy = cy - MAP_H / 2;
+  const tiles: Array<[number, number]> = [];
+  for (let tx = Math.floor(ox / T); tx <= Math.floor((ox + w) / T); tx++)
+    for (let ty = Math.floor(oy / T); ty <= Math.floor((oy + MAP_H) / T); ty++) tiles.push([tx, ty]);
+  const pts = (r: Ring) => r.map(([la, ln]) => { const [x, y] = at(la, ln); return `${(x - ox).toFixed(1)},${(y - oy).toFixed(1)}`; }).join(" ");
+  const [px, py] = at(center.lat, center.lng);
+  const label = (zn: SubArea) => zn.name ?? ZONE_LABEL[zn.kind];
+  return (
+    <div ref={box} className="relative mt-4 h-[190px] overflow-hidden rounded-2xl bg-[#2a332d]" aria-label={`Mappa del luogo${highlight ? `, zona ${highlight}` : ""}`} role="img">
+      {tiles.map(([tx, ty]) => (
+        <img key={`${tx}-${ty}`} src={`${TILES}/${z}/${ty}/${tx}`} alt="" aria-hidden="true" loading="lazy" draggable={false}
+          onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
+          className="absolute max-w-none select-none" style={{ left: tx * T - ox, top: ty * T - oy, width: T, height: T }} />
+      ))}
+      <span className="absolute inset-0 bg-black/15" aria-hidden="true" />
+      <svg className="absolute inset-0" width={w} height={MAP_H} aria-hidden="true">
+        {ring && ring.length >= 3 && <polygon points={pts(ring)} fill="rgb(45 212 191 / 0.14)" stroke="#fff" strokeWidth="1.6" />}
+        {zones.map((zn) => {
+          const on = highlight !== null && label(zn) === highlight;
+          const color = ZONE_COLORS[zn.kind];
+          return <polygon key={zn.id} points={pts(zn.ring)} fill={color} fillOpacity={on ? 0.35 : 0.14} stroke={color} strokeWidth={on ? 3 : 1.5} strokeDasharray="5 4" opacity={highlight && !on ? 0.5 : 1} />;
+        })}
+      </svg>
+      <span className="absolute grid size-6 -translate-x-1/2 -translate-y-full place-items-center" style={{ left: px - ox, top: py - oy }} aria-hidden="true">
+        <span className="size-5 rotate-45 rounded-[50%_50%_0_50%] border-[3px] border-white bg-brand-turquoise shadow-md" />
+      </span>
+    </div>
   );
 }
 
