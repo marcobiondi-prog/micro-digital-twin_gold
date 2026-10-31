@@ -5,6 +5,7 @@ import { ArrowRight, Building2, CalendarDays, Check, Share2, ChevronDown, Clock3
 import { currentMedia, removeMedia, useLabMedia, type MediaItem } from "@/models/lab-media-store";
 import { mediaTime } from "@/models/media-time";
 import { uploadGroups } from "@/models/media-groups";
+import { mediaThumb, readyThumb } from "@/lib/media-thumbs";
 import { SHOT_KINDS, kindCountText, shotKind, shotLabel, type ShotKind } from "@/models/shot-kind";
 import { TabRow } from "@/views/v8/console";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -29,26 +30,40 @@ const time = (e: HistoryEntry) => new Date(e.at).toLocaleTimeString("it-IT", { h
 type Shot = MediaItem & { flow: "piazza" | "vigneto"; at: number | null };
 
 /**
- * A photo, or a video's first frame, with a turning ring while it loads; the picture fades in once it is there.
- * A picture already in the browser's memory shows at once (checked on mount, as its load may come before React).
+ * A photo, or a video's first frame, as a light thumbnail (lib/media-thumbs: made once, small, kept for the session),
+ * started only when it comes near the screen; a turning ring while it is made, then it fades in. A thumbnail already
+ * made shows at once.
  */
 function ShotMedia({ s }: { s: Shot }) {
+  const key = `${s.flow}-${s.id}`;
+  const known = readyThumb(key);
+  const [src, setSrc] = useState<string | null | undefined>(known);
   const [ready, setReady] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const box = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (src !== undefined) return;
+    const el = box.current;
+    if (!el) return;
+    let live = true;
+    const io = new IntersectionObserver((seen) => {
+      if (!seen.some((e) => e.isIntersecting)) return;
+      io.disconnect();
+      void mediaThumb(key, s.url, s.kind).then((out) => { if (live) setSrc(out); });
+    }, { rootMargin: "300px" });
+    io.observe(el);
+    return () => { live = false; io.disconnect(); };
+  }, [key, s.url, s.kind, src]);
   const fade = `size-full object-cover transition-opacity duration-300 motion-reduce:transition-none ${ready ? "opacity-100" : "opacity-0"}`;
   return (
-    <>
-      {!ready && !failed && (
+    <span ref={box} className="absolute inset-0">
+      {src === undefined && (
         <span className="absolute inset-0 grid place-items-center" role="status" aria-label="Caricamento">
           <span className="size-8 animate-spin rounded-full border-[3px] border-white/15 border-t-brand-turquoise motion-reduce:animate-none" />
         </span>
       )}
-      {s.kind === "video"
-        ? <video ref={(v) => { if (v && v.readyState >= 2) setReady(true); }} src={`${s.url}#t=0.1`} preload="metadata" muted playsInline
-            onLoadedData={() => setReady(true)} onError={() => setFailed(true)} className={`pointer-events-none ${fade}`} />
-        : <img ref={(i) => { if (i?.complete && i.naturalWidth) setReady(true); }} src={s.url} alt="" loading="lazy"
-            onLoad={() => setReady(true)} onError={() => setFailed(true)} className={fade} />}
-    </>
+      {src && <img ref={(i) => { if (i?.complete && i.naturalWidth) setReady(true); }} src={src} alt="" decoding="async"
+        onLoad={() => setReady(true)} className={fade} />}
+    </span>
   );
 }
 
@@ -159,7 +174,8 @@ function ShotViewer({ shots, start, onClose }: { shots: Shot[]; start: number; o
         <DialogDescription className="sr-only">{placeName}{when ? `, ${when}` : ""}</DialogDescription>
         {/* The photo on top, fitted whole over a blurred copy of itself; sideways to the next one. */}
         <div className="relative h-[54dvh] shrink-0 overflow-hidden bg-black">
-          {s.kind === "image" && <img src={s.url} alt="" aria-hidden="true" className="absolute inset-0 size-full scale-125 object-cover opacity-60 blur-2xl" />}
+          {/* The blurred backdrop is drawn from the small thumbnail: blurring the whole photo was heavy on phones. */}
+          {readyThumb(`${s.flow}-${s.id}`) && <img src={readyThumb(`${s.flow}-${s.id}`)!} alt="" aria-hidden="true" className="absolute inset-0 size-full scale-125 object-cover opacity-60 blur-2xl" />}
           <div ref={row} onScroll={onScroll} data-map-gestures="" className="no-scrollbar relative flex h-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden touch-pan-x">
             {list.map((x, k) => (
               <div key={`${x.flow}-${x.id}`} className="relative flex h-full w-full shrink-0 snap-center items-center justify-center">
@@ -507,7 +523,7 @@ function OpenPile({ pile, onClose, archived = false }: { pile: Pile; onClose: ()
       </button>
       <div className="pile-fold" data-folded={folded.has(g.key) || undefined}><div className="min-h-0">
       <div className="no-scrollbar -mx-3 flex snap-x snap-mandatory gap-2 overflow-x-auto scroll-px-3 px-3 py-1 touch-pan-x" data-map-gestures="">
-        {g.shots.map((s, i) => <div key={keyOf(s)} className="pile-deal w-[7.5rem] shrink-0 snap-start sm:w-36" style={{ animationDelay: `${Math.min(gi, 4) * 70 + Math.min(i, 7) * 45}ms` }}>{selecting ? (
+        {g.shots.map((s, i) => <div key={keyOf(s)} className={`w-[7.5rem] shrink-0 snap-start sm:w-36 ${gi < 3 && i < 6 ? "pile-deal" : ""}`} style={gi < 3 && i < 6 ? { animationDelay: `${gi * 70 + i * 45}ms` } : undefined}>{selecting ? (
           <button type="button" role="checkbox" aria-checked={picked.has(keyOf(s))} aria-label={`${s.kind === "video" ? "Video" : "Foto"} ${s.name}`} onClick={() => flip(s)}
             className={`relative block aspect-square overflow-hidden rounded-2xl bg-foreground/[0.08] outline-none transition focus-visible:ring-2 focus-visible:ring-ring ${picked.has(keyOf(s)) ? "ring-2 ring-destructive" : "opacity-80"}`}>
             <ShotMedia s={s} />
