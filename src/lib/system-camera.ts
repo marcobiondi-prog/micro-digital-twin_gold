@@ -19,3 +19,10 @@ export function openSystemCamera(input: HTMLInputElement | null, mode: "photo" |
   // showPicker can choose a generic file picker on tablet/WebView hosts.
   input.click();
 }
+/**
+ * Su Android il vecchio Chrome, con la selezione multipla, apriva il gestore file invece della galleria. Da Chrome 120
+ * l'input foto/video apre il selettore di foto di Android anche con la selezione multipla.
+ */
+const isAndroid = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+const chromeMajor = typeof navigator !== "undefined" ? Number(/Chrome\/(\d+)/.exec(navigator.userAgent)?.[1] ?? 0) : 0;
+export const galleryMultiple = !isAndroid || chromeMajor >= 120;

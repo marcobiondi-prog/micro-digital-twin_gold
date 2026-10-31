@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { Building2, Camera, Grape, Images, Lock, MapPin, Video, Wrench, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -6,7 +7,8 @@ import { useInstalledApp } from "@/lib/installed-app";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { showSimMediaNow } from "@/views/v8/console";
 import { pushBackGuard } from "@/hooks/use-back-close";
-import { openAccount, requestCapture, setCameraSheetOpen, useCameraSheetOpen, type CaptureAction } from "@/lib/camera-dock";
+import { deliverFiles, openAccount, requestCapture, setCameraSheetOpen, useCameraSheetOpen, type CaptureAction } from "@/lib/camera-dock";
+import { galleryMultiple, openSystemCamera, supportsSystemCapture } from "@/lib/system-camera";
 import { cn } from "@/lib/utils";
 import { useProId } from "@/lib/use-pro-id";
 import { useLab } from "@/models/lab-store";
@@ -133,6 +135,23 @@ export function CameraSheet() {
     window.addEventListener("popstate", go);
     window.history.back();
   };
+  // The sheet's own inputs, for captures started from another page (see start).
+  const videoInput = useRef<HTMLInputElement>(null);
+  const galleryInput = useRef<HTMLInputElement>(null);
+  const pickFromSheet = (target: "urban" | "vineyard") => {
+    const picker = (window as unknown as { showOpenFilePicker?: (o: unknown) => Promise<{ getFile: () => Promise<File> }[]> }).showOpenFilePicker;
+    if (picker) {
+      void picker({ multiple: true, types: [{ description: "Foto e video", accept: { "image/*": [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".gif"], "video/*": [".mp4", ".mov", ".webm", ".m4v"] } }] })
+        .then(async (handles) => deliverFiles(target, { files: await Promise.all(handles.map((h) => h.getFile())), via: "gallery" }))
+        .catch(() => undefined);
+      return;
+    }
+    const el = galleryInput.current;
+    if (!el) return;
+    el.dataset["kind"] = target;
+    el.value = "";
+    el.click();
+  };
   // Called inside the tap: the system camera and the file picker need the user gesture.
   const start = (action: CaptureAction) => {
     if (!kind) return;
@@ -164,6 +183,15 @@ export function CameraSheet() {
       });
       return;
     }
+    if (!here && (action === "video" || action === "gallery") && (action === "gallery" || supportsSystemCapture(navigator.userAgent, navigator.platform, navigator.maxTouchPoints))) {
+      // From another page the phone's camera or gallery opens right here, inside this very tap (no timing to rely on),
+      // and the app moves to the project's page (Simula) behind it; the files then go to that page's media panel.
+      const target = kind;
+      if (action === "video") { if (videoInput.current) videoInput.current.dataset["kind"] = target; openSystemCamera(videoInput.current, "video"); }
+      else pickFromSheet(target);
+      afterClose(() => { openPage(); window.setTimeout(() => showSimMediaNow(target), 400); });
+      return;
+    }
     if (!here) {
       // The phone's camera and file picker open only from a tap — but a tap stays good for a few seconds (the
       // browser's transient activation) and the move keeps the same document: the sheet is carried to the project's
@@ -179,7 +207,15 @@ export function CameraSheet() {
   };
   const identify = (to: "/identificazione/funzionario" | "/identificazione/agronomo") => afterClose(() => void navigate({ to }));
 
+  const onPicked = (via: "camera" | "gallery") => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const target = (e.target.dataset["kind"] as "urban" | "vineyard" | undefined) ?? kind;
+    if (target && e.target.files?.length) deliverFiles(target, { files: Array.from(e.target.files), via });
+    e.target.value = "";
+  };
   return (
+    <>
+    <input ref={videoInput} type="file" accept="video/*" capture="environment" className="hidden" aria-hidden="true" tabIndex={-1} onChange={onPicked("camera")} />
+    <input ref={galleryInput} type="file" accept="image/*,video/*" multiple={galleryMultiple} className="hidden" aria-hidden="true" tabIndex={-1} onChange={onPicked("gallery")} />
     <Dialog open={open} onOpenChange={setCameraSheetOpen}>
       <DialogContent className="gap-4 border-foreground/20 bg-card dark:bg-[oklch(0.25_0.016_258)] shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_-24px_60px_rgb(0_0_0/0.6)] p-5 max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-[1.75rem] max-sm:border-x-0 max-sm:border-b-0 max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-sm:data-[state=open]:slide-in-from-bottom-1/2 max-sm:data-[state=closed]:slide-out-to-bottom-1/2 sm:w-[min(440px,calc(100vw-1.5rem))] sm:rounded-2xl">
         <span className="mx-auto -mt-1 h-1.5 w-10 rounded-full bg-foreground/20 sm:hidden" aria-hidden="true" />
@@ -220,5 +256,6 @@ export function CameraSheet() {
         )}
       </DialogContent>
     </Dialog>
+    </>
   );
 }

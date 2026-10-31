@@ -30,3 +30,25 @@ export function useCameraSheetOpen(): boolean {
 /** Opens the account dialog from anywhere (e.g. the locked AI option). */
 export const OPEN_ACCOUNT_EVENT = "mdt-open-account";
 export function openAccount() { window.dispatchEvent(new Event(OPEN_ACCOUNT_EVENT)); }
+
+/**
+ * Files picked from the camera sheet itself (Video or Galleria tapped off the project's page): the phone's camera or
+ * gallery opens inside the tap, while the app moves to the project's page behind it; the files then wait here until
+ * that page's media panel takes them (camera videos straight in, gallery picks through its review sheet).
+ */
+export type Delivery = { files: File[]; via: "camera" | "gallery" };
+const pendingFiles = new Map<Kind, Delivery[]>();
+const fileHandlers = new Map<Kind, (d: Delivery) => void>();
+export function registerFilesHandler(kind: Kind, handler: (d: Delivery) => void) {
+  fileHandlers.set(kind, handler);
+  const waiting = pendingFiles.get(kind) ?? [];
+  pendingFiles.delete(kind);
+  waiting.forEach(handler);
+  return () => { if (fileHandlers.get(kind) === handler) fileHandlers.delete(kind); };
+}
+export function deliverFiles(kind: Kind, d: Delivery) {
+  if (!d.files.length) return;
+  const handler = fileHandlers.get(kind);
+  if (handler) handler(d);
+  else pendingFiles.set(kind, [...(pendingFiles.get(kind) ?? []), d]);
+}

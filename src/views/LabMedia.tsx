@@ -17,9 +17,9 @@ import { ArCamera } from "@/views/ArCamera";
 import { prepareArOrientation } from "@/lib/ar-orientation";
 import { useInstalledApp } from "@/lib/installed-app";
 import { useDemoSignedIn } from "@/lib/demo-login";
-import { registerCaptureHandler } from "@/lib/camera-dock";
+import { registerCaptureHandler, registerFilesHandler, type Delivery } from "@/lib/camera-dock";
 import { AI_STANDBY } from "@/lib/ai-standby";
-import { openSystemCamera, prepareSystemCamera, supportsSystemCapture } from "@/lib/system-camera";
+import { galleryMultiple, openSystemCamera, prepareSystemCamera, supportsSystemCapture } from "@/lib/system-camera";
 import { SystemCamera } from "@/views/SystemCamera";
 import { GalleryReview } from "@/views/GalleryReview";
 import { guardUse } from "@/lib/app-permissions";
@@ -47,15 +47,7 @@ import {
 import { enqueueUploads, useLabUploads } from "@/models/lab-media-uploader";
 import { prewarmShare, shareFiles, shareSelectedNow, shareOne, useShareProgress } from "@/models/lab-media-sender";
 
-/**
- * Su Android il vecchio Chrome, con la selezione multipla, apriva il gestore file invece della galleria. Da Chrome 120
- * l'input foto/video apre il selettore di foto di Android (la griglia stile Google Foto) anche con la selezione
- * multipla: lì si possono scegliere più foto e video insieme; sui Chrome più vecchi resta la scelta singola.
- */
-const isAndroid =
-  typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
-const chromeMajor = typeof navigator !== "undefined" ? Number(/Chrome\/(\d+)/.exec(navigator.userAgent)?.[1] ?? 0) : 0;
-const galleryMultiple = !isAndroid || chromeMajor >= 120;
+
 
 const fmtSize = (b: number) =>
   b <= 0
@@ -264,6 +256,10 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
     else openCamera(action);
   };
   useEffect(() => registerCaptureHandler(kind, (action) => captureRef.current(action)), [kind]);
+  // Files the camera sheet picked itself (Video / Galleria tapped from another page): in like this panel's own.
+  const deliverRef = useRef<(d: Delivery) => void>(() => undefined);
+  deliverRef.current = (d) => { if (d.via === "gallery") review(d.files); else void add(d.files, d.files[0]?.type.startsWith("video/") ? "video" : "image"); };
+  useEffect(() => registerFilesHandler(kind, (d) => deliverRef.current(d)), [kind]);
 
   useEffect(() => {
     void supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
