@@ -39,6 +39,62 @@ function loadMaps3D(key: string): Promise<Maps3D> {
   return loader;
 }
 
+type Shape = HTMLElement & { outerCoordinates?: unknown; coordinates?: unknown };
+/**
+ * The drawn area and the simulation as Google 3D shapes, kept few so the camera moves smoothly: every shape is drawn
+ * again on each frame. Only the area's outline and the zones drawn by hand are drawn through the photographed mesh
+ * (drawsOccludedSegments costs a second pass); trees are a trunk and three crown discs, a pergola its posts, beams and
+ * one see-through roof, a shade net one see-through sheet.
+ */
+function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: Array<[number, number]>, sim: SimLayout | null): HTMLElement[] {
+  const out: HTMLElement[] = [];
+  if (!Polygon3DElement) return out;
+  try {
+    const poly = new Polygon3DElement({ altitudeMode: "CLAMP_TO_GROUND", fillColor: "rgba(56, 214, 196, 0.35)", strokeColor: "#ffffff", strokeWidth: 3, drawsOccludedSegments: true }) as Shape;
+    poly.outerCoordinates = area.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng }));
+    out.push(poly);
+  } catch { return out; /* an older build without polygons: the pin alone */ }
+  try {
+    const ground = (ring: Array<[number, number]>, fill: string) => {
+      const p = new Polygon3DElement({ altitudeMode: "CLAMP_TO_GROUND", fillColor: fill, strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 }) as Shape;
+      p.outerCoordinates = ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng }));
+      out.push(p);
+    };
+    // A part from the ground is raised (extruded); a higher one floats as a flat slab at its height.
+    const part = (pt: { ring: Array<[number, number]>; base: number; height: number; color: string }, at = pt.height) => {
+      const raised = pt.base === 0;
+      const p = new Polygon3DElement({ altitudeMode: "RELATIVE_TO_GROUND", extruded: raised, fillColor: pt.color, strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 }) as Shape;
+      p.outerCoordinates = pt.ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: raised ? pt.height : at }));
+      out.push(p);
+    };
+    if (sim?.kind === "piazza") {
+      for (const pt of sim.data.patches) {
+        if (pt.kind === "lawn") { ground(pt.ring, "rgba(98,176,66,0.85)"); continue; }
+        ground(pt.ring, "rgba(11,15,21,0.35)");
+        for (const p of pergolaParts(pt.ring, true)) part(p);
+      }
+      for (const t of sim.data.trees) for (const p of treeParts(t, undefined, 2.85)) part(p, (p.base + p.height) / 2);
+    } else if (sim?.kind === "vigneto") {
+      for (const pt of sim.data.patches) if (pt.kind === "zone") ground(pt.ring, `${thirstColor(sim.thirst[pt.zone ?? 0] ?? 0)}59`);
+      for (const p of sim.data.patches.filter((x) => x.kind === "cloth").flatMap((x) => netParts(x.ring, true))) part(p);
+      for (const p of sim.data.lines.filter((l) => l.kind === "wind").flatMap((l) => hedgeParts(l.line, l.strength ?? 0))) part(p);
+      if (Polyline3DElement) for (const l of sim.data.lines.filter((x) => x.kind !== "wind")) {
+        const pl = new Polyline3DElement({ altitudeMode: "CLAMP_TO_GROUND", strokeColor: l.kind === "drip" ? SIM_COLORS.drip : "#ffffff", strokeWidth: l.kind === "drip" ? 2 : 3 }) as Shape;
+        pl.coordinates = l.line.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng }));
+        out.push(pl);
+      }
+    }
+    // The zones drawn by hand: a veil and an outline of their colour, drawn through the photographed mesh.
+    for (const z of sim?.inner ?? []) if (z.ring.length >= 3) {
+      const color = z.kind === "libera" ? "#94a3b8" : ZONE_COLORS[z.kind];
+      const zp = new Polygon3DElement({ altitudeMode: "CLAMP_TO_GROUND", fillColor: z.kind === "libera" ? "rgba(71,85,105,0.6)" : `${color}66`, strokeColor: color, strokeWidth: 4, drawsOccludedSegments: true }) as Shape;
+      zp.outerCoordinates = z.ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng }));
+      out.push(zp);
+    }
+  } catch { /* polygons not supported: the area alone */ }
+  return out;
+}
+
 function applyCamera(map: Map3D, camera: Camera, animate: boolean) {
   if (animate && map.flyCameraTo) { map.flyCameraTo({ endCamera: camera, durationMillis: 900 }); return; }
   Object.assign(map, camera);
@@ -54,85 +110,41 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
     const map = mapRef.current;
     if (map && host.current) applyCamera(map, frameCamera(lat, lng, host.current.clientHeight, altitude.current), animate && !window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   };
+  const libs = useRef<Maps3D | null>(null);
+  // The map is built once per place: the drawn area and the simulation are laid over it by the next effect, so moving a
+  // lever never reloads the photorealistic tiles nor resets the camera.
   useEffect(() => {
     let cancelled = false;
     const el = host.current;
     setState("loading");
-    Promise.all([loadMaps3D(apiKey), groundElevation(lat, lng)]).then(([{ Map3DElement, Marker3DElement, Polygon3DElement, Polyline3DElement }, ground]) => {
+    Promise.all([loadMaps3D(apiKey), groundElevation(lat, lng)]).then(([lib, ground]) => {
       if (cancelled || !el) return;
       altitude.current = ground;
-      const map = new Map3DElement({ ...frameCamera(lat, lng, el.clientHeight, ground), mode: "HYBRID" }) as Map3D;
+      libs.current = lib;
+      const map = new lib.Map3DElement({ ...frameCamera(lat, lng, el.clientHeight, ground), mode: "HYBRID" }) as Map3D;
       map.style.cssText = "display:block;width:100%;height:100%;touch-action:none";
       // GREEDY: one finger moves the camera; the AUTO default turns cooperative inside a
       // scrollable page and asks for two fingers. Set as a property so older builds ignore it.
       map.gestureHandling = "GREEDY";
       // On top of the 3D mesh (roofs, trees) and drawn even when occluded: a ground pin in a street disappears behind buildings.
-      map.append(new Marker3DElement({ position: { lat, lng, altitude: 0 }, altitudeMode: "RELATIVE_TO_MESH", drawsWhenOccluded: true, label }));
-      // The area drawn with pins on the 2D map, laid on the ground and seen through the buildings.
-      if (Polygon3DElement && area.length >= 3) {
-        try {
-          const poly = new Polygon3DElement({ altitudeMode: "CLAMP_TO_GROUND", fillColor: "rgba(56, 214, 196, 0.35)", strokeColor: "#ffffff", strokeWidth: 3, drawsOccludedSegments: true }) as HTMLElement & { outerCoordinates?: unknown };
-          poly.outerCoordinates = area.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng }));
-          map.append(poly);
-        } catch { /* an older build without polygons: the pin alone */ }
-        // The simulation inside the area: lawn and zones on the ground, shade and cloth 3 m up, trees as crowns 9 m tall.
-        try {
-          const shape = (ring: Array<[number, number]>, fill: string, alt: number | null) => {
-            // Ground shapes are drawn even where the photographed mesh (trees, roofs, kiosks) would cover them.
-            const p = new Polygon3DElement({ altitudeMode: alt === null ? "CLAMP_TO_GROUND" : "RELATIVE_TO_GROUND", extruded: alt !== null, fillColor: fill, strokeColor: "rgba(255,255,255,0)", strokeWidth: 0, ...(alt === null ? { drawsOccludedSegments: true } : {}) }) as HTMLElement & { outerCoordinates?: unknown };
-            p.outerCoordinates = ring.map(([pLat, pLng]) => (alt === null ? { lat: pLat, lng: pLng } : { lat: pLat, lng: pLng, altitude: alt }));
-            map.append(p);
-          };
-          if (sim?.kind === "piazza") {
-            for (const pt of sim.data.patches) {
-              if (pt.kind === "lawn") { shape(pt.ring, "rgba(98,176,66,0.85)", null); continue; }
-              // Shade: the shadow on the ground, then the wooden pergola over it (posts raised, beams and slats as floating slabs).
-              shape(pt.ring, "rgba(11,15,21,0.35)", null);
-              for (const part of pergolaParts(pt.ring)) {
-                if (part.base === 0) { shape(part.ring, part.color, part.height); continue; }
-                const slab = new Polygon3DElement({ altitudeMode: "RELATIVE_TO_GROUND", extruded: false, fillColor: part.color, strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 }) as HTMLElement & { outerCoordinates?: unknown };
-                slab.outerCoordinates = part.ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: part.height }));
-                map.append(slab);
-              }
-            }
-            // Each tree: the trunk raised from the ground, then the crown as stacked discs floating at their heights.
-            for (const t of sim.data.trees) for (const part of treeParts(t, undefined, 1)) {
-              if (part.base === 0) { shape(part.ring, part.color, part.height); continue; }
-              const disc = new Polygon3DElement({ altitudeMode: "RELATIVE_TO_GROUND", extruded: false, fillColor: part.color, strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 }) as HTMLElement & { outerCoordinates?: unknown };
-              disc.outerCoordinates = part.ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: (part.base + part.height) / 2 }));
-              map.append(disc);
-            }
-          } else if (sim?.kind === "vigneto") {
-            // Zones tinted by thirst on the ground, shade nets floating on posts, the hedge raised along its edge.
-            for (const pt of sim.data.patches) if (pt.kind === "zone") shape(pt.ring, `${thirstColor(sim.thirst[pt.zone ?? 0] ?? 0)}59`, null);
-            for (const part of [...sim.data.patches.filter((p) => p.kind === "cloth").flatMap((p) => netParts(p.ring)), ...sim.data.lines.filter((l) => l.kind === "wind").flatMap((l) => hedgeParts(l.line, l.strength ?? 0))]) {
-              if (part.base === 0) { shape(part.ring, part.color, part.height); continue; }
-              const slab = new Polygon3DElement({ altitudeMode: "RELATIVE_TO_GROUND", extruded: false, fillColor: part.color, strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 }) as HTMLElement & { outerCoordinates?: unknown };
-              slab.outerCoordinates = part.ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: part.height }));
-              map.append(slab);
-            }
-            if (Polyline3DElement) for (const l of sim.data.lines.filter((x) => x.kind !== "wind")) {
-              const pl = new Polyline3DElement({ altitudeMode: "CLAMP_TO_GROUND", strokeColor: l.kind === "drip" ? SIM_COLORS.drip : "#ffffff", strokeWidth: l.kind === "drip" ? 2 : 3, drawsOccludedSegments: true }) as HTMLElement & { coordinates?: unknown };
-              pl.coordinates = l.line.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng }));
-              map.append(pl);
-            }
-          }
-          // The zones drawn by hand inside the area: a veil of their colour on the ground with an outline of the same colour,
-          // both drawn through the photographed mesh (a free zone greyed) — a faint veil alone was lost on the 3D ground.
-          for (const z of sim?.inner ?? []) if (z.ring.length >= 3) {
-            const color = z.kind === "libera" ? "#94a3b8" : ZONE_COLORS[z.kind];
-            const zp = new Polygon3DElement({ altitudeMode: "CLAMP_TO_GROUND", fillColor: z.kind === "libera" ? "rgba(71,85,105,0.6)" : `${color}66`, strokeColor: color, strokeWidth: 4, drawsOccludedSegments: true }) as HTMLElement & { outerCoordinates?: unknown };
-            zp.outerCoordinates = z.ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng }));
-            map.append(zp);
-          }
-        } catch { /* polygons not supported: the area alone */ }
-      }
+      map.append(new lib.Marker3DElement({ position: { lat, lng, altitude: 0 }, altitudeMode: "RELATIVE_TO_MESH", drawsWhenOccluded: true, label }));
       el.replaceChildren(map);
       mapRef.current = map;
       setState("ready");
     }).catch(() => { if (!cancelled) setState("error"); });
     return () => { cancelled = true; mapRef.current = null; el?.replaceChildren(); };
-  }, [lat, lng, label, apiKey, JSON.stringify(area), JSON.stringify(sim)]);
+  }, [lat, lng, label, apiKey]);
+  const areaKey = JSON.stringify(area), simKey = JSON.stringify(sim);
+  useEffect(() => {
+    const map = mapRef.current, lib = libs.current;
+    if (state !== "ready" || !map || !lib?.Polygon3DElement || area.length < 3) return;
+    const added: HTMLElement[] = [];
+    // Laid a moment after the levers stop, so a slide does not rebuild the shapes at every step.
+    const timer = window.setTimeout(() => {
+      for (const node of build3DOverlay(lib, area, sim)) { map.append(node); added.push(node); }
+    }, 250);
+    return () => { window.clearTimeout(timer); added.forEach((node) => node.remove()); };
+  }, [state, areaKey, simKey]);
   // The panel grows when 3D opens (and on rotation): re-frame the place once the size settles.
   useEffect(() => {
     const el = host.current;

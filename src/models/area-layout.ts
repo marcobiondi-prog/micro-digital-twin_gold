@@ -265,7 +265,7 @@ export const PERGOLA_COLORS = { post: "#7a4a22", beam: "#6b4019", slat: "#c99a63
  * long sides (0–2.9 m), a beam on top of each long side (2.8–3.1 m) and a roof of slats across it every 0.7 m
  * (3.1–3.25 m), leaving light between them. Built as slabs like the trees.
  */
-export function pergolaParts(strip: Ring): TreePart[] {
+export function pergolaParts(strip: Ring, lite = false): TreePart[] {
   if (strip.length < 4) return [];
   const f = frameOf(strip);
   const [a, b, , d] = strip.map((p) => toXY(f, p)) as Array<[number, number]>;
@@ -276,12 +276,14 @@ export function pergolaParts(strip: Ring): TreePart[] {
   const at = (s: number, t: number): [number, number] => [a![0] + ux[0]! * s + vy[0]! * t, a![1] + ux[1]! * s + vy[1]! * t];
   const box = (s0: number, s1: number, t0: number, t1: number): Ring => [at(s0, t0), at(s1, t0), at(s1, t1), at(s0, t1)].map(([x, y]) => toLL(f, x, y));
   const inset = 0.3, parts: TreePart[] = [];
-  const posts = Math.max(2, Math.round(len / 4) + 1);
+  // Lite (the photorealistic 3D, where every shape costs): posts about every 8 m and one see-through roof instead of slats.
+  const posts = Math.max(2, Math.round(len / (lite ? 8 : 4)) + 1);
   for (let i = 0; i < posts; i++) {
     const s = inset + ((len - 2 * inset) * i) / (posts - 1);
     for (const t of [inset, dep - inset]) parts.push({ ring: box(s - 0.12, s + 0.12, t - 0.12, t + 0.12), base: 0, height: 2.9, color: PERGOLA_COLORS.post });
   }
   for (const t of [inset, dep - inset]) parts.push({ ring: box(0, len, t - 0.14, t + 0.14), base: 2.8, height: 3.1, color: PERGOLA_COLORS.beam });
+  if (lite) { parts.push({ ring: box(0, len, 0, dep), base: 3.1, height: 3.25, color: `${PERGOLA_COLORS.slat}b3` }); return parts; }
   for (let s = 0.35; s < len - 0.2; s += 0.7) parts.push({ ring: box(s - 0.12, s + 0.12, 0, dep), base: 3.1, height: 3.25, color: PERGOLA_COLORS.slat });
   return parts;
 }
@@ -309,7 +311,7 @@ export function hedgeParts(edge: Ring, strength: number): TreePart[] {
  * The shade net in 3D: a mesh of thin dark threads (every 1.2 m both ways) 2.2 m up over its strip, see-through
  * between them, held by posts at its corners.
  */
-export function netParts(strip: Ring): TreePart[] {
+export function netParts(strip: Ring, lite = false): TreePart[] {
   if (strip.length < 4) return [];
   const f = frameOf(strip);
   const [a, b, , d] = strip.map((p) => toXY(f, p)) as Array<[number, number]>;
@@ -319,6 +321,8 @@ export function netParts(strip: Ring): TreePart[] {
   const at = (s2: number, t: number): [number, number] => [a![0] + ux[0]! * s2 + vy[0]! * t, a![1] + ux[1]! * s2 + vy[1]! * t];
   const box = (s0: number, s1: number, t0: number, t1: number): Ring => [at(s0, t0), at(s1, t0), at(s1, t1), at(s0, t1)].map(([x, y]) => toLL(f, x, y));
   const parts: TreePart[] = strip.map((p) => ({ ring: crownRing(p, 0.1, 6), base: 0, height: 2.2, color: "#5b4a3a" }));
+  // Lite (the photorealistic 3D): one see-through dark sheet instead of the threads.
+  if (lite) { parts.push({ ring: box(0, len, 0, dep), base: 2.15, height: 2.2, color: `${VINE_3D.net}8c` }); return parts; }
   const t = 0.07, step = 1.2;
   for (let s2 = 0; s2 <= len + 1e-6; s2 += step) parts.push({ ring: box(s2 - t, s2 + t, 0, dep), base: 2.15, height: 2.2, color: VINE_3D.net });
   for (let t2 = 0; t2 <= dep + 1e-6; t2 += step) parts.push({ ring: box(0, len, t2 - t, t2 + t), base: 2.15, height: 2.2, color: VINE_3D.net });
