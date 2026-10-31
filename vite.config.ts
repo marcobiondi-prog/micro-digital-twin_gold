@@ -12,7 +12,7 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig(({ command }) => ({
   server: { host: "::", port: 8080 },
   // Simulated sign-in (src/lib/demo-login.ts): dev server and Vercel previews only, never production.
-  define: { __DEMO_LOGIN__: JSON.stringify(command === "serve" || process.env["VERCEL_ENV"] === "preview") },
+  define: { __DEMO_LOGIN__: JSON.stringify(command === "serve" || process.env["VERCEL_ENV"] === "preview"), __BUILD_TIME__: JSON.stringify(new Date().toISOString()) },
   resolve: {
     dedupe: ["react", "react-dom", "@tanstack/react-query", "@tanstack/query-core"],
   },
@@ -42,6 +42,10 @@ export default defineConfig(({ command }) => ({
       workbox: {
         navigateFallback: null,
         globPatterns: ["**/*.{js,css,woff2,png,svg,ico}"],
+        // The heavy files used only now and then (PDF, maps, AI camera scene, towns list, screenshots) are not
+        // downloaded with every update: they are kept the first time they are used (the "assets" cache below), so a
+        // new version installs in a few seconds instead of after ~6 MB.
+        globIgnores: ["**/pdf.worker*", "**/pdf-*", "**/maplibre-gl*", "**/ar-scene*", "**/jspdf*", "**/html2canvas*", "**/comuni-it*", "**/index.es-*", "**/purify*"],
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         clientsClaim: true,

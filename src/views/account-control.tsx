@@ -5,7 +5,8 @@ import { CLOUD_QUOTA, bytesText, usageTone, useCloudUsage } from "@/lib/use-clou
 import { ProfileIcon } from "@/views/ProfileIcon";
 import { proSummary } from "@/models/professional-id";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ComponentType, type FormEvent } from "react";
-import { LogOut, UserRound, Mail, LockKeyhole, Camera, ShieldCheck, ChevronRight, LoaderCircle, Trash2 } from "lucide-react";
+import { LogOut, UserRound, Mail, LockKeyhole, Camera, ShieldCheck, ChevronRight, LoaderCircle, Trash2, RefreshCw } from "lucide-react";
+import { buildLabel, checkForUpdate } from "@/lib/app-version";
 import { Link } from "@tanstack/react-router";
 import { InfoNav, type InfoPath } from "@/views/v10/InfoPage";
 import { pushBackGuard } from "@/hooks/use-back-close";
@@ -516,6 +517,7 @@ export function AccountControl() {
               </section>
             ))}
           </nav>
+          <AppVersion />
           {/* Twin closes the panel: still (no animation, no name), smiling. */}
           <TwinStill className="mx-auto block h-16 w-auto" />
         </div>
@@ -526,6 +528,25 @@ export function AccountControl() {
 }
 
 /** Twin drawn still, with smiling eyes: the account panel's sign-off (no animation, no name). */
+/** Which version is running (its build date) and a button to look for a newer one now. */
+function AppVersion() {
+  const [state, setState] = useState<"idle" | "checking" | "latest" | "updated" | "offline">("idle");
+  const check = async () => { setState("checking"); setState(await checkForUpdate()); };
+  return (
+    <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-2 rounded-2xl bg-foreground/[0.05] p-3 text-center">
+      <p className="text-sm text-muted-foreground">Versione dell'app · <span className="tabular-nums text-foreground">{buildLabel()}</span></p>
+      <button type="button" onClick={() => void check()} disabled={state === "checking" || state === "updated"}
+        className="inline-flex h-10 items-center gap-2 rounded-full bg-foreground/10 px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">
+        {state === "checking" || state === "updated" ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <RefreshCw className="size-4" aria-hidden="true" />}
+        {state === "checking" ? "Cerco…" : state === "updated" ? "Aggiorno…" : "Cerca aggiornamenti"}
+      </button>
+      <p role="status" className="text-xs text-muted-foreground">
+        {state === "latest" ? "Hai già l'ultima versione." : state === "offline" ? "Senza rete: riprova quando sei connesso." : ""}
+      </p>
+    </div>
+  );
+}
+
 function TwinStill({ className = "" }: { className?: string }) {
   return (
     <svg viewBox="0 0 512 452" className={className} role="img" aria-label="Twin">
