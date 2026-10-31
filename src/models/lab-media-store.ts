@@ -95,7 +95,17 @@ export async function ensureMedia(k: MediaKind, userId: string | null) {
   // The photos and videos taken on this device without signing in stay listed too (they live in its local store),
   // so signing in never hides them.
   const device = await loadGuestFiles(k);
-  const { data, error } = await supabase.storage.from(MEDIA_BUCKET).list(folder, { sortBy: { column: "created_at", order: "desc" } });
+  // The storage lists 100 files per call by default: read every page, so files past the first 100 (Gruppo 6 and on)
+  // are never left out.
+  const PAGE = 1000;
+  const data: Array<{ id: string | null; name: string; metadata?: Record<string, unknown> | null }> = [];
+  let error: unknown = null;
+  for (let offset = 0; ; offset += PAGE) {
+    const res = await supabase.storage.from(MEDIA_BUCKET).list(folder, { limit: PAGE, offset, sortBy: { column: "created_at", order: "desc" } });
+    if (res.error) { error = res.error; break; }
+    data.push(...(res.data ?? []));
+    if ((res.data ?? []).length < PAGE) break;
+  }
   // A failed listing (offline, say) is tried again next time and keeps the account's files already listed, so they
   // never vanish from the list while the connection is down.
   if (error) {
@@ -104,7 +114,7 @@ export async function ensureMedia(k: MediaKind, userId: string | null) {
     emit();
     return state[k];
   }
-  const files = (data ?? []).filter((f) => f.id);
+  const files = data.filter((f) => f.id);
   let account: MediaItem[] = [];
   if (files.length) {
     const paths = files.map((f) => `${folder}/${f.name}`);
@@ -112,11 +122,14 @@ export async function ensureMedia(k: MediaKind, userId: string | null) {
     const now = Date.now();
     const fresh = (p: string) => { const l = signedAt.get(p); return l && now - l.at < 50 * 60_000 ? l.url : null; };
     const stale = paths.filter((p) => !fresh(p));
-    const { data: signed } = stale.length ? await supabase.storage.from(MEDIA_BUCKET).createSignedUrls(stale, 3600) : { data: [] };
-    (signed ?? []).forEach((x, i) => { if (x.signedUrl) signedAt.set(stale[i]!, { url: x.signedUrl, at: now }); });
+    for (let i = 0; i < stale.length; i += 500) {
+      const part = stale.slice(i, i + 500);
+      const { data: signed } = await supabase.storage.from(MEDIA_BUCKET).createSignedUrls(part, 3600);
+      (signed ?? []).forEach((x, j) => { if (x.signedUrl) signedAt.set(part[j]!, { url: x.signedUrl, at: now }); });
+    }
     account = files.map((f, i) => ({ f, p: paths[i]!, url: fresh(paths[i]!) })).filter((x) => x.url).map(({ f, p, url }) => ({
-      id: p, path: p, url: url!, name: f.name.replace(/^\d+-/, ""), size: Number(f.metadata?.size ?? 0),
-      kind: isVideo(f.name, f.metadata?.mimetype) ? "video" : "image",
+      id: p, path: p, url: url!, name: f.name.replace(/^\d+-/, ""), size: Number(f.metadata?.["size"] ?? 0),
+      kind: isVideo(f.name, f.metadata?.["mimetype"] as string | undefined) ? "video" : "image",
     }));
   }
   state[k] = [...account, ...device];

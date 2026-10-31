@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Check, Loader2, Trash2, X } from "lucide-react";
+import { Camera, Check, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { releaseSystemCamera } from "@/lib/system-camera";
@@ -21,7 +21,7 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
 }) {
   // Each shot of the multiple shot: the frame grabbed at the tap at once, swapped for the camera's full-resolution
   // photo when that arrives (sharp = true).
-  type Shot = { id: number; file: File; url: string; sharp: boolean };
+  type Shot = { id: number; file: Promise<File | null>; thumb: string };
   const [shots, setShots] = useState<Shot[]>([]);
   const shotsRef = useRef(shots);
   shotsRef.current = shots;
@@ -35,8 +35,11 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
   const burst = mode !== "video" && mode !== null && multi;
   const finish = useCallback((keep: boolean) => {
     const taken = shotsRef.current;
-    if (taken.length && keep) onCapture(taken.map((s) => s.file));
-    taken.forEach((s) => URL.revokeObjectURL(s.url));
+    // Shots still encoding are waited for, then handed over together: nothing shot is lost.
+    if (taken.length && keep) void Promise.all(taken.map((s) => s.file)).then((files) => {
+      const ready = files.filter((f): f is File => !!f);
+      if (ready.length) onCapture(ready);
+    });
     shotsRef.current = [];
     setShots([]);
     setAsking(false);
@@ -44,7 +47,7 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
   }, [close, onCapture]);
   // Closing a multiple shot by Back or a swipe keeps what was taken: nothing shot is ever lost.
   const onClose = useCallback(() => finish(true), [finish]);
-  const dropShot = (id: number) => setShots((p) => { const gone = p.find((s) => s.id === id); if (gone) URL.revokeObjectURL(gone.url); return p.filter((s) => s.id !== id); });
+  const dropShot = (id: number) => setShots((p) => p.filter((s) => s.id !== id));
   useEffect(() => { const el = stripRef.current; if (el) el.scrollTo({ left: el.scrollWidth, behavior: "smooth" }); }, [shots.length]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -123,32 +126,27 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
       canvas.height = video.videoHeight;
       const context = canvas.getContext("2d");
       if (!context || !canvas.width || !canvas.height) return;
-      context.drawImage(video, 0, 0);
       playCameraSound("shutter");
+      context.drawImage(video, 0, 0);
       if (burst || holding.current) {
+        // The multiple shot answers at once: flash, sound and tick first, a small preview in the strip right away,
+        // while the full frame encodes off the main thread. No full-resolution photo per shot: on phones it pauses
+        // the preview each time and made the shots lag.
         setFlash((n) => n + 1);
         hapticTick(30);
-        const id = Date.now();
-        const track = stream.getVideoTracks()[0];
+        const id = Date.now() + Math.random();
+        const thumbCanvas = document.createElement("canvas");
+        const scale = 160 / Math.max(canvas.width, canvas.height);
+        thumbCanvas.width = Math.round(canvas.width * scale);
+        thumbCanvas.height = Math.round(canvas.height * scale);
+        thumbCanvas.getContext("2d")?.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+        const thumb = thumbCanvas.toDataURL("image/jpeg", 0.7);
         setPending((n) => n + 1);
-        canvas.toBlob((blob) => {
-          if (!blob || !activeRef.current) { setPending((n) => n - 1); return; }
-          const file = new File([blob], `multiplo-${id}.jpg`, { type: "image/jpeg" });
-          setShots((p) => [...p, { id, file, url: URL.createObjectURL(file), sharp: false }]);
-          // The camera's own photo, at full resolution where the phone offers it (Chrome on Android), replaces the frame.
-          const Capture = (window as unknown as { ImageCapture?: new (t: MediaStreamTrack) => { takePhoto: () => Promise<Blob> } }).ImageCapture;
-          const done = () => setPending((n) => n - 1);
-          // While the shutter is held the frames come too fast for the full-resolution photo: the frame stays.
-          if (!Capture || !track || holding.current) { done(); return; }
-          Promise.race([new Capture(track).takePhoto(), new Promise<never>((_, no) => window.setTimeout(() => no(new Error("slow")), 4000))])
-            .then((photo) => {
-              if (!activeRef.current || photo.size <= blob.size) return;
-              const sharp = new File([photo], `multiplo-${id}.jpg`, { type: photo.type || "image/jpeg" });
-              setShots((p) => p.map((s) => (s.id === id ? (URL.revokeObjectURL(s.url), { id, file: sharp, url: URL.createObjectURL(sharp), sharp: true }) : s)));
-            })
-            .catch(() => undefined)
-            .finally(done);
-        }, "image/jpeg", 0.92);
+        const file = new Promise<File | null>((resolve) => canvas.toBlob((blob) => {
+          setPending((n) => n - 1);
+          resolve(blob ? new File([blob], `multiplo-${Math.floor(id)}.jpg`, { type: "image/jpeg" }) : null);
+        }, "image/jpeg", 0.9));
+        setShots((p) => [...p, { id, file, thumb }]);
         return;
       }
       // A single photo: the camera's own full-resolution photo where the phone offers it, else the frame.
@@ -217,8 +215,8 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
           <span className="camera-title"><Camera className="size-4" /> {burst ? "Scatto multiplo" : "Fotocamera"}</span>
           <span className="ml-auto flex items-center gap-2">
             {burst && shots.length > 0 && (
-              <button type="button" onClick={() => finish(true)} disabled={pending > 0} className="inline-flex h-10 items-center gap-1.5 rounded-full bg-white px-4 text-sm font-semibold text-black disabled:opacity-80">
-                {pending > 0 ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Check className="size-4" aria-hidden="true" />} Fine · {shots.length} foto
+              <button type="button" onClick={() => finish(true)} className="inline-flex h-10 items-center gap-1.5 rounded-full bg-white px-4 text-sm font-semibold text-black disabled:opacity-80">
+                <Check className="size-4" aria-hidden="true" /> Fine · {shots.length} foto
               </button>
             )}
             <Button variant="ghost" size="icon" onClick={() => (burst && shots.length ? setAsking(true) : onClose())} aria-label="Chiudi fotocamera" title="Chiudi fotocamera" className="camera-tool"><X /></Button>
@@ -247,7 +245,7 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
             <div ref={stripRef} data-map-gestures className="mx-auto mb-3 flex max-w-md touch-pan-x snap-x gap-2 overflow-x-auto px-1 pt-2 [scrollbar-width:none]">
               {shots.map((s, i) => (
                 <span key={s.id} className="relative shrink-0 snap-end">
-                  <img src={s.url} alt={`Foto ${i + 1}`} className="size-14 rounded-lg object-cover ring-1 ring-white/50" />
+                  <img src={s.thumb} alt={`Foto ${i + 1}`} className="size-14 rounded-lg object-cover ring-1 ring-white/50" />
                   <span className="absolute bottom-0.5 left-1 text-[10px] font-semibold text-white [text-shadow:0_1px_2px_black]">{i + 1}</span>
                   <button type="button" onClick={() => dropShot(s.id)} aria-label={`Togli la foto ${i + 1}`} className="absolute -right-1.5 -top-1.5 grid size-6 place-items-center rounded-full bg-black/80 text-white ring-1 ring-white/40"><Trash2 className="size-3" aria-hidden="true" /></button>
                 </span>

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef } from "react";
 
 /** How long the shutter must be held before the multiple shot starts, and how often it shoots while held. */
-export const HOLD_MS = 350;
-export const BURST_EVERY_MS = 300;
+export const HOLD_MS = 250;
+export const BURST_EVERY_MS = 200;
 
 /**
  * Hold-to-burst: once the shutter has been held for HOLD_MS, `onHold(true)` shoots at once and then every
