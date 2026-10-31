@@ -85,6 +85,19 @@ async function runQueue(
     emit();
   };
 
+  // Signed in without a connection the file waits on the phone (the device's store, like a guest's), listed at once;
+  // useMediaSync sends it to the account as soon as the connection is back.
+  let keptOffline = 0;
+  const keepOnPhone = async (file: File, up: Upload) => {
+    const item: MediaItem = { id: `${Date.now()}-${crypto.randomUUID()}`, name: up.name, size: file.size, url: URL.createObjectURL(file), kind: up.kind };
+    await saveGuestFile(kind, file, item);
+    setMedia(kind, (p) => [item, ...p]);
+    keptOffline++;
+    mark(up.id, "done");
+  };
+  const offline = () => typeof navigator !== "undefined" && navigator.onLine === false;
+  const networkError = (e: unknown) => offline() || /fetch|network|load failed|timeout/i.test(e instanceof Error ? e.message : String((e as { message?: unknown })?.message ?? e));
+
   const uploadOne = async (i: number) => {
     const file = files[i]!;
     const up = batch[i]!;
@@ -108,6 +121,7 @@ async function runQueue(
         mark(up.id, "done");
         return;
       }
+      if (offline()) { await keepOnPhone(file, up); return; }
       const safe = up.name.replace(/[^\w.-]+/g, "_").slice(-80);
       // File in parallelo possono partire nello stesso millisecondo: il suffisso evita percorsi uguali.
       const path = `${userId}/${kind}/${Date.now()}-${i}-${Math.random().toString(36).slice(2, 7)}-${safe}`;
@@ -115,7 +129,8 @@ async function runQueue(
         .from(MEDIA_BUCKET)
         .upload(path, file, { contentType: file.type });
       if (error) {
-        mark(up.id, "error");
+        if (networkError(error)) await keepOnPhone(file, up);
+        else mark(up.id, "error");
         return;
       }
       const { data } = await supabase.storage.from(MEDIA_BUCKET).createSignedUrl(path, 3600);
@@ -127,6 +142,7 @@ async function runQueue(
         mark(up.id, "done");
       } else mark(up.id, "error");
     } catch (e) {
+      if (userId && networkError(e)) { try { await keepOnPhone(file, up); return; } catch { /* below */ } }
       console.error("[uploader] errore file", up.name, e);
       mark(up.id, "error");
     }
@@ -150,6 +166,10 @@ async function runQueue(
       failed === 1 ? "1 file non caricato" : `${failed} file non caricati`,
       { description: "Formato non supportato o connessione assente; riprova." },
     );
+  else if (keptOffline > 0)
+    toast(keptOffline === 1 ? "Senza rete: 1 file tenuto sul telefono" : `Senza rete: ${keptOffline} file tenuti sul telefono`, {
+      description: "Li porto nel tuo account appena torna la connessione.",
+    });
   else if (done > 0)
     toast.success(done === 1 ? "File caricato" : `${done} file caricati`, {
       description:

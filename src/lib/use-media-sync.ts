@@ -7,14 +7,15 @@ import { refreshMedia, syncDeviceMedia } from "@/models/lab-media-store";
 const EVERY_MS = 60_000;
 
 /**
- * Mounted once by the root. Signed in, it sends this device's photos and videos (taken before signing in) up to the
- * account, and keeps both projects' lists in step with the account: on sign-in, on return to the app and every minute.
+ * Mounted once by the root. Signed in, it sends this device's photos and videos (taken before signing in, or while
+ * there was no connection) up to the account — at once when the connection comes back —, and keeps both projects' lists in step with the account: on sign-in, on return to the app and every minute.
  */
 export function useMediaSync() {
   useEffect(() => {
     let last = 0;
     const run = async (force = false) => {
-      if (document.hidden || (!force && Date.now() - last < EVERY_MS - 1000)) return;
+      // Offline nothing can go up nor be listed: the photos wait on the phone and the list stays as it is.
+      if (document.hidden || !navigator.onLine || (!force && Date.now() - last < EVERY_MS - 1000)) return;
       last = Date.now();
       const { data } = await supabase.auth.getSession();
       const user = data.session?.user.id;
@@ -32,7 +33,10 @@ export function useMediaSync() {
     document.addEventListener("visibilitychange", back);
     window.addEventListener("focus", back);
     const timer = window.setInterval(() => void run(), EVERY_MS);
+    // Back online: what was kept on the phone while offline goes up at once.
+    const online = () => void run(true);
+    window.addEventListener("online", online);
     const { data } = supabase.auth.onAuthStateChange((event) => { if (event === "SIGNED_IN") void run(true); });
-    return () => { document.removeEventListener("visibilitychange", back); window.removeEventListener("focus", back); window.clearInterval(timer); data.subscription.unsubscribe(); };
+    return () => { document.removeEventListener("visibilitychange", back); window.removeEventListener("focus", back); window.clearInterval(timer); window.removeEventListener("online", online); data.subscription.unsubscribe(); };
   }, []);
 }

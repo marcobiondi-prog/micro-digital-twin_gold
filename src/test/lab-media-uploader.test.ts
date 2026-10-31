@@ -151,3 +151,21 @@ describe("caricamento multiplo in parallelo", () => {
     vi.doUnmock("@/integrations/supabase/client");
   });
 });
+
+describe("senza rete con l'accesso", () => {
+  it("una foto che non riesce a salire per la rete resta sul telefono, in elenco, invece di andare persa", async () => {
+    vi.resetModules();
+    data.clear();
+    vi.doMock("@/integrations/supabase/client", () => ({
+      supabase: { storage: { from: () => ({ upload: async () => { throw new TypeError("Failed to fetch"); } }) } },
+    }));
+    const uploader = await import("@/models/lab-media-uploader");
+    const store = await import("@/models/lab-media-store");
+    uploader.enqueueUploads("urban", [new File(["x"], "foto.jpg", { type: "image/jpeg" })], "user-1");
+    await vi.waitFor(() => expect(store.getMedia("urban").length).toBe(1));
+    expect(store.getMedia("urban")[0]!.path).toBeUndefined();
+    await vi.waitFor(() => expect([...data.keys()].some((k) => k.startsWith("urban:"))).toBe(true));
+    expect(uploader.getUploads("urban").every((u) => u.status === "done")).toBe(true);
+    vi.doUnmock("@/integrations/supabase/client");
+  });
+});

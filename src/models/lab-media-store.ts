@@ -96,8 +96,14 @@ export async function ensureMedia(k: MediaKind, userId: string | null) {
   // so signing in never hides them.
   const device = await loadGuestFiles(k);
   const { data, error } = await supabase.storage.from(MEDIA_BUCKET).list(folder, { sortBy: { column: "created_at", order: "desc" } });
-  // A failed listing is tried again next time, instead of leaving the account's files missing until a reload.
-  if (error) loadedFor[k] = null;
+  // A failed listing (offline, say) is tried again next time and keeps the account's files already listed, so they
+  // never vanish from the list while the connection is down.
+  if (error) {
+    loadedFor[k] = null;
+    state[k] = [...state[k].filter((i) => i.path), ...device];
+    emit();
+    return state[k];
+  }
   const files = (data ?? []).filter((f) => f.id);
   let account: MediaItem[] = [];
   if (files.length) {
