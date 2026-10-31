@@ -18,7 +18,7 @@ export function areaGeoJson(ring: Ring, closed = true) {
 export function addAreaLayers(map: MlMap) {
   if (map.getSource(AREA_SOURCE)) return;
   map.addSource(AREA_SOURCE, { type: "geojson", data: areaGeoJson([]) });
-  map.addLayer({ id: "drawn-area-fill", type: "fill", source: AREA_SOURCE, filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#38d6c4", "fill-opacity": 0.28 } });
+  map.addLayer({ id: "drawn-area-fill", type: "fill", source: AREA_SOURCE, filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#38d6c4", "fill-opacity": 0.12 } });
   map.addLayer({ id: "drawn-area-line", type: "line", source: AREA_SOURCE, filter: ["==", ["geometry-type"], "LineString"], paint: { "line-color": "#ffffff", "line-width": 2.5 }, layout: { "line-join": "round", "line-cap": "round" } });
 }
 

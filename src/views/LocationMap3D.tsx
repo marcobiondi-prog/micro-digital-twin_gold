@@ -50,7 +50,7 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
   const out: HTMLElement[] = [];
   if (!Polygon3DElement) return out;
   try {
-    const poly = new Polygon3DElement({ altitudeMode: "CLAMP_TO_GROUND", fillColor: "rgba(56, 214, 196, 0.35)", strokeColor: "#ffffff", strokeWidth: 3, drawsOccludedSegments: true }) as Shape;
+    const poly = new Polygon3DElement({ altitudeMode: "CLAMP_TO_GROUND", fillColor: "rgba(56, 214, 196, 0.14)", strokeColor: "#ffffff", strokeWidth: 3, drawsOccludedSegments: true }) as Shape;
     poly.outerCoordinates = area.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng }));
     out.push(poly);
   } catch { return out; /* an older build without polygons: the pin alone */ }
