@@ -61,11 +61,11 @@ export function VideoPlayer({ src, autoPlay = false }: { src: string; autoPlay?:
   };
   const glass = "bg-black/35 backdrop-blur-xl border border-white/10";
   return (
-    <div className="relative grid size-full place-items-center" onClick={(e) => { if (e.target === e.currentTarget || e.target === v.current) { if (shown && !v.current?.paused) setShown(false); else poke(); } }}>
+    <div className="absolute inset-0 grid place-items-center overflow-hidden" onClick={(e) => { if (e.target === e.currentTarget || e.target === v.current) { if (shown && !v.current?.paused) setShown(false); else poke(); } }}>
       <video ref={v} src={src} playsInline preload="metadata" autoPlay={autoPlay} muted={muted} loop={loop}
         onPlay={() => { setPlaying(true); poke(); }} onPause={() => { setPlaying(false); setShown(true); }}
         onTimeUpdate={(e) => setT(e.currentTarget.currentTime)} onLoadedMetadata={(e) => setD(e.currentTarget.duration || 0)} onEnded={() => setShown(true)}
-        className="relative z-0 max-h-full max-w-full" />
+        className="relative z-0 max-h-full max-w-full object-contain" />
       <div className={`pointer-events-none absolute inset-0 z-10 transition-opacity duration-200 motion-reduce:transition-none ${shown ? "opacity-100" : "opacity-0"}`}>
         <button type="button" onClick={toggle} aria-label={playing ? "Pausa" : "Riproduci"} tabIndex={shown ? 0 : -1}
           className={`absolute left-1/2 top-[44%] grid size-[72px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-white outline-none focus-visible:ring-2 focus-visible:ring-white ${glass} ${shown ? "pointer-events-auto" : ""}`}>

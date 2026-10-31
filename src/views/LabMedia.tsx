@@ -638,7 +638,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
           <DialogTitle className="truncate pr-6 text-sm">{view?.name}</DialogTitle>
           {view &&
             (view.kind === "video" ? (
-              <div className="h-[70vh] overflow-hidden rounded-lg bg-black">
+              <div className="relative h-[70vh] overflow-hidden rounded-lg bg-black">
                 <VideoPlayer src={view.url} autoPlay />
               </div>
             ) : (
