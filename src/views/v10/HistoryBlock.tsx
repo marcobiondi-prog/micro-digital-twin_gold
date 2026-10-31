@@ -421,7 +421,7 @@ function OpenPile({ pile, onClose, archived = false }: { pile: Pile; onClose: ()
  * The archive: the photos and videos put away, as folders named by their day (gg/mm/aaaa) under month headings, newest
  * first, with a date field to go straight to one day; a folder opens like a pile, with Ripristina instead of Archivia.
  */
-function ArchiveBlock({ shots }: { shots: Shot[] }) {
+function ArchiveBlock({ shots, keys }: { shots: Shot[]; keys: string[] }) {
   const { signedIn } = useSignedIn();
   const [open, setOpen] = useState(false);
   const [day, setDay] = useState("");
@@ -441,7 +441,7 @@ function ArchiveBlock({ shots }: { shots: Shot[] }) {
     <div className="rounded-2xl bg-foreground/[0.04]">
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-3 px-4 py-3.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-2xl">
         <span className="grid size-10 shrink-0 place-items-center rounded-full bg-foreground/[0.08]"><Archive className="size-5" aria-hidden="true" /></span>
-        <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Archivio</span><span className="block text-xs text-muted-foreground">{piles.length === 1 ? "1 giorno" : `${piles.length} giorni`} · {countText(shots)} · {signedIn ? "nell'account" : "su questo dispositivo"}</span></span>
+        <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Archivio</span><span className="block text-xs text-muted-foreground">{shots.length ? `${piles.length === 1 ? "1 giorno" : `${piles.length} giorni`} · ${countText(shots)}` : `${keys.length === 1 ? "1 file" : `${keys.length} file`} archiviati`} · {signedIn ? "nell'account" : "su questo dispositivo"}</span></span>
         <ChevronDown className={`size-5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
       {open && (
@@ -452,11 +452,11 @@ function ArchiveBlock({ shots }: { shots: Shot[] }) {
             <input type="date" lang="it" aria-label="Giorno gg/mm/aaaa" value={day} onChange={(e) => { setDay(e.target.value); setShown(null); }} className="min-w-0 flex-1 bg-transparent text-right font-semibold tabular-nums outline-none [color-scheme:dark]" />
             {day && <button type="button" onClick={() => setDay("")} className="shrink-0 text-xs font-semibold text-muted-foreground">Tutti</button>}
           </label>
-          {list.length === 0 && <p className="px-1 text-sm text-muted-foreground">Niente in archivio per quel giorno.</p>}
+          {list.length === 0 && <p className="px-1 text-sm text-muted-foreground">{shots.length ? "Niente in archivio per quel giorno." : "Le foto e i video archiviati non sono ancora caricati qui: puoi comunque rimetterli tutti nelle pile."}</p>}
           {!day && (
-            <button type="button" onClick={() => { restoreMedia(shots.map((x) => `${x.flow}-${x.id}`)); toast.success("Archivio ripristinato: foto e video di nuovo nelle pile"); }}
+            <button type="button" onClick={() => { restoreMedia(keys); toast.success("Archivio ripristinato: foto e video di nuovo nelle pile"); }}
               className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-foreground/10 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <ArchiveRestore className="size-4" aria-hidden="true" />Ripristina tutto · {countText(shots)}
+              <ArchiveRestore className="size-4" aria-hidden="true" />Ripristina tutto · {shots.length ? countText(shots) : `${keys.length} file`}
             </button>
           )}
           {months.map((m) => (
@@ -594,6 +594,8 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
     const shots = inFlow.filter((s) => !archive[`${s.flow}-${s.id}`]);
     const archivedAll = inFlow.filter((s) => archive[`${s.flow}-${s.id}`]);
     const archivedShots = compact ? [] : archivedAll;
+    // Every archived key of this tab, even for files not loaded (yet) on this device, so the archive can always be restored.
+    const archKeys = Object.keys(archive).filter((k) => shown(k.startsWith("vigneto-") ? "vigneto" : "piazza"));
     const groups = compact ? groupByDay(inTab).slice(0, COMPACT_DAYS) : groupByDay(inTab);
     const visibleShots = compact ? shots.slice(0, COMPACT_SHOTS) : shots;
     return (
@@ -604,11 +606,11 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
             <PhotoPiles shots={visibleShots} />
           </div>
         )}
-        {archivedShots.length > 0 && <ArchiveBlock shots={archivedShots} />}
-        {compact && archivedAll.length > 0 && (
+        {!compact && archKeys.length > 0 && <ArchiveBlock shots={archivedShots} keys={archKeys} />}
+        {compact && archKeys.length > 0 && (
           <Link to="/cronologia" className="flex items-center gap-3 rounded-2xl bg-foreground/[0.04] px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <Archive className="size-5 text-muted-foreground" aria-hidden="true" />
-            <span className="flex-1 text-sm"><span className="font-semibold">Archivio</span><span className="text-muted-foreground"> · {countText(archivedAll)}</span></span>
+            <span className="flex-1 text-sm"><span className="font-semibold">Archivio</span><span className="text-muted-foreground"> · {archivedAll.length ? countText(archivedAll) : `${archKeys.length} file`} · tocca per recuperarle</span></span>
             <ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />
           </Link>
         )}
