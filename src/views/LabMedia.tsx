@@ -1,5 +1,5 @@
 import { VideoPlayer } from "@/views/v10/VideoPlayer";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   Camera,
@@ -41,6 +41,7 @@ import {
 import { hideFromSim, useSimMedia } from "@/models/sim-hidden";
 import {
   ensureMedia,
+  useLabMedia,
   type MediaItem,
 } from "@/models/lab-media-store";
 import { enqueueUploads, useLabUploads } from "@/models/lab-media-uploader";
@@ -141,6 +142,8 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
   const [userId, setUserId] = useState<string | null | undefined>(undefined);
   // The simulation's own files: those taken out of it stay in the Cronologia only.
   const items = useSimMedia(kind);
+  const allItems = useLabMedia(kind);
+  const visible = useMemo(() => new Set(items.map((i) => i.id)), [items]);
   /** Avanzamento dell'invio nella coda condivisa: prosegue anche cambiando scheda o sezione. */
   const progress = useShareProgress(kind);
   const armed = progress?.armed ?? null;
@@ -600,7 +603,9 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
           )}
           {items.length > 0 ? (
             <>
-              {uploadGroups(items).map(({ n: g, files: group, full }, gi, all) => {
+              {/* Numbered on the project's whole list, as the Cronologia: a group keeps its number when files (or other
+                  groups) are taken out of the simulation, and a group with nothing left here is not shown. */}
+              {uploadGroups(allItems).map((g) => ({ ...g, files: g.files.filter((f) => visible.has(f.id)) })).filter((g) => g.files.length > 0).map(({ n: g, files: group, full }, gi, all) => {
                 const shown = openGroups ? openGroups.has(g) : gi === 0;
                 const photos = group.filter((x) => x.kind === "image").length;
                 const videos = group.length - photos;
@@ -616,7 +621,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
                         <Images className="size-4 shrink-0 text-primary" />
                         <span className="min-w-0 flex-1">
                           <span className="font-medium">Gruppo {g}</span>
-                          <span className="text-muted-foreground"> · {full ? `${MEDIA_GROUP} elementi` : `${group.length} di ${MEDIA_GROUP}`}</span>
+                          <span className="text-muted-foreground"> · {full ? `${group.length} elementi` : `${group.length} di ${MEDIA_GROUP}`}</span>
                           <span className="block text-xs text-muted-foreground">
                             {[photos && `${photos} foto`, videos && `${videos} video`].filter(Boolean).join(" · ")}
                           </span>

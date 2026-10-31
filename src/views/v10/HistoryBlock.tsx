@@ -6,7 +6,7 @@ import { currentMedia, removeMedia, useLabMedia, type MediaItem } from "@/models
 import { mediaTime } from "@/models/media-time";
 import { uploadGroups } from "@/models/media-groups";
 import { mediaThumb, readyThumb } from "@/lib/media-thumbs";
-import { unhide, useSimHidden, useSimMedia } from "@/models/sim-hidden";
+import { unhide, useSimHidden } from "@/models/sim-hidden";
 import { SHOT_KINDS, kindCountText, shotKind, shotLabel, type ShotKind } from "@/models/shot-kind";
 import { TabRow } from "@/views/v8/console";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -69,13 +69,15 @@ function ShotMedia({ s }: { s: Shot }) {
 }
 
 function Thumb({ s, onOpen }: { s: Shot; onOpen: () => void }) {
+  // Taken out of the simulation: still here, said in its caption.
+  const outOfSim = !!useSimHidden()[`${s.flow}-${s.id}`];
   const when = s.at ? new Date(s.at).toLocaleDateString("it-IT", { day: "numeric", month: "short" }) : "";
   return (
     <button type="button" onClick={onOpen} aria-label={`Apri ${s.kind === "video" ? "il video" : "la foto"} ${s.flow}${when ? `, ${when}` : ""}`} className="relative block aspect-square w-full overflow-hidden rounded-2xl bg-foreground/[0.08] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
       <ShotMedia s={s} />
       {s.kind === "video" && <span className="absolute inset-0 grid place-items-center"><Play className="size-7 text-white drop-shadow" aria-hidden="true" /></span>}
       <KindMark s={s} />
-      <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-2 pb-1.5 pt-5 text-xs text-white">{s.flow === "piazza" ? "Piazza" : "Vigneto"}{when ? ` · ${when}` : ""}</span>
+      <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-2 pb-1.5 pt-5 text-xs text-white">{outOfSim ? "Fuori dalla simulazione" : `${s.flow === "piazza" ? "Piazza" : "Vigneto"}${when ? ` · ${when}` : ""}`}</span>
     </button>
   );
 }
@@ -312,7 +314,7 @@ function groupPilesOf(shots: Shot[], numbers: Map<string, number>): Pile[] {
   for (const s of shots) {
     const n = numbers.get(`${s.flow}-${s.id}`);
     const key = `g-${s.flow}-${n ?? "x"}`;
-    const p = out.get(key) ?? { key, label: n ? `Gruppo ${n}` : "Tolte dalla simulazione", shots: [], group: true, last: 0 };
+    const p = out.get(key) ?? { key, label: n ? `Gruppo ${n}` : "Senza gruppo", shots: [], group: true, last: 0 };
     p.shots.push(s);
     p.last = Math.max(p.last, s.at ?? 0);
     out.set(key, p);
@@ -463,8 +465,9 @@ function useGridColumns() {
  * on the project's whole list by upload (20 a group), so a day's photos read under the group they were loaded in.
  */
 function useGroupNumbers() {
-  // Numbered on the simulation's own list, as it shows them; a file taken out of the simulation has no group here.
-  const urban = useSimMedia("urban"), vineyard = useSimMedia("vineyard");
+  // Numbered on the project's whole list: a group keeps its number and its files here even when they are taken out
+  // of the simulation.
+  const urban = useLabMedia("urban"), vineyard = useLabMedia("vineyard");
   return useMemo(() => {
     const map = new Map<string, number>();
     for (const g of uploadGroups(urban)) for (const f of g.files) map.set(`piazza-${f.id}`, g.n);
@@ -505,7 +508,7 @@ function OpenPile({ pile, onClose, archived = false }: { pile: Pile; onClose: ()
     ? pilesOf(pile.shots).map((d) => ({ key: `${pile.key}-${d.key}`, flow: d.shots[0]!.flow, n: null, shots: d.shots, day: d.label }))
     : dayGroups(pile.shots, numbers)), [pile, numbers]);
   const bothFlows = new Set(groups.map((g) => g.flow)).size > 1;
-  const groupTitle = (g: ShotGroup) => g.day ?? `${bothFlows ? (g.flow === "piazza" ? "Piazza · " : "Vigneto · ") : ""}${g.n ? `Gruppo ${g.n}` : "Tolte dalla simulazione"}`;
+  const groupTitle = (g: ShotGroup) => g.day ?? `${bothFlows ? (g.flow === "piazza" ? "Piazza · " : "Vigneto · ") : ""}${g.n ? `Gruppo ${g.n}` : "Senza gruppo"}`;
   const [folded, setFolded] = useState<Set<string>>(new Set());
   // Files taken out of their simulation can go back into it from here.
   const simHidden = useSimHidden();
