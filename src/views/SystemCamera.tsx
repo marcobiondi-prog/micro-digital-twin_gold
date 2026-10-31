@@ -9,6 +9,7 @@ import { CameraCaptureControl } from "@/views/CameraCaptureControl";
 import { playCameraSound } from "@/lib/camera-sounds";
 import { hapticTick } from "@/lib/haptics";
 import { useHoldBurst } from "@/lib/hold-burst";
+import { createTrackZoomer, pinchZoom, splitZoom, trackZoomRange, zoomHaptic, zoomLabel, ZOOM_LENSES, ZOOM_MAX, ZOOM_MIN } from "@/lib/camera-zoom";
 
 /**
  * Live capture for hosts without native HTML capture, such as Windows tablets, and for the multiple shot ("burst"):
@@ -56,6 +57,35 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
   const [ready, setReady] = useState(false);
   const [recording, setRecording] = useState(false);
   const [error, setError] = useState("");
+  // Zoom like the AI camera: pinch on the preview or the lens chips 1·2·3·5; the camera's own (hardware) zoom first,
+  // the rest a centred digital crop shown on the preview and kept in the photos. Videos zoom only in hardware (a crop
+  // would not reach the recording), so without it they have no zoom.
+  const [zoom, setZoomState] = useState(1);
+  const zoomRef = useRef(1);
+  const digitalRef = useRef(1);
+  const [digital, setDigital] = useState(1);
+  const zoomRangeRef = useRef<ReturnType<typeof trackZoomRange>>(null);
+  const zoomerRef = useRef<((value: number) => void) | null>(null);
+  const pinchFrom = useRef(1);
+  const [canZoom, setCanZoom] = useState(false);
+  const setZoom = (value: number) => {
+    const range = zoomRangeRef.current;
+    const max = mode === "video" ? (range ? range.max / range.min : 1) : ZOOM_MAX;
+    const next = Math.min(max, Math.max(ZOOM_MIN, Math.round(value * 10) / 10));
+    const { hardware, digital: rest } = splitZoom(next, range);
+    if (hardware !== null) zoomerRef.current?.(hardware);
+    const d = mode === "video" ? 1 : rest;
+    digitalRef.current = d;
+    setDigital(d);
+    const haptic = zoomHaptic(zoomRef.current, next);
+    if (haptic) hapticTick([...haptic]);
+    zoomRef.current = next;
+    setZoomState(next);
+  };
+  const onPinch = (ratio: number, start: boolean) => {
+    if (start) pinchFrom.current = zoomRef.current;
+    else setZoom(pinchZoom(pinchFrom.current, 1, ratio));
+  };
 
   useEffect(() => {
     if (!mode) return;
@@ -94,6 +124,11 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
         if (!video) return;
         video.srcObject = stream;
         await video.play();
+        const track = stream.getVideoTracks()[0];
+        zoomRangeRef.current = trackZoomRange(track);
+        zoomerRef.current = zoomRangeRef.current ? createTrackZoomer(track) : null;
+        zoomRef.current = 1; digitalRef.current = 1; setZoomState(1); setDigital(1);
+        setCanZoom(mode !== "video" || !!zoomRangeRef.current);
         if (!cancelled) setReady(true);
       } catch (cause) {
         if (cancelled) return;
@@ -121,13 +156,16 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
     const stream = streamRef.current;
     if (!ready || !video || !stream) return;
     if (mode === "photo" || mode === "burst") {
+      // The digital part of the zoom is a centred crop of the frame, as the preview shows it.
+      const d = digitalRef.current;
+      const sw = Math.round(video.videoWidth / d), sh = Math.round(video.videoHeight / d);
       const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      canvas.width = sw;
+      canvas.height = sh;
       const context = canvas.getContext("2d");
       if (!context || !canvas.width || !canvas.height) return;
       playCameraSound("shutter");
-      context.drawImage(video, 0, 0);
+      context.drawImage(video, (video.videoWidth - sw) / 2, (video.videoHeight - sh) / 2, sw, sh, 0, 0, sw, sh);
       if (burst || holding.current) {
         // The multiple shot answers at once: flash, sound and tick first, a small preview in the strip right away,
         // while the full frame encodes off the main thread. No full-resolution photo per shot: on phones it pauses
@@ -161,7 +199,8 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
           onCapture([new File([best], `foto-${Date.now()}.jpg`, { type: best.type || "image/jpeg" })]);
           onClose();
         };
-        if (!Capture || !track) { save(null); return; }
+        // A digital zoom is not in the camera's own photo: the cropped frame is kept then.
+        if (!Capture || !track || digitalRef.current > 1.01) { save(null); return; }
         Promise.race([new Capture(track).takePhoto(), new Promise<never>((_, no) => window.setTimeout(() => no(new Error("slow")), 4000))])
           .then(save, () => save(null));
       }, "image/jpeg", 0.92);
@@ -202,9 +241,9 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
     <Dialog open={mode !== null} onOpenChange={(open) => { if (!open) onClose(); }} modal>
       <DialogContent data-no-ui-click className="camera-hud inset-0 left-0 top-0 block h-dvh w-screen max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 bg-camera-surface p-0 text-camera-ink shadow-none duration-0 data-[state=open]:animate-none data-[state=closed]:animate-none sm:max-h-none sm:overflow-hidden sm:rounded-none [&>button]:hidden" aria-describedby={undefined}>
         <DialogTitle className="sr-only">{mode === "video" ? "Registra video" : burst ? "Scatto multiplo" : "Scatta foto"}</DialogTitle>
-        <CameraCloseGestures onClose={onClose}>
+        <CameraCloseGestures onClose={onClose} onPinch={canZoom ? onPinch : undefined}>
         <div className="absolute inset-0">
-          <video ref={videoRef} autoPlay muted playsInline className="h-full w-full object-cover" />
+          <video ref={videoRef} autoPlay muted playsInline className="h-full w-full object-cover" style={digital > 1 ? { transform: `scale(${digital})` } : undefined} />
           {!ready && !error && <p className="absolute inset-0 grid place-items-center text-sm text-muted-foreground" role="status">Apertura fotocamera…</p>}
         </div>
         {error && <p role="alert" className="absolute inset-x-6 top-20 mx-auto max-w-lg rounded-md bg-background/90 p-4 text-center text-sm text-destructive">{error}</p>}
@@ -252,6 +291,18 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
               ))}
             </div>
           )}
+          {canZoom && ready && (() => {
+            const lower = [...ZOOM_LENSES].reverse().find((l) => l < zoom - 0.05);
+            const higher = ZOOM_LENSES.find((l) => l > zoom + 0.05 && (mode !== "video" || !zoomRangeRef.current || l <= zoomRangeRef.current.max / zoomRangeRef.current.min));
+            const side = (lens: number | undefined, label: string) => <button type="button" className="ar-zoom-lens"
+              aria-label={lens === undefined ? label : `${label}: ${zoomLabel(lens)}`} disabled={lens === undefined}
+              onClick={() => lens !== undefined && setZoom(lens)}>{lens ?? "·"}</button>;
+            return <div className="ar-zoom-lenses mb-2 w-fit" role="group" aria-label="Zoom della fotocamera" data-camera-controls>
+              {side(lower, "Riduci zoom")}
+              <button type="button" className="ar-zoom-lens" data-active aria-label={`Zoom ${zoomLabel(zoom)}: tocca per tornare a 1×`} onClick={() => setZoom(1)}>{zoomLabel(zoom)}</button>
+              {side(higher, "Aumenta zoom")}
+            </div>;
+          })()}
           {mode !== "video" && (
             <div className="mx-auto mb-2 flex w-fit rounded-full bg-black/55 p-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur" role="radiogroup" aria-label="Tipo di scatto">
               <button type="button" role="radio" aria-checked={!burst} disabled={shots.length > 0} onClick={() => setMulti(false)} className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""} disabled:opacity-50`}>Singolo</button>
