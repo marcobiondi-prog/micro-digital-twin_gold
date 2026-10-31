@@ -421,7 +421,7 @@ function useGroupNumbers() {
     return map;
   }, [urban, vineyard]);
 }
-type ShotGroup = { key: string; flow: Shot["flow"]; n: number | null; shots: Shot[] };
+type ShotGroup = { key: string; flow: Shot["flow"]; n: number | null; shots: Shot[]; day?: string };
 /** A day's shots by project and group, newest group first, keeping each group's files in the day's order. */
 function dayGroups(shots: Shot[], numbers: Map<string, number>): ShotGroup[] {
   const out = new Map<string, ShotGroup>();
@@ -448,9 +448,13 @@ function OpenPile({ pile, onClose, archived = false }: { pile: Pile; onClose: ()
   const keyOf = (s: Shot) => `${s.flow}-${s.id}`;
   const numbers = useGroupNumbers();
   // A day splits into its groups; a group's own pile is a single group, shown without a header.
-  const groups = useMemo(() => (pile.group ? [{ key: pile.key, flow: pile.shots[0]!.flow, n: null, shots: pile.shots }] : dayGroups(pile.shots, numbers)), [pile, numbers]);
+  // A day splits into its groups, a group into its days (gg/mm/aaaa, newest first): both ways the photos read by
+  // group and by day.
+  const groups = useMemo<ShotGroup[]>(() => (pile.group
+    ? pilesOf(pile.shots).map((d) => ({ key: `${pile.key}-${d.key}`, flow: d.shots[0]!.flow, n: null, shots: d.shots, day: d.label }))
+    : dayGroups(pile.shots, numbers)), [pile, numbers]);
   const bothFlows = new Set(groups.map((g) => g.flow)).size > 1;
-  const groupTitle = (g: ShotGroup) => `${bothFlows ? (g.flow === "piazza" ? "Piazza · " : "Vigneto · ") : ""}${g.n ? `Gruppo ${g.n}` : "Sul telefono"}`;
+  const groupTitle = (g: ShotGroup) => g.day ?? `${bothFlows ? (g.flow === "piazza" ? "Piazza · " : "Vigneto · ") : ""}${g.n ? `Gruppo ${g.n}` : "Sul telefono"}`;
   const [folded, setFolded] = useState<Set<string>>(new Set());
   const flip = (s: Shot) => setPicked((p) => { const n = new Set(p); if (n.has(keyOf(s))) n.delete(keyOf(s)); else n.add(keyOf(s)); return n; });
   const all = picked.size === pile.shots.length;
@@ -494,13 +498,13 @@ function OpenPile({ pile, onClose, archived = false }: { pile: Pile; onClose: ()
       {/* The day's photos by the simulation's groups (Gruppo n, 20 a group), each one row that slides sideways (the card
           keeps its height however many there are; its own move, not the page's tabs). Opening deals them out of the pile. */}
       {groups.map((g, gi) => (
-      <section key={g.key} className="pile-group" style={{ animationDelay: `${Math.min(gi, 4) * 70}ms` }} aria-label={pile.group ? pile.label : groupTitle(g)}>
-      {!pile.group && <button type="button" aria-expanded={!folded.has(g.key)} onClick={() => setFolded((p) => { const n = new Set(p); if (n.has(g.key)) n.delete(g.key); else n.add(g.key); return n; })}
+      <section key={g.key} className="pile-group" style={{ animationDelay: `${Math.min(gi, 4) * 70}ms` }} aria-label={pile.group ? `${pile.label} · ${groupTitle(g)}` : groupTitle(g)}>
+      <button type="button" aria-expanded={!folded.has(g.key)} onClick={() => setFolded((p) => { const n = new Set(p); if (n.has(g.key)) n.delete(g.key); else n.add(g.key); return n; })}
         className="flex w-full items-center gap-2 px-1 py-1 text-left outline-none focus-visible:underline">
-        <Layers className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-        <span className="min-w-0 flex-1 text-sm font-semibold">{groupTitle(g)}<span className="ml-2 font-medium text-muted-foreground">{countText(g.shots)}</span></span>
+        {g.day ? <CalendarDays className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" /> : <Layers className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />}
+        <span className="min-w-0 flex-1 text-sm font-semibold tabular-nums">{groupTitle(g)}<span className="ml-2 font-medium text-muted-foreground">{countText(g.shots)}</span></span>
         <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform duration-300 ${folded.has(g.key) ? "-rotate-90" : ""}`} aria-hidden="true" />
-      </button>}
+      </button>
       <div className="pile-fold" data-folded={folded.has(g.key) || undefined}><div className="min-h-0">
       <div className="no-scrollbar -mx-3 flex snap-x snap-mandatory gap-2 overflow-x-auto scroll-px-3 px-3 py-1 touch-pan-x" data-map-gestures="">
         {g.shots.map((s, i) => <div key={keyOf(s)} className="pile-deal w-[7.5rem] shrink-0 snap-start sm:w-36" style={{ animationDelay: `${Math.min(gi, 4) * 70 + Math.min(i, 7) * 45}ms` }}>{selecting ? (
