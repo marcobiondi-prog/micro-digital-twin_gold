@@ -8,7 +8,9 @@ import { setUrban, useLab } from "@/models/lab-store";
 import { REFERENCE_M2, euroRange, grouped, interventionCost } from "@/models/intervention-cost";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { useSeasonClock, WhenPicker } from "@/views/v10/when";
-import { coolingShare, estimatedTemp } from "@/models/season-climate";
+import { coolingShare, estimatedTemp, SEASON_LABEL } from "@/models/season-climate";
+import { setPiazzaReading } from "@/models/sim-reading";
+import { clockText } from "@/models/sim-when";
 import { GAIN_BG, GAIN_TEXT } from "@/views/v7/studio-ui";
 import { ImportWeatherButton } from "@/views/SimulationGrid";
 import { hapticTick } from "@/lib/haptics";
@@ -223,6 +225,8 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
   const share = coolingShare(before);
   const gainNow = est.dT * share;
   const after = before - gainNow;
+  // The map of the same simulation shows this very reading.
+  useEffect(() => { setPiazzaReading({ before: +before.toFixed(1), after: +after.toFixed(1), when: `${SEASON_LABEL[season] ?? season}, ore ${clockText(hour, clock.minute ?? 0)}` }); }, [before, after, season, hour, clock.minute]);
   const gain = gainNow < 0.8 ? 0 : gainNow < 1.8 ? 1 : gainNow < 2.8 ? 2 : gainNow < 3.8 ? 3 : 4;
   // The arc spans only what can be reached now (a little past both ends), so the three stops stay apart.
   const lowest = before - MAX_GAIN * share;

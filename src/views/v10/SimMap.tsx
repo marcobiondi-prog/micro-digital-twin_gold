@@ -7,7 +7,9 @@ import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn } from "@/lib/demo-login";
 import { cn } from "@/lib/utils";
 import { setUrban, setVineyard, useLab, vineMetrics } from "@/models/lab-store";
 import { piazzaLayout, vineLayout, type LayoutEdits } from "@/models/area-layout";
-import { vineMixOf, zoneMixOf } from "@/models/vine-interventions";
+import { applyZoneMix, vineMixOf, zoneMixOf } from "@/models/vine-interventions";
+import { usePiazzaReading } from "@/models/sim-reading";
+import { Thermometer } from "lucide-react";
 import { SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import type { MovedPart } from "@/views/v10/SatelliteMap2D";
 import { drawnAreaFor, freeM2, lotsOf, MAX_PINS, pinsM2, surfaceText, usableM2, ZONE_KINDS, ZONE_LABEL, zoneName, zonesOfArea, type DrawnArea, type SubArea, type ZoneKind } from "@/models/drawn-area";
@@ -146,7 +148,9 @@ export function SimMap({ kind }: { kind: SimKind }) {
       )}
       {/* The place is chosen here: search it or use the device position; the map follows. */}
       <PlaceSearch kind={kind} />
-      <div className="-mx-4 h-[52vh] min-h-72 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
+      <div className="relative -mx-4 h-[52vh] min-h-72 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
+        {/* The temperature the interventions bring, on the map itself (2D and 3D), following the levers live. */}
+        {!drawing && !drawingZone && <MapReading kind={kind} />}
         {show3d
           ? <Suspense fallback={<div className="h-full w-full bg-card" />}>{key
             ? <LocationMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} apiKey={key} area={ring} sim={sim}
@@ -167,6 +171,49 @@ export function SimMap({ kind }: { kind: SimKind }) {
         onArrange={() => { setView("2d"); setArranging((a) => !a); }} onAuto={() => { setEdits({}); toast("Disposizione automatica ripristinata"); }} />}
       {saved && !drawing && <ZonesBar area={saved} flow={kind === "urban" ? "piazza" : "vigneto"} onAdd={startZone} onEdit={editZone} onRemove={(id) => setZones(zonesOfArea(saved).filter((z) => z.id !== id))} />}
       </>}
+    </div>
+  );
+}
+
+/** Colour of a temperature on the five-step heat scale: red when too hot, down to turquoise and blue when cool. */
+export const heatTone = (t: number) =>
+  t >= 39 ? "#ef4444" : t >= 36 ? "#f97316" : t >= 30 ? "#f59e0b" : t >= 18 ? "#2dd4bf" : "#60a5fa";
+const deg = (t: number) => `${t.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}°`;
+
+/**
+ * A reading laid over the map, top centre (clear of the recenter button and of the 3D view's own controls): the piazza's
+ * perceived heat as its simulation shows it now — without → with the interventions, the gain, season and hour —, or
+ * the vineyard's temperature on the leaves, the shade cloth taking up to 3 °C off each zone.
+ */
+function MapReading({ kind }: { kind: SimKind }) {
+  const piazza = usePiazzaReading();
+  const vine = useLab().vineyard;
+  let before: number, after: number, what: string;
+  if (kind === "urban") {
+    if (!piazza) return null;
+    ({ before, after } = piazza);
+    what = `Calore percepito · ${piazza.when}`;
+  } else {
+    const zones = vine.zones;
+    if (!zones.length) return null;
+    const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    before = +avg(zones.map((z) => z.temperature)).toFixed(1);
+    after = +avg(zones.map((z) => applyZoneMix(z, zoneMixOf(z, vineMixOf(vine))).temperature)).toFixed(1);
+    what = "Temperatura sulle foglie · media delle zone";
+  }
+  const gain = +(before - after).toFixed(1);
+  return (
+    <div role="status" aria-live="polite" className="pointer-events-none absolute left-1/2 top-3 z-10 max-w-[calc(100%-7.5rem)] -translate-x-1/2 rounded-2xl bg-black/65 px-3.5 py-2 text-white shadow-lg ring-1 ring-white/15 backdrop-blur-md">
+      <p className="flex items-center justify-center gap-1.5 whitespace-nowrap text-lg font-semibold tabular-nums leading-tight">
+        <Thermometer className="size-4 shrink-0" style={{ color: heatTone(after) }} aria-hidden="true" />
+        {gain > 0.05 ? <>
+          <span className="text-white/60 line-through decoration-white/40">{deg(before)}</span>
+          <span aria-hidden="true" className="text-white/50">→</span>
+          <span style={{ color: heatTone(after) }}>{deg(after)}</span>
+          <span className="ml-1 rounded-full bg-white/12 px-1.5 text-xs font-semibold text-emerald-300">−{gain.toLocaleString("it-IT")}°</span>
+        </> : <span style={{ color: heatTone(after) }}>{deg(after)}</span>}
+      </p>
+      <p className="truncate text-center text-[11px] text-white/70">{gain > 0.05 ? what : `${what} · senza interventi`}</p>
     </div>
   );
 }
