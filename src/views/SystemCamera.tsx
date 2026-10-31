@@ -127,7 +127,7 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
         setPending((n) => n + 1);
         canvas.toBlob((blob) => {
           if (!blob || !activeRef.current) { setPending((n) => n - 1); return; }
-          const file = new File([blob], `foto-${id}.jpg`, { type: "image/jpeg" });
+          const file = new File([blob], `multiplo-${id}.jpg`, { type: "image/jpeg" });
           setShots((p) => [...p, { id, file, url: URL.createObjectURL(file), sharp: false }]);
           // The camera's own photo, at full resolution where the phone offers it (Chrome on Android), replaces the frame.
           const Capture = (window as unknown as { ImageCapture?: new (t: MediaStreamTrack) => { takePhoto: () => Promise<Blob> } }).ImageCapture;
@@ -136,7 +136,7 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
           Promise.race([new Capture(track).takePhoto(), new Promise<never>((_, no) => window.setTimeout(() => no(new Error("slow")), 4000))])
             .then((photo) => {
               if (!activeRef.current || photo.size <= blob.size) return;
-              const sharp = new File([photo], `foto-${id}.jpg`, { type: photo.type || "image/jpeg" });
+              const sharp = new File([photo], `multiplo-${id}.jpg`, { type: photo.type || "image/jpeg" });
               setShots((p) => p.map((s) => (s.id === id ? (URL.revokeObjectURL(s.url), { id, file: sharp, url: URL.createObjectURL(sharp), sharp: true }) : s)));
             })
             .catch(() => undefined)

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { ArrowRight, Building2, CalendarDays, Check, Share2, ChevronDown, Clock3, Cloud, Smartphone, Grape, History, Archive, ArchiveRestore, FolderClosed, Play, Trash2 } from "lucide-react";
+import { ArrowRight, Building2, CalendarDays, Check, Share2, ChevronDown, Clock3, Cloud, Smartphone, Grape, History, Archive, ArchiveRestore, FolderClosed, Layers, Play, Sparkles, Trash2 } from "lucide-react";
 import { currentMedia, removeMedia, useLabMedia, type MediaItem } from "@/models/lab-media-store";
 import { mediaTime } from "@/models/media-time";
+import { SHOT_KINDS, kindCountText, shotKind, type ShotKind } from "@/models/shot-kind";
 import { TabRow } from "@/views/v8/console";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { forShare, zoneOfName } from "@/views/v10/ExportSheet";
@@ -56,6 +57,7 @@ function Thumb({ s, onOpen }: { s: Shot; onOpen: () => void }) {
     <button type="button" onClick={onOpen} aria-label={`Apri ${s.kind === "video" ? "il video" : "la foto"} ${s.flow}${when ? `, ${when}` : ""}`} className="relative block aspect-square w-full overflow-hidden rounded-2xl bg-foreground/[0.08] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
       <ShotMedia s={s} />
       {s.kind === "video" && <span className="absolute inset-0 grid place-items-center"><Play className="size-7 text-white drop-shadow" aria-hidden="true" /></span>}
+      <KindMark s={s} />
       <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-2 pb-1.5 pt-5 text-xs text-white">{s.flow === "piazza" ? "Piazza" : "Vigneto"}{when ? ` · ${when}` : ""}</span>
     </button>
   );
@@ -177,7 +179,7 @@ function ShotViewer({ shots, start, onClose }: { shots: Shot[]; start: number; o
           <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto touch-pan-x" data-map-gestures="">
             {zone && <span className="shrink-0 rounded-full bg-foreground/[0.07] px-3 py-1.5 text-[12.5px]">Zona: {zone}</span>}
             {nearWhen && <span className="shrink-0 rounded-full bg-foreground/[0.07] px-3 py-1.5 text-[12.5px]">{SEASON_LABEL[nearWhen.season]} · {whenClock(nearWhen)}</span>}
-            <span className="shrink-0 rounded-full bg-foreground/[0.07] px-3 py-1.5 text-[12.5px]">{s.flow === "piazza" ? "Piazza" : "Vigneto"} · {s.kind === "video" ? "video" : "foto"}</span>
+            <span className="shrink-0 rounded-full bg-foreground/[0.07] px-3 py-1.5 text-[12.5px]">{s.flow === "piazza" ? "Piazza" : "Vigneto"} · {({ foto: "foto", multiplo: "scatto multiplo", ai: s.kind === "video" ? "video con l'AI" : "foto con l'AI", video: "video" } as const)[shotKind(s)]}</span>
           </div>
           {note && <p role="status" className="mt-3 text-center text-[13px] text-brand-turquoise">{note}</p>}
           {ask ? (
@@ -281,10 +283,40 @@ function pilesOf(shots: Shot[]): Pile[] {
   }
   return out;
 }
-const countText = (shots: Shot[]) => {
-  const v = shots.filter((s) => s.kind === "video").length, f = shots.length - v;
-  return [f ? `${f} foto` : "", v ? `${v} ${v === 1 ? "video" : "video"}` : ""].filter(Boolean).join(" · ");
-};
+const countText = (shots: Shot[]) => kindCountText(shots);
+
+/** The corner mark of a multiple shot or an AI shot, so each kind reads at a glance in the piles and the rows. */
+function KindMark({ s }: { s: Shot }) {
+  const k = shotKind(s);
+  if (k !== "multiplo" && k !== "ai") return null;
+  const Icon = k === "multiplo" ? Layers : Sparkles;
+  return (
+    <span className="absolute left-1.5 top-1.5 z-[1] grid size-6 place-items-center rounded-full bg-black/65 text-white ring-1 ring-white/30" title={k === "multiplo" ? "Scatto multiplo" : "Fotocamera AI"}>
+      <Icon className="size-3.5" aria-hidden="true" />
+    </span>
+  );
+}
+
+/**
+ * The kinds as one row of pills — Tutti, then only the kinds present, each with how many — to see one kind at a time:
+ * single photos, multiple shots, AI shots or videos.
+ */
+function KindPills({ shots, value, onChange }: { shots: Shot[]; value: ShotKind | "tutti"; onChange: (k: ShotKind | "tutti") => void }) {
+  const counts = useMemo(() => { const n: Record<ShotKind, number> = { foto: 0, multiplo: 0, ai: 0, video: 0 }; for (const s of shots) n[shotKind(s)]++; return n; }, [shots]);
+  const present = SHOT_KINDS.filter((k) => counts[k.id]);
+  if (present.length < 2) return null;
+  const pill = (on: boolean) => `inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring ${on ? "bg-foreground text-background" : "bg-foreground/[0.07] text-foreground/85"}`;
+  return (
+    <div role="radiogroup" aria-label="Tipo di foto e video" data-map-gestures className="-mx-1 flex touch-pan-x gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+      <button type="button" role="radio" aria-checked={value === "tutti"} onClick={() => onChange("tutti")} className={pill(value === "tutti")}>Tutti<span className="tabular-nums opacity-70">{shots.length}</span></button>
+      {present.map((k) => (
+        <button key={k.id} type="button" role="radio" aria-checked={value === k.id} onClick={() => onChange(k.id)} className={pill(value === k.id)}>
+          {k.label}<span className="tabular-nums opacity-70">{counts[k.id]}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /** One picture of a pile: the photo, or the video's first frame with a play mark. */
 function PileCard({ s, className, style }: { s: Shot; className?: string; style?: React.CSSProperties }) {
@@ -292,6 +324,7 @@ function PileCard({ s, className, style }: { s: Shot; className?: string; style?
     <span className={`absolute inset-0 overflow-hidden rounded-2xl bg-[oklch(0.27_0.016_258)] shadow-[0_6px_18px_rgb(0_0_0/0.45)] ring-1 ring-white/10 ${className ?? ""}`} style={style}>
       <ShotMedia s={s} />
       {s.kind === "video" && <span className="absolute inset-0 grid place-items-center"><Play className="size-7 text-white drop-shadow" aria-hidden="true" /></span>}
+      <KindMark s={s} />
     </span>
   );
 }
@@ -421,11 +454,15 @@ function OpenPile({ pile, onClose, archived = false }: { pile: Pile; onClose: ()
  * The archive: the photos and videos put away, as folders named by their day (gg/mm/aaaa) under month headings, newest
  * first, with a date field to go straight to one day; a folder opens like a pile, with Ripristina instead of Archivia.
  */
-function ArchiveBlock({ shots, keys, defaultOpen = false }: { shots: Shot[]; keys: string[]; defaultOpen?: boolean }) {
+function ArchiveBlock({ shots: all, keys, defaultOpen = false }: { shots: Shot[]; keys: string[]; defaultOpen?: boolean }) {
   const { signedIn } = useSignedIn();
   const [open, setOpen] = useState(defaultOpen);
   const [day, setDay] = useState("");
   const [shown, setShown] = useState<string | null>(null);
+  // Sub-categories: one kind at a time (single photos, multiple shots, AI shots, videos), restored on their own too.
+  const [kind, setKind] = useState<ShotKind | "tutti">("tutti");
+  const shots = useMemo(() => (kind === "tutti" ? all : all.filter((s) => shotKind(s) === kind)), [all, kind]);
+  const kindLabel = kind === "tutti" ? "" : ({ foto: "le foto", multiplo: "gli scatti multipli", ai: "quelle con l'AI", video: "i video" } as const)[kind];
   const piles = useMemo(() => pilesOf(shots), [shots]);
   const isoOf = (p: Pile) => { const s0 = p.shots[0]; if (!s0?.at) return ""; const d = new Date(s0.at); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
   const list = day ? piles.filter((p) => isoOf(p) === day) : piles;
@@ -441,11 +478,12 @@ function ArchiveBlock({ shots, keys, defaultOpen = false }: { shots: Shot[]; key
     <div className="rounded-2xl bg-foreground/[0.04]">
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-3 px-4 py-3.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-2xl">
         <span className="grid size-10 shrink-0 place-items-center rounded-full bg-foreground/[0.08]"><Archive className="size-5" aria-hidden="true" /></span>
-        <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Archivio</span><span className="block text-xs text-muted-foreground">{shots.length ? `${piles.length === 1 ? "1 giorno" : `${piles.length} giorni`} · ${countText(shots)}` : `${keys.length === 1 ? "1 file" : `${keys.length} file`} archiviati`} · {signedIn ? "nell'account" : "su questo dispositivo"}</span></span>
+        <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Archivio</span><span className="block text-xs text-muted-foreground">{all.length ? `${piles.length === 1 ? "1 giorno" : `${piles.length} giorni`} · ${countText(shots)}` : `${keys.length === 1 ? "1 file" : `${keys.length} file`} archiviati`} · {signedIn ? "nell'account" : "su questo dispositivo"}</span></span>
         <ChevronDown className={`size-5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
       {open && (
         <div className="space-y-3 px-3 pb-3">
+          <KindPills shots={all} value={kind} onChange={(k) => { setKind(k); setShown(null); }} />
           <label className="flex items-center gap-2 rounded-xl bg-foreground/[0.06] px-3 py-2 text-sm">
             <CalendarDays className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <span className="shrink-0 text-muted-foreground">Vai al giorno</span>
@@ -453,10 +491,16 @@ function ArchiveBlock({ shots, keys, defaultOpen = false }: { shots: Shot[]; key
             {day && <button type="button" onClick={() => setDay("")} className="shrink-0 text-xs font-semibold text-muted-foreground">Tutti</button>}
           </label>
           {list.length === 0 && <p className="px-1 text-sm text-muted-foreground">{shots.length ? "Niente in archivio per quel giorno." : "Le foto e i video archiviati non sono ancora caricati qui: puoi comunque rimetterli tutti nelle pile."}</p>}
-          {!day && (
+          {!day && kind !== "tutti" && shots.length > 0 && (
+            <button type="button" onClick={() => { restoreMedia(shots.map((s) => `${s.flow}-${s.id}`)); toast.success(`Ripristinati: ${countText(shots)}`); setKind("tutti"); }}
+              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-foreground/10 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <ArchiveRestore className="size-4" aria-hidden="true" />Ripristina {kindLabel} · {shots.length}
+            </button>
+          )}
+          {!day && kind === "tutti" && (
             <button type="button" onClick={() => { restoreMedia(keys); toast.success("Archivio ripristinato: foto e video di nuovo nelle pile"); }}
               className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-foreground/10 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <ArchiveRestore className="size-4" aria-hidden="true" />Ripristina tutto · {shots.length ? countText(shots) : `${keys.length} file`}
+              <ArchiveRestore className="size-4" aria-hidden="true" />Ripristina tutto · {keys.length === 1 ? "1 file" : `${keys.length} file`}
             </button>
           )}
           {months.map((m) => (
@@ -601,6 +645,8 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
   const swipe = useTabSwipe(FILTERS.map((f) => f.id), filter, setFilter, compact || flow ? none : area);
   const [confirm, setConfirm] = useState(false);
   const [clearing, setClearing] = useState(false);
+  // On the Cronologia page the photos and videos can be seen one kind at a time.
+  const [shotFilter, setShotFilter] = useState<ShotKind | "tutti">("tutti");
   useEffect(() => { setConfirm(false); }, [filter]);
   const urban = useLabMedia("urban"), vineyard = useLabMedia("vineyard");
   const archive = useMediaArchive();
@@ -623,12 +669,14 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
     // Every archived key of this tab, even for files not loaded (yet) on this device, so the archive can always be restored.
     const archKeys = Object.keys(archive).filter((k) => shown(k.startsWith("vigneto-") ? "vigneto" : "piazza"));
     const groups = compact ? groupByDay(inTab).slice(0, COMPACT_DAYS) : groupByDay(inTab);
-    const visibleShots = compact ? shots.slice(0, COMPACT_SHOTS) : shots;
+    const ofKind = compact || shotFilter === "tutti" ? shots : shots.filter((s) => shotKind(s) === shotFilter);
+    const visibleShots = compact ? shots.slice(0, COMPACT_SHOTS) : ofKind;
     return (
       <>
-        {visibleShots.length > 0 && (
+        {shots.length > 0 && (
           <div className="space-y-2">
-            <h3 className="px-1 text-sm font-medium text-muted-foreground">Foto e video{compact && shots.length > visibleShots.length ? ` · ultimi ${visibleShots.length} di ${shots.length}` : ""}</h3>
+            <h3 className="px-1 text-sm font-medium text-muted-foreground">Foto e video{compact && shots.length > visibleShots.length ? ` · ultimi ${visibleShots.length} di ${shots.length}` : ` · ${countText(shots)}`}</h3>
+            {!compact && <KindPills shots={shots} value={shotFilter} onChange={setShotFilter} />}
             <PhotoPiles shots={visibleShots} />
           </div>
         )}
