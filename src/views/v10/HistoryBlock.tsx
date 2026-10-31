@@ -272,7 +272,7 @@ function MiniMap({ center, area, highlight }: { center: { lat: number; lng: numb
 }
 
 /** Photos and videos of one day, as a pile. */
-type Pile = { key: string; label: string; shots: Shot[] };
+type Pile = { key: string; label: string; shots: Shot[]; group?: boolean };
 function pilesOf(shots: Shot[]): Pile[] {
   const out: Pile[] = [];
   for (const s of shots) {
@@ -283,6 +283,34 @@ function pilesOf(shots: Shot[]): Pile[] {
     if (last?.key === key) last.shots.push(s); else out.push({ key, label, shots: [s] });
   }
   return out;
+}
+/** How the photos are piled on the Cronologia: one pile per day, or one per simulation group (Gruppo n). */
+export type PileView = "giorno" | "gruppo";
+/**
+ * One pile per group of the simulation (the same Gruppo n, 20 uploads a group), newest first: a group loaded over
+ * several days stays whole here, while by day it is split among those days.
+ */
+function groupPilesOf(shots: Shot[], numbers: Map<string, number>): Pile[] {
+  const out = new Map<string, Pile & { last: number }>();
+  for (const s of shots) {
+    const n = numbers.get(`${s.flow}-${s.id}`);
+    const key = `g-${s.flow}-${n ?? "x"}`;
+    const p = out.get(key) ?? { key, label: n ? `Gruppo ${n}` : "Senza gruppo", shots: [], group: true, last: 0 };
+    p.shots.push(s);
+    p.last = Math.max(p.last, s.at ?? 0);
+    out.set(key, p);
+  }
+  const piles = [...out.values()].sort((a, b) => b.last - a.last);
+  const both = new Set(shots.map((s) => s.flow)).size > 1;
+  return piles.map(({ last: _last, ...p }) => (both ? { ...p, label: `${p.shots[0]!.flow === "piazza" ? "Piazza" : "Vigneto"} · ${p.label}` } : p));
+}
+/** The days a group's photos were taken: "31/10/2026" or "29/10 – 31/10/2026". */
+function daysText(shots: Shot[]) {
+  const times = shots.map((s) => s.at).filter((t): t is number => t !== null);
+  if (!times.length) return "Senza data";
+  const day = (t: number, year: boolean) => new Date(t).toLocaleDateString("it-IT", year ? { day: "2-digit", month: "2-digit", year: "numeric" } : { day: "2-digit", month: "2-digit" });
+  const lo = Math.min(...times), hi = Math.max(...times);
+  return day(lo, true) === day(hi, true) ? day(hi, true) : `${day(lo, false)} – ${day(hi, true)}`;
 }
 const countText = (shots: Shot[]) => kindCountText(shots);
 
@@ -317,6 +345,20 @@ function KindPills({ shots, value, onChange }: { shots: Shot[]; value: ShotKind 
   );
 }
 
+const PILE_VIEW_KEY = "mdt-pile-view-v1";
+/** Per gruppo | Per giorno: how the Cronologia piles its photos and videos. */
+function PileViewSwitch({ value, onChange }: { value: PileView; onChange: (v: PileView) => void }) {
+  const opt = (v: PileView, label: string) => (
+    <button type="button" role="radio" aria-checked={value === v} onClick={() => onChange(v)}
+      className={`h-8 flex-1 rounded-full px-3 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring ${value === v ? "bg-foreground text-background" : "text-foreground/80"}`}>{label}</button>
+  );
+  return (
+    <div role="radiogroup" aria-label="Raggruppa foto e video" className="flex w-full max-w-xs rounded-full bg-foreground/[0.07] p-1">
+      {opt("gruppo", "Per gruppo")}{opt("giorno", "Per giorno")}
+    </div>
+  );
+}
+
 /** One picture of a pile: the photo, or the video's first frame with a play mark. */
 function PileCard({ s, className, style }: { s: Shot; className?: string; style?: React.CSSProperties }) {
   return (
@@ -332,8 +374,9 @@ function PileCard({ s, className, style }: { s: Shot; className?: string; style?
  * The photos and videos stacked one on the other like a pile of prints, one pile per day (the newest on top, the next
  * two peeking out turned a little), with the date and how many; a tap spreads that day's pile into its grid.
  */
-function PhotoPiles({ shots }: { shots: Shot[] }) {
-  const piles = useMemo(() => pilesOf(shots), [shots]);
+function PhotoPiles({ shots, by = "giorno" }: { shots: Shot[]; by?: PileView }) {
+  const numbers = useGroupNumbers();
+  const piles = useMemo(() => (by === "gruppo" ? groupPilesOf(shots, numbers) : pilesOf(shots)), [shots, by, numbers]);
   const [open, setOpen] = useState<string | null>(null);
   const shown = piles.find((p) => p.key === open) ?? null;
   return (
@@ -354,6 +397,7 @@ function PhotoPiles({ shots }: { shots: Shot[] }) {
                 {p.shots.length > 1 && <span className="absolute -right-2 -top-2 grid h-7 min-w-7 place-items-center rounded-full bg-foreground px-2 text-xs font-bold tabular-nums text-background shadow">{p.shots.length}</span>}
               </span>
               <span className="mt-3 block px-1 text-sm font-semibold tabular-nums">{p.label}</span>
+              {p.group && <span className="block px-1 text-xs tabular-nums text-muted-foreground">{daysText(p.shots)}</span>}
               <span className="block px-1 text-xs text-muted-foreground">{countText(p.shots)}</span>
             </button>
           );
@@ -403,7 +447,8 @@ function OpenPile({ pile, onClose, archived = false }: { pile: Pile; onClose: ()
   const [busy, setBusy] = useState(false);
   const keyOf = (s: Shot) => `${s.flow}-${s.id}`;
   const numbers = useGroupNumbers();
-  const groups = useMemo(() => dayGroups(pile.shots, numbers), [pile.shots, numbers]);
+  // A day splits into its groups; a group's own pile is a single group, shown without a header.
+  const groups = useMemo(() => (pile.group ? [{ key: pile.key, flow: pile.shots[0]!.flow, n: null, shots: pile.shots }] : dayGroups(pile.shots, numbers)), [pile, numbers]);
   const bothFlows = new Set(groups.map((g) => g.flow)).size > 1;
   const groupTitle = (g: ShotGroup) => `${bothFlows ? (g.flow === "piazza" ? "Piazza · " : "Vigneto · ") : ""}${g.n ? `Gruppo ${g.n}` : "Sul telefono"}`;
   const [folded, setFolded] = useState<Set<string>>(new Set());
@@ -449,13 +494,13 @@ function OpenPile({ pile, onClose, archived = false }: { pile: Pile; onClose: ()
       {/* The day's photos by the simulation's groups (Gruppo n, 20 a group), each one row that slides sideways (the card
           keeps its height however many there are; its own move, not the page's tabs). Opening deals them out of the pile. */}
       {groups.map((g, gi) => (
-      <section key={g.key} className="pile-group" style={{ animationDelay: `${Math.min(gi, 4) * 70}ms` }} aria-label={groupTitle(g)}>
-      <button type="button" aria-expanded={!folded.has(g.key)} onClick={() => setFolded((p) => { const n = new Set(p); if (n.has(g.key)) n.delete(g.key); else n.add(g.key); return n; })}
+      <section key={g.key} className="pile-group" style={{ animationDelay: `${Math.min(gi, 4) * 70}ms` }} aria-label={pile.group ? pile.label : groupTitle(g)}>
+      {!pile.group && <button type="button" aria-expanded={!folded.has(g.key)} onClick={() => setFolded((p) => { const n = new Set(p); if (n.has(g.key)) n.delete(g.key); else n.add(g.key); return n; })}
         className="flex w-full items-center gap-2 px-1 py-1 text-left outline-none focus-visible:underline">
         <Layers className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         <span className="min-w-0 flex-1 text-sm font-semibold">{groupTitle(g)}<span className="ml-2 font-medium text-muted-foreground">{countText(g.shots)}</span></span>
         <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform duration-300 ${folded.has(g.key) ? "-rotate-90" : ""}`} aria-hidden="true" />
-      </button>
+      </button>}
       <div className="pile-fold" data-folded={folded.has(g.key) || undefined}><div className="min-h-0">
       <div className="no-scrollbar -mx-3 flex snap-x snap-mandatory gap-2 overflow-x-auto scroll-px-3 px-3 py-1 touch-pan-x" data-map-gestures="">
         {g.shots.map((s, i) => <div key={keyOf(s)} className="pile-deal w-[7.5rem] shrink-0 snap-start sm:w-36" style={{ animationDelay: `${Math.min(gi, 4) * 70 + Math.min(i, 7) * 45}ms` }}>{selecting ? (
@@ -722,6 +767,10 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
   const [clearing, setClearing] = useState(false);
   // On the Cronologia page the photos and videos can be seen one kind at a time.
   const [shotFilter, setShotFilter] = useState<ShotKind | "tutti">("tutti");
+  // Per gruppo by default (the simulation's groups, whole even when loaded over several days), kept on this device.
+  const [pileView, setPileView] = useState<PileView>("gruppo");
+  useEffect(() => { try { if (localStorage.getItem(PILE_VIEW_KEY) === "giorno") setPileView("giorno"); } catch { /* default */ } }, []);
+  const choosePileView = (v: PileView) => { setPileView(v); try { localStorage.setItem(PILE_VIEW_KEY, v); } catch { /* this time only */ } };
   useEffect(() => { setConfirm(false); }, [filter]);
   const urban = useLabMedia("urban"), vineyard = useLabMedia("vineyard");
   const archive = useMediaArchive();
@@ -752,8 +801,9 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
           <div className="space-y-2">
             <h3 className="px-1 text-sm font-medium text-muted-foreground">Foto e video{compact && shots.length > visibleShots.length ? ` · ultimi ${visibleShots.length} di ${shots.length}` : ` · ${countText(shots)}`}</h3>
             {!compact && <KindPills shots={shots} value={shotFilter} onChange={setShotFilter} />}
+            {!compact && <PileViewSwitch value={pileView} onChange={choosePileView} />}
             {!compact && <ArchiveAll shots={visibleShots} kind={shotFilter} />}
-            <PhotoPiles shots={visibleShots} />
+            <PhotoPiles shots={visibleShots} by={compact ? "giorno" : pileView} />
           </div>
         )}
         {!compact && archKeys.length > 0 && <ArchiveBlock shots={archivedShots} keys={archKeys} />}
