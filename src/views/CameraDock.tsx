@@ -141,6 +141,20 @@ export function CameraSheet() {
       });
       return;
     }
+    if (action === "burst") {
+      // Foto is the app's own camera, which needs no tap of its own: it opens at once, and the move to the project's
+      // page and to its Simula tab (where the photos land) happens behind it, while the camera covers the screen.
+      afterClose(() => {
+        if (!here) openPage();
+        const t0 = Date.now();
+        const tryStart = () => {
+          if (requestCapture(kind, "burst")) { window.setTimeout(() => showSimMediaNow(kind), 400); return; }
+          if (Date.now() - t0 < 4000) window.setTimeout(tryStart, 120); else toast.error("Fotocamera non pronta, riprova tra un attimo");
+        };
+        tryStart();
+      });
+      return;
+    }
     if (!here) {
       // The phone's camera and file picker open only from a tap on the page that keeps the photos: go there with the
       // sheet still open (it never closes and comes back), then the next tap starts the capture.
@@ -149,12 +163,6 @@ export function CameraSheet() {
     }
     // The new photo or video lands under the simulation: show it now, before the camera covers the page.
     showSimMediaNow(kind);
-    if (action === "burst") {
-      // Foto is the app's own camera (Singolo | Multiplo, hold for a row of shots) (no user gesture needed): it opens once the sheet's Back has landed,
-      // else that Back would close it at once.
-      afterClose(() => { if (!requestCapture(kind, "burst")) toast.error("Fotocamera non pronta, riprova tra un attimo"); });
-      return;
-    }
     if (!requestCapture(kind, action)) toast.error("Fotocamera non pronta, riprova tra un attimo");
     close();
   };
