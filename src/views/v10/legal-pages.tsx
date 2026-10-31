@@ -190,6 +190,7 @@ export function LicensesPage() {
           <li>Dati dei sensori di Sensor.Community, licenza DbCL/ODbL.</li>
           <li>Foto di riferimento delle piante: autore e licenza indicati sotto ogni foto (Royal Botanic Gardens, Kew; GBIF).</li>
           <li>Immagini satellitari della mappa 2D © Esri, Maxar, Earthstar Geographics.</li>
+          <li>Posizione del telefono (tasto GPS della mappa): i sistemi di navigazione satellitare GPS (Stati Uniti), Galileo (Unione europea), GLONASS (Russia), BeiDou (Cina), QZSS (Giappone) e NavIC (India), secondo quelli che il telefono riceve. L'app legge solo la posizione che il telefono le passa, con il tuo permesso.</li>
           <li>Elenco dei comuni italiani: dati ISTAT (2020) da comuni-json di Matteo Contrini, licenza MIT.</li>
           <li>Stemmi dei comuni e delle regioni da Wikimedia Commons (trovati tramite Wikidata): autore e licenza nella pagina di ogni file.</li>
         </ul>

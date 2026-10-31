@@ -22,7 +22,7 @@ export function OpenMap3D({ lat, lng, label, zoom, area = [], sim = null }: { la
     setState("loading");
     void import("maplibre-gl").then(({ default: maplibregl }) => {
       if (cancelled || !host.current) return;
-      const map = new maplibregl.Map({ container: host.current, style: STYLE, ...camera, maxPitch: 75, attributionControl: { compact: true } });
+      const map = new maplibregl.Map({ container: host.current, style: STYLE, ...camera, maxPitch: 75, attributionControl: false });
       map.on("load", () => {
         // The style already raises buildings only at close zoom: make sure they stand up wherever there are heights.
         if (!map.getLayer("building-3d") && map.getSource("openmaptiles")) {

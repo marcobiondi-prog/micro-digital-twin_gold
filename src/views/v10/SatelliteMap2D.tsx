@@ -57,7 +57,7 @@ export function SatelliteMap2D({ lat, lng, label, zoom, area = [], drawing = fal
     setState("loading");
     void import("maplibre-gl").then(({ default: maplibregl }) => {
       if (cancelled || !host.current) return;
-      const map = new maplibregl.Map({ container: host.current, style: STYLE, ...camera, maxZoom: 19, pitchWithRotate: false, cooperativeGestures: false, attributionControl: { compact: true } });
+      const map = new maplibregl.Map({ container: host.current, style: STYLE, ...camera, maxZoom: 19, pitchWithRotate: false, cooperativeGestures: false, attributionControl: false });
       map.touchPitch.disable();
       libRef.current = maplibregl;
       map.on("load", () => { addAreaLayers(map); addSimLayers(map, lat); if (!cancelled) setState("ready"); });

@@ -52,12 +52,14 @@ function Reveal({ children, className = "" }: { children: ReactNode; className?:
 
 /** The four steps of the tutorial, each with a white line drawing (every stroke has pathLength 1, so it can draw itself). */
 const STEPS: Array<{ title: string; text: string; art: ReactNode }> = [
-  { title: "Trova il luogo", text: "Nella simulazione, nella scheda Mappa, cerchi la piazza o il vigneto e lo guardi in 2D o in 3D.",
+  { title: "Trova il luogo", text: "Nella scheda Mappa cerchi il luogo o accendi il GPS, che resta attivo e ti segue. Lo guardi in 2D o 3D, ne disegni l'area con i puntini e la dividi in zone e lotti.",
     art: <>
-      <path pathLength={1} d="M20 30 L55 20 L105 30 L140 20 V75 L105 85 L55 75 L20 85 Z" />
-      <path pathLength={1} d="M55 20 V75 M105 30 V85" strokeOpacity="0.5" />
-      <path pathLength={1} d="M80 64 C74 56 66 48 66 40 A14 14 0 0 1 94 40 C94 48 86 56 80 64 Z" />
-      <circle pathLength={1} cx="80" cy="40" r="5" />
+      <path pathLength={1} d="M14 30 L50 20 L100 30 L146 20 V78 L100 88 L50 78 L14 88 Z" strokeOpacity="0.45" />
+      <path pathLength={1} d="M34 46 L66 34 L96 44 L88 72 L46 74 Z" />
+      <path pathLength={1} d="M66 34 L70 73" strokeOpacity="0.6" strokeDasharray="0.04 0.03" />
+      {[[34, 46], [66, 34], [96, 44], [88, 72], [46, 74]].map(([x, y]) => <circle key={`${x}-${y}`} cx={x} cy={y} r="3" fill="currentColor" stroke="none" className="intro-pop" />)}
+      <path pathLength={1} d="M124 58 C120 53 116 49 116 44 A8 8 0 0 1 132 44 C132 49 128 53 124 58 Z" />
+      <path pathLength={1} d="M114 30 A14 14 0 0 1 134 30 M108 24 A22 22 0 0 1 140 24" strokeOpacity="0.6" />
     </> },
   { title: "Muovi il punto", text: "Sull'arco scegli quanto rinfrescare: vedi subito i gradi in meno e quanto costa.",
     art: <>
