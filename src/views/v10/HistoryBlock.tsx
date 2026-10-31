@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { ArrowRight, Building2, CalendarDays, Check, Share2, ChevronDown, Clock3, Cloud, Smartphone, Grape, History, Archive, ArchiveRestore, FolderClosed, Layers, Play, Sparkles, Trash2 } from "lucide-react";
+import { ArrowRight, Building2, CalendarDays, Check, Share2, ChevronDown, Clock3, Cloud, Smartphone, Grape, History, Archive, ArchiveRestore, Camera, FolderClosed, Layers, Play, Sparkles, Trash2, Video } from "lucide-react";
 import { currentMedia, removeMedia, useLabMedia, type MediaItem } from "@/models/lab-media-store";
 import { mediaTime } from "@/models/media-time";
-import { SHOT_KINDS, kindCountText, shotKind, type ShotKind } from "@/models/shot-kind";
+import { SHOT_KINDS, kindCountText, shotKind, shotLabel, type ShotKind } from "@/models/shot-kind";
 import { TabRow } from "@/views/v8/console";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { forShare, zoneOfName } from "@/views/v10/ExportSheet";
@@ -285,14 +285,13 @@ function pilesOf(shots: Shot[]): Pile[] {
 }
 const countText = (shots: Shot[]) => kindCountText(shots);
 
-/** The corner mark of a multiple shot or an AI shot, so each kind reads at a glance in the piles and the rows. */
+/** The corner label of every photo and video — Foto, Multiplo, AI or Video — so each kind reads at a glance in the piles and the rows. */
 function KindMark({ s }: { s: Shot }) {
   const k = shotKind(s);
-  if (k !== "multiplo" && k !== "ai") return null;
-  const Icon = k === "multiplo" ? Layers : Sparkles;
+  const Icon = k === "multiplo" ? Layers : k === "ai" ? Sparkles : k === "video" ? Video : Camera;
   return (
-    <span className="absolute left-1.5 top-1.5 z-[1] grid size-6 place-items-center rounded-full bg-black/65 text-white ring-1 ring-white/30" title={k === "multiplo" ? "Scatto multiplo" : "Fotocamera AI"}>
-      <Icon className="size-3.5" aria-hidden="true" />
+    <span className="absolute left-1.5 top-1.5 z-[1] inline-flex h-6 items-center gap-1 rounded-full bg-black/65 px-2 text-[11px] font-semibold text-white ring-1 ring-white/25">
+      <Icon className="size-3.5" aria-hidden="true" />{shotLabel(s)}
     </span>
   );
 }

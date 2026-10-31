@@ -25,3 +25,10 @@ export function kindCountText(items: Array<{ name: string; kind: "image" | "vide
   for (const i of items) n[shotKind(i)]++;
   return SHOT_KINDS.filter((k) => n[k.id]).map((k) => `${n[k.id]} ${n[k.id] === 1 ? k.one : k.many}`).join(" · ");
 }
+
+/** The short label shown on a photo or video: "Foto", "Multiplo", "AI" (or "AI · Multiplo" for the AI camera's multiple shot), "Video". */
+export function shotLabel(item: { name: string; kind: "image" | "video" }): string {
+  const k = shotKind(item);
+  if (k === "ai") return /(^|[^a-z])multiplo-/.test(item.name.toLowerCase()) ? "AI · Multiplo" : item.kind === "video" ? "Video AI" : "AI";
+  return k === "foto" ? "Foto" : k === "multiplo" ? "Multiplo" : "Video";
+}

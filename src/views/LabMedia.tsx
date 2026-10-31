@@ -26,6 +26,7 @@ import { guardUse } from "@/lib/app-permissions";
 import { useLab } from "@/models/lab-store";
 import { ZONE_LABEL, drawnAreaFor } from "@/models/drawn-area";
 import { MEDIA_GROUP, uploadGroups } from "@/models/media-groups";
+import { shotLabel } from "@/models/shot-kind";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/views/health";
 import { Button } from "@/components/ui/button";
@@ -676,8 +677,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
                       <span
                         className={`shrink-0 text-xs ${leaving.has(it.id) ? "text-destructive" : "text-muted-foreground"}`}
                       >
-                        {it.kind === "video" ? "Video" : "Foto"}
-                        {/^(foto|video)-ar-/.test(it.name) && " AR"}
+                        {shotLabel(it)}
                         {fmtSize(it.size) && ` · ${fmtSize(it.size)}`}
                       </span>
                       <button

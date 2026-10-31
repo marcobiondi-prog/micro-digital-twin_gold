@@ -15,3 +15,14 @@ describe("shot kinds", () => {
       .toBe("1 foto · 2 scatti multipli · 1 video");
   });
 });
+
+describe("shot labels", () => {
+  it("labels every kind, the AI camera's multiple shot included", async () => {
+    const { shotLabel } = await import("@/models/shot-kind");
+    expect(shotLabel({ name: "IMG_1.jpg", kind: "image" })).toBe("Foto");
+    expect(shotLabel({ name: "multiplo-1.jpg", kind: "image" })).toBe("Multiplo");
+    expect(shotLabel({ name: "foto-ar-specie-multiplo-17.jpg", kind: "image" })).toBe("AI · Multiplo");
+    expect(shotLabel({ name: "foto-ar-17.jpg", kind: "image" })).toBe("AI");
+    expect(shotLabel({ name: "v.mp4", kind: "video" })).toBe("Video");
+  });
+});

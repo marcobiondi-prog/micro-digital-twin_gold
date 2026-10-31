@@ -1,6 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { flushSync } from "react-dom";
-import { Activity, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grid2X2, Minus, Plus, ScanSearch, SlidersHorizontal, Square, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
+import { Activity, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grid2X2, Minus, Plus, ScanSearch, SlidersHorizontal, Square, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
 import { supportsCameraTorch, setCameraTorch } from "@/lib/camera-torch";
 import { detectArObject, getReferencePhoto, type Detection, type Soil } from "@/controllers/ar-detect.functions";
 import { gbifPhotoSearchUrl, pickGbifPhoto, type ReferencePhoto } from "@/models/ar-reference-photo";
@@ -88,7 +88,7 @@ export function ArCamera({
   kind,
   context,
   onCapture,
-  onClose,
+  onClose: closeCamera,
   onFallback,
 }: {
   mode: Mode | null;
@@ -99,6 +99,20 @@ export function ArCamera({
   onClose: () => void;
   onFallback: (mode: Mode) => void;
 }) {
+  // Multiple shot (Multiplo): the AI camera stays open, each shutter tap keeps one more captioned photo, and "Fine"
+  // (or closing, Back included) adds them all at once — nothing shot is lost.
+  const [burst, setBurst] = useState(false);
+  const [burstShots, setBurstShots] = useState<Array<{ id: number; file: File; url: string }>>([]);
+  const burstRef = useRef(burstShots);
+  burstRef.current = burstShots;
+  const [burstFlash, setBurstFlash] = useState(0);
+  const onClose = useCallback(() => {
+    const taken = burstRef.current;
+    if (taken.length) { onCapture(taken.map((s) => s.file)); taken.forEach((s) => URL.revokeObjectURL(s.url)); burstRef.current = []; setBurstShots([]); }
+    setBurst(false);
+    closeCamera();
+  }, [closeCamera, onCapture]);
+  const dropBurstShot = (id: number) => setBurstShots((p) => { const gone = p.find((s) => s.id === id); if (gone) URL.revokeObjectURL(gone.url); return p.filter((s) => s.id !== id); });
   // Copernicus area context (signed-in camera): read once per place, shared with the Lab panel.
   const lab = useLab();
   const place = kind === "urban" ? lab.urban.location : lab.vineyard.location;
@@ -1078,6 +1092,18 @@ export function ArCamera({
     wrapped.forEach((line, i) => g.fillText(line, fontSize, source.height + (i + 1.2) * fontSize * 1.5));
     // The photo is already frozen in `saved`: close the camera at once and let the JPEG encode
     // (the slow part on phones) finish in the background, then hand the file to the Lab queue.
+    if (burst) {
+      // Still an AI shot (its kind in the history), marked as one of a multiple shot; the camera stays open.
+      const id = Date.now();
+      setBurstFlash((n) => n + 1);
+      hapticTick(30);
+      saved.toBlob((b) => {
+        if (!b) return;
+        const file = new File([b], `foto-ar${tag}-multiplo-${id}.jpg`, { type: "image/jpeg" });
+        setBurstShots((p) => [...p, { id, file, url: URL.createObjectURL(file) }]);
+      }, "image/jpeg", 0.88);
+      return;
+    }
     const name = `foto-ar${tag}-${Date.now()}.jpg`;
     onClose();
     saved.toBlob(
@@ -1468,6 +1494,34 @@ export function ArCamera({
                 Fai uno swipe dal basso verso l’alto per chiudere.
               </p>
             </div>
+          </div>
+        )}
+        {/* Singolo | Multiplo for photos, and while shooting the strip of the shots kept with "Fine · n". */}
+        {!error && mode === "photo" && (
+          <div className="ar-burst-bar" data-camera-controls>
+            {burstFlash > 0 && <div key={burstFlash} className="burst-flash pointer-events-none fixed inset-0 bg-white" aria-hidden="true" />}
+            {burst && burstShots.length > 0 && (
+              <div data-map-gestures className="flex max-w-[min(22rem,90vw)] touch-pan-x gap-1.5 overflow-x-auto px-1 pt-2 [scrollbar-width:none]">
+                {burstShots.map((s, i) => (
+                  <span key={s.id} className="relative shrink-0">
+                    <img src={s.url} alt={`Foto ${i + 1}`} className="size-11 rounded-md object-cover ring-1 ring-white/50" />
+                    <button type="button" onClick={() => dropBurstShot(s.id)} aria-label={`Togli la foto ${i + 1}`} className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-black/80 text-white ring-1 ring-white/40"><X className="size-3" aria-hidden="true" /></button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <div role="radiogroup" aria-label="Tipo di scatto" className="flex rounded-full bg-black/55 p-0.5 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur">
+                <button type="button" role="radio" aria-checked={!burst} disabled={burstShots.length > 0} onClick={() => setBurst(false)} className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""} disabled:opacity-50`}>Singolo</button>
+                <button type="button" role="radio" aria-checked={burst} onClick={() => setBurst(true)} className={`h-8 rounded-full px-3 ${burst ? "bg-white text-black" : ""}`}>Multiplo</button>
+              </div>
+              {burst && burstShots.length > 0 && (
+                <button type="button" onClick={onClose} className="inline-flex h-9 items-center gap-1 rounded-full bg-white px-3.5 text-xs font-semibold text-black">
+                  <Check className="size-3.5" aria-hidden="true" />Fine · {burstShots.length}
+                </button>
+              )}
+            </div>
+            <span className="sr-only" role="status" aria-live="polite">{burst ? `${burstShots.length} foto scattate` : ""}</span>
           </div>
         )}
         </CameraCloseGestures>

@@ -2102,3 +2102,6 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .burst-flash { animation: burst-flash 0.22s ease-out forwards; opacity: 0; }
 @keyframes burst-flash { from { opacity: 0.55; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .burst-flash { animation: none; } }
+
+/* AI camera: Singolo | Multiplo above the capture row, and the strip of the multiple shot's photos. */
+.ar-burst-bar { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom) + 10.5rem); z-index: 30; display: grid; justify-items: center; gap: .5rem; }
