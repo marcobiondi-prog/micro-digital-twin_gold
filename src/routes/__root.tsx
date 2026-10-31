@@ -19,6 +19,7 @@ import { isChunkError, reloadFresh } from "@/router";
 import { History, Building2, Grape, Info, LayoutDashboard, Lock } from "lucide-react";
 import { useProId, useSyncProId } from "@/lib/use-pro-id";
 import { useSyncMediaArchive } from "@/models/media-archive";
+import { useSyncSimHidden } from "@/models/sim-hidden";
 import { useMediaSync } from "@/lib/use-media-sync";
 import { useDstNotice } from "@/lib/dst-notice";
 import { installAppPermissionGuards, usePermissions } from "@/lib/app-permissions";
@@ -389,6 +390,7 @@ function RootComponent() {
   // The professional profile follows the account: adopted on sign-in, or uploaded to an account without one.
   useSyncProId();
   useSyncMediaArchive();
+  useSyncSimHidden();
   useMediaSync();
   useDstNotice();
   // A permission changed in the phone's settings is said once on return to the app.

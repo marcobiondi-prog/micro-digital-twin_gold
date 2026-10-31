@@ -18,7 +18,7 @@ import { Card, Ring, StatusBadge, levelColor } from "@/views/health";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { scenarioCsv, scenarioGeoJson } from "@/models/scenario-export";
-import { useLabMedia } from "@/models/lab-media-store";
+import { simOnly, useSimMedia } from "@/models/sim-hidden";
 import { scanReportRows, useArScans } from "@/models/ar-scan-log";
 import { noise } from "@/models/data";
 import { splitLocation } from "@/views/SimulationGrid";
@@ -418,7 +418,8 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   const proId = useProId();
   // "Maria Rossi · Agronomo · patentino MOL/CB/01234 (Molise)" on the cover and in the copied text.
   const author = proId ? `${proId.name} · ${proSummary(proId)}` : "";
-  const reportMedia = useLabMedia(ctx === "Urbano" ? "urban" : "vineyard");
+  // The simulation's own photos: those taken out of it stay in the Cronologia, not in the report.
+  const reportMedia = useSimMedia(ctx === "Urbano" ? "urban" : "vineyard");
   // Every AI camera scan of this flow, photo or not.
   const scanRows = scanReportRows(useArScans(ctx === "Urbano" ? "urban" : "vineyard"));
   const [open, setOpen] = useState(false);
@@ -699,7 +700,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
         return { d: c.toDataURL("image/jpeg", 0.75), r: c.height / c.width };
       } catch { return null; }
     };
-    const media = await currentMedia(urban ? "urban" : "vineyard");
+    const media = simOnly(urban ? "urban" : "vineyard", await currentMedia(urban ? "urban" : "vineyard"));
     if (media.length) {
       title("Foto e video", `${media.length}`);
       const imgs = media.filter((m) => m.kind === "image");

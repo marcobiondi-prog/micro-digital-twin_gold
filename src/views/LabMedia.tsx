@@ -38,10 +38,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { hideFromSim, useSimMedia } from "@/models/sim-hidden";
 import {
   ensureMedia,
-  removeMedia,
-  useLabMedia,
   type MediaItem,
 } from "@/models/lab-media-store";
 import { enqueueUploads, useLabUploads } from "@/models/lab-media-uploader";
@@ -140,7 +139,8 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
   useEffect(() => setMounted(true), []);
   const overPage = (node: ReactNode) => (embedded && mounted ? createPortal(node, document.body) : node);
   const [userId, setUserId] = useState<string | null | undefined>(undefined);
-  const items = useLabMedia(kind);
+  // The simulation's own files: those taken out of it stay in the Cronologia only.
+  const items = useSimMedia(kind);
   /** Avanzamento dell'invio nella coda condivisa: prosegue anche cambiando scheda o sezione. */
   const progress = useShareProgress(kind);
   const armed = progress?.armed ?? null;
@@ -299,10 +299,9 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
     justRemoved.current = true;
     setLeaving((p) => new Set(p).add(item.id));
     await new Promise((r) => setTimeout(r, 200));
-    // The same deletion as the Cronologia's: from the account or the device, and out of the archive, so the file
-    // leaves the history too.
-    try { await removeMedia(kind, [item]); }
-    catch { toast.error("File non eliminato", { description: "Controlla la connessione e riprova." }); }
+    // Out of the simulation only: the file stays in the Cronologia (deleted for good only from there).
+    hideFromSim(kind, [item]);
+    toast.success("Tolto dalla simulazione", { description: "Resta nella Cronologia." });
     setLeaving((p) => {
       const n = new Set(p);
       n.delete(item.id);
@@ -320,8 +319,8 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
       setTimeout(() => setLeaving((p) => new Set(p).add(it.id)), d);
     });
     await new Promise((r) => setTimeout(r, total + 200));
-    try { await removeMedia(kind, items); }
-    catch { toast.error("Non tutti i file sono stati eliminati", { description: "Controlla la connessione e riprova." }); }
+    hideFromSim(kind, items);
+    toast.success(items.length === 1 ? "Tolto dalla simulazione" : `${items.length} file tolti dalla simulazione`, { description: "Restano nella Cronologia." });
     setLeaving(new Set());
   }
 
@@ -333,12 +332,8 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
     justRemoved.current = true;
     setLeaving((p) => new Set([...p, ...files.map((f) => f.id)]));
     await new Promise((r) => setTimeout(r, reduce ? 0 : 220));
-    try {
-      await removeMedia(kind, files);
-      toast.success(`Gruppo ${n} eliminato`, { description: files.length === 1 ? "1 file tolto." : `${files.length} file tolti.` });
-    } catch {
-      toast.error("Gruppo non eliminato", { description: "Controlla la connessione e riprova." });
-    }
+    hideFromSim(kind, files);
+    toast.success(`Gruppo ${n} tolto dalla simulazione`, { description: `${files.length === 1 ? "1 file resta" : `${files.length} file restano`} nella Cronologia.` });
     setLeaving((p) => { const next = new Set(p); files.forEach((f) => next.delete(f.id)); return next; });
   }
 
@@ -532,7 +527,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
                 variant="destructive"
                 disabled={busy || items.length === 0}
                 onClick={() => {
-                  if (window.confirm(`Eliminare tutti i ${items.length} file?`)) void removeAll();
+                  if (window.confirm(`Togliere tutti i ${items.length} file dalla simulazione? Restano nella Cronologia.`)) void removeAll();
                 }}
                 className="lab-media-action"
                 aria-label="Elimina tutti i file"
@@ -639,15 +634,15 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
                       </button>
                     </div>
                     {askGroup === g && (
-                      <div role="alertdialog" aria-label={`Eliminare il gruppo ${g}?`} className="mt-1.5 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
-                        <p className="font-medium">Eliminare il Gruppo {g}?</p>
+                      <div role="alertdialog" aria-label={`Togliere il gruppo ${g} dalla simulazione?`} className="mt-1.5 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
+                        <p className="font-medium">Togliere il Gruppo {g} dalla simulazione?</p>
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                          {group.length === 1 ? "1 file" : `${group.length} file`}{[photos && `${photos} foto`, videos && `${videos} video`].filter(Boolean).length ? ` (${[photos && `${photos} foto`, videos && `${videos} video`].filter(Boolean).join(", ")})` : ""}: non si possono recuperare.
+                          {group.length === 1 ? "1 file" : `${group.length} file`}{[photos && `${photos} foto`, videos && `${videos} video`].filter(Boolean).length ? ` (${[photos && `${photos} foto`, videos && `${videos} video`].filter(Boolean).join(", ")})` : ""}: restano nella Cronologia, dove puoi rivederli o eliminarli per sempre.
                         </p>
                         <div className="mt-2.5 flex justify-end gap-2">
                           <Button type="button" size="sm" variant="ghost" onClick={() => setAskGroup(null)}>Annulla</Button>
                           <Button type="button" size="sm" variant="destructive" onClick={() => void removeGroup(g, group)}>
-                            <Trash2 className="size-3.5" /> Elimina {group.length}
+                            <Trash2 className="size-3.5" /> Togli {group.length}
                           </Button>
                         </div>
                       </div>

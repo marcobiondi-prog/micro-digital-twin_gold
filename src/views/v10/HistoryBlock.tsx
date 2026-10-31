@@ -6,6 +6,7 @@ import { currentMedia, removeMedia, useLabMedia, type MediaItem } from "@/models
 import { mediaTime } from "@/models/media-time";
 import { uploadGroups } from "@/models/media-groups";
 import { mediaThumb, readyThumb } from "@/lib/media-thumbs";
+import { unhide, useSimHidden, useSimMedia } from "@/models/sim-hidden";
 import { SHOT_KINDS, kindCountText, shotKind, shotLabel, type ShotKind } from "@/models/shot-kind";
 import { TabRow } from "@/views/v8/console";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -311,7 +312,7 @@ function groupPilesOf(shots: Shot[], numbers: Map<string, number>): Pile[] {
   for (const s of shots) {
     const n = numbers.get(`${s.flow}-${s.id}`);
     const key = `g-${s.flow}-${n ?? "x"}`;
-    const p = out.get(key) ?? { key, label: n ? `Gruppo ${n}` : "Senza gruppo", shots: [], group: true, last: 0 };
+    const p = out.get(key) ?? { key, label: n ? `Gruppo ${n}` : "Tolte dalla simulazione", shots: [], group: true, last: 0 };
     p.shots.push(s);
     p.last = Math.max(p.last, s.at ?? 0);
     out.set(key, p);
@@ -462,7 +463,8 @@ function useGridColumns() {
  * on the project's whole list by upload (20 a group), so a day's photos read under the group they were loaded in.
  */
 function useGroupNumbers() {
-  const urban = useLabMedia("urban"), vineyard = useLabMedia("vineyard");
+  // Numbered on the simulation's own list, as it shows them; a file taken out of the simulation has no group here.
+  const urban = useSimMedia("urban"), vineyard = useSimMedia("vineyard");
   return useMemo(() => {
     const map = new Map<string, number>();
     for (const g of uploadGroups(urban)) for (const f of g.files) map.set(`piazza-${f.id}`, g.n);
@@ -503,8 +505,11 @@ function OpenPile({ pile, onClose, archived = false }: { pile: Pile; onClose: ()
     ? pilesOf(pile.shots).map((d) => ({ key: `${pile.key}-${d.key}`, flow: d.shots[0]!.flow, n: null, shots: d.shots, day: d.label }))
     : dayGroups(pile.shots, numbers)), [pile, numbers]);
   const bothFlows = new Set(groups.map((g) => g.flow)).size > 1;
-  const groupTitle = (g: ShotGroup) => g.day ?? `${bothFlows ? (g.flow === "piazza" ? "Piazza · " : "Vigneto · ") : ""}${g.n ? `Gruppo ${g.n}` : "Sul telefono"}`;
+  const groupTitle = (g: ShotGroup) => g.day ?? `${bothFlows ? (g.flow === "piazza" ? "Piazza · " : "Vigneto · ") : ""}${g.n ? `Gruppo ${g.n}` : "Tolte dalla simulazione"}`;
   const [folded, setFolded] = useState<Set<string>>(new Set());
+  // Files taken out of their simulation can go back into it from here.
+  const simHidden = useSimHidden();
+  const outOfSim = pile.shots.filter((s) => simHidden[keyOf(s)]);
   const flip = (s: Shot) => setPicked((p) => { const n = new Set(p); if (n.has(keyOf(s))) n.delete(keyOf(s)); else n.add(keyOf(s)); return n; });
   const all = picked.size === pile.shots.length;
   const stop = () => { setSelecting(false); setPicked(new Set()); setAsk(false); };
@@ -546,6 +551,12 @@ function OpenPile({ pile, onClose, archived = false }: { pile: Pile; onClose: ()
       </div>
       {/* The day's photos by the simulation's groups (Gruppo n, 20 a group), each one row that slides sideways (the card
           keeps its height however many there are; its own move, not the page's tabs). Opening deals them out of the pile. */}
+      {!selecting && outOfSim.length > 0 && (
+        <button type="button" onClick={() => { unhide(outOfSim.map(keyOf)); toast.success(outOfSim.length === 1 ? "1 file di nuovo nella simulazione" : `${outOfSim.length} file di nuovo nella simulazione`); }}
+          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-foreground/10 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <ArchiveRestore className="size-4" aria-hidden="true" />Rimetti nella simulazione · {outOfSim.length}
+        </button>
+      )}
       {groups.map((g, gi) => (
       <section key={g.key} className="pile-group" style={{ animationDelay: `${Math.min(gi, 4) * 70}ms` }} aria-label={pile.group ? `${pile.label} · ${groupTitle(g)}` : groupTitle(g)}>
       <button type="button" aria-expanded={!folded.has(g.key)} onClick={() => setFolded((p) => { const n = new Set(p); if (n.has(g.key)) n.delete(g.key); else n.add(g.key); return n; })}

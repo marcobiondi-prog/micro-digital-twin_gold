@@ -76,6 +76,8 @@ export async function removeMedia(k: MediaKind, items: MediaItem[]) {
   const flow = k === "urban" ? "piazza" : "vigneto";
   const { restoreMedia } = await import("@/models/media-archive");
   restoreMedia(removed.map((i) => `${flow}-${i.id}`));
+  const { unhide } = await import("@/models/sim-hidden");
+  unhide(removed.map((i) => `${flow}-${i.id}`));
   if (removed.length < items.length) throw new Error(`not-deleted:${items.length - removed.length}`);
 }
 
@@ -182,6 +184,7 @@ export async function syncDeviceMedia(userId: string, onStart?: (n: number) => v
     if (!recs.length) return 0;
     onStart?.(recs.length);
     const { moveArchived } = await import("@/models/media-archive");
+    const { moveHidden } = await import("@/models/sim-hidden");
     for (const r of recs) {
       const at = Number(/^(\d{12,})/.exec(r.item.id)?.[1]) || Date.now();
       const safe = r.item.name.replace(/[^\w.-]+/g, "_").slice(-80);
@@ -191,6 +194,7 @@ export async function syncDeviceMedia(userId: string, onStart?: (n: number) => v
       await withStore("readwrite", (s) => s.delete(r.key)).catch(() => undefined);
       const flow = r.mediaKind === "urban" ? "piazza" : "vigneto";
       moveArchived(`${flow}-${r.item.id}`, `${flow}-${path}`);
+      moveHidden(`${flow}-${r.item.id}`, `${flow}-${path}`);
       moved++;
     }
     if (moved) { await refreshMedia("urban"); await refreshMedia("vineyard"); }
