@@ -1,4 +1,4 @@
-import { useContext, useState, type ReactNode } from "react";
+import { useContext, useEffect, useState, type ReactNode } from "react";
 import { comparison, nextPhase, prototypeChoice } from "@/models/scenarios";
 import { UNIT_COST, grouped } from "@/models/intervention-cost";
 import { VINE_UNIT_COST } from "@/models/vine-interventions";
@@ -9,6 +9,8 @@ import { openAccount } from "@/lib/camera-dock";
 import { cn } from "@/lib/utils";
 import { Faq, InfoCard, InfoNav, InfoPage, PageLink } from "./InfoPage";
 import { AI_STANDBY } from "@/lib/ai-standby";
+import { GNSS } from "@/models/gnss";
+import { gnssLogos } from "@/lib/gnss-logos";
 
 const eur = (n: number) => `${grouped(n)} €`;
 const level = (id: string) => comparison.find((l) => l.id === id)!;
@@ -178,6 +180,31 @@ const LIBS: Array<[string, string]> = [
   ["class-variance-authority", "Apache-2.0"], ["React Hook Form", "MIT"], ["Embla Carousel", "MIT"], ["tz-lookup (fusi orari dalla posizione)", "CC0-1.0"],
 ];
 
+/** The six satellite systems as tiles: each logo on a white tile (they are drawn for light backgrounds), its name and country under it. */
+function SatelliteLogos() {
+  const [logos, setLogos] = useState<Record<string, string | null>>({});
+  const [failed, setFailed] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => { let on = true; void gnssLogos().then((l) => { if (on) setLogos(l); }); return () => { on = false; }; }, []);
+  return (
+    <span className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6" role="list" aria-label="Sistemi satellitari">
+      {GNSS.map((g) => {
+        const src = logos[g.id];
+        return (
+          <span key={g.id} role="listitem" className="flex flex-col items-center gap-1.5 rounded-xl bg-foreground/[0.04] p-2 text-center ring-1 ring-foreground/10">
+            <span className="grid h-12 w-full place-items-center rounded-lg bg-white p-1.5">
+              {src && !failed.has(g.id)
+                ? <img src={src} alt={`Logo ${g.name}`} loading="lazy" className="max-h-full max-w-full object-contain" onError={() => setFailed((p) => new Set(p).add(g.id))} />
+                : <span className="text-sm font-bold tracking-wide text-slate-700">{g.name}</span>}
+            </span>
+            <span className="text-xs font-semibold leading-tight">{g.name}</span>
+            <span className="text-[11px] leading-tight text-muted-foreground">{g.country}</span>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
 export function LicensesPage() {
   return (
     <InfoPage title="Licenze" intro="Il software aperto e i dati che rendono possibile l'app, con le loro licenze.">
@@ -190,9 +217,11 @@ export function LicensesPage() {
           <li>Dati dei sensori di Sensor.Community, licenza DbCL/ODbL.</li>
           <li>Foto di riferimento delle piante: autore e licenza indicati sotto ogni foto (Royal Botanic Gardens, Kew; GBIF).</li>
           <li>Immagini satellitari della mappa 2D © Esri, Maxar, Earthstar Geographics.</li>
-          <li>Posizione del telefono (tasto GPS della mappa): i sistemi di navigazione satellitare GPS (Stati Uniti), Galileo (Unione europea), GLONASS (Russia), BeiDou (Cina), QZSS (Giappone) e NavIC (India), secondo quelli che il telefono riceve. L'app legge solo la posizione che il telefono le passa, con il tuo permesso.</li>
+          <li>Posizione del telefono (tasto GPS della mappa): i sistemi di navigazione satellitare GPS (Stati Uniti), Galileo (Unione europea), GLONASS (Russia), BeiDou (Cina), QZSS (Giappone) e NavIC (India), secondo quelli che il telefono riceve. L'app legge solo la posizione che il telefono le passa, con il tuo permesso.
+            <SatelliteLogos />
+          </li>
           <li>Elenco dei comuni italiani: dati ISTAT (2020) da comuni-json di Matteo Contrini, licenza MIT.</li>
-          <li>Stemmi dei comuni e delle regioni da Wikimedia Commons (trovati tramite Wikidata): autore e licenza nella pagina di ogni file.</li>
+          <li>Stemmi dei comuni e delle regioni e loghi dei sistemi satellitari da Wikimedia Commons (trovati tramite Wikidata): autore e licenza nella pagina di ogni file. I loghi appartengono ai rispettivi titolari e sono mostrati solo come riconoscimento.</li>
         </ul>
       </InfoCard>
       <InfoCard title="Software">
