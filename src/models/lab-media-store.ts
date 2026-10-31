@@ -90,16 +90,23 @@ export async function ensureMedia(k: MediaKind, userId: string | null) {
     return state[k];
   }
   const folder = `${userId}/${k}`;
-  const { data } = await supabase.storage.from(MEDIA_BUCKET).list(folder, { sortBy: { column: "created_at", order: "desc" } });
+  // The photos and videos taken on this device without signing in stay listed too (they live in its local store),
+  // so signing in never hides them.
+  const device = await loadGuestFiles(k);
+  const { data, error } = await supabase.storage.from(MEDIA_BUCKET).list(folder, { sortBy: { column: "created_at", order: "desc" } });
+  // A failed listing is tried again next time, instead of leaving the account's files missing until a reload.
+  if (error) loadedFor[k] = null;
   const files = (data ?? []).filter((f) => f.id);
+  let account: MediaItem[] = [];
   if (files.length) {
     const paths = files.map((f) => `${folder}/${f.name}`);
     const { data: signed } = await supabase.storage.from(MEDIA_BUCKET).createSignedUrls(paths, 3600);
-    state[k] = (signed ?? []).map((s, i) => ({ s, f: files[i]!, p: paths[i]! })).filter((x) => x.s.signedUrl).map(({ s, f, p }) => ({
+    account = (signed ?? []).map((s, i) => ({ s, f: files[i]!, p: paths[i]! })).filter((x) => x.s.signedUrl).map(({ s, f, p }) => ({
       id: p, path: p, url: s.signedUrl ?? "", name: f.name.replace(/^\d+-/, ""), size: Number(f.metadata?.size ?? 0),
       kind: isVideo(f.name, f.metadata?.mimetype) ? "video" : "image",
     }));
   }
+  state[k] = [...account, ...device];
   emit();
   return state[k];
 }

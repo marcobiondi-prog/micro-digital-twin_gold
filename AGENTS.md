@@ -14,7 +14,7 @@
 - Header/favicon use optimized transparent robot PNGs.
 - Cases keep dated evidence separate from Query weather and daily source research; authenticated jobs write the public read-only cache.
 - Urban dashboard stage and log persist per signed-in user (owner-only RLS); guests keep them in memory.
-- Auth in the project's own Supabase (email/password + Google OAuth); schema in supabase/migrations; avatar prefs in user-owned profiles and private avatar storage; guest Lab media persists per flow in device-local IndexedDB; uploads queue at module level (lab-media-uploader.ts) and survive unmount; other guest data session-only.
+- Auth in the project's own Supabase (email/password + Google OAuth); schema in supabase/migrations; avatar prefs in user-owned profiles and private avatar storage; guest Lab media persists per flow in device-local IndexedDB, and stays listed (beside the account's files) after signing in, so photos taken before the sign-in never disappear; a failed account listing is retried on the next read; uploads queue at module level (lab-media-uploader.ts) and survive unmount; other guest data session-only.
 - Shared dialog scopes account overlay; phone icon reveal reverses on close, other dialogs unchanged.
 - Tablet/desktop: page and full-document dark backdrop scroll together; dialogs stay modal with fixed backdrop on phones — centralized in the shared dialog.
 - AI sensor placement: auth-protected server fn via Sensor.Community + OSM within 5 km; locked for guests in the page sections (hidden elsewhere); each suggestion shows a "luogo" line.
