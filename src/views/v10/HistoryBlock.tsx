@@ -526,6 +526,37 @@ function ArchiveBlock({ shots: all, keys, defaultOpen = false }: { shots: Shot[]
   );
 }
 
+/**
+ * Every photo and video shown (all days, or only the chosen kind) archived in one go, after one confirm in place;
+ * nothing is deleted and the archive brings them back.
+ */
+function ArchiveAll({ shots, kind }: { shots: Shot[]; kind: ShotKind | "tutti" }) {
+  const [ask, setAsk] = useState(false);
+  useEffect(() => { setAsk(false); }, [kind]);
+  if (shots.length < 2) return null;
+  const what = kind === "tutti" ? "tutto" : ({ foto: "le foto", multiplo: "gli scatti multipli", ai: "quelle con l'AI", video: "i video" } as const)[kind];
+  const days = pilesOf(shots).length;
+  const go = () => {
+    archiveMedia(shots.map((s) => `${s.flow}-${s.id}`));
+    setAsk(false);
+    toast.success(`Archiviati: ${countText(shots)}`, { description: "Li ritrovi nell'Archivio, divisi per giorno." });
+  };
+  return ask ? (
+    <div role="alertdialog" aria-label="Archiviare tutto?" className="rounded-2xl bg-foreground/[0.06] p-3.5 text-sm">
+      <p className="font-semibold">Archiviare {what}?</p>
+      <p className="mt-0.5 text-muted-foreground">{countText(shots)} di {days === 1 ? "1 giorno" : `${days} giorni`} vanno nell'Archivio. Non si cancella niente: li puoi ripristinare quando vuoi.</p>
+      <div className="mt-3 flex gap-2">
+        <button type="button" onClick={() => setAsk(false)} className="h-10 flex-1 rounded-full bg-foreground/[0.08] font-semibold">Annulla</button>
+        <button type="button" onClick={go} className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full bg-white font-semibold text-black"><Archive className="size-4" aria-hidden="true" />Archivia {shots.length}</button>
+      </div>
+    </div>
+  ) : (
+    <button type="button" onClick={() => setAsk(true)} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-foreground/[0.08] text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <Archive className="size-4" aria-hidden="true" />Archivia {what} · {shots.length}
+    </button>
+  );
+}
+
 /** The season and hour the simulation was set to, written out; older entries say they were not recorded. */
 function WhenLine({ e }: { e: HistoryEntry }) {
   const w = whenOf(e);
@@ -677,6 +708,7 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
           <div className="space-y-2">
             <h3 className="px-1 text-sm font-medium text-muted-foreground">Foto e video{compact && shots.length > visibleShots.length ? ` · ultimi ${visibleShots.length} di ${shots.length}` : ` · ${countText(shots)}`}</h3>
             {!compact && <KindPills shots={shots} value={shotFilter} onChange={setShotFilter} />}
+            {!compact && <ArchiveAll shots={visibleShots} kind={shotFilter} />}
             <PhotoPiles shots={visibleShots} />
           </div>
         )}
