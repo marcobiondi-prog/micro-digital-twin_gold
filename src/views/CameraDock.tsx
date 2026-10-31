@@ -106,7 +106,7 @@ export function CameraSheet() {
   };
   // Moves to the project's page while the sheet stays on screen: its own history step is taken back (a guard keeps the
   // sheet open on that Back), the page replaces it, and the sheet's step is put back on top of the new page.
-  const carryTo = () => {
+  const carryTo = (action: CaptureAction) => {
     const release = pushBackGuard(() => true);
     let done = false;
     const go = () => {
@@ -118,6 +118,15 @@ export function CameraSheet() {
       void navigate({ to: page, replace: pathname !== "/" && pathname !== "/benvenuto" }).then(() => {
         if (kind) showSimMediaNow(kind);
         window.history.pushState({ ...(window.history.state ?? {}), __panel: true }, "");
+        // Then the capture itself, as soon as the page's photos are ready, while the opening tap still counts.
+        const activation = (navigator as Navigator & { userActivation?: { isActive: boolean } }).userActivation;
+        const t0 = Date.now();
+        const tryStart = () => {
+          if (!kind || (activation && !activation.isActive)) return;
+          if (requestCapture(kind, action)) { close(); return; }
+          if (Date.now() - t0 < 4000) window.setTimeout(tryStart, 80);
+        };
+        tryStart();
       });
     };
     const timer = window.setTimeout(go, 400);
@@ -156,9 +165,11 @@ export function CameraSheet() {
       return;
     }
     if (!here) {
-      // The phone's camera and file picker open only from a tap on the page that keeps the photos: go there with the
-      // sheet still open (it never closes and comes back), then the next tap starts the capture.
-      carryTo();
+      // The phone's camera and file picker open only from a tap — but a tap stays good for a few seconds (the
+      // browser's transient activation) and the move keeps the same document: the sheet is carried to the project's
+      // page and the capture starts there by itself. Should the tap have expired on the way (a very slow phone), the
+      // sheet simply stays on that page and one more tap starts it.
+      carryTo(action);
       return;
     }
     // The new photo or video lands under the simulation: show it now, before the camera covers the page.
