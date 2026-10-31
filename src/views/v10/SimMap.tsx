@@ -12,7 +12,7 @@ import { usePiazzaReading } from "@/models/sim-reading";
 import { Thermometer } from "lucide-react";
 import { SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import type { MovedPart } from "@/views/v10/SatelliteMap2D";
-import { drawnAreaFor, freeM2, lotsOf, MAX_PINS, pinsM2, surfaceText, usableM2, ZONE_KINDS, ZONE_LABEL, zoneName, zonesOfArea, type DrawnArea, type SubArea, type ZoneKind } from "@/models/drawn-area";
+import { drawnAreaFor, freeM2, leversForZones, lotsOf, MAX_PINS, pinsM2, surfaceText, usableM2, ZONE_KINDS, ZONE_LABEL, zoneName, zonesOfArea, type DrawnArea, type SubArea, type ZoneKind } from "@/models/drawn-area";
 import type { Ring } from "@/models/place-area";
 import type { SimKind } from "@/views/v8/console";
 import { PlaceSearch } from "@/views/SimulationGrid";
@@ -25,6 +25,14 @@ const LocationMap3D = lazy(() => import("@/views/LocationMap3D").then((m) => ({ 
  * The "Mappa" tab of a simulator (beside Simula): the place of this simulation on a big interactive map,
  * with the search to change it and the 2D / 3D switch.
  */
+const SEEDED_KEY = "mdt-zone-seeded-v1";
+function seededZones(): Set<string> {
+  try { return new Set(JSON.parse(localStorage.getItem(SEEDED_KEY) ?? "[]") as string[]); } catch { return new Set(); }
+}
+function keepSeeded(seen: Set<string>) {
+  try { localStorage.setItem(SEEDED_KEY, JSON.stringify([...seen].slice(-200))); } catch { /* kept for this session only */ }
+}
+
 export function SimMap({ kind }: { kind: SimKind }) {
   const lab = useLab();
   const loc = kind === "urban" ? lab.urban.location : lab.vineyard.location;
@@ -106,6 +114,25 @@ export function SimMap({ kind }: { kind: SimKind }) {
     }
     closeZone();
   };
+  // A zone given an intervention (Alberi, Prato, Pergolato) holds it: when one appears (drawn now, or found on opening)
+  // and its lever is too low to fill it, the lever is raised so its trees, lawn or pergola show on the 2D and 3D maps
+  // (and count in the temperature and the costs). Each zone (id and kind) is seeded once per device, so a lever turned
+  // down by hand later stays down.
+  const zoneSig = kind === "urban" && saved ? zonesOfArea(saved).map((z) => `${z.id}:${z.kind}:${z.ring.length}`).join("|") : "";
+  useEffect(() => {
+    if (kind !== "urban" || !saved) return;
+    const seen = seededZones(), fresh = new Set<string>();
+    for (const z of zonesOfArea(saved)) if (["alberi", "prato", "ombra"].includes(z.kind) && !seen.has(`${z.id}:${z.kind}`)) fresh.add(z.id);
+    if (!fresh.size) return;
+    const u = lab.urban, next = leversForZones(saved, { trees: u.trees, permeable: u.permeable, shade: u.shade }, fresh);
+    for (const z of zonesOfArea(saved)) if (fresh.has(z.id)) seen.add(`${z.id}:${z.kind}`);
+    keepSeeded(seen);
+    if (!next) return;
+    setUrban(next);
+    const said = [next.trees !== u.trees && `Alberi ${next.trees}`, next.permeable !== u.permeable && `Prato ${next.permeable} %`, next.shade !== u.shade && `Ombra ${next.shade} %`].filter(Boolean).join(" · ");
+    toast.success("Interventi messi nelle zone", { description: `${said}: li vedi sulla mappa 2D e 3D.` });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind, zoneSig]);
   const setEdits = (edits: LayoutEdits) => {
     if (!saved) return;
     const area = { ...saved, edits };

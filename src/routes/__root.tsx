@@ -493,11 +493,11 @@ function RootComponent() {
       return;
     }
     if (location.pathname === "/reset-password") return;
-    // The entrance shows once, at the first access: afterwards a fresh open lands on the map (a shared scenario link or
-    // the "i" still open the tutorial).
+    // The entrance shows once, at the first access: afterwards a fresh open lands on the urban simulation (a shared
+    // scenario link or the "i" still open the tutorial).
     const params = new URLSearchParams(location.searchStr);
     if (location.pathname === "/" && (params.has("scenario") || params.has("rivedi"))) return;
-    const home = introSeen() ? "/benvenuto" : "/";
+    const home = introSeen() ? "/urbano" : "/";
     if (location.pathname === home || (home === "/" && location.pathname === "/index")) return;
     const id = setTimeout(() => void navigate({ to: home, replace: true }), 250);
     // Unmounted before the move (StrictMode's double mount): let the next mount try again.

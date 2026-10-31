@@ -88,3 +88,27 @@ export function zoneSummaryRows(area: DrawnArea | null | undefined, place: { lat
   for (const l of lotsOf(a)) rows.push([l.name, `${surfaceText(l.m2)}${empty ? "" : ` · ${money({ lo: cost.lo * l.share, hi: cost.hi * l.share })}`}`]);
   return rows;
 }
+
+/** The piazza's levers: trees (count), lawn and shade (% of the usable surface). */
+export type PiazzaLevers = { trees: number; permeable: number; shade: number };
+/** About one tree every 60 m² of a trees zone (crowns 4 m across, room between them). */
+export const M2_PER_TREE = 60;
+/**
+ * The levers needed so that every zone given an intervention actually holds it: a Prato / Pergolato zone needs at
+ * least its share of the usable surface as lawn / shade (rounded up to the lever's 10 % steps), a trees zone about one
+ * tree every 60 m². Only raises: a lever already high enough stays. Null when nothing has to change.
+ */
+export function leversForZones(a: DrawnArea, now: PiazzaLevers, only?: ReadonlySet<string>): PiazzaLevers | null {
+  const usable = usableM2(a);
+  if (usable <= 0) return null;
+  const zones = zonesOf(a).filter((z) => !only || only.has(z.id));
+  const m2 = (k: ZoneKind) => zones.filter((z) => z.kind === k).reduce((s, z) => s + pinsM2(z.ring), 0);
+  const pct = (k: ZoneKind) => { const v = m2(k); return v > 0 ? Math.min(100, Math.ceil((100 * v) / usable / 10) * 10) : 0; };
+  const treesM2 = m2("alberi");
+  const next = {
+    trees: Math.max(now.trees, treesM2 > 0 ? Math.min(30, Math.max(1, Math.round(treesM2 / M2_PER_TREE))) : 0),
+    permeable: Math.max(now.permeable, pct("prato")),
+    shade: Math.max(now.shade, pct("ombra")),
+  };
+  return next.trees === now.trees && next.permeable === now.permeable && next.shade === now.shade ? null : next;
+}
