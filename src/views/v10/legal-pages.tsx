@@ -211,7 +211,7 @@ export function LicensesPage() {
       </InfoCard>
       <InfoCard title="Software">
         <p>Le librerie open source con cui è fatta l'app, con la loro licenza.</p>
-        <LogoTiles items={LIBRARIES} cacheKey="mdt-lib-logo-v1" label="Librerie" />
+        <ul>{LIBRARIES.map((l) => <li key={l.id}>{l.name} — {l.sub}</li>)}</ul>
       </InfoCard>
     </InfoPage>
   );

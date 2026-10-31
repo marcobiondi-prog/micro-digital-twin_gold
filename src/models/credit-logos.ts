@@ -31,29 +31,29 @@ export const SERVICES: CreditItem[] = [
   item("commons", "Wikimedia Commons", "Immagini di stemmi e loghi", si("wikimediacommons")),
 ];
 
-/** The open-source libraries with their licences (the tile's second line). */
+/** The open-source libraries with their licences, listed as plain text (no logos). */
 export const LIBRARIES: CreditItem[] = [
-  item("react", "React", "MIT", si("react")),
-  item("tanstack", "TanStack Router, Start e Query", "MIT", si("tanstack")),
-  item("tailwind", "Tailwind CSS", "MIT", si("tailwindcss")),
-  item("radix", "Radix UI", "MIT", si("radixui")),
-  item("lucide", "Lucide", "ISC", si("lucide")),
+  item("react", "React", "MIT"),
+  item("tanstack", "TanStack Router, Start e Query", "MIT"),
+  item("tailwind", "Tailwind CSS", "MIT"),
+  item("radix", "Radix UI", "MIT"),
+  item("lucide", "Lucide", "ISC"),
   item("recharts", "Recharts", "MIT"),
-  item("maplibre", "MapLibre GL JS", "BSD-3-Clause", si("maplibre")),
-  item("three", "three.js", "MIT", si("threedotjs")),
+  item("maplibre", "MapLibre GL JS", "BSD-3-Clause"),
+  item("three", "three.js", "MIT"),
   item("d3", "D3", "ISC", si("d3")),
   item("jspdf", "jsPDF", "MIT"),
   item("jszip", "JSZip", "MIT"),
-  item("pdfjs", "PDF.js", "Apache-2.0", si("mozilla")),
-  item("zod", "Zod", "MIT", si("zod")),
-  item("datefns", "date-fns", "MIT", si("datefns")),
+  item("pdfjs", "PDF.js", "Apache-2.0"),
+  item("zod", "Zod", "MIT"),
+  item("datefns", "date-fns", "MIT"),
   item("sonner", "Sonner", "MIT"),
   item("vaul", "Vaul", "MIT"),
   item("cva", "class-variance-authority", "Apache-2.0"),
-  item("rhf", "React Hook Form", "MIT", si("reacthookform")),
+  item("rhf", "React Hook Form", "MIT"),
   item("embla", "Embla Carousel", "MIT"),
   item("tzlookup", "tz-lookup", "CC0-1.0 · fusi orari"),
-  item("simpleicons", "Simple Icons", "CC0-1.0 · loghi", si("simpleicons")),
+  item("simpleicons", "Simple Icons", "CC0-1.0 · loghi"),
 ];
 
 const quote = (s: string) => `"${s.replace(/["\\]/g, "\\$&")}"@en`;
