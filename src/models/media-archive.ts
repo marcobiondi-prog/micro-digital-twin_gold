@@ -48,3 +48,11 @@ export function useMediaArchive(): Record<string, string> {
 }
 export function archiveMedia(keys: string[]) { load(); const at = new Date().toISOString(); state = { ...state, ...Object.fromEntries(keys.map((k) => [k, at])) }; save(); }
 export function restoreMedia(keys: string[]) { load(); const next = { ...state }; keys.forEach((k) => delete next[k]); state = next; save(); }
+/** A file moved to a new id (uploaded from the device to the account): its archive mark follows it. */
+export function moveArchived(from: string, to: string) {
+  load();
+  if (!state[from]) return;
+  const next = { ...state, [to]: state[from]! };
+  delete next[from];
+  state = next; save();
+}

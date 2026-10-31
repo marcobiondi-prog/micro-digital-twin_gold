@@ -56,7 +56,7 @@ function sizeText(bytes: number): string {
 const LIGHT_PHOTO = 450_000;
 const lightSize = (m: MediaItem) => (m.kind === "image" ? Math.min(m.size || LIGHT_PHOTO, LIGHT_PHOTO) : m.size);
 /** The zone a gallery photo was tagged with ("Lotto A - foto.jpg" → "Lotto A"). */
-export const zoneOfName = (name: string) => { const m = /^(.{1,24}?) - /.exec(name.replace(/^\d{6,}-/, "")); return m ? m[1]! : null; };
+export const zoneOfName = (name: string) => { const m = /^(.{1,24}?) - /.exec(name.replace(/^\d{6,}-/, "").replace(/^(\d+-[a-z0-9]{5}-)/, "").replace(/_/g, " ")); return m ? m[1]!.trim() : null; };
 
 async function lighten(m: MediaItem): Promise<Blob> {
   const blob = await (await fetch(m.url)).blob();

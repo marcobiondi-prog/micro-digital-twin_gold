@@ -8,6 +8,8 @@ export const MEDIA_BUCKET = "lab-media";
 /** Lab media kept at module level so switching tabs/sections never loses uploaded files. */
 const state: Record<MediaKind, MediaItem[]> = { urban: [], vineyard: [] };
 const loadedFor: Record<MediaKind, string | null> = { urban: null, vineyard: null };
+/** The account files' signed links and when they were made (they last an hour). */
+const signedAt = new Map<string, { url: string; at: number }>();
 const subs = new Set<() => void>();
 const emit = () => subs.forEach((f) => f());
 
@@ -100,15 +102,58 @@ export async function ensureMedia(k: MediaKind, userId: string | null) {
   let account: MediaItem[] = [];
   if (files.length) {
     const paths = files.map((f) => `${folder}/${f.name}`);
-    const { data: signed } = await supabase.storage.from(MEDIA_BUCKET).createSignedUrls(paths, 3600);
-    account = (signed ?? []).map((s, i) => ({ s, f: files[i]!, p: paths[i]! })).filter((x) => x.s.signedUrl).map(({ s, f, p }) => ({
-      id: p, path: p, url: s.signedUrl ?? "", name: f.name.replace(/^\d+-/, ""), size: Number(f.metadata?.size ?? 0),
+    // A link signed less than 50 minutes ago is kept, so a refresh does not reload pictures or restart a playing video.
+    const now = Date.now();
+    const fresh = (p: string) => { const l = signedAt.get(p); return l && now - l.at < 50 * 60_000 ? l.url : null; };
+    const stale = paths.filter((p) => !fresh(p));
+    const { data: signed } = stale.length ? await supabase.storage.from(MEDIA_BUCKET).createSignedUrls(stale, 3600) : { data: [] };
+    (signed ?? []).forEach((x, i) => { if (x.signedUrl) signedAt.set(stale[i]!, { url: x.signedUrl, at: now }); });
+    account = files.map((f, i) => ({ f, p: paths[i]!, url: fresh(paths[i]!) })).filter((x) => x.url).map(({ f, p, url }) => ({
+      id: p, path: p, url: url!, name: f.name.replace(/^\d+-/, ""), size: Number(f.metadata?.size ?? 0),
       kind: isVideo(f.name, f.metadata?.mimetype) ? "video" : "image",
     }));
   }
   state[k] = [...account, ...device];
   emit();
   return state[k];
+}
+
+/** Lists the account's files again (another device may have added or removed some, and the signed links last an hour). */
+export async function refreshMedia(k: MediaKind) {
+  const { data } = await supabase.auth.getSession();
+  loadedFor[k] = null;
+  return ensureMedia(k, data.session?.user.id ?? null);
+}
+
+let syncing = false;
+/**
+ * Signed in, the photos and videos still kept only on this device (taken before signing in) go up to the account, so
+ * every device of that account sees them; each one leaves the device's store once it is safely uploaded, and its
+ * archive mark follows it. Returns how many went up.
+ */
+export async function syncDeviceMedia(userId: string, onStart?: (n: number) => void): Promise<number> {
+  if (syncing) return 0;
+  syncing = true;
+  let moved = 0;
+  try {
+    const recs = await withStore<GuestRecord[]>("readonly", (s) => s.getAll() as IDBRequest<GuestRecord[]>).catch(() => [] as GuestRecord[]);
+    if (!recs.length) return 0;
+    onStart?.(recs.length);
+    const { moveArchived } = await import("@/models/media-archive");
+    for (const r of recs) {
+      const at = Number(/^(\d{12,})/.exec(r.item.id)?.[1]) || Date.now();
+      const safe = r.item.name.replace(/[^\w.-]+/g, "_").slice(-80);
+      const path = `${userId}/${r.mediaKind}/${at}-${safe}`;
+      const { error } = await supabase.storage.from(MEDIA_BUCKET).upload(path, r.blob, { ...(r.blob.type ? { contentType: r.blob.type } : {}), upsert: true });
+      if (error) continue;
+      await withStore("readwrite", (s) => s.delete(r.key)).catch(() => undefined);
+      const flow = r.mediaKind === "urban" ? "piazza" : "vigneto";
+      moveArchived(`${flow}-${r.item.id}`, `${flow}-${path}`);
+      moved++;
+    }
+    if (moved) { await refreshMedia("urban"); await refreshMedia("vineyard"); }
+    return moved;
+  } finally { syncing = false; }
 }
 
 export async function currentMedia(k: MediaKind) {

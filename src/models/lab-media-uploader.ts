@@ -95,7 +95,8 @@ async function runQueue(
       }
       if (!userId) {
         const item: MediaItem = {
-          id: crypto.randomUUID(),
+          // The time first, so the Cronologia knows its day (as for the account's files).
+          id: `${Date.now()}-${crypto.randomUUID()}`,
           name: up.name,
           size: file.size,
           url: URL.createObjectURL(file),
