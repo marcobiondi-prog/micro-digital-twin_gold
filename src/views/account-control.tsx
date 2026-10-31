@@ -105,6 +105,11 @@ function StorageBar({ used, share, files }: { used: number; share: number; files
       <p className="mt-2 text-xs text-muted-foreground">
         {files === 1 ? "1 foto o video" : `${files} foto e video`} nel tuo account · liberi {bytesText(Math.max(0, CLOUD_QUOTA - used))}
       </p>
+      {share >= 0.95 && (
+        <p className="mt-1.5 text-xs font-semibold" style={{ color: usageTone(share) }} role="status">
+          {CLOUD_QUOTA - used < 50 * 1024 ** 2 ? "Spazio esaurito: i nuovi file restano sul telefono finché non elimini qualche foto o video." : "Quasi pieno: oltre i 50 GB i nuovi file restano sul telefono."}
+        </p>
+      )}
     </div>
   );
 }

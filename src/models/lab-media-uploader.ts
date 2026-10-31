@@ -3,6 +3,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
   MEDIA_BUCKET,
+  cloudUsed,
+  fitsInCloud,
   saveGuestFile,
   setMedia,
   type MediaItem,
@@ -39,6 +41,8 @@ export function useLabUploads(k: MediaKind) {
     () => state[k],
   );
 }
+
+const gb = (n: number) => `${(n / 1024 ** 3).toLocaleString("it-IT", { maximumFractionDigits: 1 })} GB`;
 
 export function mediaKind(file: File, hint?: "image" | "video"): "image" | "video" | null {
   if (file.type.startsWith("video/")) return "video";
@@ -88,6 +92,9 @@ async function runQueue(
   // Signed in without a connection the file waits on the phone (the device's store, like a guest's), listed at once;
   // useMediaSync sends it to the account as soon as the connection is back.
   let keptOffline = 0;
+  // Bytes of this batch already on their way up, so files sent together cannot overrun the 50 GB between them.
+  let reserved = 0;
+  let overQuota = 0;
   const keepOnPhone = async (file: File, up: Upload) => {
     const item: MediaItem = { id: `${Date.now()}-${crypto.randomUUID()}`, name: up.name, size: file.size, url: URL.createObjectURL(file), kind: up.kind };
     await saveGuestFile(kind, file, item);
@@ -122,12 +129,17 @@ async function runQueue(
         return;
       }
       if (offline()) { await keepOnPhone(file, up); return; }
+      // The account's 50 GB are full: the file stays on the phone instead, and goes up once space is freed.
+      if (!fitsInCloud(file.size, reserved)) { await keepOnPhone(file, up); keptOffline--; overQuota++; return; }
+      reserved += file.size;
       const safe = up.name.replace(/[^\w.-]+/g, "_").slice(-80);
       // File in parallelo possono partire nello stesso millisecondo: il suffisso evita percorsi uguali.
       const path = `${userId}/${kind}/${Date.now()}-${i}-${Math.random().toString(36).slice(2, 7)}-${safe}`;
       const { error } = await supabase.storage
         .from(MEDIA_BUCKET)
         .upload(path, file, { contentType: file.type });
+      // Once answered, the file is either listed (and counted by cloudUsed) or not in the account at all.
+      reserved -= file.size;
       if (error) {
         if (networkError(error)) await keepOnPhone(file, up);
         else mark(up.id, "error");
@@ -166,6 +178,10 @@ async function runQueue(
       failed === 1 ? "1 file non caricato" : `${failed} file non caricati`,
       { description: "Formato non supportato o connessione assente; riprova." },
     );
+  else if (overQuota > 0)
+    toast.error("Spazio nel cloud esaurito", {
+      description: `${overQuota === 1 ? "1 file resta" : `${overQuota} file restano`} sul telefono: hai usato ${gb(cloudUsed())} di 50 GB. Elimina qualche foto o video per liberare spazio.`,
+    });
   else if (keptOffline > 0)
     toast(keptOffline === 1 ? "Senza rete: 1 file tenuto sul telefono" : `Senza rete: ${keptOffline} file tenuti sul telefono`, {
       description: "Li porto nel tuo account appena torna la connessione.",

@@ -1,8 +1,7 @@
 import { useEffect } from "react";
-import { currentMedia, useLabMedia } from "@/models/lab-media-store";
+import { CLOUD_QUOTA, currentMedia, useLabMedia } from "@/models/lab-media-store";
 
-/** The cloud space each account has for its photos and videos. */
-export const CLOUD_QUOTA = 50 * 1024 ** 3;
+export { CLOUD_QUOTA };
 
 /** "0 B", "350 MB", "1,2 GB", in Italian decimals. */
 export function bytesText(n: number): string {

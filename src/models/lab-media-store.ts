@@ -131,6 +131,13 @@ export async function refreshMedia(k: MediaKind) {
   return ensureMedia(k, data.session?.user.id ?? null);
 }
 
+/** The cloud space each account has for its photos and videos: uploads stop there. */
+export const CLOUD_QUOTA = 50 * 1024 ** 3;
+/** Bytes the account's files take now (both projects, as listed). */
+export const cloudUsed = () => [...state.urban, ...state.vineyard].reduce((s, m) => s + (m.path ? m.size || 0 : 0), 0);
+/** Whether this many more bytes still fit in the account's space. */
+export const fitsInCloud = (bytes: number, reserved = 0) => cloudUsed() + reserved + bytes <= CLOUD_QUOTA;
+
 let syncing = false;
 /**
  * Signed in, the photos and videos still kept only on this device (taken before signing in) go up to the account, so
@@ -142,7 +149,10 @@ export async function syncDeviceMedia(userId: string, onStart?: (n: number) => v
   syncing = true;
   let moved = 0;
   try {
-    const recs = await withStore<GuestRecord[]>("readonly", (s) => s.getAll() as IDBRequest<GuestRecord[]>).catch(() => [] as GuestRecord[]);
+    const all = await withStore<GuestRecord[]>("readonly", (s) => s.getAll() as IDBRequest<GuestRecord[]>).catch(() => [] as GuestRecord[]);
+    // Only what fits in the account's 50 GB goes up; the rest waits on the phone until space is freed.
+    let room = CLOUD_QUOTA - cloudUsed();
+    const recs = all.filter((r) => { const size = r.blob.size || r.item.size; if (size > room) return false; room -= size; return true; });
     if (!recs.length) return 0;
     onStart?.(recs.length);
     const { moveArchived } = await import("@/models/media-archive");

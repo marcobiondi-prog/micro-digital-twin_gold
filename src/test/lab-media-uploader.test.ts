@@ -169,3 +169,23 @@ describe("senza rete con l'accesso", () => {
     vi.doUnmock("@/integrations/supabase/client");
   });
 });
+
+describe("spazio nel cloud pieno", () => {
+  it("oltre i 50 GB il file non sale: resta sul telefono, in elenco", async () => {
+    vi.resetModules();
+    data.clear();
+    const upload = vi.fn(async () => ({ error: null }));
+    vi.doMock("@/integrations/supabase/client", () => ({
+      supabase: { storage: { from: () => ({ upload, createSignedUrl: async (p: string) => ({ data: { signedUrl: `https://x/${p}` } }) }) } },
+    }));
+    const uploader = await import("@/models/lab-media-uploader");
+    const store = await import("@/models/lab-media-store");
+    // The account already holds 50 GB minus a few bytes.
+    store.setMedia("vineyard", () => [{ id: "a", path: "u/vineyard/a.jpg", name: "a.jpg", size: store.CLOUD_QUOTA - 2, url: "x", kind: "image" }]);
+    uploader.enqueueUploads("urban", [new File(["xxxx"], "foto.jpg", { type: "image/jpeg" })], "user-1");
+    await vi.waitFor(() => expect(store.getMedia("urban").length).toBe(1));
+    expect(upload).not.toHaveBeenCalled();
+    expect(store.getMedia("urban")[0]!.path).toBeUndefined();
+    vi.doUnmock("@/integrations/supabase/client");
+  });
+});
