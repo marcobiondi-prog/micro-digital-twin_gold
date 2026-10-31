@@ -1,7 +1,8 @@
 import { BRAND_ICONS, type BrandIcon } from "@/data/brand-icons";
 
 /**
- * The services and libraries credited in Licenze, each shown as a tile with its logo: the Simple Icons mark when
+ * The services and libraries credited in Licenze — only those that gather data and the technologies the app is made
+ * with; nothing about how the site is published or signed in to (no Supabase, Vercel nor Google sign-in) — each shown as a tile with its logo: the Simple Icons mark when
  * there is one (bundled, so it shows offline), else the Wikidata "logo image" (P154) of its English Wikipedia article,
  * else its name alone. Nothing here is drawn by hand.
  */
@@ -15,7 +16,6 @@ export const SERVICES: CreditItem[] = [
   item("osm", "OpenStreetMap", "Mappe, luoghi e superfici", si("openstreetmap")),
   item("esri", "Esri", "Immagini satellitari della mappa", si("esri")),
   item("gmaps", "Google Maps", "Ricerca dei luoghi e mappa 3D", si("googlemaps")),
-  item("google", "Google", "Accesso con Google", si("google")),
   item("openmeteo", "Open-Meteo", "Meteo e clima dell'anno", undefined, ["Open-Meteo"]),
   item("nasa", "NASA POWER", "Dati climatici", si("nasa")),
   item("copernicus", "Copernicus", "Dati dai satelliti", undefined, ["Copernicus Programme"]),
@@ -45,7 +45,6 @@ export const LIBRARIES: CreditItem[] = [
   item("jspdf", "jsPDF", "MIT"),
   item("jszip", "JSZip", "MIT"),
   item("pdfjs", "PDF.js", "Apache-2.0", si("mozilla")),
-  item("supabasejs", "Supabase JS", "MIT"),
   item("zod", "Zod", "MIT", si("zod")),
   item("datefns", "date-fns", "MIT", si("datefns")),
   item("sonner", "Sonner", "MIT"),
