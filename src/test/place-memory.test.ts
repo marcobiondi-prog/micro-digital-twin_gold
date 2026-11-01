@@ -31,3 +31,13 @@ describe("changing place keeps each place's simulation", () => {
     expect(getLab().vineyard.area).not.toBeNull();
   });
 });
+
+describe("Torna all'ultima posizione", () => {
+  it("offers the last place left, with its name", async () => {
+    const { lastPlace } = await import("@/models/place-memory");
+    setUrban({ location: A });
+    setUrban({ location: B });
+    expect(lastPlace(getLab().urban.places, B)).toEqual({ label: "Piazza A", lat: A.lat, lng: A.lng });
+    expect(lastPlace([], B)).toBeNull();
+  });
+});
