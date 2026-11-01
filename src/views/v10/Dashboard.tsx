@@ -35,7 +35,7 @@ const useReducedMotion = () => {
 // shared with the PDF report, so it prints what is on screen.
 let dashSeason: Season | null = null;
 const seasonSubs = new Set<() => void>();
-export const getDashSeason = (): Season => dashSeason ?? getPiazzaReading()?.season ?? "estate";
+export const getDashSeason = (): Season => getPiazzaReading()?.season ?? dashSeason ?? "estate";
 const setDashSeason = (s: Season) => { dashSeason = s === getPiazzaReading()?.season ? null : s; seasonSubs.forEach((f) => f()); };
 const useDashSeason = () => useSyncExternalStore((f) => { seasonSubs.add(f); return () => { seasonSubs.delete(f); }; }, () => dashSeason, () => dashSeason);
 
@@ -157,13 +157,20 @@ function MixRows({ rows, total, note }: { rows: Array<{ icon: LucideIcon; label:
 }
 
 /** Season pills (one row). */
-function SeasonPills({ value, onChange }: { value: Season; onChange: (s: Season) => void }) {
+/** The four seasons; with `only` (the simulation's season) the others are switched off: the season is chosen there. */
+function SeasonPills({ value, onChange, only }: { value: Season; onChange: (s: Season) => void; only?: Season | undefined }) {
   return (
-    <div className="grid w-full max-w-sm grid-cols-4 gap-1 rounded-full bg-foreground/[0.05] p-1" role="radiogroup" aria-label="Stagione">
-      {SEASONS.map((s) => (
-        <button key={s} type="button" role="radio" aria-checked={value === s} onClick={() => { hapticTick(); onChange(s); }}
-          className={cn("h-9 min-w-0 truncate rounded-full px-1 text-[13px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", value === s ? "bg-secondary text-secondary-foreground" : "text-foreground/75")}>{SEASON_LABEL[s]}</button>
-      ))}
+    <div className="space-y-1.5">
+      <div className="grid w-full max-w-sm grid-cols-4 gap-1 rounded-full bg-foreground/[0.05] p-1" role="radiogroup" aria-label="Stagione">
+        {SEASONS.map((s) => {
+          const off = !!only && s !== only;
+          return (
+            <button key={s} type="button" role="radio" aria-checked={value === s} disabled={off} title={off ? "La stagione si cambia nella simulazione" : undefined} onClick={() => { hapticTick(); onChange(s); }}
+              className={cn("h-9 min-w-0 truncate rounded-full px-1 text-[13px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35", value === s ? "bg-secondary text-secondary-foreground" : "text-foreground/75")}>{SEASON_LABEL[s]}</button>
+          );
+        })}
+      </div>
+      {only && <p className="text-center text-xs text-muted-foreground">La stagione e l'ora si cambiano nella simulazione</p>}
     </div>
   );
 }
@@ -241,7 +248,9 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
   const { lat, lng } = urban.location;
   const picked = useDashSeason();
   const reading = usePiazzaReading();
-  const season = picked ?? reading?.season ?? "estate";
+  // With the simulation's reading the season is the simulation's (the other pills are off); a season picked
+  // before the simulation was opened gives way to it.
+  const season = reading?.season ?? picked ?? "estate";
   const profile = useSeasonProfile(lat, lng);
   const fetchArea = useServerFn(getPlaceArea);
   const area = useQuery({ queryKey: ["place-area", lat, lng], queryFn: () => loadPlaceArea((d) => fetchArea({ data: d }), lat, lng), staleTime: Infinity, retry: 1 });
@@ -254,7 +263,7 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
   return (
     <div className="space-y-8" data-testid="dashboard-urbana">
       <ResultCard kind="urban" place={place.name}
-        when={<SeasonPills value={season} onChange={setDashSeason} />}>
+        when={<SeasonPills value={season} onChange={setDashSeason} only={reading?.season} />}>
         <p className="text-center text-sm text-muted-foreground">{dash.sim ? "Come nella simulazione" : dash.fromSim ? "Alla stessa ora della simulazione" : "Nell'ora più calda"} · {dash.when.toLowerCase()}</p>
         <ResultArc before={before} after={after} min={dash.min} max={dash.max} unit="°"
           value={`${fmt1(after)}°`} words={heatWords(after)} step={heatStep(after)} bg={after < 10 ? "bg-urban" : after < 18 ? "bg-water" : undefined} level={sum.level} cost={empty ? "0 €" : euroRange(sum.cost)} />
