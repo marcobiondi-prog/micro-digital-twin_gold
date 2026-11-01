@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { SearchedLocation } from "@/controllers/geo.functions";
 import { photonSuggestions, photonUrl, type OsmSuggestion } from "@/models/osm-suggest";
-import { areaCandidates, placeArea, placeAreaQuery, vineyardAreaQuery } from "@/models/place-area";
+import { areaCandidates, placeArea, placeCentre, placeAreaQuery, vineyardAreaQuery } from "@/models/place-area";
 
 // Ricerca gratuita per ospiti tramite OpenStreetMap (Nominatim): nessun costo Google.
 const UA = { "User-Agent": "MicroDigitalTwin/1.0", "Accept-Language": "it" };
@@ -58,7 +58,7 @@ export const suggestOsmLocations = createServerFn({ method: "POST" })
 /** Surface of the chosen place from its mapped shape (square, pedestrian area or park containing the point); none, no number. */
 export const getPlaceArea = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180), kind: z.enum(["piazza", "vigneto"]).optional() }).parse(d))
-  .handler(async ({ data }): Promise<{ m2: number; name?: string | undefined; centre?: [number, number] } | null> => {
+  .handler(async ({ data }): Promise<{ m2?: number; name?: string | undefined; centre?: [number, number] } | null> => {
     try {
       const r = await fetch("https://overpass-api.de/api/interpreter", {
         method: "POST",
@@ -67,7 +67,12 @@ export const getPlaceArea = createServerFn({ method: "POST" })
       });
       if (!r.ok) { console.error(`Place area failed [${r.status}]`); return null; }
       const j = (await r.json()) as { elements?: Parameters<typeof areaCandidates>[0] };
-      const area = placeArea(areaCandidates(j.elements ?? []), data.lat, data.lng);
-      return area ? { m2: area.m2, name: area.name, centre: area.centre } : null;
+      const candidates = areaCandidates(j.elements ?? []);
+      const area = placeArea(candidates, data.lat, data.lng);
+      if (area) return { m2: area.m2, name: area.name, centre: area.centre };
+      // No shape holds the point (it fell on the road beside the square): no surface is measured, but the pin still
+      // goes to the middle of the nearest square.
+      const centre = placeCentre(candidates, data.lat, data.lng);
+      return centre ? { centre } : null;
     } catch { return null; }
   });

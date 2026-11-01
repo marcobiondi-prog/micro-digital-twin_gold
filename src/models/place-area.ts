@@ -48,6 +48,29 @@ export function placeArea(candidates: AreaCandidate[], lat: number, lng: number)
   return { m2: Math.round(best.m2), kind: best.kind, name: best.name, centre: ringCentroid(ring) };
 }
 
+/**
+ * Where the place's pin stands: the centre of the shape that contains the point (as placeArea picks it) or, when the
+ * address's point falls just outside every shape (on the road beside the square), the centre of the nearest one — a
+ * square before a pedestrian area before a park — within 120 m. Null without any shape around.
+ */
+export function placeCentre(candidates: AreaCandidate[], lat: number, lng: number): [number, number] | null {
+  const inside = placeArea(candidates, lat, lng);
+  if (inside) return inside.centre;
+  const k = Math.cos((lat * Math.PI) / 180);
+  const near = candidates
+    .map((c) => {
+      const ring = [...c.rings].sort((a, b) => ringAreaM2(b) - ringAreaM2(a))[0]!;
+      const m2 = c.rings.reduce((s, r) => s + ringAreaM2(r), 0);
+      // Distance to the shape's nearest corner or edge middle (a close enough measure of how near it is).
+      const pts = ring.flatMap((p, i) => { const q = ring[(i + 1) % ring.length]!; return [p, [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2] as [number, number]]; });
+      const d = Math.min(...pts.map(([a, b]) => Math.hypot((a - lat) * 111_320, (b - lng) * 111_320 * k)));
+      return { kind: c.kind, ring, m2, d };
+    })
+    .filter((c) => c.d <= 120 && c.m2 >= 50 && c.m2 <= 500_000)
+    .sort((a, b) => RANK[a.kind] - RANK[b.kind] || a.d - b.d);
+  return near[0] ? ringCentroid(near[0].ring) : null;
+}
+
 /** The centroid of a ring (area-weighted, the middle of the shape, not the mean of its corners). */
 export function ringCentroid(ring: Ring): [number, number] {
   const lat0 = ring[0]![0], lng0 = ring[0]![1];

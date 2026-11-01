@@ -38,7 +38,7 @@ export function setAreaData(map: MlMap, ring: Ring, closed = true) {
 
 /** A pin of the area: a white dot with a dark ring and its number, big enough to grab with a finger. */
 /**
- * The place's pin for the 2D maps: a dark teardrop whose tip is the element's very bottom edge, anchored "bottom", with a
+ * The place's pin for the 2D maps: the app's turquoise teardrop (dark edge and eye) whose tip is the element's very bottom edge, anchored "bottom", with a
  * small white dot on the exact point under it — the library's default pin was placed by an offset guess and read a
  * little off the spot.
  */
@@ -46,7 +46,7 @@ export function placePinElement(): HTMLElement {
   const el = document.createElement("div");
   el.setAttribute("aria-hidden", "true");
   el.style.cssText = "position:relative;width:26px;height:36px;pointer-events:auto;cursor:pointer";
-  el.innerHTML = `<svg width="26" height="36" viewBox="0 0 26 36" style="display:block;overflow:visible;filter:drop-shadow(0 2px 3px rgb(0 0 0/.45))"><path d="M13 36C13 36 1 22.6 1 13a12 12 0 0 1 24 0c0 9.6-12 23-12 23z" fill="#0b0f15" stroke="#fff" stroke-width="1.5"/><circle cx="13" cy="13" r="4.5" fill="#fff"/></svg><span style="position:absolute;left:50%;bottom:-3px;width:6px;height:6px;margin-left:-3px;border-radius:9999px;background:#fff;box-shadow:0 0 0 1.5px #0b0f15"></span>`;
+  el.innerHTML = `<svg width="26" height="36" viewBox="0 0 26 36" style="display:block;overflow:visible;filter:drop-shadow(0 2px 3px rgb(0 0 0/.45))"><path d="M13 36C13 36 1 22.6 1 13a12 12 0 0 1 24 0c0 9.6-12 23-12 23z" fill="#38d6c4" stroke="#0b0f15" stroke-width="1.5"/><circle cx="13" cy="13" r="4.5" fill="#0b0f15"/></svg><span style="position:absolute;left:50%;bottom:-3px;width:6px;height:6px;margin-left:-3px;border-radius:9999px;background:#38d6c4;box-shadow:0 0 0 1.5px #0b0f15"></span>`;
   return el;
 }
 

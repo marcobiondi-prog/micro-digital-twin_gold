@@ -16,3 +16,13 @@ describe("the place's centre", () => {
     expect(area.centre[1]).toBeCloseTo(14.6606, 5);
   });
 });
+
+describe("the pin beside the square", async () => {
+  const { placeCentre } = await import("@/models/place-area");
+  it("goes to the middle of the nearest square when the address falls on the road beside it", () => {
+    const ring: Array<[number, number]> = [[41.56, 14.66], [41.56, 14.6612], [41.5609, 14.6612], [41.5609, 14.66]];
+    const c = placeCentre([{ rings: [ring], kind: "piazza" }], 41.5603, 14.65985)!;
+    expect(c[0]).toBeCloseTo(41.56045, 5);
+    expect(c[1]).toBeCloseTo(14.6606, 5);
+  });
+});
