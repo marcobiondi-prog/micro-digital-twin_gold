@@ -40,8 +40,8 @@ export function CameraDockButton({ focused = false }: { focused?: boolean }) {
       aria-label={aiReady ? "Fotocamera AI e altre opzioni" : building ? "Fotocamera: foto, video e galleria (fotocamera AI in sviluppo, non ancora disponibile)" : "Fotocamera: foto, video e galleria"}
       className="ps-nav-camera camera-dock-button" data-ai={aiReady || undefined} data-building={building || undefined} data-focus={focused || undefined}
     >
-      {/* In development: a turquoise ring filled about halfway, like something still loading. */}
-      {building && <span className="camera-dev-ring" aria-hidden="true" />}
+      {/* In development: a bright yellow dot on the button's corner, like a "work in progress" light. */}
+      {building && <span className="camera-dev-dot" aria-hidden="true" />}
       {aiReady || building
         ? <span className="relative grid place-items-center">
             <img src={aiLogo} alt="" aria-hidden="true" draggable={false} className={cn("size-8 select-none", building && "opacity-55 grayscale-[35%]")} />
