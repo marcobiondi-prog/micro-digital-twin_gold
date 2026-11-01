@@ -7,8 +7,12 @@ import { sunPath, sunShare } from "./sun-exposure";
  * edits: a tree moved, the lawn's or the shade's centre moved, the windbreak's side. Pure geometry in [lat, lng].
  */
 export type LatLng = [number, number];
-/** `best`: the piazza laid out where the summer sun hits most (models/sun-exposure) instead of lawn west, shade east. */
-export type LayoutEdits = { trees?: Array<LatLng | null>; lawnAt?: LatLng | null; shadeAt?: LatLng | null; windAt?: LatLng | null; best?: boolean };
+/**
+ * `best`: the piazza laid out where the summer sun hits most (models/sun-exposure) instead of lawn west, shade east.
+ * `onlyDrawn`: only what was drawn by hand — the Prato and Pergolato zones, the trees in the Alberi zones — and nothing
+ * placed automatically around them.
+ */
+export type LayoutEdits = { trees?: Array<LatLng | null>; lawnAt?: LatLng | null; shadeAt?: LatLng | null; windAt?: LatLng | null; best?: boolean; onlyDrawn?: boolean };
 
 /** `exact`: the very ring of a zone drawn by hand (a Prato or Pergolato zone), not a strip of grid cells. */
 export type Patch = { ring: Ring; kind: "lawn" | "shade" | "zone" | "cloth"; zone?: number; exact?: boolean };
@@ -156,10 +160,12 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
   const lawnTarget = (Math.max(0, Math.min(100, lawn)) / 100) * usable, shadeTarget = (Math.max(0, Math.min(100, shade)) / 100) * usable;
   const exactLawnM2 = lawnTarget > 0 ? zoneM2("prato") : 0, exactShadeM2 = shadeTarget > 0 ? zoneM2("ombra") : 0;
   // The zones drawn for lawn or pergola come first (only while the lever has some), then the rest of the share around its centre.
-  const fixedLawn = lawnTarget > 0 ? cells.filter((x) => isLawn(x.x, x.y)) : [];
-  const fixedShade = shadeTarget > 0 ? cells.filter((x) => isShade(x.x, x.y) && !fixedLawn.includes(x)) : [];
-  const nLawn = fixedLawn.length + Math.round(Math.max(0, lawnTarget - exactLawnM2) / (c * c));
-  const nShade = fixedShade.length + Math.round(Math.max(0, shadeTarget - exactShadeM2) / (c * c));
+  // "Solo quello disegnato": the zones alone, whatever the levers say (they are set from the zones).
+  const only = !!edits.onlyDrawn;
+  const fixedLawn = lawnTarget > 0 || only ? cells.filter((x) => isLawn(x.x, x.y)) : [];
+  const fixedShade = shadeTarget > 0 || only ? cells.filter((x) => isShade(x.x, x.y) && !fixedLawn.includes(x)) : [];
+  const nLawn = fixedLawn.length + (only ? 0 : Math.round(Math.max(0, lawnTarget - exactLawnM2) / (c * c)));
+  const nShade = fixedShade.length + (only ? 0 : Math.round(Math.max(0, shadeTarget - exactShadeM2) / (c * c)));
   const reserved = new Set([...fixedLawn, ...fixedShade]);
   // The automatic lawn and pergolas keep off the zones drawn for trees, unless there is no other room.
   const forTrees = new Set(cells.filter((x) => isTrees(x.x, x.y)));
@@ -189,8 +195,8 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
   }
   // Trees stand outside the pergolas and the free zones, inside the "alberi" zones when there are any; spots under a
   // shade cell are skipped (looked for on a finer grid), unless there is no room.
-  const n = Math.max(0, Math.round(trees)), box = { minX, maxX, minY, maxY };
   const treeZones = zones.filter((z) => z.kind === "alberi" && z.ring.length >= 3);
+  const n = only && !treeZones.length ? 0 : Math.max(0, Math.round(trees)), box = { minX, maxX, minY, maxY };
   const room = treeZones.length ? treeZones.reduce((s2, z) => s2 + ringAreaM2(z.ring), 0) : ringAreaM2(ring);
   const allowed = (x: number, y: number) => !isFree(x, y) && (!treeZones.length || isTrees(x, y));
   const underShade = (x: number, y: number) => shadeCells.some((sc) => Math.abs(sc.x - x) <= c / 2 + 1 && Math.abs(sc.y - y) <= c / 2 + 1);
@@ -232,7 +238,7 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
   const autoLawn = lawnCells.filter((x) => !fixedLawn.includes(x)).length, autoShade = shadeCells.filter((x) => !fixedShade.includes(x)).length;
   return {
     trees: placed, cell: c,
-    lawnM2: Math.round((fixedLawn.length ? exactLawnM2 : 0) + autoLawn * c * c), shadeM2: Math.round((fixedShade.length ? exactShadeM2 : 0) + autoShade * c * c),
+    lawnM2: Math.round((fixedLawn.length ? zoneM2("prato") : 0) + autoLawn * c * c), shadeM2: Math.round((fixedShade.length ? zoneM2("ombra") : 0) + autoShade * c * c),
     lawnTarget: Math.round(lawnTarget), shadeTarget: Math.round(shadeTarget),
     ...(best ? { sunny: cells.filter((x) => sunOf(x) >= 0.6).length / cells.length } : {}),
     // A Prato or Pergolato zone is drawn as its own outline, exactly as big as it was drawn; only the rest of the

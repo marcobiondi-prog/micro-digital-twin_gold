@@ -20,7 +20,7 @@ import { usePiazzaReading } from "@/models/sim-reading";
 import { Thermometer } from "lucide-react";
 import { SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import type { MovedPart } from "@/views/v10/SatelliteMap2D";
-import { drawnAreaFor, freeM2, leversForZones, lotsOf, MAX_PINS, pinsM2, surfaceText, usableM2, ZONE_KINDS, ZONE_LABEL, zoneName, zonesOfArea, type DrawnArea, type SubArea, type ZoneKind } from "@/models/drawn-area";
+import { drawnAreaFor, freeM2, leversForZones, leversOfZones, lotsOf, MAX_PINS, pinsM2, surfaceText, usableM2, ZONE_KINDS, ZONE_LABEL, zoneName, zonesOfArea, type DrawnArea, type SubArea, type ZoneKind } from "@/models/drawn-area";
 import type { Ring } from "@/models/place-area";
 import type { SimKind } from "@/views/v8/console";
 import { PlaceSearch } from "@/views/SimulationGrid";
@@ -150,6 +150,12 @@ export function SimMap({ kind }: { kind: SimKind }) {
   const zoneSig = kind === "urban" && saved ? zonesOfArea(saved).map((z) => `${z.id}:${z.kind}:${z.ring.length}`).join("|") : "";
   useEffect(() => {
     if (kind !== "urban" || !saved) return;
+    // "Solo quello disegnato": the levers follow the zones exactly, whenever a zone is drawn, changed or removed.
+    if (saved.edits?.onlyDrawn) {
+      const u = lab.urban, next = leversOfZones(saved);
+      if (next.trees !== u.trees || next.permeable !== u.permeable || next.shade !== u.shade) setUrban({ ...next, treeCells: null, permeableCells: null, shadeCells: null });
+      return;
+    }
     const seen = seededZones(), fresh = new Set<string>();
     for (const z of zonesOfArea(saved)) if (["alberi", "prato", "ombra"].includes(z.kind) && !seen.has(`${z.id}:${z.kind}`)) fresh.add(z.id);
     if (!fresh.size) return;
@@ -161,7 +167,7 @@ export function SimMap({ kind }: { kind: SimKind }) {
     const said = [next.trees !== u.trees && `Alberi ${next.trees}`, next.permeable !== u.permeable && `Prato ${next.permeable} %`, next.shade !== u.shade && `Ombra ${next.shade} %`].filter(Boolean).join(" · ");
     toast.success("Interventi messi nelle zone", { description: `${said}: li vedi sulla mappa 2D e 3D.` });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kind, zoneSig]);
+  }, [kind, zoneSig, !!saved?.edits?.onlyDrawn]);
   const setEdits = (edits: LayoutEdits) => {
     if (!saved) return;
     const area = { ...saved, edits };
@@ -231,6 +237,15 @@ export function SimMap({ kind }: { kind: SimKind }) {
       <AreaBar drawing={drawing} pins={ring.length} m2={ring.length >= 3 ? pinsM2(ring) : null} saved={!!saved} vineyard={kind === "vineyard"}
         onStart={() => { setArranging(false); startDrawing(); }} onUndo={() => setDraft((d) => d.slice(0, -1))} onCancel={() => setDrawing(false)} onFinish={finish} onRemove={remove} />
       {sim && !drawing && <SimBar sim={sim} when={reading?.when} arranging={arranging} edited={!!saved?.edits && Object.keys(saved.edits).length > 0} best={!!saved?.edits?.best}
+        only={!!saved?.edits?.onlyDrawn} canOnly={!!saved && zonesOfArea(saved).some((z) => ["alberi", "prato", "ombra"].includes(z.kind))}
+        onOnly={() => {
+          if (!saved) return;
+          if (saved.edits?.onlyDrawn) { setEdits({}); toast("Torna la disposizione automatica", { description: "Le leve tornano a mettere prato, pergolati e alberi anche fuori dalle zone." }); return; }
+          const next = leversOfZones(saved);
+          setUrban({ ...next, treeCells: null, permeableCells: null, shadeCells: null, area: { ...saved, edits: { onlyDrawn: true } } });
+          setArranging(false);
+          toast.success("Solo quello disegnato da te", { description: `Alberi ${next.trees} · Prato ${next.permeable} % · Ombra ${next.shade} %: temperatura e costi contano solo le tue zone.` });
+        }}
         onArrange={() => { setView("2d"); setArranging((a) => !a); }} onAuto={() => { setEdits({}); toast("Disposizione automatica ripristinata"); }}
         onBest={() => {
           setEdits({ best: true });
@@ -358,7 +373,7 @@ function roomText(l: PiazzaLayout) {
  * Under the area: what the map shows inside it (a small legend that follows the levers) and the hand mode: "Sposta
  * elementi" makes each tree and the Prato / Ombra (or Frangivento) labels draggable; "Disposizione automatica" undoes the moves.
  */
-function SimBar({ sim, when, arranging, edited, best, onArrange, onAuto, onBest }: { sim: SimLayout; when?: string | undefined; arranging: boolean; edited: boolean; best: boolean; onArrange: () => void; onAuto: () => void; onBest: () => void }) {
+function SimBar({ sim, when, arranging, edited, best, only, canOnly, onArrange, onAuto, onBest, onOnly }: { sim: SimLayout; when?: string | undefined; arranging: boolean; edited: boolean; best: boolean; only: boolean; canOnly: boolean; onArrange: () => void; onAuto: () => void; onBest: () => void; onOnly: () => void }) {
   const m2 = (v: number) => `${Math.round(v).toLocaleString("it-IT")} m²`;
   const legend = sim.kind === "piazza"
     ? [[dot(SIM_COLORS.tree), `Alberi ${sim.data.trees.length} · ${m2(sim.data.trees.length * TREE_SHADE_M2)} di chioma`], [dot(SIM_COLORS.lawn, false), `Prato ${m2(sim.data.lawnM2)}`], [dot(SIM_COLORS.shade, false), `Pergolati ${m2(sim.data.shadeM2)}`], [dot("#0b0f15", false), "Ombre"]] as const
@@ -372,14 +387,22 @@ function SimBar({ sim, when, arranging, edited, best, onArrange, onAuto, onBest 
       {sim.kind === "piazza" && <p className="text-sm text-muted-foreground">{shadowText(sim, when)}{roomText(sim.data)}</p>}
       <p className="text-sm text-muted-foreground">{arranging
         ? sim.kind === "piazza" ? "Trascina gli alberi, o le etichette Prato e Ombra per spostare quelle zone." : "Trascina l'etichetta Frangivento verso il lato dove lo vuoi."
+        : only && sim.kind === "piazza"
+          ? "Solo quello disegnato da te: prato e pergolati sono le tue zone, gli alberi stanno nelle zone Alberi. Le leve della simulazione seguono le zone; se ne cambi una torna la disposizione automatica."
         : best && sim.kind === "piazza"
           ? `Posizione migliore: pergolati, prato e alberi dove d'estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno.${sim.data.sunny !== undefined ? ` Al sole per gran parte del giorno: ${Math.round(sim.data.sunny * 100)} % dell'area.` : ""}`
           : "Segue le leve della simulazione: cambia gli alberi o le percentuali e la mappa si aggiorna."}</p>
+      {sim.kind === "piazza" && !canOnly && !only && !arranging && <p className="text-xs text-muted-foreground">Per vedere solo quello che disegni, aggiungi una zona Alberi, Prato o Pergolato.</p>}
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={onArrange} aria-pressed={arranging} className={cn(barBtn, arranging ? "bg-foreground text-background" : "bg-foreground/[0.08]")}>
           {arranging ? <><Check className="size-4" aria-hidden="true" />Fatto</> : <><Hand className="size-4" aria-hidden="true" />Sposta elementi</>}
         </button>
         {sim.kind === "piazza" && !arranging && (
+          <button type="button" onClick={onOnly} disabled={!canOnly && !only} aria-pressed={only} className={cn(barBtn, only ? "bg-brand-turquoise/20 text-brand-turquoise ring-1 ring-brand-turquoise/40" : "bg-foreground/[0.08]", "disabled:opacity-40")}>
+            <PenLine className="size-4" aria-hidden="true" />{only ? "Solo disegnato · attivo" : "Solo quello disegnato"}
+          </button>
+        )}
+        {sim.kind === "piazza" && !arranging && !only && (
           <button type="button" onClick={onBest} aria-pressed={best} className={cn(barBtn, best ? "bg-brand-turquoise/20 text-brand-turquoise ring-1 ring-brand-turquoise/40" : "bg-foreground/[0.08]")}>
             <Sun className="size-4" aria-hidden="true" />{best ? "Posizione migliore · attiva" : "Posizione migliore"}
           </button>

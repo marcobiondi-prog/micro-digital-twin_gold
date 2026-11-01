@@ -94,6 +94,19 @@ export type PiazzaLevers = { trees: number; permeable: number; shade: number };
 /** About one tree every 60 m² of a trees zone (crowns 4 m across, room between them). */
 export const M2_PER_TREE = 60;
 /**
+ * The levers of "Solo quello disegnato": exactly what the zones hold — lawn and shade their share of the usable surface
+ * (to the whole %), trees about one every 60 m² of each trees zone (at least one per zone), nothing else.
+ */
+export function leversOfZones(a: DrawnArea): PiazzaLevers {
+  const usable = usableM2(a);
+  const zones = zonesOf(a);
+  const m2 = (k: ZoneKind) => zones.filter((z) => z.kind === k).reduce((s, z) => s + pinsM2(z.ring), 0);
+  const pct = (k: ZoneKind) => (usable > 0 ? Math.min(100, Math.round((100 * m2(k)) / usable)) : 0);
+  const trees = zones.filter((z) => z.kind === "alberi").reduce((s, z) => s + Math.max(1, Math.round(pinsM2(z.ring) / M2_PER_TREE)), 0);
+  return { trees: Math.min(30, trees), permeable: pct("prato"), shade: pct("ombra") };
+}
+
+/**
  * The levers needed so that every zone given an intervention actually holds it: a Prato / Pergolato zone needs at
  * least its share of the usable surface as lawn / shade (rounded up to the lever's 10 % steps), a trees zone about one
  * tree every 60 m². Only raises: a lever already high enough stays. Null when nothing has to change.

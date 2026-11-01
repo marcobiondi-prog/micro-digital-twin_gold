@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { TREE_SHADE_M2 } from "@/models/area-layout";
 import { drawnM2 } from "@/models/drawn-area";
 import { loadPlaceArea } from "@/lib/place-area-client";
@@ -264,7 +265,15 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
   const shadeM2 = Math.round(m2 * (urban.shade / 100) + urban.trees * TREE_SHADE_M2);
 
   // Levers set totals, so the squares are placed again from the default layout.
+  // With "Solo quello disegnato" on the map, a lever moved by hand goes back to the automatic layout (said once).
   const change = (patch: { trees?: number; permeable?: number; shade?: number }) => {
+    const a = urban.area;
+    if (a?.edits?.onlyDrawn) {
+      const { onlyDrawn: _off, ...edits } = a.edits;
+      setUrban({ ...patch, treeCells: null, permeableCells: null, shadeCells: null, area: { ...a, edits } });
+      toast("Torna la disposizione automatica", { description: "Hai cambiato una leva: prato, pergolati e alberi vanno anche fuori dalle zone disegnate." });
+      return;
+    }
     setUrban({ ...patch, treeCells: null, permeableCells: null, shadeCells: null });
   };
 
