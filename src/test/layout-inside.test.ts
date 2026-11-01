@@ -29,3 +29,18 @@ describe("everything the simulation draws stays inside the drawn area", () => {
     for (const p of l.patches) expect(allIn(p.ring)).toBe(true);
   });
 });
+
+describe("trees moved by hand and small trees zones", () => {
+  const zone = { kind: "alberi", ring: [at(28, 10), at(34, 10), at(34, 16), at(28, 16)] as Ring };
+  it("spreads the trees of a small trees zone on distinct spots instead of piling them up", () => {
+    const l = piazzaLayout(area, 6, 0, 0, {}, [zone])!;
+    const keys = new Set(l.trees.map((t) => `${t[0].toFixed(6)},${t[1].toFixed(6)}`));
+    expect(keys.size).toBeGreaterThan(1);
+  });
+  it("keeps a tree where it was put by hand, even outside the trees zone, while its crown stays in the area", () => {
+    const spot = at(10, 15);
+    const l = piazzaLayout(area, 2, 0, 0, { trees: [spot, null] }, [zone])!;
+    expect(l.trees[0]![0]).toBeCloseTo(spot[0], 8);
+    expect(l.trees[0]![1]).toBeCloseTo(spot[1], 8);
+  });
+});

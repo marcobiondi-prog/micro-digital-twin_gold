@@ -89,15 +89,26 @@ function treeSpots(ring: Ring, f: Frame, n: number, box: { minX: number; maxX: n
   let spots: Array<[number, number]> = [];
   let fits: (x: number, y: number) => boolean = () => false;
   if (n <= 0) return { spots, fits: (x, y) => allowed(x, y) && inside(ring, f, x, y) };
+  const grid = (test: (x: number, y: number) => boolean) => {
+    let t = Math.sqrt(room / n), out: Array<[number, number]> = [];
+    for (let k = 0; k < 60; k++) {
+      out = [];
+      for (let y = box.minY + t / 2; y <= box.maxY; y += t) for (let x = box.minX + t / 2; x <= box.maxX; x += t) if (test(x, y)) out.push([x, y]);
+      if (out.length >= n || t < 0.8) break;
+      t *= 0.88;
+    }
+    return out;
+  };
   for (const margin of [CROWN_REACH_M, 3, 2, 1, 0]) {
     const offs = ring8(margin);
     fits = (x: number, y: number) => offs.every(([dx, dy]) => allowed(x + dx!, y + dy!) && inside(ring, f, x + dx!, y + dy!));
-    let t = Math.sqrt(room / n);
-    for (let k = 0; k < 60; k++) {
-      spots = [];
-      for (let y = box.minY + t / 2; y <= box.maxY; y += t) for (let x = box.minX + t / 2; x <= box.maxX; x += t) if (fits(x, y)) spots.push([x, y]);
-      if (spots.length >= n || t < 0.8) break;
-      t *= 0.88;
+    spots = grid(fits);
+    // A trees zone too small for that many whole crowns: the trunks still stand inside it, each on its own spot, with
+    // the crown allowed past the zone's edge (never past the area's), instead of all the trees piled on one spot.
+    if (spots.length < n) {
+      const loose = (x: number, y: number) => allowed(x, y) && offs.every(([dx, dy]) => inside(ring, f, x + dx!, y + dy!));
+      const extra = grid(loose).filter(([x, y]) => spots.every(([a, b]) => Math.hypot(a - x, b - y) > 0.5));
+      spots = [...spots, ...extra];
     }
     // Any room for a whole crown: the trees share those spots rather than leave the area.
     if (spots.length) break;
@@ -191,11 +202,15 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
   }
   // A tree moved by hand stays where it was put only with its whole crown inside; past the edge it goes back to the
   // nearest spot that keeps it inside.
+  // A tree moved by hand goes where it was put — even out of a trees zone — as long as its whole crown stays inside the
+  // area and its trunk is not in a zone left free.
+  const crown = Array.from({ length: 12 }, (_, i) => [Math.cos((i * Math.PI) / 6) * CROWN_REACH_M, Math.sin((i * Math.PI) / 6) * CROWN_REACH_M]);
+  const handFits = (x: number, y: number) => !isFree(x, y) && inside(ring, f, x, y) && crown.every(([dx, dy]) => inside(ring, f, x + dx!, y + dy!));
   let room1: Array<[number, number]> | null = null;
   const keepInside = (p: LatLng): LatLng => {
     const [x, y] = toXY(f, p);
-    if (first.fits(x, y)) return p;
-    room1 ??= (() => { const out: Array<[number, number]> = []; for (let yy = minY; yy <= maxY; yy += 1) for (let xx = minX; xx <= maxX; xx += 1) if (first.fits(xx, yy)) out.push([xx, yy]); return out; })();
+    if (handFits(x, y)) return p;
+    room1 ??= (() => { const out: Array<[number, number]> = []; for (let yy = minY; yy <= maxY; yy += 1) for (let xx = minX; xx <= maxX; xx += 1) if (handFits(xx, yy)) out.push([xx, yy]); return out; })();
     if (!room1.length) return p;
     const best = room1.reduce((b, q) => (dist(q, [x, y]) < dist(b, [x, y]) ? q : b), room1[0]!);
     return toLL(f, best[0], best[1]);
