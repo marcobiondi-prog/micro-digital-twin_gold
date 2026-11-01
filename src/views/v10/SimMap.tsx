@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { toast } from "sonner";
-import { Check, Hand, Lock, MapPin, PenLine, RotateCcw, Trash2, Undo2, X } from "lucide-react";
+import { Check, Hand, Lock, MapPin, PenLine, RotateCcw, Sun, Trash2, Undo2, X } from "lucide-react";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { openAccount } from "@/lib/camera-dock";
 import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn } from "@/lib/demo-login";
@@ -223,8 +223,13 @@ export function SimMap({ kind }: { kind: SimKind }) {
       ) : <>
       <AreaBar drawing={drawing} pins={ring.length} m2={ring.length >= 3 ? pinsM2(ring) : null} saved={!!saved} vineyard={kind === "vineyard"}
         onStart={() => { setArranging(false); startDrawing(); }} onUndo={() => setDraft((d) => d.slice(0, -1))} onCancel={() => setDrawing(false)} onFinish={finish} onRemove={remove} />
-      {sim && !drawing && <SimBar sim={sim} arranging={arranging} edited={!!saved?.edits && Object.keys(saved.edits).length > 0}
-        onArrange={() => { setView("2d"); setArranging((a) => !a); }} onAuto={() => { setEdits({}); toast("Disposizione automatica ripristinata"); }} />}
+      {sim && !drawing && <SimBar sim={sim} arranging={arranging} edited={!!saved?.edits && Object.keys(saved.edits).length > 0} best={!!saved?.edits?.best}
+        onArrange={() => { setView("2d"); setArranging((a) => !a); }} onAuto={() => { setEdits({}); toast("Disposizione automatica ripristinata"); }}
+        onBest={() => {
+          setEdits({ best: true });
+          setArranging(false);
+          toast.success("Elementi nella posizione migliore", { description: "Pergolati, prato e alberi dove d'estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno all'area." });
+        }} />}
       {saved && !drawing && <ZonesBar area={saved} flow={kind === "urban" ? "piazza" : "vigneto"} onAdd={startZone} onEdit={editZone} onRemove={(id) => setZones(zonesOfArea(saved).filter((z) => z.id !== id))} />}
       </>}
     </div>
@@ -333,7 +338,7 @@ const dot = (color: string, round = true) => <span className={cn("inline-block s
  * Under the area: what the map shows inside it (a small legend that follows the levers) and the hand mode: "Sposta
  * elementi" makes each tree and the Prato / Ombra (or Frangivento) labels draggable; "Disposizione automatica" undoes the moves.
  */
-function SimBar({ sim, arranging, edited, onArrange, onAuto }: { sim: SimLayout; arranging: boolean; edited: boolean; onArrange: () => void; onAuto: () => void }) {
+function SimBar({ sim, arranging, edited, best, onArrange, onAuto, onBest }: { sim: SimLayout; arranging: boolean; edited: boolean; best: boolean; onArrange: () => void; onAuto: () => void; onBest: () => void }) {
   const legend = sim.kind === "piazza"
     ? [[dot(SIM_COLORS.tree), `Alberi ${sim.data.trees.length}`], [dot(SIM_COLORS.lawn, false), "Prato"], [dot(SIM_COLORS.shade, false), "Pergolati (ombra)"]] as const
     : [[dot(thirstColor(10), false), "Zone (colore = sete)"], [dot(SIM_COLORS.drip, false), "Irrigazione"], [dot(SIM_COLORS.cloth, false), "Teli d'ombra"], [dot(SIM_COLORS.wind, false), "Frangivento"]] as const;
@@ -345,11 +350,18 @@ function SimBar({ sim, arranging, edited, onArrange, onAuto }: { sim: SimLayout;
       </ul>
       <p className="text-sm text-muted-foreground">{arranging
         ? sim.kind === "piazza" ? "Trascina gli alberi, o le etichette Prato e Ombra per spostare quelle zone." : "Trascina l'etichetta Frangivento verso il lato dove lo vuoi."
-        : "Segue le leve della simulazione: cambia gli alberi o le percentuali e la mappa si aggiorna."}</p>
+        : best && sim.kind === "piazza"
+          ? `Posizione migliore: pergolati, prato e alberi dove d'estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno.${sim.data.sunny !== undefined ? ` Al sole per gran parte del giorno: ${Math.round(sim.data.sunny * 100)} % dell'area.` : ""}`
+          : "Segue le leve della simulazione: cambia gli alberi o le percentuali e la mappa si aggiorna."}</p>
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={onArrange} aria-pressed={arranging} className={cn(barBtn, arranging ? "bg-foreground text-background" : "bg-foreground/[0.08]")}>
           {arranging ? <><Check className="size-4" aria-hidden="true" />Fatto</> : <><Hand className="size-4" aria-hidden="true" />Sposta elementi</>}
         </button>
+        {sim.kind === "piazza" && !arranging && (
+          <button type="button" onClick={onBest} aria-pressed={best} className={cn(barBtn, best ? "bg-brand-turquoise/20 text-brand-turquoise ring-1 ring-brand-turquoise/40" : "bg-foreground/[0.08]")}>
+            <Sun className="size-4" aria-hidden="true" />{best ? "Posizione migliore · attiva" : "Posizione migliore"}
+          </button>
+        )}
         {edited && <button type="button" onClick={onAuto} className={cn(barBtn, "bg-foreground/[0.08]")}><RotateCcw className="size-4" aria-hidden="true" />Disposizione automatica</button>}
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { ringAreaM2, ringContains, type Ring } from "./place-area";
+import { sunPath, sunShare } from "./sun-exposure";
 
 /**
  * The simulation drawn inside the area: where the piazza's trees, lawn and shade go, or how the vineyard's three zones,
@@ -6,12 +7,14 @@ import { ringAreaM2, ringContains, type Ring } from "./place-area";
  * edits: a tree moved, the lawn's or the shade's centre moved, the windbreak's side. Pure geometry in [lat, lng].
  */
 export type LatLng = [number, number];
-export type LayoutEdits = { trees?: Array<LatLng | null>; lawnAt?: LatLng | null; shadeAt?: LatLng | null; windAt?: LatLng | null };
+/** `best`: the piazza laid out where the summer sun hits most (models/sun-exposure) instead of lawn west, shade east. */
+export type LayoutEdits = { trees?: Array<LatLng | null>; lawnAt?: LatLng | null; shadeAt?: LatLng | null; windAt?: LatLng | null; best?: boolean };
 
 /** `exact`: the very ring of a zone drawn by hand (a Prato or Pergolato zone), not a strip of grid cells. */
 export type Patch = { ring: Ring; kind: "lawn" | "shade" | "zone" | "cloth"; zone?: number; exact?: boolean };
 export type Line = { line: Ring; kind: "drip" | "wind" | "seam"; zone?: number; strength?: number };
-export type PiazzaLayout = { trees: LatLng[]; patches: Patch[]; lawnAt: LatLng; shadeAt: LatLng; cell: number };
+/** `sunny`: with `best`, the share of the area in the summer sun for most of the day (0–1), to say why. */
+export type PiazzaLayout = { trees: LatLng[]; patches: Patch[]; lawnAt: LatLng; shadeAt: LatLng; cell: number; sunny?: number };
 export type VineLayout = { patches: Patch[]; lines: Line[]; windAt: LatLng; zones: LatLng[] };
 
 /** The tree crown's radius on the map (m): about an 8 m crown. */
@@ -142,11 +145,26 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
     const open = cells.filter((x) => !skip.has(x) && !forTrees.has(x));
     return open.length >= need ? open : cells.filter((x) => !skip.has(x));
   };
-  const lawnNeed = Math.max(0, nLawn - fixedLawn.length);
-  const lawnCells = [...fixedLawn, ...pool(reserved, lawnNeed).sort(byDist(lawnAt)).slice(0, lawnNeed)];
-  const taken = new Set([...lawnCells, ...fixedShade]);
+  // "Posizione migliore": every cell scored by its summer sun; the pergolas take the sunniest cells (shade where the heat
+  // hits), the lawn the sunniest of the rest (a cool surface instead of hot paving), the trees the sunniest free spots.
+  const best = !!edits.best;
+  const sun = best ? sunPath((minY + maxY) / 2 / M + f.lat0) : [];
+  const ptsM = grid.xy;
+  const sunAt = new Map<Cell, number>();
+  const sunOf = (cell: Cell) => { let v = sunAt.get(cell); if (v === undefined) { v = sunShare(ptsM, sun, cell.x, cell.y); sunAt.set(cell, v); } return v; };
+  const bySun = (a: Cell, b: Cell) => sunOf(b) - sunOf(a) || a.y - b.y;
   const shadeNeed = Math.max(0, nShade - fixedShade.length);
-  const shadeCells = [...fixedShade, ...pool(taken, shadeNeed).sort(byDist(shadeAt)).slice(0, shadeNeed)];
+  const lawnNeed = Math.max(0, nLawn - fixedLawn.length);
+  let lawnCells: Cell[], shadeCells: Cell[];
+  if (best) {
+    shadeCells = [...fixedShade, ...pool(reserved, shadeNeed).sort(bySun).slice(0, shadeNeed)];
+    const takenB = new Set([...shadeCells, ...fixedLawn]);
+    lawnCells = [...fixedLawn, ...pool(takenB, lawnNeed).sort(bySun).slice(0, lawnNeed)];
+  } else {
+    lawnCells = [...fixedLawn, ...pool(reserved, lawnNeed).sort(byDist(lawnAt)).slice(0, lawnNeed)];
+    const taken = new Set([...lawnCells, ...fixedShade]);
+    shadeCells = [...fixedShade, ...pool(taken, shadeNeed).sort(byDist(shadeAt)).slice(0, shadeNeed)];
+  }
   // Trees stand outside the pergolas and the free zones, inside the "alberi" zones when there are any; spots under a
   // shade cell are skipped (looked for on a finer grid), unless there is no room.
   const n = Math.max(0, Math.round(trees)), box = { minX, maxX, minY, maxY };
@@ -156,7 +174,18 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
   const underShade = (x: number, y: number) => shadeCells.some((sc) => Math.abs(sc.x - x) <= c / 2 + 1 && Math.abs(sc.y - y) <= c / 2 + 1);
   const first = treeSpots(ring, f, n, box, allowed, room);
   let auto = first.spots;
-  if (shadeCells.length && auto.some(([x, y]) => underShade(x, y))) {
+  if (best && n > 0) {
+    // The sunniest spots that keep the whole crown inside, off the pergolas, at least a crown apart while there is room.
+    const cand: Array<[number, number]> = [];
+    for (let y = minY; y <= maxY; y += 1.5) for (let x = minX; x <= maxX; x += 1.5) if (first.fits(x, y) && !underShade(x, y)) cand.push([x, y]);
+    const score = new Map(cand.map((p) => [p, sunShare(ptsM, sun, p[0], p[1])]));
+    cand.sort((a, b) => score.get(b)! - score.get(a)! || a[1] - b[1]);
+    for (const gap of [TREE_RADIUS_M * 1.6, TREE_RADIUS_M, 2, 0]) {
+      const picked: Array<[number, number]> = [];
+      for (const p of cand) { if (picked.length >= n) break; if (picked.every((q) => dist(p, q) >= gap)) picked.push(p); }
+      if (picked.length >= n || gap === 0) { if (picked.length) auto = picked.length >= n ? picked : [...picked, ...auto].slice(0, n); break; }
+    }
+  } else if (shadeCells.length && auto.some(([x, y]) => underShade(x, y))) {
     const free = treeSpots(ring, f, Math.ceil(n / Math.max(0.15, 1 - shadeCells.length / cells.length)) + 4, box, allowed, room).spots.filter(([x, y]) => !underShade(x, y));
     if (free.length >= n) auto = Array.from({ length: n }, (_, i) => free[Math.floor(((i + 0.5) * free.length) / n)]!);
   }
@@ -173,16 +202,18 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
   };
   const placed = auto.map((p, i) => { const e = edits.trees?.[i]; return e ? keepInside(e) : toLL(f, p[0], p[1]); });
   const rest = cells.filter((x) => !new Set(lawnCells).has(x));
+  const centre = (list: Cell[], fallback: [number, number]): [number, number] => list.length ? [list.reduce((t, q) => t + q.x, 0) / list.length, list.reduce((t, q) => t + q.y, 0) / list.length] : fallback;
   return {
     trees: placed, cell: c,
+    ...(best ? { sunny: cells.filter((x) => sunOf(x) >= 0.6).length / cells.length } : {}),
     // A Prato or Pergolato zone is drawn as its own outline, exactly as big as it was drawn; only the rest of the
     // lever's share is made of grid strips.
     patches: [
       ...(fixedLawn.length ? exactRings(zones, "prato", "lawn") : []), ...strips(f, c, lawnCells.filter((x) => !fixedLawn.includes(x)), "lawn"),
       ...(fixedShade.length ? exactRings(zones, "ombra", "shade") : []), ...strips(f, c, shadeCells.filter((x) => !fixedShade.includes(x)), "shade"),
     ],
-    lawnAt: toLL(f, ...(nLawn ? (() => { const m = nearestCell(cells, lawnAt); return [m.x, m.y] as [number, number]; })() : lawnAt)),
-    shadeAt: toLL(f, ...(nShade ? (() => { const m = nearestCell(rest.length ? rest : cells, shadeAt); return [m.x, m.y] as [number, number]; })() : shadeAt)),
+    lawnAt: toLL(f, ...(best ? (() => { const m = nearestCell(lawnCells.length ? lawnCells : cells, centre(lawnCells, lawnAt)); return [m.x, m.y] as [number, number]; })() : nLawn ? (() => { const m = nearestCell(cells, lawnAt); return [m.x, m.y] as [number, number]; })() : lawnAt)),
+    shadeAt: toLL(f, ...(best ? (() => { const m = nearestCell(shadeCells.length ? shadeCells : cells, centre(shadeCells, shadeAt)); return [m.x, m.y] as [number, number]; })() : nShade ? (() => { const m = nearestCell(rest.length ? rest : cells, shadeAt); return [m.x, m.y] as [number, number]; })() : shadeAt)),
   };
 }
 
