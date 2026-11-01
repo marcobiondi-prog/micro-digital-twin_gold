@@ -339,8 +339,8 @@ const countText = (shots: Shot[]) => kindCountText(shots);
  */
 function ArchiveIcon({ kind, small = false }: { kind: "foto" | "interventi"; small?: boolean }) {
   const Icon = kind === "foto" ? Images : ClipboardList;
-  // Photos in the app's turquoise, interventions in its PlayStation blue: the two archives read apart at a glance.
-  const tone = kind === "foto" ? "bg-brand-turquoise/15 text-brand-turquoise" : "bg-primary/20 text-primary";
+  // Photos in the app's turquoise, interventions in a bright violet: two far hues, so the archives read apart at a glance.
+  const tone = kind === "foto" ? "bg-brand-turquoise/15 text-brand-turquoise" : "bg-violet-500/20 text-violet-600 dark:bg-violet-400/20 dark:text-violet-300";
   return (
     <span className={`relative grid shrink-0 place-items-center rounded-full ${tone} ${small ? "size-8" : "size-10"}`} aria-hidden="true">
       <Icon className={small ? "size-4" : "size-5"} />
@@ -1068,7 +1068,7 @@ function HistoryArchiveBlock({ items, defaultOpen = false }: { items: SourcedEnt
                 {m.days.map((g) => (
                   <button key={g.key} type="button" aria-expanded={shown === g.key} onClick={() => setShown(shown === g.key ? null : g.key)}
                     className="flex w-full items-center gap-3 border-b border-foreground/[0.06] px-3 py-2.5 text-left outline-none last:border-0 focus-visible:bg-foreground/[0.06]">
-                    <FolderClosed className="size-5 shrink-0 text-primary" aria-hidden="true" />
+                    <FolderClosed className="size-5 shrink-0 text-violet-600 dark:text-violet-300" aria-hidden="true" />
                     <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold tabular-nums">{g.label}</span><span className="block text-xs tabular-nums text-muted-foreground">{archivedOn(g.items.map((e) => marks[e.id]), "Archiviato")}</span></span>
                     <span className="text-right text-xs text-muted-foreground">{entriesText(g.items.length)}</span>
                     <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform ${shown === g.key ? "rotate-180" : ""}`} aria-hidden="true" />
