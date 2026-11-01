@@ -72,29 +72,35 @@ function strips(f: Frame, c: number, cells: Cell[], kind: Patch["kind"], zone?: 
 const dist = (a: [number, number], b: [number, number]) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const nearestCell = (cells: Cell[], p: [number, number]) => cells.reduce((b, c) => (dist([c.x, c.y], p) < dist([b.x, b.y], p) ? c : b), cells[0]!);
 
-/** Up to `n` tree spots spread evenly inside the area, kept 2 m from its edge. */
-function treeSpots(ring: Ring, f: Frame, n: number, box: { minX: number; maxX: number; minY: number; maxY: number }, allowed: (x: number, y: number) => boolean = () => true, room = ringAreaM2(ring)): Array<[number, number]> {
-  if (n <= 0) return [];
-  const area = room;
-  // The whole crown stays inside the area and inside its trees zone (as big as it was drawn): the trunk is kept a crown's
-  // reach (3.4 m, the drawn crown) from every edge; in a place too small for that the margin shrinks step by step.
-  const ring8 = (m: number) => [[0, 0], ...Array.from({ length: 8 }, (_, i) => [Math.cos((i * Math.PI) / 4) * m, Math.sin((i * Math.PI) / 4) * m])];
+/** How far a trunk keeps from every edge so the whole drawn crown (4 m in 2D, a little less in 3D) stays inside. */
+export const CROWN_REACH_M = TREE_RADIUS_M + 0.2;
+
+/**
+ * `n` tree spots spread evenly inside the area with their whole crown inside it (and inside its trees zone): the trunk is
+ * kept a crown's reach from every edge; with more trees than room the spots get closer (crowns may overlap) and are
+ * shared, never pushed past the edge; only a place too narrow for one whole crown lets the margin shrink. Also returns
+ * the test a spot must pass, so a tree moved by hand is kept inside too.
+ */
+function treeSpots(ring: Ring, f: Frame, n: number, box: { minX: number; maxX: number; minY: number; maxY: number }, allowed: (x: number, y: number) => boolean = () => true, room = ringAreaM2(ring)): { spots: Array<[number, number]>; fits: (x: number, y: number) => boolean } {
+  const ring8 = (m: number) => [[0, 0], ...Array.from({ length: 12 }, (_, i) => [Math.cos((i * Math.PI) / 6) * m, Math.sin((i * Math.PI) / 6) * m])];
   let spots: Array<[number, number]> = [];
-  for (const margin of [TREE_RADIUS_M * 0.85, 2, 1, 0]) {
+  let fits: (x: number, y: number) => boolean = () => false;
+  if (n <= 0) return { spots, fits: (x, y) => allowed(x, y) && inside(ring, f, x, y) };
+  for (const margin of [CROWN_REACH_M, 3, 2, 1, 0]) {
     const offs = ring8(margin);
-    const fits = (x: number, y: number) => offs.every(([dx, dy]) => allowed(x + dx!, y + dy!) && inside(ring, f, x + dx!, y + dy!));
-    let t = Math.sqrt(area / n);
-    for (let k = 0; k < 40; k++) {
+    fits = (x: number, y: number) => offs.every(([dx, dy]) => allowed(x + dx!, y + dy!) && inside(ring, f, x + dx!, y + dy!));
+    let t = Math.sqrt(room / n);
+    for (let k = 0; k < 60; k++) {
       spots = [];
       for (let y = box.minY + t / 2; y <= box.maxY; y += t) for (let x = box.minX + t / 2; x <= box.maxX; x += t) if (fits(x, y)) spots.push([x, y]);
-      if (spots.length >= n || t < 2.5) break;
+      if (spots.length >= n || t < 0.8) break;
       t *= 0.88;
     }
-    if (spots.length >= n) break;
+    // Any room for a whole crown: the trees share those spots rather than leave the area.
+    if (spots.length) break;
   }
-  if (spots.length <= n) return spots;
-  // More spots than trees: take them evenly through the grid.
-  return Array.from({ length: n }, (_, i) => spots[Math.floor(((i + 0.5) * spots.length) / n)]!);
+  if (!spots.length) return { spots, fits };
+  return { spots: Array.from({ length: n }, (_, i) => spots[Math.floor(((i + 0.5) * spots.length) / n) % spots.length]!), fits };
 }
 
 /** A smaller area inside the big one (models/drawn-area SubArea, its kind only matters here). */
@@ -148,12 +154,24 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
   const room = treeZones.length ? treeZones.reduce((s2, z) => s2 + ringAreaM2(z.ring), 0) : ringAreaM2(ring);
   const allowed = (x: number, y: number) => !isFree(x, y) && (!treeZones.length || isTrees(x, y));
   const underShade = (x: number, y: number) => shadeCells.some((sc) => Math.abs(sc.x - x) <= c / 2 + 1 && Math.abs(sc.y - y) <= c / 2 + 1);
-  let auto = treeSpots(ring, f, n, box, allowed, room);
+  const first = treeSpots(ring, f, n, box, allowed, room);
+  let auto = first.spots;
   if (shadeCells.length && auto.some(([x, y]) => underShade(x, y))) {
-    const free = treeSpots(ring, f, Math.ceil(n / Math.max(0.15, 1 - shadeCells.length / cells.length)) + 4, box, allowed, room).filter(([x, y]) => !underShade(x, y));
+    const free = treeSpots(ring, f, Math.ceil(n / Math.max(0.15, 1 - shadeCells.length / cells.length)) + 4, box, allowed, room).spots.filter(([x, y]) => !underShade(x, y));
     if (free.length >= n) auto = Array.from({ length: n }, (_, i) => free[Math.floor(((i + 0.5) * free.length) / n)]!);
   }
-  const placed = auto.map((p, i) => edits.trees?.[i] ?? toLL(f, p[0], p[1]));
+  // A tree moved by hand stays where it was put only with its whole crown inside; past the edge it goes back to the
+  // nearest spot that keeps it inside.
+  let room1: Array<[number, number]> | null = null;
+  const keepInside = (p: LatLng): LatLng => {
+    const [x, y] = toXY(f, p);
+    if (first.fits(x, y)) return p;
+    room1 ??= (() => { const out: Array<[number, number]> = []; for (let yy = minY; yy <= maxY; yy += 1) for (let xx = minX; xx <= maxX; xx += 1) if (first.fits(xx, yy)) out.push([xx, yy]); return out; })();
+    if (!room1.length) return p;
+    const best = room1.reduce((b, q) => (dist(q, [x, y]) < dist(b, [x, y]) ? q : b), room1[0]!);
+    return toLL(f, best[0], best[1]);
+  };
+  const placed = auto.map((p, i) => { const e = edits.trees?.[i]; return e ? keepInside(e) : toLL(f, p[0], p[1]); });
   const rest = cells.filter((x) => !new Set(lawnCells).has(x));
   return {
     trees: placed, cell: c,
@@ -230,7 +248,18 @@ export function vineLayout(ring: Ring, mixes: ZoneMix[], edits: LayoutEdits = {}
   const mids = xy.map((p, i) => { const q = xy[(i + 1) % xy.length]!; return [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2] as [number, number]; });
   const target = edits.windAt ? toXY(f, edits.windAt) : mids.reduce((b, m) => (m[0] < b[0] ? m : b), mids[0]!);
   const e = mids.reduce((b, m, i) => (dist(m, target) < dist(mids[b]!, target) ? i : b), 0);
-  if (strength > 0) lines.push({ kind: "wind", strength, line: [ring[e]!, ring[(e + 1) % ring.length]!] });
+  // The hedge stands inside the area: moved in from its edge by half its width (plus a little) and kept off the corners.
+  if (strength > 0) {
+    const a = xy[e]!, b = xy[(e + 1) % xy.length]!, len = dist(a, b);
+    if (len > 0.5) {
+      const ux = (b[0] - a[0]) / len, uy = (b[1] - a[1]) / len;
+      let nx = -uy, ny = ux;
+      const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+      if (!inside(ring, f, mx + nx, my + ny)) { nx = -nx; ny = -ny; }
+      const off = hedgeWidthM(strength) / 2 + 0.4, cut = Math.min(off, len / 2 - 0.1);
+      lines.push({ kind: "wind", strength, line: [toLL(f, a[0] + ux * cut + nx * off, a[1] + uy * cut + ny * off), toLL(f, b[0] - ux * cut + nx * off, b[1] - uy * cut + ny * off)] });
+    }
+  }
   return { patches, lines, zones, windAt: toLL(f, ...mids[e]!) };
 }
 
@@ -360,13 +389,17 @@ export const VINE_3D = { hedge: "#2f6b2a", hedgeTop: "#3d8a35", net: "#1f2933" }
  * The windbreak in 3D: a hedge along its edge, a 1.6 m wide wall whose height follows its strength (1.8 m at 10 %,
  * up to 4 m at full), in two slabs, the top a lighter green.
  */
+/** The hedge's width on the ground (m): 1,5 m for a light windbreak, up to 3 m at full strength. */
+export const hedgeWidthM = (strength: number) => 1.5 + 1.5 * Math.min(1, Math.max(0, strength) / 100);
+
 export function hedgeParts(edge: Ring, strength: number): TreePart[] {
   if (edge.length < 2 || strength <= 0) return [];
   const f = frameOf(edge);
   const [a, b] = edge.map((p) => toXY(f, p)) as [[number, number], [number, number]];
   const len = dist(a, b);
   if (len < 1) return [];
-  const ux = (b[0] - a[0]) / len, uy = (b[1] - a[1]) / len, nx = -uy * 0.8, ny = ux * 0.8;
+  const half = hedgeWidthM(strength) / 2;
+  const ux = (b[0] - a[0]) / len, uy = (b[1] - a[1]) / len, nx = -uy * half, ny = ux * half;
   const ring: Ring = [[a[0] + nx, a[1] + ny], [b[0] + nx, b[1] + ny], [b[0] - nx, b[1] - ny], [a[0] - nx, a[1] - ny]].map(([x, y]) => toLL(f, x!, y!));
   const h = 1.8 + 2.2 * Math.min(1, strength / 100);
   return [{ ring, base: 0, height: h - 0.5, color: VINE_3D.hedge }, { ring, base: h - 0.5, height: h, color: VINE_3D.hedgeTop }];

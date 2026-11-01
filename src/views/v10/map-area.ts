@@ -1,7 +1,7 @@
 import type { Map as MlMap, GeoJSONSource } from "maplibre-gl";
 import type { Ring } from "@/models/place-area";
 import { ZONE_LABEL, type SubArea, type ZoneKind } from "@/models/drawn-area";
-import { hedgeParts, netParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, TREE_RADIUS_M, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
+import { hedgeParts, hedgeWidthM, netParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, TREE_RADIUS_M, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
 
 /** The drawn area on a maplibre map: a turquoise fill and a white outline, from a ring of [lat, lng] pins. */
 export const AREA_SOURCE = "drawn-area";
@@ -101,7 +101,7 @@ export function simFeatures(sim: SimLayout | null, withTreePoints: boolean) {
     for (const l of sim.data.lines) out.push(lineF(l.line, l.kind === "drip"
       ? { kind: "drip", color: SIM_COLORS.drip, width: 2 }
       : l.kind === "seam" ? { kind: "seam", color: "#ffffff", width: 2.5 }
-      : { kind: "wind", color: SIM_COLORS.wind, width: 6 + (l.strength ?? 0) / 10 }));
+      : { kind: "wind", color: SIM_COLORS.wind, width: 6 + (l.strength ?? 0) / 10, wm: hedgeWidthM(l.strength ?? 0) }));
   }
   // The inner zones: a free zone greyed, every zone outlined with a dashed line of its colour.
   for (const z of sim.inner ?? []) {
@@ -222,7 +222,7 @@ export function addSimLayers(map: MlMap, lat: number, raised = false) {
   // Drip lines: a blue pipe with light drippers along it (round dots); the windbreak: a hedge of bushes.
   map.addLayer({ id: "sim-drip-pipe", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "drip"], paint: { "line-color": "#0369a1", "line-width": 1.6 } }, before);
   map.addLayer({ id: "sim-drip-dots", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "drip"], paint: { "line-color": "#bae6fd", "line-width": 4, "line-dasharray": [0, 2.4] }, layout: { "line-cap": "round" } }, before);
-  map.addLayer({ id: "sim-hedge", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "wind"], paint: { "line-pattern": HEDGE_IMAGE, "line-width": ["get", "width"] }, layout: { "line-cap": "round", "line-join": "round" } }, before);
+  map.addLayer({ id: "sim-hedge", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "wind"], paint: { "line-pattern": HEDGE_IMAGE, "line-width": ["interpolate", ["exponential", 2], ["zoom"], 12, ["*", ["get", "wm"], metresToPx(1, lat, 12)], 22, ["*", ["get", "wm"], metresToPx(1, lat, 22)]] }, layout: { "line-cap": "round", "line-join": "round" } }, before);
   map.addLayer({ id: "sim-line", type: "line", source: SIM_SOURCE, filter: ["all", ["==", ["geometry-type"], "LineString"], ["!=", ["get", "kind"], "drip"], ["!=", ["get", "kind"], "wind"]], paint: { "line-color": ["get", "color"], "line-width": ["get", "width"], "line-dasharray": ["case", ["==", ["get", "kind"], "drip"], ["literal", [2, 1.5]], ["==", ["get", "kind"], "zoneline"], ["literal", [2.5, 1.5]], ["literal", [1, 0]]] }, layout: { "line-cap": "round" } }, before);
   if (raised) {
     map.addSource(SIM_TREES_3D, { type: "geojson", data: fc([]) });

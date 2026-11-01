@@ -114,7 +114,7 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
       // Each tree: a soft shadow cast north on the ground, a dark trunk, then three crown discs each ringed a deeper green,
       // so the layers read as foliage — five shapes a tree.
       for (const t of sim.data.trees) {
-        ground(crownRing([t[0] + 1.4 / 111_320, t[1]], TREE_RADIUS_M * 0.85, 12), "rgba(5,12,8,0.28)");
+        ground(crownRing([t[0] + 0.4 / 111_320, t[1]], TREE_RADIUS_M * 0.85, 12), "rgba(5,12,8,0.28)");
         for (const p of treeParts(t, undefined, 2.85)) {
           if (p.base === 0) part({ ...p, color: "#4e341c" });
           else part(p, (p.base + p.height) / 2, "rgba(14,52,20,0.75)", 1.5);
