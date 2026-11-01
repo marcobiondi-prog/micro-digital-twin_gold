@@ -9,10 +9,14 @@ import { VitePWA } from "vite-plugin-pwa";
 // Deploy target: nitro detects Vercel/Netlify/Cloudflare automatically and falls
 // back to a Node server (`npm start`). Force one with NITRO_PRESET, e.g.
 // NITRO_PRESET=cloudflare-module npm run build.
+// One build time for the whole build: written into the code (__BUILD_TIME__) and served as /version.json, so the app
+// can tell whether the version it runs is the one online (lib/app-version).
+const BUILD_TIME = new Date().toISOString();
+
 export default defineConfig(({ command }) => ({
   server: { host: "::", port: 8080 },
   // Simulated sign-in (src/lib/demo-login.ts): dev server and Vercel previews only, never production.
-  define: { __DEMO_LOGIN__: JSON.stringify(command === "serve" || process.env["VERCEL_ENV"] === "preview"), __BUILD_TIME__: JSON.stringify(new Date().toISOString()) },
+  define: { __DEMO_LOGIN__: JSON.stringify(command === "serve" || process.env["VERCEL_ENV"] === "preview"), __BUILD_TIME__: JSON.stringify(BUILD_TIME) },
   resolve: {
     dedupe: ["react", "react-dom", "@tanstack/react-query", "@tanstack/query-core"],
   },
@@ -30,6 +34,15 @@ export default defineConfig(({ command }) => ({
     // Vercel: AI recognition can outlast the default 10 s function limit (60 s fits every plan).
     ...(command === "build" ? [nitro({ vercel: { functions: { maxDuration: 60 } } })] : []),
     viteReact(),
+    {
+      name: "mdt-version-json",
+      apply: "build",
+      generateBundle() {
+        // Only the browser build serves it (the server build has its own output).
+        if (this.environment?.name && this.environment.name !== "client") return;
+        this.emitFile({ type: "asset", fileName: "version.json", source: JSON.stringify({ build: BUILD_TIME }) });
+      },
+    },
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: null,

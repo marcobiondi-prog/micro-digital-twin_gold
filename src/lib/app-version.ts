@@ -8,25 +8,64 @@ export function buildLabel(iso: string | null = BUILD_TIME): string {
   return `${d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" })} · ${d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
+/** The version online now (its build time, from /version.json), or null without a connection. */
+export async function onlineBuild(): Promise<string | null> {
+  try {
+    const res = await fetch(`/version.json?t=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { build?: unknown };
+    return typeof data.build === "string" ? data.build : null;
+  } catch { return null; }
+}
+
+const TARGET_KEY = "mdt-update-target", FRESH_KEY = "mdt-update-fresh";
 /**
- * Asks for a newer version now: the worker checks the server; if one is there it installs and takes over, and the
- * page reloads on it. Resolves "updated" (reloading), "latest" (nothing newer) or "offline".
+ * Loads the version online: a reload that remembers which version it expects; if the page comes back still on the
+ * old one (an old file kept somewhere), checkUpdateLanded clears every cache and the worker and loads it clean.
+ */
+export async function applyUpdate(target?: string | null) {
+  const want = target ?? (await onlineBuild());
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    reg?.waiting?.postMessage({ type: "SKIP_WAITING" });
+  } catch { /* no worker */ }
+  try { if (want) sessionStorage.setItem(TARGET_KEY, want); } catch { /* a plain reload then */ }
+  window.location.reload();
+}
+/** Run once at start: after applyUpdate, the page must be the version it asked for, else it reloads clean (once). */
+export function checkUpdateLanded() {
+  try {
+    const want = sessionStorage.getItem(TARGET_KEY);
+    if (!want || !BUILD_TIME) return;
+    sessionStorage.removeItem(TARGET_KEY);
+    if (want === BUILD_TIME || sessionStorage.getItem(FRESH_KEY) === want) return;
+    sessionStorage.setItem(FRESH_KEY, want);
+    void import("@/router").then((m) => m.reloadFresh(), () => window.location.reload());
+  } catch { /* storage unavailable */ }
+}
+
+/**
+ * Asks for a newer version now: the worker checks the server and the version online is compared with the one running
+ * (/version.json), so a new version already installed but not yet loaded counts too. Resolves "updated" (reloading
+ * on it), "latest" (this is the version online) or "offline".
  */
 export async function checkForUpdate(): Promise<"updated" | "latest" | "offline"> {
-  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return "latest";
+  if (typeof navigator === "undefined") return "latest";
   try {
-    const reg = await navigator.serviceWorker.getRegistration();
-    if (!reg) return "latest";
-    await reg.update();
-    const incoming = reg.installing ?? reg.waiting;
-    if (!incoming) return "latest";
-    await new Promise<void>((resolve) => {
-      if (incoming.state === "activated") { resolve(); return; }
-      incoming.addEventListener("statechange", () => { if (incoming.state === "activated" || incoming.state === "redundant") resolve(); });
-      window.setTimeout(resolve, 30_000);
-    });
-    window.location.reload();
-    return "updated";
+    const reg = "serviceWorker" in navigator ? await navigator.serviceWorker.getRegistration() : undefined;
+    await reg?.update().catch(() => undefined);
+    const incoming = reg?.installing ?? reg?.waiting;
+    if (incoming) {
+      await new Promise<void>((resolve) => {
+        if (incoming.state === "activated") { resolve(); return; }
+        incoming.addEventListener("statechange", () => { if (incoming.state === "activated" || incoming.state === "redundant") resolve(); });
+        window.setTimeout(resolve, 30_000);
+      });
+    }
+    const online = await onlineBuild();
+    if (!online) return incoming ? (await applyUpdate(null), "updated") : "offline";
+    if (BUILD_TIME && online !== BUILD_TIME) { await applyUpdate(online); return "updated"; }
+    return "latest";
   } catch {
     return "offline";
   }

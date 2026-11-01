@@ -31,14 +31,28 @@ export async function registerServiceWorker() {
   // A new version is fetched on every return to the app (not only at a cold start), and once it has taken over the
   // app says so with a button that loads it — never by itself, so a photo being taken or an upload is never cut off.
   const hadController = Boolean(navigator.serviceWorker.controller);
-  navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (!hadController) return;
+  const version = await import("@/lib/app-version");
+  // Back from an update that did not take (the page still the old version): load it clean, once.
+  version.checkUpdateLanded();
+  let told = false;
+  const tellReady = () => {
+    if (told) return;
+    told = true;
     void import("sonner").then(({ toast }) => toast("Nuova versione dell'app pronta", {
       description: "Tocca Aggiorna per usarla subito.",
       duration: Infinity,
-      action: { label: "Aggiorna", onClick: () => window.location.reload() },
+      // Aggiorna loads the version online for sure: a reload that checks it landed, else a clean one.
+      action: { label: "Aggiorna", onClick: () => void version.applyUpdate() },
     }));
-  });
+  };
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadController) tellReady(); });
+  // A newer version online that the worker has not brought (yet): said all the same, on start and on every return.
+  const compare = async () => {
+    const online = await version.onlineBuild();
+    if (online && version.BUILD_TIME && online !== version.BUILD_TIME) tellReady();
+  };
+  window.setTimeout(() => void compare(), 10_000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") window.setTimeout(() => void compare(), 10_000); });
   try {
     const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
     // A new version installing (an update, not the first install): its progress shows as a bar.
