@@ -4,6 +4,7 @@ import { vineModel, type Pheno } from "./data";
 import { piazzaEstimate, vineZones } from "./scenarios";
 /** The area drawn with pins on the simulation's map, kept with the place it was drawn for. */
 import type { DrawnArea } from "./drawn-area";
+import { movePlace, samePlace, type PlaceSnap } from "./place-memory";
 
 export type Loc = { label: string; lat: number; lng: number };
 export type VineZoneState = { temperature: number; moisture: number; wind: number; rain: boolean; irrigation?: number; shade?: number; windbreak?: number };
@@ -11,9 +12,14 @@ export type LabState = {
   savedAt?: number | null;
   syncedAt?: number | null;
   syncedTargets?: string[] | null;
-  urban: { trees: number; permeable: number; shade: number; location: Loc; treeCells: number[] | null; permeableCells: number[] | null; shadeCells: number[] | null; realTemp?: number | null; area?: DrawnArea | null };
-  vineyard: { zones: VineZoneState[]; phase: Pheno; selected: number; allZones: boolean; location: Loc; irrigation?: number; shade?: number; windbreak?: number; climateKey?: string; area?: DrawnArea | null };
+  urban: { trees: number; permeable: number; shade: number; location: Loc; treeCells: number[] | null; permeableCells: number[] | null; shadeCells: number[] | null; realTemp?: number | null; area?: DrawnArea | null; places?: PlaceSnap<UrbanSnap>[] };
+  vineyard: { zones: VineZoneState[]; phase: Pheno; selected: number; allZones: boolean; location: Loc; irrigation?: number; shade?: number; windbreak?: number; climateKey?: string; area?: DrawnArea | null; places?: PlaceSnap<VineSnap>[] };
 };
+/** What is kept per place (models/place-memory): the interventions and the area drawn, with its zones and edits. */
+type UrbanSnap = { trees: number; permeable: number; shade: number; area: DrawnArea | null };
+type VineSnap = { zones: VineZoneState[]; selected: number; allZones: boolean; irrigation?: number; shade?: number; windbreak?: number; area: DrawnArea | null };
+/** The area of a place put back on its (possibly slightly moved) new spot, so it still counts there. */
+const reanchor = (area: DrawnArea | null, at: Loc) => (area ? { ...area, lat: at.lat, lng: at.lng } : null);
 
 const KEY = "micro-digital-twin-lab";
 const defaults = (): LabState => ({
@@ -43,14 +49,33 @@ function load() {
   window.addEventListener("storage", (e) => { if (e.key === KEY && e.newValue) { try { state = JSON.parse(e.newValue); listeners.forEach((l) => l()); } catch { /* ignore */ } } });
 }
 
-export function setUrban(patch: Partial<LabState["urban"]>) { state = { ...state, urban: { ...state.urban, ...patch } }; emit("urban"); }
+// Changing place keeps what the place left had and brings back what the place reached had (models/place-memory); a
+// place never seen keeps the current interventions, without the area drawn elsewhere.
+export function setUrban(patch: Partial<LabState["urban"]>) {
+  let base = state.urban;
+  const to = patch.location;
+  if (to && !samePlace(base.location, to)) {
+    const { trees, permeable, shade } = base;
+    const { places, back } = movePlace(base.places, base.location, { trees, permeable, shade, area: base.area ?? null }, to);
+    base = { ...base, places, ...(back ? { trees: back.trees, permeable: back.permeable, shade: back.shade, area: reanchor(back.area, to), treeCells: null, permeableCells: null, shadeCells: null } : { area: null }) };
+  }
+  state = { ...state, urban: { ...base, ...patch } }; emit("urban");
+}
 export function setVineyard(patch: Partial<LabState["vineyard"]> | ((v: LabState["vineyard"]) => Partial<LabState["vineyard"]>)) {
   const p = typeof patch === "function" ? patch(state.vineyard) : patch;
-  state = { ...state, vineyard: { ...state.vineyard, ...p } }; emit("vineyard");
+  let base = state.vineyard;
+  const to = p.location;
+  if (to && !samePlace(base.location, to)) {
+    const { zones, selected, allZones, irrigation, shade, windbreak } = base;
+    const snap: VineSnap = { zones, selected, allZones, area: base.area ?? null, ...(irrigation !== undefined ? { irrigation } : {}), ...(shade !== undefined ? { shade } : {}), ...(windbreak !== undefined ? { windbreak } : {}) };
+    const { places, back } = movePlace(base.places, base.location, snap, to);
+    base = { ...base, places, ...(back ? { ...back, area: reanchor(back.area, to) } : { area: null }) };
+  }
+  state = { ...state, vineyard: { ...base, ...p } }; emit("vineyard");
 }
 /** Restore the default scenario (keeps the chosen location). */
-export function resetUrban() { const d = defaults().urban; state = { ...state, urban: { ...d, location: state.urban.location, realTemp: state.urban.realTemp ?? null, area: state.urban.area ?? null } }; emit("urban"); }
-export function resetVineyard() { const d = defaults().vineyard; state = { ...state, vineyard: { ...d, location: state.vineyard.location, area: state.vineyard.area ?? null } }; emit("vineyard"); }
+export function resetUrban() { const d = defaults().urban; state = { ...state, urban: { ...d, location: state.urban.location, realTemp: state.urban.realTemp ?? null, area: state.urban.area ?? null, places: state.urban.places ?? [] } }; emit("urban"); }
+export function resetVineyard() { const d = defaults().vineyard; state = { ...state, vineyard: { ...d, location: state.vineyard.location, area: state.vineyard.area ?? null, places: state.vineyard.places ?? [] } }; emit("vineyard"); }
 /** Urban edits refresh Urbana + Esecutivo; vineyard edits refresh Vitivinicola + Esecutivo. */
 const SYNC_TARGETS = { urban: ["Urbana", "Esecutivo"], vineyard: ["Vitivinicola", "Esecutivo"] } as const;
 function emit(target: keyof typeof SYNC_TARGETS) {

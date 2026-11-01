@@ -2,15 +2,15 @@ import { useRef, type ReactNode } from "react";
 import { isCameraCloseGesture } from "@/lib/ar-close-swipe";
 
 /**
- * Observe the preview itself rather than invisible edge strips. A second finger turns the
- * gesture into a pinch (zoom) and cancels any close swipe in progress.
+ * Observe the preview itself: a sideways close only from Android's back strip at the screen's edges, an upward one
+ * from the lower quarter. A second finger turns the gesture into a pinch (zoom) and cancels any close swipe in progress.
  */
 export function CameraCloseGestures({ onClose, children, rotation = 0, onPinch }: {
   onClose: () => void; children: ReactNode; rotation?: number;
   /** Ratio of the current finger distance to the distance when the pinch started; `start` marks a new pinch. */
   onPinch?: ((ratio: number, start: boolean) => void) | undefined;
 }) {
-  const startRef = useRef<{ id: number; x: number; y: number; top: number; height: number } | null>(null);
+  const startRef = useRef<{ id: number; x: number; y: number; top: number; height: number; sx: number; sy: number } | null>(null);
   const touches = useRef(new Map<number, { x: number; y: number }>());
   const pinchStart = useRef<number | null>(null);
   const spread = () => {
@@ -28,6 +28,9 @@ export function CameraCloseGestures({ onClose, children, rotation = 0, onPinch }
     if (rotation === 180) return { x: rect.right - x, y: rect.bottom - y, height: rect.height };
     return { x: x - rect.left, y: y - rect.top, height: rect.height };
   };
+  // The sideways close is Android's back gesture: measured on the screen, from its edge strips only.
+  const edgeOf = (start: { sx: number; sy: number }, event: { clientX: number; clientY: number }) =>
+    ({ startX: start.sx, width: window.innerWidth, dx: event.clientX - start.sx, dy: event.clientY - start.sy });
   return <div className="absolute inset-0 touch-none" data-camera-gestures
     onPointerDownCapture={(event) => {
       const target = event.target;
@@ -47,7 +50,7 @@ export function CameraCloseGestures({ onClose, children, rotation = 0, onPinch }
         return;
       }
       const point = localPoint(event.clientX, event.clientY, event.currentTarget);
-      startRef.current = { id: event.pointerId, x: point.x, y: point.y, top: 0, height: point.height };
+      startRef.current = { id: event.pointerId, x: point.x, y: point.y, top: 0, height: point.height, sx: event.clientX, sy: event.clientY };
     }}
     onPointerMoveCapture={(event) => {
       if (touches.current.has(event.pointerId)) {
@@ -61,7 +64,7 @@ export function CameraCloseGestures({ onClose, children, rotation = 0, onPinch }
       const start = startRef.current;
       if (!start || start.id !== event.pointerId) return;
       const point = localPoint(event.clientX, event.clientY, event.currentTarget);
-      if (!isCameraCloseGesture(point.x - start.x, point.y - start.y, start.y - start.top, start.height)) return;
+      if (!isCameraCloseGesture(point.x - start.x, point.y - start.y, start.y - start.top, start.height, edgeOf(start, event))) return;
       startRef.current = null;
       event.preventDefault();
       event.stopPropagation();
@@ -74,7 +77,7 @@ export function CameraCloseGestures({ onClose, children, rotation = 0, onPinch }
       startRef.current = null;
       if (pinching) return;
       const point = localPoint(event.clientX, event.clientY, event.currentTarget);
-      if (!start || start.id !== event.pointerId || !isCameraCloseGesture(point.x - start.x, point.y - start.y, start.y - start.top, start.height)) return;
+      if (!start || start.id !== event.pointerId || !isCameraCloseGesture(point.x - start.x, point.y - start.y, start.y - start.top, start.height, edgeOf(start, event))) return;
       event.preventDefault();
       event.stopPropagation();
       onClose();
