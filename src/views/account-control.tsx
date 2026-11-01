@@ -546,11 +546,13 @@ function AppVersion() {
         <RefreshCw className={`size-4 ${state === "checking" || state === "updated" ? "animate-spin" : ""}`} aria-hidden="true" />
         {install.phase === "installing" ? `Installo… ${install.pct} %` : install.phase === "applying" ? `Carico la nuova versione… ${install.pct} %` : state === "checking" ? "Cerco…" : state === "updated" ? "Aggiorno…" : "Cerca aggiornamenti"}
       </button>
-      {install.phase !== "idle" && <UpdateBar pct={install.pct} searching={install.phase === "checking"} />}
-      {/* Its line keeps its height even empty, so the answer never moves Twin below. */}
-      <p role="status" className="min-h-4 text-xs leading-4 text-muted-foreground">
-        {state === "latest" ? "Hai già l'ultima versione." : state === "offline" ? "Senza rete: riprova quando sei connesso." : ""}
-      </p>
+      {/* One line of fixed height for the answer or, while updating, a thin bar in its place: nothing grows, so Twin
+          below never moves nor gets squeezed. */}
+      <div className="flex h-4 w-full items-center justify-center">
+        {install.phase !== "idle"
+          ? <UpdateBar pct={install.pct} searching={install.phase === "checking"} />
+          : <p role="status" className="text-xs leading-4 text-muted-foreground">{state === "latest" ? "Hai già l'ultima versione." : state === "offline" ? "Senza rete: riprova quando sei connesso." : ""}</p>}
+      </div>
     </div>
   );
 }
@@ -558,7 +560,7 @@ function AppVersion() {
 /** The installation of a new version as a thin bar with its percentage. */
 function UpdateBar({ pct, searching = false }: { pct: number; searching?: boolean }) {
   return (
-    <div role="progressbar" aria-label="Installazione della nuova versione" aria-valuemin={0} aria-valuemax={100} aria-valuenow={searching ? undefined : pct} className="h-1.5 w-full max-w-60 overflow-hidden rounded-full bg-foreground/10">
+    <div role="progressbar" aria-label="Installazione della nuova versione" aria-valuemin={0} aria-valuemax={100} aria-valuenow={searching ? undefined : pct} className="h-[3px] w-full max-w-60 overflow-hidden rounded-full bg-foreground/10">
       <div className={`h-full rounded-full bg-[var(--brand-turquoise)] transition-[width] duration-300 motion-reduce:transition-none ${searching ? "w-1/4 animate-pulse" : ""}`} style={searching ? undefined : { width: `${pct}%` }} />
     </div>
   );
