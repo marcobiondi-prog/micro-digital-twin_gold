@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { ArrowRight, Building2, CalendarDays, Check, Share2, ChevronDown, Clock3, Cloud, Smartphone, Grape, History, Archive, ArchiveRestore, Camera, FolderClosed, Layers, Play, Sparkles, Trash2, Video, Download } from "lucide-react";
+import { ArrowRight, Building2, CalendarDays, Check, Share2, ChevronDown, Clock3, Cloud, Smartphone, Grape, History, Archive, ArchiveRestore, Camera, FolderClosed, Layers, Play, Sparkles, Trash2, Video, Download, Images, ClipboardList } from "lucide-react";
 import { currentMedia, refreshMedia, removeMedia, useLabMedia, useMediaListError, type MediaItem } from "@/models/lab-media-store";
 import { mediaTime } from "@/models/media-time";
 import { uploadGroups } from "@/models/media-groups";
@@ -333,6 +333,22 @@ function daysText(shots: Shot[]) {
   return day(lo, true) === day(hi, true) ? day(hi, true) : `${day(lo, false)} – ${day(hi, true)}`;
 }
 const countText = (shots: Shot[]) => kindCountText(shots);
+/**
+ * The two archives told apart at a glance: photos and videos (a stack of pictures, turquoise) and interventions (a
+ * clipboard list, amber), each with a small archive box on its corner.
+ */
+function ArchiveIcon({ kind, small = false }: { kind: "foto" | "interventi"; small?: boolean }) {
+  const Icon = kind === "foto" ? Images : ClipboardList;
+  const tone = kind === "foto" ? "bg-brand-turquoise/15 text-brand-turquoise" : "bg-amber-400/15 text-amber-400";
+  return (
+    <span className={`relative grid shrink-0 place-items-center rounded-full ${tone} ${small ? "size-8" : "size-10"}`} aria-hidden="true">
+      <Icon className={small ? "size-4" : "size-5"} />
+      <span className={`absolute -bottom-0.5 -right-0.5 grid place-items-center rounded-full bg-background text-foreground ring-1 ring-foreground/15 ${small ? "size-4" : "size-[18px]"}`}>
+        <Archive className={small ? "size-2.5" : "size-3"} />
+      </span>
+    </span>
+  );
+}
 /** When they went into the archive: "Archiviata il 01/11/2026", or "dal 30/10 al 01/11/2026" over several days. */
 const dayOf = (iso: string) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`; };
 function archivedOn(isos: Array<string | undefined>, word = "Archiviata"): string {
@@ -645,8 +661,8 @@ function ArchiveBlock({ shots: all, keys, defaultOpen = false }: { shots: Shot[]
   return (
     <div className="rounded-2xl bg-foreground/[0.04]">
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-3 px-4 py-3.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-2xl">
-        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-foreground/[0.08]"><Archive className="size-5" aria-hidden="true" /></span>
-        <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Archivio</span><span className="block text-xs text-muted-foreground">{all.length ? `${piles.length === 1 ? "1 giorno" : `${piles.length} giorni`} · ${countText(shots)}` : `${keys.length === 1 ? "1 file" : `${keys.length} file`} archiviati`} · {signedIn ? "nell'account" : "su questo dispositivo"}</span></span>
+        <ArchiveIcon kind="foto" />
+        <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Archivio foto e video</span><span className="block text-xs text-muted-foreground">{all.length ? `${piles.length === 1 ? "1 giorno" : `${piles.length} giorni`} · ${countText(shots)}` : `${keys.length === 1 ? "1 file" : `${keys.length} file`} archiviati`} · {signedIn ? "nell'account" : "su questo dispositivo"}</span></span>
         <ChevronDown className={`size-5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
       {open && (
@@ -1020,7 +1036,7 @@ function HistoryArchiveBlock({ items, defaultOpen = false }: { items: SourcedEnt
   return (
     <div className="rounded-2xl bg-foreground/[0.04]">
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-foreground/[0.08]"><Archive className="size-5" aria-hidden="true" /></span>
+        <ArchiveIcon kind="interventi" />
         <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Archivio interventi</span><span className="block text-xs text-muted-foreground">{days.length === 1 ? "1 giorno" : `${days.length} giorni`} · {entriesText(items.length)} · {signedIn ? "nell'account" : "su questo dispositivo"}</span><span className="block text-xs tabular-nums text-muted-foreground">{archivedOn(items.map((e) => marks[e.id]), "Archiviati")}</span></span>
         <ChevronDown className={`size-5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
@@ -1051,7 +1067,7 @@ function HistoryArchiveBlock({ items, defaultOpen = false }: { items: SourcedEnt
                 {m.days.map((g) => (
                   <button key={g.key} type="button" aria-expanded={shown === g.key} onClick={() => setShown(shown === g.key ? null : g.key)}
                     className="flex w-full items-center gap-3 border-b border-foreground/[0.06] px-3 py-2.5 text-left outline-none last:border-0 focus-visible:bg-foreground/[0.06]">
-                    <FolderClosed className="size-5 shrink-0 text-brand-turquoise" aria-hidden="true" />
+                    <FolderClosed className="size-5 shrink-0 text-amber-400" aria-hidden="true" />
                     <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold tabular-nums">{g.label}</span><span className="block text-xs tabular-nums text-muted-foreground">{archivedOn(g.items.map((e) => marks[e.id]), "Archiviato")}</span></span>
                     <span className="text-right text-xs text-muted-foreground">{entriesText(g.items.length)}</span>
                     <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform ${shown === g.key ? "rotate-180" : ""}`} aria-hidden="true" />
@@ -1208,15 +1224,15 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
         {!compact && archivedEntries.length > 0 && <HistoryArchiveBlock items={archivedEntries} />}
         {compact && archivedEntries.length > 0 && (
           <Link to="/archivio" className="flex items-center gap-3 rounded-2xl bg-foreground/[0.04] px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <Archive className="size-5 text-muted-foreground" aria-hidden="true" />
+            <ArchiveIcon kind="interventi" small />
             <span className="flex-1 text-sm"><span className="font-semibold">Archivio interventi</span><span className="text-muted-foreground"> · {entriesText(archivedEntries.length)} · tocca per recuperarli</span></span>
             <ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />
           </Link>
         )}
         {compact && archKeys.length > 0 && (
           <Link to="/archivio" className="flex items-center gap-3 rounded-2xl bg-foreground/[0.04] px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <Archive className="size-5 text-muted-foreground" aria-hidden="true" />
-            <span className="flex-1 text-sm"><span className="font-semibold">Archivio</span><span className="text-muted-foreground"> · {archivedAll.length ? countText(archivedAll) : `${archKeys.length} file`} · tocca per recuperarle</span></span>
+            <ArchiveIcon kind="foto" small />
+            <span className="flex-1 text-sm"><span className="font-semibold">Archivio foto e video</span><span className="text-muted-foreground"> · {archivedAll.length ? countText(archivedAll) : `${archKeys.length} file`} · tocca per recuperarle</span></span>
             <ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />
           </Link>
         )}
