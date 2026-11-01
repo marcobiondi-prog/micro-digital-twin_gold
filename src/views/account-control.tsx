@@ -544,9 +544,9 @@ function AppVersion() {
       <button type="button" onClick={() => void check()} disabled={state === "checking" || state === "updated"}
         className="inline-flex h-10 items-center gap-2 rounded-full bg-foreground/10 px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">
         <RefreshCw className={`size-4 ${state === "checking" || state === "updated" ? "animate-spin" : ""}`} aria-hidden="true" />
-        {install.phase === "installing" ? `Installo… ${install.pct} %` : state === "checking" ? "Cerco…" : state === "updated" ? "Aggiorno…" : "Cerca aggiornamenti"}
+        {install.phase === "installing" ? `Installo… ${install.pct} %` : install.phase === "applying" ? `Carico la nuova versione… ${install.pct} %` : state === "checking" ? "Cerco…" : state === "updated" ? "Aggiorno…" : "Cerca aggiornamenti"}
       </button>
-      {install.phase !== "idle" && <UpdateBar pct={install.pct} />}
+      {install.phase !== "idle" && <UpdateBar pct={install.pct} searching={install.phase === "checking"} />}
       {/* Its line keeps its height even empty, so the answer never moves Twin below. */}
       <p role="status" className="min-h-4 text-xs leading-4 text-muted-foreground">
         {state === "latest" ? "Hai già l'ultima versione." : state === "offline" ? "Senza rete: riprova quando sei connesso." : ""}
@@ -556,10 +556,10 @@ function AppVersion() {
 }
 
 /** The installation of a new version as a thin bar with its percentage. */
-function UpdateBar({ pct }: { pct: number }) {
+function UpdateBar({ pct, searching = false }: { pct: number; searching?: boolean }) {
   return (
-    <div role="progressbar" aria-label="Installazione della nuova versione" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} className="h-1.5 w-full max-w-60 overflow-hidden rounded-full bg-foreground/10">
-      <div className="h-full rounded-full bg-[var(--brand-turquoise)] transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${pct}%` }} />
+    <div role="progressbar" aria-label="Installazione della nuova versione" aria-valuemin={0} aria-valuemax={100} aria-valuenow={searching ? undefined : pct} className="h-1.5 w-full max-w-60 overflow-hidden rounded-full bg-foreground/10">
+      <div className={`h-full rounded-full bg-[var(--brand-turquoise)] transition-[width] duration-300 motion-reduce:transition-none ${searching ? "w-1/4 animate-pulse" : ""}`} style={searching ? undefined : { width: `${pct}%` }} />
     </div>
   );
 }

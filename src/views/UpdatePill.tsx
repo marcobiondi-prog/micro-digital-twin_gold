@@ -8,13 +8,14 @@ import { useUpdateProgress } from "@/lib/update-progress";
  */
 export function UpdatePill() {
   const { phase, pct } = useUpdateProgress();
-  if (phase === "idle") return null;
+  // While "Cerca aggiornamenti" is only asking, the account panel's own bar is enough.
+  if (phase === "idle" || phase === "checking") return null;
   const done = phase === "ready";
   return (
     <div role="status" aria-live="polite" className="update-pill pointer-events-none fixed left-1/2 top-[calc(env(safe-area-inset-top)+8px)] z-[70] w-[min(18rem,calc(100vw-32px))] -translate-x-1/2 rounded-2xl bg-black/55 px-3 py-2 text-white shadow-lg ring-1 ring-white/15 backdrop-blur-md">
       <p className="flex items-center gap-2 text-[13px] font-medium">
         {done ? <Check className="size-4 text-[var(--brand-turquoise)]" aria-hidden="true" /> : <Download className="size-4" aria-hidden="true" />}
-        <span className="flex-1">{done ? "Nuova versione installata" : "Installo la nuova versione"}</span>
+        <span className="flex-1">{done ? "Nuova versione installata" : phase === "applying" ? "Carico la nuova versione" : "Installo la nuova versione"}</span>
         <span className="tabular-nums text-white/80">{pct} %</span>
       </p>
       <div role="progressbar" aria-label="Installazione della nuova versione" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/15">

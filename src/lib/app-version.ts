@@ -25,6 +25,8 @@ const TARGET_KEY = "mdt-update-target", FRESH_KEY = "mdt-update-fresh";
  */
 export async function applyUpdate(target?: string | null) {
   const want = target ?? (await onlineBuild());
+  // The bar fills to 100 % before the reload, wherever the update was started.
+  await import("@/lib/update-progress").then((m) => m.showApplying()).catch(() => undefined);
   try {
     const reg = await navigator.serviceWorker?.getRegistration();
     reg?.waiting?.postMessage({ type: "SKIP_WAITING" });
@@ -51,6 +53,13 @@ export function checkUpdateLanded() {
  */
 export async function checkForUpdate(): Promise<"updated" | "latest" | "offline"> {
   if (typeof navigator === "undefined") return "latest";
+  const progress = await import("@/lib/update-progress");
+  progress.markChecking(true);
+  const result = await findUpdate();
+  if (result !== "updated") progress.markChecking(false);
+  return result;
+}
+async function findUpdate(): Promise<"updated" | "latest" | "offline"> {
   try {
     const reg = "serviceWorker" in navigator ? await navigator.serviceWorker.getRegistration() : undefined;
     await reg?.update().catch(() => undefined);
