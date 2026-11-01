@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Crosshair, LoaderCircle } from "lucide-react";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Ring } from "@/models/place-area";
-import { addAreaLayers, addSimLayers, setAreaData, setSimData, type SimLayout } from "@/views/v10/map-area";
+import { addAreaLayers, addSimLayers, placePinElement, setAreaData, setSimData, type SimLayout } from "@/views/v10/map-area";
 
 /**
  * 3D view without the browser key: an open vector map tilted, with the buildings raised from their heights and a pin
@@ -38,7 +38,7 @@ export function OpenMap3D({ lat, lng, label, zoom, area = [], sim = null }: { la
         if (!cancelled) setState("ready");
       });
       map.on("error", () => { if (!cancelled && !map.loaded()) setState("error"); });
-      new maplibregl.Marker({ color: "#0b0f15" }).setLngLat([lng, lat]).setPopup(new maplibregl.Popup({ offset: 24 }).setText(label)).addTo(map);
+      new maplibregl.Marker({ element: placePinElement(), anchor: "bottom" }).setLngLat([lng, lat]).setPopup(new maplibregl.Popup({ offset: 38 }).setText(label)).addTo(map);
       mapRef.current = map;
       remove = () => map.remove();
     }).catch(() => { if (!cancelled) setState("error"); });
