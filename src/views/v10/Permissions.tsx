@@ -150,7 +150,8 @@ export function PermissionsPage() {
   useEffect(() => { setGps(readFlag(GPS_KEY, "on")); setNotify(readFlag(NOTIFY_KEY, "1")); }, []);
   const toggleGps = (on: boolean) => {
     setGps(on);
-    try { if (on) localStorage.setItem(GPS_KEY, "on"); else localStorage.removeItem(GPS_KEY); } catch { /* storage off */ }
+    // Switched on or off from here, the GPS starts following again (no pause left from a place chosen by hand).
+    try { if (on) localStorage.setItem(GPS_KEY, "on"); else localStorage.removeItem(GPS_KEY); localStorage.removeItem("mdt-gps-paused-v1"); } catch { /* storage off */ }
     setMsg(on ? "GPS acceso: la mappa ti seguirà da quando la apri." : "GPS spento: la mappa non segue più la tua posizione.");
     if (on && states?.posizione === "prompt") void ask("posizione");
   };

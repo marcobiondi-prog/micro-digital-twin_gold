@@ -79,6 +79,10 @@ const GPS_STEP_M = 100;
 const GPS_KEY = "mdt-gps-v1";
 function readGps() { try { return typeof localStorage !== "undefined" && localStorage.getItem(GPS_KEY) === "on"; } catch { return false; } }
 function saveGps(on: boolean) { try { if (on) localStorage.setItem(GPS_KEY, "on"); else localStorage.removeItem(GPS_KEY); } catch { /* storage unavailable */ } }
+/** A place chosen by hand while the GPS is on pauses the following (kept across openings) until "Seguimi di nuovo". */
+const GPS_PAUSE_KEY = "mdt-gps-paused-v1";
+function readGpsPaused() { try { return typeof localStorage !== "undefined" && localStorage.getItem(GPS_PAUSE_KEY) === "1"; } catch { return false; } }
+function saveGpsPaused(on: boolean) { try { if (on) localStorage.setItem(GPS_PAUSE_KEY, "1"); else localStorage.removeItem(GPS_PAUSE_KEY); } catch { /* storage unavailable */ } }
 function metresBetween(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const r = Math.PI / 180, x = (b.lng - a.lng) * r * Math.cos(((a.lat + b.lat) / 2) * r), y = (b.lat - a.lat) * r;
   return Math.hypot(x, y) * 6371000;
@@ -129,6 +133,7 @@ function LocationSearch({ initial, onSelect, bare = false }: { initial: Searched
   const pick = async (item: LocationSuggestion) => {
     setSuggestions([]);
     const osm = osmPlaces[item.placeId];
+    pauseFollow();
     if (osm) { onSelect(osm); setQuery(""); return; }
     setLoading(true); setError(null);
     try { const result = await placeDetails({ data: { placeId: item.placeId, sessionToken: token } }); if (result.location) { onSelect(result.location); setQuery(""); } else setError(result.error ?? "Zona non trovata."); }
@@ -138,8 +143,15 @@ function LocationSearch({ initial, onSelect, bare = false }: { initial: Searched
   // GPS always on: once turned on it stays on (on this device, across openings) and keeps following the phone —
   // the place moves with it when it has gone more than 100 m — until tapped off.
   const [gps, setGps] = useState(false);
+  // While the GPS is on, a place chosen by hand (search or suggestion) stays chosen: the GPS keeps running but stops
+  // moving the place until "Seguimi di nuovo" (or a tap on the GPS button) brings it back to the phone's position.
+  const [paused, setPaused] = useState(false);
+  const pausedRef = useRef(false); pausedRef.current = paused;
+  const lastFix = useRef<{ lat: number; lng: number } | null>(null);
+  const pauseFollow = () => { if (gpsRef.current) { setPaused(true); saveGpsPaused(true); } };
+  const gpsRef = useRef(false); gpsRef.current = gps;
   // Read after mounting, so the server's page and the first render agree.
-  useEffect(() => { if (readGps() && appAllowed("posizione")) { setLocating(true); setGps(true); } }, []);
+  useEffect(() => { if (readGps() && appAllowed("posizione")) { setLocating(!readGpsPaused()); setGps(true); setPaused(readGpsPaused()); } }, []);
   // Position revoked inside the app (Account → Autorizzazioni): the GPS goes off at once.
   const positionAllowed = useAppAllowed("posizione");
   useEffect(() => { if (!positionAllowed) { setGps(false); setLocating(false); } }, [positionAllowed]);
@@ -151,8 +163,9 @@ function LocationSearch({ initial, onSelect, bare = false }: { initial: Searched
     let busy = false, live = true;
     const id = navigator.geolocation.watchPosition(async ({ coords }) => {
       const here = { lat: coords.latitude, lng: coords.longitude };
+      lastFix.current = here;
       setLocating(false);
-      if (busy || metresBetween(placeRef.current, here) < GPS_STEP_M) return;
+      if (pausedRef.current || busy || metresBetween(placeRef.current, here) < GPS_STEP_M) return;
       busy = true;
       const fallback = { label: `La mia posizione (${here.lat.toFixed(4)}, ${here.lng.toFixed(4)})`, ...here };
       try { const result = await reverseGoogle({ data: here }); if (live) selectRef.current(result.location ?? fallback); }
@@ -164,8 +177,18 @@ function LocationSearch({ initial, onSelect, bare = false }: { initial: Searched
     }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 15000 });
     return () => { live = false; navigator.geolocation.clearWatch(id); };
   }, [gps, reverseGoogle]);
+  // Back to following the phone: at once to the last position known, then on with every move.
+  const resume = () => {
+    setPaused(false); saveGpsPaused(false);
+    const here = lastFix.current;
+    if (!here) { setLocating(true); return; }
+    const fallback = { label: `La mia posizione (${here.lat.toFixed(4)}, ${here.lng.toFixed(4)})`, ...here };
+    if (metresBetween(placeRef.current, here) < GPS_STEP_M) return;
+    void reverseGoogle({ data: here }).then((r) => selectRef.current(r.location ?? fallback), () => selectRef.current(fallback));
+  };
   const locate = () => {
-    if (gps) { setGps(false); saveGps(false); setLocating(false); return; }
+    if (gps && paused) { resume(); return; }
+    if (gps) { setGps(false); saveGps(false); setPaused(false); saveGpsPaused(false); setLocating(false); return; }
     if (!guardUse("posizione")) return;
     setError(null); setLocating(true); setGps(true); saveGps(true);
   };
@@ -179,10 +202,10 @@ function LocationSearch({ initial, onSelect, bare = false }: { initial: Searched
       const result = await searchLocation({ data: { query } }).catch(() => ({ location: undefined, error: undefined }));
       // When Google refuses or fails, OpenStreetMap still finds the place; Google's reason stays visible only if OSM fails too.
       const found = result.location ? result : await searchOsm({ data: { query } }).catch(() => ({ location: undefined, error: undefined }));
-      if (found.location) { onSelect(found.location); setQuery(""); } else setError(result.error ?? found.error ?? "Zona non trovata.");
+      if (found.location) { pauseFollow(); onSelect(found.location); setQuery(""); } else setError(result.error ?? found.error ?? "Zona non trovata.");
     } catch (searchError) { console.error(searchError); setError("Ricerca della zona non disponibile. Riprova tra poco."); } finally { setLoading(false); }
   };
-  return <div className="location-search min-w-0 md:col-span-full"><form onSubmit={submit} className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2" role="search"><div className="relative min-w-0"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cerca una località" aria-label="Cerca una località" className="h-11 rounded-lg bg-lab-surface pl-9 pr-3 font-mono" autoComplete="off" aria-autocomplete="list" aria-controls="location-suggestions" />{suggestions.length > 0 && <ul id="location-suggestions" role="listbox" className="absolute inset-x-0 top-12 z-50 overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-lg">{suggestions.map((item) => <li key={item.placeId} role="option" aria-selected={false}><Button variant="ghost" type="button" onClick={() => pick(item)} className="flex h-auto min-h-11 w-full items-center justify-start gap-2 rounded-none px-3 py-2 text-left text-sm"><MapPin className="size-4 shrink-0 text-primary" /><span className="min-w-0 whitespace-normal break-words">{item.text}</span></Button></li>)}</ul>}</div><Button type="submit" size="icon" disabled={loading || query.trim().length < 3} aria-label="Cerca zona" className="size-11 shrink-0 rounded-lg">{loading ? <LoaderCircle className="animate-spin" /> : <Search />}</Button><Button type="button" variant="secondary" onClick={locate} aria-pressed={gps} aria-label={gps ? "GPS attivo: tocca per spegnerlo" : "Usa la mia posizione e tieni attivo il GPS"} className={`h-11 shrink-0 rounded-lg px-3 ${gps ? "bg-brand-turquoise text-black hover:bg-brand-turquoise/90" : ""}`}>{locating ? <LoaderCircle className="animate-spin" /> : <LocateFixed />}<span className="hidden sm:inline">{gps ? "GPS attivo" : "La mia posizione"}</span></Button></form>{!bare && <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-[minmax(7rem,12rem)_minmax(0,1fr)] sm:items-center md:grid-cols-1 md:items-start lg:grid-cols-[minmax(7rem,12rem)_minmax(0,1fr)] lg:items-center"><div className="flex min-w-0 items-start gap-1.5 text-xs text-muted-foreground"><MapPin className="mt-0.5 size-3.5 shrink-0 text-primary" /><div className="min-w-0"><span className="block break-words font-medium text-foreground">{splitLocation(initial.label).name}</span>{splitLocation(initial.label).sub && <span className="block break-words">{splitLocation(initial.label).sub}</span>}<span className="mt-1 block font-mono text-[10px]">{initial.lat.toFixed(4)}, {initial.lng.toFixed(4)}</span></div></div><LocationMapPreview location={initial} /></div>}{noSuggestions && !error && query.trim().length >= 2 && <p role="status" className="mt-2 text-xs text-muted-foreground">Nessun suggerimento: premi Cerca per trovare la zona.</p>}{error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}</div>;
+  return <div className="location-search min-w-0 md:col-span-full"><form onSubmit={submit} className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2" role="search"><div className="relative min-w-0"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cerca una località" aria-label="Cerca una località" className="h-11 rounded-lg bg-lab-surface pl-9 pr-3 font-mono" autoComplete="off" aria-autocomplete="list" aria-controls="location-suggestions" />{suggestions.length > 0 && <ul id="location-suggestions" role="listbox" className="absolute inset-x-0 top-12 z-50 overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-lg">{suggestions.map((item) => <li key={item.placeId} role="option" aria-selected={false}><Button variant="ghost" type="button" onClick={() => pick(item)} className="flex h-auto min-h-11 w-full items-center justify-start gap-2 rounded-none px-3 py-2 text-left text-sm"><MapPin className="size-4 shrink-0 text-primary" /><span className="min-w-0 whitespace-normal break-words">{item.text}</span></Button></li>)}</ul>}</div><Button type="submit" size="icon" disabled={loading || query.trim().length < 3} aria-label="Cerca zona" className="size-11 shrink-0 rounded-lg">{loading ? <LoaderCircle className="animate-spin" /> : <Search />}</Button><Button type="button" variant="secondary" onClick={locate} aria-pressed={gps} aria-label={gps ? (paused ? "GPS in pausa sulla zona scelta: tocca per farti seguire di nuovo" : "GPS attivo: tocca per spegnerlo") : "Usa la mia posizione e tieni attivo il GPS"} className={`h-11 shrink-0 rounded-lg px-3 ${gps ? (paused ? "bg-transparent text-brand-turquoise ring-2 ring-inset ring-brand-turquoise hover:bg-brand-turquoise/10" : "bg-brand-turquoise text-black hover:bg-brand-turquoise/90") : ""}`}>{locating ? <LoaderCircle className="animate-spin" /> : <LocateFixed />}<span className="hidden sm:inline">{gps ? (paused ? "GPS in pausa" : "GPS attivo") : "La mia posizione"}</span></Button></form>{gps && paused && <div role="status" className="mt-2 flex items-center gap-2 rounded-lg bg-brand-turquoise/10 px-3 py-2 text-xs"><span className="min-w-0 flex-1">Hai scelto tu la zona: il GPS resta acceso ma non la sposta.</span><button type="button" onClick={resume} className="shrink-0 rounded-full bg-brand-turquoise px-3 py-1.5 font-semibold text-black">Seguimi di nuovo</button></div>}{!bare && <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-[minmax(7rem,12rem)_minmax(0,1fr)] sm:items-center md:grid-cols-1 md:items-start lg:grid-cols-[minmax(7rem,12rem)_minmax(0,1fr)] lg:items-center"><div className="flex min-w-0 items-start gap-1.5 text-xs text-muted-foreground"><MapPin className="mt-0.5 size-3.5 shrink-0 text-primary" /><div className="min-w-0"><span className="block break-words font-medium text-foreground">{splitLocation(initial.label).name}</span>{splitLocation(initial.label).sub && <span className="block break-words">{splitLocation(initial.label).sub}</span>}<span className="mt-1 block font-mono text-[10px]">{initial.lat.toFixed(4)}, {initial.lng.toFixed(4)}</span></div></div><LocationMapPreview location={initial} /></div>}{noSuggestions && !error && query.trim().length >= 2 && <p role="status" className="mt-2 text-xs text-muted-foreground">Nessun suggerimento: premi Cerca per trovare la zona.</p>}{error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}</div>;
 }
 
 const MAP_RESIZE_MS = 300;
