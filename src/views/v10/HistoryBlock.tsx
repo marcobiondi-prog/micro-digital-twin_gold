@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { ArrowRight, Building2, CalendarDays, Check, Share2, ChevronDown, Clock3, Cloud, Smartphone, Grape, History, Archive, ArchiveRestore, Camera, FolderClosed, Layers, Play, Sparkles, Trash2, Video } from "lucide-react";
+import { ArrowRight, Building2, CalendarDays, Check, Share2, ChevronDown, Clock3, Cloud, Smartphone, Grape, History, Archive, ArchiveRestore, Camera, FolderClosed, Layers, Play, Sparkles, Trash2, Video, Download } from "lucide-react";
 import { currentMedia, refreshMedia, removeMedia, useLabMedia, useMediaListError, type MediaItem } from "@/models/lab-media-store";
 import { mediaTime } from "@/models/media-time";
 import { uploadGroups } from "@/models/media-groups";
@@ -539,8 +539,8 @@ function OpenPile({ pile, onClose, archived = false }: { pile: Pile; onClose: ()
   };
   return (
     <div className="pile-open space-y-3 rounded-2xl bg-foreground/[0.05] p-3">
-      <div className="flex items-center gap-3 px-1">
-        <h4 className="min-w-0 flex-1 text-sm font-semibold tabular-nums">{pile.label}<span className="ml-2 font-medium text-muted-foreground">{selecting ? (picked.size ? `${picked.size} scelti` : "Tocca per scegliere") : countText(pile.shots)}</span></h4>
+      <div className={`flex items-center gap-x-3 px-1 ${archived ? "flex-wrap gap-y-1.5" : ""}`}>
+        <h4 className={`min-w-0 flex-1 text-sm font-semibold tabular-nums ${archived ? "basis-full" : ""}`}>{pile.label}<span className="ml-2 font-medium text-muted-foreground">{selecting ? (picked.size ? `${picked.size} scelti` : "Tocca per scegliere") : countText(pile.shots)}</span></h4>
         {selecting
           ? <>
               <button type="button" onClick={() => setPicked(all ? new Set() : new Set(pile.shots.map(keyOf)))} className="text-sm font-semibold text-foreground outline-none focus-visible:underline">{all ? "Nessuna" : "Tutte"}</button>
@@ -548,6 +548,7 @@ function OpenPile({ pile, onClose, archived = false }: { pile: Pile; onClose: ()
             </>
           : <>
               <button type="button" onClick={() => shelve(pile.shots)} className="inline-flex items-center gap-1 text-sm font-semibold text-foreground outline-none focus-visible:underline">{archived ? <ArchiveRestore className="size-4" aria-hidden="true" /> : <Archive className="size-4" aria-hidden="true" />}{archived ? "Ripristina" : "Archivia"}</button>
+              {archived && <SaveArchive compact shots={pile.shots} what={`il ${pile.label}`} zipName={`archivio-${pile.label.replace(/[^0-9a-z]+/gi, "-")}.zip`} />}
               {archived && <button type="button" onClick={() => { setPicked(new Set(pile.shots.map(keyOf))); setSelecting(true); setAsk(true); }} className="inline-flex items-center gap-1 text-sm font-semibold text-destructive outline-none focus-visible:underline"><Trash2 className="size-4" aria-hidden="true" />Elimina</button>}
               <button type="button" onClick={() => setSelecting(true)} className="text-sm font-semibold text-foreground outline-none focus-visible:underline">Seleziona</button>
               <button type="button" onClick={onClose} className="text-sm font-semibold text-muted-foreground outline-none focus-visible:underline">Chiudi</button>
@@ -660,6 +661,7 @@ function ArchiveBlock({ shots: all, keys, defaultOpen = false }: { shots: Shot[]
               <ArchiveRestore className="size-4" aria-hidden="true" />Ripristina tutto · {keys.length === 1 ? "1 file" : `${keys.length} file`}
             </button>
           )}
+          {!day && shots.length > 0 && <SaveArchive shots={shots} what={kind === "tutti" ? "tutto l'archivio" : kindLabel} zipName={`archivio${kind === "tutti" ? "" : `-${kind}`}-${new Date().toISOString().slice(0, 10)}.zip`} />}
           {!day && shots.length > 0 && <DeleteArchive shots={shots} what={kind === "tutti" ? "tutto l'archivio" : kindLabel} onDone={() => { setShown(null); if (kind !== "tutti") setKind("tutti"); }} />}
           {months.map((m) => (
             <div key={m.name}>
@@ -681,6 +683,65 @@ function ArchiveBlock({ shots: all, keys, defaultOpen = false }: { shots: Shot[]
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Photos and videos saved on the phone, in Download: one file as it is, several as one zip with a folder per day
+ * (gg-mm-aaaa). Each file is fetched from where it is kept (the account or this device); onStep says how far it is.
+ */
+async function saveShots(shots: Shot[], zipName: string, onStep: (done: number) => void): Promise<number> {
+  const save = (blob: Blob, name: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  };
+  const got: Array<{ s: Shot; blob: Blob }> = [];
+  let done = 0;
+  for (let i = 0; i < shots.length; i += 4) {
+    await Promise.all(shots.slice(i, i + 4).map(async (s) => {
+      try { const r = await fetch(s.url); if (r.ok) got.push({ s, blob: await r.blob() }); } catch { /* resta fuori */ }
+      onStep(++done);
+    }));
+  }
+  if (!got.length) throw new Error("none");
+  if (got.length === 1) { save(got[0]!.blob, got[0]!.s.name); return 1; }
+  const { default: JSZip } = await import("jszip");
+  const zip = new JSZip();
+  const used = new Set<string>();
+  for (const { s, blob } of got) {
+    const d = s.at ? new Date(s.at) : null;
+    const dir = d ? `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}` : "senza-data";
+    let n = `${dir}/${s.name}`, k = 2;
+    while (used.has(n)) n = `${dir}/${k++}-${s.name}`;
+    used.add(n); zip.file(n, blob);
+  }
+  save(await zip.generateAsync({ type: "blob", compression: "STORE" }), zipName);
+  return got.length;
+}
+
+/** "Salva sul telefono" for these archived photos and videos: a zip in Download (one file as it is), with progress. */
+function SaveArchive({ shots, what, zipName, compact = false }: { shots: Shot[]; what: string; zipName: string; compact?: boolean }) {
+  const [step, setStep] = useState<number | null>(null);
+  const go = async () => {
+    if (step !== null) return;
+    setStep(0);
+    try {
+      const n = await saveShots(shots, zipName, setStep);
+      const missed = shots.length - n;
+      toast.success(n === 1 ? "File salvato in Download" : `Cartella zip salvata in Download · ${n} file`, missed ? { description: `${missed} file non raggiungibili: controlla la connessione e riprova.` } : undefined);
+    } catch { toast.error("Salvataggio non riuscito: controlla la connessione e riprova"); }
+    finally { setStep(null); }
+  };
+  const label = step !== null ? `Preparo ${step} di ${shots.length}…` : compact ? "Salva" : `Salva sul telefono ${what} · ${shots.length}`;
+  return compact ? (
+    <button type="button" onClick={() => void go()} disabled={step !== null} aria-label={step === null ? `Salva sul telefono ${what}` : undefined} className="inline-flex items-center gap-1 text-sm font-semibold text-foreground outline-none focus-visible:underline disabled:opacity-60"><Download className="size-4" aria-hidden="true" />{label}</button>
+  ) : (
+    <button type="button" onClick={() => void go()} disabled={step !== null} className="relative inline-flex h-10 w-full items-center justify-center gap-2 overflow-hidden rounded-full bg-foreground/10 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      {step !== null && <span className="absolute inset-y-0 left-0 bg-brand-turquoise/25 transition-[width]" style={{ width: `${(step / Math.max(1, shots.length)) * 100}%` }} aria-hidden="true" />}
+      <span className="relative inline-flex items-center gap-2"><Download className="size-4" aria-hidden="true" />{label}</span>
+    </button>
   );
 }
 
