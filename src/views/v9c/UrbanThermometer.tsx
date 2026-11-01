@@ -2,7 +2,7 @@ import { drawnM2 } from "@/models/drawn-area";
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronDown, CloudRain, Leaf, Minus, Plus,  Ruler, Sprout, Sun, TreePine, Umbrella, Wallet, type LucideIcon } from "lucide-react";
+import { ChevronDown, CloudRain, Leaf, Minus, Plus,  Ruler, Sprout, Sun, Thermometer, TreePine, Umbrella, Wallet, type LucideIcon } from "lucide-react";
 import { comparison, piazzaEstimate, type PrototypeId } from "@/models/scenarios";
 import { setUrban, useLab } from "@/models/lab-store";
 import { REFERENCE_M2, euroRange, grouped, interventionCost } from "@/models/intervention-cost";
@@ -10,6 +10,7 @@ import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { useSeasonClock, WhenPicker } from "@/views/v10/when";
 import { coolingShare, estimatedTemp, SEASON_LABEL } from "@/models/season-climate";
 import { setPiazzaReading } from "@/models/sim-reading";
+import { loadAirTemperature } from "@/views/air-temp-client";
 import { clockText } from "@/models/sim-when";
 import { GAIN_BG, GAIN_TEXT } from "@/views/v7/studio-ui";
 import { ImportWeatherButton } from "@/views/SimulationGrid";
@@ -232,11 +233,17 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
   const gainNow = est.dT * share;
   const after = before - gainNow;
   // The map of the same simulation shows this very reading.
-  useEffect(() => { setPiazzaReading({ before: +before.toFixed(1), after: +after.toFixed(1), when: `${SEASON_LABEL[season] ?? season}, ore ${clockText(hour, clock.minute ?? 0)}` }); }, [before, after, season, hour, clock.minute]);
   const gain = gainNow < 0.8 ? 0 : gainNow < 1.8 ? 1 : gainNow < 2.8 ? 2 : gainNow < 3.8 ? 3 : 4;
   // The arc spans only what can be reached now (a little past both ends), so the three stops stay apart.
   const lowest = before - MAX_GAIN * share;
   const dialMax = before + 0.6, dialMin = lowest - 1.4;
+  // The map and the dashboard show this very reading, on the same arc.
+  useEffect(() => {
+    setPiazzaReading({ before: +before.toFixed(1), after: +after.toFixed(1), when: `${SEASON_LABEL[season] ?? season}, ore ${clockText(hour, clock.minute ?? 0)}`, season, hour, min: dialMin, max: dialMax });
+  }, [before, after, season, hour, clock.minute, dialMin, dialMax]);
+  // The real temperature of the place right now, written under the arc beside the reading without interventions.
+  const { lat: rLat, lng: rLng } = urban.location;
+  const realNow = useQuery({ queryKey: ["air-now", rLat.toFixed(3), rLng.toFixed(3)], queryFn: () => loadAirTemperature(rLat, rLng), staleTime: 10 * 60_000, refetchInterval: 15 * 60_000, retry: 1 });
   const feel = feeling(after);
   const preset = PRESETS.find((p) => p.trees === urban.trees && p.permeable === urban.permeable && p.shade === urban.shade)?.id ?? null;
   const level = comparison.find((l) => l.id === (preset ?? levelOf(est.dT))) ?? comparison[0]!;
@@ -312,6 +319,13 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
           <span className="mt-1.5 font-mono text-sm font-semibold tabular-nums">{est.dT > 0.05 ? euroRange(cost.total) : "Nessun intervento"}</span>
         </div>
       </div>
+
+      {/* Under the arc: the place's real temperature right now (the reading without interventions is in the chip below). */}
+      {typeof realNow.data === "number" && (
+        <p className="-mt-1 flex items-center justify-center gap-1.5 text-center text-sm text-muted-foreground">
+          <Thermometer className="size-4" aria-hidden="true" />Temperatura reale adesso nel luogo <b className="font-semibold tabular-nums text-foreground">{fmt(realNow.data)}°</b>
+        </p>
+      )}
 
       {/* When: one chip under the gauge (season, hour, live dot); touching it opens the season and hour controls. */}
       <div className="-mt-2 space-y-2">

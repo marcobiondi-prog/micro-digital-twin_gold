@@ -27,13 +27,14 @@ export type PiazzaSummary = {
 };
 
 /** Piazza: a whole day of the season (real year of the place, else an estimate) read at its hottest hour. */
-export function piazzaSummary(urban: LabState["urban"], season: Season, profile: Array<number | null> | null, areaM2: number | null): PiazzaSummary {
+export function piazzaSummary(urban: LabState["urban"], season: Season, profile: Array<number | null> | null, areaM2: number | null, atHour?: number | null): PiazzaSummary {
   const est = piazzaEstimate(urban.trees, urban.permeable, urban.shade);
   const day = Array.from({ length: 24 }, (_, h) => {
     const before = profile?.[h] ?? estimatedTemp(season, h, urban.realTemp ?? 40);
     return { h, prima: +before.toFixed(1), dopo: +(before - est.dT * coolingShare(before)).toFixed(1) };
   });
-  const hot = day.reduce((a, b) => (b.prima > a.prima ? b : a), day[0]!);
+  // Read at the hour asked (the simulation's), else at the day's hottest.
+  const hot = atHour != null && day[atHour] ? day[atHour]! : day.reduce((a, b) => (b.prima > a.prima ? b : a), day[0]!);
   // A surface drawn with pins on the map wins over the measured one, which wins over the reference.
   const drawn = drawnM2(urban.area, urban.location);
   const m2 = drawn ?? areaM2 ?? REFERENCE_M2;

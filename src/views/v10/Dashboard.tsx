@@ -4,10 +4,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ArrowRight, CloudRain, Droplets, Leaf, Lock, Mail, MapPin, ShieldCheck, Sparkles, Sun, TreePine, Umbrella, Wind, type LucideIcon } from "lucide-react";
-import { useLab } from "@/models/lab-store";
+import { useLab, type LabState } from "@/models/lab-store";
+import { getPiazzaReading, usePiazzaReading, type PiazzaReading } from "@/models/sim-reading";
 import { heatStep, heatWords, piazzaMix, piazzaSummary, thirstStep, thirstWords, vineMixRows, vineSummary } from "@/models/project-summary";
 import { euroRange, grouped } from "@/models/intervention-cost";
-import { SEASONS, SEASON_LABEL, type Season } from "@/models/season-climate";
+import { SEASONS, SEASON_LABEL, coolingShare, type Season } from "@/models/season-climate";
 import { clockText } from "@/models/sim-when";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { zoneSummaryRows } from "@/models/drawn-area";
@@ -29,12 +30,28 @@ const useReducedMotion = () => {
   return reduce;
 };
 
-// The season the piazza is read in (summer by default): shared with the PDF report, so it prints what is on screen.
-let dashSeason: Season = "estate";
+// The season the piazza is read in: the simulation's own (its arc's season and hour) until another is picked here;
+// shared with the PDF report, so it prints what is on screen.
+let dashSeason: Season | null = null;
 const seasonSubs = new Set<() => void>();
-export const getDashSeason = () => dashSeason;
-const setDashSeason = (s: Season) => { dashSeason = s; seasonSubs.forEach((f) => f()); };
+export const getDashSeason = (): Season => dashSeason ?? getPiazzaReading()?.season ?? "estate";
+const setDashSeason = (s: Season) => { dashSeason = s === getPiazzaReading()?.season ? null : s; seasonSubs.forEach((f) => f()); };
 const useDashSeason = () => useSyncExternalStore((f) => { seasonSubs.add(f); return () => { seasonSubs.delete(f); }; }, () => dashSeason, () => dashSeason);
+
+/**
+ * The piazza as the dashboard and the report read it: on the simulation's season and hour, the very numbers and arc
+ * of the simulation (its published reading); another season picked here is read at that same hour, on an arc built
+ * the same way (from today + 0,6 down to what can be reached − 1,4).
+ */
+export function piazzaDash(urban: LabState["urban"], season: Season, profile: Record<Season, Array<number | null>> | null | undefined, areaM2: number | null, reading: PiazzaReading | null) {
+  const sum = piazzaSummary(urban, season, profile?.[season] ?? null, areaM2, reading?.hour ?? null);
+  const sim = !!reading && reading.season === season && reading.min != null && reading.max != null;
+  const before = sim ? reading!.before : sum.before, after = sim ? reading!.after : sum.after;
+  const lowest = before - 5.2 * coolingShare(before);
+  const min = sim ? reading!.min! : lowest - 1.4, max = sim ? reading!.max! : before + 0.6;
+  const when = sim ? reading!.when : `${SEASON_LABEL[season]}, ore ${clockText(sum.hour)}`;
+  return { sum, before, after, min, max, when, sim, fromSim: !!reading };
+}
 
 /** A section of the dashboard: a bold title, an optional hint on the right, then its content. */
 export function DashSection({ title, hint, children }: { title: string; hint?: ReactNode; children: ReactNode }) {
@@ -58,7 +75,7 @@ export function DashCard({ children, className }: { children: ReactNode; classNa
  * The result of the project, read-only: the same half ring as the simulation, the faint ring where it starts, the white
  * dot where the interventions bring it, and inside the reading, its words and the level.
  */
-function ResultArc({ before, after, min, max, unit, value, words, step, level, cost }: { before: number; after: number; min: number; max: number; unit: string; value: string; words: string; step: number; level: string | null; cost: string }) {
+function ResultArc({ before, after, min, max, unit, value, words, step, bg, level, cost }: { before: number; after: number; min: number; max: number; unit: string; value: string; words: string; step: number; bg?: string | undefined; level: string | null; cost: string }) {
   const R = 88, C = Math.PI * R;
   const share = (t: number) => Math.max(0, Math.min(1, (t - min) / (max - min)));
   const at = (t: number) => { const a = Math.PI * (1 - share(t)); return { x: 100 + Math.cos(a) * R, y: 100 - Math.sin(a) * R }; };
@@ -79,7 +96,7 @@ function ResultArc({ before, after, min, max, unit, value, words, step, level, c
         <text x="188" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{Math.round(max)}{unit}</text>
       </svg>
       <div className="absolute inset-x-0 bottom-1 flex flex-col items-center text-center">
-        <span className={cn("rounded-full px-3 py-1 text-xs font-semibold text-white", GAIN_BG[step])}>{words}</span>
+        <span className={cn("rounded-full px-3 py-1 text-xs font-semibold text-white", bg ?? GAIN_BG[step])}>{words}</span>
         <span className="mt-1 font-display text-5xl font-extralight leading-none tabular-nums">{value}</span>
         <span className="mt-1 text-xs text-muted-foreground">{level ?? "Nessun intervento"} · {cost}</span>
       </div>
@@ -221,23 +238,27 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
   const urban = useLab().urban;
   const reduce = useReducedMotion();
   const { lat, lng } = urban.location;
-  const season = useDashSeason();
+  const picked = useDashSeason();
+  const reading = usePiazzaReading();
+  const season = picked ?? reading?.season ?? "estate";
   const profile = useSeasonProfile(lat, lng);
   const fetchArea = useServerFn(getPlaceArea);
   const area = useQuery({ queryKey: ["place-area", lat, lng], queryFn: () => fetchArea({ data: { lat, lng } }), staleTime: Infinity, retry: 1 });
-  // The same summary the PDF report reads: a whole day of the season, read at its hottest hour.
-  const sum = piazzaSummary(urban, season, profile.data?.profile[season] ?? null, area.data?.m2 ?? null);
-  const { day, estimated, before, after, empty, m2 } = sum;
+  // The same reading as the simulation's arc (season, hour, numbers, ends), shared with the PDF report.
+  const dash = piazzaDash(urban, season, profile.data?.profile, area.data?.m2 ?? null, reading);
+  const sum = dash.sum;
+  const { day, estimated, empty, m2 } = sum;
+  const { before, after } = dash;
   const place = splitLocation(urban.location.label);
   return (
     <div className="space-y-8" data-testid="dashboard-urbana">
       <ResultCard kind="urban" place={place.name}
         when={<SeasonPills value={season} onChange={setDashSeason} />}>
-        <p className="text-center text-sm text-muted-foreground">Nell'ora più calda · {SEASON_LABEL[season].toLowerCase()}, ore {clockText(sum.hour)}</p>
-        <ResultArc before={before} after={after} min={Math.floor(Math.min(after, before) - 3)} max={Math.ceil(before + 2)} unit="°"
-          value={`${fmt1(after)}°`} words={heatWords(after)} step={heatStep(after)} level={sum.level} cost={empty ? "0 €" : euroRange(sum.cost)} />
+        <p className="text-center text-sm text-muted-foreground">{dash.sim ? "Come nella simulazione" : dash.fromSim ? "Alla stessa ora della simulazione" : "Nell'ora più calda"} · {dash.when.toLowerCase()}</p>
+        <ResultArc before={before} after={after} min={dash.min} max={dash.max} unit="°"
+          value={`${fmt1(after)}°`} words={heatWords(after)} step={heatStep(after)} bg={after < 10 ? "bg-urban" : after < 18 ? "bg-water" : undefined} level={sum.level} cost={empty ? "0 €" : euroRange(sum.cost)} />
         <p className="text-center text-sm">
-          {before - after >= 0.05 ? <>Da <b>{fmt1(before)}°</b> a <b className={GAIN_TEXT[heatStep(after)]}>{fmt1(after)}°</b> percepiti: <b>−{fmt1(before - after)}°</b></> : empty ? "Nessun intervento: apri la simulazione per provarne uno." : "In questa stagione gli interventi non cambiano il calore."}
+          {before - after >= 0.05 ? <>Da <b>{fmt1(before)}°</b> a <b className={GAIN_TEXT[heatStep(after)]}>{fmt1(after)}°</b> percepiti: <b>−{fmt1(before - after)}°</b></> : empty ? "Nessun intervento: apri la simulazione per provarne uno." : (dash.fromSim ? "A quest'ora gli interventi non cambiano il calore." : "In questa stagione gli interventi non cambiano il calore.")}
         </p>
       </ResultCard>
 

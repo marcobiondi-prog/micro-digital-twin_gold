@@ -29,7 +29,8 @@ import { Fold, FoldTabs } from "@/views/Fold";
 import { Ambient, PageHero, TabRow } from "@/views/v8/console";
 import { FieldAI } from "@/views/FieldAI";
 import { ExportSheet } from "@/views/v10/ExportSheet";
-import { DashCard, DashSection, PiazzaDashboard, PremiumPart, URBAN_LOCKED, VINE_LOCKED, VineDashboard, getDashSeason } from "@/views/v10/Dashboard";
+import { DashCard, DashSection, PiazzaDashboard, PremiumPart, URBAN_LOCKED, VINE_LOCKED, VineDashboard, getDashSeason, piazzaDash } from "@/views/v10/Dashboard";
+import { getPiazzaReading } from "@/models/sim-reading";
 import { useQueryClient } from "@tanstack/react-query";
 import { heatStep, heatWords, piazzaMix, piazzaSummary, thirstStep, thirstWords, vineMixRows, vineSummary } from "@/models/project-summary";
 import { SEASON_LABEL, type Season } from "@/models/season-climate";
@@ -448,7 +449,9 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   const season = getDashSeason();
   const areaOf = (key: unknown[]) => (qc.getQueryData(key) as { m2: number | null } | undefined)?.m2 ?? null;
   const yearOf = qc.getQueryData(["season-climate", u.location.lat, u.location.lng]) as { profile: Record<Season, Array<number | null>> } | undefined;
-  const ps = piazzaSummary(u, season, yearOf?.profile[season] ?? null, areaOf(["place-area", u.location.lat, u.location.lng]));
+  // The same reading as the dashboard's arc: the simulation's season and hour (its very numbers), else that hour of the season picked.
+  const pd = piazzaDash(u, season, yearOf?.profile, areaOf(["place-area", u.location.lat, u.location.lng]), getPiazzaReading());
+  const ps = { ...pd.sum, before: pd.before, after: pd.after };
   const vs = vineSummary(v, areaOf(["vine-area", v.location.lat, v.location.lng]));
   const notes = useNotes();
   const f1 = (n: number) => n.toLocaleString("it-IT", { maximumFractionDigits: 1, minimumFractionDigits: 1 });
@@ -457,7 +460,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   const resultRows: [string, string][] = ctx === "Urbano"
     ? [
       ["Luogo", u.location.label],
-      ["Quando", `Ora più calda · ${SEASON_LABEL[season].toLowerCase()}, ore ${clockText(ps.hour)}${ps.estimated ? " (stima indicativa)" : ""}`],
+      ["Quando", `${pd.sim ? "Come nella simulazione" : pd.fromSim ? "Alla stessa ora della simulazione" : "Ora più calda"} · ${pd.when.toLowerCase()}${ps.estimated ? " (stima indicativa)" : ""}`],
       ["Calore percepito", `da ${f1(ps.before)} °C a ${f1(ps.after)} °C (−${f1(ps.before - ps.after)} °C) · ${heatWords(ps.after)}`],
       ["Livello", ps.level ?? "Nessun intervento"],
       ["Costo indicativo", ps.empty ? "Nessun intervento" : euroRange(ps.cost)],
@@ -607,15 +610,15 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
     // The result, read like the dashboard.
     const urban = ctx === "Urbano";
     const before = urban ? ps.before : vs.before, after = urban ? ps.after : vs.after;
-    const min = urban ? Math.floor(Math.min(after, before) - 3) : Math.max(0, Math.floor(Math.min(after, before) - 8));
-    const max = urban ? Math.ceil(before + 2) : Math.min(100, Math.ceil(before + 6));
+    const min = urban ? pd.min : Math.max(0, Math.floor(Math.min(after, before) - 8));
+    const max = urban ? pd.max : Math.min(100, Math.ceil(before + 6));
     const stepIx = urban ? heatStep(after) : thirstStep(after);
     const words = urban ? heatWords(after) : thirstWords(after);
     const level = (urban ? ps.level : vs.level) ?? "Nessun intervento";
     const cost = (urban ? ps.empty : vs.empty) ? "0 €" : euroRange(urban ? ps.cost : vs.cost);
     card(M, y, CW, 92);
     doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...C.muted);
-    doc.text(clean(urban ? `Nell'ora più calda · ${SEASON_LABEL[season].toLowerCase()}, ore ${clockText(ps.hour)}` : "Sete delle viti · media delle tre zone"), W / 2, y + 10, { align: "center" });
+    doc.text(clean(urban ? `${pd.sim ? "Come nella simulazione" : pd.fromSim ? "Alla stessa ora della simulazione" : "Nell'ora più calda"} · ${pd.when.toLowerCase()}` : "Sete delle viti · media delle tre zone"), W / 2, y + 10, { align: "center" });
     const cy = y + 60;
     arc(W / 2, cy, 38, before, after, min, max);
     pill(words, W / 2, cy - 25, STEP[stepIx]!);
