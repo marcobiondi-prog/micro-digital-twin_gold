@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { crownRing, mowStripes, hedgeParts, netParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, TREE_RADIUS_M, treeParts } from "@/models/area-layout";
+import { mowStripes, hedgeParts, netParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts } from "@/models/area-layout";
 import { SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import { Crosshair, LoaderCircle } from "lucide-react";
 import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camera";
@@ -125,7 +125,6 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
     };
     if (sim?.kind === "piazza") {
       for (const pt of sim.data.patches) {
-        // Lawn: a fresh green with a darker edge; under a pergola its soft shadow, then posts, beams and a framed roof.
         // Lawn: a fresh green with a darker edge and light mowing stripes across it (a few lines, no extra surfaces).
         if (pt.kind === "lawn") {
           ground(pt.ring, "rgba(92,170,62,0.82)", "#3a7a28", 2);
@@ -137,17 +136,22 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
           }
           continue;
         }
-        ground(pt.ring, "rgba(11,15,21,0.3)");
+      }
+      // The shadows of the pergolas and the trees with the sun of the simulation's season and hour, over the lawn.
+      for (const r of sim.shadows ?? []) {
+        if (flat) out.push(absPoly({ fillColor: "rgba(11,15,21,0.3)", strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 }, r, 0.25));
+        else ground(r, "rgba(11,15,21,0.3)");
+      }
+      for (const pt of sim.data.patches) {
+        if (pt.kind !== "shade") continue;
         for (const p of pt.exact ? pergolaRingParts(pt.ring, true) : pergolaParts(pt.ring, true)) {
           if (p.base === 0) part({ ...p, color: "#5c3a1c" });
           else if (p.height < 3.2) part(p, p.height, "#4a2e14", 1);
           else part(p, p.height, PERGOLA_COLORS.beam, 3);
         }
       }
-      // Each tree: a soft shadow cast north on the ground, a dark trunk, then three crown discs each ringed a deeper green,
-      // so the layers read as foliage — five shapes a tree.
+      // Each tree: a dark trunk, then three crown discs each ringed a deeper green, so the layers read as foliage.
       for (const t of sim.data.trees) {
-        ground(crownRing([t[0] + 0.4 / 111_320, t[1]], TREE_RADIUS_M * 0.85, 12), "rgba(5,12,8,0.28)");
         for (const p of treeParts(t, undefined, 2.85)) {
           if (p.base === 0) part({ ...p, color: "#4e341c" });
           else part(p, (p.base + p.height) / 2, "rgba(14,52,20,0.75)", 1.5);

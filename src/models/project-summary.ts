@@ -1,3 +1,4 @@
+import { TREE_SHADE_M2 } from "./area-layout";
 import { drawnM2 } from "./drawn-area";
 import type { LabState } from "./lab-store";
 import { vineMetrics } from "./lab-store";
@@ -46,7 +47,7 @@ export function piazzaSummary(urban: LabState["urban"], season: Season, profile:
     hour: hot.h, before: hot.prima, after: hot.dopo, empty, level: empty ? null : levelName(preset) ?? "Su misura",
     m2, measured: drawn === null && areaM2 !== null, drawn: drawn !== null, cost: interventionCost(m2, urban.trees, urban.permeable, urban.shade).total,
     co2: Math.round(urban.trees * 22), water: Math.round(m2 * (urban.permeable / 100) * 0.7 * 0.6),
-    shadeM2: Math.round(m2 * (urban.shade / 100) + urban.trees * 30),
+    shadeM2: Math.round(m2 * (urban.shade / 100) + urban.trees * TREE_SHADE_M2),
     lawnM2: Math.round((m2 * urban.permeable) / 100), shadeArea: Math.round((m2 * urban.shade) / 100),
   };
 }

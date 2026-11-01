@@ -12,7 +12,9 @@ import { openAccount } from "@/lib/camera-dock";
 import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn } from "@/lib/demo-login";
 import { cn } from "@/lib/utils";
 import { setUrban, setVineyard, useLab, vineMetrics } from "@/models/lab-store";
-import { piazzaLayout, vineLayout, type LayoutEdits } from "@/models/area-layout";
+import { piazzaLayout, piazzaShadows, TREE_SHADE_M2, vineLayout, type LayoutEdits, type PiazzaLayout } from "@/models/area-layout";
+import { sunAt } from "@/models/sun-shadow";
+import { getSimWhen } from "@/models/sim-when";
 import { applyZoneMix, vineMixOf, zoneMixOf } from "@/models/vine-interventions";
 import { usePiazzaReading } from "@/models/sim-reading";
 import { Thermometer } from "lucide-react";
@@ -100,17 +102,22 @@ export function SimMap({ kind }: { kind: SimKind }) {
   // The simulation inside the saved area: automatic from the levers, plus what was moved by hand (kept with the area).
   const [arranging, setArranging] = useState(false);
   useEffect(() => { if (!saved) setArranging(false); }, [saved]);
+  const reading = usePiazzaReading(), rSeason = reading?.season, rHour = reading?.hour;
   const sim = useMemo<SimLayout | null>(() => {
     if (!saved) return null;
     const edits = saved.edits ?? {}, inner = zonesOfArea(saved);
     if (kind === "urban") {
       const data = piazzaLayout(saved.ring, lab.urban.trees, lab.urban.permeable, lab.urban.shade, edits, inner);
-      return data ? { kind: "piazza", data, inner } : null;
+      if (!data) return null;
+      // The shadows with the sun of the simulation's season and hour (its "when" chip), on the area's place.
+      const when = getSimWhen("urban"), season = rSeason ?? when?.season, hour = rHour ?? when?.hour;
+      const sun = season !== undefined && hour !== undefined ? sunAt(saved.lat, saved.lng, season, hour, when?.minute ?? 0, when?.dst) : null;
+      return { kind: "piazza", data, inner, shadows: piazzaShadows(data, sun) };
     }
     const v = lab.vineyard, fallback = vineMixOf(v);
     const data = vineLayout(saved.ring, v.zones.map((z) => zoneMixOf(z, fallback)), edits, inner);
     return data ? { kind: "vigneto", data, thirst: vineMetrics(v).results.map((r) => r.s), inner } : null;
-  }, [saved, kind, lab.urban, lab.vineyard]);
+  }, [saved, kind, lab.urban, lab.vineyard, rSeason, rHour]);
   const setZones = (zones: SubArea[]) => {
     if (!saved) return;
     const area = { ...saved, zones };
@@ -223,7 +230,7 @@ export function SimMap({ kind }: { kind: SimKind }) {
       ) : <>
       <AreaBar drawing={drawing} pins={ring.length} m2={ring.length >= 3 ? pinsM2(ring) : null} saved={!!saved} vineyard={kind === "vineyard"}
         onStart={() => { setArranging(false); startDrawing(); }} onUndo={() => setDraft((d) => d.slice(0, -1))} onCancel={() => setDrawing(false)} onFinish={finish} onRemove={remove} />
-      {sim && !drawing && <SimBar sim={sim} arranging={arranging} edited={!!saved?.edits && Object.keys(saved.edits).length > 0} best={!!saved?.edits?.best}
+      {sim && !drawing && <SimBar sim={sim} when={reading?.when} arranging={arranging} edited={!!saved?.edits && Object.keys(saved.edits).length > 0} best={!!saved?.edits?.best}
         onArrange={() => { setView("2d"); setArranging((a) => !a); }} onAuto={() => { setEdits({}); toast("Disposizione automatica ripristinata"); }}
         onBest={() => {
           setEdits({ best: true });
@@ -334,13 +341,27 @@ function AreaBar({ drawing, pins, m2, saved, vineyard, onStart, onUndo, onCancel
 
 const dot = (color: string, round = true) => <span className={cn("inline-block size-3 shrink-0", round ? "rounded-full" : "rounded-[3px]")} style={{ background: color }} aria-hidden="true" />;
 
+/** What the shadows on the map are: the sun of the simulation's season and hour; none with the sun down. */
+function shadowText(sim: Extract<SimLayout, { kind: "piazza" }>, when?: string) {
+  const at = when ? ` (${when.toLowerCase()})` : "";
+  if (!sim.data.trees.length && !sim.data.shadeM2) return "";
+  return sim.shadows?.length ? `Le ombre seguono il sole della simulazione${at}: si allungano col sole basso e girano con le ore. ` : `A quest'ora${at} il sole è sotto l'orizzonte: niente ombre. `;
+}
+/** Says when the area has no room for all the m² the simulation counts. */
+function roomText(l: PiazzaLayout) {
+  const short = (got: number, want: number) => want > 0 && got < want * 0.95 - 10;
+  const parts = [short(l.lawnM2, l.lawnTarget) && `prato ${l.lawnTarget.toLocaleString("it-IT")} m²`, short(l.shadeM2, l.shadeTarget) && `pergolati ${l.shadeTarget.toLocaleString("it-IT")} m²`].filter(Boolean);
+  return parts.length ? `La simulazione conta ${parts.join(" e ")}: nell'area disegnata c'è posto per meno.` : "Prato e pergolati hanno sulla mappa gli stessi m² contati dalla simulazione.";
+}
+
 /**
  * Under the area: what the map shows inside it (a small legend that follows the levers) and the hand mode: "Sposta
  * elementi" makes each tree and the Prato / Ombra (or Frangivento) labels draggable; "Disposizione automatica" undoes the moves.
  */
-function SimBar({ sim, arranging, edited, best, onArrange, onAuto, onBest }: { sim: SimLayout; arranging: boolean; edited: boolean; best: boolean; onArrange: () => void; onAuto: () => void; onBest: () => void }) {
+function SimBar({ sim, when, arranging, edited, best, onArrange, onAuto, onBest }: { sim: SimLayout; when?: string | undefined; arranging: boolean; edited: boolean; best: boolean; onArrange: () => void; onAuto: () => void; onBest: () => void }) {
+  const m2 = (v: number) => `${Math.round(v).toLocaleString("it-IT")} m²`;
   const legend = sim.kind === "piazza"
-    ? [[dot(SIM_COLORS.tree), `Alberi ${sim.data.trees.length}`], [dot(SIM_COLORS.lawn, false), "Prato"], [dot(SIM_COLORS.shade, false), "Pergolati (ombra)"]] as const
+    ? [[dot(SIM_COLORS.tree), `Alberi ${sim.data.trees.length} · ${m2(sim.data.trees.length * TREE_SHADE_M2)} di chioma`], [dot(SIM_COLORS.lawn, false), `Prato ${m2(sim.data.lawnM2)}`], [dot(SIM_COLORS.shade, false), `Pergolati ${m2(sim.data.shadeM2)}`], [dot("#0b0f15", false), "Ombre"]] as const
     : [[dot(thirstColor(10), false), "Zone (colore = sete)"], [dot(SIM_COLORS.drip, false), "Irrigazione"], [dot(SIM_COLORS.cloth, false), "Teli d'ombra"], [dot(SIM_COLORS.wind, false), "Frangivento"]] as const;
   return (
     <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4">
@@ -348,6 +369,7 @@ function SimBar({ sim, arranging, edited, best, onArrange, onAuto, onBest }: { s
       <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-muted-foreground" aria-label="Legenda">
         {legend.map(([icon, text]) => <li key={text} className="inline-flex items-center gap-1.5">{icon}{text}</li>)}
       </ul>
+      {sim.kind === "piazza" && <p className="text-sm text-muted-foreground">{shadowText(sim, when)}{roomText(sim.data)}</p>}
       <p className="text-sm text-muted-foreground">{arranging
         ? sim.kind === "piazza" ? "Trascina gli alberi, o le etichette Prato e Ombra per spostare quelle zone." : "Trascina l'etichetta Frangivento verso il lato dove lo vuoi."
         : best && sim.kind === "piazza"

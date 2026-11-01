@@ -13,12 +13,17 @@ export type LayoutEdits = { trees?: Array<LatLng | null>; lawnAt?: LatLng | null
 /** `exact`: the very ring of a zone drawn by hand (a Prato or Pergolato zone), not a strip of grid cells. */
 export type Patch = { ring: Ring; kind: "lawn" | "shade" | "zone" | "cloth"; zone?: number; exact?: boolean };
 export type Line = { line: Ring; kind: "drip" | "wind" | "seam"; zone?: number; strength?: number };
-/** `sunny`: with `best`, the share of the area in the summer sun for most of the day (0–1), to say why. */
-export type PiazzaLayout = { trees: LatLng[]; patches: Patch[]; lawnAt: LatLng; shadeAt: LatLng; cell: number; sunny?: number };
+/**
+ * `sunny`: with `best`, the share of the area in the summer sun for most of the day (0–1), to say why. `lawnM2` /
+ * `shadeM2`: the m² actually drawn as lawn and pergola; `lawnTarget` / `shadeTarget`: the m² the simulation counts
+ * (the lever's share of the usable surface), so the map can say when there is no room for all of it.
+ */
+export type PiazzaLayout = { trees: LatLng[]; patches: Patch[]; lawnAt: LatLng; shadeAt: LatLng; cell: number; sunny?: number; lawnM2: number; shadeM2: number; lawnTarget: number; shadeTarget: number };
 export type VineLayout = { patches: Patch[]; lines: Line[]; windAt: LatLng; zones: LatLng[] };
 
-/** The tree crown's radius on the map (m): about an 8 m crown. */
-export const TREE_RADIUS_M = 4;
+/** The shade one tree gives in the simulation (m², models/project-summary) and so its crown on the map: about 6,2 m wide. */
+export const TREE_SHADE_M2 = 30;
+export const TREE_RADIUS_M = Math.sqrt(TREE_SHADE_M2 / Math.PI);
 const M = 111_195;
 
 type Frame = { lat0: number; lng0: number; k: number };
@@ -144,11 +149,17 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
   const lawnAt = edits.lawnAt ? toXY(f, edits.lawnAt) : ([minX + (maxX - minX) * 0.25, cy] as [number, number]);
   const shadeAt = edits.shadeAt ? toXY(f, edits.shadeAt) : ([minX + (maxX - minX) * 0.75, cy] as [number, number]);
   const byDist = (p: [number, number]) => (a: Cell, b: Cell) => dist([a.x, a.y], p) - dist([b.x, b.y], p);
-  const nLawn = Math.round((Math.max(0, Math.min(100, lawn)) / 100) * cells.length);
-  const nShade = Math.round((Math.max(0, Math.min(100, shade)) / 100) * cells.length);
+  // The m² the simulation counts: the lever's share of the usable surface (the area less the zones left free). The
+  // zones drawn for lawn or pergola count with their own surface; the rest is made of whole cells (c² each).
+  const zoneM2 = (kind: string) => zones.filter((z) => z.kind === kind && z.ring.length >= 3).reduce((t, z) => t + ringAreaM2(z.ring), 0);
+  const usable = Math.max(0, ringAreaM2(ring) - zoneM2("libera"));
+  const lawnTarget = (Math.max(0, Math.min(100, lawn)) / 100) * usable, shadeTarget = (Math.max(0, Math.min(100, shade)) / 100) * usable;
+  const exactLawnM2 = lawnTarget > 0 ? zoneM2("prato") : 0, exactShadeM2 = shadeTarget > 0 ? zoneM2("ombra") : 0;
   // The zones drawn for lawn or pergola come first (only while the lever has some), then the rest of the share around its centre.
-  const fixedLawn = nLawn ? cells.filter((x) => isLawn(x.x, x.y)) : [];
-  const fixedShade = nShade ? cells.filter((x) => isShade(x.x, x.y) && !fixedLawn.includes(x)) : [];
+  const fixedLawn = lawnTarget > 0 ? cells.filter((x) => isLawn(x.x, x.y)) : [];
+  const fixedShade = shadeTarget > 0 ? cells.filter((x) => isShade(x.x, x.y) && !fixedLawn.includes(x)) : [];
+  const nLawn = fixedLawn.length + Math.round(Math.max(0, lawnTarget - exactLawnM2) / (c * c));
+  const nShade = fixedShade.length + Math.round(Math.max(0, shadeTarget - exactShadeM2) / (c * c));
   const reserved = new Set([...fixedLawn, ...fixedShade]);
   // The automatic lawn and pergolas keep off the zones drawn for trees, unless there is no other room.
   const forTrees = new Set(cells.filter((x) => isTrees(x.x, x.y)));
@@ -218,8 +229,11 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
   const placed = auto.map((p, i) => { const e = edits.trees?.[i]; return e ? keepInside(e) : toLL(f, p[0], p[1]); });
   const rest = cells.filter((x) => !new Set(lawnCells).has(x));
   const centre = (list: Cell[], fallback: [number, number]): [number, number] => list.length ? [list.reduce((t, q) => t + q.x, 0) / list.length, list.reduce((t, q) => t + q.y, 0) / list.length] : fallback;
+  const autoLawn = lawnCells.filter((x) => !fixedLawn.includes(x)).length, autoShade = shadeCells.filter((x) => !fixedShade.includes(x)).length;
   return {
     trees: placed, cell: c,
+    lawnM2: Math.round((fixedLawn.length ? exactLawnM2 : 0) + autoLawn * c * c), shadeM2: Math.round((fixedShade.length ? exactShadeM2 : 0) + autoShade * c * c),
+    lawnTarget: Math.round(lawnTarget), shadeTarget: Math.round(shadeTarget),
     ...(best ? { sunny: cells.filter((x) => sunOf(x) >= 0.6).length / cells.length } : {}),
     // A Prato or Pergolato zone is drawn as its own outline, exactly as big as it was drawn; only the rest of the
     // lever's share is made of grid strips.
@@ -309,6 +323,48 @@ export function vineLayout(ring: Ring, mixes: ZoneMix[], edits: LayoutEdits = {}
   return { patches, lines, zones, windAt: toLL(f, ...mids[e]!) };
 }
 
+/** The heights shadows are cast from: a pergola's roof, a tree's crown from its lowest branches to its top. */
+export const PERGOLA_ROOF_M = 3.2;
+const CROWN_LOW_M = 2.5, CROWN_HIGH_M = 9;
+export type SunPos = { az: number; alt: number };
+/** How far (m, east and north) the shadow of a point `h` m up falls; capped at 5 × h when the sun is low. */
+const castBy = (h: number, sun: SunPos): [number, number] => {
+  const d = Math.min(h / Math.tan(sun.alt), h * 5);
+  return [-Math.sin(sun.az) * d, -Math.cos(sun.az) * d];
+};
+const moveRing = (ring: Ring, dx: number, dy: number): Ring => ring.map(([lat, lng]) => [lat + dy / M, lng + dx / (M * Math.cos((lat * Math.PI) / 180))] as LatLng);
+/** The convex hull of some points (Andrew's monotone chain). */
+function hull(pts: Ring): Ring {
+  const p = [...pts].sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+  const cross = (o: LatLng, a: LatLng, b: LatLng) => (a[1] - o[1]) * (b[0] - o[0]) - (a[0] - o[0]) * (b[1] - o[1]);
+  const half = (list: Ring) => { const h: LatLng[] = []; for (const q of list) { while (h.length >= 2 && cross(h[h.length - 2]!, h[h.length - 1]!, q) <= 0) h.pop(); h.push(q); } h.pop(); return h; };
+  return [...half(p), ...half([...p].reverse())];
+}
+
+/**
+ * The shadows the piazza casts with the sun at `sun` (the simulation's season and hour, models/sun-shadow): each pergola
+ * roof's outline moved away from the sun by its height over the sun's tangent; each tree's crown stretched from its
+ * lowest branches' shadow to its top's, plus its trunk's. None with the sun down.
+ */
+export function piazzaShadows(l: PiazzaLayout, sun: SunPos | null): Ring[] {
+  if (!sun || sun.alt <= 0.05) return [];
+  const out: Ring[] = [];
+  const [px, py] = castBy(PERGOLA_ROOF_M, sun);
+  for (const p of l.patches) if (p.kind === "shade") out.push(moveRing(p.ring, px, py));
+  const [lx, ly] = castBy(CROWN_LOW_M, sun), [hx, hy] = castBy(CROWN_HIGH_M, sun);
+  const len = Math.hypot(lx, ly);
+  for (const t of l.trees) {
+    const crown = crownRing(t, TREE_RADIUS_M, 16);
+    out.push(hull([...moveRing(crown, lx, ly), ...moveRing(crown, hx, hy)]));
+    // The trunk: a thin band from its foot to the crown's shadow.
+    if (len > 0.3) {
+      const nx = (-ly / len) * 0.2, ny = (lx / len) * 0.2;
+      out.push(moveRing([t, t, t, t], 0, 0).map((q, i) => moveRing([q], (i < 2 ? 0 : lx) + (i === 0 || i === 3 ? nx : -nx), (i < 2 ? 0 : ly) + (i === 0 || i === 3 ? ny : -ny))[0]!));
+    }
+  }
+  return out;
+}
+
 /** A tree's crown as a small polygon (for the 3D views). */
 export function crownRing([lat, lng]: LatLng, radius = TREE_RADIUS_M, sides = 10): Ring {
   const k = M * Math.cos((lat * Math.PI) / 180);
@@ -328,7 +384,8 @@ const CROWN_GREENS = ["#2f7d32", "#3a8f3c", "#2b6e2f", "#46963f", "#357a3a"];
 export function treeParts(at: LatLng, radius = TREE_RADIUS_M, step = 0.5): TreePart[] {
   const seed = Math.abs(Math.round(at[0] * 1e6 + at[1] * 1e6));
   const green = CROWN_GREENS[seed % CROWN_GREENS.length]!;
-  const r = radius * 0.85 * (0.9 + ((seed >> 3) % 5) * 0.05);
+  // The widest tier is the crown the simulation counts (TREE_RADIUS_M), give or take 5 %, so it stays inside the area.
+  const r = radius * (0.95 + ((seed >> 3) % 5) * 0.025);
   const parts: TreePart[] = [{ ring: crownRing(at, 0.35, 8), base: 0, height: 3, color: "#6b4f2e" }];
   const bottom = 2.5, top = 11, tiers = [[2.5, 6], [5, 8.6], [7.6, 11]] as const;
   for (let h = bottom; h < top - 1e-6; h += step) {

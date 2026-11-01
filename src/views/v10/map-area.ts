@@ -61,7 +61,8 @@ export function pinElement(n: number, drawing: boolean): HTMLElement {
 // ——— The simulation drawn inside the area (models/area-layout) ———
 
 /** `inner`: the smaller areas drawn inside the big one (free zones, zones for one intervention, lots). */
-export type SimLayout = ({ kind: "piazza"; data: PiazzaLayout } | { kind: "vigneto"; data: VineLayout; thirst: number[] }) & { inner?: SubArea[] };
+/** `shadows`: the piazza's shadows at the simulation's season and hour (models/area-layout piazzaShadows); none at night. */
+export type SimLayout = ({ kind: "piazza"; data: PiazzaLayout; shadows?: Ring[] } | { kind: "vigneto"; data: VineLayout; thirst: number[] }) & { inner?: SubArea[] };
 /** The outline colour of each kind of inner zone. */
 export const ZONE_COLORS: Record<ZoneKind, string> = { libera: "#cbd5e1", alberi: "#4ade80", prato: "#86efac", ombra: PERGOLA_COLORS.slat, lotto: "#fbbf24" };
 /** A zone's short name on the map. */
@@ -86,10 +87,12 @@ export function simFeatures(sim: SimLayout | null, withTreePoints: boolean) {
   if (!sim) return fc([]);
   const out: unknown[] = [];
   if (sim.kind === "piazza") {
-    // Shade: in 2D the slatted pergola pattern; in 3D only the shadow it casts on the ground (the pergola stands over it).
-    for (const p of sim.data.patches) out.push(poly(p.ring, p.kind === "lawn"
+    // Shade: in 2D the slatted pergola pattern (in 3D the pergola stands over its ground); then the shadows the pergolas
+    // and the trees cast with the sun of the simulation's season and hour.
+    for (const p of sim.data.patches) if (p.kind === "lawn" || withTreePoints) out.push(poly(p.ring, p.kind === "lawn"
       ? { kind: "lawn", color: SIM_COLORS.lawn, opacity: 0.55 }
-      : withTreePoints ? { kind: "shade", color: SIM_COLORS.shade, opacity: 0.9 } : { kind: "shadow", color: "#0b0f15", opacity: 0.35 }));
+      : { kind: "shade", color: SIM_COLORS.shade, opacity: 0.9 }));
+    for (const r of sim.shadows ?? []) out.push(poly(r, { kind: "shadow", color: "#0b0f15", opacity: 0.32 }));
     if (withTreePoints) for (const t of sim.data.trees) out.push({ type: "Feature", properties: { kind: "tree" }, geometry: { type: "Point", coordinates: [t[1], t[0]] } });
   } else {
     // Zones: rows of vines on soil tinted by their thirst; cloth: a dark shade net; drip lines and the hedge drawn below.
@@ -202,7 +205,7 @@ export function addSimLayers(map: MlMap, lat: number, raised = false) {
   if (map.getSource(SIM_SOURCE)) return;
   const before = map.getLayer("drawn-area-line") ? "drawn-area-line" : undefined;
   map.addSource(SIM_SOURCE, { type: "geojson", data: fc([]) });
-  map.addLayer({ id: "sim-fill", type: "fill", source: SIM_SOURCE, filter: ["all", ["==", ["geometry-type"], "Polygon"], ["!=", ["get", "kind"], "shade"], ["!=", ["get", "kind"], "lawn"], ["!=", ["get", "kind"], "zone"], ["!=", ["get", "kind"], "cloth"], ["!=", ["get", "kind"], "tint"]], paint: { "fill-color": ["get", "color"], "fill-opacity": ["get", "opacity"] } }, before);
+  map.addLayer({ id: "sim-fill", type: "fill", source: SIM_SOURCE, filter: ["all", ["==", ["geometry-type"], "Polygon"], ["!=", ["get", "kind"], "shade"], ["!=", ["get", "kind"], "lawn"], ["!=", ["get", "kind"], "zone"], ["!=", ["get", "kind"], "cloth"], ["!=", ["get", "kind"], "tint"], ["!=", ["get", "kind"], "shadow"]], paint: { "fill-color": ["get", "color"], "fill-opacity": ["get", "opacity"] } }, before);
   // The vineyard: rows of vines on soil tinted by each zone's thirst, a white seam around each zone, the shade nets.
   const thirstTints = [[0x6f, 0x8f, 0x4a], [0x9a, 0x85, 0x3c], [0x9c, 0x5a, 0x3a]] as const;
   VINE_IMAGES.forEach((id, i) => { if (!map.hasImage(id)) map.addImage(id, vineImage(thirstTints[i]!)); });
@@ -215,6 +218,8 @@ export function addSimLayers(map: MlMap, lat: number, raised = false) {
   // The lawn: mowing stripes and blades of grass, without the hairlines between its row strips.
   if (!map.hasImage(LAWN_IMAGE)) map.addImage(LAWN_IMAGE, lawnImage());
   map.addLayer({ id: "sim-lawn", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "lawn"], paint: { "fill-pattern": LAWN_IMAGE, "fill-opacity": 0.95, "fill-antialias": false } }, before);
+  // The shadows cast on the ground (over the lawn, under the pergolas and the trees), without seams where they overlap.
+  map.addLayer({ id: "sim-shadow", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "shadow"], paint: { "fill-color": "#0b0f15", "fill-opacity": 0.32, "fill-antialias": false } }, before);
   // The pergolas seen from above: slats with light between them, and a wooden frame.
   if (!map.hasImage(SLATS_IMAGE)) map.addImage(SLATS_IMAGE, slatsImage());
   map.addLayer({ id: "sim-pergola", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "shade"], paint: { "fill-pattern": SLATS_IMAGE, "fill-opacity": 0.95 } }, before);
@@ -245,6 +250,7 @@ export function setSimGhost(map: MlMap, ghost: boolean) {
   set("sim-fill", "fill-opacity", ["*", ["get", "opacity"], k]);
   set("sim-lawn", "fill-opacity", 0.95 * k);
   set("sim-pergola", "fill-opacity", 0.95 * k);
+  set("sim-shadow", "fill-opacity", 0.32 * k);
   set("sim-pergola-frame", "line-opacity", k);
   set("sim-line", "line-opacity", k);
   set("sim-vine", "fill-opacity", 0.92 * k);

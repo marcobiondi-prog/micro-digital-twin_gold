@@ -1,3 +1,4 @@
+import { TREE_SHADE_M2 } from "@/models/area-layout";
 import { drawnM2 } from "@/models/drawn-area";
 import { loadPlaceArea } from "@/lib/place-area-client";
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
@@ -260,7 +261,7 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
   // Same yearly estimates as the dashboard, on this surface (700 mm of rain, 60 % kept by permeable ground).
   const co2 = Math.round(urban.trees * 22);
   const water = Math.round(m2 * (urban.permeable / 100) * 0.7 * 0.6);
-  const shadeM2 = Math.round(m2 * (urban.shade / 100) + urban.trees * 30);
+  const shadeM2 = Math.round(m2 * (urban.shade / 100) + urban.trees * TREE_SHADE_M2);
 
   // Levers set totals, so the squares are placed again from the default layout.
   const change = (patch: { trees?: number; permeable?: number; shade?: number }) => {
