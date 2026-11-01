@@ -86,3 +86,26 @@ describe("pergolas", () => {
     expect(parts.filter((p) => p.base === 0).length).toBeGreaterThanOrEqual(4);
   });
 });
+
+describe("zones drawn by hand", () => {
+  // A 24 m × 20 m trees zone in the middle of the area.
+  const zLat = 20 / 111_195, zLng = 24 / (111_195 * Math.cos((lat * Math.PI) / 180));
+  const zone: Array<[number, number]> = [[lat + dLat / 2 - zLat / 2, lng + dLng / 2 - zLng / 2], [lat + dLat / 2 - zLat / 2, lng + dLng / 2 + zLng / 2], [lat + dLat / 2 + zLat / 2, lng + dLng / 2 + zLng / 2], [lat + dLat / 2 + zLat / 2, lng + dLng / 2 - zLng / 2]];
+  it("keep every tree's whole crown inside its trees zone", async () => {
+    const { TREE_RADIUS_M } = await import("@/models/area-layout");
+    const l = piazzaLayout(ring, 6, 0, 0, {}, [{ kind: "alberi", ring: zone }])!;
+    expect(l.trees).toHaveLength(6);
+    const r = (TREE_RADIUS_M * 0.85) / 111_195;
+    for (const [a, b] of l.trees) for (let i = 0; i < 8; i++) {
+      const ang = (i * Math.PI) / 4;
+      expect(ringContains(zone, a + Math.sin(ang) * r * 0.99, b + (Math.cos(ang) * r * 0.99) / Math.cos((lat * Math.PI) / 180))).toBe(true);
+    }
+  });
+  it("stripe a lawn only inside its outline", async () => {
+    const { mowStripes } = await import("@/models/area-layout");
+    const lines = mowStripes(zone);
+    expect(lines.length).toBeGreaterThan(3);
+    for (const line of lines) for (const [a, b] of line) expect(ringContains(zone, a, b)).toBe(true);
+  });
+});
+

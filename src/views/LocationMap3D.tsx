@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { crownRing, hedgeParts, netParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, TREE_RADIUS_M, treeParts } from "@/models/area-layout";
+import { crownRing, mowStripes, hedgeParts, netParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, TREE_RADIUS_M, treeParts } from "@/models/area-layout";
 import { SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import { Crosshair, LoaderCircle } from "lucide-react";
 import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camera";
@@ -85,7 +85,16 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
     if (sim?.kind === "piazza") {
       for (const pt of sim.data.patches) {
         // Lawn: a fresh green with a darker edge; under a pergola its soft shadow, then posts, beams and a framed roof.
-        if (pt.kind === "lawn") { ground(pt.ring, "rgba(104,182,70,0.78)", "#3d7f2a", 2); continue; }
+        // Lawn: a fresh green with a darker edge and light mowing stripes across it (a few lines, no extra surfaces).
+        if (pt.kind === "lawn") {
+          ground(pt.ring, "rgba(92,170,62,0.82)", "#3a7a28", 2);
+          if (Polyline3DElement) for (const line of mowStripes(pt.ring)) {
+            const pl = new Polyline3DElement({ altitudeMode: "CLAMP_TO_GROUND", strokeColor: "rgba(178,226,120,0.55)", strokeWidth: 5, drawsOccludedSegments: true }) as Shape;
+            pl.coordinates = line.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng }));
+            out.push(pl);
+          }
+          continue;
+        }
         ground(pt.ring, "rgba(11,15,21,0.3)");
         for (const p of pt.exact ? pergolaRingParts(pt.ring, true) : pergolaParts(pt.ring, true)) {
           if (p.base === 0) part({ ...p, color: "#5c3a1c" });

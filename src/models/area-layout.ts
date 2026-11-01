@@ -76,13 +76,21 @@ const nearestCell = (cells: Cell[], p: [number, number]) => cells.reduce((b, c) 
 function treeSpots(ring: Ring, f: Frame, n: number, box: { minX: number; maxX: number; minY: number; maxY: number }, allowed: (x: number, y: number) => boolean = () => true, room = ringAreaM2(ring)): Array<[number, number]> {
   if (n <= 0) return [];
   const area = room;
-  const fits = (x: number, y: number) => allowed(x, y) && [[0, 0], [2, 0], [-2, 0], [0, 2], [0, -2]].every(([dx, dy]) => inside(ring, f, x + dx!, y + dy!));
-  let t = Math.sqrt(area / n), spots: Array<[number, number]> = [];
-  for (let k = 0; k < 40; k++) {
-    spots = [];
-    for (let y = box.minY + t / 2; y <= box.maxY; y += t) for (let x = box.minX + t / 2; x <= box.maxX; x += t) if (fits(x, y)) spots.push([x, y]);
-    if (spots.length >= n || t < 2.5) break;
-    t *= 0.88;
+  // The whole crown stays inside the area and inside its trees zone (as big as it was drawn): the trunk is kept a crown's
+  // reach (3.4 m, the drawn crown) from every edge; in a place too small for that the margin shrinks step by step.
+  const ring8 = (m: number) => [[0, 0], ...Array.from({ length: 8 }, (_, i) => [Math.cos((i * Math.PI) / 4) * m, Math.sin((i * Math.PI) / 4) * m])];
+  let spots: Array<[number, number]> = [];
+  for (const margin of [TREE_RADIUS_M * 0.85, 2, 1, 0]) {
+    const offs = ring8(margin);
+    const fits = (x: number, y: number) => offs.every(([dx, dy]) => allowed(x + dx!, y + dy!) && inside(ring, f, x + dx!, y + dy!));
+    let t = Math.sqrt(area / n);
+    for (let k = 0; k < 40; k++) {
+      spots = [];
+      for (let y = box.minY + t / 2; y <= box.maxY; y += t) for (let x = box.minX + t / 2; x <= box.maxX; x += t) if (fits(x, y)) spots.push([x, y]);
+      if (spots.length >= n || t < 2.5) break;
+      t *= 0.88;
+    }
+    if (spots.length >= n) break;
   }
   if (spots.length <= n) return spots;
   // More spots than trees: take them evenly through the grid.
@@ -321,6 +329,28 @@ export function pergolaRingParts(ring: Ring, lite = false): TreePart[] {
   });
   parts.push({ ring, base: 3.1, height: 3.25, color: `${PERGOLA_COLORS.slat}b3` });
   return parts;
+}
+
+/**
+ * Mowing stripes across a lawn for the 3D view: east–west lines every `spacing` m, cut to the lawn's outline (each
+ * scanline split where it crosses the edges), at most `max` of them so a big lawn stays light.
+ */
+export function mowStripes(ring: Ring, spacing = 3, max = 24): Ring[] {
+  if (ring.length < 3) return [];
+  const f = frameOf(ring), pts = ring.map((p) => toXY(f, p));
+  const ys = pts.map((p) => p[1]), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const step = Math.max(spacing, (y1 - y0) / max);
+  const out: Ring[] = [];
+  for (let y = y0 + step / 2; y < y1; y += step) {
+    const xs: number[] = [];
+    pts.forEach((a, i) => {
+      const b = pts[(i + 1) % pts.length]!;
+      if ((a[1] <= y && b[1] > y) || (b[1] <= y && a[1] > y)) xs.push(a[0] + ((y - a[1]) * (b[0] - a[0])) / (b[1] - a[1]));
+    });
+    xs.sort((p, q) => p - q);
+    for (let k = 0; k + 1 < xs.length; k += 2) if (xs[k + 1]! - xs[k]! > 0.5) out.push([toLL(f, xs[k]! + 0.3, y), toLL(f, xs[k + 1]! - 0.3, y)]);
+  }
+  return out;
 }
 
 /** Vineyard 3D colours: the hedge of the windbreak and the shade net. */
