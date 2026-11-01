@@ -58,7 +58,7 @@ export const suggestOsmLocations = createServerFn({ method: "POST" })
 /** Surface of the chosen place from its mapped shape (square, pedestrian area or park containing the point); none, no number. */
 export const getPlaceArea = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180), kind: z.enum(["piazza", "vigneto"]).optional() }).parse(d))
-  .handler(async ({ data }): Promise<{ m2: number; name?: string | undefined } | null> => {
+  .handler(async ({ data }): Promise<{ m2: number; name?: string | undefined; centre?: [number, number] } | null> => {
     try {
       const r = await fetch("https://overpass-api.de/api/interpreter", {
         method: "POST",
@@ -68,6 +68,6 @@ export const getPlaceArea = createServerFn({ method: "POST" })
       if (!r.ok) { console.error(`Place area failed [${r.status}]`); return null; }
       const j = (await r.json()) as { elements?: Parameters<typeof areaCandidates>[0] };
       const area = placeArea(areaCandidates(j.elements ?? []), data.lat, data.lng);
-      return area ? { m2: area.m2, name: area.name } : null;
+      return area ? { m2: area.m2, name: area.name, centre: area.centre } : null;
     } catch { return null; }
   });

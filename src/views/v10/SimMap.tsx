@@ -1,4 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { toast } from "sonner";
 import { Check, Hand, Lock, MapPin, PenLine, RotateCcw, Trash2, Undo2, X } from "lucide-react";
 import { useSignedIn } from "@/lib/use-signed-in";
@@ -52,6 +55,17 @@ export function SimMap({ kind }: { kind: SimKind }) {
   const zoom3d = kind === "urban" ? 17 : 15;
   // The area drawn with pins for this place (kept with the simulation), and the pins being placed while drawing.
   const saved = drawnAreaFor(kind === "urban" ? lab.urban.area : lab.vineyard.area, loc);
+  // The pin stands at the middle of the place's mapped shape (the square, the park, the vineyard plot that contains the
+  // point), not on the address's point, which can fall a few metres aside; without a shape, on the point. Same query
+  // (and cache) as the surface used by the simulation.
+  const fetchArea = useServerFn(getPlaceArea);
+  const placeShape = useQuery({
+    queryKey: kind === "urban" ? ["place-area", loc.lat, loc.lng] : ["vine-area", loc.lat, loc.lng],
+    queryFn: () => fetchArea({ data: kind === "urban" ? { lat: loc.lat, lng: loc.lng } : { lat: loc.lat, lng: loc.lng, kind: "vigneto" } }),
+    staleTime: Infinity, retry: 1,
+  });
+  const centre = placeShape.data?.centre;
+  const pin = centre ? { lat: centre[0], lng: centre[1] } : { lat: loc.lat, lng: loc.lng };
   const [drawing, setDrawing] = useState(false);
   const [draft, setDraft] = useState<Ring>([]);
   useEffect(() => { setDrawing(false); }, [loc.lat, loc.lng]);
@@ -180,10 +194,10 @@ export function SimMap({ kind }: { kind: SimKind }) {
         <MapReading kind={kind} />
         {show3d
           ? <Suspense fallback={<div className="h-full w-full bg-card" />}>{key
-            ? <LocationMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} apiKey={key} area={ring} sim={sim}
-              fallback={<OpenMap3D lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />} />
-            : <OpenMap3D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />}</Suspense>
-          : <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} lat={loc.lat} lng={loc.lng} label={name ?? ""} zoom={zoom} area={ring} drawing={drawing || drawingZone}
+            ? <LocationMap3D key={`${loc.lat},${loc.lng}`} lat={pin.lat} lng={pin.lng} label={name ?? ""} apiKey={key} area={ring} sim={sim}
+              fallback={<OpenMap3D lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />} />
+            : <OpenMap3D key={`${loc.lat},${loc.lng}`} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />}</Suspense>
+          : <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} drawing={drawing || drawingZone}
             onAreaChange={drawingZone ? setZoneDraft : setDraft} sim={editingZone && sim ? { ...sim, inner: (sim.inner ?? []).filter((z) => z.id !== editingZone) } : sim} arranging={arranging} onMove={moved}
             outline={drawingZone ? saved?.ring ?? null : null} onOutside={() => toast("La zona va dentro l'area disegnata")} /></Suspense>}
       </div>

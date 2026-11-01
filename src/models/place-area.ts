@@ -35,14 +35,30 @@ const RANK: Record<AreaCandidate["kind"], number> = { piazza: 0, pedonale: 1, pa
  * The surface of the chosen place: among the mapped shapes around the point, the one that contains it, a square
  * before a pedestrian area before a park, the smallest first. Null when none contains the point: no area is invented.
  */
-export function placeArea(candidates: AreaCandidate[], lat: number, lng: number): { m2: number; kind: AreaCandidate["kind"]; name?: string | undefined } | null {
+export function placeArea(candidates: AreaCandidate[], lat: number, lng: number): { m2: number; kind: AreaCandidate["kind"]; name?: string | undefined; centre: [number, number] } | null {
   const hits = candidates
     .filter((c) => c.rings.some((r) => ringContains(r, lat, lng)))
-    .map((c) => ({ kind: c.kind, name: c.name, m2: c.rings.reduce((s, r) => s + ringAreaM2(r), 0) }))
+    .map((c) => ({ kind: c.kind, name: c.name, rings: c.rings, m2: c.rings.reduce((s, r) => s + ringAreaM2(r), 0) }))
     .filter((c) => c.m2 >= 50 && c.m2 <= 500_000)
     .sort((a, b) => RANK[a.kind] - RANK[b.kind] || a.m2 - b.m2);
   const best = hits[0];
-  return best ? { m2: Math.round(best.m2), kind: best.kind, name: best.name } : null;
+  if (!best) return null;
+  // The centre of the mapped shape (its largest ring): where the place's pin stands, not the address's point.
+  const ring = [...best.rings].sort((a, b) => ringAreaM2(b) - ringAreaM2(a))[0]!;
+  return { m2: Math.round(best.m2), kind: best.kind, name: best.name, centre: ringCentroid(ring) };
+}
+
+/** The centroid of a ring (area-weighted, the middle of the shape, not the mean of its corners). */
+export function ringCentroid(ring: Ring): [number, number] {
+  const lat0 = ring[0]![0], lng0 = ring[0]![1];
+  let a = 0, cx = 0, cy = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const [y1, x1] = [ring[i]![0] - lat0, ring[i]![1] - lng0], [y2, x2] = [ring[(i + 1) % ring.length]![0] - lat0, ring[(i + 1) % ring.length]![1] - lng0];
+    const cross = x1 * y2 - x2 * y1;
+    a += cross; cx += (x1 + x2) * cross; cy += (y1 + y2) * cross;
+  }
+  if (Math.abs(a) < 1e-14) return [ring.reduce((s, p) => s + p[0], 0) / ring.length, ring.reduce((s, p) => s + p[1], 0) / ring.length];
+  return [lat0 + cy / (3 * a), lng0 + cx / (3 * a)];
 }
 
 /** Overpass query: closed shapes within 80 m that can be a public space. */
