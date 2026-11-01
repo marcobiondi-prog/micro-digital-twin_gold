@@ -548,6 +548,7 @@ function OpenPile({ pile, onClose, archived = false }: { pile: Pile; onClose: ()
             </>
           : <>
               <button type="button" onClick={() => shelve(pile.shots)} className="inline-flex items-center gap-1 text-sm font-semibold text-foreground outline-none focus-visible:underline">{archived ? <ArchiveRestore className="size-4" aria-hidden="true" /> : <Archive className="size-4" aria-hidden="true" />}{archived ? "Ripristina" : "Archivia"}</button>
+              {archived && <button type="button" onClick={() => { setPicked(new Set(pile.shots.map(keyOf))); setSelecting(true); setAsk(true); }} className="inline-flex items-center gap-1 text-sm font-semibold text-destructive outline-none focus-visible:underline"><Trash2 className="size-4" aria-hidden="true" />Elimina</button>}
               <button type="button" onClick={() => setSelecting(true)} className="text-sm font-semibold text-foreground outline-none focus-visible:underline">Seleziona</button>
               <button type="button" onClick={onClose} className="text-sm font-semibold text-muted-foreground outline-none focus-visible:underline">Chiudi</button>
             </>}
@@ -659,6 +660,7 @@ function ArchiveBlock({ shots: all, keys, defaultOpen = false }: { shots: Shot[]
               <ArchiveRestore className="size-4" aria-hidden="true" />Ripristina tutto · {keys.length === 1 ? "1 file" : `${keys.length} file`}
             </button>
           )}
+          {!day && shots.length > 0 && <DeleteArchive shots={shots} what={kind === "tutti" ? "tutto l'archivio" : kindLabel} onDone={() => { setShown(null); if (kind !== "tutti") setKind("tutti"); }} />}
           {months.map((m) => (
             <div key={m.name}>
               <p className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{m.name}</p>
@@ -679,6 +681,44 @@ function ArchiveBlock({ shots: all, keys, defaultOpen = false }: { shots: Shot[]
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The archive deleted for good (all of it, or only the chosen kind), after one confirm in place: from the account's
+ * storage when uploaded, from the device otherwise (removeMedia, which also drops their archive marks).
+ */
+function DeleteArchive({ shots, what, onDone }: { shots: Shot[]; what: string; onDone: () => void }) {
+  const [ask, setAsk] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setAsk(false); }, [what]);
+  const go = async () => {
+    setBusy(true);
+    try {
+      const urban = shots.filter((s) => s.flow === "piazza"), vine = shots.filter((s) => s.flow === "vigneto");
+      if (urban.length) await removeMedia("urban", urban);
+      if (vine.length) await removeMedia("vineyard", vine);
+      toast.success(`Eliminati dall'archivio: ${countText(shots)}`);
+      setAsk(false);
+      onDone();
+    } catch (e) {
+      const left = /not-deleted:(\d+)/.exec(e instanceof Error ? e.message : "")?.[1];
+      toast.error(left ? `${left} file non eliminati: riprova` : "Eliminazione non riuscita: controlla la connessione e riprova");
+    } finally { setBusy(false); }
+  };
+  return ask ? (
+    <div role="alertdialog" aria-label="Eliminare l'archivio?" className="rounded-2xl bg-destructive/10 p-3.5 text-sm">
+      <p className="font-semibold">Eliminare {what}?</p>
+      <p className="mt-0.5 text-muted-foreground">{countText(shots)} archiviati vengono eliminati per sempre. Non si possono recuperare.</p>
+      <div className="mt-3 flex gap-2">
+        <button type="button" onClick={() => setAsk(false)} disabled={busy} className="h-10 flex-1 rounded-full bg-foreground/[0.08] font-semibold">Annulla</button>
+        <button type="button" onClick={() => void go()} disabled={busy} className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full bg-destructive font-semibold text-white disabled:opacity-60"><Trash2 className="size-4" aria-hidden="true" />{busy ? "Elimino…" : `Elimina ${shots.length}`}</button>
+      </div>
+    </div>
+  ) : (
+    <button type="button" onClick={() => setAsk(true)} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-destructive/15 text-sm font-semibold text-destructive outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <Trash2 className="size-4" aria-hidden="true" />Elimina {what} · {shots.length}
+    </button>
   );
 }
 
