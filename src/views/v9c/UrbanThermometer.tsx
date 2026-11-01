@@ -1,4 +1,5 @@
 import { drawnM2 } from "@/models/drawn-area";
+import { loadPlaceArea } from "@/lib/place-area-client";
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -250,7 +251,7 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
   // The real surface of the chosen place, measured on its mapped shape; without one, the reference piazza (said so).
   const fetchArea = useServerFn(getPlaceArea);
   const { lat, lng } = urban.location;
-  const area = useQuery({ queryKey: ["place-area", lat, lng], queryFn: () => fetchArea({ data: { lat, lng } }), staleTime: Infinity, retry: 1 });
+  const area = useQuery({ queryKey: ["place-area", lat, lng], queryFn: () => loadPlaceArea((d) => fetchArea({ data: d }), lat, lng), staleTime: Infinity, retry: 1 });
   // A surface drawn with pins on the Mappa tab wins over the measured one.
   const drawn = drawnM2(urban.area, urban.location);
   const measured = area.data?.m2 ?? null;

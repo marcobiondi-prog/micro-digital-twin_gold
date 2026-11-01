@@ -113,3 +113,15 @@ export function areaCandidates(elements: OsmEl[]): AreaCandidate[] {
     return closed.length ? [{ rings: closed, kind: kindOf(el.tags), name: el.tags?.["name"] }] : [];
   });
 }
+
+/** Overpass servers asked in turn: the main one often turns busy servers away (429/504), the mirrors answer the same. */
+export const OVERPASS_URLS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://overpass.private.coffee/api/interpreter"];
+export type PlaceAreaResult = { m2?: number; name?: string | undefined; centre?: [number, number] } | null;
+/** From an Overpass answer: the surface and centre of the shape holding the point, else the centre of the nearest one. */
+export function placeAreaResult(elements: Parameters<typeof areaCandidates>[0], lat: number, lng: number): PlaceAreaResult {
+  const candidates = areaCandidates(elements);
+  const area = placeArea(candidates, lat, lng);
+  if (area) return { m2: area.m2, name: area.name, centre: area.centre };
+  const centre = placeCentre(candidates, lat, lng);
+  return centre ? { centre } : null;
+}

@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { loadPlaceArea } from "@/lib/place-area-client";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -243,7 +244,7 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
   const season = picked ?? reading?.season ?? "estate";
   const profile = useSeasonProfile(lat, lng);
   const fetchArea = useServerFn(getPlaceArea);
-  const area = useQuery({ queryKey: ["place-area", lat, lng], queryFn: () => fetchArea({ data: { lat, lng } }), staleTime: Infinity, retry: 1 });
+  const area = useQuery({ queryKey: ["place-area", lat, lng], queryFn: () => loadPlaceArea((d) => fetchArea({ data: d }), lat, lng), staleTime: Infinity, retry: 1 });
   // The same reading as the simulation's arc (season, hour, numbers, ends), shared with the PDF report.
   const dash = piazzaDash(urban, season, profile.data?.profile, area.data?.m2 ?? null, reading);
   const sum = dash.sum;
@@ -315,7 +316,7 @@ export function VineDashboard({ records }: { records: ReactNode }) {
   const vine = useLab().vineyard;
   const { lat, lng } = vine.location;
   const fetchArea = useServerFn(getPlaceArea);
-  const area = useQuery({ queryKey: ["vine-area", lat, lng], queryFn: () => fetchArea({ data: { lat, lng, kind: "vigneto" } }), staleTime: Infinity, retry: 1 });
+  const area = useQuery({ queryKey: ["vine-area", lat, lng], queryFn: () => loadPlaceArea((d) => fetchArea({ data: d }), lat, lng, "vigneto"), staleTime: Infinity, retry: 1 });
   // The same summary the PDF report reads.
   const sum = vineSummary(vine, area.data?.m2 ?? null);
   const { before, after: thirst, mix, empty, same, safe, m2 } = sum;

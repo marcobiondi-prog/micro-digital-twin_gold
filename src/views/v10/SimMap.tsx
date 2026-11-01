@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { loadPlaceArea } from "@/lib/place-area-client";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
@@ -61,7 +62,7 @@ export function SimMap({ kind }: { kind: SimKind }) {
   const fetchArea = useServerFn(getPlaceArea);
   const placeShape = useQuery({
     queryKey: kind === "urban" ? ["place-area", loc.lat, loc.lng] : ["vine-area", loc.lat, loc.lng],
-    queryFn: () => fetchArea({ data: kind === "urban" ? { lat: loc.lat, lng: loc.lng } : { lat: loc.lat, lng: loc.lng, kind: "vigneto" } }),
+    queryFn: () => loadPlaceArea((d) => fetchArea({ data: d }), loc.lat, loc.lng, kind === "urban" ? "piazza" : "vigneto"),
     staleTime: Infinity, retry: 1,
   });
   const centre = placeShape.data?.centre;

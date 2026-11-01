@@ -1,4 +1,5 @@
 import { drawnM2 } from "@/models/drawn-area";
+import { loadPlaceArea } from "@/lib/place-area-client";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -79,7 +80,7 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
   // The vineyard's real surface, measured on its mapped plot; without one, one hectare (said so).
   const fetchArea = useServerFn(getPlaceArea);
   const { lat, lng } = vine.location;
-  const area = useQuery({ queryKey: ["vine-area", lat, lng], queryFn: () => fetchArea({ data: { lat, lng, kind: "vigneto" } }), staleTime: Infinity, retry: 1 });
+  const area = useQuery({ queryKey: ["vine-area", lat, lng], queryFn: () => loadPlaceArea((d) => fetchArea({ data: d }), lat, lng, "vigneto"), staleTime: Infinity, retry: 1 });
   // A surface drawn with pins on the Mappa tab wins over the measured one.
   const drawn = drawnM2(vine.area, vine.location);
   const measured = area.data?.m2 ?? null;
