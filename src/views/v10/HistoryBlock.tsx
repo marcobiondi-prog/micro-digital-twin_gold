@@ -22,7 +22,8 @@ import { peekStyle, useTabSwipe } from "@/lib/use-tab-swipe";
 import { useProId } from "@/lib/use-pro-id";
 import { SEASON_LABEL } from "@/models/season-climate";
 import { DashCard, DashSection } from "@/views/v10/Dashboard";
-import { clearHistory, useHistory } from "@/lib/use-history";
+import { clearHistory, removeHistory, useHistory } from "@/lib/use-history";
+import { archiveHistory, restoreHistory, useHistoryArchive } from "@/models/history-archive";
 import { groupByDay, whenClock, whenOf, type HistoryEntry, type HistoryFlow, type HistorySource, type SourcedEntry } from "@/models/intervention-history";
 
 /** When the intervention was made, on this device's clock: "09:12". */
@@ -332,6 +333,14 @@ function daysText(shots: Shot[]) {
   return day(lo, true) === day(hi, true) ? day(hi, true) : `${day(lo, false)} – ${day(hi, true)}`;
 }
 const countText = (shots: Shot[]) => kindCountText(shots);
+/** When they went into the archive: "Archiviata il 01/11/2026", or "dal 30/10 al 01/11/2026" over several days. */
+const dayOf = (iso: string) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`; };
+function archivedOn(isos: Array<string | undefined>, word = "Archiviata"): string {
+  const t = isos.filter((x): x is string => !!x).map((x) => Date.parse(x)).filter((x) => !Number.isNaN(x)).sort((a, b) => a - b);
+  if (!t.length) return "";
+  const a = dayOf(new Date(t[0]!).toISOString()), b = dayOf(new Date(t[t.length - 1]!).toISOString());
+  return a === b ? `${word} il ${a}` : `${word} dal ${a.slice(0, 5)} al ${b}`;
+}
 
 /** The corner label of every photo and video — Foto, Multiplo, AI or Video — so each kind reads at a glance in the piles and the rows. */
 function KindMark({ s }: { s: Shot }) {
@@ -614,6 +623,7 @@ function OpenPile({ pile, onClose, archived = false }: { pile: Pile; onClose: ()
  */
 function ArchiveBlock({ shots: all, keys, defaultOpen = false }: { shots: Shot[]; keys: string[]; defaultOpen?: boolean }) {
   const { signedIn } = useSignedIn();
+  const marks = useMediaArchive();
   const [open, setOpen] = useState(defaultOpen);
   const [day, setDay] = useState("");
   const [shown, setShown] = useState<string | null>(null);
@@ -671,8 +681,8 @@ function ArchiveBlock({ shots: all, keys, defaultOpen = false }: { shots: Shot[]
                   <button key={p.key} type="button" aria-expanded={shown === p.key} onClick={() => setShown(shown === p.key ? null : p.key)}
                     className="flex w-full items-center gap-3 border-b border-foreground/[0.06] px-3 py-2.5 text-left outline-none last:border-0 focus-visible:bg-foreground/[0.06]">
                     <FolderClosed className="size-5 shrink-0 text-brand-turquoise" aria-hidden="true" />
-                    <span className="flex-1 text-[15px] font-semibold tabular-nums">{p.label}</span>
-                    <span className="text-xs text-muted-foreground">{countText(p.shots)}</span>
+                    <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold tabular-nums">{p.label}</span><span className="block text-xs tabular-nums text-muted-foreground">{archivedOn(p.shots.map((x) => marks[`${x.flow}-${x.id}`]))}</span></span>
+                    <span className="text-right text-xs text-muted-foreground">{countText(p.shots)}</span>
                     <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform ${shown === p.key ? "rotate-180" : ""}`} aria-hidden="true" />
                   </button>
                 ))}
@@ -869,6 +879,194 @@ function DayTab({ label, items }: { label: string; items: SourcedEntry[] }) {
   );
 }
 
+const entriesText = (n: number) => (n === 1 ? "1 intervento" : `${n} interventi`);
+
+/** The interventions as a table for the phone (CSV, ; separated, opens in a spreadsheet), saved in Download. */
+function saveEntries(items: SourcedEntry[], marks: Record<string, string>, name: string) {
+  const cell = (v: string) => `"${v.replace(/"/g, '""')}"`;
+  const rows = [["Data", "Ora", "Progetto", "Luogo", "Intervento", "Stagione e ora simulate", "Salvato", "Archiviato il"]];
+  for (const e of sortNewest(items)) {
+    const w = whenOf(e);
+    rows.push([dayOf(e.at), time(e), e.flow === "piazza" ? "Piazza" : "Vigneto", e.place, e.text, w ? `${SEASON_LABEL[w.season]}, ore ${whenClock(w)}` : "", e.source === "account" ? "Account" : "Dispositivo", marks[e.id] ? dayOf(marks[e.id]!) : ""]);
+  }
+  const blob = new Blob(["\ufeff" + rows.map((r) => r.map(cell).join(";")).join("\r\n")], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+const sortNewest = (items: SourcedEntry[]) => [...items].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+
+/** A red action that asks once in place before deleting for good. */
+function ConfirmDelete({ label, title, body, run, compact = false }: { label: string; title: string; body: string; run: () => Promise<boolean>; compact?: boolean }) {
+  const [ask, setAsk] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const go = async () => { setBusy(true); try { if (await run()) setAsk(false); } finally { setBusy(false); } };
+  if (ask) return (
+    <div role="alertdialog" aria-label={title} className="w-full basis-full rounded-2xl bg-destructive/10 p-3.5 text-sm">
+      <p className="font-semibold">{title}</p>
+      <p className="mt-0.5 text-muted-foreground">{body} Non si possono recuperare.</p>
+      <div className="mt-3 flex gap-2">
+        <button type="button" onClick={() => setAsk(false)} disabled={busy} className="h-10 flex-1 rounded-full bg-foreground/[0.08] font-semibold">Annulla</button>
+        <button type="button" onClick={() => void go()} disabled={busy} className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full bg-destructive font-semibold text-white disabled:opacity-60"><Trash2 className="size-4" aria-hidden="true" />{busy ? "Elimino…" : "Elimina"}</button>
+      </div>
+    </div>
+  );
+  return compact
+    ? <button type="button" onClick={() => setAsk(true)} className="inline-flex items-center gap-1 text-sm font-semibold text-destructive outline-none focus-visible:underline"><Trash2 className="size-4" aria-hidden="true" />{label}</button>
+    : <button type="button" onClick={() => setAsk(true)} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-destructive/15 text-sm font-semibold text-destructive outline-none focus-visible:ring-2 focus-visible:ring-ring"><Trash2 className="size-4" aria-hidden="true" />{label}</button>;
+}
+
+const deleteEntries = async (items: SourcedEntry[]) => {
+  const ok = await removeHistory(items.map((e) => e.id));
+  if (ok) toast.success(items.length === 1 ? "Intervento eliminato" : `${items.length} interventi eliminati`);
+  else toast.error("Eliminati da questo dispositivo, non dal tuo account: controlla la connessione e riprova");
+  return ok;
+};
+
+/** Every intervention shown archived in one go, after one confirm in place; nothing is deleted. */
+function ArchiveAllEntries({ items }: { items: SourcedEntry[] }) {
+  const [ask, setAsk] = useState(false);
+  if (items.length < 2) return null;
+  const days = groupByDay(items).length;
+  return ask ? (
+    <div role="alertdialog" aria-label="Archiviare tutti gli interventi?" className="rounded-2xl bg-foreground/[0.06] p-3.5 text-sm">
+      <p className="font-semibold">Archiviare tutti gli interventi?</p>
+      <p className="mt-0.5 text-muted-foreground">{entriesText(items.length)} di {days === 1 ? "1 giorno" : `${days} giorni`} vanno nell'Archivio. Non si cancella niente: li puoi ripristinare quando vuoi.</p>
+      <div className="mt-3 flex gap-2">
+        <button type="button" onClick={() => setAsk(false)} className="h-10 flex-1 rounded-full bg-foreground/[0.08] font-semibold">Annulla</button>
+        <button type="button" onClick={() => { archiveHistory(items.map((e) => e.id)); setAsk(false); toast.success(`Archiviati: ${entriesText(items.length)}`, { description: "Li ritrovi nell'Archivio degli interventi, divisi per giorno." }); }}
+          className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full bg-white font-semibold text-black"><Archive className="size-4" aria-hidden="true" />Archivia {items.length}</button>
+      </div>
+    </div>
+  ) : (
+    <button type="button" onClick={() => setAsk(true)} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-foreground/[0.08] text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <Archive className="size-4" aria-hidden="true" />Archivia tutti gli interventi · {items.length}
+    </button>
+  );
+}
+
+/** One archived day opened: its interventions, with Ripristina, Salva, Elimina and a selection, like a photo folder. */
+function ArchivedDay({ label, items, onClose }: { label: string; items: SourcedEntry[]; onClose: () => void }) {
+  const marks = useHistoryArchive();
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const chosen = items.filter((e) => picked.has(e.id));
+  const stop = () => { setSelecting(false); setPicked(new Set()); };
+  const restore = (list: SourcedEntry[]) => {
+    restoreHistory(list.map((e) => e.id));
+    toast.success(`${entriesText(list.length)} di nuovo nella cronologia`);
+    if (list.length === items.length) onClose(); else stop();
+  };
+  const all = picked.size === items.length;
+  return (
+    <div className="pile-open space-y-2 rounded-2xl bg-foreground/[0.05] p-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-1">
+        <h4 className="min-w-0 basis-full text-sm font-semibold tabular-nums">{label}<span className="ml-2 font-medium text-muted-foreground">{selecting ? (picked.size ? `${picked.size} scelti` : "Tocca per scegliere") : [entriesText(items.length), archivedOn(items.map((e) => marks[e.id]), "archiviati")].filter(Boolean).join(" · ")}</span></h4>
+        {selecting ? <>
+          <button type="button" onClick={() => setPicked(all ? new Set() : new Set(items.map((e) => e.id)))} className="text-sm font-semibold outline-none focus-visible:underline">{all ? "Nessuno" : "Tutti"}</button>
+          <button type="button" onClick={stop} className="text-sm font-semibold text-muted-foreground outline-none focus-visible:underline">Annulla</button>
+        </> : <>
+          <button type="button" onClick={() => restore(items)} className="inline-flex items-center gap-1 text-sm font-semibold outline-none focus-visible:underline"><ArchiveRestore className="size-4" aria-hidden="true" />Ripristina</button>
+          <button type="button" onClick={() => { saveEntries(items, marks, `archivio-interventi-${label.replace(/\//g, "-")}.csv`); toast.success("Tabella salvata in Download"); }} className="inline-flex items-center gap-1 text-sm font-semibold outline-none focus-visible:underline"><Download className="size-4" aria-hidden="true" />Salva</button>
+          <ConfirmDelete compact label="Elimina" title={`Eliminare gli interventi del ${label}?`} body={`${entriesText(items.length)} archiviati vengono eliminati per sempre.`} run={async () => { const ok = await deleteEntries(items); if (ok) onClose(); return ok; }} />
+          <button type="button" onClick={() => setSelecting(true)} className="text-sm font-semibold outline-none focus-visible:underline">Seleziona</button>
+          <button type="button" onClick={onClose} className="text-sm font-semibold text-muted-foreground outline-none focus-visible:underline">Chiudi</button>
+        </>}
+      </div>
+      <div className="divide-y divide-foreground/10 rounded-xl bg-foreground/[0.03] px-3">
+        {items.map((e) => selecting ? (
+          <button key={e.id} type="button" role="checkbox" aria-checked={picked.has(e.id)} onClick={() => setPicked((p) => { const n = new Set(p); if (n.has(e.id)) n.delete(e.id); else n.add(e.id); return n; })}
+            className="flex w-full items-center gap-3 py-3 text-left outline-none focus-visible:bg-foreground/[0.06]">
+            <span className={`grid size-6 shrink-0 place-items-center rounded-full border-2 ${picked.has(e.id) ? "border-destructive bg-destructive text-white" : "border-foreground/40"}`}>{picked.has(e.id) && <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />}</span>
+            <span className="w-12 shrink-0 text-sm tabular-nums text-muted-foreground">{time(e)}</span>
+            <span className="min-w-0 flex-1 break-words text-[15px] leading-snug">{e.text}</span>
+          </button>
+        ) : <EntryRow key={e.id} e={e} />)}
+      </div>
+      {selecting && (
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => restore(chosen)} disabled={!picked.size} className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-foreground/10 text-sm font-semibold disabled:opacity-40"><ArchiveRestore className="size-4" aria-hidden="true" />Ripristina{picked.size ? ` ${picked.size}` : ""}</button>
+          {picked.size > 0
+            ? <div className="flex-1"><ConfirmDelete label={`Elimina ${picked.size}`} title={chosen.length === 1 ? "Eliminare questo intervento?" : `Eliminare ${chosen.length} interventi?`} body="Vengono eliminati per sempre." run={async () => { const ok = await deleteEntries(chosen); if (ok) { if (chosen.length === items.length) onClose(); else stop(); } return ok; }} /></div>
+            : <button type="button" disabled className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-destructive/15 text-sm font-semibold text-destructive opacity-40"><Trash2 className="size-4" aria-hidden="true" />Elimina</button>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The interventions' archive, built like the photos' one: folded "n giorni · n interventi", open a "Vai al giorno"
+ * field, Ripristina tutto, Salva sul telefono (a table), Elimina tutto l'archivio, then folders by day under month
+ * headings (each with the date it was archived), opening into ArchivedDay.
+ */
+function HistoryArchiveBlock({ items, defaultOpen = false }: { items: SourcedEntry[]; defaultOpen?: boolean }) {
+  const { signedIn } = useSignedIn();
+  const marks = useHistoryArchive();
+  const [open, setOpen] = useState(defaultOpen);
+  const [day, setDay] = useState("");
+  const [shown, setShown] = useState<string | null>(null);
+  const days = useMemo(() => groupByDay(items), [items]);
+  const isoOf = (at: string) => { const d = new Date(at); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  const list = day ? days.filter((g) => isoOf(g.items[0]!.at) === day) : days;
+  const months: Array<{ name: string; days: typeof days }> = [];
+  for (const g of list) {
+    const name = new Date(g.items[0]!.at).toLocaleDateString("it-IT", { month: "long", year: "numeric" });
+    const last = months[months.length - 1];
+    if (last?.name === name) last.days.push(g); else months.push({ name, days: [g] });
+  }
+  const current = days.find((g) => g.key === shown) ?? null;
+  return (
+    <div className="rounded-2xl bg-foreground/[0.04]">
+      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-foreground/[0.08]"><Archive className="size-5" aria-hidden="true" /></span>
+        <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Archivio interventi</span><span className="block text-xs text-muted-foreground">{days.length === 1 ? "1 giorno" : `${days.length} giorni`} · {entriesText(items.length)} · {signedIn ? "nell'account" : "su questo dispositivo"}</span><span className="block text-xs tabular-nums text-muted-foreground">{archivedOn(items.map((e) => marks[e.id]), "Archiviati")}</span></span>
+        <ChevronDown className={`size-5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+      </button>
+      {open && (
+        <div className="space-y-3 px-3 pb-3">
+          <label className="flex items-center gap-2 rounded-xl bg-foreground/[0.06] px-3 py-2 text-sm">
+            <CalendarDays className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span className="shrink-0 text-muted-foreground">Vai al giorno</span>
+            <input type="date" lang="it" aria-label="Giorno gg/mm/aaaa" value={day} onChange={(e) => { setDay(e.target.value); setShown(null); }} className="min-w-0 flex-1 bg-transparent text-right font-semibold tabular-nums outline-none [color-scheme:dark]" />
+            {day && <button type="button" onClick={() => setDay("")} className="shrink-0 text-xs font-semibold text-muted-foreground">Tutti</button>}
+          </label>
+          {list.length === 0 && <p className="px-1 text-sm text-muted-foreground">Nessun intervento in archivio per quel giorno.</p>}
+          {!day && <>
+            <button type="button" onClick={() => { restoreHistory(items.map((e) => e.id)); toast.success("Archivio ripristinato: interventi di nuovo nella cronologia"); }}
+              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-foreground/10 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <ArchiveRestore className="size-4" aria-hidden="true" />Ripristina tutto · {entriesText(items.length)}
+            </button>
+            <button type="button" onClick={() => { saveEntries(items, marks, `archivio-interventi-${new Date().toISOString().slice(0, 10)}.csv`); toast.success(`Tabella salvata in Download · ${entriesText(items.length)}`); }}
+              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-foreground/10 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <Download className="size-4" aria-hidden="true" />Salva sul telefono · {entriesText(items.length)}
+            </button>
+            <ConfirmDelete label={`Elimina tutto l'archivio · ${items.length}`} title="Eliminare tutto l'archivio degli interventi?" body={`${entriesText(items.length)} archiviati vengono eliminati per sempre${signedIn ? ", anche dal tuo account" : ""}.`} run={() => deleteEntries(items)} />
+          </>}
+          {months.map((m) => (
+            <div key={m.name}>
+              <p className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{m.name}</p>
+              <div className="overflow-hidden rounded-xl bg-foreground/[0.05]">
+                {m.days.map((g) => (
+                  <button key={g.key} type="button" aria-expanded={shown === g.key} onClick={() => setShown(shown === g.key ? null : g.key)}
+                    className="flex w-full items-center gap-3 border-b border-foreground/[0.06] px-3 py-2.5 text-left outline-none last:border-0 focus-visible:bg-foreground/[0.06]">
+                    <FolderClosed className="size-5 shrink-0 text-brand-turquoise" aria-hidden="true" />
+                    <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold tabular-nums">{g.label}</span><span className="block text-xs tabular-nums text-muted-foreground">{archivedOn(g.items.map((e) => marks[e.id]), "Archiviato")}</span></span>
+                    <span className="text-right text-xs text-muted-foreground">{entriesText(g.items.length)}</span>
+                    <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform ${shown === g.key ? "rotate-180" : ""}`} aria-hidden="true" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+          {current && <ArchivedDay key={current.key} label={current.label} items={current.items} onClose={() => setShown(null)} />}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
  * The archive alone, on its own page (/archivio, from Benvenuto's "Archivio · … · tocca per recuperarle"): only the
  * archived photos and videos, already open, never the interventions. Identified, only that profile's project.
@@ -889,14 +1087,28 @@ export function ArchiveOnly() {
     ...vineyard.map((m): Shot => ({ ...m, flow: "vigneto", at: mediaTime(m) })),
   ].filter((s) => inFlow(s.flow) && archive[`${s.flow}-${s.id}`]).sort((a, b) => (b.at ?? 0) - (a.at ?? 0)), [urban, vineyard, archive, flow]); // eslint-disable-line react-hooks/exhaustive-deps
   const keys = Object.keys(archive).filter((k) => inFlow(k.startsWith("vigneto-") ? "vigneto" : "piazza"));
-  if (keys.length === 0) return (
+  const { entries: history } = useHistory();
+  const hArch = useHistoryArchive();
+  const archivedEntries = history.filter((e) => inFlow(e.flow) && hArch[e.id]);
+  if (keys.length === 0 && archivedEntries.length === 0) return (
     <div className="flex flex-col items-center gap-3 rounded-2xl bg-foreground/[0.04] px-6 py-10 text-center">
       <Archive className="size-8 text-muted-foreground" aria-hidden="true" />
       <p className="font-semibold">L'archivio è vuoto</p>
-      <p className="text-sm text-muted-foreground">Le foto e i video che archivi dalla cronologia finiscono qui, divisi per giorno.</p>
+      <p className="text-sm text-muted-foreground">Gli interventi, le foto e i video che archivi dalla cronologia finiscono qui, divisi per giorno.</p>
     </div>
   );
-  return <ArchiveBlock shots={shots} keys={keys} defaultOpen />;
+  return (
+    <div className="space-y-3">
+      {(urbanError || vineError) && keys.length > 0 && (
+        <div role="alert" className="flex items-center gap-3 rounded-2xl bg-amber-500/10 px-4 py-3 text-sm ring-1 ring-amber-500/30">
+          <span className="flex-1">Non riesco a leggere le foto e i video del tuo account</span>
+          <button type="button" onClick={() => void retryMedia()} disabled={retrying} className="h-9 shrink-0 rounded-full bg-foreground/10 px-3 text-sm font-semibold disabled:opacity-60">{retrying ? "Riprovo…" : "Riprova"}</button>
+        </div>
+      )}
+      {archivedEntries.length > 0 && <HistoryArchiveBlock items={archivedEntries} defaultOpen />}
+      {keys.length > 0 && <ArchiveBlock shots={shots} keys={keys} defaultOpen />}
+    </div>
+  );
 }
 
 /** Recorded signed in (kept in the account) or without signing in (kept on this device). */
@@ -946,6 +1158,7 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
   useEffect(() => { setConfirm(false); }, [filter]);
   const urban = useLabMedia("urban"), vineyard = useLabMedia("vineyard");
   const archive = useMediaArchive();
+  const hArch = useHistoryArchive();
   useEffect(() => { void currentMedia("urban"); void currentMedia("vineyard"); }, []);
   // The account's files could not be read: said plainly with the reason and a retry, never an empty silence.
   const urbanError = useMediaListError("urban"), vineError = useMediaListError("vineyard");
@@ -957,11 +1170,14 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
   ].sort((a, b) => (b.at ?? 0) - (a.at ?? 0)), [urban, vineyard]);
   // One project only with a profile (or on the dashboard); otherwise everything on Benvenuto and the filter tab on the Cronologia page.
   const shownIn = (f: Filter) => (fl: HistoryFlow) => (flow ? fl === flow : compact || f === "tutti" || f === fl);
-  const entries = all.filter((e) => shownIn(filter)(e.flow));
+  // Archived interventions leave the day cards for their own archive.
+  const entries = all.filter((e) => shownIn(filter)(e.flow) && !hArch[e.id]);
   // The photos and interventions of one filter tab: the open one, and the one peeking beside it while swiping.
   const list = (f: Filter) => {
     const shown = shownIn(f);
-    const inTab = all.filter((e) => shown(e.flow));
+    const inTabAll = all.filter((e) => shown(e.flow));
+    const inTab = inTabAll.filter((e) => !hArch[e.id]);
+    const archivedEntries = inTabAll.filter((e) => hArch[e.id]);
     const inFlow = allShots.filter((s) => shown(s.flow));
     const shots = inFlow.filter((s) => !archive[`${s.flow}-${s.id}`]);
     const archivedAll = inFlow.filter((s) => archive[`${s.flow}-${s.id}`]);
@@ -989,6 +1205,14 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
           </div>
         )}
         {!compact && archKeys.length > 0 && <ArchiveBlock shots={archivedShots} keys={archKeys} />}
+        {!compact && archivedEntries.length > 0 && <HistoryArchiveBlock items={archivedEntries} />}
+        {compact && archivedEntries.length > 0 && (
+          <Link to="/archivio" className="flex items-center gap-3 rounded-2xl bg-foreground/[0.04] px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <Archive className="size-5 text-muted-foreground" aria-hidden="true" />
+            <span className="flex-1 text-sm"><span className="font-semibold">Archivio interventi</span><span className="text-muted-foreground"> · {entriesText(archivedEntries.length)} · tocca per recuperarli</span></span>
+            <ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />
+          </Link>
+        )}
         {compact && archKeys.length > 0 && (
           <Link to="/archivio" className="flex items-center gap-3 rounded-2xl bg-foreground/[0.04] px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <Archive className="size-5 text-muted-foreground" aria-hidden="true" />
@@ -996,18 +1220,23 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
             <ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />
           </Link>
         )}
+        {!compact && <ArchiveAllEntries items={inTab} />}
         {groups.length === 0 ? visibleShots.length > 0 ? null : (
           <DashCard className="flex flex-col items-center gap-2 py-8 text-center">
             <History className="size-7 text-muted-foreground" aria-hidden="true" />
-            <p className="text-[15px] font-medium">{loading ? "Carico la cronologia…" : f === "tutti" ? "Ancora nessun intervento" : `Ancora nessun intervento ${f === "piazza" ? "nella piazza" : "nel vigneto"}`}</p>
-            {!loading && <p className="max-w-xs text-sm text-muted-foreground">Quando cambi alberi, prato, ombra o irrigazione nella simulazione, l’intervento si registra da solo e lo trovi qui, con foto e video.</p>}
+            <p className="text-[15px] font-medium">{loading ? "Carico la cronologia…" : archivedEntries.length ? "Gli interventi sono tutti nell'archivio" : f === "tutti" ? "Ancora nessun intervento" : `Ancora nessun intervento ${f === "piazza" ? "nella piazza" : "nel vigneto"}`}</p>
+            {!loading && !archivedEntries.length && <p className="max-w-xs text-sm text-muted-foreground">Quando cambi alberi, prato, ombra o irrigazione nella simulazione, l’intervento si registra da solo e lo trovi qui, con foto e video.</p>}
           </DashCard>
         ) : groups.map((g) => compact
           ? <DayTab key={g.key} label={g.label} items={g.items} />
           : (
           <div key={g.key} className="space-y-2">
-            {/* One card per day: its date on top, then each intervention of that day with its time. */}
-            <h3 className="px-1 text-sm font-semibold tabular-nums text-foreground/90">{g.label}<span className="ml-2 font-medium text-muted-foreground">{g.items.length === 1 ? "1 intervento" : `${g.items.length} interventi`}</span></h3>
+            {/* One card per day: its date on top (with Archivia for the whole day), then each intervention of that day with its time. */}
+            <div className="flex items-center gap-3 px-1">
+              <h3 className="min-w-0 flex-1 text-sm font-semibold tabular-nums text-foreground/90">{g.label}<span className="ml-2 font-medium text-muted-foreground">{entriesText(g.items.length)}</span></h3>
+              <button type="button" onClick={() => { archiveHistory(g.items.map((e) => e.id)); toast.success(`${entriesText(g.items.length)} in Archivio · ${g.label}`); }}
+                className="inline-flex items-center gap-1 text-sm font-semibold outline-none focus-visible:underline"><Archive className="size-4" aria-hidden="true" />Archivia</button>
+            </div>
             <DashCard className="divide-y divide-foreground/10 py-1 sm:py-1">
               {g.items.map((e) => <EntryRow key={e.id} e={e} />)}
             </DashCard>
@@ -1019,7 +1248,9 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
   const more = compact && (entries.length > 0 || allShots.length > COMPACT_SHOTS);
   const clear = async () => {
     setClearing(true);
-    const ok = await clearHistory(filter === "tutti" ? undefined : filter);
+    // The archive is kept: with archived entries in this tab only the others go.
+    const keepArchive = all.some((e) => shownIn(filter)(e.flow) && hArch[e.id]);
+    const ok = keepArchive ? await removeHistory(entries.map((e) => e.id)) : await clearHistory(filter === "tutti" ? undefined : filter);
     setClearing(false);
     setConfirm(false);
     reload();

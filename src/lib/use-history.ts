@@ -87,6 +87,27 @@ export async function clearHistory(flow?: HistoryFlow): Promise<boolean> {
 }
 
 /**
+ * Deletes these entries for good: from this device and, signed in, from the account; their archive marks go too.
+ * Every open history reads the account again.
+ */
+export async function removeHistory(ids: string[]): Promise<boolean> {
+  if (!ids.length) return true;
+  removeLocalHistory(ids);
+  const { data } = await supabase.auth.getSession();
+  const uid = data.session?.user.id;
+  let ok = true;
+  if (uid) {
+    for (let i = 0; i < ids.length; i += 200) {
+      const { error } = await table().delete().eq("user_id", uid).in("id", ids.slice(i, i + 200));
+      if (error) { ok = false; break; }
+    }
+  }
+  if (ok) { const { restoreHistory } = await import("@/models/history-archive"); restoreHistory(ids); }
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(HISTORY_SYNCED));
+  return ok;
+}
+
+/**
  * Puts an entry's interventions back in its simulation (the place stays the one chosen now), and asks it to open on the
  * entry's season and hour when it has them.
  */
