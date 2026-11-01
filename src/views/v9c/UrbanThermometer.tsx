@@ -212,7 +212,13 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
   useEffect(() => {
     const el = gaugeRef.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(([e]) => setGaugeSeen(e?.isIntersecting ?? true), { rootMargin: "-120px 0px 0px 0px" });
+    // Pinned only once the gauge has been scrolled up past the tabs: a gauge hidden (another tab), still sliding in
+    // sideways on a page change, or below the screen is not "scrolled away" — those used to flash the pill for a moment.
+    const io = new IntersectionObserver(([e]) => {
+      if (!e) return;
+      const r = e.boundingClientRect;
+      setGaugeSeen(e.isIntersecting || r.height === 0 || r.bottom > (e.rootBounds?.top ?? 0) + 120);
+    }, { rootMargin: "-120px 0px 0px 0px" });
     io.observe(el);
     return () => io.disconnect();
   }, []);
