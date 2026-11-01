@@ -1,4 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { setPinFix, usePinFix } from "@/models/pin-fix";
+import { ringCentroid } from "@/models/place-area";
 import { loadPlaceArea } from "@/lib/place-area-client";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -66,7 +68,12 @@ export function SimMap({ kind }: { kind: SimKind }) {
     staleTime: Infinity, retry: 1,
   });
   const centre = placeShape.data?.centre;
-  const pin = centre ? { lat: centre[0], lng: centre[1] } : { lat: loc.lat, lng: loc.lng };
+  // A pin put in place by hand wins; then the middle of the area drawn on the map; then the mapped shape's centre.
+  const pinFix = usePinFix(loc.lat, loc.lng);
+  const drawnCentre = saved && saved.ring.length >= 3 ? ringCentroid(saved.ring) : null;
+  const at = pinFix ?? drawnCentre ?? centre ?? null;
+  const pin = at ? { lat: at[0], lng: at[1] } : { lat: loc.lat, lng: loc.lng };
+  const movePin = (lat: number, lng: number) => { setPinFix(loc.lat, loc.lng, [lat, lng]); toast.success("Pin spostato", { description: "Resta qui per questo luogo, anche in 3D." }); };
   const [drawing, setDrawing] = useState(false);
   const [draft, setDraft] = useState<Ring>([]);
   useEffect(() => { setDrawing(false); }, [loc.lat, loc.lng]);
@@ -200,8 +207,15 @@ export function SimMap({ kind }: { kind: SimKind }) {
             : <OpenMap3D key={`${loc.lat},${loc.lng}`} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />}</Suspense>
           : <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} drawing={drawing || drawingZone}
             onAreaChange={drawingZone ? setZoneDraft : setDraft} sim={editingZone && sim ? { ...sim, inner: (sim.inner ?? []).filter((z) => z.id !== editingZone) } : sim} arranging={arranging} onMove={moved}
-            outline={drawingZone ? saved?.ring ?? null : null} onOutside={() => toast("La zona va dentro l'area disegnata")} /></Suspense>}
+            outline={drawingZone ? saved?.ring ?? null : null} onOutside={() => toast("La zona va dentro l'area disegnata")} onPinMove={arranging ? undefined : movePin} /></Suspense>}
       </div>
+      {/* The pin can be put right by hand on the 2D map; a pin moved by hand can go back to the automatic one. */}
+      {!drawing && !drawingZone && !arranging && (
+        <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 px-2 text-center text-xs text-muted-foreground">
+          {pinFix ? "Pin messo da te." : "Il pin non è al centro del luogo?"} {show3d ? "Spostalo sulla mappa 2D." : "Tienilo premuto e trascinalo."}
+          {pinFix && <button type="button" onClick={() => { setPinFix(loc.lat, loc.lng, null); toast("Pin automatico di nuovo"); }} className="font-semibold text-foreground underline decoration-foreground/30 underline-offset-4">Rimetti automatico</button>}
+        </p>
+      )}
       {drawingZone ? (
         <ZoneDrawBar kind={zoneKind!} pins={zoneDraft.length} m2={zoneDraft.length >= 3 ? pinsM2(zoneDraft) : null} editing={editingZone !== null}
           kinds={ZONE_KINDS[kind === "urban" ? "piazza" : "vigneto"]} onKind={setZoneKind}

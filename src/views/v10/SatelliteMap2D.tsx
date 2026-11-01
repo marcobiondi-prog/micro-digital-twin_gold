@@ -33,8 +33,10 @@ const STYLE: StyleSpecification = {
 
 type Camera = { center: [number, number]; zoom: number; bearing: number };
 
-export function SatelliteMap2D({ lat, lng, label, zoom, area = [], drawing = false, onAreaChange, sim = null, arranging = false, onMove, outline = null, onOutside }: {
+export function SatelliteMap2D({ lat, lng, label, zoom, area = [], drawing = false, onAreaChange, sim = null, arranging = false, onMove, outline = null, onOutside, onPinMove }: {
   lat: number; lng: number; label: string; zoom: number; area?: Ring; drawing?: boolean; onAreaChange?: (ring: Ring) => void;
+  /** The place's pin can be dragged to the right spot (not while drawing): where it was let go. */
+  onPinMove?: ((lat: number, lng: number) => void) | undefined;
   /** Drawing a zone inside the big area: its outline, shown still, and taps outside it refused (onOutside). */
   outline?: Ring | null; onOutside?: () => void;
   /** The simulation drawn inside the area; while `arranging` its trees and handles can be dragged (onMove). */
@@ -47,6 +49,11 @@ export function SatelliteMap2D({ lat, lng, label, zoom, area = [], drawing = fal
   const handles = useRef<Marker[]>([]);
   const moveRef = useRef(onMove);
   moveRef.current = onMove;
+  const pinMoveRef = useRef(onPinMove);
+  pinMoveRef.current = onPinMove;
+  const placePin = useRef<Marker | null>(null);
+  // Set while the pin is let go by hand, so the map does not jump to it.
+  const draggedTo = useRef<string | null>(null);
   // The latest pins, mode and callback for the map's own handlers.
   const live = useRef({ area, drawing, onAreaChange, outline, onOutside });
   live.current = { area, drawing, onAreaChange, outline, onOutside };
@@ -70,13 +77,24 @@ export function SatelliteMap2D({ lat, lng, label, zoom, area = [], drawing = fal
         set([...ring, [e.lngLat.lat, e.lngLat.lng]]);
       });
       // A tile that does not arrive leaves a gap, not an error: the map stays usable.
-      new maplibregl.Marker({ element: placePinElement(), anchor: "bottom" }).setLngLat([lng, lat]).setPopup(new maplibregl.Popup({ offset: 38 }).setText(label)).addTo(map);
+      const pinMarker = new maplibregl.Marker({ element: placePinElement(), anchor: "bottom", draggable: !!pinMoveRef.current && !live.current.drawing }).setLngLat([lng, lat]).setPopup(new maplibregl.Popup({ offset: 38 }).setText(label)).addTo(map);
+      pinMarker.on("dragend", () => { const p = pinMarker.getLngLat(); draggedTo.current = `${p.lat},${p.lng}`; pinMoveRef.current?.(p.lat, p.lng); });
+      placePin.current = pinMarker;
       mapRef.current = map;
       remove = () => map.remove();
     }).catch(() => { if (!cancelled) setState("error"); });
-    return () => { cancelled = true; mapRef.current = null; pins.current = []; handles.current = []; remove?.(); };
+    return () => { cancelled = true; mapRef.current = null; placePin.current = null; pins.current = []; handles.current = []; remove?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lat, lng, zoom, label]);
+  }, [zoom, label]);
+  // The pin follows its place (the square's centre arriving, a pin moved by hand) without rebuilding the map; the map
+  // centres on it unless the hand just put it there.
+  useEffect(() => {
+    placePin.current?.setLngLat([lng, lat]);
+    if (draggedTo.current === `${lat},${lng}`) { draggedTo.current = null; return; }
+    mapRef.current?.jumpTo({ center: [lng, lat] });
+  }, [lat, lng]);
+  // The pin can be dragged only outside drawing.
+  useEffect(() => { placePin.current?.setDraggable(!!onPinMove && !drawing); }, [drawing, onPinMove, state]);
   // The area and its pins follow the props: numbered pins that can be dragged while drawing, small dots otherwise.
   useEffect(() => {
     const map = mapRef.current, lib = libRef.current;
