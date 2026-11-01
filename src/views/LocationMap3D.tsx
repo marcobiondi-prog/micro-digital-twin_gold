@@ -175,13 +175,7 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
       // On top of the 3D mesh (roofs, trees) and drawn even when occluded: a ground pin in a street disappears behind buildings.
       const marker = new lib.Marker3DElement({ position: { lat, lng, altitude: 0 }, altitudeMode: "RELATIVE_TO_MESH", drawsWhenOccluded: true, label });
       map.append(marker);
-      // The app's turquoise pin (as in 2D) instead of the default red one, when the marker library is there.
-      void (window as typeof window & { google?: GoogleMaps }).google?.maps.importLibrary("marker").then((m) => {
-        const { PinElement } = m as { PinElement: new (o: Record<string, unknown>) => { element: HTMLElement } };
-        const tpl = document.createElement("template");
-        tpl.content.append(new PinElement({ background: "#38d6c4", borderColor: "#0b0f15", glyphColor: "#0b0f15" }).element);
-        marker.append(tpl);
-      }).catch(() => undefined);
+      // Google's own red pin, like the 2D one.
       el.replaceChildren(map);
       mapRef.current = map;
       setState("ready");
