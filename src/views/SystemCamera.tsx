@@ -334,7 +334,10 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
           {canZoom && ready && <ZoomDial className="mb-2" zoom={zoom} max={mode === "video" && zoomRangeRef.current ? zoomRangeRef.current.max / zoomRangeRef.current.min : ZOOM_MAX} onZoom={setZoom} />}
           {mode !== "video" && (
             <div className="mx-auto mb-2 flex w-fit rounded-full bg-black/55 p-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur" role="radiogroup" aria-label="Tipo di scatto">
-              <button type="button" role="radio" aria-checked={!burst} onClick={backToSingle} className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""} disabled:opacity-50`}>Singolo</button>
+              <button type="button" role="radio" aria-checked={!burst} onClick={backToSingle}
+                  // Off once the multiple shot has photos (no switching by mistake mid-series): "Fine" hands them over first.
+                  disabled={burst && shots.length > 0} title={burst && shots.length > 0 ? "Prima tocca Fine per tenere gli scatti" : undefined}
+                  className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""} disabled:opacity-40`}>Singolo</button>
               <button type="button" role="radio" aria-checked={burst} onClick={() => setMulti(true)} className={`h-8 rounded-full px-3 ${burst ? "bg-white text-black" : ""}`}>Multiplo</button>
             </div>
           )}
