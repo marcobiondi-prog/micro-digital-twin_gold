@@ -49,18 +49,20 @@ type Shape = HTMLElement & { outerCoordinates?: unknown; coordinates?: unknown }
 function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: Array<[number, number]>, sim: SimLayout | null, groundM = 0): HTMLElement[] {
   const out: HTMLElement[] = [];
   if (!Polygon3DElement) return out;
-  // With the place's ground height known, every shape lies FLAT on it (ABSOLUTE heights from one ground level): laid on
-  // the photographed mesh vertex by vertex, a corner that fell on a real tree's crown or a roof was lifted metres up and
-  // the lawn, the shadows and the crowns turned into slanted green wedges. Drawn through the mesh, so never hidden.
-  const flat = groundM > 0;
+  // Every shape lies FLAT on Google's own ground model (RELATIVE_TO_GROUND, heights in metres above it), drawn through the
+  // photographed mesh so it is never hidden. Laid on the mesh vertex by vertex, a corner on a real tree's crown or a roof
+  // was lifted metres and the lawn turned into slanted green wedges; laid at an outside ground height (sea-level metres
+  // from another elevation model) everything floated above the piazza. Google's ground matches its own map.
+  void groundM;
+  const flat = true;
   const absPoly = (o: Record<string, unknown>, ring: Array<[number, number]>, h: number) => {
-    const p = new Polygon3DElement({ ...o, altitudeMode: "ABSOLUTE", drawsOccludedSegments: true }) as Shape;
-    p.outerCoordinates = ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: groundM + h }));
+    const p = new Polygon3DElement({ ...o, altitudeMode: "RELATIVE_TO_GROUND", drawsOccludedSegments: true }) as Shape;
+    p.outerCoordinates = ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: h }));
     return p;
   };
   const absLine = (o: Record<string, unknown>, coords: Array<{ lat: number; lng: number; h: number }>) => {
-    const pl = new Polyline3DElement!({ ...o, altitudeMode: "ABSOLUTE", drawsOccludedSegments: true }) as Shape;
-    pl.coordinates = coords.map((c) => ({ lat: c.lat, lng: c.lng, altitude: groundM + c.h }));
+    const pl = new Polyline3DElement!({ ...o, altitudeMode: "RELATIVE_TO_GROUND", drawsOccludedSegments: true }) as Shape;
+    pl.coordinates = coords.map((c) => ({ lat: c.lat, lng: c.lng, altitude: c.h }));
     return pl;
   };
   // Ground shapes sit on the photographed mesh, 20 cm up, like the place's pin (RELATIVE_TO_MESH): clamped to the terrain
@@ -74,7 +76,7 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
   const meshLine = (o: Record<string, unknown>) => onMesh(Polyline3DElement!, o);
   try {
     const areaStyle = { fillColor: "rgba(56, 214, 196, 0.14)", strokeColor: "#ffffff", strokeWidth: 3, drawsOccludedSegments: true };
-    if (flat) out.push(absPoly(areaStyle, area, 0.3));
+    if (flat) out.push(absPoly(areaStyle, area, 0.15));
     else {
       const poly = meshPoly(areaStyle) as Shape;
       poly.outerCoordinates = area.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: LIFT }));
@@ -85,7 +87,7 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
     // Ground shapes are drawn through the photographed mesh: the terrain they clamp to often lies under the mesh.
     // An outline (stroke) costs no extra shape and gives each piece a crisp edge, so it reads as an object, not a smear.
     const ground = (ring: Array<[number, number]>, fill: string, stroke = "rgba(0,0,0,0)", width = 0) => {
-      if (flat) { out.push(absPoly({ fillColor: fill, strokeColor: stroke, strokeWidth: width }, ring, 0.4)); return; }
+      if (flat) { out.push(absPoly({ fillColor: fill, strokeColor: stroke, strokeWidth: width }, ring, 0.2)); return; }
       const p = meshPoly({ fillColor: fill, strokeColor: stroke, strokeWidth: width, drawsOccludedSegments: true }) as Shape;
       p.outerCoordinates = ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: LIFT }));
       out.push(p);
@@ -128,7 +130,7 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
         if (pt.kind === "lawn") {
           ground(pt.ring, "rgba(92,170,62,0.82)", "#3a7a28", 2);
           if (Polyline3DElement) for (const line of mowStripes(pt.ring)) {
-            if (flat) { out.push(absLine({ strokeColor: "rgba(178,226,120,0.55)", strokeWidth: 5 }, line.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, h: 0.5 })))); continue; }
+            if (flat) { out.push(absLine({ strokeColor: "rgba(178,226,120,0.55)", strokeWidth: 5 }, line.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, h: 0.3 })))); continue; }
             const pl = meshLine({ strokeColor: "rgba(178,226,120,0.55)", strokeWidth: 5, drawsOccludedSegments: true }) as Shape;
             pl.coordinates = line.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: LIFT }));
             out.push(pl);
@@ -167,7 +169,7 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
     for (const z of sim?.inner ?? []) if (z.ring.length >= 3) {
       const color = z.kind === "libera" ? "#94a3b8" : ZONE_COLORS[z.kind];
       const zStyle = { fillColor: z.kind === "libera" ? "rgba(71,85,105,0.6)" : `${color}66`, strokeColor: color, strokeWidth: 4 };
-      if (flat) { out.push(absPoly(zStyle, z.ring, 0.35)); continue; }
+      if (flat) { out.push(absPoly(zStyle, z.ring, 0.18)); continue; }
       const zp = meshPoly({ ...zStyle, drawsOccludedSegments: true }) as Shape;
       zp.outerCoordinates = z.ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: LIFT }));
       out.push(zp);
