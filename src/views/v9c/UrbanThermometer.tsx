@@ -330,8 +330,11 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
         </div>
       </div>
 
-      {/* What the two small numbers at the arc's ends are, right under the line inside it. */}
-      <p className="-mt-3 text-center text-xs leading-snug text-muted-foreground">I numeri ai lati dell'arco: a destra {Math.round(dialMax)}°, poco sopra il calore di adesso senza interventi; a sinistra {Math.round(dialMin)}°, poco sotto il più fresco che puoi ottenere a quest'ora.</p>
+      {/* Labels under the two numbers at the arc's ends: the coolest it can get, and today without interventions. */}
+      <div className="mx-auto -mt-3 flex w-full max-w-[21rem] justify-between px-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground" aria-hidden="true">
+        <span className="rounded-full bg-sky-400/15 px-2 py-0.5 text-sky-300">Il più fresco</span>
+        <span className="rounded-full bg-foreground/[0.08] px-2 py-0.5">Senza interventi</span>
+      </div>
       {/* Under the arc: the place's real temperature right now (the reading without interventions is in the chip below). */}
       {typeof realNow.data === "number" && (
         <p className="-mt-1 flex items-center justify-center gap-1.5 text-center text-sm text-muted-foreground">
