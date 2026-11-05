@@ -127,7 +127,7 @@ function HorizonGlint() {
   return <span className="intro-glint absolute left-0 top-0 h-[3px] w-24 rounded-full bg-[radial-gradient(closest-side,#fff,rgb(200_255_248/0.8)_45%,transparent)] shadow-[0_0_18px_4px_rgb(160_250_240/0.55)]" style={{ offsetPath: path, offsetRotate: "auto" }} />;
 }
 
-function Backdrop() {
+export function Backdrop() {
   return (
     <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[#05070c]" aria-hidden="true">
       {/* Aurora: three coloured lights, blended so they brighten where they meet. */}
@@ -156,7 +156,7 @@ function Backdrop() {
  * The entrance is always dark, whatever theme the app uses: its pages carry the .dark tokens themselves, and while one is
  * open the phone's status bar takes the dark canvas colour (the app's own colour comes back on leaving).
  */
-function useDarkChrome() {
+export function useDarkChrome() {
   useEffect(() => {
     const meta = document.querySelector<HTMLMetaElement>(THEME_META);
     const before = meta?.getAttribute("content") ?? null;

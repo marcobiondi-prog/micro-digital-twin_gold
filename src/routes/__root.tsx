@@ -14,6 +14,7 @@ import { THEME_DARK, ThemeToggle, themeBootScript } from "@/views/theme-toggle";
 import { AccountControl } from "@/views/account-control";
 import { CameraDockButton, CameraSheet } from "@/views/CameraDock";
 import { PermissionsSheet } from "@/views/v10/Permissions";
+import { SectorGate } from "@/views/v10/SectorGate";
 import { syncAppOrientation } from "@/lib/ar-orientation";
 import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
 import { installUiClicks } from "@/lib/ui-sounds";
@@ -576,6 +577,7 @@ function RootComponent() {
       {!intro && <BottomNav />}
       <CameraSheet />
       <PermissionsSheet />
+      <SectorGate />
     </QueryClientProvider>
   );
 }
