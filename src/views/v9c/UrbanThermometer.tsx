@@ -5,10 +5,10 @@ import { loadPlaceArea } from "@/lib/place-area-client";
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronDown, CloudRain, Leaf, Minus, Plus,  Ruler, Sprout, Sun, Thermometer, TreePine, Umbrella, Wallet, type LucideIcon } from "lucide-react";
+import { CloudRain, Leaf, Minus, Plus, Ruler, Sprout, Sun, Thermometer, TreePine, Umbrella, Users, type LucideIcon } from "lucide-react";
 import { comparison, piazzaEstimate, type PrototypeId } from "@/models/scenarios";
 import { setUrban, useLab } from "@/models/lab-store";
-import { REFERENCE_M2, euroRange, grouped, interventionCost } from "@/models/intervention-cost";
+import { REFERENCE_M2, grouped } from "@/models/intervention-cost";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { useSeasonClock, WhenPicker } from "@/views/v10/when";
 import { coolingShare, estimatedTemp, SEASON_LABEL } from "@/models/season-climate";
@@ -204,12 +204,11 @@ export function Lever({ icon: Icon, label, value, step, max, color, swatch, onCh
 
 /**
  * v9 "C · Termometro": no grid. Pick a ready piazza or move the three levers; a big gauge with a dot shows how hot
- * the piazza feels and says it in words, a chip tells what the last touch gained; then the estimated cost (total and per m²)
- * on the place's measured surface, and three small cards with the yearly benefits.
+ * the piazza feels and says it in words, a chip tells what the last touch gained; then
+ * "Cosa ottieni" (no money on screen): the degrees taken off, the yearly benefits, the shade and the people it covers.
  */
 export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() => Promise<void>) | undefined }) {
   const urban = useLab().urban;
-  const [costOpen, setCostOpen] = useState(false);
   // Is the gauge on screen? When not, a compact reading stays pinned under the tabs.
   const gaugeRef = useRef<HTMLDivElement>(null);
   const [gaugeSeen, setGaugeSeen] = useState(true);
@@ -258,7 +257,6 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
   const drawn = drawnM2(urban.area, urban.location);
   const measured = area.data?.m2 ?? null;
   const m2 = drawn ?? measured ?? REFERENCE_M2;
-  const cost = interventionCost(m2, urban.trees, urban.permeable, urban.shade);
   // Same yearly estimates as the dashboard, on this surface (700 mm of rain, 60 % kept by permeable ground).
   const co2 = Math.round(urban.trees * 22);
   const water = Math.round(m2 * (urban.permeable / 100) * 0.7 * 0.6);
@@ -298,6 +296,7 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
     { icon: Leaf, value: `${co2} kg`, label: "CO₂ l'anno" },
     { icon: CloudRain, value: `${water} m³`, label: "Pioggia tenuta" },
     { icon: Sun, value: `${grouped(shadeM2)} m²`, label: "All'ombra" },
+    { icon: Users, value: `≈ ${grouped(Math.floor(shadeM2 / 2))}`, label: "Persone all'ombra" },
   ];
   const surface = area.isPending ? "…" : `${grouped(m2)} m²`;
   const surfaceNote = drawn !== null ? "Superficie disegnata" : area.isPending ? "Misuro la piazza…" : measured ? "Superficie della piazza" : "Superficie di riferimento";
@@ -323,11 +322,11 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
       {/* 2 · The gauge: drag the white dot to choose how much to cool. */}
       <div ref={gaugeRef} className="relative mx-auto mt-10 flex max-w-[21rem] flex-col items-center px-7">
         <Gauge before={before} after={after} lowest={lowest} min={dialMin} max={dialMax} stops={share > 0.15 ? stops : []} onSlide={slideTo} onStop={applyLevel} />
-        {/* Inside the arc: how it feels, the reading and what it costs, all following the dot. */}
+        {/* Inside the arc: how it feels, the reading and the degrees gained, all following the dot. */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center" aria-live="polite">
           <span className={cn("rounded-full px-3 py-0.5 text-[13px] font-semibold text-white transition-colors duration-300", feel.bg ?? GAIN_BG[feel.step])}>{feel.text}</span>
           <span className="mt-1 font-display text-6xl font-light leading-none tracking-tight tabular-nums">{fmt(after)}°</span>
-          <span className="mt-1.5 font-mono text-sm font-semibold tabular-nums">{est.dT > 0.05 ? euroRange(cost.total) : "Nessun intervento"}</span>
+          <span className="mt-1.5 font-mono text-sm font-semibold tabular-nums">{gainNow > 0.05 ? `−${fmt(gainNow)}° rispetto a oggi` : est.dT > 0.05 ? "A quest'ora non serve" : "Nessun intervento"}</span>
         </div>
       </div>
 
@@ -354,38 +353,22 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
         <Lever icon={Umbrella} label="Ombra" value={urban.shade} step={10} max={100} color="text-urban" swatch="bg-urban" onChange={(v) => change({ shade: v })} />
       </div>
 
-      {/* 4 · Cost and benefits, folded: closed it still says the total. */}
-      <div className="rounded-3xl bg-foreground/[0.05]">
-        <button type="button" onClick={() => setCostOpen((o) => !o)} aria-expanded={costOpen} aria-controls="piazza-cost-body"
-          className="flex w-full items-center gap-3 rounded-3xl p-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <Wallet className="size-6 shrink-0 text-muted-foreground" aria-hidden="true" />
-          <span className="min-w-0 flex-1">
-            <span className="block text-xs text-muted-foreground">Costo stimato dell'intervento{est.dT <= 0.05 ? "" : preset ? ` · ${level.s}` : ` · vicino a ${level.s}`}</span>
-            {/* Shown even folded: the total; the cost per m² lives inside. */}
-            {urban.trees + urban.permeable + urban.shade === 0
-              ? <span className="block font-mono text-base font-semibold">Nessun intervento</span>
-              : <>
-                <span className="block font-mono text-base font-semibold tabular-nums">Tot. {euroRange(cost.total)}</span>
-              </>}
-            <span className="mt-0.5 block text-xs text-muted-foreground">{costOpen ? "Nascondi i dettagli" : "Tocca per i dettagli e i benefici"}</span>
-          </span>
-          <ChevronDown className={cn("size-5 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", costOpen && "rotate-180")} aria-hidden="true" />
-        </button>
-        <div id="piazza-cost-body" hidden={!costOpen} className="space-y-3 px-4 pb-4">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-            <span className="inline-flex items-center gap-1.5 text-muted-foreground"><Ruler className="size-4 shrink-0" aria-hidden="true" />{surface} · {surfaceNote.toLowerCase()}</span>
-            {urban.trees + urban.permeable + urban.shade > 0 && <span className="font-mono font-semibold tabular-nums">{Math.round(cost.perM2.lo)}–{Math.round(cost.perM2.hi)} € al m²</span>}
-          </div>
-          <dl className="grid grid-cols-3 gap-2 border-t border-foreground/10 pt-3">
-            {facts.map(({ icon: Icon, value, label }) => (
-              <div key={label} className="flex min-w-0 flex-col items-center gap-1 text-center">
-                <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <div className="flex min-w-0 flex-col-reverse"><dt className="truncate text-[11px] text-muted-foreground">{label}</dt><dd className="font-mono text-sm font-semibold tabular-nums">{value}</dd></div>
-              </div>
-            ))}
-          </dl>
-          <p className="text-[11px] leading-snug text-muted-foreground">Stima indicativa, IVA esclusa: albero 600–1.500 € l'uno, prato 60–140 €/m², ombra 120–350 €/m².</p>
-        </div>
+      {/* 4 · What the piazza gets: the degrees taken off, then the yearly benefits and the shade, always in view. */}
+      <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4" aria-label="Cosa ottieni">
+        <p className="text-[15px] font-semibold">Cosa ottieni</p>
+        <p className="text-sm text-muted-foreground">{gainNow > 0.05
+          ? <>Il calore percepito scende di <b className="font-semibold tabular-nums text-foreground">{fmt(gainNow)}°</b>: da {fmt(before)}° a {fmt(after)}°, {feel.text.toLowerCase()}.</>
+          : urban.trees + urban.permeable + urban.shade > 0 ? <>A quest'ora non fa abbastanza caldo perché gli interventi tolgano gradi: i benefici qui sotto restano.</> : <>Nessun intervento: muovi il punto sull'arco o le leve.</>}</p>
+        <dl className="grid grid-cols-2 gap-2">
+          {facts.map(({ icon: Icon, value, label }) => (
+            <div key={label} className="flex min-w-0 items-center gap-2.5 rounded-2xl bg-foreground/[0.04] px-3 py-2.5">
+              <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <div className="flex min-w-0 flex-col-reverse"><dt className="truncate text-[11px] text-muted-foreground">{label}</dt><dd className="font-mono text-sm font-semibold tabular-nums">{value}</dd></div>
+            </div>
+          ))}
+        </dl>
+        <p className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><Ruler className="size-3.5 shrink-0" aria-hidden="true" />{surface} · {surfaceNote.toLowerCase()}</p>
+        <p className="text-[11px] leading-snug text-muted-foreground">Stime indicative su un anno: 22 kg di CO₂ per albero, 700 mm di pioggia di cui il 60 % trattenuto dal prato, 2 m² d'ombra a persona.</p>
       </div>
     </section>
   );
