@@ -1,4 +1,4 @@
-import { saveProId, useProId } from "@/lib/use-pro-id";
+import { keepProIdInAccount, saveProId, useProId } from "@/lib/use-pro-id";
 import { DeviceCacheCard } from "@/views/v10/DeviceCache";
 import { getMedia, removeMedia, useLabMedia } from "@/models/lab-media-store";
 import { CLOUD_QUOTA, bytesText, usageTone, useCloudUsage } from "@/lib/use-cloud-usage";
@@ -323,6 +323,7 @@ export function AccountControl() {
     await queryClient.cancelQueries();
     queryClient.clear();
     if (!account?.guest) {
+      await keepProIdInAccount();
       const { error } = await supabase.auth.signOut();
       if (error) { setNotice(error.message); setPending(false); return; }
     }

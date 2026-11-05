@@ -1,4 +1,5 @@
 import { useEffect, useSyncExternalStore } from "react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { isProId, type ProId } from "@/models/professional-id";
 
@@ -40,7 +41,16 @@ export async function saveProId(id: ProId | null): Promise<void> {
   if (data.session) await supabase.auth.updateUser({ data: { pro_id: id } }).catch(() => undefined);
 }
 
-/** Mounted once: on sign-in the account's profile comes to this device, or this device's goes to an account without one. */
+/** Before signing out: the profile on this device goes into the account (if a save had failed), so the next sign-in brings it back. */
+export async function keepProIdInAccount(): Promise<void> {
+  const id = snapshot();
+  if (id) await supabase.auth.updateUser({ data: { pro_id: id } }).catch(() => undefined);
+}
+
+/**
+ * Mounted once: on sign-in the account's profile comes to this device, or this device's goes to an account without one;
+ * on sign-out the profile leaves this device (kept in the account for the next sign-in).
+ */
 export function useSyncProId() {
   useEffect(() => {
     const adopt = (meta: unknown) => {
@@ -49,7 +59,15 @@ export function useSyncProId() {
       else if (snapshot()) void supabase.auth.updateUser({ data: { pro_id: snapshot() } }).catch(() => undefined);
     };
     void supabase.auth.getSession().then(({ data }) => { if (data.session) adopt(data.session.user.user_metadata); });
-    const { data } = supabase.auth.onAuthStateChange((event, s) => { if (event === "SIGNED_IN" && s) adopt(s.user.user_metadata); });
+    // Signing out of the personal account signs out of the professional profile too (it stays saved in the account
+    // and comes back with the next sign-in).
+    const { data } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === "SIGNED_IN" && s) adopt(s.user.user_metadata);
+      if (event === "SIGNED_OUT" && snapshot()) {
+        set(null);
+        toast("Sei uscito anche dal profilo professionale", { description: "Accedi di nuovo e torna da solo." });
+      }
+    });
     return () => data.subscription.unsubscribe();
   }, []);
 }
