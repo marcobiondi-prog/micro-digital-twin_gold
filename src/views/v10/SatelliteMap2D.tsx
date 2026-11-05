@@ -9,6 +9,7 @@ import type { LatLng } from "@/models/area-layout";
 /** Something moved by hand on the map: a tree (its index) or the lawn's, the shade's or the windbreak's handle. */
 export type MovedPart = { part: "tree"; index: number; at: LatLng } | { part: "lawn" | "shade" | "wind"; at: LatLng };
 import { Crosshair, LoaderCircle } from "lucide-react";
+import { googleTiles, type GoogleTiles } from "@/lib/google-2d-tiles";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { StyleSpecification } from "maplibre-gl";
 
@@ -19,6 +20,12 @@ import type { StyleSpecification } from "maplibre-gl";
  * the rest of the simulation faded behind.
  */
 const ARCGIS = "https://server.arcgisonline.com/ArcGIS/rest/services";
+/** Google's satellite tiles when the key allows them (the same imagery as the 3D view), the open imagery otherwise. */
+const styleOf = (g: GoogleTiles | null): StyleSpecification => (g ? {
+  version: 8,
+  sources: { imagery: { type: "raster", tiles: [g.url], tileSize: g.tileSize, maxzoom: 19 } },
+  layers: [{ id: "imagery", type: "raster", source: "imagery" }],
+} : STYLE);
 const STYLE: StyleSpecification = {
   version: 8,
   sources: {
@@ -33,7 +40,9 @@ const STYLE: StyleSpecification = {
 
 type Camera = { center: [number, number]; zoom: number; bearing: number };
 
-export function SatelliteMap2D({ lat, lng, label, zoom, area = [], drawing = false, onAreaChange, sim = null, arranging = false, onMove, outline = null, onOutside, onPinMove }: {
+export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawing = false, onAreaChange, sim = null, arranging = false, onMove, outline = null, onOutside, onPinMove }: {
+  /** The browser key: with it the 2D map uses Google's satellite imagery, like the 3D view. */
+  apiKey?: string | undefined;
   lat: number; lng: number; label: string; zoom: number; area?: Ring; drawing?: boolean; onAreaChange?: (ring: Ring) => void;
   /** The place's pin can be dragged to the right spot (not while drawing): where it was let go. */
   onPinMove?: ((lat: number, lng: number) => void) | undefined;
@@ -58,13 +67,15 @@ export function SatelliteMap2D({ lat, lng, label, zoom, area = [], drawing = fal
   const live = useRef({ area, drawing, onAreaChange, outline, onOutside });
   live.current = { area, drawing, onAreaChange, outline, onOutside };
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [googleOn, setGoogleOn] = useState(false);
   const camera: Camera = { center: [lng, lat], zoom, bearing: 0 };
   useEffect(() => {
     let cancelled = false, remove: (() => void) | undefined;
     setState("loading");
-    void import("maplibre-gl").then(({ default: maplibregl }) => {
+    void Promise.all([import("maplibre-gl"), googleTiles(apiKey)]).then(([{ default: maplibregl }, google]) => {
       if (cancelled || !host.current) return;
-      const map = new maplibregl.Map({ container: host.current, style: STYLE, ...camera, maxZoom: 19, pitchWithRotate: false, cooperativeGestures: false, attributionControl: false });
+      setGoogleOn(!!google);
+      const map = new maplibregl.Map({ container: host.current, style: styleOf(google), ...camera, maxZoom: google ? 21 : 19, pitchWithRotate: false, cooperativeGestures: false, attributionControl: false });
       map.touchPitch.disable();
       libRef.current = maplibregl;
       map.on("load", () => { addAreaLayers(map); addSimLayers(map, lat); if (!cancelled) setState("ready"); });
@@ -142,6 +153,8 @@ export function SatelliteMap2D({ lat, lng, label, zoom, area = [], drawing = fal
     <div data-map-gestures="" className="relative h-full w-full touch-none overflow-hidden bg-card">
       <div ref={host} className="h-full w-full" role="img" aria-label={`Mappa di ${label}`} />
       {state === "ready" && <button type="button" onClick={recenter} aria-label="Ricentra la mappa sul punto" className="absolute left-2 top-2 grid size-9 place-items-center rounded-full border border-border/60 bg-background/90 text-foreground shadow-sm backdrop-blur"><Crosshair className="size-4" aria-hidden="true" /></button>}
+      {/* Google's tiles carry its name on the map, as in the 3D view. */}
+      {state === "ready" && googleOn && <span className="pointer-events-none absolute bottom-1.5 left-2 text-[11px] font-semibold text-white/90 [text-shadow:0_1px_2px_rgb(0_0_0/0.8)]">Google</span>}
       {state === "loading" && <div className="pointer-events-none absolute inset-0 grid place-items-center text-muted-foreground"><LoaderCircle className="size-5 animate-spin" aria-label="Caricamento mappa" /></div>}
       {state === "error" && <p role="status" className="absolute inset-0 grid place-items-center px-4 text-center text-sm text-muted-foreground">Mappa non disponibile in questo momento.</p>}
     </div>
