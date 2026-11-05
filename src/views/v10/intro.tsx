@@ -61,7 +61,7 @@ const STEPS: Array<{ title: string; text: string; art: ReactNode }> = [
       <path pathLength={1} d="M124 58 C120 53 116 49 116 44 A8 8 0 0 1 132 44 C132 49 128 53 124 58 Z" />
       <path pathLength={1} d="M114 30 A14 14 0 0 1 134 30 M108 24 A22 22 0 0 1 140 24" strokeOpacity="0.6" />
     </> },
-  { title: "Muovi il punto", text: "Sull'arco scegli quanto rinfrescare: vedi subito i gradi in meno e quanto costa.",
+  { title: "Capisci quando hai bisogno del mio intervento", text: "Sull'arco scegli quanto rinfrescare: vedi subito i gradi in meno e quanto costa.",
     art: <>
       <path pathLength={1} d="M30 84 A50 50 0 0 1 130 84" strokeWidth="6" strokeOpacity="0.25" />
       <path pathLength={1} d="M30 84 A50 50 0 0 1 98 37" strokeWidth="6" />
