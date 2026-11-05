@@ -29,7 +29,8 @@ import { Fold, FoldTabs } from "@/views/Fold";
 import { Ambient, PageHero, TabRow } from "@/views/v8/console";
 import { FieldAI } from "@/views/FieldAI";
 import { ExportSheet } from "@/views/v10/ExportSheet";
-import { DashCard, DashSection, PiazzaDashboard, PremiumPart, URBAN_LOCKED, VINE_LOCKED, VineDashboard, getDashSeason, piazzaDash } from "@/views/v10/Dashboard";
+import { SEND_PROJECT_EVENT } from "@/lib/send-project";
+import { DashCard, DashSection, PiazzaDashboard, PremiumPart, SendProject, URBAN_LOCKED, VINE_LOCKED, VineDashboard, getDashSeason, piazzaDash } from "@/views/v10/Dashboard";
 import { getPiazzaReading } from "@/models/sim-reading";
 import { useQueryClient } from "@tanstack/react-query";
 import { heatStep, heatWords, piazzaMix, piazzaSummary, thirstStep, thirstWords, vineMixRows, vineSummary } from "@/models/project-summary";
@@ -305,6 +306,7 @@ function UrbanRecords() {
             }} className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"><Trash2 className="size-4" /></button></li>)}</ul>
         </DashCard>
       </DashSection>
+      <SendProject flow="piazza" />
       <PremiumPart locked={URBAN_LOCKED}>
         <div className="space-y-8">
           <DashSection title="Approvazioni degli enti" hint={STAGES[displayedStage]}>
@@ -389,6 +391,7 @@ function VineRecords() {
           }} className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"><Trash2 className="size-4" /></button></li>)}</ul>
         </DashCard>
       </DashSection>
+      <SendProject flow="vigneto" />
       <PremiumPart locked={VINE_LOCKED}>
         <DashSection title="Piano suggerito dall'AI"><FieldAI onAdd={addNote} /></DashSection>
       </PremiumPart>
@@ -443,6 +446,12 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   };
   /** "Esporta report": the sheet in steps (which files, which photos, where), drawing the report meanwhile. */
   const startExport = () => setOpen(true);
+  // The free "Invia il progetto" card under the records opens this same sheet.
+  useEffect(() => {
+    const show = () => setOpen(true);
+    window.addEventListener(SEND_PROJECT_EVENT, show);
+    return () => window.removeEventListener(SEND_PROJECT_EVENT, show);
+  }, []);
   const u = labState.urban, v = labState.vineyard;
   // The same summary as the dashboard on screen (season, measured surfaces and the place's real year from the shared cache).
   const qc = useQueryClient();

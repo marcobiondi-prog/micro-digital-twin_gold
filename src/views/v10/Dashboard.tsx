@@ -4,7 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { ArrowRight, CloudRain, Droplets, Leaf, Lock, Mail, MapPin, ShieldCheck, Sparkles, Sun, TreePine, Umbrella, Wind, type LucideIcon } from "lucide-react";
+import { ArrowRight, CloudRain, Droplets, Leaf, Lock, Mail, MapPin, Send, ShieldCheck, Sparkles, Sun, TreePine, Umbrella, Wind, type LucideIcon } from "lucide-react";
 import { useLab, type LabState } from "@/models/lab-store";
 import { getPiazzaReading, usePiazzaReading, type PiazzaReading } from "@/models/sim-reading";
 import { heatStep, heatWords, piazzaMix, piazzaSummary, thirstStep, thirstWords, vineMixRows, vineSummary } from "@/models/project-summary";
@@ -20,6 +20,7 @@ import { splitLocation } from "@/views/SimulationGrid";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn } from "@/lib/demo-login";
 import { openAccount } from "@/lib/camera-dock";
+import { openProjectSend } from "@/lib/send-project";
 import { hapticTick } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
@@ -176,6 +177,34 @@ function SeasonPills({ value, onChange, only }: { value: Season; onChange: (s: S
 }
 
 export type Locked = { icon: LucideIcon; title: string; line: string };
+
+/**
+ * Free for everyone, signed in or not: send the project — the report (PDF), the table, the map data and the photos —
+ * by email or through the phone's share window, from the same sheet as "Esporta report". Only the open project goes:
+ * a municipal officer sends the piazza, an agronomist the vineyard.
+ */
+export function SendProject({ flow }: { flow: "piazza" | "vigneto" }) {
+  const piazza = flow === "piazza";
+  return (
+    <section className="space-y-3" aria-label="Invia il progetto">
+      <div className="flex items-center gap-2 px-1">
+        <h2 className="text-lg font-semibold tracking-tight">Invia il progetto</h2>
+        <span className="rounded-full bg-ok/15 px-2.5 py-0.5 text-[11px] font-semibold text-ok">gratis</span>
+      </div>
+      <div className="rounded-3xl bg-foreground/[0.05] p-4 sm:p-5">
+        <div className="flex items-start gap-3">
+          <Send className="mt-0.5 size-5 shrink-0 text-brand-turquoise" aria-hidden="true" />
+          <p className="min-w-0 flex-1 text-sm text-muted-foreground">{piazza
+            ? "Manda il progetto della piazza al Comune, all'ufficio tecnico o a chi vuoi: report, tabella, dati per la mappa e foto, per email o con le app del telefono."
+            : "Manda il progetto del vigneto all'azienda, al consulente o a chi vuoi: report, tabella, dati per la mappa e foto, per email o con le app del telefono."}</p>
+        </div>
+        <button type="button" onClick={openProjectSend} className="mt-3 inline-flex h-11 items-center gap-2 rounded-full bg-foreground px-5 text-sm font-semibold text-background outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Send className="size-4" aria-hidden="true" />{piazza ? "Invia il progetto della piazza" : "Invia il progetto del vigneto"}
+        </button>
+      </div>
+    </section>
+  );
+}
 
 /**
  * The Premium part of the dashboard. Signed in (or simulated on previews) it shows its tools; otherwise each one stays

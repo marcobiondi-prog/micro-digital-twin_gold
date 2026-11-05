@@ -255,12 +255,24 @@ export function AccountControl() {
     void selectAvatar("upload", file);
   };
 
+  // Where the last tap landed, for the panel opened by a button elsewhere on the page.
+  const lastTap = useRef<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    const note = (e: PointerEvent) => { lastTap.current = { x: e.clientX, y: e.clientY }; };
+    window.addEventListener("pointerdown", note, { capture: true, passive: true });
+    return () => window.removeEventListener("pointerdown", note, { capture: true });
+  }, []);
   const placePanel = useCallback((element: HTMLDivElement | null) => {
     if (!element || !triggerRef.current || !window.matchMedia("(max-width: 639px)").matches) return;
     const trigger = triggerRef.current.getBoundingClientRect();
     const panel = element.getBoundingClientRect();
-    element.style.setProperty("--account-x", `${trigger.left + trigger.width / 2 - panel.left}px`);
-    element.style.setProperty("--account-y", `${trigger.top + trigger.height / 2 - panel.top}px`);
+    // The sheet unfolds from the account button; opened from further down the page (the dashboard's "Accedi per
+    // sbloccare", a locked tool), the button has scrolled out of sight and a circle grown from there never covered the
+    // screen — the panel stayed invisible behind its dark veil. Then it unfolds from the tap that opened it.
+    const onScreen = trigger.bottom > 0 && trigger.top < window.innerHeight;
+    const at = onScreen ? { x: trigger.left + trigger.width / 2, y: trigger.top + trigger.height / 2 } : lastTap.current ?? { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    element.style.setProperty("--account-x", `${at.x - panel.left}px`);
+    element.style.setProperty("--account-y", `${at.y - panel.top}px`);
   }, []);
 
   useEffect(() => {

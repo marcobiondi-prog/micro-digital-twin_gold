@@ -250,6 +250,7 @@ const FREE_FEATURES = [
   "Mappa 2D e ricerca del luogo",
   "Foto e video, registro interventi e quaderno di campagna",
   "Report PDF, dati per le mappe e link di condivisione",
+  "Invio del progetto della tua piazza o del tuo vigneto: report, tabella, dati per la mappa e foto, per email o con le app del telefono",
 ];
 const PREMIUM_FEATURES = [
   AI_STANDBY ? "Fotocamera AI (in sviluppo, arriverà con un prossimo aggiornamento)" : "Fotocamera AI: riconosce piante e terreno",
