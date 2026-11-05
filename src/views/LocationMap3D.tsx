@@ -1,3 +1,4 @@
+import { isKeyRejected, loadGoogleMaps, onKeyRejected } from "@/lib/google-maps-js";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { mowStripes, hedgeParts, netParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts } from "@/models/area-layout";
 import { SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
@@ -10,33 +11,14 @@ import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camer
  * the referrer-restricted browser key; the 2D embed stays the default.
  */
 type Maps3D = { Map3DElement: new (options: Record<string, unknown>) => HTMLElement; Marker3DElement: new (options: Record<string, unknown>) => HTMLElement; Polygon3DElement?: new (options: Record<string, unknown>) => HTMLElement; Polyline3DElement?: new (options: Record<string, unknown>) => HTMLElement };
-type GoogleMaps = { maps: { importLibrary: (name: string) => Promise<unknown> } };
 type Map3D = HTMLElement & Partial<Camera> & { gestureHandling?: string; flyCameraTo?: (options: { endCamera: Camera; durationMillis: number }) => void };
 
-let loader: Promise<Maps3D> | undefined;
-
 // The browser key can be refused for this address (its allowed sites do not include it): the API then calls
-// window.gm_authFailure. From then on the 3D view hands over to its fallback instead of showing the provider's error.
-let keyRejected = false;
-const rejectedSubs = new Set<() => void>();
-if (typeof window !== "undefined") {
-  (window as typeof window & { gm_authFailure?: () => void }).gm_authFailure = () => { keyRejected = true; rejectedSubs.forEach((f) => f()); };
-}
-const useKeyRejected = () => useSyncExternalStore((f) => { rejectedSubs.add(f); return () => { rejectedSubs.delete(f); }; }, () => keyRejected, () => false);
+// window.gm_authFailure (lib/google-maps-js). From then on the 3D view hands over to its fallback instead of showing the provider's error.
+const useKeyRejected = () => useSyncExternalStore(onKeyRejected, isKeyRejected, () => false);
 
 function loadMaps3D(key: string): Promise<Maps3D> {
-  loader ??= new Promise<Maps3D>((resolve, reject) => {
-    const w = window as typeof window & { google?: GoogleMaps; __mdtMaps3dReady?: () => void };
-    const done = () => w.google!.maps.importLibrary("maps3d").then((lib) => resolve(lib as Maps3D), reject);
-    if (w.google?.maps?.importLibrary) { void done(); return; }
-    w.__mdtMaps3dReady = () => void done();
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=beta&language=it&region=IT&loading=async&callback=__mdtMaps3dReady`;
-    script.async = true;
-    script.onerror = () => reject(new Error("Maps JavaScript API non raggiungibile"));
-    document.head.appendChild(script);
-  }).catch((error) => { loader = undefined; throw error; });
-  return loader;
+  return loadGoogleMaps(key).then((g) => g.maps.importLibrary("maps3d") as Promise<Maps3D>);
 }
 
 type Shape = HTMLElement & { outerCoordinates?: unknown; coordinates?: unknown };

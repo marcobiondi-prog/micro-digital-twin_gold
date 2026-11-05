@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from "react";
 import type { Season } from "./season-climate";
 
 /**
@@ -14,7 +15,17 @@ type Kind = "urban" | "vineyard";
 const current: Partial<Record<Kind, SimWhen>> = {};
 const requested: Partial<Record<Kind, SimWhen>> = {};
 
-export const setSimWhen = (kind: Kind, when: SimWhen) => { current[kind] = when; };
+const subs = new Set<() => void>();
+export const setSimWhen = (kind: Kind, when: SimWhen) => {
+  const was = current[kind];
+  if (was && was.season === when.season && was.hour === when.hour && was.minute === when.minute && was.dst === when.dst) return;
+  current[kind] = when;
+  subs.forEach((f) => f());
+};
+/** The simulation's season and hour, live (the map's day and night follow it). */
+export function useSimWhen(kind: Kind): SimWhen | null {
+  return useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, () => current[kind] ?? null, () => null);
+}
 export const getSimWhen = (kind: Kind): SimWhen | null => current[kind] ?? null;
 
 /** Asks the simulation to open on this season and hour the next time its clock starts. */

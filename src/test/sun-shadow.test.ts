@@ -56,3 +56,16 @@ describe("shadows follow the simulation's sun", () => {
     expect(piazzaShadows(t, sunAt(41.56, 14.66, "estate", 17, 0, "legale"))).toHaveLength(4);
   });
 });
+
+describe("day and night on the map follow the simulation's hour", async () => {
+  const { dayLight, sunHeightDeg } = await import("@/models/sun-shadow");
+  it("is day at summer noon and night at winter 22:00", () => {
+    expect(dayLight(sunHeightDeg(41.56, 14.66, "estate", 13, 0, "legale"), false).phase).toBe("giorno");
+    expect(dayLight(sunHeightDeg(41.56, 14.66, "inverno", 22, 0, "solare"), false)).toEqual({ phase: "notte", veil: "rgba(10, 18, 50, 0.5)" });
+  });
+  it("turns golden at sunset and clear by day", () => {
+    expect(dayLight(4, false).phase).toBe("tramonto");
+    expect(dayLight(4, true).phase).toBe("alba");
+    expect(dayLight(30, true).veil).toBeNull();
+  });
+});

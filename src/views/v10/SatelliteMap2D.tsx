@@ -9,7 +9,7 @@ import type { LatLng } from "@/models/area-layout";
 /** Something moved by hand on the map: a tree (its index) or the lawn's, the shade's or the windbreak's handle. */
 export type MovedPart = { part: "tree"; index: number; at: LatLng } | { part: "lawn" | "shade" | "wind"; at: LatLng };
 import { Crosshair, LoaderCircle } from "lucide-react";
-import { googleTiles, type GoogleTiles } from "@/lib/google-2d-tiles";
+import { isKeyRejected, loadGoogleMaps, onKeyRejected } from "@/lib/google-maps-js";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { StyleSpecification } from "maplibre-gl";
 
@@ -20,12 +20,6 @@ import type { StyleSpecification } from "maplibre-gl";
  * the rest of the simulation faded behind.
  */
 const ARCGIS = "https://server.arcgisonline.com/ArcGIS/rest/services";
-/** Google's satellite tiles when the key allows them (the same imagery as the 3D view), the open imagery otherwise. */
-const styleOf = (g: GoogleTiles | null): StyleSpecification => (g ? {
-  version: 8,
-  sources: { imagery: { type: "raster", tiles: [g.url], tileSize: g.tileSize, maxzoom: 19 } },
-  layers: [{ id: "imagery", type: "raster", source: "imagery" }],
-} : STYLE);
 const STYLE: StyleSpecification = {
   version: 8,
   sources: {
@@ -39,6 +33,7 @@ const STYLE: StyleSpecification = {
 };
 
 type Camera = { center: [number, number]; zoom: number; bearing: number };
+type GMap = { moveCamera: (c: { center?: { lat: number; lng: number }; zoom?: number }) => void };
 
 export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawing = false, onAreaChange, sim = null, arranging = false, onMove, outline = null, onOutside, onPinMove }: {
   /** The browser key: with it the 2D map uses Google's satellite imagery, like the 3D view. */
@@ -52,6 +47,7 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
   sim?: SimLayout | null; arranging?: boolean; onMove?: (moved: MovedPart) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
+  const under = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const libRef = useRef<typeof import("maplibre-gl") | null>(null);
   const pins = useRef<Marker[]>([]);
@@ -70,13 +66,34 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
   const [googleOn, setGoogleOn] = useState(false);
   const camera: Camera = { center: [lng, lat], zoom, bearing: 0 };
   useEffect(() => {
-    let cancelled = false, remove: (() => void) | undefined;
+    let cancelled = false, remove: (() => void) | undefined, offKey: (() => void) | undefined;
     setState("loading");
-    void Promise.all([import("maplibre-gl"), googleTiles(apiKey)]).then(([{ default: maplibregl }, google]) => {
+    // With the browser key the base is Google's own map (satellite with names, the same imagery as the 3D view), drawn
+    // under a see-through maplibre that keeps the area, the zones and the simulation and leads the camera; without
+    // it, or with the key refused, the open imagery of the style.
+    const google = apiKey && !isKeyRejected()
+      ? loadGoogleMaps(apiKey).then((g) => g.maps.importLibrary("maps") as Promise<{ Map: new (el: HTMLElement, o: Record<string, unknown>) => GMap }>).catch(() => null)
+      : Promise.resolve(null);
+    void Promise.all([import("maplibre-gl"), google]).then(([{ default: maplibregl }, gmaps]) => {
       if (cancelled || !host.current) return;
-      setGoogleOn(!!google);
-      const map = new maplibregl.Map({ container: host.current, style: styleOf(google), ...camera, maxZoom: google ? 21 : 19, pitchWithRotate: false, cooperativeGestures: false, attributionControl: false });
+      const base = gmaps && under.current ? new gmaps.Map(under.current, {
+        center: { lat, lng }, zoom: zoom + 1, mapTypeId: "hybrid", disableDefaultUI: true, gestureHandling: "none", keyboardShortcuts: false,
+        clickableIcons: false, isFractionalZoomEnabled: true, tilt: 0, backgroundColor: "#1d2129",
+      }) : null;
+      setGoogleOn(!!base);
+      const map = new maplibregl.Map({ container: host.current, style: STYLE, ...camera, maxZoom: base ? 21 : 19, pitchWithRotate: false, cooperativeGestures: false, attributionControl: false });
       map.touchPitch.disable();
+      if (base) {
+        // Google's satellite map does not turn: the map moves and zooms only, and Google's camera follows every frame
+        // (its zoom is one more: its tiles are 256 px, maplibre's 512).
+        map.dragRotate.disable(); map.touchZoomRotate.disableRotation();
+        const follow = () => { const c = map.getCenter(); base.moveCamera({ center: { lat: c.lat, lng: c.lng }, zoom: map.getZoom() + 1 }); };
+        map.on("move", follow);
+        const hideOpen = () => { for (const l of ["imagery", "places"]) if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "none"); };
+        map.on("load", hideOpen);
+        // A key refused for this address: back to the open imagery.
+        offKey = onKeyRejected(() => { setGoogleOn(false); for (const l of ["imagery", "places"]) if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "visible"); });
+      }
       libRef.current = maplibregl;
       map.on("load", () => { addAreaLayers(map); addSimLayers(map, lat); if (!cancelled) setState("ready"); });
       // Drawing: a tap on the map is a new pin at that spot.
@@ -92,7 +109,7 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
       pinMarker.on("dragend", () => { const p = pinMarker.getLngLat(); draggedTo.current = `${p.lat},${p.lng}`; pinMoveRef.current?.(p.lat, p.lng); });
       placePin.current = pinMarker;
       mapRef.current = map;
-      remove = () => map.remove();
+      remove = () => { offKey?.(); map.remove(); };
     }).catch(() => { if (!cancelled) setState("error"); });
     return () => { cancelled = true; mapRef.current = null; placePin.current = null; pins.current = []; handles.current = []; remove?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -151,10 +168,11 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
   const recenter = () => mapRef.current?.easeTo({ ...camera, duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 800 });
   return (
     <div data-map-gestures="" className="relative h-full w-full touch-none overflow-hidden bg-card">
-      <div ref={host} className="h-full w-full" role="img" aria-label={`Mappa di ${label}`} />
+      {/* Google's map under, maplibre (see-through) over it with everything drawn and the gestures. */}
+      <div ref={under} className={`pointer-events-none absolute inset-0 ${googleOn ? "" : "invisible"}`} aria-hidden="true" />
+      <div ref={host} className="relative h-full w-full" role="img" aria-label={`Mappa di ${label}`} />
       {state === "ready" && <button type="button" onClick={recenter} aria-label="Ricentra la mappa sul punto" className="absolute left-2 top-2 grid size-9 place-items-center rounded-full border border-border/60 bg-background/90 text-foreground shadow-sm backdrop-blur"><Crosshair className="size-4" aria-hidden="true" /></button>}
       {/* Google's tiles carry its name on the map, as in the 3D view. */}
-      {state === "ready" && googleOn && <span className="pointer-events-none absolute bottom-1.5 left-2 text-[11px] font-semibold text-white/90 [text-shadow:0_1px_2px_rgb(0_0_0/0.8)]">Google</span>}
       {state === "loading" && <div className="pointer-events-none absolute inset-0 grid place-items-center text-muted-foreground"><LoaderCircle className="size-5 animate-spin" aria-label="Caricamento mappa" /></div>}
       {state === "error" && <p role="status" className="absolute inset-0 grid place-items-center px-4 text-center text-sm text-muted-foreground">Mappa non disponibile in questo momento.</p>}
     </div>

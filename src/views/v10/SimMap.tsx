@@ -6,15 +6,15 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { toast } from "sonner";
-import { Check, Hand, Lock, MapPin, PenLine, RotateCcw, Sun, Trash2, Undo2, X } from "lucide-react";
+import { Check, Hand, Lock, MapPin, Moon, PenLine, RotateCcw, Sun, Sunrise, Sunset, Trash2, Undo2, X } from "lucide-react";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { openAccount } from "@/lib/camera-dock";
 import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn } from "@/lib/demo-login";
 import { cn } from "@/lib/utils";
 import { setUrban, setVineyard, useLab, vineMetrics } from "@/models/lab-store";
 import { piazzaLayout, piazzaShadows, TREE_SHADE_M2, vineLayout, type LayoutEdits, type PiazzaLayout } from "@/models/area-layout";
-import { sunAt } from "@/models/sun-shadow";
-import { getSimWhen } from "@/models/sim-when";
+import { dayLight, solarHour, sunAt, sunHeightDeg } from "@/models/sun-shadow";
+import { getSimWhen, useSimWhen } from "@/models/sim-when";
 import { applyZoneMix, vineMixOf, zoneMixOf } from "@/models/vine-interventions";
 import { usePiazzaReading } from "@/models/sim-reading";
 import { Thermometer } from "lucide-react";
@@ -212,7 +212,9 @@ export function SimMap({ kind }: { kind: SimKind }) {
       <PlaceSearch kind={kind} />
       <div className="relative -mx-4 h-[52vh] min-h-72 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
         {/* The temperature the interventions bring, on the map itself (2D and 3D), following the levers live. */}
-        <MapReading kind={kind} />
+        <MapReading kind={kind} lat={pin.lat} lng={pin.lng} />
+        {/* Day and night at the simulation's season and hour, over the 2D and the 3D map alike. */}
+        <DayNight kind={kind} lat={pin.lat} lng={pin.lng} />
         {show3d
           ? <Suspense fallback={<div className="h-full w-full bg-card" />}>{key
             ? <LocationMap3D key={`${loc.lat},${loc.lng}`} lat={pin.lat} lng={pin.lng} label={name ?? ""} apiKey={key} area={ring} sim={sim}
@@ -268,7 +270,25 @@ const deg = (t: number) => `${t.toLocaleString("it-IT", { minimumFractionDigits:
  * perceived heat as its simulation shows it now — without → with the interventions, the gain, season and hour —, or
  * the vineyard's temperature on the leaves, the shade cloth taking up to 3 °C off each zone.
  */
-function MapReading({ kind }: { kind: SimKind }) {
+/** The light of the simulation's hour on the map (models/sun-shadow dayLight): its phase, or null before the clock starts. */
+function useDayLight(kind: SimKind, lat: number, lng: number) {
+  const when = useSimWhen(kind);
+  if (!when) return null;
+  const height = sunHeightDeg(lat, lng, when.season, when.hour, when.minute ?? 0, when.dst);
+  return dayLight(height, solarHour(when.hour + (when.minute ?? 0) / 60, lng, when.dst) < 12);
+}
+
+/** A see-through veil over the map: none by day, golden at dawn and dusk, blue twilight, dark blue at night. */
+function DayNight({ kind, lat, lng }: { kind: SimKind; lat: number; lng: number }) {
+  const light = useDayLight(kind, lat, lng);
+  return <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[5] transition-[background-color] duration-700 motion-reduce:transition-none" style={{ backgroundColor: light?.veil ?? "transparent" }} />;
+}
+const PHASE_ICON = { giorno: Sun, alba: Sunrise, tramonto: Sunset, notte: Moon } as const;
+const PHASE_WORD = { giorno: "giorno", alba: "alba", tramonto: "tramonto", notte: "notte" } as const;
+
+function MapReading({ kind, lat, lng }: { kind: SimKind; lat: number; lng: number }) {
+  const light = useDayLight(kind, lat, lng);
+  const PhaseIcon = light ? PHASE_ICON[light.phase] : null;
   const piazza = usePiazzaReading();
   const lab = useLab();
   const vine = lab.vineyard;
@@ -291,6 +311,7 @@ function MapReading({ kind }: { kind: SimKind }) {
   return (
     <div key={after} role="status" aria-live="polite" className="map-reading pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-full bg-black/20 px-2.5 py-1 text-white ring-1 ring-white/20 backdrop-blur-[2px] [text-shadow:0_1px_2px_rgb(0_0_0/0.8)]">
       <p className="flex items-center justify-center gap-1 whitespace-nowrap text-[13px] font-medium tabular-nums leading-tight">
+        {PhaseIcon && <PhaseIcon className="size-3.5 shrink-0 text-amber-200" aria-label={PHASE_WORD[light!.phase]} />}
         <Thermometer className="size-3.5 shrink-0" style={{ color: heatTone(after) }} aria-hidden="true" />
         {gain > 0.05 ? <>
           <span className="text-white/60 line-through decoration-white/40">{deg(before)}</span>
