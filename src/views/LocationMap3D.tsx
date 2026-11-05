@@ -1,4 +1,5 @@
 import { isKeyRejected, loadGoogleMaps, onKeyRejected } from "@/lib/google-maps-js";
+import { densify, tileRing } from "@/models/drape";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { crownRing, mowStripes, hedgeParts, netParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts } from "@/models/area-layout";
 import { MIST_RADIUS_M, SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
@@ -37,15 +38,31 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
   // from another elevation model) everything floated above the piazza. Google's ground matches its own map.
   void groundM;
   const flat = true;
-  const absPoly = (o: Record<string, unknown>, ring: Array<[number, number]>, h: number) => {
+  // On a hilly ground a big flat shape cut into the slope and vanished, its long edges ran under it: shapes are laid in
+  // small tiles that each follow the ground (models/drape), their outline in short pieces of polyline, and every line
+  // gets a point every few metres. Walls (extruded) only get their outline densified.
+  const DRAPE_STEP = 5, DRAPE_CELL = 8;
+  const rawPoly = (o: Record<string, unknown>, ring: Array<[number, number]>, h: number) => {
     const p = new Polygon3DElement({ ...o, altitudeMode: "RELATIVE_TO_GROUND", drawsOccludedSegments: true }) as Shape;
     p.outerCoordinates = ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: h }));
     return p;
   };
   const absLine = (o: Record<string, unknown>, coords: Array<{ lat: number; lng: number; h: number }>) => {
     const pl = new Polyline3DElement!({ ...o, altitudeMode: "RELATIVE_TO_GROUND", drawsOccludedSegments: true }) as Shape;
-    pl.coordinates = coords.map((c) => ({ lat: c.lat, lng: c.lng, altitude: c.h }));
+    const vertical = coords.length === 2 && coords[0]!.lat === coords[1]!.lat && coords[0]!.lng === coords[1]!.lng;
+    pl.coordinates = (vertical ? coords : densify(coords, DRAPE_STEP)).map((c) => ({ lat: c.lat, lng: c.lng, altitude: c.h }));
     return pl;
+  };
+  /** A polygon draped on the ground: tiles for its fill, a densified polyline for its edge; small ones stay whole. */
+  const absPoly = (o: Record<string, unknown>, ring: Array<[number, number]>, h: number): Shape => {
+    if (o["extruded"]) return rawPoly(o, densify(ring.map(([lat, lng]) => ({ lat, lng })), DRAPE_STEP, true).slice(0, -1).map((q) => [q.lat, q.lng] as [number, number]), h);
+    const tiles = tileRing(ring, DRAPE_CELL);
+    if (tiles.length <= 1) return rawPoly(o, densify(ring.map(([lat, lng]) => ({ lat, lng })), DRAPE_STEP, true).slice(0, -1).map((q) => [q.lat, q.lng] as [number, number]), h);
+    const fill = { ...o, strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 };
+    tiles.forEach((t, i) => { if (i < tiles.length - 1) out.push(rawPoly(fill, t, h)); });
+    const width = Number(o["strokeWidth"] ?? 0);
+    if (width > 0 && Polyline3DElement) out.push(absLine({ strokeColor: o["strokeColor"], strokeWidth: width }, [...ring, ring[0]!].map(([lat, lng]) => ({ lat, lng, h: h + 0.05 }))));
+    return rawPoly(fill, tiles[tiles.length - 1]!, h);
   };
   // Ground shapes sit on the photographed mesh, 20 cm up, like the place's pin (RELATIVE_TO_MESH): clamped to the terrain
   // model, which in a town lies metres under the mesh, they were drawn below it and, seen tilted, looked shifted from
@@ -57,8 +74,8 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
   const meshPoly = (o: Record<string, unknown>) => onMesh(Polygon3DElement, o);
   const meshLine = (o: Record<string, unknown>) => onMesh(Polyline3DElement!, o);
   try {
-    const areaStyle = { fillColor: "rgba(56, 214, 196, 0.14)", strokeColor: "#ffffff", strokeWidth: 3, drawsOccludedSegments: true };
-    if (flat) out.push(absPoly(areaStyle, area, 0.15));
+    const areaStyle = { fillColor: "rgba(56, 214, 196, 0.16)", strokeColor: "#ffffff", strokeWidth: 4, drawsOccludedSegments: true };
+    if (flat) out.push(absPoly(areaStyle, area, 0.35));
     else {
       const poly = meshPoly(areaStyle) as Shape;
       poly.outerCoordinates = area.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: LIFT }));
@@ -69,7 +86,7 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
     // Ground shapes are drawn through the photographed mesh: the terrain they clamp to often lies under the mesh.
     // An outline (stroke) costs no extra shape and gives each piece a crisp edge, so it reads as an object, not a smear.
     const ground = (ring: Array<[number, number]>, fill: string, stroke = "rgba(0,0,0,0)", width = 0) => {
-      if (flat) { out.push(absPoly({ fillColor: fill, strokeColor: stroke, strokeWidth: width }, ring, 0.2)); return; }
+      if (flat) { out.push(absPoly({ fillColor: fill, strokeColor: stroke, strokeWidth: width }, ring, 0.4)); return; }
       const p = meshPoly({ fillColor: fill, strokeColor: stroke, strokeWidth: width, drawsOccludedSegments: true }) as Shape;
       p.outerCoordinates = ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: LIFT }));
       out.push(p);
