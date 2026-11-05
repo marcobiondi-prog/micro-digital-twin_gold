@@ -2160,3 +2160,9 @@ html[data-sys-camera] body > :not([data-sys-camera-root]):not(:has([data-sys-cam
 @keyframes update-pill-in { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 .update-pill { animation: update-pill-in 0.25s ease-out; }
 @media (prefers-reduced-motion: reduce) { .update-pill { animation: none; } }
+
+/* The app's pill alerts (components/ui/sonner): the icon takes the colour of its kind. */
+.app-toast [data-icon] { color: var(--color-brand-turquoise); }
+.app-toast[data-type="error"] [data-icon] { color: #f87171; }
+.app-toast[data-type="warning"] [data-icon] { color: #fbbf24; }
+.app-toast[data-type="info"] [data-icon] { color: #93c5fd; }
