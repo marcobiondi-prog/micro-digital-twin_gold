@@ -1,7 +1,7 @@
 import { isKeyRejected, loadGoogleMaps, onKeyRejected } from "@/lib/google-maps-js";
 import { densify, tileRing } from "@/models/drape";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { crownRing, mowStripes, trapParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts } from "@/models/area-layout";
+import { bedParts, BEDS_3D, crownRing, trapParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts } from "@/models/area-layout";
 import { MIST_RADIUS_M, SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import { Crosshair, LoaderCircle } from "lucide-react";
 import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camera";
@@ -124,17 +124,13 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
     };
     if (sim?.kind === "piazza") {
       for (const pt of sim.data.patches) {
-        // Aiuole e ciottoli: a fresh green with a darker edge and light pebble paths across it (a few lines, no extra surfaces).
-        if (pt.kind === "lawn") {
-          ground(pt.ring, "rgba(92,170,62,0.82)", "#3a7a28", 2);
-          if (Polyline3DElement) for (const line of mowStripes(pt.ring)) {
-            if (flat) { out.push(absLine({ strokeColor: "rgba(214,206,190,0.75)", strokeWidth: 5 }, line.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, h: 0.3 })))); continue; }
-            const pl = meshLine({ strokeColor: "rgba(214,206,190,0.75)", strokeWidth: 5, drawsOccludedSegments: true }) as Shape;
-            pl.coordinates = line.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: LIFT }));
-            out.push(pl);
-          }
-          continue;
-        }
+        // Aiuole e ciottoli: the pebble ground (the patch, sand-grey with a stone edge); the raised beds go on it below.
+        if (pt.kind === "lawn") { ground(pt.ring, "rgba(205,195,174,0.92)", "#9c907a", 2); continue; }
+      }
+      // The beds on the pebbles: a stone curb with the grass on top, a round shrub and two flower clumps each (bedParts,
+      // at most 18 beds so the view stays light).
+      for (const p of bedParts(sim.data.patches.filter((x) => x.kind === "lawn").map((x) => x.ring)).parts) {
+        part(p, p.height, p.color === BEDS_3D.curb ? "#b8b09e" : p.color === BEDS_3D.shrub || p.color === BEDS_3D.shrubTop ? "#1f4d1c" : "rgba(0,0,0,0)", p.color === BEDS_3D.curb || p.color === BEDS_3D.shrub ? 1 : 0);
       }
       // The shadows of the pergolas and the trees with the sun of the simulation's season and hour, over the lawn.
       for (const r of sim.shadows ?? []) {

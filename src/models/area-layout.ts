@@ -538,6 +538,61 @@ export function mowStripes(ring: Ring, spacing = 3, max = 24): Ring[] {
   return out;
 }
 
+/** Colours of the aiuole e ciottoli in 3D: pebble ground, stone curbs, grass, shrubs and flowers. */
+export const BEDS_3D = { pebbles: "#cdc3ae", curb: "#e7e1d3", grass: "#5fae45", grassTop: "#74c257", shrub: "#2f6f2a", shrubTop: "#3f8a36", flowers: ["#f472b6", "#facc15", "#f8fafc", "#c084fc", "#fb923c"] } as const;
+
+/**
+ * Aiuole e ciottoli in 3D over the lawn patches (one piece of the piazza's permeable ground, drawn as strips or exact
+ * zones): a pebble ground under everything (the patches themselves), and on it raised beds — rectangles about 4 × 2,4 m,
+ * 1,2 m of pebble path between them, each wholly inside the patches — as a stone curb 25 cm high with the grass on top,
+ * a rounded shrub at one end and two flower clumps along it. The bed grows when the patches are large, so there are never
+ * more than `maxBeds` beds (the 3D view stays light). Each part is a TreePart (base 0 = extruded from the ground).
+ */
+export function bedParts(patches: Ring[], maxBeds = 18): { beds: Ring[]; parts: TreePart[] } {
+  const rings = patches.filter((r) => r.length >= 3);
+  if (!rings.length) return { beds: [], parts: [] };
+  const f = frameOf(rings.flat());
+  const pts = rings.flat().map((p) => toXY(f, p));
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const inAny = (x: number, y: number) => rings.some((r) => inside(r, f, x, y));
+  const fits = (cx: number, cy: number, w: number, h: number) =>
+    [[-w / 2, -h / 2], [w / 2, -h / 2], [w / 2, h / 2], [-w / 2, h / 2], [0, 0], [0, -h / 2], [0, h / 2]].every(([dx, dy]) => inAny(cx + dx!, cy + dy!));
+  const place = (w: number, h: number, gap: number) => {
+    const out: Array<[number, number]> = [];
+    const pitchX = w + gap, pitchY = h + gap;
+    const nx = Math.max(1, Math.floor((x1 - x0 + gap) / pitchX)), ny = Math.max(1, Math.floor((y1 - y0 + gap) / pitchY));
+    // Centred on the patches' box, so the paths on the edges are even.
+    const ox = x0 + (x1 - x0 - (nx * pitchX - gap)) / 2 + w / 2, oy = y0 + (y1 - y0 - (ny * pitchY - gap)) / 2 + h / 2;
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const cx = ox + i * pitchX, cy = oy + j * pitchY; if (fits(cx, cy, w, h)) out.push([cx, cy]); }
+    return out;
+  };
+  let w = 4, h = 2.4, gap = 1.2, spots = place(w, h, gap);
+  for (let k = 0; spots.length > maxBeds && k < 8; k++) { w *= 1.25; h *= 1.2; gap *= 1.1; spots = place(w, h, gap); }
+  // A patch too small for a whole bed still gets one, smaller, at its middle when it fits.
+  if (!spots.length) { w = 2.4; h = 1.6; gap = 0.8; spots = place(w, h, gap).slice(0, 1); }
+  const rect = (cx: number, cy: number, rw: number, rh: number): Ring =>
+    [[cx - rw / 2, cy - rh / 2], [cx + rw / 2, cy - rh / 2], [cx + rw / 2, cy + rh / 2], [cx - rw / 2, cy + rh / 2]].map(([x, y]) => toLL(f, x!, y!));
+  const beds: Ring[] = [], parts: TreePart[] = [];
+  spots.slice(0, maxBeds).forEach(([cx, cy], n) => {
+    const bed = rect(cx, cy, w, h);
+    beds.push(bed);
+    // The stone curb (the bed's outline, a little wider), then the grass inside it a hair higher.
+    parts.push({ ring: rect(cx, cy, w + 0.3, h + 0.3), base: 0, height: 0.25, color: BEDS_3D.curb });
+    parts.push({ ring: bed, base: 0, height: 0.3, color: n % 2 ? BEDS_3D.grass : BEDS_3D.grassTop });
+    // A round shrub at one end (a wide lower tier and a narrower top, so it reads rounded), two flower clumps spread
+    // along the rest of the bed on either side of its middle line, their colours changing from bed to bed.
+    const r = Math.min(0.75, h / 3), sx = cx - w / 2 + r + 0.25;
+    parts.push({ ring: crownRing(toLL(f, sx, cy), r, 12), base: 0, height: 0.75, color: BEDS_3D.shrub });
+    parts.push({ ring: crownRing(toLL(f, sx, cy), r * 0.65, 10), base: 0.75, height: 1.05, color: BEDS_3D.shrubTop });
+    const from = sx + r + 0.4, to = cx + w / 2 - 0.75;
+    for (const [k, t] of [[0, 0.2], [1, 0.85]] as const) {
+      parts.push({ ring: crownRing(toLL(f, from + (to - from) * t, cy + (k ? -h / 5 : h / 5)), 0.62, 8), base: 0, height: 0.55, color: BEDS_3D.flowers[(n * 2 + k) % BEDS_3D.flowers.length]! });
+    }
+  });
+  return { beds, parts };
+}
+
 /** Vineyard 3D colours: the traps against animal pests (a yellow sticky box on a post). */
 export const VINE_3D = { trap: "#facc15", post: "#5b4a3a" } as const;
 
