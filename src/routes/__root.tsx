@@ -130,7 +130,7 @@ const nav: ReadonlyArray<{ to: "/benvenuto" | "/urbano" | "/vigneto" | "/dashboa
 const navFor = (id: ProId | null | undefined) => {
   if (!id) return nav;
   const locked = id.kind === "agronomo" ? "/urbano" : "/vigneto";
-  return nav.map((n) => (n.to === locked ? { to: "/profilo" as const, l: id.kind === "agronomo" ? "Profilo agronomo" : "Profilo funzionario" } : n));
+  return nav.map((n) => (n.to === locked ? { to: "/profilo" as const, l: id.kind === "agronomo" ? "Profilo conduttore" : "Profilo funzionario" } : n));
 };
 
 const NAV_H = 49;
@@ -151,7 +151,7 @@ const bottomItems: readonly NavItem[] = [
 function itemsFor(id: ProId | null | undefined): readonly NavItem[] {
   if (!id) return bottomItems;
   const locked = id.kind === "agronomo" ? "/urbano" : "/vigneto";
-  return bottomItems.map((b) => (b.to === locked ? { to: "/profilo", l: id.kind === "agronomo" ? "Agronomo" : "Funzionario", I: KIND_ICON[id.kind] } : b));
+  return bottomItems.map((b) => (b.to === locked ? { to: "/profilo", l: id.kind === "agronomo" ? "Conduttore" : "Funzionario", I: KIND_ICON[id.kind] } : b));
 }
 /** Pages that light the Profilo item: the profile page and the identification pages. */
 const isProfilePath = (p: string) => p === "/profilo" || p.startsWith("/identificazione");

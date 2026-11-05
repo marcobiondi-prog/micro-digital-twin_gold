@@ -15,7 +15,7 @@ const avg = (n: number[]) => n.reduce((a, b) => a + b, 0) / Math.max(1, n.length
 export const heatStep = (t: number) => (t >= 39 ? 0 : t >= 36 ? 1 : t >= 30 ? 2 : t >= 26 ? 3 : 4);
 export const heatWords = (t: number) => (t >= 39 ? "Troppo caldo" : t >= 36 ? "Molto caldo" : t >= 30 ? "Caldo" : t >= 18 ? "Si sta bene" : t >= 10 ? "Fresco" : "Freddo");
 export const thirstStep = (s: number) => (s >= 80 ? 0 : s >= 65 ? 1 : s >= 45 ? 2 : s >= 25 ? 3 : 4);
-export const thirstWords = (s: number) => (s >= 65 ? "Sete forte" : s >= 35 ? "Da tenere d'occhio" : "Le viti stanno bene");
+export const thirstWords = (s: number) => (s >= 65 ? "Stress forte" : s >= 35 ? "Da tenere d'occhio" : "Le viti stanno bene");
 const levelName = (id: string | null) => (id ? comparison.find((c) => c.id === id)?.s ?? null : null);
 
 const PIAZZA_PRESETS = { zero: [3, 10, 10], mvp: [6, 20, 15], roadmap: [12, 40, 30] } as const;
@@ -74,14 +74,14 @@ export function vineSummary(vine: LabState["vineyard"], areaM2: number | null): 
   const drawn = drawnM2(vine.area, vine.location);
   const m2 = drawn ?? areaM2 ?? VINE_REFERENCE_M2;
   const cost = mixes.reduce((t, m) => { const c = vineCost(m2 / Math.max(1, mixes.length), m).total; return { lo: t.lo + c.lo, hi: t.hi + c.hi }; }, { lo: 0, hi: 0 });
-  const empty = mixes.every((m) => m.irrigation + m.shade + m.windbreak === 0);
+  const empty = mixes.every((m) => m.irrigation + m.pestAnimal + m.pestPlant === 0);
   const first = mixes[0] ?? NO_MIX;
-  const same = mixes.every((m) => m.irrigation === first.irrigation && m.shade === first.shade && m.windbreak === first.windbreak);
-  const preset = same ? VINE_LEVELS.find((p) => p.irrigation === first.irrigation && p.shade === first.shade && p.windbreak === first.windbreak)?.id ?? null : null;
+  const same = mixes.every((m) => m.irrigation === first.irrigation && m.pestAnimal === first.pestAnimal && m.pestPlant === first.pestPlant);
+  const preset = same ? VINE_LEVELS.find((p) => p.irrigation === first.irrigation && p.pestAnimal === first.pestAnimal && p.pestPlant === first.pestPlant)?.id ?? null : null;
   return {
     before: avg(plain), after: avg(after),
     zones: vine.zones.map((z, i) => ({ after: after[i] ?? 0, plain: plain[i] ?? 0, temp: z.temperature, moisture: z.moisture })),
-    mix: { irrigation: avg(mixes.map((m) => m.irrigation)), shade: avg(mixes.map((m) => m.shade)), windbreak: avg(mixes.map((m) => m.windbreak)) },
+    mix: { irrigation: avg(mixes.map((m) => m.irrigation)), pestAnimal: avg(mixes.map((m) => m.pestAnimal)), pestPlant: avg(mixes.map((m) => m.pestPlant)) },
     same, empty, level: empty ? null : levelName(preset) ?? "Su misura", safe: after.filter((s) => s < 35).length,
     m2, measured: drawn === null && areaM2 !== null, drawn: drawn !== null, cost,
   };
@@ -90,6 +90,6 @@ export function vineSummary(vine: LabState["vineyard"], areaM2: number | null): 
 /** What was put in the vineyard, one line each with its cost per hectare. */
 export const vineMixRows = (s: VineSummary) => [
   { label: "Irrigazione", value: `+${Math.round(s.mix.irrigation)}%`, cost: `${euroRange(VINE_UNIT_COST.irrigation)} l'ettaro` },
-  { label: "Teli d'ombra", value: `${Math.round(s.mix.shade)}%`, cost: `${euroRange(VINE_UNIT_COST.shade)} l'ettaro` },
-  { label: "Frangivento", value: `${Math.round(s.mix.windbreak)}%`, cost: `${euroRange(VINE_UNIT_COST.windbreak)} l'ettaro` },
+  { label: "Difesa dai parassiti animali", value: `${Math.round(s.mix.pestAnimal)}%`, cost: `${euroRange(VINE_UNIT_COST.pestAnimal)} l'ettaro` },
+  { label: "Difesa dai parassiti vegetali", value: `${Math.round(s.mix.pestPlant)}%`, cost: `${euroRange(VINE_UNIT_COST.pestPlant)} l'ettaro` },
 ];

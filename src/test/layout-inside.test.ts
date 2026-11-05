@@ -21,10 +21,9 @@ describe("everything the simulation draws stays inside the drawn area", () => {
     const l = piazzaLayout(area, 2, 0, 0, { trees: [at(-20, 10), null] })!;
     expect(allIn(crownRing(l.trees[0]!, CROWN_REACH_M - 0.1, 16))).toBe(true);
   });
-  it("keeps the windbreak, the drip lines and the shade cloth inside", () => {
-    const l = vineLayout(area, [{ irrigation: 20, shade: 50, windbreak: 100 }, { irrigation: 10, shade: 0, windbreak: 100 }, { irrigation: 0, shade: 100, windbreak: 100 }])!;
-    const wind = l.lines.find((x) => x.kind === "wind")!;
-    expect(allIn(wind.line)).toBe(true);
+  it("keeps the pipes, the drip lines, the traps and the treated rows inside", () => {
+    const l = vineLayout(area, [{ irrigation: 20, pestAnimal: 50, pestPlant: 100 }, { irrigation: 10, pestAnimal: 0, pestPlant: 100 }, { irrigation: 0, pestAnimal: 100, pestPlant: 100 }])!;
+    expect(allIn(l.traps)).toBe(true);
     for (const x of l.lines) expect(allIn(x.line)).toBe(true);
     for (const p of l.patches) expect(allIn(p.ring)).toBe(true);
   });

@@ -25,8 +25,8 @@ type Item = { id: "camera" | "urban" | "vine"; Icon: typeof Building2; name: str
 const items: Item[] = [
   { id: "urban", Icon: Building2, name: "Sei un funzionario urbano?", cta: "Identificati come funzionario",
     desc: "Ti identifichi con il Comune, l'ufficio e l'email del Comune: si apre la piazza, dove metti alberi, aiuole e ombra." },
-  { id: "vine", Icon: Grape, name: "Sei un agronomo?", cta: "Identificati come agronomo",
-    desc: "Ti identifichi con il patentino fitosanitario: si apre il vigneto, dove regoli acqua, ombra e vento." },
+  { id: "vine", Icon: Grape, name: "Sei il conduttore di un vigneto?", cta: "Identificati come conduttore",
+    desc: "Ti identifichi con il patentino fitosanitario: si apre il vigneto, dove regoli acqua e difesa dai parassiti." },
   // AI_STANDBY: in development, so nothing says what it will do.
   AI_STANDBY
     ? { id: "camera", Icon: ScanLine, name: "Fotocamera AI · in sviluppo", cta: "Apri la fotocamera", desc: "Non è ancora disponibile: arriverà con un prossimo aggiornamento. Intanto puoi scattare foto e video." }
@@ -277,7 +277,7 @@ export function Tutorial() {
 }
 
 /**
- * The choice (/scegli): one big question, three numbered ways in — "Sei un funzionario urbano?", "Sei un agronomo?",
+ * The choice (/scegli): one big question, three numbered ways in — "Sei un funzionario urbano?", "Sei il conduttore di un vigneto?",
  * the AI camera — one white button and the way to the welcome page. The identification happens here: the white button
  * of a profile shows its form in place, and once identified its simulation opens.
  */

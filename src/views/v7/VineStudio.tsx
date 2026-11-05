@@ -37,7 +37,7 @@ export function VineStudio({ onZonesEdit }: { onZonesEdit?: () => void }) {
     <Studio>
       <div className="mx-auto w-full max-w-[46rem] space-y-4">
         <Readout icon={Droplets} value={`${result.s}`} unit="/100" tone={GAIN_TEXT[gain]}
-          caption={<><span className={cn("size-2 rounded-full", GAIN_BG[gain])} aria-hidden="true" /><span className="text-foreground">Sete della vite · zona {sel + 1}</span></>}>
+          caption={<><span className={cn("size-2 rounded-full", GAIN_BG[gain])} aria-hidden="true" /><span className="text-foreground">Stress della vite · zona {sel + 1}</span></>}>
           <button type="button" onClick={toggleRain} aria-pressed={zone.rain} aria-label={`Pioggia sulla zona ${sel + 1}`}
             className={cn("ml-auto flex shrink-0 flex-col items-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-semibold uppercase tracking-wide outline-none transition-[background-color,box-shadow,color] duration-150 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
               zone.rain ? "bg-foreground/[0.12] text-sky-600 dark:text-sky-200 shadow-[0_0_0_2px_var(--foreground),0_0_20px_-2px_color-mix(in_oklab,var(--foreground)_45%,transparent)]" : "bg-foreground/[0.05] text-foreground/60")}>
@@ -51,7 +51,7 @@ export function VineStudio({ onZonesEdit }: { onZonesEdit?: () => void }) {
             if (!r) return null;
             const g = stressGain(r.s), on = i === sel;
             return (
-              <button key={i} type="button" role="radio" aria-checked={on} aria-label={`Zona ${i + 1}, sete ${r.s} su 100`}
+              <button key={i} type="button" role="radio" aria-checked={on} aria-label={`Zona ${i + 1}, stress ${r.s} su 100`}
                 onClick={() => { hapticTick(); setVineyard({ selected: i, allZones: false }); }}
                 className={cn("relative overflow-hidden rounded-xl outline-none transition-[box-shadow] duration-200 focus-visible:ring-2 focus-visible:ring-ring", on ? "shadow-[0_0_0_2.5px_var(--foreground),0_0_20px_-2px_color-mix(in_oklab,var(--foreground)_45%,transparent)]" : "")}>
                 <span className="pointer-events-none absolute inset-0 scale-110 blur-lg transition-[background-color] duration-500 motion-reduce:transition-none" style={{ background: HEAT_VAR[4 - g] }} aria-hidden="true" />

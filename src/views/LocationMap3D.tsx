@@ -1,7 +1,7 @@
 import { isKeyRejected, loadGoogleMaps, onKeyRejected } from "@/lib/google-maps-js";
 import { densify, tileRing } from "@/models/drape";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { crownRing, mowStripes, hedgeParts, netParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts } from "@/models/area-layout";
+import { crownRing, mowStripes, trapParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts } from "@/models/area-layout";
 import { MIST_RADIUS_M, SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import { Crosshair, LoaderCircle } from "lucide-react";
 import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camera";
@@ -165,10 +165,11 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
       }
     } else if (sim?.kind === "vigneto") {
       for (const pt of sim.data.patches) if (pt.kind === "zone") ground(pt.ring, `${thirstColor(sim.thirst[pt.zone ?? 0] ?? 0)}59`);
-      for (const p of sim.data.patches.filter((x) => x.kind === "cloth").flatMap((x) => netParts(x.ring, true))) part(p, p.height, "#0b1220", 2);
-      for (const p of sim.data.lines.filter((l) => l.kind === "wind").flatMap((l) => hedgeParts(l.line, l.strength ?? 0))) part(p, p.height, "#1d4a1b", 1);
-      if (Polyline3DElement) for (const l of sim.data.lines.filter((x) => x.kind !== "wind")) {
-        const style = { strokeColor: l.kind === "drip" ? SIM_COLORS.drip : "#ffffff", strokeWidth: l.kind === "drip" ? 2 : 3 };
+      // Treated rows (plant pests): a light see-through veil; traps (animal pests): a post with a yellow box.
+      for (const pt of sim.data.patches) if (pt.kind === "treat") ground(pt.ring, `${SIM_COLORS.treat}40`);
+      for (const t of sim.data.traps) for (const p of trapParts(t)) { if (p.base === 0) part(p); else part(p, p.height, "#422006", 1); }
+      if (Polyline3DElement) for (const l of sim.data.lines) {
+        const style = { strokeColor: l.kind === "drip" ? SIM_COLORS.drip : l.kind === "main" ? SIM_COLORS.main : "#ffffff", strokeWidth: l.kind === "drip" ? 2 : l.kind === "main" ? 5 : 3 };
         if (flat) { out.push(absLine(style, l.line.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, h: 0.5 })))); continue; }
         const pl = meshLine({ ...style, drawsOccludedSegments: true }) as Shape;
         pl.coordinates = l.line.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: LIFT }));

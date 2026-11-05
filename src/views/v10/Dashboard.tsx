@@ -4,7 +4,8 @@ import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { ArrowRight, CloudRain, Droplets, Leaf, Lock, Mail, MapPin, Send, ShieldCheck, Sparkles, Sun, TreePine, Umbrella, Wind, type LucideIcon } from "lucide-react";
+import { ArrowRight, Bug, CloudRain, Droplets, Leaf, Lock, Mail, MapPin, Send, ShieldCheck, Sparkles, Sun, TreePine, Umbrella, Wind, type LucideIcon } from "lucide-react";
+import { DEFENCE_MAX } from "@/models/vine-interventions";
 import { useLab, type LabState } from "@/models/lab-store";
 import { getPiazzaReading, usePiazzaReading, type PiazzaReading } from "@/models/sim-reading";
 import { heatStep, heatWords, piazzaMix, piazzaSummary, thirstStep, thirstWords, vineMixRows, vineSummary } from "@/models/project-summary";
@@ -362,7 +363,7 @@ export function VineDashboard({ records }: { records: ReactNode }) {
   return (
     <div className="space-y-8" data-testid="dashboard-vitivinicola">
       <ResultCard kind="vineyard" place={place.name} when={<span className="text-xs text-muted-foreground">Media delle tre zone, come le hai lasciate nella simulazione</span>}>
-        <p className="text-center text-sm text-muted-foreground">Sete delle viti</p>
+        <p className="text-center text-sm text-muted-foreground">Stress delle viti</p>
         <ResultArc before={before} after={thirst} min={Math.max(0, Math.floor(Math.min(thirst, before) - 8))} max={Math.min(100, Math.ceil(before + 6))} unit=""
           value={`${Math.round(thirst)}`} words={thirstWords(thirst)} step={thirstStep(thirst)} level={sum.level} cost={empty ? "0 €" : euroRange(sum.cost)} />
         <p className="text-center text-sm">
@@ -370,7 +371,7 @@ export function VineDashboard({ records }: { records: ReactNode }) {
         </p>
       </ResultCard>
 
-      <DashSection title="Le tre zone" hint="sete su 100">
+      <DashSection title="Le tre zone" hint="stress su 100">
         <div className="grid grid-cols-3 gap-2">
           {vine.zones.map((z, i) => (
             <DashCard key={i} className="space-y-1 px-3 py-4 text-center">
@@ -386,8 +387,8 @@ export function VineDashboard({ records }: { records: ReactNode }) {
       <DashSection title="Cosa ottieni">
         <Facts items={[
           { icon: ShieldCheck, value: `${safe} di ${sum.zones.length}`, label: "Zone al sicuro" },
-          { icon: Leaf, value: mix.shade ? `−${fmt1((mix.shade / 100) * 3)}°` : "0°", label: "Sulle foglie" },
-          { icon: Wind, value: mix.windbreak ? `−${Math.round((mix.windbreak / 100) * 60)}%` : "0%", label: "Vento" },
+          { icon: Bug, value: mix.pestAnimal ? `−${Math.round(mix.pestAnimal * DEFENCE_MAX)}%` : "0%", label: "Parassiti animali" },
+          { icon: Leaf, value: mix.pestPlant ? `−${Math.round(mix.pestPlant * DEFENCE_MAX)}%` : "0%", label: "Parassiti vegetali" },
         ]} />
       </DashSection>
 

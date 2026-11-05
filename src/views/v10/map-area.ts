@@ -1,7 +1,7 @@
 import type { Map as MlMap, GeoJSONSource } from "maplibre-gl";
 import type { Ring } from "@/models/place-area";
 import { ZONE_LABEL, type SubArea, type ZoneKind } from "@/models/drawn-area";
-import { crownRing, hedgeParts, hedgeWidthM, netParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, TREE_RADIUS_M, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
+import { crownRing, trapParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, TREE_RADIUS_M, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
 
 /** The drawn area on a maplibre map: a turquoise fill and a white outline, from a ring of [lat, lng] pins. */
 export const AREA_SOURCE = "drawn-area";
@@ -19,6 +19,8 @@ export function addAreaLayers(map: MlMap) {
   if (map.getSource(AREA_SOURCE)) return;
   map.addSource(AREA_SOURCE, { type: "geojson", data: areaGeoJson([]) });
   map.addLayer({ id: "drawn-area-fill", type: "fill", source: AREA_SOURCE, filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#38d6c4", "fill-opacity": 0.12 } });
+  // A dark casing under the white line, so the edge reads on bright fields and on dark roofs alike.
+  map.addLayer({ id: "drawn-area-casing", type: "line", source: AREA_SOURCE, filter: ["==", ["geometry-type"], "LineString"], paint: { "line-color": "#0b0f15", "line-width": 5.5, "line-opacity": 0.45, "line-blur": 0.5 }, layout: { "line-join": "round", "line-cap": "round" } });
   map.addLayer({ id: "drawn-area-line", type: "line", source: AREA_SOURCE, filter: ["==", ["geometry-type"], "LineString"], paint: { "line-color": "#ffffff", "line-width": 2.5 }, layout: { "line-join": "round", "line-cap": "round" } });
 }
 
@@ -74,7 +76,7 @@ export const SIM_TREES_3D = "sim-trees-3d";
 
 /** The vines' thirst as the zone's colour: green, amber, red (the same steps as the arc's verdict). */
 export const thirstColor = (s: number) => (s >= 65 ? "#ef4444" : s >= 35 ? "#eab308" : "#22c55e");
-export const SIM_COLORS = { lawn: "#62ac42", shade: PERGOLA_COLORS.slat, cloth: "#334155", drip: "#38bdf8", wind: "#15803d", tree: "#2e7d32" } as const;
+export const SIM_COLORS = { lawn: "#62ac42", shade: PERGOLA_COLORS.slat, treat: "#5eead4", drip: "#38bdf8", main: "#0369a1", trap: "#facc15", tree: "#2e7d32" } as const;
 /** The 2D pattern of a pergola seen from above: wooden slats with light between them. */
 export const SLATS_IMAGE = "pergola-slats";
 /** The 2D pattern of a lawn: mowing stripes in two greens with blades of grass, so it reads as grass, not a flat green. */
@@ -102,16 +104,18 @@ export function simFeatures(sim: SimLayout | null, withTreePoints: boolean) {
     }
     if (withTreePoints) for (const t of sim.data.trees) out.push({ type: "Feature", properties: { kind: "tree" }, geometry: { type: "Point", coordinates: [t[1], t[0]] } });
   } else {
-    // Zones: rows of vines on soil tinted by their thirst; cloth: a dark shade net; drip lines and the hedge drawn below.
+    // Zones: rows of vines on soil tinted by their stress; treated rows (plant pests): a fine spray over them.
     for (const p of sim.data.patches) out.push(poly(p.ring, p.kind === "zone"
       ? { kind: "zone", pattern: VINE_IMAGES[thirstStepOf(sim.thirst[p.zone ?? 0] ?? 0)], color: thirstColor(sim.thirst[p.zone ?? 0] ?? 0), opacity: 0.9 }
-      : { kind: "cloth", color: SIM_COLORS.cloth, opacity: 0.55 }));
+      : { kind: "treat", color: SIM_COLORS.treat, opacity: 0.85 }));
     // Each zone also gets a see-through veil of its thirst colour on top, so the three zones stand apart at a glance.
     for (const p of sim.data.patches) if (p.kind === "zone") out.push(poly(p.ring, { kind: "tint", color: thirstColor(sim.thirst[p.zone ?? 0] ?? 0), opacity: 0.3 }));
     for (const l of sim.data.lines) out.push(lineF(l.line, l.kind === "drip"
       ? { kind: "drip", color: SIM_COLORS.drip, width: 2 }
-      : l.kind === "seam" ? { kind: "seam", color: "#ffffff", width: 2.5 }
-      : { kind: "wind", color: SIM_COLORS.wind, width: 6 + (l.strength ?? 0) / 10, wm: hedgeWidthM(l.strength ?? 0) }));
+      : l.kind === "main" ? { kind: "main", color: SIM_COLORS.main, width: 4 }
+      : { kind: "seam", color: "#ffffff", width: 2.5 }));
+    // Traps against animal pests: a yellow sticky box seen from above (2D); in 3D they stand on a post.
+    if (withTreePoints) for (const t of sim.data.traps) out.push({ type: "Feature", properties: { kind: "trap" }, geometry: { type: "Point", coordinates: [t[1], t[0]] } });
   }
   // The inner zones: a free zone greyed, every zone outlined with a dashed line of its colour.
   for (const z of sim.inner ?? []) {
@@ -126,15 +130,15 @@ export function simFeatures(sim: SimLayout | null, withTreePoints: boolean) {
 /** The centre of a ring (mean of its pins), for a zone's tag. */
 export const ringCentre = (ring: Ring): [number, number] => [ring.reduce((a, p) => a + p[0], 0) / ring.length, ring.reduce((a, p) => a + p[1], 0) / ring.length];
 
-/** What stands up in 3D: each tree and a wooden pergola over each shade strip; in the vineyard the hedge and the shade nets. */
+/** What stands up in 3D: each tree and a wooden pergola over each shade strip; in the vineyard the traps on their posts. */
 export const treeCrowns = (sim: SimLayout | null) => fc(!sim ? [] : (sim.kind === "piazza"
   ? [...sim.data.misters.map((m) => ({ ring: crownRing(m, 0.12, 6), base: 0, height: 3, color: "#cbd5e1" })), ...sim.data.trees.flatMap((t) => treeParts(t)), ...sim.data.patches.filter((p) => p.kind === "shade").flatMap((p) => (p.exact ? pergolaRingParts(p.ring) : pergolaParts(p.ring)))]
-  : [...sim.data.lines.filter((l) => l.kind === "wind").flatMap((l) => hedgeParts(l.line, l.strength ?? 0)), ...sim.data.patches.filter((p) => p.kind === "cloth").flatMap((p) => netParts(p.ring))]
+  : sim.data.traps.flatMap((t) => trapParts(t))
 ).map((p) => poly(p.ring, { kind: "raised", base: p.base, height: p.height, color: p.color })));
 
-/** The vineyard's 2D images: rows of vines on soil tinted by thirst (three steps), the shade net, the hedge. */
+/** The vineyard's 2D images: rows of vines on soil tinted by stress (three steps), the spray over treated rows. */
 export const VINE_IMAGES = ["vine-ok", "vine-watch", "vine-thirst"] as const;
-export const NET_IMAGE = "shade-net", HEDGE_IMAGE = "windbreak-hedge";
+export const SPRAY_IMAGE = "treated-rows";
 const thirstStepOf = (s: number) => (s >= 65 ? 2 : s >= 35 ? 1 : 0);
 type Img = { width: number; height: number; data: Uint8Array };
 const blank = (w: number, h: number): Img => ({ width: w, height: h, data: new Uint8Array(w * h * 4) });
@@ -152,19 +156,11 @@ function vineImage(soil: readonly number[]): Img {
   }
   return img;
 }
-/** A dark shade net: a fine square mesh, see-through between the threads. */
-function netImage(): Img {
-  const img = blank(8, 8);
-  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) put(img, x, y, [0x1f, 0x29, 0x33], x % 4 === 0 || y % 4 === 0 ? 235 : 120);
-  return img;
-}
-/** A hedge seen from above: round bushes in two greens along the line, a darker edge. */
-function hedgeImage(): Img {
-  const w = 16, h = 16, img = blank(w, h);
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const cx = x < 8 ? 4 : 12, d = Math.hypot(x - cx, y - 8);
-    if (d < 6.5) put(img, x, y, d < 3 ? [0x4f, 0x9a, 0x3c] : [0x2f, 0x6b, 0x2a]);
-    else if (y > 2 && y < 14) put(img, x, y, [0x24, 0x52, 0x20]);
+/** Treated rows from above: fine light droplets in a diagonal scatter, see-through between them. */
+function sprayImage(): Img {
+  const img = blank(12, 12);
+  for (const [x, y] of [[1, 1], [7, 2], [4, 5], [10, 6], [2, 9], [8, 10]] as const) {
+    put(img, x, y, [0xcc, 0xfb, 0xf1], 235); put(img, x + 1, y, [0x5e, 0xea, 0xd4], 200); put(img, x, y + 1, [0x5e, 0xea, 0xd4], 200);
   }
   return img;
 }
@@ -233,16 +229,15 @@ export function addSimLayers(map: MlMap, lat: number, raised = false) {
   if (map.getSource(SIM_SOURCE)) return;
   const before = map.getLayer("drawn-area-line") ? "drawn-area-line" : undefined;
   map.addSource(SIM_SOURCE, { type: "geojson", data: fc([]) });
-  map.addLayer({ id: "sim-fill", type: "fill", source: SIM_SOURCE, filter: ["all", ["==", ["geometry-type"], "Polygon"], ["!=", ["get", "kind"], "shade"], ["!=", ["get", "kind"], "lawn"], ["!=", ["get", "kind"], "zone"], ["!=", ["get", "kind"], "cloth"], ["!=", ["get", "kind"], "tint"], ["!=", ["get", "kind"], "shadow"]], paint: { "fill-color": ["get", "color"], "fill-opacity": ["get", "opacity"] } }, before);
+  map.addLayer({ id: "sim-fill", type: "fill", source: SIM_SOURCE, filter: ["all", ["==", ["geometry-type"], "Polygon"], ["!=", ["get", "kind"], "shade"], ["!=", ["get", "kind"], "lawn"], ["!=", ["get", "kind"], "zone"], ["!=", ["get", "kind"], "treat"], ["!=", ["get", "kind"], "tint"], ["!=", ["get", "kind"], "shadow"]], paint: { "fill-color": ["get", "color"], "fill-opacity": ["get", "opacity"] } }, before);
   // The vineyard: rows of vines on soil tinted by each zone's thirst, a white seam around each zone, the shade nets.
   const thirstTints = [[0x6f, 0x8f, 0x4a], [0x9a, 0x85, 0x3c], [0x9c, 0x5a, 0x3a]] as const;
   VINE_IMAGES.forEach((id, i) => { if (!map.hasImage(id)) map.addImage(id, vineImage(thirstTints[i]!)); });
-  if (!map.hasImage(NET_IMAGE)) map.addImage(NET_IMAGE, netImage());
-  if (!map.hasImage(HEDGE_IMAGE)) map.addImage(HEDGE_IMAGE, hedgeImage());
+  if (!map.hasImage(SPRAY_IMAGE)) map.addImage(SPRAY_IMAGE, sprayImage());
   map.addLayer({ id: "sim-vine", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "zone"], paint: { "fill-pattern": ["get", "pattern"], "fill-opacity": 0.92, "fill-antialias": false } }, before);
   // The veils over the zones, without seams between their row strips.
   map.addLayer({ id: "sim-tint", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "tint"], paint: { "fill-color": ["get", "color"], "fill-opacity": ["get", "opacity"], "fill-antialias": false } }, before);
-  map.addLayer({ id: "sim-net", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "cloth"], paint: { "fill-pattern": NET_IMAGE, "fill-opacity": 0.9, "fill-antialias": false } }, before);
+  map.addLayer({ id: "sim-net", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "treat"], paint: { "fill-pattern": SPRAY_IMAGE, "fill-opacity": 0.9, "fill-antialias": false } }, before);
   // The lawn: mowing stripes and blades of grass, without the hairlines between its row strips.
   if (!map.hasImage(LAWN_IMAGE)) map.addImage(LAWN_IMAGE, lawnImage());
   map.addLayer({ id: "sim-lawn", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "lawn"], paint: { "fill-pattern": LAWN_IMAGE, "fill-opacity": 0.95, "fill-antialias": false } }, before);
@@ -252,15 +247,19 @@ export function addSimLayers(map: MlMap, lat: number, raised = false) {
   if (!map.hasImage(SLATS_IMAGE)) map.addImage(SLATS_IMAGE, slatsImage());
   map.addLayer({ id: "sim-pergola", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "shade"], paint: { "fill-pattern": SLATS_IMAGE, "fill-opacity": 0.95 } }, before);
   map.addLayer({ id: "sim-pergola-frame", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "shade"], paint: { "line-color": PERGOLA_COLORS.beam, "line-width": 1.5 } }, before);
-  // Drip lines: a blue pipe with light drippers along it (round dots); the windbreak: a hedge of bushes.
+  // Irrigation: the main pipe (a thick dark blue line with a light core) and the drip lines (a blue pipe with light
+  // drippers along it, every ~1 m at street zoom, and a faint wet band on the soil under each).
+  map.addLayer({ id: "sim-drip-wet", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "drip"], paint: { "line-color": "#1e3a5f", "line-opacity": 0.35, "line-blur": 1, "line-width": ["interpolate", ["exponential", 2], ["zoom"], 12, metresToPx(0.9, lat, 12), 22, metresToPx(0.9, lat, 22)] } }, before);
   map.addLayer({ id: "sim-drip-pipe", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "drip"], paint: { "line-color": "#0369a1", "line-width": 1.6 } }, before);
-  map.addLayer({ id: "sim-drip-dots", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "drip"], paint: { "line-color": "#bae6fd", "line-width": 4, "line-dasharray": [0, 2.4] }, layout: { "line-cap": "round" } }, before);
-  map.addLayer({ id: "sim-hedge", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "wind"], paint: { "line-pattern": HEDGE_IMAGE, "line-width": ["interpolate", ["exponential", 2], ["zoom"], 12, ["*", ["get", "wm"], metresToPx(1, lat, 12)], 22, ["*", ["get", "wm"], metresToPx(1, lat, 22)]] }, layout: { "line-cap": "round", "line-join": "round" } }, before);
-  map.addLayer({ id: "sim-line", type: "line", source: SIM_SOURCE, filter: ["all", ["==", ["geometry-type"], "LineString"], ["!=", ["get", "kind"], "drip"], ["!=", ["get", "kind"], "wind"]], paint: { "line-color": ["get", "color"], "line-width": ["get", "width"], "line-dasharray": ["case", ["==", ["get", "kind"], "drip"], ["literal", [2, 1.5]], ["==", ["get", "kind"], "zoneline"], ["literal", [2.5, 1.5]], ["literal", [1, 0]]] }, layout: { "line-cap": "round" } }, before);
+  map.addLayer({ id: "sim-drip-dots", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "drip"], paint: { "line-color": "#bae6fd", "line-width": 3.5, "line-dasharray": [0, 2.6] }, layout: { "line-cap": "round" } }, before);
+  map.addLayer({ id: "sim-main", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "main"], paint: { "line-color": "#0c4a6e", "line-width": 5 }, layout: { "line-cap": "round" } }, before);
+  map.addLayer({ id: "sim-main-core", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "main"], paint: { "line-color": "#38bdf8", "line-width": 1.8 }, layout: { "line-cap": "round" } }, before);
+  map.addLayer({ id: "sim-line", type: "line", source: SIM_SOURCE, filter: ["all", ["==", ["geometry-type"], "LineString"], ["!=", ["get", "kind"], "drip"], ["!=", ["get", "kind"], "main"]], paint: { "line-color": ["get", "color"], "line-width": ["get", "width"], "line-dasharray": ["case", ["==", ["get", "kind"], "drip"], ["literal", [2, 1.5]], ["==", ["get", "kind"], "zoneline"], ["literal", [2.5, 1.5]], ["literal", [1, 0]]] }, layout: { "line-cap": "round" } }, before);
   if (raised) {
     map.addSource(SIM_TREES_3D, { type: "geojson", data: fc([]) });
     map.addLayer({ id: "sim-trees-3d", type: "fill-extrusion", source: SIM_TREES_3D, paint: { "fill-extrusion-color": ["get", "color"], "fill-extrusion-base": ["get", "base"], "fill-extrusion-height": ["get", "height"], "fill-extrusion-opacity": 1, "fill-extrusion-vertical-gradient": true } });
   } else {
+    map.addLayer({ id: "sim-traps", type: "circle", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "trap"], paint: { "circle-color": SIM_COLORS.trap, "circle-radius": 4, "circle-stroke-color": "#422006", "circle-stroke-width": 1.5 } }, before);
     map.addLayer({ id: "sim-trees", type: "circle", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "tree"], paint: {
       "circle-color": SIM_COLORS.tree, "circle-opacity": 0.9, "circle-stroke-color": "#ffffff", "circle-stroke-width": 1.2,
       "circle-radius": ["interpolate", ["exponential", 2], ["zoom"], 12, metresToPx(TREE_RADIUS_M, lat, 12), 22, metresToPx(TREE_RADIUS_M, lat, 22)],
@@ -286,7 +285,11 @@ export function setSimGhost(map: MlMap, ghost: boolean) {
   set("sim-net", "fill-opacity", 0.9 * k);
   set("sim-drip-pipe", "line-opacity", k);
   set("sim-drip-dots", "line-opacity", k);
-  set("sim-hedge", "line-opacity", k);
+  set("sim-drip-wet", "line-opacity", 0.35 * k);
+  set("sim-main", "line-opacity", k);
+  set("sim-main-core", "line-opacity", k);
+  set("sim-traps", "circle-opacity", k);
+  set("sim-traps", "circle-stroke-opacity", k);
   set("sim-trees", "circle-opacity", 0.9 * k);
   set("sim-trees", "circle-stroke-opacity", k);
 }
@@ -305,7 +308,7 @@ export function tagElement(label: string): HTMLElement {
   return el;
 }
 
-/** A handle to move by hand: a tree (green dot) or a labelled pill (Prato, Ombra, Frangivento). */
+/** A handle to move by hand: a tree (green dot) or a labelled pill (Aiuole, Ombra). */
 export function handleElement(label: string | null): HTMLElement {
   const el = document.createElement("div");
   el.setAttribute("aria-hidden", "true");

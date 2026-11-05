@@ -451,7 +451,7 @@ export function AccountControl() {
             {/* Identified, the card shows only that profile: the ways to identify appear when there is none. */}
             {!proId && <ul>
               {/* Straight to that profile's registration form (the sector page, over everything), past the profile page. */}
-              {([["Agronomo · apre il vigneto", "agronomo"], ["Funzionario comunale · apre la piazza", "funzionario"]] as const).map(([label, kind]) => (
+              {([["Conduttore · apre il vigneto", "agronomo"], ["Funzionario comunale · apre la piazza", "funzionario"]] as const).map(([label, kind]) => (
                 <li key={kind}>
                   <button type="button" onClick={() => { setOpen(false); openSectorGate(kind); }} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl text-left text-[15px] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
                     <span className="min-w-0 flex-1">{label}</span>

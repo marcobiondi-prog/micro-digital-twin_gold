@@ -3,8 +3,8 @@ import { sunPath, sunShare } from "./sun-exposure";
 
 /**
  * The simulation drawn inside the area: where the piazza's trees, lawn and shade go, or how the vineyard's three zones,
- * drip lines, shade cloth and windbreak sit. Automatic from the levers (counts and percentages), with optional hand
- * edits: a tree moved, the lawn's or the shade's centre moved, the windbreak's side. Pure geometry in [lat, lng].
+ * drip lines, pestAnimal cloth and pestPlant sit. Automatic from the levers (counts and percentages), with optional hand
+ * edits: a tree moved, the lawn's or the pestAnimal's centre moved, the pestPlant's side. Pure geometry in [lat, lng].
  */
 export type LatLng = [number, number];
 /**
@@ -15,15 +15,15 @@ export type LatLng = [number, number];
 export type LayoutEdits = { trees?: Array<LatLng | null>; lawnAt?: LatLng | null; shadeAt?: LatLng | null; windAt?: LatLng | null; best?: boolean; onlyDrawn?: boolean };
 
 /** `exact`: the very ring of a zone drawn by hand (a Prato or Pergolato zone), not a strip of grid cells. */
-export type Patch = { ring: Ring; kind: "lawn" | "shade" | "zone" | "cloth"; zone?: number; exact?: boolean };
-export type Line = { line: Ring; kind: "drip" | "wind" | "seam"; zone?: number; strength?: number };
+export type Patch = { ring: Ring; kind: "lawn" | "shade" | "zone" | "treat"; zone?: number; exact?: boolean };
+export type Line = { line: Ring; kind: "drip" | "main" | "seam"; zone?: number };
 /**
  * `sunny`: with `best`, the share of the area in the summer sun for most of the day (0–1), to say why. `lawnM2` /
  * `shadeM2`: the m² actually drawn as lawn and pergola; `lawnTarget` / `shadeTarget`: the m² the simulation counts
  * (the lever's share of the usable surface), so the map can say when there is no room for all of it.
  */
 export type PiazzaLayout = { misters: LatLng[]; trees: LatLng[]; patches: Patch[]; lawnAt: LatLng; shadeAt: LatLng; cell: number; sunny?: number; lawnM2: number; shadeM2: number; lawnTarget: number; shadeTarget: number };
-export type VineLayout = { patches: Patch[]; lines: Line[]; windAt: LatLng; zones: LatLng[] };
+export type VineLayout = { patches: Patch[]; lines: Line[]; zones: LatLng[]; traps: LatLng[] };
 
 /** The shade one tree gives in the simulation (m², models/project-summary) and so its crown on the map: about 6,2 m wide. */
 export const TREE_SHADE_M2 = 30;
@@ -257,16 +257,17 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
   };
 }
 
-export type ZoneMix = { irrigation: number; shade: number; windbreak: number };
+export type ZoneMix = { irrigation: number; pestAnimal: number; pestPlant: number };
 
 /**
- * The vineyard inside the area: three zones side by side (west → east), each with drip lines along its rows (closer
- * with more irrigation), its shade cloth (that share of its cells, from the north) and a windbreak along the side
- * nearest `windAt` (the west side by default), as thick as its strength.
+ * The vineyard inside the area: three zones side by side (west → east). Each zone, with irrigation, gets a main pipe
+ * (collettore) along its western end and a drip line on its rows joined to it (every row from +16 %, else one every
+ * `step` rows); with defence against animal pests, traps spread evenly over it (one every ~250 m² at full defence, at
+ * least one); with defence against plant pests, that share of its rows treated, from the south.
  */
-export function vineLayout(ring: Ring, mixes: ZoneMix[], edits: LayoutEdits = {}, inner: InnerZone[] = []): VineLayout | null {
+export function vineLayout(ring: Ring, mixes: ZoneMix[], _edits: LayoutEdits = {}, inner: InnerZone[] = []): VineLayout | null {
   if (ring.length < 3) return null;
-  const grid = cellsOf(ring), { f, c, xy } = grid;
+  const grid = cellsOf(ring), { f, c } = grid;
   // Nothing grows in a zone left free: its cells are not part of the vineyard's zones.
   const isFree = inZone(f, inner, "libera");
   const cells = grid.cells.filter((x) => !isFree(x.x, x.y));
@@ -274,26 +275,49 @@ export function vineLayout(ring: Ring, mixes: ZoneMix[], edits: LayoutEdits = {}
   const n = Math.max(1, mixes.length);
   const sorted = [...cells].sort((a, b) => a.x - b.x || a.y - b.y);
   const zoneOf = new Map<Cell, number>(sorted.map((cell, k) => [cell, Math.min(n - 1, Math.floor((k * n) / sorted.length))]));
-  const patches: Patch[] = [], lines: Line[] = [], zones: LatLng[] = [];
+  const patches: Patch[] = [], lines: Line[] = [], zones: LatLng[] = [], traps: LatLng[] = [];
   for (let z = 0; z < n; z++) {
-    const mine = cells.filter((x) => zoneOf.get(x) === z), mix = mixes[z] ?? { irrigation: 0, shade: 0, windbreak: 0 };
+    const mine = cells.filter((x) => zoneOf.get(x) === z), mix = mixes[z] ?? { irrigation: 0, pestAnimal: 0, pestPlant: 0 };
     if (!mine.length) continue;
     patches.push(...strips(f, c, mine, "zone", z));
     const mx = mine.reduce((s, x) => s + x.x, 0) / mine.length, my = mine.reduce((s, x) => s + x.y, 0) / mine.length;
     zones.push(toLL(f, mx, my));
-    // Shade cloth: that share of the zone's cells, the northern rows first.
-    const cloth = [...mine].sort((a, b) => b.y - a.y || a.x - b.x).slice(0, Math.round((Math.max(0, Math.min(100, mix.shade)) / 100) * mine.length));
-    patches.push(...strips(f, c, cloth, "cloth", z));
-    // Drip lines: one every `step` rows, closer with more irrigation (+20 % = every row).
+    const rows = new Map<number, Cell[]>();
+    for (const cell of mine) rows.set(cell.j, [...(rows.get(cell.j) ?? []), cell]);
+    // Plant pests: that share of the zone's rows treated, the southern rows first.
+    const treated = [...mine].sort((a, b) => a.y - b.y || a.x - b.x).slice(0, Math.round((Math.max(0, Math.min(100, mix.pestPlant)) / 100) * mine.length));
+    patches.push(...strips(f, c, treated, "treat", z));
+    // Irrigation: a main pipe along the zone's western end and a drip line on the rows, joined to it.
     if (mix.irrigation > 0) {
-      const step = Math.max(1, Math.round(5 - mix.irrigation / 5));
-      const rows = new Map<number, Cell[]>();
-      for (const cell of mine) rows.set(cell.j, [...(rows.get(cell.j) ?? []), cell]);
-      for (const [j, row] of rows) {
+      const step = mix.irrigation >= 16 ? 1 : Math.max(1, Math.round(5 - mix.irrigation / 5));
+      const fed: number[] = [];
+      for (const [j, row] of [...rows].sort((a, b) => a[0] - b[0])) {
         if (j % step) continue;
         const x0 = Math.min(...row.map((r) => r.x)) - c / 2.5, x1 = Math.max(...row.map((r) => r.x)) + c / 2.5;
         lines.push({ kind: "drip", zone: z, line: [toLL(f, x0, row[0]!.y), toLL(f, x1, row[0]!.y)] });
+        fed.push(row[0]!.y);
       }
+      if (fed.length) {
+        const west = Math.min(...mine.map((x) => x.x)) - c / 2.5;
+        const y0 = Math.min(...fed), y1 = Math.max(...fed);
+        lines.push({ kind: "main", zone: z, line: y1 - y0 > 0.5 ? [toLL(f, west, y0), toLL(f, west, y1)] : [toLL(f, west, y0 - c / 3), toLL(f, west, y0 + c / 3)] });
+      }
+    }
+    // Animal pests: traps on a regular grid over the zone, half a step in from its edges (one every ~250 m² at full
+    // defence, at least one, at the zone's middle).
+    if (mix.pestAnimal > 0) {
+      const want = Math.max(1, Math.round((mine.length * c * c * (mix.pestAnimal / 100)) / 250));
+      const zoneM = mine.length * c * c;
+      let k = Math.max(1, Math.round(Math.sqrt(zoneM / want) / c));
+      let picked: Cell[] = [];
+      for (let tries = 0; tries < 6; tries++) {
+        const i0 = Math.min(...mine.map((x) => x.i)), j0 = Math.min(...mine.map((x) => x.j)), h = Math.floor(k / 2);
+        picked = mine.filter((x) => (x.i - i0 - h) % k === 0 && (x.j - j0 - h) % k === 0 && (x.i - i0 - h) >= 0 && (x.j - j0 - h) >= 0);
+        if (picked.length >= want * 0.75 || k === 1) break;
+        k -= 1;
+      }
+      if (!picked.length) picked = [mine.reduce((b, x) => (dist([x.x, x.y], [mx, my]) < dist([b.x, b.y], [mx, my]) ? x : b), mine[0]!)];
+      for (const q of picked.slice(0, Math.max(1, Math.round(want * 1.25)))) traps.push(toLL(f, q.x, q.y));
     }
   }
   // Seams between neighbouring zones (white in the maps): on every row, a short line where one zone ends and the next begins.
@@ -314,24 +338,7 @@ export function vineLayout(ring: Ring, mixes: ZoneMix[], edits: LayoutEdits = {}
     const up = at.get(`${cell.i},${cell.j + 1}`);
     if (up && zoneOf.get(up) !== zoneOf.get(cell)) lines.push({ kind: "seam", line: [toLL(f, cell.x - c / 2, cell.y + c / 2), toLL(f, cell.x + c / 2, cell.y + c / 2)] });
   }
-  // Windbreak: the edge nearest its handle (by default the westernmost edge), when there is any windbreak.
-  const strength = mixes.reduce((s, m) => s + m.windbreak, 0) / n;
-  const mids = xy.map((p, i) => { const q = xy[(i + 1) % xy.length]!; return [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2] as [number, number]; });
-  const target = edits.windAt ? toXY(f, edits.windAt) : mids.reduce((b, m) => (m[0] < b[0] ? m : b), mids[0]!);
-  const e = mids.reduce((b, m, i) => (dist(m, target) < dist(mids[b]!, target) ? i : b), 0);
-  // The hedge stands inside the area: moved in from its edge by half its width (plus a little) and kept off the corners.
-  if (strength > 0) {
-    const a = xy[e]!, b = xy[(e + 1) % xy.length]!, len = dist(a, b);
-    if (len > 0.5) {
-      const ux = (b[0] - a[0]) / len, uy = (b[1] - a[1]) / len;
-      let nx = -uy, ny = ux;
-      const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
-      if (!inside(ring, f, mx + nx, my + ny)) { nx = -nx; ny = -ny; }
-      const off = hedgeWidthM(strength) / 2 + 0.4, cut = Math.min(off, len / 2 - 0.1);
-      lines.push({ kind: "wind", strength, line: [toLL(f, a[0] + ux * cut + nx * off, a[1] + uy * cut + ny * off), toLL(f, b[0] - ux * cut + nx * off, b[1] - uy * cut + ny * off)] });
-    }
-  }
-  return { patches, lines, zones, windAt: toLL(f, ...mids[e]!) };
+  return { patches, lines, zones, traps };
 }
 
 /**
@@ -531,47 +538,13 @@ export function mowStripes(ring: Ring, spacing = 3, max = 24): Ring[] {
   return out;
 }
 
-/** Vineyard 3D colours: the hedge of the windbreak and the shade net. */
-export const VINE_3D = { hedge: "#2f6b2a", hedgeTop: "#3d8a35", net: "#1f2933" } as const;
+/** Vineyard 3D colours: the traps against animal pests (a yellow sticky box on a post). */
+export const VINE_3D = { trap: "#facc15", post: "#5b4a3a" } as const;
 
-/**
- * The windbreak in 3D: a hedge along its edge, a 1.6 m wide wall whose height follows its strength (1.8 m at 10 %,
- * up to 4 m at full), in two slabs, the top a lighter green.
- */
-/** The hedge's width on the ground (m): 1,5 m for a light windbreak, up to 3 m at full strength. */
-export const hedgeWidthM = (strength: number) => 1.5 + 1.5 * Math.min(1, Math.max(0, strength) / 100);
-
-export function hedgeParts(edge: Ring, strength: number): TreePart[] {
-  if (edge.length < 2 || strength <= 0) return [];
-  const f = frameOf(edge);
-  const [a, b] = edge.map((p) => toXY(f, p)) as [[number, number], [number, number]];
-  const len = dist(a, b);
-  if (len < 1) return [];
-  const half = hedgeWidthM(strength) / 2;
-  const ux = (b[0] - a[0]) / len, uy = (b[1] - a[1]) / len, nx = -uy * half, ny = ux * half;
-  const ring: Ring = [[a[0] + nx, a[1] + ny], [b[0] + nx, b[1] + ny], [b[0] - nx, b[1] - ny], [a[0] - nx, a[1] - ny]].map(([x, y]) => toLL(f, x!, y!));
-  const h = 1.8 + 2.2 * Math.min(1, strength / 100);
-  return [{ ring, base: 0, height: h - 0.5, color: VINE_3D.hedge }, { ring, base: h - 0.5, height: h, color: VINE_3D.hedgeTop }];
-}
-
-/**
- * The shade net in 3D: a mesh of thin dark threads (every 1.2 m both ways) 2.2 m up over its strip, see-through
- * between them, held by posts at its corners.
- */
-export function netParts(strip: Ring, lite = false): TreePart[] {
-  if (strip.length < 4) return [];
-  const f = frameOf(strip);
-  const [a, b, , d] = strip.map((p) => toXY(f, p)) as Array<[number, number]>;
-  const len = dist(a!, b!), dep = dist(a!, d!);
-  if (len < 1 || dep < 1) return [];
-  const ux = [(b![0] - a![0]) / len, (b![1] - a![1]) / len], vy = [(d![0] - a![0]) / dep, (d![1] - a![1]) / dep];
-  const at = (s2: number, t: number): [number, number] => [a![0] + ux[0]! * s2 + vy[0]! * t, a![1] + ux[1]! * s2 + vy[1]! * t];
-  const box = (s0: number, s1: number, t0: number, t1: number): Ring => [at(s0, t0), at(s1, t0), at(s1, t1), at(s0, t1)].map(([x, y]) => toLL(f, x, y));
-  const parts: TreePart[] = strip.map((p) => ({ ring: crownRing(p, 0.1, 6), base: 0, height: 2.2, color: "#5b4a3a" }));
-  // Lite (the photorealistic 3D): one see-through dark sheet instead of the threads.
-  if (lite) { parts.push({ ring: box(0, len, 0, dep), base: 2.15, height: 2.2, color: `${VINE_3D.net}8c` }); return parts; }
-  const t = 0.07, step = 1.2;
-  for (let s2 = 0; s2 <= len + 1e-6; s2 += step) parts.push({ ring: box(s2 - t, s2 + t, 0, dep), base: 2.15, height: 2.2, color: VINE_3D.net });
-  for (let t2 = 0; t2 <= dep + 1e-6; t2 += step) parts.push({ ring: box(0, len, t2 - t, t2 + t), base: 2.15, height: 2.2, color: VINE_3D.net });
-  return parts;
+/** A trap in 3D: a thin post 1,4 m tall with a small yellow box on top. */
+export function trapParts(at: LatLng): TreePart[] {
+  return [
+    { ring: crownRing(at, 0.05, 6), base: 0, height: 1.4, color: VINE_3D.post },
+    { ring: crownRing(at, 0.22, 4), base: 1.4, height: 1.75, color: VINE_3D.trap },
+  ];
 }

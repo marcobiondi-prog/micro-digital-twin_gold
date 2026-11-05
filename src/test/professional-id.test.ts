@@ -12,7 +12,7 @@ describe("professional profile", () => {
     expect(id?.licence).toBe("MOL/CB/01234");
     expect(unlocks(id, "vineyard")).toBe(true);
     expect(unlocks(id, "urban")).toBe(false);
-    expect(proSummary(id!)).toBe("Agronomo · patentino MOL/CB/01234 (Molise)");
+    expect(proSummary(id!)).toBe("Conduttore del vigneto · patentino MOL/CB/01234 (Molise)");
   });
   it("refuses an expired licence, a missing declaration and a bad number", () => {
     const { id, errors } = checkAgronomo({ ...agro, expires: "2025-01-01", declared: false, licence: "x" }, today);

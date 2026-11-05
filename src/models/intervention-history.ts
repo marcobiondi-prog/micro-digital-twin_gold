@@ -9,7 +9,7 @@ export type HistoryFlow = "piazza" | "vigneto";
 /** What was set when the entry was recorded, so "Riapri" can put it back (older entries have none). */
 export type HistoryMix = (
   | { kind: "piazza"; trees: number; permeable: number; shade: number; misters?: number }
-  | { kind: "vigneto"; zones: Array<{ irrigation: number; shade: number; windbreak: number }>; allZones: boolean; selected: number }
+  | { kind: "vigneto"; zones: Array<{ irrigation: number; pestAnimal: number; pestPlant: number }>; allZones: boolean; selected: number }
 ) & {
   /** A copy of the simulated season and hour, for an account table that lacks their own columns. */
   when?: { season: string; hour: number; minute?: number; dst?: string } | null;
@@ -64,8 +64,8 @@ export const isHistoryMix = (v: unknown): v is HistoryMix => {
   if (m.kind === "piazza") return num(m.trees) && num(m.permeable) && num(m.shade);
   if (m.kind !== "vigneto" || !Array.isArray(m.zones) || m.zones.length === 0) return false;
   return typeof m.allZones === "boolean" && num(m.selected) && m.zones.every((z: unknown) => {
-    const zone = z as { irrigation?: unknown; shade?: unknown; windbreak?: unknown } | null;
-    return !!zone && num(zone.irrigation) && num(zone.shade) && num(zone.windbreak);
+    const zone = z as { irrigation?: unknown; pestAnimal?: unknown; pestPlant?: unknown } | null;
+    return !!zone && num(zone.irrigation) && num(zone.pestAnimal) && num(zone.pestPlant);
   });
 };
 
@@ -174,7 +174,7 @@ export function mixRows(mix: HistoryMix): { title: string; rows: MixRow[] }[] {
   const zones = mix.allZones ? mix.zones.map((z, i) => [z, i] as const) : [[mix.zones[mix.selected] ?? mix.zones[0]!, mix.selected] as const];
   return zones.map(([z, i]) => ({ title: `Zona ${i + 1}`, rows: [
     { label: "Irrigazione", value: `+${z.irrigation} %` },
-    { label: "Teli d'ombra", value: `${z.shade} %` },
-    { label: "Frangivento", value: `${z.windbreak} %` },
+    { label: "Parassiti animali · difesa", value: `${z.pestAnimal} %` },
+    { label: "Parassiti vegetali · difesa", value: `${z.pestPlant} %` },
   ] }));
 }

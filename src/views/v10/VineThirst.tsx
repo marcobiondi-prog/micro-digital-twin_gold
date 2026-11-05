@@ -4,13 +4,13 @@ import { loadPlaceArea } from "@/lib/place-area-client";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronDown, CloudRain, Droplets, Thermometer, Flower2, Grape,  Leaf, Ruler, ShieldCheck, Sprout, Umbrella, Wallet, Wind, Wine, type LucideIcon } from "lucide-react";
+import { ChevronDown, CloudRain, Droplets, Thermometer, Flower2, Grape, Bug, Leaf, Ruler, ShieldCheck, Sprout, Umbrella, Wallet, Wind, Wine, type LucideIcon } from "lucide-react";
 import { phenoPhases, type Pheno } from "@/models/data";
 import { estimatedTemp, type Season } from "@/models/season-climate";
 import { useSeasonClock, WhenPicker } from "@/views/v10/when";
 import { comparison, type PrototypeId } from "@/models/scenarios";
 import { setVineyard, useLab, vineMetrics, vineThirstPartsOf } from "@/models/lab-store";
-import { NO_MIX, VINE_LEVELS, VINE_MAX, VINE_REFERENCE_M2, vineCost, vineMixAt, vineMixOf, zoneMixOf, type VineMix } from "@/models/vine-interventions";
+import { DEFENCE_MAX, NO_MIX, PEST_DEFAULT, VINE_LEVELS, VINE_MAX, VINE_REFERENCE_M2, vineCost, vineMixAt, vineMixOf, zoneMixOf, type VineMix } from "@/models/vine-interventions";
 import { euroRange, grouped } from "@/models/intervention-cost";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { GAIN_BG, GAIN_TEXT } from "@/views/v7/studio-ui";
@@ -27,7 +27,7 @@ const PHASE_SHORT: Record<Pheno, string> = { Germogliamento: "Germogli", Fioritu
 /** Thirst 0–100 → five-step scale (0 = worst), as in the rest of the vineyard. */
 const stressGain = (s: number) => (s >= 80 ? 0 : s >= 65 ? 1 : s >= 45 ? 2 : s >= 25 ? 3 : 4);
 /** How the vines are, in plain words. */
-const verdict = (s: number) => (s >= 65 ? "Sete forte" : s >= 35 ? "Da tenere d'occhio" : "Le viti stanno bene");
+const verdict = (s: number) => (s >= 65 ? "Stress forte" : s >= 35 ? "Da tenere d'occhio" : "Le viti stanno bene");
 const AIR_MIN = 0, AIR_MAX = 45;
 /** The vine's phase that matches each season (winter keeps the one in hand: the vine rests). */
 const PHASE_OF_SEASON: Partial<Record<Season, Pheno>> = { primavera: "Germogliamento", estate: "Invaiatura", autunno: "Maturazione" };
@@ -37,7 +37,8 @@ const fmt1 = (n: number) => n.toLocaleString("it-IT", { maximumFractionDigits: 1
 /**
  * v10 vineyard simulation, built like the piazza one: the half-ring arc of the vines' thirst is the one control (the three
  * levels sit on it as stops; drag the white dot or touch a level), inside it the verdict, the thirst and the cost; under it the
- * three zones, the phase of the vine and the rain; then three levers (irrigation, shade cloth, windbreak) and the cost per hectare.
+ * three zones, the phase of the vine, the rain and the pests present; then three levers (irrigation, defence from animal
+ * and plant pests) and the cost per hectare.
  */
 export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promise<void>) | undefined }) {
   const vine = useLab().vineyard;
@@ -47,7 +48,7 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
   const legacy = vineMixOf(vine);
   const mixes = vine.zones.map((z) => zoneMixOf(z, legacy));
   // On the whole vineyard the levers show the average mix (the same everywhere once set from here).
-  const avgMix = (ms: VineMix[]): VineMix => ({ irrigation: Math.round(avg(ms.map((m) => m.irrigation)) / 2) * 2, shade: Math.round(avg(ms.map((m) => m.shade)) / 10) * 10, windbreak: Math.round(avg(ms.map((m) => m.windbreak)) / 10) * 10 });
+  const avgMix = (ms: VineMix[]): VineMix => ({ irrigation: Math.round(avg(ms.map((m) => m.irrigation)) / 2) * 2, pestAnimal: Math.round(avg(ms.map((m) => m.pestAnimal)) / 10) * 10, pestPlant: Math.round(avg(ms.map((m) => m.pestPlant)) / 10) * 10 });
   const mix = all ? avgMix(mixes) : mixes[vine.selected] ?? NO_MIX;
   const [costOpen, setCostOpen] = useState(false);
   const gaugeRef = useRef<HTMLDivElement>(null);
@@ -77,17 +78,17 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
   // Where the thirst comes from (after the interventions, averaged over the scope): soil, heat, wind, phase and rain.
   const partsAll = vineThirstPartsOf({ ...vine, zones: vine.zones.map((z, i) => ({ ...z, ...mixes[i] })) });
   const sc = targets.map((i) => partsAll[i]).filter((p): p is NonNullable<typeof p> => !!p);
-  const parts = { soil: avg(sc.map((p) => p.soil)), heat: avg(sc.map((p) => p.heat)), wind: avg(sc.map((p) => p.wind)), weight: sc[0]?.weight ?? 1, rain: avg(sc.map((p) => p.rain)) };
+  const parts = { soil: avg(sc.map((p) => p.soil)), heat: avg(sc.map((p) => p.heat)), wind: avg(sc.map((p) => p.wind)), animals: avg(sc.map((p) => p.animals)), plants: avg(sc.map((p) => p.plants)), weight: sc[0]?.weight ?? 1, rain: avg(sc.map((p) => p.rain)) };
   const dialMax = Math.min(100, before + 4), dialMin = Math.max(0, lowest - 6);
   // Where the white dot sits between the lowest thirst reachable (0) and the thirst without interventions (1).
   const span = before - lowest, pos = span > 0.5 ? (after - lowest) / span : 1;
   const near: "left" | "right" | null = pos >= 0.66 ? "right" : pos <= 0.34 ? "left" : null;
   const areaHere = drawnAreaFor(vine.area, vine.location);
   const gain = stressGain(after);
-  const preset = VINE_LEVELS.find((p) => p.irrigation === mix.irrigation && p.shade === mix.shade && p.windbreak === mix.windbreak)?.id ?? null;
+  const preset = VINE_LEVELS.find((p) => p.irrigation === mix.irrigation && p.pestAnimal === mix.pestAnimal && p.pestPlant === mix.pestPlant)?.id ?? null;
   const nearest: PrototypeId = VINE_LEVELS.reduce((b, p) => (Math.abs(thirstOf(p) - after) < Math.abs(thirstOf(b) - after) ? p : b), VINE_LEVELS[0]!).id;
   const level = comparison.find((l) => l.id === (preset ?? nearest)) ?? comparison[0]!;
-  const any = mix.irrigation + mix.shade + mix.windbreak > 0;
+  const any = mix.irrigation + mix.pestAnimal + mix.pestPlant > 0;
 
   // The vineyard's real surface, measured on its mapped plot; without one, one hectare (said so).
   const fetchArea = useServerFn(getPlaceArea);
@@ -112,6 +113,9 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
     if (!delta) return;
     setVineyard((vv) => ({ zones: vv.zones.map((z, i) => (targets.includes(i) ? { ...z, temperature: Math.max(0, Math.min(45, z.temperature + delta)) } : z)) }));
   };
+  // The pests present in the scope (0–100; a zone never set has the default) and setting them on the scope's zones.
+  const pestsShown = (k: "animalPests" | "plantPests") => Math.round(avg(targets.map((i) => vine.zones[i]?.[k] ?? (k === "animalPests" ? PEST_DEFAULT.animal : PEST_DEFAULT.plant))) / 10) * 10;
+  const setPests = (k: "animalPests" | "plantPests", v: number) => setVineyard((vv) => ({ zones: vv.zones.map((z, i) => (targets.includes(i) ? { ...z, [k]: v } : z)) }));
   // Season and hour (device clock until chosen by hand): they set the air temperature of the zones from the place's real
   // year (else a plain estimate), keeping each zone's difference from the others, and the vine's phase for the season.
   // Applied once per season, hour and place, so a reload keeps the temperature tuned by hand.
@@ -156,13 +160,13 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
     let lo = 0, hi = 3;
     for (let k = 0; k < 18; k++) { const mid = (lo + hi) / 2; if (thirstOf(vineMixAt(mid)) <= t) hi = mid; else lo = mid; }
     const next = t >= before - 0.05 ? NO_MIX : vineMixAt(hi);
-    if (next.irrigation === mix.irrigation && next.shade === mix.shade && next.windbreak === mix.windbreak) return;
+    if (next.irrigation === mix.irrigation && next.pestAnimal === mix.pestAnimal && next.pestPlant === mix.pestPlant) return;
     change(next);
   };
   const applyLevel = (id: PrototypeId) => {
     const p = VINE_LEVELS.find((x) => x.id === id)!;
     hapticTick();
-    change({ irrigation: p.irrigation, shade: p.shade, windbreak: p.windbreak });
+    change({ irrigation: p.irrigation, pestAnimal: p.pestAnimal, pestPlant: p.pestPlant });
   };
   const reach = before - lowest;
   const stops: Stop[] = VINE_LEVELS.map((p) => ({ id: p.id, label: comparison.find((c) => c.id === p.id)!.s, t: thirstOf(p), on: preset === p.id, near: !preset && any && nearest === p.id }));
@@ -170,14 +174,14 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
   const safe = zonesAfter.filter((r) => r.s < 35).length;
   const facts: Array<{ icon: LucideIcon; value: string; label: string }> = [
     { icon: ShieldCheck, value: `${safe} di ${zonesAfter.length}`, label: "Zone al sicuro" },
-    { icon: Leaf, value: `−${fmt1((mix.shade / 100) * 3)} °C`, label: "Sulle foglie" },
-    { icon: Wind, value: `−${Math.round((mix.windbreak / 100) * 60)}%`, label: "Vento" },
+    { icon: Bug, value: `−${Math.round(mix.pestAnimal * DEFENCE_MAX)}%`, label: "Parassiti animali" },
+    { icon: Leaf, value: `−${Math.round(mix.pestPlant * DEFENCE_MAX)}%`, label: "Parassiti vegetali" },
   ];
   const surface = area.isPending ? "…" : `${grouped(m2)} m²`;
   const surfaceNote = drawn !== null ? "superficie disegnata" : area.isPending ? "misuro il vigneto…" : measured ? "superficie del vigneto" : "superficie di riferimento (1 ettaro)";
 
   return (
-    <section className="fuse-canvas space-y-5 rounded-t-3xl px-3 pb-6 pt-4 text-foreground sm:px-5" aria-label="Sete del vigneto">
+    <section className="fuse-canvas space-y-5 rounded-t-3xl px-3 pb-6 pt-4 text-foreground sm:px-5" aria-label="Stress del vigneto">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">{reach > 1 ? "Trascina il punto bianco o tocca un livello" : "Ritocca il vigneto qui sotto"}</p>
       </div>
@@ -188,7 +192,7 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
           const on = i === -1 ? all : !all && vine.selected === i;
           const s = i === -1 ? avg(zonesAfter.map((r) => r.s)) : zonesAfter[i]?.s ?? 0;
           return (
-            <button key={i} type="button" role="radio" aria-checked={on} aria-label={`${i === -1 ? "Tutte le zone" : `Zona ${i + 1}`}, sete ${Math.round(s)} su 100`}
+            <button key={i} type="button" role="radio" aria-checked={on} aria-label={`${i === -1 ? "Tutte le zone" : `Zona ${i + 1}`}, stress ${Math.round(s)} su 100`}
               onClick={() => { if (on) return; hapticTick(); setVineyard(i === -1 ? { allZones: true } : { allZones: false, selected: i }); }}
               className={cn("flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 rounded-[1.25rem] px-1 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", on ? "bg-secondary text-secondary-foreground shadow-[0_0_0_2px_var(--foreground)]" : "text-foreground/75 hover:bg-foreground/[0.06]")}>
               <span className="truncate text-[12px] font-semibold">{i === -1 ? "Tutte" : `Zona ${i + 1}`}</span>
@@ -211,28 +215,30 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
       {/* The arc of the vines' thirst: drag the white dot or touch a level. */}
       <div ref={gaugeRef} className="relative mx-auto mt-10 flex max-w-[21rem] flex-col items-center px-7">
         <Gauge before={before} after={after} lowest={lowest} min={dialMin} max={dialMax} stops={reach > 1 ? stops : []} onSlide={slideTo} onStop={applyLevel}
-          unit="" spoken="su 100" label={`Sete della vite da raggiungere, ${scopeName}`} step={1} rightEnd={`${Math.round(before)}`} />
+          unit="" spoken="su 100" label={`Stress della vite da raggiungere, ${scopeName}`} step={1} rightEnd={`${Math.round(before)}`} />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center" aria-live="polite">
           <span className={cn("rounded-full px-3 py-0.5 text-[13px] font-semibold text-white transition-colors duration-300", GAIN_BG[gain])}>{verdict(after)}</span>
           <span className="mt-1 font-display text-6xl font-light leading-none tracking-tight tabular-nums">{Math.round(after)}<span className="text-2xl text-muted-foreground">/100</span></span>
           {/* What the big number is, said under it: the vines' thirst out of 100, and what the interventions take off. */}
-          <span className="mt-1.5 text-center text-[13px] font-semibold leading-tight">Sete delle viti <span className="tabular-nums">{Math.round(before - after) >= 1 ? `· −${Math.round(before - after)} rispetto a oggi` : any ? "· a quest'ora non cambia" : "· nessun intervento"}</span></span>
+          <span className="mt-1.5 text-center text-[13px] font-semibold leading-tight">Stress delle viti <span className="tabular-nums">{Math.round(before - after) >= 1 ? `· −${Math.round(before - after)} rispetto a oggi` : any ? "· a quest'ora non cambia" : "· nessun intervento"}</span></span>
         </div>
       </div>
 
       {/* Labels under the arc's two end numbers, as in the piazza: the lowest thirst reachable on the left, the thirst
           without interventions (exact, on the right end); the one the white dot is near lights up, the other dims. */}
       <div className="mx-auto -mt-3 flex w-full max-w-[21rem] justify-between px-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground" aria-hidden="true">
-        <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "left" ? "bg-sky-400/30 text-sky-200" : "bg-sky-400/15 text-sky-300", near === "right" && "opacity-35")}>Sete più bassa</span>
+        <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "left" ? "bg-sky-400/30 text-sky-200" : "bg-sky-400/15 text-sky-300", near === "right" && "opacity-35")}>Stress più basso</span>
         <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 text-right transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "right" ? "bg-amber-400/25 text-amber-200" : "bg-foreground/[0.08]", near === "left" && "opacity-35")}>Senza interventi</span>
       </div>
 
       {/* Where the number comes from: the three parts of the thirst (points), the phase's weight and the rain. */}
-      <ul className="mx-auto flex max-w-[22rem] flex-wrap justify-center gap-1.5 px-2 text-[11px] font-semibold" aria-label="Da cosa dipende la sete">
+      <ul className="mx-auto flex max-w-[22rem] flex-wrap justify-center gap-1.5 px-2 text-[11px] font-semibold" aria-label="Da cosa dipende lo stress">
         {[
           { k: "Terreno asciutto", v: `+${Math.round(parts.soil)}`, on: parts.soil >= 0.5 },
           { k: "Caldo", v: `+${Math.round(parts.heat)}`, on: parts.heat >= 0.5 },
           { k: "Vento", v: `+${Math.round(parts.wind)}`, on: parts.wind >= 0.5 },
+          { k: "Parassiti animali", v: `+${Math.round(parts.animals)}`, on: parts.animals >= 0.5 },
+          { k: "Parassiti vegetali", v: `+${Math.round(parts.plants)}`, on: parts.plants >= 0.5 },
           { k: `Fase · ${vine.phase}`, v: `×${parts.weight.toLocaleString("it-IT", { maximumFractionDigits: 2 })}`, on: parts.weight !== 1 },
           ...(parts.rain > 0 ? [{ k: "Pioggia", v: `−${Math.round(parts.rain)}`, on: true }] : []),
         ].map((p) => (
@@ -244,7 +250,7 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
 
       {/* The three zones after the interventions, then the phase of the vine and the rain. */}
       <div className="-mt-2 space-y-3">
-        <p className="text-center text-sm text-muted-foreground">Sete della vite, {scopeName}: senza interventi {Math.round(before)}/100</p>
+        <p className="text-center text-sm text-muted-foreground">Stress della vite, {scopeName}: senza interventi {Math.round(before)}/100</p>
         <WhenPicker clock={clock} id="vigneto-when" detail={<>aria {Math.round(seasonAir)}°</>}
           note={clock.pending ? "Leggo l'anno del luogo…" : clock.real !== null ? "Temperatura percepita media dell'ultimo anno in questo luogo, a quella stagione e ora" : "Stima indicativa: i dati reali del luogo non sono disponibili"} />
         <div className="flex items-stretch gap-2">
@@ -266,6 +272,10 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
         </div>
         {/* The air temperature of the scope (on Tutte the average; moving it shifts every zone by the same degrees). */}
         <Lever icon={Thermometer} label="Temperatura" value={airShown - AIR_MIN} step={1} max={AIR_MAX - AIR_MIN} color="text-radar-hot" swatch="bg-radar-hot" shown={`${airShown} °C`} onChange={setAir} />
+        {/* How many pests the scope has (a condition, like the temperature): the defence levers below take them off. */}
+        <p className="px-1 pt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quanti parassiti ci sono</p>
+        <Lever icon={Bug} label="Animali" value={pestsShown("animalPests")} step={10} max={100} color="text-amber-400" swatch="bg-amber-400" shown={`${pestsShown("animalPests")}%`} onChange={(v) => setPests("animalPests", v)} />
+        <Lever icon={Leaf} label="Vegetali" value={pestsShown("plantPests")} step={10} max={100} color="text-ok" swatch="bg-ok" shown={`${pestsShown("plantPests")}%`} onChange={(v) => setPests("plantPests", v)} />
         {onImportWeather && <ImportWeatherButton onImport={onImportWeather} />}
         {/* The user's own sensors read in the last 2 hours: their values go into the zones (a zone's sensors first, else the vineyard's). */}
         {sensorLine && (
@@ -279,9 +289,10 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
 
       {/* Fine-tuning by hand: always open, one line each. */}
       <div className="space-y-3" role="group" aria-label={`Interventi, ${scopeName}`}>
+        <p className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Interventi · irrigazione e difesa</p>
         <Lever icon={Droplets} label="Irrigazione" value={mix.irrigation} step={2} max={VINE_MAX.irrigation} color="text-water" swatch="bg-water" shown={`+${mix.irrigation}%`} onChange={(v) => change({ irrigation: v })} />
-        <Lever icon={Umbrella} label="Teli d'ombra" value={mix.shade} step={10} max={VINE_MAX.shade} color="text-urban" swatch="bg-urban" onChange={(v) => change({ shade: v })} />
-        <Lever icon={Wind} label="Frangivento" value={mix.windbreak} step={10} max={VINE_MAX.windbreak} color="text-ok" swatch="bg-ok" onChange={(v) => change({ windbreak: v })} />
+        <Lever icon={Bug} label="Parassiti animali" value={mix.pestAnimal} step={10} max={VINE_MAX.pestAnimal} color="text-amber-400" swatch="bg-amber-400" shown={`${mix.pestAnimal}%`} onChange={(v) => change({ pestAnimal: v })} />
+        <Lever icon={Leaf} label="Parassiti vegetali" value={mix.pestPlant} step={10} max={VINE_MAX.pestPlant} color="text-ok" swatch="bg-ok" shown={`${mix.pestPlant}%`} onChange={(v) => change({ pestPlant: v })} />
       </div>
 
       {/* Cost per hectare and benefits, folded. */}
@@ -305,7 +316,7 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
               </div>
             ))}
           </dl>
-          <p className="text-[11px] leading-snug text-muted-foreground">Stima indicativa all'ettaro, IVA esclusa, per l'intervento completo: irrigazione a goccia 3.000–6.000 €, teli d'ombra 4.000–8.000 €, frangivento 6.000–12.000 €.</p>
+          <p className="text-[11px] leading-snug text-muted-foreground">Stima indicativa all'ettaro, IVA esclusa, per l'intervento completo: irrigazione a goccia 3.000–6.000 €, difesa dai parassiti animali (trappole, confusione sessuale, trattamenti mirati) 400–1.200 € a stagione, difesa dai parassiti vegetali (trattamenti contro peronospora e oidio, sfalci) 500–1.500 € a stagione.</p>
         </div>
       </div>
     </section>
