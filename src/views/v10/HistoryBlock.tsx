@@ -1,3 +1,4 @@
+import { rememberBack } from "@/lib/back-to";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -1224,14 +1225,14 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
         {!compact && archKeys.length > 0 && <ArchiveBlock shots={archivedShots} keys={archKeys} />}
         {!compact && archivedEntries.length > 0 && <HistoryArchiveBlock items={archivedEntries} />}
         {compact && archivedEntries.length > 0 && (
-          <Link to="/archivio" className="flex items-center gap-3 rounded-2xl bg-foreground/[0.04] px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Link to="/archivio" onClick={() => rememberBack("/archivio")} className="flex items-center gap-3 rounded-2xl bg-foreground/[0.04] px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <ArchiveIcon kind="interventi" small />
             <span className="flex-1 text-sm"><span className="font-semibold">Archivio interventi</span><span className="text-muted-foreground"> · {entriesText(archivedEntries.length)} · tocca per recuperarli</span></span>
             <ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />
           </Link>
         )}
         {compact && archKeys.length > 0 && (
-          <Link to="/archivio" className="flex items-center gap-3 rounded-2xl bg-foreground/[0.04] px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Link to="/archivio" onClick={() => rememberBack("/archivio")} className="flex items-center gap-3 rounded-2xl bg-foreground/[0.04] px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <ArchiveIcon kind="foto" small />
             <span className="flex-1 text-sm"><span className="font-semibold">Archivio foto e video</span><span className="text-muted-foreground"> · {archivedAll.length ? countText(archivedAll) : `${archKeys.length} file`} · tocca per recuperarle</span></span>
             <ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />
@@ -1283,7 +1284,7 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
       {failed && <DashCard><p className="text-sm text-muted-foreground">Non riesco a leggere la cronologia del tuo account. Vedi solo quella di questo dispositivo.</p></DashCard>}
       {list(filter)}
       {more && (
-        <Link to="/cronologia" className="flex h-12 items-center justify-center gap-2 rounded-full bg-foreground text-sm font-semibold text-background outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <Link to="/cronologia" onClick={() => rememberBack("/cronologia")} className="flex h-12 items-center justify-center gap-2 rounded-full bg-foreground text-sm font-semibold text-background outline-none focus-visible:ring-2 focus-visible:ring-ring">
           Apri la cronologia{entries.length > 0 ? ` · ${entries.length} ${entries.length === 1 ? "intervento" : "interventi"}` : ""}<ArrowRight className="size-4" aria-hidden="true" />
         </Link>
       )}

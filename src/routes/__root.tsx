@@ -1,3 +1,4 @@
+import { historyHome } from "@/lib/back-to";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { UpdatePill } from "@/views/UpdatePill";
 import { Outlet, Link, createRootRouteWithContext, useLocation, useNavigate, useRouter, HeadContent, Scripts, type ErrorComponentProps } from "@tanstack/react-router";
@@ -222,7 +223,7 @@ function BottomNav() {
   }, [pathname]);
   const items = itemsFor(proId);
   const item = ({ to, l, I }: NavItem, index: number) => {
-    const active = pathname === to || (to === "/benvenuto" && (pathname.startsWith("/cronologia") || pathname === "/archivio")) || (to === "/profilo" && isProfilePath(pathname));
+    const active = pathname === to || ((pathname.startsWith("/cronologia") || pathname === "/archivio") && to === historyHome(pathname === "/archivio" ? "/archivio" : "/cronologia")) || (to === "/profilo" && isProfilePath(pathname));
     // Piazza and vineyard wear a small lock until the profile that opens them is identified.
     const locked = (to === "/urbano" || to === "/vigneto") && proId !== undefined && !unlocks(proId, to === "/urbano" ? "urban" : "vineyard");
     const col = index < 2 ? index : index + 1, arc = ARC[col];
@@ -242,7 +243,7 @@ function BottomNav() {
     );
   };
   // The Cronologia page belongs to Benvenuto: its item stays lit there.
-  const navPath = pathname.startsWith("/cronologia") || pathname === "/archivio" ? "/benvenuto" : isProfilePath(pathname) ? "/profilo" : pathname;
+  const navPath = pathname.startsWith("/cronologia") || pathname === "/archivio" ? historyHome(pathname === "/archivio" ? "/archivio" : "/cronologia") : isProfilePath(pathname) ? "/profilo" : pathname;
   const index = items.findIndex((b) => b.to === navPath);
   const current = items[index];
   // On Home the bar points at the tile selected there: the light slides under Urbano or Vigneto, or the camera lights up.
