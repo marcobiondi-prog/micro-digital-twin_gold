@@ -35,6 +35,7 @@ import { Route as PrivacyCookieRouteImport } from './routes/privacy/cookie'
 import { Route as PrivacyInformativaRouteImport } from './routes/privacy/informativa'
 import { Route as PrivacyPreferenzeRouteImport } from './routes/privacy/preferenze'
 import { Route as ApiPublicExternalApprovalRouteImport } from './routes/api/public/external-approval'
+import { Route as ApiPublicSensorReadingsRouteImport } from './routes/api/public/sensor-readings'
 import { Route as ApiPublicJobsCaseSourcesRouteImport } from './routes/api/public/jobs/case-sources'
 
 const IndexRoute = IndexRouteImport.update({
@@ -169,6 +170,11 @@ const ApiPublicExternalApprovalRoute =
     path: '/api/public/external-approval',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicSensorReadingsRoute = ApiPublicSensorReadingsRouteImport.update({
+  id: '/api/public/sensor-readings',
+  path: '/api/public/sensor-readings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicJobsCaseSourcesRoute =
   ApiPublicJobsCaseSourcesRouteImport.update({
     id: '/api/public/jobs/case-sources',
@@ -203,6 +209,7 @@ export interface FileRoutesByFullPath {
   '/privacy/informativa': typeof PrivacyInformativaRoute
   '/privacy/preferenze': typeof PrivacyPreferenzeRoute
   '/api/public/external-approval': typeof ApiPublicExternalApprovalRoute
+  '/api/public/sensor-readings': typeof ApiPublicSensorReadingsRoute
   '/api/public/jobs/case-sources': typeof ApiPublicJobsCaseSourcesRoute
 }
 export interface FileRoutesByTo {
@@ -232,6 +239,7 @@ export interface FileRoutesByTo {
   '/privacy/informativa': typeof PrivacyInformativaRoute
   '/privacy/preferenze': typeof PrivacyPreferenzeRoute
   '/api/public/external-approval': typeof ApiPublicExternalApprovalRoute
+  '/api/public/sensor-readings': typeof ApiPublicSensorReadingsRoute
   '/api/public/jobs/case-sources': typeof ApiPublicJobsCaseSourcesRoute
 }
 export interface FileRoutesById {
@@ -262,6 +270,7 @@ export interface FileRoutesById {
   '/privacy/informativa': typeof PrivacyInformativaRoute
   '/privacy/preferenze': typeof PrivacyPreferenzeRoute
   '/api/public/external-approval': typeof ApiPublicExternalApprovalRoute
+  '/api/public/sensor-readings': typeof ApiPublicSensorReadingsRoute
   '/api/public/jobs/case-sources': typeof ApiPublicJobsCaseSourcesRoute
 }
 export interface FileRouteTypes {
@@ -293,6 +302,7 @@ export interface FileRouteTypes {
     | '/privacy/informativa'
     | '/privacy/preferenze'
     | '/api/public/external-approval'
+    | '/api/public/sensor-readings'
     | '/api/public/jobs/case-sources'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -322,6 +332,7 @@ export interface FileRouteTypes {
     | '/privacy/informativa'
     | '/privacy/preferenze'
     | '/api/public/external-approval'
+    | '/api/public/sensor-readings'
     | '/api/public/jobs/case-sources'
   id:
     | '__root__'
@@ -351,6 +362,7 @@ export interface FileRouteTypes {
     | '/privacy/informativa'
     | '/privacy/preferenze'
     | '/api/public/external-approval'
+    | '/api/public/sensor-readings'
     | '/api/public/jobs/case-sources'
   fileRoutesById: FileRoutesById
 }
@@ -381,6 +393,7 @@ export interface RootRouteChildren {
   PrivacyInformativaRoute: typeof PrivacyInformativaRoute
   PrivacyPreferenzeRoute: typeof PrivacyPreferenzeRoute
   ApiPublicExternalApprovalRoute: typeof ApiPublicExternalApprovalRoute
+  ApiPublicSensorReadingsRoute: typeof ApiPublicSensorReadingsRoute
   ApiPublicJobsCaseSourcesRoute: typeof ApiPublicJobsCaseSourcesRoute
 }
 
@@ -568,6 +581,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicExternalApprovalRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/sensor-readings': {
+      id: '/api/public/sensor-readings'
+      path: '/api/public/sensor-readings'
+      fullPath: '/api/public/sensor-readings'
+      preLoaderRoute: typeof ApiPublicSensorReadingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/jobs/case-sources': {
       id: '/api/public/jobs/case-sources'
       path: '/api/public/jobs/case-sources'
@@ -605,6 +625,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyInformativaRoute: PrivacyInformativaRoute,
   PrivacyPreferenzeRoute: PrivacyPreferenzeRoute,
   ApiPublicExternalApprovalRoute: ApiPublicExternalApprovalRoute,
+  ApiPublicSensorReadingsRoute: ApiPublicSensorReadingsRoute,
   ApiPublicJobsCaseSourcesRoute: ApiPublicJobsCaseSourcesRoute,
 }
 export const routeTree = rootRouteImport

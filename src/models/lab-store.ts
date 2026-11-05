@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { applyZoneMix, vineMixOf, zoneMixOf } from "./vine-interventions";
-import { vineModel, type Pheno } from "./data";
+import { vineModel, vineThirstParts, type Pheno } from "./data";
 import { piazzaEstimate, vineZones } from "./scenarios";
 /** The area drawn with pins on the simulation's map, kept with the place it was drawn for. */
 import type { DrawnArea } from "./drawn-area";
@@ -118,6 +118,18 @@ export function vineMetrics(v: LabState["vineyard"]) {
     waterStress: Math.round(avg(results.map((r) => r.s))),
     heatStress: Math.round(Math.max(0, Math.min(100, ((avg(zones.map((z) => z.temperature)) + offset - 20) / 25) * 100))),
   };
+}
+
+/**
+ * The parts of each zone's thirst, read exactly as vineMetrics reads it (the latitude's offset on the air and the zone's
+ * interventions applied first): dry soil, heat, wind in points, the phase's weight and the rain taken off.
+ */
+export function vineThirstPartsOf(v: LabState["vineyard"]) {
+  const offset = Math.max(-3, Math.min(3, (41.83 - v.location.lat) * 0.6));
+  return v.zones.map((z0) => {
+    const z = applyZoneMix(z0, zoneMixOf(z0, vineMixOf(v)));
+    return vineThirstParts({ moisture: z.moisture, temp: z.temperature + offset, wind: z.wind, phase: v.phase, rain: z.rain });
+  });
 }
 
 const SITUATION_LABELS = { basso: "Situazione regolare", medio: "Da monitorare", alto: "Livello di attenzione" } as const;

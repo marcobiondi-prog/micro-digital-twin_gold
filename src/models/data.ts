@@ -192,6 +192,15 @@ export const phenoPhases = ["Germogliamento", "Fioritura", "Invaiatura", "Matura
 export type Pheno = (typeof phenoPhases)[number];
 export type VineInput = { moisture: number; temp: number; wind: number; phase: Pheno; rain: boolean };
 const phaseW: Record<Pheno, number> = { Germogliamento: 0.7, Fioritura: 1.15, Invaiatura: 1.2, Maturazione: 1.0 };
+/**
+ * Where the vines' thirst comes from, in points: dry soil ((35 − moisture %) × 1,6), heat above 24 °C (× 3) and wind
+ * (km/h × 0,55), weighed by the vine's phase, less 15 with rain — the same sum vineModel turns into the 0–100 index.
+ */
+export const PHASE_WEIGHT = phaseW;
+export function vineThirstParts(i: VineInput) {
+  const soil = Math.max(0, 35 - i.moisture) * 1.6, heat = Math.max(0, i.temp - 24) * 3, wind = i.wind * 0.55;
+  return { soil, heat, wind, weight: phaseW[i.phase], rain: i.rain ? 15 : 0 };
+}
 export function vineModel(i: VineInput) {
   const base = Math.max(0, 35 - i.moisture) * 1.6 + Math.max(0, i.temp - 24) * 3 + i.wind * 0.55;
   const s = Math.round(Math.max(0, Math.min(100, base * phaseW[i.phase] - (i.rain ? 15 : 0))));

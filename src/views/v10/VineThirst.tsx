@@ -9,13 +9,16 @@ import { phenoPhases, type Pheno } from "@/models/data";
 import { estimatedTemp, type Season } from "@/models/season-climate";
 import { useSeasonClock, WhenPicker } from "@/views/v10/when";
 import { comparison, type PrototypeId } from "@/models/scenarios";
-import { setVineyard, useLab, vineMetrics } from "@/models/lab-store";
+import { setVineyard, useLab, vineMetrics, vineThirstPartsOf } from "@/models/lab-store";
 import { NO_MIX, VINE_LEVELS, VINE_MAX, VINE_REFERENCE_M2, vineCost, vineMixAt, vineMixOf, zoneMixOf, type VineMix } from "@/models/vine-interventions";
 import { euroRange, grouped } from "@/models/intervention-cost";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { GAIN_BG, GAIN_TEXT } from "@/views/v7/studio-ui";
 import { Gauge, Lever, type Stop } from "@/views/v9c/UrbanThermometer";
 import { ImportWeatherButton } from "@/views/SimulationGrid";
+import { useMySensors } from "@/lib/use-my-sensors";
+import { freshAverage, type SensorKind } from "@/models/sensor-devices";
+import { toast } from "sonner";
 import { hapticTick } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
@@ -71,6 +74,10 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
   // What the vines feel now: on the whole vineyard, the real average of the zones (their mixes may differ).
   const after = avg(targets.map((i) => zonesAfter[i]?.s ?? 0));
   const lowest = Math.min(after, thirstOf(vineMixAt(3)));
+  // Where the thirst comes from (after the interventions, averaged over the scope): soil, heat, wind, phase and rain.
+  const partsAll = vineThirstPartsOf({ ...vine, zones: vine.zones.map((z, i) => ({ ...z, ...mixes[i] })) });
+  const sc = targets.map((i) => partsAll[i]).filter((p): p is NonNullable<typeof p> => !!p);
+  const parts = { soil: avg(sc.map((p) => p.soil)), heat: avg(sc.map((p) => p.heat)), wind: avg(sc.map((p) => p.wind)), weight: sc[0]?.weight ?? 1, rain: avg(sc.map((p) => p.rain)) };
   const dialMax = Math.min(100, before + 4), dialMin = Math.max(0, lowest - 6);
   // Where the white dot sits between the lowest thirst reachable (0) and the thirst without interventions (1).
   const span = before - lowest, pos = span > 0.5 ? (after - lowest) / span : 1;
@@ -121,6 +128,28 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
       return { climateKey, ...(phase ? { phase } : {}), zones: v.zones.map((z) => ({ ...z, temperature: Math.round(Math.max(0, Math.min(45, seasonAir + z.temperature - mean)) * 10) / 10 })) };
     });
   }, [climateKey, clock.pending]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Fresh readings of the user's own sensors (last 2 hours), per zone: a zone's own sensors, else those of the whole vineyard.
+  const mine = useMySensors("vigneto");
+  const fresh = (k: SensorKind, zi: number) => freshAverage(mine.sensors.filter((x) => x.zone === zi), k) ?? freshAverage(mine.sensors.filter((x) => x.zone === null), k);
+  const sensorLine = (() => {
+    const t = freshAverage(mine.sensors, "temperatura"), m = freshAverage(mine.sensors, "umidita_suolo"), w = freshAverage(mine.sensors, "vento"), r = freshAverage(mine.sensors, "pioggia");
+    const bits = [t && `${fmt1(t.value)}°`, m && `terreno ${Math.round(m.value)} %`, w && `vento ${Math.round(w.value)} km/h`, r && (r.value > 0.2 ? "piove" : "niente pioggia")].filter(Boolean);
+    return bits.length ? bits.join(" · ") : null;
+  })();
+  const applySensors = () => {
+    hapticTick();
+    let changed = 0;
+    setVineyard((v) => ({ zones: v.zones.map((z, i) => {
+      const t = fresh("temperatura", i), m = fresh("umidita_suolo", i), w = fresh("vento", i), r = fresh("pioggia", i);
+      if (t || m || w || r) changed++;
+      return { ...z,
+        ...(t ? { temperature: Math.max(0, Math.min(45, Math.round(t.value * 10) / 10)) } : {}),
+        ...(m ? { moisture: Math.max(0, Math.min(60, Math.round(m.value))) } : {}),
+        ...(w ? { wind: Math.max(0, Math.min(30, Math.round(w.value))) } : {}),
+        ...(r ? { rain: r.value > 0.2 } : {}) };
+    }) }));
+    toast.success(changed ? "Letture dei sensori nella simulazione" : "Nessuna lettura recente da usare");
+  };
   const scopeName = all ? "tutto il vigneto" : `zona ${vine.selected + 1}`;
   // Sliding asks for a thirst: the vineyard walks the path no mix → the three ready vineyards (smallest step that reaches it).
   const slideTo = (t: number) => {
@@ -198,6 +227,21 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
         <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 text-right transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "right" ? "bg-amber-400/25 text-amber-200" : "bg-foreground/[0.08]", near === "left" && "opacity-35")}>Senza interventi</span>
       </div>
 
+      {/* Where the number comes from: the three parts of the thirst (points), the phase's weight and the rain. */}
+      <ul className="mx-auto flex max-w-[22rem] flex-wrap justify-center gap-1.5 px-2 text-[11px] font-semibold" aria-label="Da cosa dipende la sete">
+        {[
+          { k: "Terreno asciutto", v: `+${Math.round(parts.soil)}`, on: parts.soil >= 0.5 },
+          { k: "Caldo", v: `+${Math.round(parts.heat)}`, on: parts.heat >= 0.5 },
+          { k: "Vento", v: `+${Math.round(parts.wind)}`, on: parts.wind >= 0.5 },
+          { k: `Fase · ${vine.phase}`, v: `×${parts.weight.toLocaleString("it-IT", { maximumFractionDigits: 2 })}`, on: parts.weight !== 1 },
+          ...(parts.rain > 0 ? [{ k: "Pioggia", v: `−${Math.round(parts.rain)}`, on: true }] : []),
+        ].map((p) => (
+          <li key={p.k} className={cn("whitespace-nowrap rounded-full bg-foreground/[0.07] px-2 py-0.5", !p.on && "opacity-50")}>
+            <span className="text-muted-foreground">{p.k}</span> <span className="tabular-nums">{p.v}</span>
+          </li>
+        ))}
+      </ul>
+
       {/* The three zones after the interventions, then the phase of the vine and the rain. */}
       <div className="-mt-2 space-y-3">
         <p className="text-center text-sm text-muted-foreground">Sete della vite, {scopeName}: senza interventi {Math.round(before)}/100</p>
@@ -223,6 +267,14 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
         {/* The air temperature of the scope (on Tutte the average; moving it shifts every zone by the same degrees). */}
         <Lever icon={Thermometer} label="Temperatura" value={airShown - AIR_MIN} step={1} max={AIR_MAX - AIR_MIN} color="text-radar-hot" swatch="bg-radar-hot" shown={`${airShown} °C`} onChange={setAir} />
         {onImportWeather && <ImportWeatherButton onImport={onImportWeather} />}
+        {/* The user's own sensors read in the last 2 hours: their values go into the zones (a zone's sensors first, else the vineyard's). */}
+        {sensorLine && (
+          <div className="flex items-center gap-2 rounded-2xl bg-foreground/[0.05] px-3 py-2 text-xs">
+            <span className="size-2 shrink-0 rounded-full bg-emerald-400" aria-hidden="true" />
+            <span className="min-w-0 flex-1 text-muted-foreground">I tuoi sensori adesso: <b className="font-semibold text-foreground">{sensorLine}</b></span>
+            <button type="button" onClick={applySensors} className="shrink-0 rounded-full bg-foreground px-3 py-1.5 text-[11px] font-semibold text-background">Usa nella simulazione</button>
+          </div>
+        )}
       </div>
 
       {/* Fine-tuning by hand: always open, one line each. */}

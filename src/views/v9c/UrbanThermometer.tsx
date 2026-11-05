@@ -15,6 +15,8 @@ import { useSeasonClock, WhenPicker } from "@/views/v10/when";
 import { coolingShare, estimatedTemp, SEASON_LABEL } from "@/models/season-climate";
 import { setPiazzaReading } from "@/models/sim-reading";
 import { loadAirTemperature } from "@/views/air-temp-client";
+import { useMySensors } from "@/lib/use-my-sensors";
+import { freshAverage } from "@/models/sensor-devices";
 import { clockText } from "@/models/sim-when";
 import { GAIN_BG, GAIN_TEXT } from "@/views/v7/studio-ui";
 import { ImportWeatherButton } from "@/views/SimulationGrid";
@@ -254,6 +256,9 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
   }, [before, after, season, hour, clock.minute, dialMin, dialMax]);
   // The real temperature of the place right now, written under the arc beside the reading without interventions.
   const [rLat, rLng] = [cLat, cLng];
+  const mine = useMySensors("piazza");
+  const mySensorAir = freshAverage(mine.sensors, "temperatura");
+  const mySurface = freshAverage(mine.sensors, "superficie");
   const realNow = useQuery({ queryKey: ["air-now", rLat.toFixed(3), rLng.toFixed(3)], queryFn: () => loadAirTemperature(rLat, rLng), staleTime: 10 * 60_000, refetchInterval: 15 * 60_000, retry: 1 });
   const feel = feeling(after);
   const preset = PRESETS.find((p) => p.trees === urban.trees && p.permeable === urban.permeable && p.shade === urban.shade)?.id ?? null;
@@ -349,7 +354,13 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
         <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 text-right transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "right" ? "bg-amber-400/25 text-amber-200" : "bg-foreground/[0.08]", near === "left" && "opacity-35")}>{realBefore !== null ? "Media stagionale" : "Stima stagionale"} {areaHere ? "dell'area" : "del luogo"}</span>
       </div>
       {/* Under the arc: the place's real temperature right now (the reading without interventions is in the chip below). */}
-      {typeof realNow.data === "number" && (
+      {/* The user's own sensors, when one has read the air in the last 2 hours, come first. */}
+      {mySensorAir ? (
+        <p className="-mt-1 flex items-center justify-center gap-1.5 text-center text-sm text-muted-foreground">
+          <Thermometer className="size-4 text-primary" aria-hidden="true" />{mySensorAir.count > 1 ? `Dai tuoi ${mySensorAir.count} sensori adesso` : "Dal tuo sensore adesso"} <b className="font-semibold tabular-nums text-foreground">{fmt(mySensorAir.value)}°</b>
+          {mySurface && <span className="tabular-nums">· superfici {fmt(mySurface.value)}°</span>}
+        </p>
+      ) : typeof realNow.data === "number" && (
         <p className="-mt-1 flex items-center justify-center gap-1.5 text-center text-sm text-muted-foreground">
           <Thermometer className="size-4" aria-hidden="true" />Temperatura reale adesso {areaHere ? "nell'area" : "nel luogo"} <b className="font-semibold tabular-nums text-foreground">{fmt(realNow.data)}°</b>
         </p>

@@ -11,6 +11,7 @@ import { exampleSensorSuggestion } from "@/models/sensor-example";
 import { drawnAreaFor } from "@/models/drawn-area";
 import { ringCentroid } from "@/models/place-area";
 import { metres } from "@/models/sensor-picks";
+import { setSensorPrefill } from "@/lib/use-my-sensors";
 
 const tone: Record<string, string> = { alta: "bg-danger/15 text-danger", media: "bg-warn/15 text-warn", bassa: "bg-ok/15 text-ok" };
 
@@ -105,6 +106,7 @@ export function SensorAdvisor({ kind, embedded = false }: { kind: "urban" | "vin
                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${tone[s.priorita]}`}>{s.priorita}</span>
                   </div>
                   <ul className="mt-2 list-disc space-y-0.5 pl-5 text-xs">{s.motivi.map((m, k) => <li key={k}>{m}</li>)}</ul>
+                  {!demo && <Button size="sm" variant="secondary" className="mt-2 h-8 rounded-full text-xs" onClick={() => setSensorPrefill({ flow: kind === "urban" ? "piazza" : "vigneto", name: s.nome, lat: s.lat, lng: s.lng })}>Ho messo un sensore qui</Button>}
                 </div>
               ))}
             </div>
