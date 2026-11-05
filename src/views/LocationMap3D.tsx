@@ -1,7 +1,7 @@
 import { isKeyRejected, loadGoogleMaps, onKeyRejected } from "@/lib/google-maps-js";
 import { densify, tileRing } from "@/models/drape";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { bedParts, BED_H, BEDS_3D, crownRing, trapParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts } from "@/models/area-layout";
+import { bedParts, BEDS_3D, crownRing, trapParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts } from "@/models/area-layout";
 import { MIST_RADIUS_M, SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import { Crosshair, LoaderCircle } from "lucide-react";
 import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camera";
@@ -130,17 +130,11 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
       }
       // The beds on the pebbles: soft rounded flat beds of grass with a darker green edge and round flower spots
       // (bedParts, thin slabs at 0,5–0,6 m, over the area's veil and the shadows, at most 24 beds so the view stays light).
-      // They lie on the photographed paving like the place's pin (RELATIVE_TO_MESH): on Google's ground model, which
-      // in a town can lie under the paving, they were drawn inside the photo and showed only as faint lines. Each bed is
-      // small, so a corner under a real tree's crown is rare; an older build without that mode lays them on the ground.
+      // On Google's ground model like every other shape, over the area's veil (0,35 m) and the shadows: laid on the
+      // photographed mesh instead they wrapped over the real trees' crowns as green wedges.
       for (const p of bedParts(sim.data.patches.filter((x) => x.kind === "lawn").map((x) => x.ring)).parts) {
         const grass = (BEDS_3D.grass as readonly string[]).includes(p.color);
-        const style = { fillColor: p.color, strokeColor: grass ? BEDS_3D.edge : "rgba(0,0,0,0)", strokeWidth: grass ? 2 : 0, drawsOccludedSegments: true };
-        try {
-          const poly = new Polygon3DElement({ ...style, altitudeMode: "RELATIVE_TO_MESH" }) as Shape;
-          poly.outerCoordinates = p.ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: p.height - BED_H.grassBase + 0.15 }));
-          out.push(poly);
-        } catch { part(p, p.height, style.strokeColor, style.strokeWidth); }
+        part(p, p.height, grass ? BEDS_3D.edge : "rgba(0,0,0,0)", grass ? 2 : 0);
       }
       // The shadows of the pergolas and the trees with the sun of the simulation's season and hour, over the lawn.
       for (const r of sim.shadows ?? []) {

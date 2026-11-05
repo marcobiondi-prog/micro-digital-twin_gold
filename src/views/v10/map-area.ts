@@ -132,7 +132,7 @@ export const ringCentre = (ring: Ring): [number, number] => [ring.reduce((a, p) 
 
 /** What stands up in 3D: each tree and a wooden pergola over each shade strip; in the vineyard the traps on their posts. */
 export const treeCrowns = (sim: SimLayout | null) => fc(!sim ? [] : (sim.kind === "piazza"
-  ? [...bedParts(sim.data.patches.filter((p) => p.kind === "lawn").map((p) => p.ring)).parts.map((p) => ({ ...p, base: p.base - 0.45, height: p.height - 0.45 })), ...sim.data.misters.map((m) => ({ ring: crownRing(m, 0.12, 6), base: 0, height: 3, color: "#cbd5e1" })), ...sim.data.trees.flatMap((t) => treeParts(t)), ...sim.data.patches.filter((p) => p.kind === "shade").flatMap((p) => (p.exact ? pergolaRingParts(p.ring) : pergolaParts(p.ring)))]
+  ? [...bedParts(sim.data.patches.filter((p) => p.kind === "lawn").map((p) => p.ring)).parts.map((p) => ({ ...p, base: p.base - 0.55, height: p.height - 0.55 })), ...sim.data.misters.map((m) => ({ ring: crownRing(m, 0.12, 6), base: 0, height: 3, color: "#cbd5e1" })), ...sim.data.trees.flatMap((t) => treeParts(t)), ...sim.data.patches.filter((p) => p.kind === "shade").flatMap((p) => (p.exact ? pergolaRingParts(p.ring) : pergolaParts(p.ring)))]
   : sim.data.traps.flatMap((t) => trapParts(t))
 ).map((p) => poly(p.ring, { kind: "raised", base: p.base, height: p.height, color: p.color })));
 

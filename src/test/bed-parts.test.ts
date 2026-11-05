@@ -14,7 +14,7 @@ describe("aiuole e ciottoli in 3D", () => {
     expect(parts.filter((p) => grass(p.color))).toHaveLength(beds.length);
     expect(parts.filter((p) => !grass(p.color)).length).toBeGreaterThanOrEqual(beds.length * 3);
     // Flat: thin slabs just over the ground, no curbs nor blocks.
-    expect(parts.every((p) => p.base > 0 && p.height - p.base < 0.1 && p.height <= 0.6)).toBe(true);
+    expect(parts.every((p) => p.base > 0 && p.height - p.base < 0.1 && p.height <= 0.7)).toBe(true);
   });
   it("never draws more than 24 beds, however big the lawn, and is the same every time", () => {
     expect(bedParts([box(200, 150)]).beds.length).toBeLessThanOrEqual(24);
