@@ -540,8 +540,8 @@ export function mowStripes(ring: Ring, spacing = 3, max = 24): Ring[] {
 
 /** Colours of the aiuole e ciottoli in 3D: pebble ground, two grass greens and the flower spots. */
 export const BEDS_3D = { pebbles: "#cdc3ae", grass: ["#5fae45", "#6dbb4f"], edge: "#3f7f2c", flowers: ["#f472b6", "#facc15", "#f8fafc", "#c084fc", "#fb923c"] } as const;
-/** Heights of the beds: thin flat slabs just over the ground (Google 3D shows the piazza's own paving under them). */
-export const BED_H = { grassBase: 0.14, grass: 0.2, flowerBase: 0.2, flower: 0.26 } as const;
+/** Heights of the beds: thin flat slabs over the area's veil (0,35 m), the shadows (0,25 m) and the zones in Google 3D, so nothing covers them. */
+export const BED_H = { grassBase: 0.5, grass: 0.55, flowerBase: 0.55, flower: 0.6 } as const;
 
 /**
  * Aiuole e ciottoli in 3D, natural: the lawn patches are the pebble ground and on it lie flat beds of soft rounded

@@ -129,7 +129,7 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
         if (pt.kind === "lawn") continue;
       }
       // The beds on the pebbles: soft rounded flat beds of grass with a darker green edge and round flower spots
-      // (bedParts, thin slabs just over the pebble ground, at most 22 beds so the view stays light).
+      // (bedParts, thin slabs at 0,5–0,6 m, over the area's veil and the shadows, at most 24 beds so the view stays light).
       for (const p of bedParts(sim.data.patches.filter((x) => x.kind === "lawn").map((x) => x.ring)).parts) {
         const grass = (BEDS_3D.grass as readonly string[]).includes(p.color);
         part(p, p.height, grass ? BEDS_3D.edge : "rgba(0,0,0,0)", grass ? 2 : 0);
