@@ -127,10 +127,11 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
         // Aiuole e ciottoli: the pebble ground (the patch, sand-grey with a stone edge); the raised beds go on it below.
         if (pt.kind === "lawn") { ground(pt.ring, "rgba(205,195,174,0.92)", "#9c907a", 2); continue; }
       }
-      // The beds on the pebbles: a stone curb with the grass on top, a round shrub and two flower clumps each (bedParts,
-      // at most 18 beds so the view stays light).
+      // The beds on the pebbles: soft rounded flat beds of grass with a darker green edge and round flower spots
+      // (bedParts, thin slabs just over the pebble ground, at most 22 beds so the view stays light).
       for (const p of bedParts(sim.data.patches.filter((x) => x.kind === "lawn").map((x) => x.ring)).parts) {
-        part(p, p.height, p.color === BEDS_3D.curb ? "#b8b09e" : p.color === BEDS_3D.shrub || p.color === BEDS_3D.shrubTop ? "#1f4d1c" : "rgba(0,0,0,0)", p.color === BEDS_3D.curb || p.color === BEDS_3D.shrub ? 1 : 0);
+        const grass = (BEDS_3D.grass as readonly string[]).includes(p.color);
+        part(p, p.height, grass ? BEDS_3D.edge : "rgba(0,0,0,0)", grass ? 2 : 0);
       }
       // The shadows of the pergolas and the trees with the sun of the simulation's season and hour, over the lawn.
       for (const r of sim.shadows ?? []) {

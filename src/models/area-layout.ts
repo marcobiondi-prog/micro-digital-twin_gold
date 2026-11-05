@@ -538,17 +538,20 @@ export function mowStripes(ring: Ring, spacing = 3, max = 24): Ring[] {
   return out;
 }
 
-/** Colours of the aiuole e ciottoli in 3D: pebble ground, stone curbs, grass, shrubs and flowers. */
-export const BEDS_3D = { pebbles: "#cdc3ae", curb: "#e7e1d3", grass: "#5fae45", grassTop: "#74c257", shrub: "#2f6f2a", shrubTop: "#3f8a36", flowers: ["#f472b6", "#facc15", "#f8fafc", "#c084fc", "#fb923c"] } as const;
+/** Colours of the aiuole e ciottoli in 3D: pebble ground, two grass greens and the flower spots. */
+export const BEDS_3D = { pebbles: "#cdc3ae", grass: ["#5fae45", "#6dbb4f"], edge: "#3f7f2c", flowers: ["#f472b6", "#facc15", "#f8fafc", "#c084fc", "#fb923c"] } as const;
+/** Heights of the beds (thin flat slabs just over the pebble ground, which Google 3D lays 40 cm up). */
+export const BED_H = { grassBase: 0.42, grass: 0.48, flowerBase: 0.48, flower: 0.54 } as const;
 
 /**
- * Aiuole e ciottoli in 3D over the lawn patches (one piece of the piazza's permeable ground, drawn as strips or exact
- * zones): a pebble ground under everything (the patches themselves), and on it raised beds — rectangles about 4 × 2,4 m,
- * 1,2 m of pebble path between them, each wholly inside the patches — as a stone curb 25 cm high with the grass on top,
- * a rounded shrub at one end and two flower clumps along it. The bed grows when the patches are large, so there are never
- * more than `maxBeds` beds (the 3D view stays light). Each part is a TreePart (base 0 = extruded from the ground).
+ * Aiuole e ciottoli in 3D, natural: the lawn patches are the pebble ground and on it lie flat beds of soft rounded
+ * shapes (an ellipse with a wavy edge, each its own size and turn), staggered like stepping stones so the pebble paths
+ * wind between them, with a few round flower spots scattered inside each — no curbs, no blocks. Beds are kept only when
+ * wholly inside the patches (so they can span neighbouring strips) and grow when there would be more than `maxBeds`, so
+ * the view stays light; a patch too small for one gets one smaller bed at its middle. Fixed pseudo-random, the same on
+ * every device. Every part is a thin slab (base > 0).
  */
-export function bedParts(patches: Ring[], maxBeds = 18): { beds: Ring[]; parts: TreePart[] } {
+export function bedParts(patches: Ring[], maxBeds = 22): { beds: Ring[]; parts: TreePart[] } {
   const rings = patches.filter((r) => r.length >= 3);
   if (!rings.length) return { beds: [], parts: [] };
   const f = frameOf(rings.flat());
@@ -556,41 +559,59 @@ export function bedParts(patches: Ring[], maxBeds = 18): { beds: Ring[]; parts: 
   const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
   const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
   const inAny = (x: number, y: number) => rings.some((r) => inside(r, f, x, y));
-  const fits = (cx: number, cy: number, w: number, h: number) =>
-    [[-w / 2, -h / 2], [w / 2, -h / 2], [w / 2, h / 2], [-w / 2, h / 2], [0, 0], [0, -h / 2], [0, h / 2]].every(([dx, dy]) => inAny(cx + dx!, cy + dy!));
-  const place = (w: number, h: number, gap: number) => {
-    const out: Array<[number, number]> = [];
-    const pitchX = w + gap, pitchY = h + gap;
-    const nx = Math.max(1, Math.floor((x1 - x0 + gap) / pitchX)), ny = Math.max(1, Math.floor((y1 - y0 + gap) / pitchY));
-    // Centred on the patches' box, so the paths on the edges are even.
-    const ox = x0 + (x1 - x0 - (nx * pitchX - gap)) / 2 + w / 2, oy = y0 + (y1 - y0 - (ny * pitchY - gap)) / 2 + h / 2;
-    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const cx = ox + i * pitchX, cy = oy + j * pitchY; if (fits(cx, cy, w, h)) out.push([cx, cy]); }
+  let seed = 11;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  // A soft rounded outline: an ellipse turned by `rot`, its radius waving with two gentle harmonics.
+  const blob = (cx: number, cy: number, rx: number, ry: number, rot: number, ph: number, n = 18): Array<[number, number]> =>
+    Array.from({ length: n }, (_, i) => {
+      const t = (i / n) * Math.PI * 2, wave = 1 + 0.08 * Math.sin(2 * t + ph) + 0.05 * Math.sin(3 * t + ph * 1.7);
+      const ex = Math.cos(t) * rx * wave, ey = Math.sin(t) * ry * wave;
+      return [cx + ex * Math.cos(rot) - ey * Math.sin(rot), cy + ex * Math.sin(rot) + ey * Math.cos(rot)] as [number, number];
+    });
+  type Bed = { ring: Array<[number, number]>; cx: number; cy: number; rx: number; ry: number };
+  const layout = (scale: number) => {
+    seed = 11;
+    const out: Array<{ ring: Array<[number, number]>; cx: number; cy: number; rx: number; ry: number }> = [];
+    const pitchX = 6.2 * scale, pitchY = 4.6 * scale;
+    for (let j = 0, y = y0 + pitchY / 2; y < y1; j++, y += pitchY) {
+      for (let x = x0 + pitchX / 2 + (j % 2 ? pitchX / 2 : 0); x < x1; x += pitchX) {
+        const cx = x + (rnd() - 0.5) * 0.8 * scale, cy = y + (rnd() - 0.5) * 0.5 * scale;
+        const rx = (2.5 + rnd() * 0.6) * scale, ry = (1.65 + rnd() * 0.35) * scale, rot = (rnd() - 0.5) * 0.9, ph = rnd() * 6.28;
+        const ring = blob(cx, cy, rx, ry, rot, ph);
+        if (ring.every(([px, py]) => inAny(px, py))) out.push({ ring, cx, cy, rx, ry });
+      }
+    }
     return out;
   };
-  let w = 4, h = 2.4, gap = 1.2, spots = place(w, h, gap);
-  for (let k = 0; spots.length > maxBeds && k < 8; k++) { w *= 1.25; h *= 1.2; gap *= 1.1; spots = place(w, h, gap); }
-  // A patch too small for a whole bed still gets one, smaller, at its middle when it fits.
-  if (!spots.length) { w = 2.4; h = 1.6; gap = 0.8; spots = place(w, h, gap).slice(0, 1); }
-  const rect = (cx: number, cy: number, rw: number, rh: number): Ring =>
-    [[cx - rw / 2, cy - rh / 2], [cx + rw / 2, cy - rh / 2], [cx + rw / 2, cy + rh / 2], [cx - rw / 2, cy + rh / 2]].map(([x, y]) => toLL(f, x!, y!));
-  const beds: Ring[] = [], parts: TreePart[] = [];
-  spots.slice(0, maxBeds).forEach(([cx, cy], n) => {
-    const bed = rect(cx, cy, w, h);
-    beds.push(bed);
-    // The stone curb (the bed's outline, a little wider), then the grass inside it a hair higher.
-    parts.push({ ring: rect(cx, cy, w + 0.3, h + 0.3), base: 0, height: 0.25, color: BEDS_3D.curb });
-    parts.push({ ring: bed, base: 0, height: 0.3, color: n % 2 ? BEDS_3D.grass : BEDS_3D.grassTop });
-    // A round shrub at one end (a wide lower tier and a narrower top, so it reads rounded), two flower clumps spread
-    // along the rest of the bed on either side of its middle line, their colours changing from bed to bed.
-    const r = Math.min(0.75, h / 3), sx = cx - w / 2 + r + 0.25;
-    parts.push({ ring: crownRing(toLL(f, sx, cy), r, 12), base: 0, height: 0.75, color: BEDS_3D.shrub });
-    parts.push({ ring: crownRing(toLL(f, sx, cy), r * 0.65, 10), base: 0.75, height: 1.05, color: BEDS_3D.shrubTop });
-    const from = sx + r + 0.4, to = cx + w / 2 - 0.75;
-    for (const [k, t] of [[0, 0.2], [1, 0.85]] as const) {
-      parts.push({ ring: crownRing(toLL(f, from + (to - from) * t, cy + (k ? -h / 5 : h / 5)), 0.62, 8), base: 0, height: 0.55, color: BEDS_3D.flowers[(n * 2 + k) % BEDS_3D.flowers.length]! });
+  // Narrow strips take smaller beds: of three sizes the one that lays the most grass wins; then they grow while too many.
+  const green = (bs: Bed[]) => bs.reduce((t, b) => t + b.rx * b.ry, 0);
+  let scale = 1, beds = layout(1);
+  for (const sc of [0.75, 0.55]) { const alt = layout(sc); if (green(alt) > green(beds) * 1.15) { beds = alt; scale = sc; } }
+  for (let k = 0; beds.length > maxBeds && k < 10; k++) { scale *= 1.22; beds = layout(scale); }
+  if (!beds.length) {
+    // One smaller bed at the middle of the largest patch, if it fits.
+    const big = rings.reduce((m, r) => (ringAreaM2(r) > ringAreaM2(m) ? r : m), rings[0]!);
+    const c = big.map((p) => toXY(f, p)).reduce((acc, p) => [acc[0] + p[0] / big.length, acc[1] + p[1] / big.length], [0, 0]);
+    for (const sc of [0.6, 0.4, 0.25]) {
+      const ring = blob(c[0]!, c[1]!, 2 * sc, 1.3 * sc, 0, 0);
+      if (ring.every(([px, py]) => inAny(px, py))) { beds = [{ ring, cx: c[0]!, cy: c[1]!, rx: 2 * sc, ry: 1.3 * sc }]; break; }
+    }
+  }
+  const toRing = (r: Array<[number, number]>): Ring => r.map(([x, y]) => toLL(f, x, y));
+  const out: Ring[] = [], parts: TreePart[] = [];
+  beds.slice(0, maxBeds).forEach((b, n) => {
+    const ring = toRing(b.ring);
+    out.push(ring);
+    parts.push({ ring, base: BED_H.grassBase, height: BED_H.grass, color: BEDS_3D.grass[n % 2]! });
+    // A few round flower spots inside the bed, their colours changing from bed to bed.
+    const spots = Math.max(2, Math.min(5, Math.round(b.rx * b.ry * 0.9)));
+    for (let k = 0; k < spots; k++) {
+      const t = rnd() * Math.PI * 2, d = 0.25 + rnd() * 0.45;
+      const fx = b.cx + Math.cos(t) * b.rx * d, fy = b.cy + Math.sin(t) * b.ry * d;
+      parts.push({ ring: toRing(blob(fx, fy, 0.38 + rnd() * 0.2, 0.32 + rnd() * 0.15, rnd() * 3, rnd() * 6, 10)), base: BED_H.flowerBase, height: BED_H.flower, color: BEDS_3D.flowers[(n + k) % BEDS_3D.flowers.length]! });
     }
   });
-  return { beds, parts };
+  return { beds: out, parts };
 }
 
 /** Vineyard 3D colours: the traps against animal pests (a yellow sticky box on a post). */
