@@ -26,6 +26,9 @@ const set = (id: ProId | null) => {
   subs.forEach((f) => f());
 };
 
+/** The profile now, read outside React (the root's landing after the tutorial). */
+export const getProId = (): ProId | null => snapshot() ?? null;
+
 export function useProId(): ProId | null | undefined {
   return useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, snapshot, () => undefined);
 }

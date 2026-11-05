@@ -19,7 +19,7 @@ import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
 import { installUiClicks } from "@/lib/ui-sounds";
 import { isChunkError, reloadFresh } from "@/router";
 import { History, Building2, Grape, Info, LayoutDashboard, Lock } from "lucide-react";
-import { useProId, useSyncProId } from "@/lib/use-pro-id";
+import { getProId, useProId, useSyncProId } from "@/lib/use-pro-id";
 import { useSyncMediaArchive } from "@/models/media-archive";
 import { useSyncHistoryArchive } from "@/models/history-archive";
 import { useSyncSimHidden } from "@/models/sim-hidden";
@@ -29,7 +29,7 @@ import { installAppPermissionGuards, usePermissions } from "@/lib/app-permission
 import { hidePreloader, preloaderScript } from "@/lib/preloader";
 import { unlocks, type ProId } from "@/models/professional-id";
 import { AgronomoIcon, FunzionarioIcon } from "@/views/ProfileIcon";
-import { AmbientLayer } from "@/views/v8/console";
+import { AmbientLayer, openSimTab } from "@/views/v8/console";
 
 function NotFoundComponent() {
   return (
@@ -501,7 +501,11 @@ function RootComponent() {
     // scenario link or the "i" still open the tutorial).
     const params = new URLSearchParams(location.searchStr);
     if (location.pathname === "/" && (params.has("scenario") || params.has("rivedi"))) return;
-    const home = introSeen() ? "/urbano" : "/";
+    // After the tutorial a fresh open lands on the Mappa tab of the profile's simulation (the agronomist's vineyard,
+    // otherwise the piazza).
+    const seen = introSeen(), vine = getProId()?.kind === "agronomo";
+    const home = seen ? (vine ? "/vigneto" : "/urbano") : "/";
+    if (seen) openSimTab(vine ? "vineyard" : "urban", "mappa");
     if (location.pathname === home || (home === "/" && location.pathname === "/index")) return;
     const id = setTimeout(() => void navigate({ to: home, replace: true }), 250);
     // Unmounted before the move (StrictMode's double mount): let the next mount try again.
