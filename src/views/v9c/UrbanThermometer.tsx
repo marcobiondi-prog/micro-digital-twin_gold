@@ -66,7 +66,7 @@ export type Stop = { id: PrototypeId; label: string; t: number; on: boolean; nea
  * the dot goes there). Only a finger on the white dot grabs it: it follows the finger exactly, clicks into a stop
  * when close to it, and the piazza follows; arrow keys move it by 0,1 °C, Page Up/Down jump between stops.
  */
-export function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlide, onStop, unit = "°", spoken = "gradi", label = "Calore percepito da raggiungere", step: keyStep = 0.1 }: { before: number; after: number; lowest: number; min: number; max: number; stops: Stop[]; onSlide: (t: number) => void; onStop: (id: PrototypeId) => void; unit?: string; spoken?: string; label?: string; step?: number }) {
+export function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlide, onStop, unit = "°", spoken = "gradi", label = "Calore percepito da raggiungere", step: keyStep = 0.1, rightEnd }: { rightEnd?: string | undefined; before: number; after: number; lowest: number; min: number; max: number; stops: Stop[]; onSlide: (t: number) => void; onStop: (id: PrototypeId) => void; unit?: string; spoken?: string; label?: string; step?: number }) {
   const R = 88, C = Math.PI * R;
   const box = useRef<HTMLDivElement>(null);
   // While sliding, the temperature under the finger (the piazza snaps to whole trees, the dot must not).
@@ -162,7 +162,7 @@ export function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlid
         <circle cx={b.x} cy={b.y} r="5.5" fill="none" stroke="currentColor" strokeOpacity="0.5" strokeWidth="2" />
         <circle cx={a.x} cy={a.y} r={finger === null ? 11 : 13} fill="#fff" stroke="#0d1016" strokeWidth="2.5" className="[filter:drop-shadow(0_2px_4px_rgb(0_0_0/0.4))]" />
         <text x="12" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{Math.round(MIN)}{unit}</text>
-        <text x="188" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{Math.round(MAX)}{unit}</text>
+        <text x="188" y="111" fontSize="8" textAnchor="middle" fill="currentColor" opacity="0.55">{rightEnd ?? `${Math.round(MAX)}${unit}`}</text>
       </svg>
       {/* The white dot's touch area: the only place a finger grabs the arc (elsewhere the page scrolls as usual). */}
       {!disabled && <span className="absolute -translate-x-1/2 -translate-y-1/2 touch-pan-y rounded-full" style={{ ...pct(a), width: GRAB_RADIUS * 2, height: GRAB_RADIUS * 2 }} aria-hidden="true" />}
@@ -321,7 +321,7 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
 
       {/* 2 · The gauge: drag the white dot to choose how much to cool. */}
       <div ref={gaugeRef} className="relative mx-auto mt-10 flex max-w-[21rem] flex-col items-center px-7">
-        <Gauge before={before} after={after} lowest={lowest} min={dialMin} max={dialMax} stops={share > 0.15 ? stops : []} onSlide={slideTo} onStop={applyLevel} />
+        <Gauge before={before} after={after} lowest={lowest} min={dialMin} max={dialMax} stops={share > 0.15 ? stops : []} onSlide={slideTo} onStop={applyLevel} rightEnd={`${fmt(before)}°`} />
         {/* Inside the arc: how it feels, the reading and the degrees gained, all following the dot. */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center" aria-live="polite">
           <span className={cn("rounded-full px-3 py-0.5 text-[13px] font-semibold text-white transition-colors duration-300", feel.bg ?? GAIN_BG[feel.step])}>{feel.text}</span>
@@ -330,10 +330,11 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
         </div>
       </div>
 
-      {/* Labels under the two numbers at the arc's ends: the coolest it can get, and today without interventions. */}
+      {/* Labels under the two numbers at the arc's ends: the coolest it can get, and on the right the exact seasonal
+          average of the place at this hour without interventions (the arc itself keeps its small margins, unnumbered). */}
       <div className="mx-auto -mt-3 flex w-full max-w-[21rem] justify-between px-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground" aria-hidden="true">
         <span className="rounded-full bg-sky-400/15 px-2 py-0.5 text-sky-300">Il più fresco</span>
-        <span className="rounded-full bg-foreground/[0.08] px-2 py-0.5">Senza interventi</span>
+        <span className="rounded-full bg-foreground/[0.08] px-2 py-0.5 text-right">{realBefore !== null ? "Media stagionale" : "Stima stagionale"} · senza interventi</span>
       </div>
       {/* Under the arc: the place's real temperature right now (the reading without interventions is in the chip below). */}
       {typeof realNow.data === "number" && (
