@@ -12,12 +12,12 @@ describe("aiuole e ciottoli in 3D", () => {
     expect(beds.length).toBeGreaterThan(4);
     for (const b of beds) for (const [a, c] of b) expect(ringContains(box(24, 16), a, c)).toBe(true);
     expect(parts.filter((p) => grass(p.color))).toHaveLength(beds.length);
-    expect(parts.filter((p) => !grass(p.color)).length).toBeGreaterThanOrEqual(beds.length * 2);
+    expect(parts.filter((p) => !grass(p.color)).length).toBeGreaterThanOrEqual(beds.length * 3);
     // Flat: thin slabs just over the ground, no curbs nor blocks.
     expect(parts.every((p) => p.base > 0 && p.height - p.base < 0.1 && p.height < 0.6)).toBe(true);
   });
-  it("never draws more than 22 beds, however big the lawn, and is the same every time", () => {
-    expect(bedParts([box(200, 150)]).beds.length).toBeLessThanOrEqual(22);
+  it("never draws more than 24 beds, however big the lawn, and is the same every time", () => {
+    expect(bedParts([box(200, 150)]).beds.length).toBeLessThanOrEqual(24);
     expect(bedParts([box(30, 20)])).toEqual(bedParts([box(30, 20)]));
   });
   it("spans neighbouring strips and gives a small patch one smaller bed", () => {

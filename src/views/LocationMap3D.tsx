@@ -124,8 +124,9 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
     };
     if (sim?.kind === "piazza") {
       for (const pt of sim.data.patches) {
-        // Aiuole e ciottoli: the pebble ground (the patch, sand-grey with a stone edge); the raised beds go on it below.
-        if (pt.kind === "lawn") { ground(pt.ring, "rgba(205,195,174,0.92)", "#9c907a", 2); continue; }
+        // Aiuole e ciottoli: no ground plane here — the piazza's own paving shows between the beds (a grey sheet over
+        // the photographed ground looked like a slab laid on the square); the beds go on it below.
+        if (pt.kind === "lawn") continue;
       }
       // The beds on the pebbles: soft rounded flat beds of grass with a darker green edge and round flower spots
       // (bedParts, thin slabs just over the pebble ground, at most 22 beds so the view stays light).

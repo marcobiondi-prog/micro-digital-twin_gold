@@ -1,7 +1,7 @@
 import type { Map as MlMap, GeoJSONSource } from "maplibre-gl";
 import type { Ring } from "@/models/place-area";
 import { ZONE_LABEL, type SubArea, type ZoneKind } from "@/models/drawn-area";
-import { bedParts, BEDS_3D, crownRing, trapParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, TREE_RADIUS_M, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
+import { bedParts, crownRing, trapParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, TREE_RADIUS_M, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
 
 /** The drawn area on a maplibre map: a turquoise fill and a white outline, from a ring of [lat, lng] pins. */
 export const AREA_SOURCE = "drawn-area";
@@ -132,7 +132,7 @@ export const ringCentre = (ring: Ring): [number, number] => [ring.reduce((a, p) 
 
 /** What stands up in 3D: each tree and a wooden pergola over each shade strip; in the vineyard the traps on their posts. */
 export const treeCrowns = (sim: SimLayout | null) => fc(!sim ? [] : (sim.kind === "piazza"
-  ? [...bedParts(sim.data.patches.filter((p) => p.kind === "lawn").map((p) => p.ring)).parts.map((p) => ({ ...p, base: p.base - 0.4, height: p.height - 0.4 })), ...sim.data.misters.map((m) => ({ ring: crownRing(m, 0.12, 6), base: 0, height: 3, color: "#cbd5e1" })), ...sim.data.trees.flatMap((t) => treeParts(t)), ...sim.data.patches.filter((p) => p.kind === "shade").flatMap((p) => (p.exact ? pergolaRingParts(p.ring) : pergolaParts(p.ring)))]
+  ? [...bedParts(sim.data.patches.filter((p) => p.kind === "lawn").map((p) => p.ring)).parts.map((p) => ({ ...p, base: p.base - 0.12, height: p.height - 0.12 })), ...sim.data.misters.map((m) => ({ ring: crownRing(m, 0.12, 6), base: 0, height: 3, color: "#cbd5e1" })), ...sim.data.trees.flatMap((t) => treeParts(t)), ...sim.data.patches.filter((p) => p.kind === "shade").flatMap((p) => (p.exact ? pergolaRingParts(p.ring) : pergolaParts(p.ring)))]
   : sim.data.traps.flatMap((t) => trapParts(t))
 ).map((p) => poly(p.ring, { kind: "raised", base: p.base, height: p.height, color: p.color })));
 
@@ -240,8 +240,8 @@ export function addSimLayers(map: MlMap, lat: number, raised = false) {
   map.addLayer({ id: "sim-net", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "treat"], paint: { "fill-pattern": SPRAY_IMAGE, "fill-opacity": 0.9, "fill-antialias": false } }, before);
   // The lawn: mowing stripes and blades of grass, without the hairlines between its row strips.
   if (!map.hasImage(LAWN_IMAGE)) map.addImage(LAWN_IMAGE, lawnImage());
-  // In 3D the lawn is the pebble ground and the beds stand on it (bedParts, raised); in 2D the beds-and-pebbles pattern.
-  map.addLayer({ id: "sim-lawn", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "lawn"], paint: raised ? { "fill-color": BEDS_3D.pebbles, "fill-opacity": 0.95, "fill-antialias": false } : { "fill-pattern": LAWN_IMAGE, "fill-opacity": 0.95, "fill-antialias": false } }, before);
+  // In 3D no ground plane for the lawn: the beds lie on the map's own ground (bedParts, raised); in 2D the beds-and-pebbles pattern.
+  if (!raised) map.addLayer({ id: "sim-lawn", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "lawn"], paint: { "fill-pattern": LAWN_IMAGE, "fill-opacity": 0.95, "fill-antialias": false } }, before);
   // The shadows cast on the ground (over the lawn, under the pergolas and the trees), without seams where they overlap.
   map.addLayer({ id: "sim-shadow", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "shadow"], paint: { "fill-color": "#0b0f15", "fill-opacity": 0.32, "fill-antialias": false } }, before);
   // The pergolas seen from above: slats with light between them, and a wooden frame.
