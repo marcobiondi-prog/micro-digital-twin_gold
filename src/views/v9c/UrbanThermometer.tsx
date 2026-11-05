@@ -239,6 +239,9 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
   // The arc spans only what can be reached now (a little past both ends), so the three stops stay apart.
   const lowest = before - MAX_GAIN * share;
   const dialMax = before + 0.6, dialMin = lowest - 1.4;
+  // Where the white dot sits between the coolest reachable (0) and the seasonal average (1): the label it is near lights up.
+  const span = before - lowest, pos = span > 0.05 ? (after - lowest) / span : 1;
+  const near: "left" | "right" | null = pos >= 0.66 ? "right" : pos <= 0.34 ? "left" : null;
   // The map and the dashboard show this very reading, on the same arc.
   useEffect(() => {
     setPiazzaReading({ before: +before.toFixed(1), after: +after.toFixed(1), when: `${SEASON_LABEL[season] ?? season}, ore ${clockText(hour, clock.minute ?? 0)}`, season, hour, min: dialMin, max: dialMax });
@@ -333,8 +336,10 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
       {/* Labels under the two numbers at the arc's ends: the coolest it can get, and on the right the exact seasonal
           average of the place at this hour without interventions (the arc itself keeps its small margins, unnumbered). */}
       <div className="mx-auto -mt-3 flex w-full max-w-[21rem] justify-between px-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground" aria-hidden="true">
-        <span className="rounded-full bg-sky-400/15 px-2 py-0.5 text-sky-300">Il più fresco</span>
-        <span className="rounded-full bg-foreground/[0.08] px-2 py-0.5 text-right">{realBefore !== null ? "Media stagionale" : "Stima stagionale"} · senza interventi</span>
+        {/* The label the white dot is near lights up, the other dims: near the seasonal average the right one turns warm,
+            near the coolest the left one turns bright blue. */}
+        <span className={cn("rounded-full px-2 py-0.5 transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "left" ? "bg-sky-400/30 text-sky-200" : "bg-sky-400/15 text-sky-300", near === "right" && "opacity-35")}>Il più fresco</span>
+        <span className={cn("rounded-full px-2 py-0.5 text-right transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "right" ? "bg-amber-400/25 text-amber-200" : "bg-foreground/[0.08]", near === "left" && "opacity-35")}>{realBefore !== null ? "Media stagionale" : "Stima stagionale"} · senza interventi</span>
       </div>
       {/* Under the arc: the place's real temperature right now (the reading without interventions is in the chip below). */}
       {typeof realNow.data === "number" && (
