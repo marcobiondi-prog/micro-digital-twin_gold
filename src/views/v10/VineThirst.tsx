@@ -1,4 +1,5 @@
-import { drawnM2 } from "@/models/drawn-area";
+import { drawnAreaFor, drawnM2 } from "@/models/drawn-area";
+import { ringCentroid } from "@/models/place-area";
 import { loadPlaceArea } from "@/lib/place-area-client";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -71,6 +72,10 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
   const after = avg(targets.map((i) => zonesAfter[i]?.s ?? 0));
   const lowest = Math.min(after, thirstOf(vineMixAt(3)));
   const dialMax = Math.min(100, before + 4), dialMin = Math.max(0, lowest - 6);
+  // Where the white dot sits between the lowest thirst reachable (0) and the thirst without interventions (1).
+  const span = before - lowest, pos = span > 0.5 ? (after - lowest) / span : 1;
+  const near: "left" | "right" | null = pos >= 0.66 ? "right" : pos <= 0.34 ? "left" : null;
+  const areaHere = drawnAreaFor(vine.area, vine.location);
   const gain = stressGain(after);
   const preset = VINE_LEVELS.find((p) => p.irrigation === mix.irrigation && p.shade === mix.shade && p.windbreak === mix.windbreak)?.id ?? null;
   const nearest: PrototypeId = VINE_LEVELS.reduce((b, p) => (Math.abs(thirstOf(p) - after) < Math.abs(thirstOf(b) - after) ? p : b), VINE_LEVELS[0]!).id;
@@ -103,7 +108,9 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
   // Season and hour (device clock until chosen by hand): they set the air temperature of the zones from the place's real
   // year (else a plain estimate), keeping each zone's difference from the others, and the vine's phase for the season.
   // Applied once per season, hour and place, so a reload keeps the temperature tuned by hand.
-  const clock = useSeasonClock(vine.location.lat, vine.location.lng, "vineyard");
+  // With an area drawn, the season's air is read at its middle (as in the piazza), else at the place.
+  const [vLat, vLng] = areaHere ? ringCentroid(areaHere.ring).map((v) => Math.round(v * 1e4) / 1e4) as [number, number] : [vine.location.lat, vine.location.lng];
+  const clock = useSeasonClock(vLat, vLng, "vineyard");
   const seasonAir = clock.real ?? estimatedTemp(clock.season, clock.hour, 36);
   const climateKey = `${clock.season}-${clock.hour}-${vine.location.lat.toFixed(3)},${vine.location.lng.toFixed(3)}-${clock.real === null ? "stima" : "reale"}`;
   useEffect(() => {
@@ -175,12 +182,19 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
       {/* The arc of the vines' thirst: drag the white dot or touch a level. */}
       <div ref={gaugeRef} className="relative mx-auto mt-10 flex max-w-[21rem] flex-col items-center px-7">
         <Gauge before={before} after={after} lowest={lowest} min={dialMin} max={dialMax} stops={reach > 1 ? stops : []} onSlide={slideTo} onStop={applyLevel}
-          unit="" spoken="su 100" label={`Sete della vite da raggiungere, ${scopeName}`} step={1} />
+          unit="" spoken="su 100" label={`Sete della vite da raggiungere, ${scopeName}`} step={1} rightEnd={`${Math.round(before)}`} />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center" aria-live="polite">
           <span className={cn("rounded-full px-3 py-0.5 text-[13px] font-semibold text-white transition-colors duration-300", GAIN_BG[gain])}>{verdict(after)}</span>
           <span className="mt-1 font-display text-6xl font-light leading-none tracking-tight tabular-nums">{Math.round(after)}<span className="text-2xl text-muted-foreground">/100</span></span>
           <span className="mt-1.5 font-mono text-sm font-semibold tabular-nums">{any ? euroRange(cost.total) : "Nessun intervento"}</span>
         </div>
+      </div>
+
+      {/* Labels under the arc's two end numbers, as in the piazza: the lowest thirst reachable on the left, the thirst
+          without interventions (exact, on the right end); the one the white dot is near lights up, the other dims. */}
+      <div className="mx-auto -mt-3 flex w-full max-w-[21rem] justify-between px-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground" aria-hidden="true">
+        <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "left" ? "bg-sky-400/30 text-sky-200" : "bg-sky-400/15 text-sky-300", near === "right" && "opacity-35")}>Sete più bassa</span>
+        <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 text-right transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "right" ? "bg-amber-400/25 text-amber-200" : "bg-foreground/[0.08]", near === "left" && "opacity-35")}>Senza interventi</span>
       </div>
 
       {/* The three zones after the interventions, then the phase of the vine and the rain. */}

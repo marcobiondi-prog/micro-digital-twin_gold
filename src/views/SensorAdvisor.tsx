@@ -8,6 +8,9 @@ import { openAccount } from "@/lib/camera-dock";
 import { suggestHeatSensors, type NetworkSummary, type SensorPick } from "@/controllers/sensor-ai.functions";
 import { useLab } from "@/models/lab-store";
 import { exampleSensorSuggestion } from "@/models/sensor-example";
+import { drawnAreaFor } from "@/models/drawn-area";
+import { ringCentroid } from "@/models/place-area";
+import { metres } from "@/models/sensor-picks";
 
 const tone: Record<string, string> = { alta: "bg-danger/15 text-danger", media: "bg-warn/15 text-warn", bassa: "bg-ok/15 text-ok" };
 
@@ -21,22 +24,30 @@ export function SensorAdvisor({ kind, embedded = false }: { kind: "urban" | "vin
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [example, setExample] = useState(false);
-  const [result, setResult] = useState<{ sintesi: string; sensori: SensorPick[]; network: NetworkSummary } | null>(null);
+  const [result, setResult] = useState<{ sintesi: string; sensori: SensorPick[]; network: NetworkSummary; fonte?: "ai" | "app" | "misto" } | null>(null);
 
   useEffect(() => { setResult(null); setError(null); }, [kind, location.lat, location.lng]);
 
+  // With an area drawn for the place, the sensors are looked for around its middle; else around the place.
+  const area = drawnAreaFor(kind === "urban" ? lab.urban.area : lab.vineyard.area, location);
+  const [cLat, cLng] = area ? ringCentroid(area.ring) : [location.lat, location.lng];
   const run = async () => {
     if (loading) return;
     // The suggestion runs on an auth-protected server function: a simulated sign-in shows a labelled example instead.
     if (demo) { setError(null); setExample(true); setResult(exampleSensorSuggestion(kind, location.lat, location.lng)); return; }
     setExample(false);
     setLoading(true); setError(null); setResult(null);
-    try {
-      const r = await suggest({ data: { kind, label: location.label, lat: location.lat, lng: location.lng } });
-      if ("error" in r && r.error) setError(r.error);
-      else if ("sensori" in r && r.network) setResult({ sintesi: r.sintesi ?? "", sensori: r.sensori ?? [], network: r.network });
-    } catch { setError("Impossibile contattare il servizio AI. Verifica di aver effettuato l’accesso."); }
-    finally { setLoading(false); }
+    // A dropped connection gets one more try by itself before saying so.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const r = await suggest({ data: { kind, label: location.label, lat: +cLat.toFixed(5), lng: +cLng.toFixed(5) } });
+        setResult({ sintesi: r.sintesi ?? "", sensori: r.sensori ?? [], network: r.network, fonte: r.fonte });
+        setLoading(false);
+        return;
+      } catch { await new Promise((ok) => setTimeout(ok, 1200)); }
+    }
+    setError(navigator.onLine ? "Il servizio non risponde: riprova tra poco. Se continua, esci e rientra nell'account." : "Senza rete: riprova quando sei connesso.");
+    setLoading(false);
   };
 
   // Guests see what the tool does and a sign-in button instead of the panel (like the AI camera).
@@ -68,7 +79,7 @@ export function SensorAdvisor({ kind, embedded = false }: { kind: "urban" | "vin
       <div id={`sensor-panel-${kind}`} className="lab-media-body" data-open={open} aria-hidden={!open} inert={!open}>
         <div className="lab-media-inner">
           <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">L’AI analizza i sensori attivi e i luoghi sensibili attorno alla zona selezionata. Suggerimenti indicativi.</p>
+      <p className="text-xs text-muted-foreground">L’AI analizza i sensori attivi e i luoghi sensibili entro 1,5 km {area ? "dal centro dell’area disegnata" : "dal luogo scelto"}. Suggerimenti indicativi.</p>
           <Button onClick={run} disabled={loading} className="rounded-full">{loading ? "Analisi della rete…" : "Suggerisci posizioni"}</Button>
           {error && <p role="alert" className="mt-3 rounded-xl bg-danger/10 p-3 text-sm text-danger">{error}</p>}
           {result && (
@@ -80,6 +91,7 @@ export function SensorAdvisor({ kind, embedded = false }: { kind: "urban" | "vin
                 <div className="rounded-lg bg-muted p-2"><div className="text-muted-foreground">Fermate bus</div><div className="font-mono font-semibold">{result.network.fermate}</div></div>
               </div>
               {example && <p className="rounded-xl border border-dashed border-primary/50 bg-primary/5 p-3 text-xs text-muted-foreground"><b className="text-foreground">Esempio</b> (accesso simulato): con un account vero l’AI usa i sensori e i luoghi reali attorno alla zona.</p>}
+              {result.fonte && result.fonte !== "ai" && <p className="inline-flex rounded-full bg-foreground/[0.08] px-2.5 py-0.5 text-[11px] font-semibold text-muted-foreground">{result.fonte === "app" ? "Scelti dall’app con i dati della zona" : "AI e app insieme"}</p>}
               {result.sintesi && <p className="text-sm text-muted-foreground">{result.sintesi}</p>}
               {result.sensori.map((s, i) => (
                 <div key={i} className="rounded-xl bg-muted p-3 text-sm">
@@ -87,6 +99,7 @@ export function SensorAdvisor({ kind, embedded = false }: { kind: "urban" | "vin
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 font-semibold"><Thermometer className="size-4 shrink-0 text-primary" /><span className="break-words">{s.nome}</span></div>
                       {s.luogo && <p className="mt-0.5 break-words text-xs text-muted-foreground">{s.luogo}</p>}
+                      <p className="text-[11px] text-muted-foreground">a {Math.round(metres(s, { lat: cLat, lng: cLng }) / 10) * 10} m {area ? "dal centro dell’area" : "dal luogo"}</p>
                       <a className="font-mono text-[11px] text-muted-foreground underline" href={`https://www.google.com/maps?q=${s.lat},${s.lng}`} target="_blank" rel="noreferrer">{s.lat.toFixed(5)}, {s.lng.toFixed(5)}</a>
                     </div>
                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${tone[s.priorita]}`}>{s.priorita}</span>

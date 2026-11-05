@@ -152,7 +152,11 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
   // By default the lawn gathers on the west side and the shade on the east; a hand edit moves either centre.
   const lawnAt = edits.lawnAt ? toXY(f, edits.lawnAt) : ([minX + (maxX - minX) * 0.25, cy] as [number, number]);
   const shadeAt = edits.shadeAt ? toXY(f, edits.shadeAt) : ([minX + (maxX - minX) * 0.75, cy] as [number, number]);
-  const byDist = (p: [number, number]) => (a: Cell, b: Cell) => dist([a.x, a.y], p) - dist([b.x, b.y], p);
+  // Cells gathered round a centre as a compact block shaped like the area (a square-ish rectangle in its proportions),
+  // not a round blob: pergolas and beds come out as tidy rectangles instead of stepped strips.
+  const ax = Math.max(1, (maxX - minX) / 2), ay = Math.max(1, (maxY - minY) / 2);
+  const block = (q: Cell, p: [number, number]) => Math.max(Math.abs(q.x - p[0]) / ax, Math.abs(q.y - p[1]) / ay);
+  const byDist = (p: [number, number]) => (a: Cell, b: Cell) => block(a, p) - block(b, p) || dist([a.x, a.y], p) - dist([b.x, b.y], p);
   // The m² the simulation counts: the lever's share of the usable surface (the area less the zones left free). The
   // zones drawn for lawn or pergola count with their own surface; the rest is made of whole cells (c² each).
   const zoneM2 = (kind: string) => zones.filter((z) => z.kind === kind && z.ring.length >= 3).reduce((t, z) => t + ringAreaM2(z.ring), 0);
@@ -336,18 +340,32 @@ export function vineLayout(ring: Ring, mixes: ZoneMix[], edits: LayoutEdits = {}
  */
 function misterSpots(f: Frame, c: number, trunks: Array<[number, number]>, shade: Cell[], paved: Cell[], n: number): LatLng[] {
   if (n <= 0) return [];
+  // Spread evenly: each next pole on the spot farthest from those already placed (a pergola spot counts 4 m nearer,
+  // so the shade gets them first), never within 2 m of a trunk while there is another spot.
+  const inShade = new Set(shade);
+  // Where people stop: under the pergolas when there are enough of them, else also the paving within 8 m of them;
+  // with no pergola, the paving — never the area's very corners (each pole a cell away from the empty edge).
+  const nearShade = paved.filter((x) => !inShade.has(x) && shade.some((q) => dist([x.x, x.y], [q.x, q.y]) <= 8));
+  const inner = paved.filter((x) => paved.filter((q) => Math.abs(q.x - x.x) <= c * 1.01 && Math.abs(q.y - x.y) <= c * 1.01).length >= 9);
+  const all = shade.length >= n * 2 ? shade : shade.length ? [...shade, ...nearShade] : inner.length >= n ? inner : paved;
+  const clear = all.filter((x) => trunks.every((t) => dist([x.x, x.y], t) >= 2));
+  const cand = clear.length >= n ? clear : all;
+  if (!cand.length) return [];
+  const cx = cand.reduce((s, q) => s + q.x, 0) / cand.length, cy = cand.reduce((s, q) => s + q.y, 0) / cand.length;
   const pick: Array<[number, number]> = [];
-  const free = (p: [number, number], gap: number) => pick.every((q) => dist(p, q) >= gap) && trunks.every((t) => dist(p, t) >= 2);
-  for (const gap of [5, 3, 0]) {
-    for (const cell of [...shade, ...paved.filter((x) => !shade.includes(x))]) {
-      if (pick.length >= n) break;
-      const p: [number, number] = [cell.x, cell.y];
-      if (gap === 0 || free(p, gap)) pick.push(p);
+  const first = [...cand].sort((a, b) => Number(inShade.has(b)) - Number(inShade.has(a)) || dist([a.x, a.y], [cx, cy]) - dist([b.x, b.y], [cx, cy]))[0]!;
+  pick.push([first.x, first.y]);
+  while (pick.length < n) {
+    let best: Cell | null = null, bestScore = -Infinity;
+    for (const q of cand) {
+      const d = Math.min(...pick.map((p) => dist([q.x, q.y], p)));
+      if (d < 0.5) continue;
+      const score = d + (inShade.has(q) ? 4 : 0);
+      if (score > bestScore) { bestScore = score; best = q; }
     }
-    if (pick.length >= n) break;
+    if (!best) { const q = pick[pick.length % pick.length]!; pick.push([q[0] + c / 4, q[1] + c / 4]); continue; }
+    pick.push([best.x, best.y]);
   }
-  // Fewer cells than misters: the rest share the spots already chosen, a little aside.
-  while (pick.length < n && pick.length) { const q = pick[pick.length % Math.max(1, pick.length)]!; pick.push([q[0] + c / 4, q[1] + c / 4]); }
   return pick.slice(0, n).map(([x, y]) => toLL(f, x, y));
 }
 
