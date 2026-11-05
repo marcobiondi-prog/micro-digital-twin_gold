@@ -15,9 +15,12 @@ export type SimKind = "urban" | "vineyard";
 export type SimTab = "simula" | "mappa" | "sensori";
 
 // The open tab of each simulator lives at module level, so the ⋯ menu and the camera can switch it.
-const tabs: Record<SimKind, SimTab> = { urban: "simula", vineyard: "simula" };
+const tabs: Record<SimKind, SimTab> = { urban: "mappa", vineyard: "mappa" };
 const listeners = new Set<() => void>();
+// When a tab was last asked for by name (Modifica, Riprendi, the camera…), so entering the page does not override it.
+const askedAt: Record<SimKind, number> = { urban: 0, vineyard: 0 };
 export function openSimTab(kind: SimKind, tab: SimTab) {
+  askedAt[kind] = Date.now();
   if (tabs[kind] === tab) return;
   tabs[kind] = tab;
   listeners.forEach((l) => l());
@@ -41,6 +44,16 @@ export function showSimMedia(kind: SimKind) {
   openSimTab(kind, "simula");
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   window.setTimeout(() => document.getElementById(simMediaId(kind))?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }), 250);
+}
+/**
+ * A simulation always starts on its Mappa tab: entering the page (from the bar, Benvenuto, the menu, a fresh open)
+ * opens Mappa, unless a tab was just asked for on the way in (the dashboard's Modifica, Riprendi nella simulazione,
+ * the camera's photos).
+ */
+export function startOnMap(kind: SimKind) {
+  if (Date.now() - askedAt[kind] < 1500 || tabs[kind] === "mappa") return;
+  tabs[kind] = "mappa";
+  listeners.forEach((l) => l());
 }
 export function useSimTab(kind: SimKind): SimTab {
   return useSyncExternalStore((l) => { listeners.add(l); return () => { listeners.delete(l); }; }, () => tabs[kind], () => "simula");

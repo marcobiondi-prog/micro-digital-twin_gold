@@ -14,7 +14,7 @@ function Start({ to, icon: Icon, title, text, who }: { to: "/urbano" | "/vigneto
   // Locked until the profile that opens it is identified: the tile says who it is for and still leads to the page with the lock.
   const open = useSectionOpen(to === "/urbano" ? "urban" : "vineyard");
   return (
-    <Link to={to} onClick={() => openSimTab(to === "/urbano" ? "urban" : "vineyard", "simula")} className="group flex min-h-24 min-w-0 flex-1 flex-col justify-between gap-3 rounded-3xl bg-foreground/[0.05] p-4 outline-none transition-colors hover:bg-foreground/[0.09] focus-visible:ring-2 focus-visible:ring-ring">
+    <Link to={to} onClick={() => openSimTab(to === "/urbano" ? "urban" : "vineyard", "mappa")} className="group flex min-h-24 min-w-0 flex-1 flex-col justify-between gap-3 rounded-3xl bg-foreground/[0.05] p-4 outline-none transition-colors hover:bg-foreground/[0.09] focus-visible:ring-2 focus-visible:ring-ring">
       <span className="flex items-center justify-between"><Icon className="size-6" aria-hidden="true" />{open === false && <Lock className="size-5 text-muted-foreground" aria-label="bloccato" />}</span>
       <span className="min-w-0">
         <span className="flex items-center gap-1.5 text-base font-semibold">{title}<ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" /></span>

@@ -61,7 +61,7 @@ export function SectionGate({ section, children }: { section: Section; children:
   const need = SECTION_KIND[section];
   const done = () => {
     toast.success(`Identificato come ${KIND_LABEL[need].toLowerCase()}`, { description: `Si apre ${section === "urban" ? "la piazza" : "il vigneto"}.` });
-    openSimTab(section, "simula");
+    openSimTab(section, "mappa");
     window.scrollTo({ top: 0, behavior: "instant" });
   };
   return (

@@ -1,11 +1,11 @@
-import { type ReactNode } from "react";
+import { useLayoutEffect, type ReactNode } from "react";
 import { Camera, Images, Map as MapIcon, MapPin, EllipsisVertical, Radar, RotateCcw, Scale, Send, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { setCameraSheetOpen } from "@/lib/camera-dock";
 import { useTabSwipe } from "@/lib/use-tab-swipe";
 import { useAutoHistory } from "@/lib/use-auto-history";
 import { SimMap } from "@/views/v10/SimMap";
-import { Ambient, HeroButton, PageHero, Panels, TabRow, openSimTab, showSimMedia, simMediaId, useSimTab, type SimKind, type SimTab } from "./console";
+import { Ambient, HeroButton, PageHero, Panels, TabRow, openSimTab, showSimMedia, startOnMap, simMediaId, useSimTab, type SimKind, type SimTab } from "./console";
 
 const TABS: ReadonlyArray<{ id: SimTab; label: string; icon: LucideIcon }> = [
   { id: "simula", label: "Simula", icon: SlidersHorizontal },
@@ -25,6 +25,8 @@ function Item({ icon: Icon, label, onSelect }: { icon: LucideIcon; label: string
  */
 export function SimShell({ kind, place, onCompare, onReset, onSend, simula, media, sensori }: { kind: SimKind; place: string; onCompare?: (() => void) | undefined; onReset: () => void; onSend?: () => void; simula: ReactNode; media: ReactNode; sensori: ReactNode }) {
   const tab = useSimTab(kind);
+  // Entering the page always starts on Mappa (unless a tab was asked for on the way in).
+  useLayoutEffect(() => startOnMap(kind), [kind]);
   const go = (t: SimTab) => openSimTab(kind, t);
   // The place is shown and changed in the Mappa tab.
   const toMap = () => go("mappa");
