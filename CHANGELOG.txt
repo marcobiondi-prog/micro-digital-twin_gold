@@ -1,0 +1,124 @@
+MICRO DIGITAL TWIN — CHANGELOG
+Modifiche dal 1 al 5 novembre 2026
+==================================================
+
+
+5 NOVEMBRE 2026
+--------------------------------------------------
+
+Vigneto: parassiti al posto di teli d'ombra e frangivento   (a3f8504)
+- Le leve "Teli d'ombra" e "Frangivento" sono state sostituite da
+  "Parassiti animali" e "Parassiti vegetali" (difesa 0-100 %).
+- Nuova sezione "Quanti parassiti ci sono" (Animali, Vegetali): la presenza
+  dei parassiti nella zona, come la temperatura. Una difesa al massimo ne
+  toglie l'85 %.
+- Costi a stagione all'ettaro: difesa dai parassiti animali 400-1.200 €
+  (trappole, confusione sessuale, trattamenti mirati), dai vegetali
+  500-1.500 € (trattamenti contro peronospora e oidio, sfalci).
+- L'indice sotto l'arco ora comprende anche i parassiti e si chiama
+  "Stress delle viti" (prima "Sete").
+- "Cosa ottieni" (simulazione, dashboard, report) mostra quanto calano i
+  parassiti animali e vegetali.
+- Mappa: tubo principale con ali gocciolanti su ogni filare irrigato,
+  gocciolatori e terreno bagnato; trappole gialle su griglia regolare
+  (in 3D su un paletto); filari trattati con un motivo a goccioline.
+  Tolti siepe, rete d'ombra e "Sposta elementi" del vigneto.
+- Il contorno dell'area disegnata ha un bordo scuro sotto quello bianco,
+  così si legge anche sui campi chiari.
+- Il profilo "Agronomo" ora si chiama "Conduttore del vigneto" ovunque
+  (il modulo di identificazione resta uguale).
+
+Sensori dell'utente (termici e non solo)   (c0b78cd)
+- Nuovo riquadro "I tuoi sensori" nella scheda Sensori AI (con account):
+  temperatura dell'aria, temperatura delle superfici (termico), umidità
+  dell'aria, umidità del terreno, vento, pioggia.
+- Aggiungi un sensore (al centro dell'area, nel luogo o in un punto
+  suggerito dall'AI con "Ho messo un sensore qui"); la chiave del
+  dispositivo si vede una sola volta, con un esempio pronto da copiare.
+- Per ogni sensore: in linea / ultima lettura, lettura a mano, nuova
+  chiave, elimina.
+- I dispositivi inviano le letture a /api/public/sensor-readings.
+- Le letture delle ultime 2 ore entrano nella simulazione: nella piazza
+  "Dal tuo sensore adesso …", nel vigneto "Usa nella simulazione".
+- Richiede la migrazione supabase/migrations/20261105000000_sensors.sql.
+- Vigneto: sotto l'arco, etichette che spiegano da dove viene il numero
+  (terreno asciutto, caldo, vento, fase, pioggia).
+
+Mappa 3D   (3d7431b)
+- Area e forme della simulazione seguono le curve del terreno: niente più
+  oggetti che spariscono sulle colline.
+
+Vigneto: arco   (8ead7fa, 9be1855)
+- Sotto il numero grande: cosa indica e quanto tolgono gli interventi.
+- Etichette "Stress più basso" / "Senza interventi" che si accendono
+  vicino al punto, con il valore esatto a destra.
+
+Sensori AI   (9be1855)
+- Rispondono sempre: tempi massimi, server di mappe alternativi, secondo
+  tentativo, lettura robusta della risposta dell'AI, punti controllati e,
+  se serve, scelti dall'app con i dati della zona.
+- Ricerca attorno al centro dell'area disegnata, distanza di ogni punto.
+- Piazza: blocchi di aiuole e pergolati più ordinati, nebulizzatori sotto
+  i pergolati.
+
+Piazza: Aiuole e ciottoli e Nebulizzatori   (07af5c0)
+- "Prato" diventa "Aiuole e ciottoli" ovunque, con nuovo disegno in mappa
+  (aiuole fiorite e vialetti di ciottoli).
+- Nuova leva "Nebulizzatori" (0-20): -0,15 °C ciascuno,
+  1.200-2.500 € l'uno; in mappa, cronologia, report ed esportazioni.
+
+Avvisi   (f646b14)
+- Gli avvisi sono pillole scure nello stile dell'app, in alto al centro.
+
+Piazza: arco della simulazione   (befe03d … 74706b3)
+- Niente soldi nella scheda Simula: al loro posto "Cosa ottieni"
+  (gradi tolti, CO2 l'anno, pioggia trattenuta, superficie all'ombra,
+  persone all'ombra).
+- Etichette sotto i numeri dell'arco: "Il più fresco" e
+  "Media stagionale dell'area", che si accendono vicino al punto.
+- Media stagionale e temperatura reale lette al centro dell'area
+  disegnata.
+
+Mappe   (0bda3af, f8d4994)
+- Mappa 2D sulla stessa mappa di Google del 3D, sincronizzate.
+- Giorno e notte sulle mappe seguono l'ora della simulazione.
+
+Tutorial   (5353223, db39e67)
+- Passo 2: "Capisci quando hai bisogno del mio intervento".
+
+Profilo professionale e accesso   (59f5623 … cbbc51a)
+- Uscendo dall'account si esce anche dal profilo professionale;
+  rientrando torna.
+- Nuova pagina "Da dove vuoi usarmi?" (Settore urbano / Settore agricolo)
+  quando non c'è un profilo; si apre direttamente sul modulo dopo
+  l'uscita e riconosce un profilo già registrato ("Continua come …").
+
+Apertura delle simulazioni   (8a88ffc, 57c09fc)
+- Dopo il tutorial l'app si apre sulla scheda Mappa del proprio profilo.
+- Le simulazioni partono sempre dalla scheda Mappa.
+
+Cronologia e Archivio   (4d3af4c, 8ff2d2e)
+- Il tasto indietro riporta alla pagina da cui sono stati aperti
+  (anche la Dashboard).
+- Nella selezione si vedono di nuovo le foto da scegliere.
+
+Dashboard   (f30fc89)
+- L'accesso si apre da qualunque punto della pagina.
+- "Invia il progetto" gratis per tutti (anche nel piano Free).
+
+
+1 NOVEMBRE 2026
+--------------------------------------------------
+
+Mappa   (7315614, 124eea3, cc0725f, ea81a61)
+- Aiuole, pergolati e alberi disegnati con gli stessi m² della
+  simulazione; ombre proiettate dal sole della stagione e dell'ora scelte.
+- "Solo quello disegnato": si vede e si costruisce solo ciò che è stato
+  disegnato a mano.
+- Cambiando luogo non si perdono interventi e disposizioni: ogni luogo
+  tiene i suoi.
+- "Torna all'ultima posizione" sotto la ricerca.
+
+Fotocamere   (cc0725f)
+- La chiusura con lo scorrimento laterale funziona solo dal bordo dello
+  schermo, come il gesto Indietro di Android.
