@@ -1,6 +1,7 @@
 import { toast } from "sonner";
 import { TREE_SHADE_M2 } from "@/models/area-layout";
-import { drawnM2 } from "@/models/drawn-area";
+import { drawnAreaFor, drawnM2 } from "@/models/drawn-area";
+import { ringCentroid } from "@/models/place-area";
 import { loadPlaceArea } from "@/lib/place-area-client";
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -227,7 +228,11 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
   }, []);
   const est = piazzaEstimate(urban.trees, urban.permeable, urban.shade);
   // Season and hour (device clock until chosen by hand) and the place's real year for them; without it, a plain estimate said as such.
-  const clock = useSeasonClock(urban.location.lat, urban.location.lng, "urban");
+  // With an area drawn on the map, the seasonal average and the real temperature are read at its middle (rounded to
+  // about 10 m so redrawing a pin does not ask again); otherwise at the place's point.
+  const areaHere = drawnAreaFor(urban.area, urban.location);
+  const [cLat, cLng] = areaHere ? ringCentroid(areaHere.ring).map((v) => Math.round(v * 1e4) / 1e4) as [number, number] : [urban.location.lat, urban.location.lng];
+  const clock = useSeasonClock(cLat, cLng, "urban");
   const { season, hour, real: realBefore } = clock;
   const before = realBefore ?? estimatedTemp(season, hour, urban.realTemp ?? 40);
   // Trees, lawn and shade take heat away only when there is heat: all of it at 40 °C, none at 20 °C.
@@ -247,7 +252,7 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
     setPiazzaReading({ before: +before.toFixed(1), after: +after.toFixed(1), when: `${SEASON_LABEL[season] ?? season}, ore ${clockText(hour, clock.minute ?? 0)}`, season, hour, min: dialMin, max: dialMax });
   }, [before, after, season, hour, clock.minute, dialMin, dialMax]);
   // The real temperature of the place right now, written under the arc beside the reading without interventions.
-  const { lat: rLat, lng: rLng } = urban.location;
+  const [rLat, rLng] = [cLat, cLng];
   const realNow = useQuery({ queryKey: ["air-now", rLat.toFixed(3), rLng.toFixed(3)], queryFn: () => loadAirTemperature(rLat, rLng), staleTime: 10 * 60_000, refetchInterval: 15 * 60_000, retry: 1 });
   const feel = feeling(after);
   const preset = PRESETS.find((p) => p.trees === urban.trees && p.permeable === urban.permeable && p.shade === urban.shade)?.id ?? null;
@@ -338,13 +343,13 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
       <div className="mx-auto -mt-3 flex w-full max-w-[21rem] justify-between px-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground" aria-hidden="true">
         {/* The label the white dot is near lights up, the other dims: near the seasonal average the right one turns warm,
             near the coolest the left one turns bright blue. */}
-        <span className={cn("rounded-full px-2 py-0.5 transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "left" ? "bg-sky-400/30 text-sky-200" : "bg-sky-400/15 text-sky-300", near === "right" && "opacity-35")}>Il più fresco</span>
-        <span className={cn("rounded-full px-2 py-0.5 text-right transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "right" ? "bg-amber-400/25 text-amber-200" : "bg-foreground/[0.08]", near === "left" && "opacity-35")}>{realBefore !== null ? "Media stagionale" : "Stima stagionale"} · senza interventi</span>
+        <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "left" ? "bg-sky-400/30 text-sky-200" : "bg-sky-400/15 text-sky-300", near === "right" && "opacity-35")}>Il più fresco</span>
+        <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 text-right transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "right" ? "bg-amber-400/25 text-amber-200" : "bg-foreground/[0.08]", near === "left" && "opacity-35")}>{realBefore !== null ? "Media stagionale" : "Stima stagionale"} {areaHere ? "dell'area" : "del luogo"}</span>
       </div>
       {/* Under the arc: the place's real temperature right now (the reading without interventions is in the chip below). */}
       {typeof realNow.data === "number" && (
         <p className="-mt-1 flex items-center justify-center gap-1.5 text-center text-sm text-muted-foreground">
-          <Thermometer className="size-4" aria-hidden="true" />Temperatura reale adesso nel luogo <b className="font-semibold tabular-nums text-foreground">{fmt(realNow.data)}°</b>
+          <Thermometer className="size-4" aria-hidden="true" />Temperatura reale adesso {areaHere ? "nell'area" : "nel luogo"} <b className="font-semibold tabular-nums text-foreground">{fmt(realNow.data)}°</b>
         </p>
       )}
 
