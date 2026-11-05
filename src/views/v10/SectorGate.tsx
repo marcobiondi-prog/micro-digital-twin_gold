@@ -4,7 +4,9 @@ import { useLocation, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Building2, Grape, LogIn } from "lucide-react";
 import { openAccount } from "@/lib/camera-dock";
 import { introSeen } from "@/lib/intro-seen";
-import { useProId } from "@/lib/use-pro-id";
+import { clearSectorGate, saveProId, useLastProId, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
+import { proSummary } from "@/models/professional-id";
+import { toast } from "sonner";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { hapticTick } from "@/lib/haptics";
 import { type ProKind } from "@/models/professional-id";
@@ -33,11 +35,14 @@ export function SectorGate() {
   const navigate = useNavigate();
   const [seen, setSeen] = useState(false);
   useEffect(() => setSeen(introSeen()), [pathname]);
-  const shown = id === null && seen && shownOn(pathname);
+  // Asked for by name (leaving a profile or the account, the account panel's rows): shown on any page, on that form.
+  const ask = useSectorGateAsk();
+  const shown = id === null && seen && (shownOn(pathname) || ask.at > 0);
   // Signing in to an account that had a profile brings it back: the page goes away and that simulation opens on Mappa.
   const wasShown = useRef(false);
   useEffect(() => {
     if (shown) { wasShown.current = true; return; }
+    if (id) clearSectorGate();
     if (wasShown.current && id) {
       wasShown.current = false;
       const section = id.kind === "agronomo" ? "vineyard" : "urban";
@@ -47,13 +52,16 @@ export function SectorGate() {
   }, [shown, id, navigate]);
   if (!shown) return null;
   // Over everything (menus and bottom bar too), under the account dialog, which opens above it to sign in.
-  return createPortal(<SectorPage />, document.body);
+  return createPortal(<SectorPage key={ask.at} start={ask.kind} />, document.body);
 }
 
-function SectorPage() {
+function SectorPage({ start }: { start: ProKind | null }) {
   useDarkChrome();
   const { signedIn } = useSignedIn();
-  const [kind, setKind] = useState<ProKind | null>(null);
+  const [kind, setKind] = useState<ProKind | null>(start);
+  // The profile of this kind registered before (on this device or in the account): recognised, one tap brings it back
+  // with its project's history.
+  const previous = useLastProId(kind);
   // The page behind does not scroll while this one is up.
   useEffect(() => {
     const html = document.documentElement, before = html.style.overflow;
@@ -81,7 +89,22 @@ function SectorPage() {
             </button>
             <h1 className="font-display text-[2.6rem] font-extralight leading-[1] tracking-tight">{sector.name}</h1>
             <p className="text-[15px] leading-relaxed text-foreground/60">{profileIntro(sector.kind)}</p>
+            {previous && (
+              <div className="space-y-3 rounded-3xl bg-foreground/[0.08] p-5 ring-1 ring-brand-turquoise/40">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-turquoise">Ti abbiamo riconosciuto</p>
+                <div>
+                  <p className="text-xl font-semibold">{previous.name}</p>
+                  <p className="text-sm text-foreground/70">{proSummary(previous)}</p>
+                </div>
+                <p className="text-xs text-foreground/60">Ti eri già registrato con questo profilo: continua e ritrovi la cronologia {sector.kind === "funzionario" ? "della piazza" : "del vigneto"}.</p>
+                <button type="button" onClick={() => { void saveProId(previous); toast.success(`Bentornato, ${previous.name}`, { description: `Ritrovi la cronologia ${sector.kind === "funzionario" ? "della piazza" : "del vigneto"}.` }); }}
+                  className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white text-[15px] font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+                  Continua come {previous.name}<ArrowRight className="size-4" aria-hidden="true" />
+                </button>
+              </div>
+            )}
             {signIn}
+            {previous && <p className="px-1 pt-2 text-sm font-semibold text-foreground/70">Oppure registra un altro profilo</p>}
             <IdentifyForm kind={sector.kind} onDone={done} />
           </>
         ) : (

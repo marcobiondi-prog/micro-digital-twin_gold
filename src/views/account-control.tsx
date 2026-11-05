@@ -1,4 +1,4 @@
-import { keepProIdInAccount, saveProId, useProId } from "@/lib/use-pro-id";
+import { keepProIdInAccount, openSectorGate, saveProId, useProId } from "@/lib/use-pro-id";
 import { DeviceCacheCard } from "@/views/v10/DeviceCache";
 import { getMedia, removeMedia, useLabMedia } from "@/models/lab-media-store";
 import { CLOUD_QUOTA, bytesText, usageTone, useCloudUsage } from "@/lib/use-cloud-usage";
@@ -444,18 +444,19 @@ export function AccountControl() {
                 <div className="min-w-0 flex-1">
                   <p className="text-[15px] font-semibold">{proId.name}</p>
                   <p className="text-sm text-muted-foreground">{proSummary(proId)}</p>
-                  <button type="button" onClick={() => void saveProId(null)} className="mt-1 inline-flex min-h-10 items-center gap-1.5 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"><LogOut className="size-4" aria-hidden="true" />Esci dal profilo</button>
+                  <button type="button" onClick={() => { const was = proId.kind; void saveProId(null); setOpen(false); openSectorGate(was); }} className="mt-1 inline-flex min-h-10 items-center gap-1.5 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"><LogOut className="size-4" aria-hidden="true" />Esci dal profilo</button>
                 </div>
               </div>
             ) : <p className="pb-2 text-sm text-muted-foreground">Nessun profilo: piazza e vigneto sono bloccati.</p>}
             {/* Identified, the card shows only that profile: the ways to identify appear when there is none. */}
             {!proId && <ul>
-              {([["Agronomo · apre il vigneto", "/identificazione/agronomo"], ["Funzionario comunale · apre la piazza", "/identificazione/funzionario"]] as const).map(([label, to]) => (
-                <li key={to}>
-                  <Link to={to} onClick={() => setOpen(false)} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl text-left text-[15px] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+              {/* Straight to that profile's registration form (the sector page, over everything), past the profile page. */}
+              {([["Agronomo · apre il vigneto", "agronomo"], ["Funzionario comunale · apre la piazza", "funzionario"]] as const).map(([label, kind]) => (
+                <li key={kind}>
+                  <button type="button" onClick={() => { setOpen(false); openSectorGate(kind); }} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl text-left text-[15px] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
                     <span className="min-w-0 flex-1">{label}</span>
                     <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                  </Link>
+                  </button>
                 </li>
               ))}
             </ul>}

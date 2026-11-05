@@ -1,7 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { isProId, type ProId } from "@/models/professional-id";
+import { isProId, type ProId, type ProKind } from "@/models/professional-id";
 
 /**
  * The professional profile in use: kept on this device (localStorage) and, signed in, in the account's user data too,
@@ -17,8 +17,48 @@ const read = (): ProId | null => {
     return isProId(v) ? v : null;
   } catch { return null; }
 };
-const snapshot = () => (current === undefined ? (current = read()) : current);
+const snapshot = () => {
+  if (current === undefined) {
+    current = read();
+    // A profile saved before this memory existed counts as registered too (written quietly: no re-render from here).
+    if (current && !lastSnap()[current.kind]) { last = { ...lastSnap(), [current.kind]: current }; try { window.localStorage.setItem(LAST_KEY, JSON.stringify(last)); } catch { /* memory only */ } }
+  }
+  return current;
+};
+/**
+ * The last profile registered of each kind (on this device, and signed in in the account as pro_last): leaving a
+ * profile or the account keeps it, so identifying again as the same professional recognises it — "Continua come …" —
+ * and its project's history comes back with it.
+ */
+const LAST_KEY = "mdt-pro-id-last-v1";
+type Last = Partial<Record<ProKind, ProId>>;
+let last: Last | undefined;
+const readLast = (): Last => {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(LAST_KEY) ?? "{}") as Record<string, unknown>;
+    const out: Last = {};
+    for (const k of ["agronomo", "funzionario"] as const) { const p = v[k]; if (isProId(p) && p.kind === k) out[k] = p; }
+    return out;
+  } catch { return {}; }
+};
+const lastSnap = () => (last === undefined ? (last = readLast()) : last);
+const keepLast = (id: ProId) => {
+  last = { ...lastSnap(), [id.kind]: id };
+  try { window.localStorage.setItem(LAST_KEY, JSON.stringify(last)); } catch { /* memory only */ }
+  subs.forEach((f) => f());
+};
+/** The profile of that kind registered before on this device or account, if any. */
+export function useLastProId(kind: ProKind | null): ProId | null {
+  const all = useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, lastSnap, () => ({}) as Last);
+  return kind ? all[kind] ?? null : null;
+}
+export const lastProKind = (): ProKind | null => {
+  const l = lastSnap();
+  return l.funzionario && !l.agronomo ? "funzionario" : l.agronomo && !l.funzionario ? "agronomo" : null;
+};
+
 const set = (id: ProId | null) => {
+  if (id) keepLast(id);
   current = id;
   try {
     if (id) window.localStorage.setItem(KEY, JSON.stringify(id));
@@ -26,6 +66,19 @@ const set = (id: ProId | null) => {
   } catch { /* private mode: memory only */ }
   subs.forEach((f) => f());
 };
+
+/**
+ * The sector page (views/v10/SectorGate) opened on one sector's form: after leaving a profile or the account, or from
+ * the account panel's identification rows — straight to the form, past the sector choice and the profile page.
+ */
+type GateAsk = { kind: ProKind | null; at: number };
+let gateAsk: GateAsk = { kind: null, at: 0 };
+const gateSubs = new Set<() => void>();
+export function openSectorGate(kind: ProKind | null) { gateAsk = { kind, at: Date.now() }; gateSubs.forEach((f) => f()); }
+export function clearSectorGate() { if (gateAsk.at) { gateAsk = { kind: null, at: 0 }; gateSubs.forEach((f) => f()); } }
+export function useSectorGateAsk(): GateAsk {
+  return useSyncExternalStore((f) => { gateSubs.add(f); return () => { gateSubs.delete(f); }; }, () => gateAsk, () => gateAsk);
+}
 
 /** The profile now, read outside React (the root's landing after the tutorial). */
 export const getProId = (): ProId | null => snapshot() ?? null;
@@ -38,13 +91,13 @@ export function useProId(): ProId | null | undefined {
 export async function saveProId(id: ProId | null): Promise<void> {
   set(id);
   const { data } = await supabase.auth.getSession();
-  if (data.session) await supabase.auth.updateUser({ data: { pro_id: id } }).catch(() => undefined);
+  if (data.session) await supabase.auth.updateUser({ data: { pro_id: id, pro_last: lastSnap() } }).catch(() => undefined);
 }
 
 /** Before signing out: the profile on this device goes into the account (if a save had failed), so the next sign-in brings it back. */
 export async function keepProIdInAccount(): Promise<void> {
   const id = snapshot();
-  if (id) await supabase.auth.updateUser({ data: { pro_id: id } }).catch(() => undefined);
+  if (id) await supabase.auth.updateUser({ data: { pro_id: id, pro_last: lastSnap() } }).catch(() => undefined);
 }
 
 /**
@@ -54,6 +107,9 @@ export async function keepProIdInAccount(): Promise<void> {
 export function useSyncProId() {
   useEffect(() => {
     const adopt = (meta: unknown) => {
+      // The profiles registered before with this account come to this device too.
+      const prev = (meta as { pro_last?: Record<string, unknown> } | null)?.pro_last;
+      if (prev && typeof prev === "object") for (const k of ["agronomo", "funzionario"] as const) { const p = prev[k]; if (isProId(p) && p.kind === k && !lastSnap()[k]) keepLast(p); }
       const saved = (meta as { pro_id?: unknown } | null)?.pro_id;
       if (isProId(saved)) set(saved);
       else if (snapshot()) void supabase.auth.updateUser({ data: { pro_id: snapshot() } }).catch(() => undefined);
@@ -64,7 +120,10 @@ export function useSyncProId() {
     const { data } = supabase.auth.onAuthStateChange((event, s) => {
       if (event === "SIGNED_IN" && s) adopt(s.user.user_metadata);
       if (event === "SIGNED_OUT" && snapshot()) {
+        const was = snapshot()!.kind;
         set(null);
+        // The sector page opens straight on that profile's form, which recognises it.
+        openSectorGate(was);
         toast("Sei uscito anche dal profilo professionale", { description: "Accedi di nuovo e torna da solo." });
       }
     });

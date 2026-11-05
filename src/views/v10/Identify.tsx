@@ -2,7 +2,7 @@ import { useEffect, useId, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, BadgeCheck, Building2, Grape, LogOut, ShieldCheck } from "lucide-react";
-import { saveProId, useProId } from "@/lib/use-pro-id";
+import { saveProId, useProId, openSectorGate } from "@/lib/use-pro-id";
 import { loadComuni } from "@/lib/comuni";
 import { findComune, searchComuni, townDomain, type Comune } from "@/models/comuni";
 import { findRegion, officeOf, searchOffices, searchRegions } from "@/models/professional-id";
@@ -235,6 +235,8 @@ export function ProfileCard({ kind, go }: { kind: ProKind; go?: () => void }) {
   if (!mine) return null;
   const leave = async () => {
     await saveProId(null);
+    // Straight back to this profile's form, which recognises it ("Continua come …").
+    openSectorGate(kind);
     toast("Profilo rimosso", { description: "Piazza e vigneto sono bloccati finché non ti identifichi." });
   };
   return (
