@@ -186,7 +186,8 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center" aria-live="polite">
           <span className={cn("rounded-full px-3 py-0.5 text-[13px] font-semibold text-white transition-colors duration-300", GAIN_BG[gain])}>{verdict(after)}</span>
           <span className="mt-1 font-display text-6xl font-light leading-none tracking-tight tabular-nums">{Math.round(after)}<span className="text-2xl text-muted-foreground">/100</span></span>
-          <span className="mt-1.5 font-mono text-sm font-semibold tabular-nums">{any ? euroRange(cost.total) : "Nessun intervento"}</span>
+          {/* What the big number is, said under it: the vines' thirst out of 100, and what the interventions take off. */}
+          <span className="mt-1.5 text-center text-[13px] font-semibold leading-tight">Sete delle viti <span className="tabular-nums">{Math.round(before - after) >= 1 ? `· −${Math.round(before - after)} rispetto a oggi` : any ? "· a quest'ora non cambia" : "· nessun intervento"}</span></span>
         </div>
       </div>
 
