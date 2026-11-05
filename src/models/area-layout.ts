@@ -22,7 +22,7 @@ export type Line = { line: Ring; kind: "drip" | "wind" | "seam"; zone?: number; 
  * `shadeM2`: the m² actually drawn as lawn and pergola; `lawnTarget` / `shadeTarget`: the m² the simulation counts
  * (the lever's share of the usable surface), so the map can say when there is no room for all of it.
  */
-export type PiazzaLayout = { trees: LatLng[]; patches: Patch[]; lawnAt: LatLng; shadeAt: LatLng; cell: number; sunny?: number; lawnM2: number; shadeM2: number; lawnTarget: number; shadeTarget: number };
+export type PiazzaLayout = { misters: LatLng[]; trees: LatLng[]; patches: Patch[]; lawnAt: LatLng; shadeAt: LatLng; cell: number; sunny?: number; lawnM2: number; shadeM2: number; lawnTarget: number; shadeTarget: number };
 export type VineLayout = { patches: Patch[]; lines: Line[]; windAt: LatLng; zones: LatLng[] };
 
 /** The shade one tree gives in the simulation (m², models/project-summary) and so its crown on the map: about 6,2 m wide. */
@@ -142,7 +142,7 @@ const inZone = (f: Frame, zones: InnerZone[], kind: string) => {
 const exactRings = (zones: InnerZone[], kind: string, as: "lawn" | "shade"): Patch[] =>
   zones.filter((z) => z.kind === kind && z.ring.length >= 3).map((z) => ({ ring: z.ring, kind: as, exact: true }));
 
-export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: number, edits: LayoutEdits = {}, zones: InnerZone[] = []): PiazzaLayout | null {
+export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: number, edits: LayoutEdits = {}, zones: InnerZone[] = [], misters = 0): PiazzaLayout | null {
   if (ring.length < 3) return null;
   const grid = cellsOf(ring), { f, c, minX, maxX, minY, maxY } = grid;
   const isFree = inZone(f, zones, "libera"), isLawn = inZone(f, zones, "prato"), isShade = inZone(f, zones, "ombra"), isTrees = inZone(f, zones, "alberi");
@@ -237,6 +237,7 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
   const centre = (list: Cell[], fallback: [number, number]): [number, number] => list.length ? [list.reduce((t, q) => t + q.x, 0) / list.length, list.reduce((t, q) => t + q.y, 0) / list.length] : fallback;
   const autoLawn = lawnCells.filter((x) => !fixedLawn.includes(x)).length, autoShade = shadeCells.filter((x) => !fixedShade.includes(x)).length;
   return {
+    misters: misterSpots(f, c, n > 0 ? placed.map((p) => toXY(f, p)) : [], shadeCells, cells.filter((x) => !lawnCells.includes(x) && !isLawn(x.x, x.y)), Math.max(0, Math.round(misters))),
     trees: placed, cell: c,
     lawnM2: Math.round((fixedLawn.length ? zoneM2("prato") : 0) + autoLawn * c * c), shadeM2: Math.round((fixedShade.length ? zoneM2("ombra") : 0) + autoShade * c * c),
     lawnTarget: Math.round(lawnTarget), shadeTarget: Math.round(shadeTarget),
@@ -327,6 +328,27 @@ export function vineLayout(ring: Ring, mixes: ZoneMix[], edits: LayoutEdits = {}
     }
   }
   return { patches, lines, zones, windAt: toLL(f, ...mids[e]!) };
+}
+
+/**
+ * Where the misters stand: first along the pergolas (people gather in their shade, the mist cools it further), then on
+ * the paved cells spread over the area, each at least 5 m from the others and 2 m from a trunk while there is room.
+ */
+function misterSpots(f: Frame, c: number, trunks: Array<[number, number]>, shade: Cell[], paved: Cell[], n: number): LatLng[] {
+  if (n <= 0) return [];
+  const pick: Array<[number, number]> = [];
+  const free = (p: [number, number], gap: number) => pick.every((q) => dist(p, q) >= gap) && trunks.every((t) => dist(p, t) >= 2);
+  for (const gap of [5, 3, 0]) {
+    for (const cell of [...shade, ...paved.filter((x) => !shade.includes(x))]) {
+      if (pick.length >= n) break;
+      const p: [number, number] = [cell.x, cell.y];
+      if (gap === 0 || free(p, gap)) pick.push(p);
+    }
+    if (pick.length >= n) break;
+  }
+  // Fewer cells than misters: the rest share the spots already chosen, a little aside.
+  while (pick.length < n && pick.length) { const q = pick[pick.length % Math.max(1, pick.length)]!; pick.push([q[0] + c / 4, q[1] + c / 4]); }
+  return pick.slice(0, n).map(([x, y]) => toLL(f, x, y));
 }
 
 /** The heights shadows are cast from: a pergola's roof, a tree's crown from its lowest branches to its top. */

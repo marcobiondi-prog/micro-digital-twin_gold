@@ -16,7 +16,7 @@ export function scenarioExportRows(state: LabState, flow: ExportFlow, exportedAt
   if (flow === "urban") {
     const u = state.urban, m = urbanMetrics(u);
     return [{ ...common, record_id: "urban", trees_count: u.trees,
-      permeable_soil_percent: u.permeable, shade_percent: u.shade,
+      permeable_soil_percent: u.permeable, shade_percent: u.shade, misters_count: u.misters ?? 0,
       estimated_cooling_c: m.est.dT, estimated_cooling_low_c: m.est.lo,
       estimated_cooling_high_c: m.est.hi, tree_cover_percent: m.cover,
       heat_index: m.heat, climate_refuges_index: m.refuges, green_index: m.green,

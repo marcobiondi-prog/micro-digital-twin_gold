@@ -114,7 +114,7 @@ export async function removeHistory(ids: string[]): Promise<boolean> {
 export function reopenHistory(mix: HistoryMix, when: HistoryWhen | null = null) {
   if (when) requestSimWhen(mix.kind === "piazza" ? "urban" : "vineyard", when);
   if (mix.kind === "piazza") {
-    setUrban({ trees: mix.trees, permeable: mix.permeable, shade: mix.shade, treeCells: null, permeableCells: null, shadeCells: null });
+    setUrban({ trees: mix.trees, permeable: mix.permeable, shade: mix.shade, misters: mix.misters ?? 0, treeCells: null, permeableCells: null, shadeCells: null });
     return;
   }
   setVineyard((v) => ({

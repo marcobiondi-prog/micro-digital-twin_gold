@@ -29,3 +29,13 @@ describe("Solo quello disegnato", () => {
     expect(l.trees).toBe(Math.round(560 / 60));
   });
 });
+
+describe("Nebulizzatori", () => {
+  it("cool the piazza and stand inside the area, apart from each other", async () => {
+    const { piazzaEstimate, MISTER_COOLING } = await import("@/models/scenarios");
+    expect(piazzaEstimate(0, 0, 0, 4).dT).toBeCloseTo(4 * MISTER_COOLING);
+    const l = piazzaLayout(area, 2, 20, 20, {}, [], 4)!;
+    expect(l.misters).toHaveLength(4);
+    for (const m of l.misters) expect(ringContains(area, m[0], m[1])).toBe(true);
+  });
+});

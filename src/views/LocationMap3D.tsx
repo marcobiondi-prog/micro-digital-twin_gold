@@ -1,7 +1,7 @@
 import { isKeyRejected, loadGoogleMaps, onKeyRejected } from "@/lib/google-maps-js";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { mowStripes, hedgeParts, netParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts } from "@/models/area-layout";
-import { SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
+import { crownRing, mowStripes, hedgeParts, netParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts } from "@/models/area-layout";
+import { MIST_RADIUS_M, SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import { Crosshair, LoaderCircle } from "lucide-react";
 import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camera";
 
@@ -107,12 +107,12 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
     };
     if (sim?.kind === "piazza") {
       for (const pt of sim.data.patches) {
-        // Lawn: a fresh green with a darker edge and light mowing stripes across it (a few lines, no extra surfaces).
+        // Aiuole e ciottoli: a fresh green with a darker edge and light pebble paths across it (a few lines, no extra surfaces).
         if (pt.kind === "lawn") {
           ground(pt.ring, "rgba(92,170,62,0.82)", "#3a7a28", 2);
           if (Polyline3DElement) for (const line of mowStripes(pt.ring)) {
-            if (flat) { out.push(absLine({ strokeColor: "rgba(178,226,120,0.55)", strokeWidth: 5 }, line.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, h: 0.3 })))); continue; }
-            const pl = meshLine({ strokeColor: "rgba(178,226,120,0.55)", strokeWidth: 5, drawsOccludedSegments: true }) as Shape;
+            if (flat) { out.push(absLine({ strokeColor: "rgba(214,206,190,0.75)", strokeWidth: 5 }, line.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, h: 0.3 })))); continue; }
+            const pl = meshLine({ strokeColor: "rgba(214,206,190,0.75)", strokeWidth: 5, drawsOccludedSegments: true }) as Shape;
             pl.coordinates = line.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: LIFT }));
             out.push(pl);
           }
@@ -131,6 +131,13 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
           else if (p.height < 3.2) part(p, p.height, "#4a2e14", 1);
           else part(p, p.height, PERGOLA_COLORS.beam, 3);
         }
+      }
+      // Each mister: the mist on the ground round it, its pole, and a see-through cloud of mist over it.
+      for (const m of sim.data.misters) {
+        if (flat) out.push(absPoly({ fillColor: "rgba(125,211,252,0.3)", strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 }, crownRing(m, MIST_RADIUS_M, 16), 0.24));
+        else ground(crownRing(m, MIST_RADIUS_M, 16), "rgba(125,211,252,0.3)");
+        part({ ring: crownRing(m, 0.12, 6), base: 0, height: 3, color: "#cbd5e1" });
+        part({ ring: crownRing(m, 2.2, 16), base: 2.5, height: 2.7, color: "rgba(224,242,254,0.35)" }, 2.6, "rgba(125,211,252,0.6)", 1);
       }
       // Each tree: a dark trunk, then three crown discs each ringed a deeper green, so the layers read as foliage.
       for (const t of sim.data.trees) {

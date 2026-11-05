@@ -29,7 +29,7 @@ export type PiazzaSummary = {
 
 /** Piazza: a whole day of the season (real year of the place, else an estimate) read at its hottest hour. */
 export function piazzaSummary(urban: LabState["urban"], season: Season, profile: Array<number | null> | null, areaM2: number | null, atHour?: number | null): PiazzaSummary {
-  const est = piazzaEstimate(urban.trees, urban.permeable, urban.shade);
+  const est = piazzaEstimate(urban.trees, urban.permeable, urban.shade, urban.misters ?? 0);
   const day = Array.from({ length: 24 }, (_, h) => {
     const before = profile?.[h] ?? estimatedTemp(season, h, urban.realTemp ?? 40);
     return { h, prima: +before.toFixed(1), dopo: +(before - est.dT * coolingShare(before)).toFixed(1) };
@@ -39,13 +39,13 @@ export function piazzaSummary(urban: LabState["urban"], season: Season, profile:
   // A surface drawn with pins on the map wins over the measured one, which wins over the reference.
   const drawn = drawnM2(urban.area, urban.location);
   const m2 = drawn ?? areaM2 ?? REFERENCE_M2;
-  const empty = urban.trees + urban.permeable + urban.shade === 0;
+  const empty = urban.trees + urban.permeable + urban.shade + (urban.misters ?? 0) === 0;
   const preset = (Object.keys(PIAZZA_PRESETS) as Array<keyof typeof PIAZZA_PRESETS>)
     .find((k) => PIAZZA_PRESETS[k][0] === urban.trees && PIAZZA_PRESETS[k][1] === urban.permeable && PIAZZA_PRESETS[k][2] === urban.shade) ?? null;
   return {
     day, estimated: !profile || profile.every((v) => v === null),
     hour: hot.h, before: hot.prima, after: hot.dopo, empty, level: empty ? null : levelName(preset) ?? "Su misura",
-    m2, measured: drawn === null && areaM2 !== null, drawn: drawn !== null, cost: interventionCost(m2, urban.trees, urban.permeable, urban.shade).total,
+    m2, measured: drawn === null && areaM2 !== null, drawn: drawn !== null, cost: interventionCost(m2, urban.trees, urban.permeable, urban.shade, urban.misters ?? 0).total,
     co2: Math.round(urban.trees * 22), water: Math.round(m2 * (urban.permeable / 100) * 0.7 * 0.6),
     shadeM2: Math.round(m2 * (urban.shade / 100) + urban.trees * TREE_SHADE_M2),
     lawnM2: Math.round((m2 * urban.permeable) / 100), shadeArea: Math.round((m2 * urban.shade) / 100),
@@ -55,8 +55,9 @@ export function piazzaSummary(urban: LabState["urban"], season: Season, profile:
 /** What was put in the piazza, one line each with its unit cost (shared by the dashboard rows and the report). */
 export const piazzaMix = (urban: LabState["urban"], s: PiazzaSummary) => [
   { label: "Alberi", value: `${urban.trees}`, cost: `${euroRange(UNIT_COST.tree)} l'uno` },
-  { label: "Prato", value: `${urban.permeable}%`, cost: `${grouped(s.lawnM2)} m² · ${euroRange(UNIT_COST.lawnM2)} al m²` },
+  { label: "Aiuole e ciottoli", value: `${urban.permeable}%`, cost: `${grouped(s.lawnM2)} m² · ${euroRange(UNIT_COST.lawnM2)} al m²` },
   { label: "Ombra", value: `${urban.shade}%`, cost: `${grouped(s.shadeArea)} m² · ${euroRange(UNIT_COST.shadeM2)} al m²` },
+  { label: "Nebulizzatori", value: `${urban.misters ?? 0}`, cost: `${euroRange(UNIT_COST.mister)} l'uno` },
 ];
 
 export type VineSummary = {

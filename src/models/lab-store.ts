@@ -12,11 +12,11 @@ export type LabState = {
   savedAt?: number | null;
   syncedAt?: number | null;
   syncedTargets?: string[] | null;
-  urban: { trees: number; permeable: number; shade: number; location: Loc; treeCells: number[] | null; permeableCells: number[] | null; shadeCells: number[] | null; realTemp?: number | null; area?: DrawnArea | null; places?: PlaceSnap<UrbanSnap>[] };
+  urban: { trees: number; permeable: number; shade: number; misters?: number; location: Loc; treeCells: number[] | null; permeableCells: number[] | null; shadeCells: number[] | null; realTemp?: number | null; area?: DrawnArea | null; places?: PlaceSnap<UrbanSnap>[] };
   vineyard: { zones: VineZoneState[]; phase: Pheno; selected: number; allZones: boolean; location: Loc; irrigation?: number; shade?: number; windbreak?: number; climateKey?: string; area?: DrawnArea | null; places?: PlaceSnap<VineSnap>[] };
 };
 /** What is kept per place (models/place-memory): the interventions and the area drawn, with its zones and edits. */
-type UrbanSnap = { trees: number; permeable: number; shade: number; area: DrawnArea | null };
+type UrbanSnap = { trees: number; permeable: number; shade: number; misters?: number; area: DrawnArea | null };
 type VineSnap = { zones: VineZoneState[]; selected: number; allZones: boolean; irrigation?: number; shade?: number; windbreak?: number; area: DrawnArea | null };
 /** The area of a place put back on its (possibly slightly moved) new spot, so it still counts there. */
 const reanchor = (area: DrawnArea | null, at: Loc) => (area ? { ...area, lat: at.lat, lng: at.lng } : null);
@@ -55,9 +55,9 @@ export function setUrban(patch: Partial<LabState["urban"]>) {
   let base = state.urban;
   const to = patch.location;
   if (to && !samePlace(base.location, to)) {
-    const { trees, permeable, shade } = base;
-    const { places, back } = movePlace(base.places, base.location, { trees, permeable, shade, area: base.area ?? null }, to);
-    base = { ...base, places, ...(back ? { trees: back.trees, permeable: back.permeable, shade: back.shade, area: reanchor(back.area, to), treeCells: null, permeableCells: null, shadeCells: null } : { area: null }) };
+    const { trees, permeable, shade, misters } = base;
+    const { places, back } = movePlace(base.places, base.location, { trees, permeable, shade, misters: misters ?? 0, area: base.area ?? null }, to);
+    base = { ...base, places, ...(back ? { trees: back.trees, permeable: back.permeable, shade: back.shade, misters: back.misters ?? 0, area: reanchor(back.area, to), treeCells: null, permeableCells: null, shadeCells: null } : { area: null }) };
   }
   state = { ...state, urban: { ...base, ...patch } }; emit("urban");
 }
@@ -97,7 +97,7 @@ export function useLab() { return useSyncExternalStore(subscribe, () => state, (
 
 /** Derived indicators shared by the Decision Lab and the dashboards. */
 export function urbanMetrics(u: LabState["urban"]) {
-  const est = piazzaEstimate(u.trees, u.permeable, u.shade);
+  const est = piazzaEstimate(u.trees, u.permeable, u.shade, u.misters ?? 0);
   return {
     est,
     cover: Math.round(Math.min(100, 12 + u.trees * 1.5)),

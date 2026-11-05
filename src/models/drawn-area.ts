@@ -13,7 +13,7 @@ import type { LayoutEdits } from "./area-layout";
  */
 export type ZoneKind = "libera" | "alberi" | "prato" | "ombra" | "lotto";
 export type SubArea = { id: string; kind: ZoneKind; ring: Ring; name?: string };
-export const ZONE_LABEL: Record<ZoneKind, string> = { libera: "Da lasciare libera", alberi: "Alberi", prato: "Prato", ombra: "Pergolato", lotto: "Lotto" };
+export const ZONE_LABEL: Record<ZoneKind, string> = { libera: "Da lasciare libera", alberi: "Alberi", prato: "Aiuole", ombra: "Pergolato", lotto: "Lotto" };
 /** Which kinds each simulation offers: the vineyard has no trees, lawn or pergolas. */
 export const ZONE_KINDS = { piazza: ["libera", "alberi", "prato", "ombra", "lotto"], vigneto: ["libera", "lotto"] } as const;
 

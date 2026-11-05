@@ -33,7 +33,7 @@ export function UrbanFlow() {
       {/* No Confronta here: the three levels are compared inside the thermometer itself. */}
       <SimShell kind="urban" place={place.name} onReset={resetUrban}
         simula={<UrbanThermometer onImportWeather={importRealWeather} />}
-        media={<LabMedia embedded kind="urban" context={`Alberi ${trees} · prato ${permeable}% · ombra ${shade}%`} />}
+        media={<LabMedia embedded kind="urban" context={`Alberi ${trees} · aiuole e ciottoli ${permeable}% · ombra ${shade}%`} />}
         sensori={<SensorAdvisor embedded kind="urban" />} />
     </div>
   );

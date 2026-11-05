@@ -5,7 +5,7 @@ const avg = (n: number[]) => (n.length ? Math.round(n.reduce((a, b) => a + b, 0)
 
 /** The intervention currently set in the piazza simulation, in plain words. */
 export function urbanSummary(u: LabState["urban"]): string {
-  return `Alberi ${u.trees} · prato ${u.permeable}% · ombra ${u.shade}%`;
+  return `Alberi ${u.trees} · aiuole e ciottoli ${u.permeable}% · ombra ${u.shade}%${u.misters ? ` · nebulizzatori ${u.misters}` : ""}`;
 }
 
 /** The intervention currently set in the vineyard simulation: the chosen zone, or the average of all. */
@@ -17,7 +17,7 @@ export function vineyardSummary(v: LabState["vineyard"]): string {
 }
 
 /** The piazza's levers as they are now, to put back later. */
-export const urbanMix = (u: LabState["urban"]): HistoryMix => ({ kind: "piazza", trees: u.trees, permeable: u.permeable, shade: u.shade });
+export const urbanMix = (u: LabState["urban"]): HistoryMix => ({ kind: "piazza", trees: u.trees, permeable: u.permeable, shade: u.shade, ...(u.misters ? { misters: u.misters } : {}) });
 
 /** Every zone's interventions as they are now (the older vineyard-level mix fills a zone that has none), plus the scope. */
 export const vineyardMix = (v: LabState["vineyard"]): HistoryMix => ({

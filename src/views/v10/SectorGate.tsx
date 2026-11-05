@@ -23,7 +23,7 @@ import { Backdrop, useDarkChrome } from "@/views/v10/intro";
  * identification pages and the info pages, which have their own way in.
  */
 const SECTORS: Array<{ kind: ProKind; Icon: typeof Building2; name: string; who: string; opens: string }> = [
-  { kind: "funzionario", Icon: Building2, name: "Settore urbano", who: "Per i funzionari del Comune", opens: "Si apre la piazza: alberi, prato e ombra contro il caldo." },
+  { kind: "funzionario", Icon: Building2, name: "Settore urbano", who: "Per i funzionari del Comune", opens: "Si apre la piazza: alberi, aiuole e ombra contro il caldo." },
   { kind: "agronomo", Icon: Grape, name: "Settore agricolo", who: "Per gli agronomi", opens: "Si apre il vigneto: acqua, ombra e vento per le viti." },
 ];
 const FREE_PATHS = ["/", "/scegli", "/identificazione", "/privacy", "/legale", "/faq", "/chi-siamo", "/contatti", "/piani", "/reset-password", "/admin"];

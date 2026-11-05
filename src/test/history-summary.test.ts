@@ -6,7 +6,7 @@ const loc = { label: "x", lat: 0, lng: 0 };
 const zone = { temperature: 1, moisture: 1, wind: 1, rain: false };
 describe("history summary", () => {
   it("describes the piazza", () => {
-    expect(urbanSummary({ trees: 8, permeable: 30, shade: 20, location: loc, treeCells: null, permeableCells: null, shadeCells: null })).toBe("Alberi 8 · prato 30% · ombra 20%");
+    expect(urbanSummary({ trees: 8, permeable: 30, shade: 20, location: loc, treeCells: null, permeableCells: null, shadeCells: null })).toBe("Alberi 8 · aiuole e ciottoli 30% · ombra 20%");
   });
   it("describes the chosen vineyard zone", () => {
     const v: LabState["vineyard"] = { zones: [zone, { ...zone, irrigation: 4, shade: 30, windbreak: 10 }], phase: "Invaiatura", selected: 1, allZones: false, location: loc };

@@ -8,7 +8,7 @@ import { clockText } from "./sim-when";
 export type HistoryFlow = "piazza" | "vigneto";
 /** What was set when the entry was recorded, so "Riapri" can put it back (older entries have none). */
 export type HistoryMix = (
-  | { kind: "piazza"; trees: number; permeable: number; shade: number }
+  | { kind: "piazza"; trees: number; permeable: number; shade: number; misters?: number }
   | { kind: "vigneto"; zones: Array<{ irrigation: number; shade: number; windbreak: number }>; allZones: boolean; selected: number }
 ) & {
   /** A copy of the simulated season and hour, for an account table that lacks their own columns. */
@@ -166,8 +166,9 @@ export function mixRows(mix: HistoryMix): { title: string; rows: MixRow[] }[] {
   if (mix.kind === "piazza") {
     return [{ title: "Piazza", rows: [
       { label: "Alberi", value: String(mix.trees) },
-      { label: "Prato", value: `${mix.permeable} %` },
+      { label: "Aiuole e ciottoli", value: `${mix.permeable} %` },
       { label: "Ombra", value: `${mix.shade} %` },
+      ...(mix.misters ? [{ label: "Nebulizzatori", value: String(mix.misters) }] : []),
     ] }];
   }
   const zones = mix.allZones ? mix.zones.map((z, i) => [z, i] as const) : [[mix.zones[mix.selected] ?? mix.zones[0]!, mix.selected] as const];

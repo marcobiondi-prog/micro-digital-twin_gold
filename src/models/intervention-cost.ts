@@ -4,11 +4,13 @@
  * - Albero: planting a street tree with root ball, pit and stake, and the first years of watering.
  * - Prato: taking up the paving and laying soil and lawn, or a draining paving.
  * - Ombra: pergolas, sails or awnings on a light frame.
+ * - Nebulizzatore: a misting pole with its nozzles, its share of the pump and pipes, fitted.
  */
 export const UNIT_COST = {
   tree: { lo: 600, hi: 1500 },
   lawnM2: { lo: 60, hi: 140 },
   shadeM2: { lo: 120, hi: 350 },
+  mister: { lo: 1200, hi: 2500 },
 } as const;
 
 /** Reference surface when the place has no mapped shape: the piazza the simulation was built on. */
@@ -17,11 +19,11 @@ export const REFERENCE_M2 = 4000;
 export type CostRange = { lo: number; hi: number };
 
 /** Total cost of the intervention and its cost for each m² of the piazza. */
-export function interventionCost(m2: number, trees: number, permeablePct: number, shadePct: number): { total: CostRange; perM2: CostRange } {
+export function interventionCost(m2: number, trees: number, permeablePct: number, shadePct: number, misters = 0): { total: CostRange; perM2: CostRange } {
   const lawn = m2 * (permeablePct / 100), shade = m2 * (shadePct / 100);
   const total = {
-    lo: trees * UNIT_COST.tree.lo + lawn * UNIT_COST.lawnM2.lo + shade * UNIT_COST.shadeM2.lo,
-    hi: trees * UNIT_COST.tree.hi + lawn * UNIT_COST.lawnM2.hi + shade * UNIT_COST.shadeM2.hi,
+    lo: trees * UNIT_COST.tree.lo + lawn * UNIT_COST.lawnM2.lo + shade * UNIT_COST.shadeM2.lo + misters * UNIT_COST.mister.lo,
+    hi: trees * UNIT_COST.tree.hi + lawn * UNIT_COST.lawnM2.hi + shade * UNIT_COST.shadeM2.hi + misters * UNIT_COST.mister.hi,
   };
   return { total, perM2: { lo: m2 > 0 ? total.lo / m2 : 0, hi: m2 > 0 ? total.hi / m2 : 0 } };
 }

@@ -1,7 +1,7 @@
 import type { Map as MlMap, GeoJSONSource } from "maplibre-gl";
 import type { Ring } from "@/models/place-area";
 import { ZONE_LABEL, type SubArea, type ZoneKind } from "@/models/drawn-area";
-import { hedgeParts, hedgeWidthM, netParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, TREE_RADIUS_M, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
+import { crownRing, hedgeParts, hedgeWidthM, netParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, TREE_RADIUS_M, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
 
 /** The drawn area on a maplibre map: a turquoise fill and a white outline, from a ring of [lat, lng] pins. */
 export const AREA_SOURCE = "drawn-area";
@@ -68,6 +68,8 @@ export const ZONE_COLORS: Record<ZoneKind, string> = { libera: "#cbd5e1", alberi
 /** A zone's short name on the map. */
 export const zoneTag = (z: SubArea) => (z.kind === "lotto" ? z.name ?? "Lotto" : z.kind === "libera" ? "Libera" : ZONE_LABEL[z.kind]);
 export const SIM_SOURCE = "sim-layout";
+/** How far a mister's mist reaches (m): about 40 m² round each pole. */
+export const MIST_RADIUS_M = 3.5;
 export const SIM_TREES_3D = "sim-trees-3d";
 
 /** The vines' thirst as the zone's colour: green, amber, red (the same steps as the arc's verdict). */
@@ -76,7 +78,7 @@ export const SIM_COLORS = { lawn: "#62ac42", shade: PERGOLA_COLORS.slat, cloth: 
 /** The 2D pattern of a pergola seen from above: wooden slats with light between them. */
 export const SLATS_IMAGE = "pergola-slats";
 /** The 2D pattern of a lawn: mowing stripes in two greens with blades of grass, so it reads as grass, not a flat green. */
-export const LAWN_IMAGE = "lawn-grass";
+export const LAWN_IMAGE = "lawn-beds-pebbles";
 
 const poly = (ring: Ring, props: Record<string, unknown>) => ({ type: "Feature", properties: props, geometry: { type: "Polygon", coordinates: [[...ring, ring[0]!].map(([la, ln]) => [ln, la])] } });
 const lineF = (ring: Ring, props: Record<string, unknown>) => ({ type: "Feature", properties: props, geometry: { type: "LineString", coordinates: ring.map(([la, ln]) => [ln, la]) } });
@@ -93,6 +95,11 @@ export function simFeatures(sim: SimLayout | null, withTreePoints: boolean) {
       ? { kind: "lawn", color: SIM_COLORS.lawn, opacity: 0.55 }
       : { kind: "shade", color: SIM_COLORS.shade, opacity: 0.9 }));
     for (const r of sim.shadows ?? []) out.push(poly(r, { kind: "shadow", color: "#0b0f15", opacity: 0.32 }));
+    // Misters: the mist they spread (a light blue veil about 3,5 m round) and, in 2D, the pole seen from above.
+    for (const m of sim.data.misters) {
+      out.push(poly(crownRing(m, MIST_RADIUS_M, 20), { kind: "mist", color: "#7dd3fc", opacity: 0.3 }));
+      if (withTreePoints) out.push(poly(crownRing(m, 0.45, 10), { kind: "mistpole", color: "#e0f2fe", opacity: 1 }));
+    }
     if (withTreePoints) for (const t of sim.data.trees) out.push({ type: "Feature", properties: { kind: "tree" }, geometry: { type: "Point", coordinates: [t[1], t[0]] } });
   } else {
     // Zones: rows of vines on soil tinted by their thirst; cloth: a dark shade net; drip lines and the hedge drawn below.
@@ -121,7 +128,7 @@ export const ringCentre = (ring: Ring): [number, number] => [ring.reduce((a, p) 
 
 /** What stands up in 3D: each tree and a wooden pergola over each shade strip; in the vineyard the hedge and the shade nets. */
 export const treeCrowns = (sim: SimLayout | null) => fc(!sim ? [] : (sim.kind === "piazza"
-  ? [...sim.data.trees.flatMap((t) => treeParts(t)), ...sim.data.patches.filter((p) => p.kind === "shade").flatMap((p) => (p.exact ? pergolaRingParts(p.ring) : pergolaParts(p.ring)))]
+  ? [...sim.data.misters.map((m) => ({ ring: crownRing(m, 0.12, 6), base: 0, height: 3, color: "#cbd5e1" })), ...sim.data.trees.flatMap((t) => treeParts(t)), ...sim.data.patches.filter((p) => p.kind === "shade").flatMap((p) => (p.exact ? pergolaRingParts(p.ring) : pergolaParts(p.ring)))]
   : [...sim.data.lines.filter((l) => l.kind === "wind").flatMap((l) => hedgeParts(l.line, l.strength ?? 0)), ...sim.data.patches.filter((p) => p.kind === "cloth").flatMap((p) => netParts(p.ring))]
 ).map((p) => poly(p.ring, { kind: "raised", base: p.base, height: p.height, color: p.color })));
 
@@ -167,21 +174,42 @@ function hedgeImage(): Img {
  * The lawn image: two bands of green (a mown lawn's stripes) with short blades scattered lighter and darker,
  * picked by a fixed pseudo-random sequence so it is the same on every device.
  */
+/**
+ * Aiuole e ciottoli seen from above: beds of short grass with small flowers (pink, yellow, white), separated by a path
+ * of round pebbles in greys and sand tones on a darker gravel bed — a 48 px tile, so the pattern repeats as beds and paths.
+ */
 function lawnImage(): { width: number; height: number; data: Uint8Array } {
-  const w = 32, h = 32, data = new Uint8Array(w * h * 4);
-  const light = [0x6c, 0xb8, 0x4a], dark = [0x58, 0xa0, 0x3a];
+  const w = 48, h = 48, data = new Uint8Array(w * h * 4);
+  const light = [0x6c, 0xb8, 0x4a], dark = [0x5c, 0xa4, 0x3e], gravel = [0x8a, 0x80, 0x72];
   let seed = 7;
   const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const c = y < h / 2 ? light : dark, o = (y * w + x) * 4;
-    data[o] = c[0]!; data[o + 1] = c[1]!; data[o + 2] = c[2]!; data[o + 3] = 255;
-  }
-  // Blades: short vertical strokes, a little lighter or darker than their band.
-  for (let i = 0; i < 70; i++) {
-    const x = Math.floor(rnd() * w), y0 = Math.floor(rnd() * h), len = 2 + Math.floor(rnd() * 3), k = rnd() < 0.5 ? 1.18 : 0.82;
+  const put = (x: number, y: number, c: readonly number[]) => { const o = (((y + h) % h) * w + ((x + w) % w)) * 4; data[o] = c[0]!; data[o + 1] = c[1]!; data[o + 2] = c[2]!; data[o + 3] = 255; };
+  // The pebble path: the last 16 px of the tile, across.
+  const path = (x: number) => x >= 32;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) put(x, y, path(x) ? gravel : (Math.floor(y / 8) % 2 ? dark : light));
+  // Grass blades on the beds.
+  for (let i = 0; i < 140; i++) {
+    const x = Math.floor(rnd() * 32), y0 = Math.floor(rnd() * h), len = 2 + Math.floor(rnd() * 3), k = rnd() < 0.5 ? 1.18 : 0.82;
     for (let d = 0; d < len; d++) {
-      const y = (y0 + d) % h, o = (y * w + x) * 4;
+      const o = (((y0 + d) % h) * w + x) * 4;
       for (let ch = 0; ch < 3; ch++) data[o + ch] = Math.max(0, Math.min(255, Math.round(data[o + ch]! * k)));
+    }
+  }
+  // Small flowers in the beds.
+  const petals = [[0xf4, 0x8f, 0xb1], [0xfa, 0xd2, 0x4b], [0xf5, 0xf5, 0xf0], [0xc0, 0x84, 0xfc]];
+  for (let i = 0; i < 14; i++) {
+    const x = 2 + Math.floor(rnd() * 28), y = Math.floor(rnd() * h), c = petals[i % petals.length]!;
+    put(x, y, c); put(x + 1, y, c); put(x, y + 1, c); put(x + 1, y + 1, [0xf0, 0xc0, 0x30]);
+  }
+  // Round pebbles on the path, a light top edge and a dark lower edge so they read as stones.
+  const stones = [[0xd6, 0xd0, 0xc4], [0xb8, 0xb0, 0xa2], [0xe4, 0xd8, 0xbc], [0x9c, 0x96, 0x8c], [0xc8, 0xb8, 0x9a]];
+  for (let i = 0; i < 26; i++) {
+    const cx = 33 + Math.floor(rnd() * 14), cy = Math.floor(rnd() * h), r = 1.4 + rnd() * 1.6, c = stones[i % stones.length]!;
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+      const d = Math.hypot(dx, dy * 1.2);
+      if (d > r) continue;
+      const k = dy < 0 ? 1.12 : dy > 0 && d > r - 1 ? 0.72 : 1;
+      put(cx + dx < 32 ? 32 : Math.min(47, cx + dx), cy + dy, c.map((v) => Math.min(255, Math.round(v * k))));
     }
   }
   return { width: w, height: h, data };

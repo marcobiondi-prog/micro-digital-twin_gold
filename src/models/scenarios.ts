@@ -1,8 +1,14 @@
 import { vineModel } from "./data";
 
 /** Piazza-scale estimate calibrated on the video (6 alberi + 20% permeabile ≈ −2/−4 °C). */
-export function piazzaEstimate(trees: number, depave: number, shade: number) {
-  const dT = Math.min(5.2, trees * 0.25 + depave * 0.04 + shade * 0.03);
+/**
+ * The piazza's cooling (°C of perceived heat at full heat): trees, aiuole e ciottoli, shade and misters — each mister
+ * a pole that sprays a fine mist over about 40 m², cooling the air around it by evaporation (0,15 °C on the piazza's
+ * average each, a few degrees right under it).
+ */
+export const MISTER_COOLING = 0.15;
+export function piazzaEstimate(trees: number, depave: number, shade: number, misters = 0) {
+  const dT = Math.min(5.2, trees * 0.25 + depave * 0.04 + shade * 0.03 + misters * MISTER_COOLING);
   return { dT, lo: dT * 0.7, hi: Math.min(5.5, dT * 1.3) };
 }
 

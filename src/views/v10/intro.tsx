@@ -24,7 +24,7 @@ import { IdentifyForm, profileIntro } from "@/views/v10/Identify";
 type Item = { id: "camera" | "urban" | "vine"; Icon: typeof Building2; name: string; desc: string; cta: string };
 const items: Item[] = [
   { id: "urban", Icon: Building2, name: "Sei un funzionario urbano?", cta: "Identificati come funzionario",
-    desc: "Ti identifichi con il Comune, l'ufficio e l'email del Comune: si apre la piazza, dove metti alberi, prato e ombra." },
+    desc: "Ti identifichi con il Comune, l'ufficio e l'email del Comune: si apre la piazza, dove metti alberi, aiuole e ombra." },
   { id: "vine", Icon: Grape, name: "Sei un agronomo?", cta: "Identificati come agronomo",
     desc: "Ti identifichi con il patentino fitosanitario: si apre il vigneto, dove regoli acqua, ombra e vento." },
   // AI_STANDBY: in development, so nothing says what it will do.

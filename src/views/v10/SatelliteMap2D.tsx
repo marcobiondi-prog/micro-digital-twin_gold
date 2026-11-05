@@ -159,7 +159,7 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
     };
     if (sim.kind === "piazza") {
       sim.data.trees.forEach((t, index) => add(t, null, (to) => moveRef.current?.({ part: "tree", index, at: to })));
-      if (sim.data.patches.some((p) => p.kind === "lawn")) add(sim.data.lawnAt, "Prato", (to) => moveRef.current?.({ part: "lawn", at: to }));
+      if (sim.data.patches.some((p) => p.kind === "lawn")) add(sim.data.lawnAt, "Aiuole", (to) => moveRef.current?.({ part: "lawn", at: to }));
       if (sim.data.patches.some((p) => p.kind === "shade")) add(sim.data.shadeAt, "Ombra", (to) => moveRef.current?.({ part: "shade", at: to }));
     } else if (sim.data.lines.some((l) => l.kind === "wind")) {
       add(sim.data.windAt, "Frangivento", (to) => moveRef.current?.({ part: "wind", at: to }));

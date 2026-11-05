@@ -107,7 +107,7 @@ export function SimMap({ kind }: { kind: SimKind }) {
     if (!saved) return null;
     const edits = saved.edits ?? {}, inner = zonesOfArea(saved);
     if (kind === "urban") {
-      const data = piazzaLayout(saved.ring, lab.urban.trees, lab.urban.permeable, lab.urban.shade, edits, inner);
+      const data = piazzaLayout(saved.ring, lab.urban.trees, lab.urban.permeable, lab.urban.shade, edits, inner, lab.urban.misters ?? 0);
       if (!data) return null;
       // The shadows with the sun of the simulation's season and hour (its "when" chip), on the area's place.
       const when = getSimWhen("urban"), season = rSeason ?? when?.season, hour = rHour ?? when?.hour;
@@ -164,7 +164,7 @@ export function SimMap({ kind }: { kind: SimKind }) {
     keepSeeded(seen);
     if (!next) return;
     setUrban(next);
-    const said = [next.trees !== u.trees && `Alberi ${next.trees}`, next.permeable !== u.permeable && `Prato ${next.permeable} %`, next.shade !== u.shade && `Ombra ${next.shade} %`].filter(Boolean).join(" · ");
+    const said = [next.trees !== u.trees && `Alberi ${next.trees}`, next.permeable !== u.permeable && `Aiuole ${next.permeable} %`, next.shade !== u.shade && `Ombra ${next.shade} %`].filter(Boolean).join(" · ");
     toast.success("Interventi messi nelle zone", { description: `${said}: li vedi sulla mappa 2D e 3D.` });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind, zoneSig, !!saved?.edits?.onlyDrawn]);
@@ -242,17 +242,17 @@ export function SimMap({ kind }: { kind: SimKind }) {
         only={!!saved?.edits?.onlyDrawn} canOnly={!!saved && zonesOfArea(saved).some((z) => ["alberi", "prato", "ombra"].includes(z.kind))}
         onOnly={() => {
           if (!saved) return;
-          if (saved.edits?.onlyDrawn) { setEdits({}); toast("Torna la disposizione automatica", { description: "Le leve tornano a mettere prato, pergolati e alberi anche fuori dalle zone." }); return; }
+          if (saved.edits?.onlyDrawn) { setEdits({}); toast("Torna la disposizione automatica", { description: "Le leve tornano a mettere aiuole, pergolati e alberi anche fuori dalle zone." }); return; }
           const next = leversOfZones(saved);
           setUrban({ ...next, treeCells: null, permeableCells: null, shadeCells: null, area: { ...saved, edits: { onlyDrawn: true } } });
           setArranging(false);
-          toast.success("Solo quello disegnato da te", { description: `Alberi ${next.trees} · Prato ${next.permeable} % · Ombra ${next.shade} %: temperatura e costi contano solo le tue zone.` });
+          toast.success("Solo quello disegnato da te", { description: `Alberi ${next.trees} · Aiuole ${next.permeable} % · Ombra ${next.shade} %: temperatura e costi contano solo le tue zone.` });
         }}
         onArrange={() => { setView("2d"); setArranging((a) => !a); }} onAuto={() => { setEdits({}); toast("Disposizione automatica ripristinata"); }}
         onBest={() => {
           setEdits({ best: true });
           setArranging(false);
-          toast.success("Elementi nella posizione migliore", { description: "Pergolati, prato e alberi dove d'estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno all'area." });
+          toast.success("Elementi nella posizione migliore", { description: "Pergolati, aiuole e alberi dove d'estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno all'area." });
         }} />}
       {saved && !drawing && <ZonesBar area={saved} flow={kind === "urban" ? "piazza" : "vigneto"} onAdd={startZone} onEdit={editZone} onRemove={(id) => setZones(zonesOfArea(saved).filter((z) => z.id !== id))} />}
       </>}
@@ -307,7 +307,7 @@ function MapReading({ kind, lat, lng }: { kind: SimKind; lat: number; lng: numbe
   }
   const gain = +(before - after).toFixed(1);
   // Something is in place but takes nothing off now (no heat at this hour or season): said, so the pill is not mute.
-  const placed = kind === "urban" ? lab.urban.trees + lab.urban.permeable + lab.urban.shade > 0 : true;
+  const placed = kind === "urban" ? lab.urban.trees + lab.urban.permeable + lab.urban.shade + (lab.urban.misters ?? 0) > 0 : true;
   return (
     <div key={after} role="status" aria-live="polite" className="map-reading pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-full bg-black/20 px-2.5 py-1 text-white ring-1 ring-white/20 backdrop-blur-[2px] [text-shadow:0_1px_2px_rgb(0_0_0/0.8)]">
       <p className="flex items-center justify-center gap-1 whitespace-nowrap text-[13px] font-medium tabular-nums leading-tight">
@@ -386,8 +386,8 @@ function shadowText(sim: Extract<SimLayout, { kind: "piazza" }>, when?: string) 
 /** Says when the area has no room for all the m² the simulation counts. */
 function roomText(l: PiazzaLayout) {
   const short = (got: number, want: number) => want > 0 && got < want * 0.95 - 10;
-  const parts = [short(l.lawnM2, l.lawnTarget) && `prato ${l.lawnTarget.toLocaleString("it-IT")} m²`, short(l.shadeM2, l.shadeTarget) && `pergolati ${l.shadeTarget.toLocaleString("it-IT")} m²`].filter(Boolean);
-  return parts.length ? `La simulazione conta ${parts.join(" e ")}: nell'area disegnata c'è posto per meno.` : "Prato e pergolati hanno sulla mappa gli stessi m² contati dalla simulazione.";
+  const parts = [short(l.lawnM2, l.lawnTarget) && `aiuole ${l.lawnTarget.toLocaleString("it-IT")} m²`, short(l.shadeM2, l.shadeTarget) && `pergolati ${l.shadeTarget.toLocaleString("it-IT")} m²`].filter(Boolean);
+  return parts.length ? `La simulazione conta ${parts.join(" e ")}: nell'area disegnata c'è posto per meno.` : "Aiuole e pergolati hanno sulla mappa gli stessi m² contati dalla simulazione.";
 }
 
 /**
@@ -397,7 +397,7 @@ function roomText(l: PiazzaLayout) {
 function SimBar({ sim, when, arranging, edited, best, only, canOnly, onArrange, onAuto, onBest, onOnly }: { sim: SimLayout; when?: string | undefined; arranging: boolean; edited: boolean; best: boolean; only: boolean; canOnly: boolean; onArrange: () => void; onAuto: () => void; onBest: () => void; onOnly: () => void }) {
   const m2 = (v: number) => `${Math.round(v).toLocaleString("it-IT")} m²`;
   const legend = sim.kind === "piazza"
-    ? [[dot(SIM_COLORS.tree), `Alberi ${sim.data.trees.length} · ${m2(sim.data.trees.length * TREE_SHADE_M2)} di chioma`], [dot(SIM_COLORS.lawn, false), `Prato ${m2(sim.data.lawnM2)}`], [dot(SIM_COLORS.shade, false), `Pergolati ${m2(sim.data.shadeM2)}`], [dot("#0b0f15", false), "Ombre"]] as const
+    ? [[dot(SIM_COLORS.tree), `Alberi ${sim.data.trees.length} · ${m2(sim.data.trees.length * TREE_SHADE_M2)} di chioma`], [dot(SIM_COLORS.lawn, false), `Aiuole e ciottoli ${m2(sim.data.lawnM2)}`], [dot(SIM_COLORS.shade, false), `Pergolati ${m2(sim.data.shadeM2)}`], [dot("#0b0f15", false), "Ombre"], ...(sim.data.misters.length ? [[dot("#7dd3fc"), `Nebulizzatori ${sim.data.misters.length}`] as const] : [])] as const
     : [[dot(thirstColor(10), false), "Zone (colore = sete)"], [dot(SIM_COLORS.drip, false), "Irrigazione"], [dot(SIM_COLORS.cloth, false), "Teli d'ombra"], [dot(SIM_COLORS.wind, false), "Frangivento"]] as const;
   return (
     <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4">
@@ -407,13 +407,13 @@ function SimBar({ sim, when, arranging, edited, best, only, canOnly, onArrange, 
       </ul>
       {sim.kind === "piazza" && <p className="text-sm text-muted-foreground">{shadowText(sim, when)}{roomText(sim.data)}</p>}
       <p className="text-sm text-muted-foreground">{arranging
-        ? sim.kind === "piazza" ? "Trascina gli alberi, o le etichette Prato e Ombra per spostare quelle zone." : "Trascina l'etichetta Frangivento verso il lato dove lo vuoi."
+        ? sim.kind === "piazza" ? "Trascina gli alberi, o le etichette Aiuole e Ombra per spostare quelle zone." : "Trascina l'etichetta Frangivento verso il lato dove lo vuoi."
         : only && sim.kind === "piazza"
-          ? "Solo quello disegnato da te: prato e pergolati sono le tue zone, gli alberi stanno nelle zone Alberi. Le leve della simulazione seguono le zone; se ne cambi una torna la disposizione automatica."
+          ? "Solo quello disegnato da te: aiuole e pergolati sono le tue zone, gli alberi stanno nelle zone Alberi. Le leve della simulazione seguono le zone; se ne cambi una torna la disposizione automatica."
         : best && sim.kind === "piazza"
-          ? `Posizione migliore: pergolati, prato e alberi dove d'estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno.${sim.data.sunny !== undefined ? ` Al sole per gran parte del giorno: ${Math.round(sim.data.sunny * 100)} % dell'area.` : ""}`
+          ? `Posizione migliore: pergolati, aiuole e alberi dove d'estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno.${sim.data.sunny !== undefined ? ` Al sole per gran parte del giorno: ${Math.round(sim.data.sunny * 100)} % dell'area.` : ""}`
           : "Segue le leve della simulazione: cambia gli alberi o le percentuali e la mappa si aggiorna."}</p>
-      {sim.kind === "piazza" && !canOnly && !only && !arranging && <p className="text-xs text-muted-foreground">Per vedere solo quello che disegni, aggiungi una zona Alberi, Prato o Pergolato.</p>}
+      {sim.kind === "piazza" && !canOnly && !only && !arranging && <p className="text-xs text-muted-foreground">Per vedere solo quello che disegni, aggiungi una zona Alberi, Aiuole o Pergolato.</p>}
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={onArrange} aria-pressed={arranging} className={cn(barBtn, arranging ? "bg-foreground text-background" : "bg-foreground/[0.08]")}>
           {arranging ? <><Check className="size-4" aria-hidden="true" />Fatto</> : <><Hand className="size-4" aria-hidden="true" />Sposta elementi</>}
@@ -437,7 +437,7 @@ function SimBar({ sim, when, arranging, edited, best, only, canOnly, onArrange, 
 const ZONE_HINT: Record<ZoneKind, string> = {
   libera: "Resta vuota (una fontana, una strada, un parcheggio) e la sua superficie si toglie dai costi.",
   alberi: "Gli alberi della simulazione vanno qui dentro.",
-  prato: "Qui c'è prato, poi il resto della percentuale dove c'è posto.",
+  prato: "Qui ci sono aiuole e ciottoli, poi il resto della percentuale dove c'è posto.",
   ombra: "Qui c'è un pergolato, poi il resto della percentuale dove c'è posto.",
   lotto: "Una parte del progetto, con la sua superficie e la sua quota di costo.",
 };

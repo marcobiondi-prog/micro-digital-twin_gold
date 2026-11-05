@@ -1243,7 +1243,7 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
           <DashCard className="flex flex-col items-center gap-2 py-8 text-center">
             <History className="size-7 text-muted-foreground" aria-hidden="true" />
             <p className="text-[15px] font-medium">{loading ? "Carico la cronologia…" : archivedEntries.length ? "Gli interventi sono tutti nell'archivio" : f === "tutti" ? "Ancora nessun intervento" : `Ancora nessun intervento ${f === "piazza" ? "nella piazza" : "nel vigneto"}`}</p>
-            {!loading && !archivedEntries.length && <p className="max-w-xs text-sm text-muted-foreground">Quando cambi alberi, prato, ombra o irrigazione nella simulazione, l’intervento si registra da solo e lo trovi qui, con foto e video.</p>}
+            {!loading && !archivedEntries.length && <p className="max-w-xs text-sm text-muted-foreground">Quando cambi alberi, aiuole, ombra o irrigazione nella simulazione, l’intervento si registra da solo e lo trovi qui, con foto e video.</p>}
           </DashCard>
         ) : groups.map((g) => compact
           ? <DayTab key={g.key} label={g.label} items={g.items} />

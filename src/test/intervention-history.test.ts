@@ -103,7 +103,7 @@ describe("intervention-history", () => {
 describe("mixRows", () => {
   it("reads the piazza's levers", () => {
     expect(mixRows({ kind: "piazza", trees: 7, permeable: 20, shade: 15 })).toEqual([{ title: "Piazza", rows: [
-      { label: "Alberi", value: "7" }, { label: "Prato", value: "20 %" }, { label: "Ombra", value: "15 %" }] }]);
+      { label: "Alberi", value: "7" }, { label: "Aiuole e ciottoli", value: "20 %" }, { label: "Ombra", value: "15 %" }] }]);
   });
   it("lists every zone on Tutte, only the chosen one otherwise", () => {
     const zones = [{ irrigation: 8, shade: 30, windbreak: 40 }, { irrigation: 2, shade: 0, windbreak: 10 }];
