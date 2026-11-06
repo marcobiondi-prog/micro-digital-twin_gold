@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { Crosshair, LoaderCircle } from "lucide-react";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Ring } from "@/models/place-area";
-import { addAreaLayers, addSimLayers, placePinElement, setAreaData, setSimData, type SimLayout } from "@/views/v10/map-area";
+import { addAreaLayers, addSimLayers, placePinElement, setAreaData, setSimData, SIM_TREES_3D, type SimLayout } from "@/views/v10/map-area";
+import type { GeoJSONSource, Map as MlMap } from "maplibre-gl";
+import { useSimWhen } from "@/models/sim-when";
+import { sunAt } from "@/models/sun-shadow";
+import type { SimThreeLayer } from "@/views/v10/three-layer";
 
 /**
  * 3D view without the browser key: an open vector map tilted, with the buildings raised from their heights and a pin
@@ -16,6 +20,12 @@ export function OpenMap3D({ lat, lng, label, zoom, area = [], sim = null }: { la
   const host = useRef<HTMLDivElement>(null);
   const mapRef = useRef<{ easeTo: (c: Camera & { duration: number }) => void } | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  // The simulation's objects are drawn by three.js inside the map (views/v10/three-layer): real models lit by the
+  // simulation's sun, with shadows. The map is built once per place; the objects and the light follow the levers.
+  const engine = useRef<{ map: MlMap; three: SimThreeLayer | null } | null>(null);
+  const when = useSimWhen(sim?.kind === "vigneto" ? "vineyard" : "urban");
+  const sun = when ? sunAt(lat, lng, when.season, when.hour, when.minute ?? 0, when.dst) : null;
+  const simKey = JSON.stringify(sim), sunKey = sun ? `${sun.az.toFixed(3)},${sun.alt.toFixed(3)}` : "notte";
   const camera: Camera = { center: [lng, lat], zoom, pitch: 60, bearing: -20 };
   useEffect(() => {
     let cancelled = false, remove: (() => void) | undefined;
@@ -34,17 +44,36 @@ export function OpenMap3D({ lat, lng, label, zoom, area = [], sim = null }: { la
         setAreaData(map, area);
         // The simulation inside it: lawn, shade, zones and lines on the ground, the trees raised as crowns.
         addSimLayers(map, lat, true);
-        setSimData(map, sim, true);
-        if (!cancelled) setState("ready");
+        let three: SimThreeLayer | null = null;
+        void import("@/views/v10/three-layer").then(({ simThreeLayer }) => {
+          if (cancelled) return;
+          three = simThreeLayer(maplibregl, [lng, lat]);
+          map.addLayer(three);
+          engine.current = { map, three };
+          setState("ready");
+        }).catch(() => { engine.current = { map, three: null }; if (!cancelled) setState("ready"); });
+        engine.current = { map, three };
       });
       map.on("error", () => { if (!cancelled && !map.loaded()) setState("error"); });
       new maplibregl.Marker({ element: placePinElement(), anchor: "bottom" }).setLngLat([lng, lat]).setPopup(new maplibregl.Popup({ offset: 38 }).setText(label)).addTo(map);
       mapRef.current = map;
       remove = () => map.remove();
     }).catch(() => { if (!cancelled) setState("error"); });
-    return () => { cancelled = true; mapRef.current = null; remove?.(); };
+    return () => { cancelled = true; mapRef.current = null; engine.current = null; remove?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lat, lng, zoom, label, JSON.stringify(area), JSON.stringify(sim)]);
+  }, [lat, lng, zoom, label, JSON.stringify(area)]);
+  // The levers and the clock: the ground shapes on the map's own layers, the objects (and, without three.js, the old
+  // extruded slabs) and the sun in the three.js layer — no rebuilding of the map.
+  useEffect(() => {
+    const e = engine.current;
+    if (state !== "ready" || !e) return;
+    setSimData(e.map, sim, true);
+    if (e.three) {
+      (e.map.getSource(SIM_TREES_3D) as GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features: [] });
+      e.three.update(sim, sun ? { az: sun.az, alt: sun.alt } : null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, simKey, sunKey]);
   const recenter = () => mapRef.current?.easeTo({ ...camera, duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 800 });
   return (
     <div data-map-gestures="" className="relative h-full w-full touch-none overflow-hidden bg-card">
