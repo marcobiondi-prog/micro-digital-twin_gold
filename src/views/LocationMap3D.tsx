@@ -29,7 +29,7 @@ type Shape = HTMLElement & { outerCoordinates?: unknown; coordinates?: unknown }
  * shade net one see-through sheet. Heights start from the photographed mesh and every shape is drawn through it, so
  * nothing ends up buried under the photographed ground.
  */
-function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: Array<[number, number]>, sim: SimLayout | null, groundM = 0): HTMLElement[] {
+function build3DOverlay({ Polygon3DElement, Polyline3DElement, Marker3DElement }: Maps3D, area: Array<[number, number]>, sim: SimLayout | null, groundM = 0): HTMLElement[] {
   const out: HTMLElement[] = [];
   if (!Polygon3DElement) return out;
   // Every shape lies FLAT on Google's own ground model (RELATIVE_TO_GROUND, heights in metres above it), drawn through the
@@ -156,6 +156,17 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
         part({ ring: crownRing(m, 0.12, 6), base: 0, height: 3, color: "#cbd5e1" });
         part({ ring: crownRing(m, 2.2, 16), base: 2.5, height: 2.7, color: "rgba(224,242,254,0.35)" }, 2.6, "rgba(125,211,252,0.6)", 1);
       }
+      // Each pole's number over it, as in 2D: a sky badge for those in the zones drawn for them, white for the others.
+      sim.data.misters.forEach((m, i) => {
+        try {
+          const inZone = i < sim.data.mistersInZones;
+          const mk = new Marker3DElement({ position: { lat: m[0], lng: m[1], altitude: 3.4 }, altitudeMode: "RELATIVE_TO_GROUND", drawsWhenOccluded: true, sizePreserved: true }) as HTMLElement;
+          const tpl = document.createElement("template");
+          tpl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="11" fill="${inZone ? "#38bdf8" : "#f8fafc"}" stroke="${inZone ? "#e0f2fe" : "#38bdf8"}" stroke-width="2.5"/><text x="13" y="17.5" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="700" fill="${inZone ? "#0b0f15" : "#0369a1"}">${i + 1}</text></svg>`;
+          mk.append(tpl);
+          out.push(mk);
+        } catch { /* an older build without custom markers: the poles alone */ }
+      });
       // Each tree: a dark trunk, then three crown discs each ringed a deeper green, so the layers read as foliage.
       for (const t of sim.data.trees) {
         for (const p of treeParts(t, undefined, 2.85)) {

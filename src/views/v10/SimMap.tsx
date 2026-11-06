@@ -213,6 +213,14 @@ export function SimMap({ kind }: { kind: SimKind }) {
       <div className="relative -mx-4 h-[52vh] min-h-72 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
         {/* The temperature the interventions bring, on the map itself (2D and 3D), following the levers live. */}
         <MapReading kind={kind} lat={pin.lat} lng={pin.lng} />
+        {/* How many misting poles the map shows, exactly: those in the zones drawn for them and those the app placed. */}
+        {sim?.kind === "piazza" && sim.data.misters.length > 0 && !drawing && (
+          <p role="status" className="pointer-events-none absolute left-1/2 top-12 z-[3] -translate-x-1/2 whitespace-nowrap rounded-full bg-black/45 px-3 py-1 text-[12px] font-semibold text-white ring-1 ring-white/15 backdrop-blur-sm [text-shadow:0_1px_2px_rgb(0_0_0/.6)]">
+            <span className="mr-1 inline-block size-2.5 rounded-full bg-sky-400 align-middle ring-2 ring-sky-100" aria-hidden="true" />
+            Nebulizzatori {sim.data.misters.length}
+            {sim.data.mistersInZones > 0 && <span className="font-normal text-white/80"> · {sim.data.mistersInZones} nelle tue zone{sim.data.misters.length > sim.data.mistersInZones ? ` · ${sim.data.misters.length - sim.data.mistersInZones} messi dall'app` : ""}</span>}
+          </p>
+        )}
         {/* Day and night at the simulation's season and hour, over the 2D and the 3D map alike. */}
         <DayNight kind={kind} lat={pin.lat} lng={pin.lng} />
         {show3d
@@ -397,7 +405,7 @@ function roomText(l: PiazzaLayout) {
 function SimBar({ sim, when, arranging, edited, best, only, canOnly, onArrange, onAuto, onBest, onOnly }: { sim: SimLayout; when?: string | undefined; arranging: boolean; edited: boolean; best: boolean; only: boolean; canOnly: boolean; onArrange: () => void; onAuto: () => void; onBest: () => void; onOnly: () => void }) {
   const m2 = (v: number) => `${Math.round(v).toLocaleString("it-IT")} m²`;
   const legend = sim.kind === "piazza"
-    ? [[dot(SIM_COLORS.tree), `Alberi ${sim.data.trees.length} · ${m2(sim.data.trees.length * TREE_SHADE_M2)} di chioma`], [dot(SIM_COLORS.lawn, false), `Aiuole e ciottoli ${m2(sim.data.lawnM2)}`], [dot(SIM_COLORS.shade, false), `Pergolati ${m2(sim.data.shadeM2)}`], [dot("#0b0f15", false), "Ombre"], ...(sim.data.misters.length ? [[dot("#7dd3fc"), `Nebulizzatori ${sim.data.misters.length}`] as const] : [])] as const
+    ? [[dot(SIM_COLORS.tree), `Alberi ${sim.data.trees.length} · ${m2(sim.data.trees.length * TREE_SHADE_M2)} di chioma`], [dot(SIM_COLORS.lawn, false), `Aiuole e ciottoli ${m2(sim.data.lawnM2)}`], [dot(SIM_COLORS.shade, false), `Pergolati ${m2(sim.data.shadeM2)}`], [dot("#0b0f15", false), "Ombre"], ...(sim.data.misters.length ? [[dot("#7dd3fc"), `Nebulizzatori ${sim.data.misters.length}${sim.data.mistersInZones ? ` (${sim.data.mistersInZones} nelle tue zone)` : ""}`] as const] : [])] as const
     : [[dot(thirstColor(10), false), "Zone (colore = stress)"], [dot(SIM_COLORS.drip, false), "Irrigazione · tubo e ali gocciolanti"], [dot(SIM_COLORS.trap), `Trappole ${sim.data.traps.length} · parassiti animali`], [dot(SIM_COLORS.treat, false), "Filari trattati · parassiti vegetali"]] as const;
   return (
     <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4">

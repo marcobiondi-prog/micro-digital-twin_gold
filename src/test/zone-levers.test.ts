@@ -31,3 +31,13 @@ describe("misters zone", () => {
     for (const [a, b] of l.misters) expect(ringContains(zone, a, b)).toBe(true);
   });
 });
+
+describe("misters inside and outside the zones", () => {
+  it("keeps about one every 40 m² in the zone and places the rest outside it, counted apart", () => {
+    const zone = sq(0.12, 0.4); // 12 m × 12 m: room for about 4
+    const l = piazzaLayout(sq(1), 0, 0, 0, {}, [{ kind: "nebulizzatori", ring: zone }], 7)!;
+    expect(l.misters).toHaveLength(7);
+    expect(l.mistersInZones).toBe(4);
+    l.misters.forEach(([a, b], i) => expect(ringContains(zone, a, b)).toBe(i < 4));
+  });
+});

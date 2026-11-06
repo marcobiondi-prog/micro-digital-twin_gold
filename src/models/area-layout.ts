@@ -23,7 +23,8 @@ export type Line = { line: Ring; kind: "drip" | "main" | "seam"; zone?: number }
  * `shadeM2`: the m² actually drawn as lawn and pergola; `lawnTarget` / `shadeTarget`: the m² the simulation counts
  * (the lever's share of the usable surface), so the map can say when there is no room for all of it.
  */
-export type PiazzaLayout = { misters: LatLng[]; trees: LatLng[]; patches: Patch[]; lawnAt: LatLng; shadeAt: LatLng; cell: number; sunny?: number; lawnM2: number; shadeM2: number; lawnTarget: number; shadeTarget: number };
+/** `misters`: every misting pole, those in the zones drawn for them first (`mistersInZones` of them), then the ones the app places. */
+export type PiazzaLayout = { misters: LatLng[]; mistersInZones: number; trees: LatLng[]; patches: Patch[]; lawnAt: LatLng; shadeAt: LatLng; cell: number; sunny?: number; lawnM2: number; shadeM2: number; lawnTarget: number; shadeTarget: number };
 export type VineLayout = { patches: Patch[]; lines: Line[]; zones: LatLng[]; traps: LatLng[] };
 
 /** The shade one tree gives in the simulation (m², models/project-summary) and so its crown on the map: about 6,2 m wide. */
@@ -245,12 +246,18 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
   const rest = cells.filter((x) => !new Set(lawnCells).has(x));
   const centre = (list: Cell[], fallback: [number, number]): [number, number] => list.length ? [list.reduce((t, q) => t + q.x, 0) / list.length, list.reduce((t, q) => t + q.y, 0) / list.length] : fallback;
   const autoLawn = lawnCells.filter((x) => !fixedLawn.includes(x)).length, autoShade = shadeCells.filter((x) => !fixedShade.includes(x)).length;
+  // Misting poles: the zones drawn for them hold about one every 40 m² each (at least one a zone), the rest of the
+  // lever the app places itself as before (under and near the pergolas, else on the paving), off those zones.
+  const nMist = Math.max(0, Math.round(misters));
+  const zoneCap = mistZones.reduce((t, z) => t + Math.max(1, Math.round(ringAreaM2(z.ring) / 40)), 0);
+  const inZones = Math.min(nMist, zoneCap);
+  const trunks = n > 0 ? placed.map((p) => toXY(f, p)) : [];
+  const zoneMisters: LatLng[] = !inZones ? [] : mistCells.length
+    ? misterSpots(f, c, trunks, mistCells, mistCells, inZones)
+    : mistZones.slice(0, inZones).map((z) => { const xy = z.ring.map((p) => toXY(f, p)); return toLL(f, xy.reduce((s2, p) => s2 + p[0], 0) / xy.length, xy.reduce((s2, p) => s2 + p[1], 0) / xy.length); });
+  const autoMisters = misterSpots(f, c, trunks, shadeCells.filter((x) => !isMist(x.x, x.y)), cells.filter((x) => !lawnCells.includes(x) && !isLawn(x.x, x.y) && !isMist(x.x, x.y)), nMist - zoneMisters.length);
   return {
-    misters: mistZones.length
-      // Zones drawn for misters hold them all: spread over their cells (a zone smaller than a cell: its middle).
-      ? (mistCells.length ? misterSpots(f, c, n > 0 ? placed.map((p) => toXY(f, p)) : [], mistCells, mistCells, Math.max(0, Math.round(misters)))
-        : mistZones.slice(0, Math.max(0, Math.round(misters))).map((z) => { const xy = z.ring.map((p) => toXY(f, p)); return toLL(f, xy.reduce((s2, p) => s2 + p[0], 0) / xy.length, xy.reduce((s2, p) => s2 + p[1], 0) / xy.length); }))
-      : misterSpots(f, c, n > 0 ? placed.map((p) => toXY(f, p)) : [], shadeCells, cells.filter((x) => !lawnCells.includes(x) && !isLawn(x.x, x.y)), Math.max(0, Math.round(misters))),
+    misters: [...zoneMisters, ...autoMisters], mistersInZones: zoneMisters.length,
     trees: placed, cell: c,
     lawnM2: Math.round((fixedLawn.length ? zoneM2("prato") : 0) + autoLawn * c * c), shadeM2: Math.round((fixedShade.length ? zoneM2("ombra") : 0) + autoShade * c * c),
     lawnTarget: Math.round(lawnTarget), shadeTarget: Math.round(shadeTarget),

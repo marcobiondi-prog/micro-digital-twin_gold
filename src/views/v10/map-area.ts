@@ -312,6 +312,18 @@ export function tagElement(label: string): HTMLElement {
   return el;
 }
 
+/**
+ * A misting pole on the 2D map: a round sky-blue badge with its number (1…n), the same size at every zoom — solid for
+ * the poles in the zones drawn for them, white with a sky ring for those the app placed.
+ */
+export function misterElement(n: number, inZone: boolean): HTMLElement {
+  const el = document.createElement("div");
+  el.setAttribute("aria-hidden", "true");
+  el.textContent = String(n);
+  el.style.cssText = `display:grid;place-items:center;width:20px;height:20px;border-radius:9999px;font:700 11px/1 system-ui,sans-serif;pointer-events:none;box-shadow:0 1px 4px rgb(0 0 0/.45);${inZone ? "background:#38bdf8;color:#0b0f15;border:2px solid #e0f2fe" : "background:#f8fafc;color:#0369a1;border:2px solid #38bdf8"}`;
+  return el;
+}
+
 /** A handle to move by hand: a tree (green dot) or a labelled pill (Aiuole, Ombra). */
 export function handleElement(label: string | null): HTMLElement {
   const el = document.createElement("div");

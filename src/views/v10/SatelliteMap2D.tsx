@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap, Marker } from "maplibre-gl";
 import type { Ring } from "@/models/place-area";
 import { MAX_PINS } from "@/models/drawn-area";
-import { addAreaLayers, addSimLayers, handleElement, placePinElement, ringCentre, tagElement, zoneTag, pinElement, setAreaData, setOutlineData, setSimData, setSimGhost, type SimLayout } from "@/views/v10/map-area";
+import { addAreaLayers, addSimLayers, handleElement, misterElement, placePinElement, ringCentre, tagElement, zoneTag, pinElement, setAreaData, setOutlineData, setSimData, setSimGhost, type SimLayout } from "@/views/v10/map-area";
 import { ringContains } from "@/models/place-area";
 import type { LatLng } from "@/models/area-layout";
 
@@ -150,6 +150,8 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
     handles.current = [];
     // The vineyard's zone names on their zones, and every inner zone's name ("Libera", "Lotto A", "Alberi"…).
     if (sim?.kind === "vigneto" && !drawing) sim.data.zones.forEach((z, i) => handles.current.push(new lib.Marker({ element: tagElement(`Zona ${i + 1}`) }).setLngLat([z[1], z[0]]).addTo(map)));
+    // Every misting pole numbered, in the zones drawn for them first (solid) then those the app placed (white).
+    if (sim?.kind === "piazza" && !drawing) sim.data.misters.forEach((m, i) => handles.current.push(new lib.Marker({ element: misterElement(i + 1, i < sim.data.mistersInZones) }).setLngLat([m[1], m[0]]).addTo(map)));
     if (sim && !drawing) for (const z of sim.inner ?? []) { if (z.ring.length < 3) continue; const c = ringCentre(z.ring); handles.current.push(new lib.Marker({ element: tagElement(zoneTag(z)) }).setLngLat([c[1], c[0]]).addTo(map)); }
     if (!arranging || drawing || !sim) return;
     const add = (at: LatLng, label: string | null, done: (to: LatLng) => void) => {
