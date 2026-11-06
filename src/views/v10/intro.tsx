@@ -30,8 +30,8 @@ const items: Item[] = [
     desc: "Si apre il vigneto: acqua e difesa dai parassiti per le viti." },
   // AI_STANDBY: in development, so nothing says what it will do, and it cannot be opened from here.
   AI_STANDBY
-    ? { id: "camera", Icon: ScanLine, name: "Fotocamera AI", who: "Per tutti", cta: "", desc: "Non è ancora disponibile: arriverà con un prossimo aggiornamento." }
-    : { id: "camera", Icon: ScanLine, name: "Fotocamera AI", who: "Per tutti", cta: "Inizia con Fotocamera AI", desc: "Inquadra una pianta: riconosce la specie e il fresco che regala." },
+    ? { id: "camera", Icon: ScanLine, name: "Fotocamera AI", who: "Per gli utenti Premium", cta: "", desc: "Non è ancora disponibile: arriverà con un prossimo aggiornamento." }
+    : { id: "camera", Icon: ScanLine, name: "Fotocamera AI", who: "Per gli utenti Premium", cta: "Inizia con Fotocamera AI", desc: "Inquadra una pianta: riconosce la specie e il fresco che regala." },
 ];
 const KIND_OF = { urban: "funzionario", vine: "agronomo" } as const;
 
