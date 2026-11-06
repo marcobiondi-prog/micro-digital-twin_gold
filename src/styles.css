@@ -677,9 +677,9 @@
   .simulation-tree-foot { bottom: -0.25rem; width: 0.625rem; height: 0.625rem; }
   .simulation-shade { width: 1rem; height: 1rem; }
 }
-.simulation-selector-capsule { border: 1px solid var(--border); background: color-mix(in oklab, var(--card) 62%, transparent); backdrop-filter: blur(10px); }
+.simulation-selector-capsule { border: 1px solid var(--border); background: color-mix(in oklab, var(--card) 62%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
 /* La copia del selettore fissata sotto Confronta resta solida: niente vetro traslucido sotto i contenuti che scorrono. */
-[data-mode-pin-row] .simulation-selector-capsule { background: var(--background); backdrop-filter: none; }
+[data-mode-pin-row] .simulation-selector-capsule { background: var(--background); -webkit-backdrop-filter: none; backdrop-filter: none; }
 @media (min-width: 768px) {
   .simulation-panels {
     grid-template-columns: minmax(0, 1fr) minmax(15rem, 19rem);
@@ -954,7 +954,7 @@
    Nessun movimento. */
 .bar-liquid {
   background-color: color-mix(in oklab, var(--background) 74%, transparent);
-  backdrop-filter: blur(44px) saturate(140%);
+  -webkit-backdrop-filter: blur(44px) saturate(140%); backdrop-filter: blur(44px) saturate(140%);
   border-top: 1px solid color-mix(in oklab, var(--foreground) 12%, transparent);
 }
 /* Tema scuro: la lastra si chiude un poco, il filo di bordo resta sottile. */
@@ -1426,8 +1426,8 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 /* Shared camera HUD: stable contrast over footage, independent of document theme. */
 .camera-hud { --background: var(--camera-surface); --foreground: var(--camera-ink); --muted-foreground: var(--camera-muted); --destructive: var(--camera-record); --accent: var(--camera-glass); --accent-foreground: var(--camera-ink); }
 .camera-topbar { position: absolute; top: max(1rem, env(safe-area-inset-top)); left: max(1rem, env(safe-area-inset-left)); right: max(1rem, env(safe-area-inset-right)); display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
-.camera-title { display: inline-flex; align-items: center; gap: .5rem; border: 1px solid var(--camera-border); border-radius: 8px; background: var(--camera-glass); padding: .625rem .75rem; font-size: .75rem; font-weight: 600; backdrop-filter: blur(12px); }
-.camera-tool { border-radius: 50%; color: var(--camera-ink); background: var(--camera-glass); border: 1px solid var(--camera-border); backdrop-filter: blur(12px); }
+.camera-title { display: inline-flex; align-items: center; gap: .5rem; border: 1px solid var(--camera-border); border-radius: 8px; background: var(--camera-glass); padding: .625rem .75rem; font-size: .75rem; font-weight: 600; -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+.camera-tool { border-radius: 50%; color: var(--camera-ink); background: var(--camera-glass); border: 1px solid var(--camera-border); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
 .camera-bottom { position: absolute; inset-inline: max(1rem, env(safe-area-inset-left), env(safe-area-inset-right)); bottom: calc(2.5rem + env(safe-area-inset-bottom)); }
 .camera-capture-dock { width: min(100%, 22rem); margin-inline: auto; display: grid; justify-items: center; gap: .375rem; color: var(--camera-ink); text-shadow: var(--camera-shadow); }
 .camera-capture-status { display: flex; align-items: center; justify-content: center; gap: .375rem; min-height: 1.5rem; padding: .125rem .625rem; border-radius: 4px; background: var(--camera-glass); font-size: .6875rem; font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -1443,7 +1443,7 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .camera-capture-label, .camera-labelled-tool > span { font-size: .6875rem; font-weight: 500; line-height: 1.25rem; }
 .camera-labelled-tool { display: grid; justify-items: center; gap: .125rem; }
 .camera-viewfinder { filter: drop-shadow(var(--camera-shadow)); opacity: .85; }
-.ar-pill-hud .camera-tool { min-height: 40px; border-radius: 999px; color: var(--camera-ink); background: var(--camera-glass); border: 1px solid var(--camera-border); backdrop-filter: blur(12px); }
+.ar-pill-hud .camera-tool { min-height: 40px; border-radius: 999px; color: var(--camera-ink); background: var(--camera-glass); border: 1px solid var(--camera-border); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
 .ar-pill-hud .camera-tool:hover, .ar-pill-hud .camera-tool[aria-pressed=true] { background: var(--camera-surface); border-color: var(--camera-ink); }
 .ar-pill-hud .camera-labelled-tool .camera-tool { width: auto; min-width: 94px; gap: .375rem; padding-inline: .625rem; font-size: .6875rem; }
 .ar-scan-tools { display: flex; align-items: center; justify-content: center; gap: .375rem; }
@@ -1457,7 +1457,7 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .ar-pill-hud .ar-tools-panel [data-camera-scroll] { text-shadow: var(--camera-shadow); }
 .ar-pill-hud .ar-tools-panel > div { max-width: 100%; }
 .ar-pill-hud .ar-tools-panel [data-camera-scroll] { background: transparent; padding-left: 0; }
-.ar-thermal-summary { position: absolute; top: calc(max(1rem, env(safe-area-inset-top)) + 3.25rem); left: max(1rem, env(safe-area-inset-left)); width: min(calc(100% - 2rem), 22rem); padding: .625rem .75rem; border: 1px solid var(--camera-border); border-radius: 8px; color: var(--camera-ink); background: var(--camera-glass); backdrop-filter: blur(12px); pointer-events: none; }
+.ar-thermal-summary { position: absolute; top: calc(max(1rem, env(safe-area-inset-top)) + 3.25rem); left: max(1rem, env(safe-area-inset-left)); width: min(calc(100% - 2rem), 22rem); padding: .625rem .75rem; border: 1px solid var(--camera-border); border-radius: 8px; color: var(--camera-ink); background: var(--camera-glass); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); pointer-events: none; }
 .ar-thermal-heading { display: flex; align-items: center; gap: .375rem; font-size: .75rem; font-weight: 600; }
 .ar-thermal-values { display: flex; gap: 1.5rem; margin-top: .375rem; font-variant-numeric: tabular-nums; }
 .ar-thermal-values dt, .ar-thermal-note { color: var(--camera-muted); font-size: .625rem; }
@@ -1559,7 +1559,7 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .ar-thermal-summary .ar-green-controls { margin-top: .625rem; }
 .ar-green-count { min-width: 9.5rem; text-align: center; font-size: .75rem; font-weight: 600; color: var(--camera-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* Variante autonoma (prima di qualsiasi scansione): pannello compatto sopra il dock. */
-.ar-green-dock { position: absolute; left: 50%; bottom: calc(max(1rem, env(safe-area-inset-bottom)) + 7.5rem); transform: translateX(-50%); z-index: 20; padding: .25rem .5rem; border: 1px solid var(--camera-border); border-radius: 999px; background: var(--camera-glass); backdrop-filter: blur(12px); }
+.ar-green-dock { position: absolute; left: 50%; bottom: calc(max(1rem, env(safe-area-inset-bottom)) + 7.5rem); transform: translateX(-50%); z-index: 20; padding: .25rem .5rem; border: 1px solid var(--camera-border); border-radius: 999px; background: var(--camera-glass); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
 .ar-green-dock .ar-green-controls { margin-top: 0; }
 
 /* Mirino della fotocamera AI: angoli sempre visibili; durante la scansione si aggancia
@@ -1573,7 +1573,7 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .ar-viewfinder-corner.br { bottom: 0; right: 0; border-left: 0; border-top: 0; border-bottom-right-radius: 6px; }
 .ar-viewfinder.is-locked .ar-viewfinder-corner, .ar-viewfinder.is-locking .ar-viewfinder-corner { border-color: var(--ar-outline); box-shadow: 0 0 10px color-mix(in oklab, var(--ar-outline) 55%, transparent); }
 .ar-viewfinder.is-locked:not(.is-locking) { animation: ar-viewfinder-snap 320ms cubic-bezier(.22,1,.36,1); }
-.ar-viewfinder-label { position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); white-space: nowrap; border-radius: 999px; padding: 2px 8px; font-size: 10px; font-weight: 600; background: color-mix(in oklab, var(--camera-surface) 55%, transparent); color: var(--camera-ink); backdrop-filter: blur(6px); }
+.ar-viewfinder-label { position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); white-space: nowrap; border-radius: 999px; padding: 2px 8px; font-size: 10px; font-weight: 600; background: color-mix(in oklab, var(--camera-surface) 55%, transparent); color: var(--camera-ink); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .ar-viewfinder.is-locked .ar-viewfinder-label { color: var(--ar-outline); }
 /* Clips the full-height sweep to the viewfinder so it never adds page scroll; the label stays outside. */
 .ar-viewfinder-scan { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
@@ -1599,7 +1599,7 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .ar-growth-slider input[type="range"] { width: 100%; accent-color: var(--ar-outline); height: 1.25rem; }
 
 /* Esito analisi minimizzato: barra compatta riapribile. */
-.ar-analysis-min { display: flex; align-items: center; gap: .375rem; padding: .375rem .75rem; border: 1px solid var(--camera-border); border-radius: 999px; background: var(--camera-glass); backdrop-filter: blur(12px); color: var(--camera-ink); font-size: .75rem; font-weight: 600; }
+.ar-analysis-min { display: flex; align-items: center; gap: .375rem; padding: .375rem .75rem; border: 1px solid var(--camera-border); border-radius: 999px; background: var(--camera-glass); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: var(--camera-ink); font-size: .75rem; font-weight: 600; }
 
 /* Stima termica minimizzata e bilancia trascinabile */
 .ar-thermal-summary-min { display: flex; align-items: center; gap: .375rem; width: auto; padding: .375rem .625rem; font-size: .75rem; cursor: pointer; pointer-events: auto; }
@@ -1613,8 +1613,8 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .ar-framing-hint { position: absolute; top: calc(max(1rem, env(safe-area-inset-top)) + 3.5rem); left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 2rem); border-radius: 6px; padding: .5rem .75rem; background: var(--camera-glass); color: var(--camera-ink); font-size: .75rem; text-align: center; pointer-events: none; opacity: 0; transition: opacity 180ms ease; }
 .ar-framing-hint[data-visible=true] { opacity: 1; }
 .ar-framing-hint[data-camera-controls] { pointer-events: auto; z-index: 30; max-height: calc(100dvh - 12rem); overflow-y: auto; }
-.ar-tutorial-veil { position: absolute; z-index: 25; inset: 0; background: color-mix(in oklab, var(--camera-surface, var(--background)) 30%, transparent); backdrop-filter: blur(10px) saturate(1.15); animation: ar-veil-in 260ms ease-out; }
-.ar-tutorial { position: absolute; z-index: 30; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(20rem, calc(100% - 2rem)); max-height: calc(100dvh - 8rem); overflow-y: auto; padding: 1.25rem 1.25rem 1rem; border-radius: 1.25rem; text-align: center; color: var(--camera-ink); background: color-mix(in oklab, var(--camera-surface, var(--background)) 55%, transparent); backdrop-filter: blur(22px) saturate(1.4); border: 1px solid color-mix(in oklab, var(--camera-ink) 18%, transparent); box-shadow: 0 20px 50px -20px color-mix(in oklab, var(--foreground) 45%, transparent), inset 0 1px 0 color-mix(in oklab, var(--camera-ink) 15%, transparent); animation: ar-tutorial-in 240ms ease-out; }
+.ar-tutorial-veil { position: absolute; z-index: 25; inset: 0; background: color-mix(in oklab, var(--camera-surface, var(--background)) 30%, transparent); -webkit-backdrop-filter: blur(10px) saturate(1.15); backdrop-filter: blur(10px) saturate(1.15); animation: ar-veil-in 260ms ease-out; }
+.ar-tutorial { position: absolute; z-index: 30; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(20rem, calc(100% - 2rem)); max-height: calc(100dvh - 8rem); overflow-y: auto; padding: 1.25rem 1.25rem 1rem; border-radius: 1.25rem; text-align: center; color: var(--camera-ink); background: color-mix(in oklab, var(--camera-surface, var(--background)) 55%, transparent); -webkit-backdrop-filter: blur(22px) saturate(1.4); backdrop-filter: blur(22px) saturate(1.4); border: 1px solid color-mix(in oklab, var(--camera-ink) 18%, transparent); box-shadow: 0 20px 50px -20px color-mix(in oklab, var(--foreground) 45%, transparent), inset 0 1px 0 color-mix(in oklab, var(--camera-ink) 15%, transparent); animation: ar-tutorial-in 240ms ease-out; }
 .ar-tutorial-close { position: absolute; top: .6rem; right: .6rem; display: grid; place-items: center; width: 1.9rem; height: 1.9rem; border-radius: 999px; color: var(--camera-ink); opacity: .75; }
 .ar-tutorial-close:hover { opacity: 1; background: color-mix(in oklab, var(--camera-ink) 12%, transparent); }
 .ar-tutorial-icon { position: relative; margin: 0 auto .75rem; display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: 999px; color: var(--primary-foreground); background: linear-gradient(135deg, var(--primary), var(--brand-turquoise, var(--primary))); box-shadow: 0 6px 18px -6px var(--primary); }
@@ -1637,8 +1637,8 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 /* Stima termica: spiegazione dell'icona della fiamma, con contorno satinato. */
 .ar-thermal-info-btn { display: grid; place-items: center; border-radius: 999px; color: inherit; transition: background 160ms ease; }
 .ar-thermal-info-btn:hover, .ar-thermal-info-btn:focus-visible { background: color-mix(in oklab, var(--camera-ink) 14%, transparent); }
-.ar-thermal-info-veil { position: absolute; z-index: 24; inset: 0; background: color-mix(in oklab, var(--camera-surface, var(--background)) 30%, transparent); backdrop-filter: blur(10px) saturate(1.15); animation: ar-veil-in 260ms ease-out; }
-.ar-thermal-info { position: absolute; z-index: 30; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(20rem, calc(100% - 2rem)); max-height: calc(100dvh - 8rem); overflow-y: auto; padding: 1.25rem 1.25rem 1rem; border-radius: 1.25rem; text-align: center; color: var(--camera-ink); background: color-mix(in oklab, var(--camera-surface, var(--background)) 55%, transparent); backdrop-filter: blur(22px) saturate(1.4); box-shadow: 0 20px 50px -20px color-mix(in oklab, var(--foreground) 45%, transparent); animation: ar-tutorial-in 240ms ease-out; }
+.ar-thermal-info-veil { position: absolute; z-index: 24; inset: 0; background: color-mix(in oklab, var(--camera-surface, var(--background)) 30%, transparent); -webkit-backdrop-filter: blur(10px) saturate(1.15); backdrop-filter: blur(10px) saturate(1.15); animation: ar-veil-in 260ms ease-out; }
+.ar-thermal-info { position: absolute; z-index: 30; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(20rem, calc(100% - 2rem)); max-height: calc(100dvh - 8rem); overflow-y: auto; padding: 1.25rem 1.25rem 1rem; border-radius: 1.25rem; text-align: center; color: var(--camera-ink); background: color-mix(in oklab, var(--camera-surface, var(--background)) 55%, transparent); -webkit-backdrop-filter: blur(22px) saturate(1.4); backdrop-filter: blur(22px) saturate(1.4); box-shadow: 0 20px 50px -20px color-mix(in oklab, var(--foreground) 45%, transparent); animation: ar-tutorial-in 240ms ease-out; }
 .ar-thermal-info::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; background: linear-gradient(150deg, color-mix(in oklab, var(--camera-ink) 60%, transparent), color-mix(in oklab, var(--camera-ink) 8%, transparent) 32%, color-mix(in oklab, var(--camera-ink) 28%, transparent) 62%, color-mix(in oklab, var(--camera-ink) 60%, transparent)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude; pointer-events: none; box-shadow: inset 0 1px 0 color-mix(in oklab, var(--camera-ink) 28%, transparent), inset 0 -1px 0 color-mix(in oklab, var(--camera-ink) 12%, transparent); }
 .ar-thermal-info-icon { position: relative; margin: 0 auto .75rem; display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: 999px; color: var(--primary-foreground); background: linear-gradient(135deg, var(--primary), var(--brand-turquoise, var(--primary))); box-shadow: 0 6px 18px -6px var(--primary); }
 .ar-thermal-info-icon::after { content: ""; position: absolute; inset: -6px; border-radius: inherit; border: 1.5px solid color-mix(in oklab, var(--primary) 55%, transparent); animation: ar-icon-pulse 2.2s ease-out infinite; }
@@ -1657,7 +1657,7 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .ar-scan-label { max-width: calc(100% - 2rem); white-space: normal; text-align: center; }
 .ar-scan-label small { display: block; margin-top: .25rem; color: var(--camera-muted); font-variant-numeric: tabular-nums; }
 .ar-identification-badge { margin-top: .5rem; padding-left: .5rem; border-left: 2px solid var(--ar-outline); color: var(--camera-muted); font-size: .6875rem; line-height: 1.4; }
-.ar-specimen-dock { width: min(100%, 22rem); padding: .375rem .875rem .625rem; border: 1px solid var(--camera-border); border-radius: 8px; background: var(--camera-glass); color: var(--camera-ink); backdrop-filter: blur(12px); }
+.ar-specimen-dock { width: min(100%, 22rem); padding: .375rem .875rem .625rem; border: 1px solid var(--camera-border); border-radius: 8px; background: var(--camera-glass); color: var(--camera-ink); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
 .ar-specimen-dock .ar-green-controls { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; gap: .375rem; margin: 0; }
 .ar-specimen-dock .camera-tool { width: 44px; height: 44px; }
 .ar-specimen-dock .ar-green-count { min-width: 0; white-space: normal; font-size: .75rem; line-height: 1.35; }
@@ -1717,7 +1717,7 @@ html[data-ar-camera], html[data-ar-camera] body { background: var(--camera-surfa
 
 /* Compositor snapshots keep live footage, frozen scans and HUD together. */
 .ar-rotation-viewport { view-transition-name: ar-camera-rotation; background: var(--camera-surface); }
-.ar-start-swipe-hint { position: absolute; z-index: 35; top: calc(100% + .25rem); left: 50%; transform: translateX(-50%); width: max-content; max-width: 100%; padding: .2rem .6rem; border-radius: 8px; border: 1px solid color-mix(in oklab, var(--camera-ink) 20%, transparent); background: color-mix(in oklab, var(--camera-surface) 20%, transparent); color: var(--camera-ink); backdrop-filter: blur(16px) saturate(1.2); font-size: .6875rem; line-height: 1.4; text-align: center; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity 240ms ease, visibility 240ms; }
+.ar-start-swipe-hint { position: absolute; z-index: 35; top: calc(100% + .25rem); left: 50%; transform: translateX(-50%); width: max-content; max-width: 100%; padding: .2rem .6rem; border-radius: 8px; border: 1px solid color-mix(in oklab, var(--camera-ink) 20%, transparent); background: color-mix(in oklab, var(--camera-surface) 20%, transparent); color: var(--camera-ink); -webkit-backdrop-filter: blur(16px) saturate(1.2); backdrop-filter: blur(16px) saturate(1.2); font-size: .6875rem; line-height: 1.4; text-align: center; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity 240ms ease, visibility 240ms; }
 .ar-camera-surface[data-landscape=true] .ar-start-swipe-hint { top: 100%; padding-block: 0; font-size: .625rem; }
 .ar-start-swipe-hint[data-visible=true] { opacity: 1; visibility: visible; }
 @media (prefers-reduced-motion: reduce) { .ar-start-swipe-hint { transition: none; } }
@@ -1748,9 +1748,9 @@ html[data-home-video] .home-video-player[data-kind="promo"] video { object-fit: 
 .home-promo-slide .home-video-player { aspect-ratio: 16 / 9; max-height: 70dvh; max-width: min(100%, calc(70dvh * 16 / 9)); margin-inline: auto; }
 .home-video-player video { display: block; width: 100%; height: 100%; object-fit: contain; }
 .home-video-toolbar { position: absolute; top: max(.75rem, env(safe-area-inset-top)); right: max(.75rem, env(safe-area-inset-right)); }
-.home-video-toolbar button, .home-video-controls { color: var(--camera-ink); border: none; backdrop-filter: none; }
-.home-video-toolbar button { border-radius: 8px; background: var(--camera-glass); border: 1px solid var(--camera-border); backdrop-filter: blur(18px); }
-.home-video-controls { position: absolute; bottom: max(.75rem, env(safe-area-inset-bottom)); left: max(.75rem, env(safe-area-inset-left)); right: max(.75rem, env(safe-area-inset-right)); display: flex; align-items: center; gap: .5rem; padding: .3rem .625rem; border: 1px solid var(--camera-border); border-radius: 999px; background: color-mix(in oklab, var(--camera-surface) 52%, transparent); backdrop-filter: blur(14px); text-shadow: var(--camera-shadow); }
+.home-video-toolbar button, .home-video-controls { color: var(--camera-ink); border: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.home-video-toolbar button { border-radius: 8px; background: var(--camera-glass); border: 1px solid var(--camera-border); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
+.home-video-controls { position: absolute; bottom: max(.75rem, env(safe-area-inset-bottom)); left: max(.75rem, env(safe-area-inset-left)); right: max(.75rem, env(safe-area-inset-right)); display: flex; align-items: center; gap: .5rem; padding: .3rem .625rem; border: 1px solid var(--camera-border); border-radius: 999px; background: color-mix(in oklab, var(--camera-surface) 52%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); text-shadow: var(--camera-shadow); }
 .home-video-controls button { color: var(--camera-ink); flex-shrink: 0; filter: drop-shadow(var(--camera-shadow)); }
 .home-video-time { font-size: .75rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .home-video-seek { flex: 1; min-width: 0; accent-color: var(--brand-turquoise); cursor: pointer; }
@@ -1758,8 +1758,8 @@ html[data-home-video] .home-video-player[data-kind="promo"] video { object-fit: 
 .home-video-status button { pointer-events: auto; }
 .home-video-play { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
 /* Shown while the browser forces muted autoplay; any tap on the page also turns sound on. */
-.home-video-unmute { position: absolute; top: max(.75rem, env(safe-area-inset-top)); left: max(.75rem, env(safe-area-inset-left)); z-index: 1; border-radius: 999px; background: var(--camera-glass); color: var(--camera-ink); border: 1px solid var(--camera-border); backdrop-filter: blur(18px); }
-.home-video-overlay { background: var(--camera-glass); backdrop-filter: blur(16px); }
+.home-video-unmute { position: absolute; top: max(.75rem, env(safe-area-inset-top)); left: max(.75rem, env(safe-area-inset-left)); z-index: 1; border-radius: 999px; background: var(--camera-glass); color: var(--camera-ink); border: 1px solid var(--camera-border); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
+.home-video-overlay { background: var(--camera-glass); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
 .home-video-dialog { display: block; width: min(1100px, calc(100vw - 3rem)); max-width: none; height: auto; aspect-ratio: 16 / 9; padding: 0; gap: 0; overflow: hidden; border-color: var(--camera-border); background: var(--camera-surface); }
 .home-video-dialog > button { display: none; }
 .home-video-dialog.home-video-touch { position: fixed; inset: 0 !important; width: 100dvw; height: 100dvh; max-height: none !important; transform: none !important; translate: 0 0 !important; border: 0; border-radius: 0; aspect-ratio: auto; animation: none !important; }
@@ -1791,27 +1791,27 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .ar-camera-surface { --ar-header-bottom: calc(max(1rem, env(safe-area-inset-top)) + 6rem); }
 .ar-camera-topbar { z-index: 21; }
 .ar-camera-actions { grid-column: 1 / -1; grid-row: 1; justify-content: flex-end; align-items: center; }
-.ar-focus-options { display:flex; align-items:center; gap:.25rem; padding:.3125rem; border-radius:999px; background:var(--camera-glass); border:1px solid var(--camera-border); backdrop-filter:blur(12px); box-shadow:0 2px 10px color-mix(in oklab, oklch(0 0 0) 35%, transparent); }
+.ar-focus-options { display:flex; align-items:center; gap:.25rem; padding:.3125rem; border-radius:999px; background:var(--camera-glass); border:1px solid var(--camera-border); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow:0 2px 10px color-mix(in oklab, oklch(0 0 0) 35%, transparent); }
 .ar-focus-options > * { flex:none; }
 .ar-camera-surface .ar-thermal-summary { top:var(--ar-header-bottom); }
 /* Leaves room for the capture dock, but never squeezes the results below ~12rem while the screen has it. */
 .ar-camera-surface .ar-thermal-summary:not(.ar-thermal-summary-min) { max-height:max(min(12rem, calc(var(--ar-camera-height, 100dvh) - var(--ar-header-bottom) - 1rem)), calc(var(--ar-camera-height, 100dvh) - var(--ar-header-bottom) - env(safe-area-inset-bottom) - 12rem)); overflow-y:auto; }
 .ar-camera-surface .ar-tools-panel { max-height:max(3rem, calc(var(--ar-camera-height, 100dvh) - var(--ar-header-bottom) - env(safe-area-inset-bottom) - 9rem)); overflow-y:auto; overscroll-behavior:contain; }
 .ar-camera-surface[data-landscape=true] #ar-camera-tools { width:calc(66% - 1rem); align-self:flex-end; }
-.ar-pill-hud .ar-focus-pill { height:36px; min-height:36px; padding-inline:.625rem; font-size:12px; line-height:1; background:transparent; border-color:transparent; backdrop-filter:none; box-shadow:none; }
+.ar-pill-hud .ar-focus-pill { height:36px; min-height:36px; padding-inline:.625rem; font-size:12px; line-height:1; background:transparent; border-color:transparent; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow:none; }
 .ar-pill-hud .ar-focus-pill:hover { background:color-mix(in oklab, var(--camera-ink) 12%, transparent); border-color:transparent; }
 .ar-pill-hud .ar-focus-pill[aria-checked="true"] { background:linear-gradient(180deg, color-mix(in oklab, var(--nav-accent) 88%, oklch(1 0 0)), var(--nav-accent)); color:var(--nav-accent-foreground); border-color:color-mix(in oklab, var(--nav-accent) 60%, oklch(1 0 0)); box-shadow:0 2px 10px color-mix(in oklab, var(--nav-accent) 45%, transparent); }
 .ar-pill-hud .ar-esito-chip { height:48px; min-height:48px; padding-inline:.625rem; gap:.25rem; font-size:12px; line-height:1; border-radius:999px;
-  background:var(--camera-glass); border:1px solid var(--camera-border); backdrop-filter:blur(12px);
+  background:var(--camera-glass); border:1px solid var(--camera-border); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
   box-shadow:0 2px 10px color-mix(in oklab, oklch(0 0 0) 35%, transparent); }
 .ar-pill-hud .ar-esito-chip:hover { border-color:var(--camera-ink); }
 .ar-focus-pill:disabled { opacity:.5; }
 
 /* Keep the heat legend halfway down the right edge, away from the upper summary. */
-.ar-heat-legend { position:absolute; top:50%; transform:translateY(-50%); right:max(1rem, env(safe-area-inset-right)); width:3.75rem; display:flex; flex-direction:column; align-items:center; gap:.25rem; padding:.5rem .25rem; border:1px solid var(--camera-border); border-radius:999px; background:var(--camera-glass); color:var(--camera-ink); backdrop-filter:blur(12px); font-size:10px; font-weight:500; cursor:pointer; }
+.ar-heat-legend { position:absolute; top:50%; transform:translateY(-50%); right:max(1rem, env(safe-area-inset-right)); width:3.75rem; display:flex; flex-direction:column; align-items:center; gap:.25rem; padding:.5rem .25rem; border:1px solid var(--camera-border); border-radius:999px; background:var(--camera-glass); color:var(--camera-ink); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); font-size:10px; font-weight:500; cursor:pointer; }
 
 /* AI camera zoom: Xperia-style lens chips in a glass capsule; the active chip grows and shows the live value. */
-.ar-zoom-lenses { display: flex; align-items: center; justify-content: center; gap: .375rem; margin-inline: auto; padding: .25rem; border: 1.5px solid oklch(0.98 0 0 / 55%); border-radius: 999px; background: oklch(0.12 0.005 255 / 55%); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.ar-zoom-lenses { display: flex; align-items: center; justify-content: center; gap: .375rem; margin-inline: auto; padding: .25rem; border: 1.5px solid oklch(0.98 0 0 / 55%); border-radius: 999px; background: oklch(0.12 0.005 255 / 55%); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 .ar-zoom-lens { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 999px; background: oklch(0.2 0.005 255 / 70%); color: oklch(0.98 0 0 / 85%); font-size: .6875rem; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.01em; transition: width .18s ease, height .18s ease, background-color .18s ease, color .18s ease; }
 .ar-zoom-lens[data-active] { width: 2.5rem; height: 2.5rem; background: oklch(0.98 0 0 / 92%); color: oklch(0.16 0.008 255); font-size: .75rem; font-weight: 700; }
 .ar-zoom-lens:disabled { opacity: .45; }
@@ -1874,12 +1874,12 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .ar-real-photo { display: block; width: 100%; max-height: 10rem; margin: 0 auto .5rem; border-radius: 8px; object-fit: cover; }
 
 /* In-camera confirm (turns with the camera surface in landscape, unlike window.confirm). */
-.ar-confirm-veil { position: absolute; inset: 0; z-index: 60; display: grid; place-items: center; padding: 1rem; background: oklch(0 0 0 / 35%); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
-.ar-confirm { width: min(20rem, 100%); padding: 1.125rem 1.125rem .875rem; border-radius: 1.25rem; color: var(--camera-ink); background: var(--camera-glass); border: 1px solid var(--camera-border); backdrop-filter: blur(22px) saturate(1.4); box-shadow: 0 20px 50px -20px oklch(0 0 0 / 70%); animation: ar-confirm-in 240ms ease-out; }
+.ar-confirm-veil { position: absolute; inset: 0; z-index: 60; display: grid; place-items: center; padding: 1rem; background: oklch(0 0 0 / 35%); -webkit-backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.ar-confirm { width: min(20rem, 100%); padding: 1.125rem 1.125rem .875rem; border-radius: 1.25rem; color: var(--camera-ink); background: var(--camera-glass); border: 1px solid var(--camera-border); -webkit-backdrop-filter: blur(22px) saturate(1.4); backdrop-filter: blur(22px) saturate(1.4); box-shadow: 0 20px 50px -20px oklch(0 0 0 / 70%); animation: ar-confirm-in 240ms ease-out; }
 /* The veil already centres the confirm: a blurred fade in place, no translate (the tutorial's keyframes offset by -50%). */
 .ar-confirm-veil { animation: ar-confirm-veil-in 240ms ease-out; }
 @keyframes ar-confirm-in { from { opacity: 0; transform: scale(.96); filter: blur(8px); } to { opacity: 1; transform: none; filter: blur(0); } }
-@keyframes ar-confirm-veil-in { from { opacity: 0; -webkit-backdrop-filter: blur(0); backdrop-filter: blur(0); } to { opacity: 1; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); } }
+@keyframes ar-confirm-veil-in { from { opacity: 0; -webkit-backdrop-filter: blur(0); -webkit-backdrop-filter: blur(0); backdrop-filter: blur(0); } to { opacity: 1; -webkit-backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); } }
 .ar-confirm-title { display: flex; align-items: center; gap: .5rem; font-size: .95rem; font-weight: 700; }
 .ar-confirm-text { margin-top: .5rem; font-size: .8125rem; line-height: 1.45; opacity: .85; }
 .ar-confirm-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1rem; }
@@ -1946,7 +1946,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .ps-nav { padding-bottom: env(safe-area-inset-bottom); }
 .ps-nav-bg { filter: drop-shadow(0 -6px 18px rgb(0 0 0 / 0.28)); }
 /* Frosted glass under the slab, cut to the same arch: what scrolls behind shows through, blurred, like the PS app. */
-.ps-nav-glass { backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 90' preserveAspectRatio='none'%3E%3Cpath d='M0 22 Q50 2 100 22 V90 H0 Z'/%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 90' preserveAspectRatio='none'%3E%3Cpath d='M0 22 Q50 2 100 22 V90 H0 Z'/%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat; }
+.ps-nav-glass { -webkit-backdrop-filter: blur(14px) saturate(1.2); backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 90' preserveAspectRatio='none'%3E%3Cpath d='M0 22 Q50 2 100 22 V90 H0 Z'/%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 90' preserveAspectRatio='none'%3E%3Cpath d='M0 22 Q50 2 100 22 V90 H0 Z'/%3E%3C/svg%3E") 0 0 / 100% 100% no-repeat; }
 .ps-nav-item { position: relative; display: flex; width: 100%; height: 3.25rem; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 0.25rem; color: rgb(255 255 255 / 0.88); outline: none; transition: color 200ms ease; }
 .ps-nav-item:focus-visible .ps-nav-icon { box-shadow: 0 0 0 2px rgb(255 255 255 / 0.6); }
 .ps-nav-icon { position: relative; z-index: 1; display: grid; place-items: center; width: 2.75rem; height: 2.25rem; border-radius: 0.75rem; transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1), filter 220ms ease; }
@@ -2166,3 +2166,9 @@ html[data-sys-camera] body > :not([data-sys-camera-root]):not(:has([data-sys-cam
 .app-toast[data-type="error"] [data-icon] { color: #f87171; }
 .app-toast[data-type="warning"] [data-icon] { color: #fbbf24; }
 .app-toast[data-type="info"] [data-icon] { color: #93c5fd; }
+
+/* iOS Safari before 18 reads only the prefixed property: the Tailwind backdrop utilities get it too, so the glass
+   (see-through blurred bars, pills and sheets) shows on iPhones like on Android. */
+[class*="backdrop-"] {
+  -webkit-backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,);
+}
