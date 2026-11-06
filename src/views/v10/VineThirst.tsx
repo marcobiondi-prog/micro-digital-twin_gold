@@ -51,14 +51,14 @@ export function VineZonePicker() {
   const legacy = vineMixOf(vine);
   const zonesAfter = vineMetrics({ ...vine, zones: vine.zones.map((z) => ({ ...z, ...zoneMixOf(z, legacy) })) }).results;
   return (
-    <div className="pointer-events-auto flex gap-1 rounded-full bg-black/45 p-1 ring-1 ring-white/15 backdrop-blur-md" role="radiogroup" aria-label="Zona del vigneto" onClick={(e) => e.stopPropagation()}>
+    <div className="pointer-events-auto flex gap-1 rounded-full bg-black/20 p-1 ring-1 ring-white/20 backdrop-blur-[2px]" role="radiogroup" aria-label="Zona del vigneto" onClick={(e) => e.stopPropagation()}>
       {[-1, ...vine.zones.map((_, i) => i)].map((i) => {
         const on = i === -1 ? all : !all && vine.selected === i;
         const s = i === -1 ? avg(zonesAfter.map((r) => r.s)) : zonesAfter[i]?.s ?? 0;
         return (
           <button key={i} type="button" role="radio" aria-checked={on} aria-label={`${i === -1 ? "Tutte le zone" : `Zona ${i + 1}`}, bisogno di intervento ${Math.round(s)} su 100`}
             onClick={(e) => { e.stopPropagation(); if (on) return; hapticTick(); setVineyard(i === -1 ? { allZones: true } : { allZones: false, selected: i }); }}
-            className={cn("flex h-9 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 text-[12px] font-semibold text-white outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white", on ? "bg-white text-black" : "hover:bg-white/15")}>
+            className={cn("flex h-9 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 text-[12px] font-semibold text-white outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white", on ? "bg-white/80 text-black" : "[text-shadow:0_1px_2px_rgb(0_0_0/0.7)] hover:bg-white/15")}>
             {i === -1 ? "Tutte" : `Zona ${i + 1}`}
             <span className={cn("size-2 rounded-full", GAIN_BG[stressGain(s)])} aria-hidden="true" />
             <span className="font-mono tabular-nums">{Math.round(s)}</span>
