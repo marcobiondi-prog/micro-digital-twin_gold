@@ -4,7 +4,7 @@ import { loadPlaceArea } from "@/lib/place-area-client";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronDown, CloudRain, Droplets, Thermometer, Flower2, Grape, Leaf, Ruler, ShieldCheck, Sprout, Umbrella, Wallet, Wind, Wine, type LucideIcon } from "lucide-react";
+import { CalendarDays, ChevronDown, CloudRain, Droplets, ListChecks, Thermometer, Flower2, Grape, Leaf, Ruler, ShieldCheck, Sprout, Umbrella, Wallet, Wind, Wine, type LucideIcon } from "lucide-react";
 import { phenoPhases, type Pheno } from "@/models/data";
 import { estimatedTemp, type Season } from "@/models/season-climate";
 import { useSeasonClock, WhenPicker } from "@/views/v10/when";
@@ -313,37 +313,66 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
           </div>
         ))}
       </dl>
-      <VineAdviceCard needs={zonesAfter.map((r) => r.s)} mixes={mixes} m2={m2} surface={`${surface} · ${surfaceNote}`} />
-      <VineForecastCard />
+      <VineAccordion needs={zonesAfter.map((r) => r.s)} mixes={mixes} m2={m2} surface={`${surface} · ${surfaceNote}`} />
     </section>
   );
 }
 
 const TONE_DOT: Record<AdviceTone, string> = { urgent: "bg-danger", soon: "bg-amber-400", ok: "bg-ok" };
 
-/** Cosa fare adesso, then the water: what the vines drink a day and a week, what brings the soil back, what the irrigation gives. */
-function VineAdviceCard({ needs, mixes, m2, surface }: { needs: number[]; mixes: VineMix[]; m2: number; surface: string }) {
+type AccKey = "advice" | "water" | "forecast";
+
+/** One fold of the accordion: a header (icon, title, one line of summary, chevron) and its body, shown when open. */
+function AccItem({ id, open, onToggle, icon: Icon, title, summary, children }: { id: AccKey; open: boolean; onToggle: (id: AccKey) => void; icon: LucideIcon; title: string; summary: string; children: React.ReactNode }) {
+  return (
+    <div className="border-b border-foreground/10 last:border-b-0">
+      <button type="button" onClick={() => { hapticTick(); onToggle(id); }} aria-expanded={open} aria-controls={`vine-acc-${id}`}
+        className="flex w-full items-center gap-3 px-4 py-3.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+        <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-semibold">{title}</span>
+          <span className="block truncate text-xs text-muted-foreground">{summary}</span>
+        </span>
+        <ChevronDown className={cn("size-5 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", open && "rotate-180")} aria-hidden="true" />
+      </button>
+      <div id={`vine-acc-${id}`} hidden={!open} className="space-y-3 px-4 pb-4">{children}</div>
+    </div>
+  );
+}
+
+const DAY_NAME = new Intl.DateTimeFormat("it-IT", { weekday: "short" });
+
+/**
+ * Cosa fare adesso · Acqua necessaria · Prossimi 7 giorni, folded in one accordion (one open at a time, the advice
+ * first): each header says the gist in one line, so the page stays short.
+ */
+function VineAccordion({ needs, mixes, m2, surface }: { needs: number[]; mixes: VineMix[]; m2: number; surface: string }) {
   const vine = useLab().vineyard;
+  const [open, setOpen] = useState<AccKey | null>("advice");
+  const toggle = (k: AccKey) => setOpen((o) => (o === k ? null : k));
   const zones = vine.zones.map((z, i) => ({ need: needs[i] ?? 0, moisture: z.moisture, temp: z.temperature, wind: z.wind, rain: z.rain, mix: mixes[i] ?? NO_MIX }));
   const advice = vineAdvice(zones, vine.phase);
   const zoneM2 = m2 / Math.max(1, vine.zones.length);
   const water = vine.zones.map((z, i) => vineWater({ moisture: z.moisture, temp: z.temperature, rain: z.rain, irrigation: mixes[i]?.irrigation ?? 0 }, vine.phase, zoneM2));
   const total = water.reduce((t, w) => ({ perDay: t.perDay + w.perDay, refill: t.refill + w.refill, given: t.given + w.given }), { perDay: 0, refill: 0, given: 0 });
+  const { lat, lng } = vine.location;
+  const q = useQuery({ queryKey: ["vine-forecast", lat.toFixed(2), lng.toFixed(2)], queryFn: () => loadForecast(lat, lng), staleTime: 60 * 60 * 1000 });
+  const days = q.data ? forecastNeed(vine, q.data) : null;
+  const peak = days?.reduce((b, d) => (d.need > b.need ? d : b), days[0]!) ?? null;
+  const actions = advice.filter((a) => a.tone !== "ok").length;
   return (
-    <>
-      <section className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4" aria-label="Cosa fare adesso">
-        <h3 className="text-[15px] font-semibold">Cosa fare adesso</h3>
+    <div className="rounded-3xl bg-foreground/[0.05]">
+      <AccItem id="advice" open={open === "advice"} onToggle={toggle} icon={ListChecks} title="Cosa fare adesso"
+        summary={actions ? `${actions} ${actions === 1 ? "cosa da fare" : "cose da fare"} · ${advice.find((x) => x.tone !== "ok")?.text ?? ""}` : advice[0]?.text ?? ""}>
         <ul className="space-y-2">
           {advice.map((a) => (
             <li key={a.text} className="flex items-start gap-2.5 text-sm leading-snug"><span className={cn("mt-1.5 size-2 shrink-0 rounded-full", TONE_DOT[a.tone])} aria-hidden="true" />{a.text}</li>
           ))}
         </ul>
-      </section>
-      <section className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4" aria-label="Acqua necessaria">
-        <div className="flex items-baseline justify-between gap-2">
-          <h3 className="text-[15px] font-semibold">Acqua necessaria</h3>
-          <span className="text-xs text-muted-foreground">{surface}</span>
-        </div>
+      </AccItem>
+      <AccItem id="water" open={open === "water"} onToggle={toggle} icon={Droplets} title="Acqua necessaria"
+        summary={`${waterText(total.perDay)} al giorno · ${waterText(total.refill)} per il terreno`}>
+        <p className="text-xs text-muted-foreground">{surface}</p>
         <div className="grid grid-cols-3 gap-2 text-center">
           <div><p className="font-mono text-base font-semibold tabular-nums">{waterText(total.perDay)}</p><p className="text-[11px] text-muted-foreground">al giorno</p></div>
           <div><p className="font-mono text-base font-semibold tabular-nums">{waterText(total.perDay * 7)}</p><p className="text-[11px] text-muted-foreground">a settimana</p></div>
@@ -358,39 +387,27 @@ function VineAdviceCard({ needs, mixes, m2, surface }: { needs: number[]; mixes:
           ))}
         </ul>
         <p className="text-[11px] leading-snug text-muted-foreground">{total.given > 0 ? `L'irrigazione impostata porta ${waterText(total.given)}. ` : ""}Stima indicativa: consumo delle viti dalla temperatura e dalla fase, terreno riportato al 30 % di umidità sui primi 50 cm.</p>
-      </section>
-    </>
-  );
-}
-
-const DAY_NAME = new Intl.DateTimeFormat("it-IT", { weekday: "short" });
-
-/** The coming 7 days at the place: highest temperature, wind, rain and the need of intervention each day would bring. */
-function VineForecastCard() {
-  const vine = useLab().vineyard;
-  const { lat, lng } = vine.location;
-  const q = useQuery({ queryKey: ["vine-forecast", lat.toFixed(2), lng.toFixed(2)], queryFn: () => loadForecast(lat, lng), staleTime: 60 * 60 * 1000 });
-  const days = q.data ? forecastNeed(vine, q.data) : null;
-  return (
-    <section className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4" aria-label="Prossimi 7 giorni">
-      <h3 className="text-[15px] font-semibold">Prossimi 7 giorni</h3>
-      {q.isPending ? <p className="text-sm text-muted-foreground">Leggo le previsioni del luogo…</p>
-        : !days ? <p className="text-sm text-muted-foreground">Previsioni non disponibili ora.</p>
-        : (
-          <>
-            <ul className="-mx-1 flex snap-x gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none]" data-map-gestures="">
-              {days.map((d, i) => (
-                <li key={d.date} className="flex min-w-[3.6rem] flex-1 snap-start flex-col items-center gap-1 rounded-2xl bg-foreground/[0.05] px-1.5 py-2 text-center">
-                  <span className="text-[11px] font-semibold capitalize text-muted-foreground">{i === 0 ? "Oggi" : DAY_NAME.format(new Date(`${d.date}T12:00`))}</span>
-                  <span className="font-mono text-sm font-semibold tabular-nums">{Math.round(d.tmax)}°</span>
-                  <span className="text-[10px] text-muted-foreground">{d.rain >= 2 ? `${Math.round(d.rain)} mm` : `${Math.round(d.wind)} km/h`}</span>
-                  <span className={cn("mt-0.5 rounded-full px-2 py-0.5 font-mono text-[12px] font-semibold tabular-nums text-white", GAIN_BG[stressGain(d.need)])}>{Math.round(d.need)}</span>
-                </li>
-              ))}
-            </ul>
-            <p className="text-[11px] leading-snug text-muted-foreground">Per ogni giorno: temperatura massima, pioggia (o vento) e il bisogno di intervento su 100 con gli interventi impostati.</p>
-          </>
-        )}
-    </section>
+      </AccItem>
+      <AccItem id="forecast" open={open === "forecast"} onToggle={toggle} icon={CalendarDays} title="Prossimi 7 giorni"
+        summary={q.isPending ? "Leggo le previsioni…" : !days || !peak ? "Previsioni non disponibili ora" : `Il giorno più critico: ${peak === days[0] ? "oggi" : DAY_NAME.format(new Date(`${peak.date}T12:00`))}, ${Math.round(peak.tmax)}° · ${Math.round(peak.need)}/100`}>
+        {q.isPending ? <p className="text-sm text-muted-foreground">Leggo le previsioni del luogo…</p>
+          : !days ? <p className="text-sm text-muted-foreground">Previsioni non disponibili ora.</p>
+          : (
+            <>
+              <ul className="-mx-1 flex snap-x gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none]" data-map-gestures="">
+                {days.map((d, i) => (
+                  <li key={d.date} className="flex min-w-[3.6rem] flex-1 snap-start flex-col items-center gap-1 rounded-2xl bg-foreground/[0.05] px-1.5 py-2 text-center">
+                    <span className="text-[11px] font-semibold capitalize text-muted-foreground">{i === 0 ? "Oggi" : DAY_NAME.format(new Date(`${d.date}T12:00`))}</span>
+                    <span className="font-mono text-sm font-semibold tabular-nums">{Math.round(d.tmax)}°</span>
+                    <span className="text-[10px] text-muted-foreground">{d.rain >= 2 ? `${Math.round(d.rain)} mm` : `${Math.round(d.wind)} km/h`}</span>
+                    <span className={cn("mt-0.5 rounded-full px-2 py-0.5 font-mono text-[12px] font-semibold tabular-nums text-white", GAIN_BG[stressGain(d.need)])}>{Math.round(d.need)}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[11px] leading-snug text-muted-foreground">Per ogni giorno: temperatura massima, pioggia (o vento) e il bisogno di intervento su 100 con gli interventi impostati.</p>
+            </>
+          )}
+      </AccItem>
+    </div>
   );
 }
