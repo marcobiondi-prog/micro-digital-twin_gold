@@ -30,8 +30,8 @@ const items: Item[] = [
     desc: "Si apre il vigneto: acqua e difesa dai parassiti per le viti." },
   // AI_STANDBY: in development, so nothing says what it will do, and it cannot be opened from here.
   AI_STANDBY
-    ? { id: "camera", Icon: ScanLine, name: "Fotocamera AI", who: "Per gli utenti Premium", cta: "", desc: "Non è ancora disponibile: arriverà con un prossimo aggiornamento." }
-    : { id: "camera", Icon: ScanLine, name: "Fotocamera AI", who: "Per gli utenti Premium", cta: "Inizia con Fotocamera AI", desc: "Inquadra una pianta: riconosce la specie e il fresco che regala." },
+    ? { id: "camera", Icon: ScanLine, name: "Fotocamera AI", who: "", cta: "", desc: "Non è ancora disponibile: arriverà con un prossimo aggiornamento." }
+    : { id: "camera", Icon: ScanLine, name: "Fotocamera AI", who: "", cta: "Inizia con Fotocamera AI", desc: "Inquadra una pianta: riconosce la specie e il fresco che regala." },
 ];
 const KIND_OF = { urban: "funzionario", vine: "agronomo" } as const;
 
@@ -338,7 +338,7 @@ export function Choice() {
                     {off && <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-300 ring-1 ring-amber-300/30">In sviluppo</span>}
                     {mine && <span className="rounded-full bg-brand-turquoise/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-turquoise">Il tuo profilo</span>}
                   </span>
-                  <span className="block text-sm text-foreground/70">{it.who}</span>
+                  {it.who && <span className="block text-sm text-foreground/70">{it.who}</span>}
                   <span className="mt-1 block text-xs text-foreground/55">{mine ? `Entra ${it.id === "urban" ? "nella piazza" : "nel vigneto"}: ${it.desc.replace(/^Si apre [^:]+: /, "")}` : it.desc}</span>
                 </span>
                 {!off && <ArrowRight className="size-5 shrink-0 text-foreground/60" aria-hidden="true" />}
