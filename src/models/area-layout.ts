@@ -545,13 +545,13 @@ export function mowStripes(ring: Ring, spacing = 3, max = 24): Ring[] {
 }
 
 /** Colours of the aiuole e ciottoli in 3D: pebble ground, two grass greens and the flower spots. */
-export const BEDS_3D = { pebbles: "#8a8580", stones: ["#d6d0c4", "#b8b0a2"], grass: ["#4f9a3e", "#5aa646"], edge: "#3a7a2c", flowers: ["#f472b6", "#facc15", "#f8fafc", "#c084fc", "#fb923c"] } as const;
+export const BEDS_3D = { pebbles: "#c8b99c", stones: ["#efe8da", "#a39684", "#d9c9a8", "#8c8173", "#f5f1e8"], grass: ["#4f9a3e", "#5aa646"], edge: "#3a7a2c", flowers: ["#f472b6", "#facc15", "#f8fafc", "#c084fc", "#fb923c"] } as const;
 /** Heights of the beds: thin flat slabs over the area's veil (0,35 m), the shadows (0,25 m) and the zones in Google 3D, so nothing covers them. */
 export const BED_H = { pebbleBase: 0.55, pebble: 0.58, grassBase: 0.6, grass: 0.65, flowerBase: 0.65, flower: 0.7 } as const;
 
 /**
- * Aiuole e ciottoli in 3D, drawn like the 2D pattern: the lawn patches are a path of pebbles (a grey ground with light
- * stones scattered on it) crossed by beds of grass running north–south, 2 m wide with 1 m of pebble path between them,
+ * Aiuole e ciottoli in 3D, drawn like the 2D pattern: the lawn patches are a path of pebbles (a gravel ground packed with
+ * round stones of several tints) crossed by beds of grass running north–south, 2 m wide with 0,5 m of pebble path between them,
  * small flowers scattered on the grass. The beds are the patches cut into bands (clipped to them, so they follow the
  * patches' shape), pieces of neighbouring row strips joined into one; the band pitch grows while there would be more
  * than `maxBeds` pieces, so the view stays light. Fixed pseudo-random flowers and stones, the same on every device.
@@ -583,7 +583,7 @@ export function bedParts(patches: Ring[], maxBeds = 70): { beds: Ring[]; parts: 
     }
     return out;
   };
-  let bed = 2, path = 1, beds = bandsAt(bed, path);
+  let bed = 2, path = 0.5, beds = bandsAt(bed, path);
   for (let k = 0; beds.length > maxBeds && k < 8; k++) { bed *= 1.3; path *= 1.2; beds = bandsAt(bed, path); }
   let seed = 11;
   const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
@@ -609,11 +609,13 @@ export function bedParts(patches: Ring[], maxBeds = 70): { beds: Ring[]; parts: 
       flowers++;
     }
   }
+  // Pebbles packed along the paths: round stones in sand, white, grey and brown, about one every 0,3 m² of path.
   let stones = 0;
-  for (let t = 0; t < 400 && stones < 40; t++) {
+  const wantStones = Math.min(110, Math.round((rings.reduce((t, r) => t + ringAreaM2(r), 0) - beds.reduce((t, b) => t + ringAreaM2(b), 0)) / 0.3));
+  for (let t = 0; t < wantStones * 8 && stones < wantStones; t++) {
     const ring = rings[t % rings.length]!, p = spotIn(ring);
     if (!p || beds.some((b) => inside2(b, p))) continue;
-    parts.push({ ring: crownRing(p, 0.12 + rnd() * 0.06, 7), base: BED_H.flowerBase, height: BED_H.flower, color: BEDS_3D.stones[stones % 2]! });
+    parts.push({ ring: crownRing(p, 0.1 + rnd() * 0.08, 7), base: BED_H.flowerBase, height: BED_H.flower, color: BEDS_3D.stones[stones % BEDS_3D.stones.length]! });
     stones++;
   }
   return { beds, parts };
