@@ -1,7 +1,7 @@
 import type { Map as MlMap, GeoJSONSource } from "maplibre-gl";
 import type { Ring } from "@/models/place-area";
 import { ZONE_LABEL, type SubArea, type ZoneKind } from "@/models/drawn-area";
-import { bedParts, crownRing, trapParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, TREE_RADIUS_M, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
+import { bedParts, crownRing, trapParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
 
 /** The drawn area on a maplibre map: a turquoise fill and a white outline, from a ring of [lat, lng] pins. */
 export const AREA_SOURCE = "drawn-area";
@@ -99,8 +99,9 @@ export function simFeatures(sim: SimLayout | null, withTreePoints: boolean) {
     for (const r of sim.shadows ?? []) out.push(poly(r, { kind: "shadow", color: "#0b0f15", opacity: 0.32 }));
     // Misters: the mist they spread (a light blue veil about 3,5 m round) and, in 2D, the pole seen from above.
     for (const m of sim.data.misters) {
-      out.push(poly(crownRing(m, MIST_RADIUS_M, 20), { kind: "mist", color: "#7dd3fc", opacity: 0.3 }));
-      if (withTreePoints) out.push(poly(crownRing(m, 0.45, 10), { kind: "mistpole", color: "#e0f2fe", opacity: 1 }));
+      // In 2D a fixed-size symbol (it keeps its size on screen at every zoom); in the open 3D the mist on the ground.
+      if (withTreePoints) out.push({ type: "Feature", properties: { kind: "mister" }, geometry: { type: "Point", coordinates: [m[1], m[0]] } });
+      else out.push(poly(crownRing(m, MIST_RADIUS_M, 20), { kind: "mist", color: "#7dd3fc", opacity: 0.3 }));
     }
     if (withTreePoints) for (const t of sim.data.trees) out.push({ type: "Feature", properties: { kind: "tree" }, geometry: { type: "Point", coordinates: [t[1], t[0]] } });
   } else {
@@ -221,36 +222,34 @@ function slatsImage(): { width: number; height: number; data: Uint8Array } {
   return { width: w, height: h, data };
 }
 
-/** Pixels for a length in metres at a zoom, around a latitude (so a crown keeps its real size while zooming). */
-const metresToPx = (m: number, lat: number, zoom: number) => m / ((156_543.03 * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom);
 
 /** Adds the simulation's source and layers under the area's white outline; `raised` adds the 3D trees and shade. */
-export function addSimLayers(map: MlMap, lat: number, raised = false) {
+export function addSimLayers(map: MlMap, _lat: number, raised = false) {
   if (map.getSource(SIM_SOURCE)) return;
   const before = map.getLayer("drawn-area-line") ? "drawn-area-line" : undefined;
   map.addSource(SIM_SOURCE, { type: "geojson", data: fc([]) });
   map.addLayer({ id: "sim-fill", type: "fill", source: SIM_SOURCE, filter: ["all", ["==", ["geometry-type"], "Polygon"], ["!=", ["get", "kind"], "shade"], ["!=", ["get", "kind"], "lawn"], ["!=", ["get", "kind"], "zone"], ["!=", ["get", "kind"], "treat"], ["!=", ["get", "kind"], "tint"], ["!=", ["get", "kind"], "shadow"]], paint: { "fill-color": ["get", "color"], "fill-opacity": ["get", "opacity"] } }, before);
   // The vineyard: rows of vines on soil tinted by each zone's thirst, a white seam around each zone, the shade nets.
   const thirstTints = [[0x6f, 0x8f, 0x4a], [0x9a, 0x85, 0x3c], [0x9c, 0x5a, 0x3a]] as const;
-  VINE_IMAGES.forEach((id, i) => { if (!map.hasImage(id)) map.addImage(id, vineImage(thirstTints[i]!)); });
-  if (!map.hasImage(SPRAY_IMAGE)) map.addImage(SPRAY_IMAGE, sprayImage());
+  VINE_IMAGES.forEach((id, i) => { if (!map.hasImage(id)) map.addImage(id, vineImage(thirstTints[i]!), { pixelRatio: 2 }); });
+  if (!map.hasImage(SPRAY_IMAGE)) map.addImage(SPRAY_IMAGE, sprayImage(), { pixelRatio: 2 });
   map.addLayer({ id: "sim-vine", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "zone"], paint: { "fill-pattern": ["get", "pattern"], "fill-opacity": 0.92, "fill-antialias": false } }, before);
   // The veils over the zones, without seams between their row strips.
   map.addLayer({ id: "sim-tint", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "tint"], paint: { "fill-color": ["get", "color"], "fill-opacity": ["get", "opacity"], "fill-antialias": false } }, before);
   map.addLayer({ id: "sim-net", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "treat"], paint: { "fill-pattern": SPRAY_IMAGE, "fill-opacity": 0.9, "fill-antialias": false } }, before);
   // The lawn: mowing stripes and blades of grass, without the hairlines between its row strips.
-  if (!map.hasImage(LAWN_IMAGE)) map.addImage(LAWN_IMAGE, lawnImage());
+  if (!map.hasImage(LAWN_IMAGE)) map.addImage(LAWN_IMAGE, lawnImage(), { pixelRatio: 2 });
   // In 3D no ground plane for the lawn: the beds lie on the map's own ground (bedParts, raised); in 2D the beds-and-pebbles pattern.
   if (!raised) map.addLayer({ id: "sim-lawn", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "lawn"], paint: { "fill-pattern": LAWN_IMAGE, "fill-opacity": 0.95, "fill-antialias": false } }, before);
   // The shadows cast on the ground (over the lawn, under the pergolas and the trees), without seams where they overlap.
   map.addLayer({ id: "sim-shadow", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "shadow"], paint: { "fill-color": "#0b0f15", "fill-opacity": 0.32, "fill-antialias": false } }, before);
   // The pergolas seen from above: slats with light between them, and a wooden frame.
-  if (!map.hasImage(SLATS_IMAGE)) map.addImage(SLATS_IMAGE, slatsImage());
+  if (!map.hasImage(SLATS_IMAGE)) map.addImage(SLATS_IMAGE, slatsImage(), { pixelRatio: 2 });
   map.addLayer({ id: "sim-pergola", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "shade"], paint: { "fill-pattern": SLATS_IMAGE, "fill-opacity": 0.95 } }, before);
   map.addLayer({ id: "sim-pergola-frame", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "shade"], paint: { "line-color": PERGOLA_COLORS.beam, "line-width": 1.5 } }, before);
   // Irrigation: the main pipe (a thick dark blue line with a light core) and the drip lines (a blue pipe with light
   // drippers along it, every ~1 m at street zoom, and a faint wet band on the soil under each).
-  map.addLayer({ id: "sim-drip-wet", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "drip"], paint: { "line-color": "#1e3a5f", "line-opacity": 0.35, "line-blur": 1, "line-width": ["interpolate", ["exponential", 2], ["zoom"], 12, metresToPx(0.9, lat, 12), 22, metresToPx(0.9, lat, 22)] } }, before);
+  map.addLayer({ id: "sim-drip-wet", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "drip"], paint: { "line-color": "#1e3a5f", "line-opacity": 0.35, "line-blur": 1, "line-width": 4 } }, before);
   map.addLayer({ id: "sim-drip-pipe", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "drip"], paint: { "line-color": "#0369a1", "line-width": 1.6 } }, before);
   map.addLayer({ id: "sim-drip-dots", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "drip"], paint: { "line-color": "#bae6fd", "line-width": 3.5, "line-dasharray": [0, 2.6] }, layout: { "line-cap": "round" } }, before);
   map.addLayer({ id: "sim-main", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "main"], paint: { "line-color": "#0c4a6e", "line-width": 5 }, layout: { "line-cap": "round" } }, before);
@@ -260,10 +259,12 @@ export function addSimLayers(map: MlMap, lat: number, raised = false) {
     map.addSource(SIM_TREES_3D, { type: "geojson", data: fc([]) });
     map.addLayer({ id: "sim-trees-3d", type: "fill-extrusion", source: SIM_TREES_3D, paint: { "fill-extrusion-color": ["get", "color"], "fill-extrusion-base": ["get", "base"], "fill-extrusion-height": ["get", "height"], "fill-extrusion-opacity": 1, "fill-extrusion-vertical-gradient": true } });
   } else {
+    map.addLayer({ id: "sim-misters", type: "circle", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "mister"], paint: { "circle-color": "#7dd3fc", "circle-opacity": 0.85, "circle-radius": 6, "circle-stroke-color": "#e0f2fe", "circle-stroke-width": 2 } }, before);
     map.addLayer({ id: "sim-traps", type: "circle", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "trap"], paint: { "circle-color": SIM_COLORS.trap, "circle-radius": 4, "circle-stroke-color": "#422006", "circle-stroke-width": 1.5 } }, before);
     map.addLayer({ id: "sim-trees", type: "circle", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "tree"], paint: {
       "circle-color": SIM_COLORS.tree, "circle-opacity": 0.9, "circle-stroke-color": "#ffffff", "circle-stroke-width": 1.2,
-      "circle-radius": ["interpolate", ["exponential", 2], ["zoom"], 12, metresToPx(TREE_RADIUS_M, lat, 12), 22, metresToPx(TREE_RADIUS_M, lat, 22)],
+      // A fixed size on screen at every zoom, like an icon: zooming in never blows the trees up.
+      "circle-radius": 7,
     } }, before);
   }
 }
@@ -292,6 +293,8 @@ export function setSimGhost(map: MlMap, ghost: boolean) {
   set("sim-traps", "circle-opacity", k);
   set("sim-traps", "circle-stroke-opacity", k);
   set("sim-trees", "circle-opacity", 0.9 * k);
+  set("sim-misters", "circle-opacity", 0.85 * k);
+  set("sim-misters", "circle-stroke-opacity", k);
   set("sim-trees", "circle-stroke-opacity", k);
 }
 

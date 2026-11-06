@@ -553,7 +553,7 @@ export const BEDS_3D = { pebbles: "#c8b99c", stones: ["#efe8da", "#a39684", "#d9
 export const BED_H = { pebbleBase: 0.55, pebble: 0.58, grassBase: 0.6, grass: 0.65, flowerBase: 0.65, flower: 0.7 } as const;
 
 /**
- * Aiuole e ciottoli in 3D, drawn like the 2D pattern: beds of grass running north–south, 2 m wide, with 0,5 m pebble
+ * Aiuole e ciottoli in 3D, drawn like the 2D pattern: beds of grass running north–south, 1,2 m wide, with 0,4 m pebble
  * paths between them — the paths are made of stones only (round pebbles in white, sand, grey and brown, packed), no
  * ground sheet under them — and small flowers scattered on the grass. Beds and paths are the patches cut into bands
  * (clipped to them, so they follow the patches' shape), the pieces of row strips stacked over the same band joined into
@@ -561,7 +561,7 @@ export const BED_H = { pebbleBase: 0.55, pebble: 0.58, grassBase: 0.6, grass: 0.
  * slices and only the slices wholly inside stay. The band pitch grows while there would be more than `maxBeds` beds,
  * so the view stays light. Fixed pseudo-random flowers and stones, the same on every device. Thin slabs (base > 0).
  */
-export function bedParts(patches: Ring[], maxBeds = 40, area?: Ring): { beds: Ring[]; parts: TreePart[] } {
+export function bedParts(patches: Ring[], maxBeds = 50, area?: Ring): { beds: Ring[]; parts: TreePart[] } {
   const rings = patches.filter((r) => r.length >= 3);
   if (!rings.length) return { beds: [], parts: [] };
   const lats = rings.flat().map((p) => p[0]), lngs = rings.flat().map((p) => p[1]);
@@ -608,22 +608,22 @@ export function bedParts(patches: Ring[], maxBeds = 40, area?: Ring): { beds: Ri
     }
     return { beds, paths };
   };
-  let bed = 2, path = 0.5, lay = layout(bed, path);
+  let bed = 1.2, path = 0.4, lay = layout(bed, path);
   for (let k = 0; lay.beds.length > maxBeds && k < 8; k++) { bed *= 1.3; path *= 1.15; lay = layout(bed, path); }
   const { beds, paths } = lay;
   let seed = 11;
   const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
   const parts: TreePart[] = beds.map((ring, n) => ({ ring, base: BED_H.grassBase, height: BED_H.grass, color: BEDS_3D.grass[n % 2]! }));
-  // Pebbles along every path in two staggered rows (0,25 m apart across it), spaced along it so there are at most 140
+  // Pebbles along every path in staggered rows (about 0,25 m apart across it), spaced along it so there are at most 140
   // in all (every 0,28 m on a small lawn), each whole inside its path.
   const pathM2 = paths.reduce((t, r) => t + ringAreaM2(r), 0);
-  const along = Math.max(0.28, (2 * pathM2) / Math.max(0.3, path) / 140);
+  const along = Math.max(0.22, pathM2 / Math.max(0.3, path) / 140);
   const dLat = along / 111_320, dLng = 0.25 / kLng;
   let stones = 0;
   for (const r of paths) {
     const la = r.map((p) => p[0]), ln = r.map((p) => p[1]);
     const lo = Math.min(...la), hi = Math.max(...la), a = Math.min(...ln), b = Math.max(...ln);
-    const cols = Math.max(1, Math.round((b - a) / dLng));
+    const cols = Math.max(1, Math.floor((b - a) / dLng));
     for (let ci = 0; ci < cols && stones < 140; ci++) {
       const x = a + (b - a) * ((ci + 0.5) / cols);
       for (let y = lo + dLat * (ci % 2 ? 0.75 : 0.25); y < hi && stones < 140; y += dLat) {
