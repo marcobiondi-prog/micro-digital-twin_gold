@@ -1,3 +1,4 @@
+import { VineZonePicker } from "@/views/v10/VineThirst";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { setPinFix, usePinFix } from "@/models/pin-fix";
 import { ringCentroid } from "@/models/place-area";
@@ -200,8 +201,9 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
     else setEdits({ ...e, [m.part === "lawn" ? "lawnAt" : m.part === "shade" ? "shadeAt" : "windAt"]: m.at });
   };
   if (preview) return (
-    <button type="button" onClick={() => openSimTab(kind, "mappa")} aria-label="Apri la mappa: disegna l'area e sposta gli elementi"
-      className="relative -mx-4 block h-[34vh] min-h-56 w-[calc(100%+2rem)] overflow-hidden text-left outline-none focus-visible:ring-2 focus-visible:ring-ring sm:mx-0 sm:w-full sm:rounded-3xl">
+    // The whole preview opens the Mappa tab; in the vineyard the zone pills over it choose the simulation's scope.
+    <div onClick={() => openSimTab(kind, "mappa")}
+      className="relative -mx-4 block h-[34vh] min-h-56 w-[calc(100%+2rem)] cursor-pointer overflow-hidden text-left sm:mx-0 sm:w-full sm:rounded-3xl">
       <MapReading kind={kind} lat={pin.lat} lng={pin.lng} />
       {/* The map (and its night veil) fades out at its foot by a mask, so the page itself — its ambient light, in light
           or dark — shows through: a gradient to a fixed colour left a band of another blue under the map. */}
@@ -212,10 +214,12 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
           <Suspense fallback={<div className="h-full w-full" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} sim={sim} still /></Suspense>
         </ParallaxLayer>
       </div>
-      <span className="pointer-events-none absolute bottom-3 right-3 z-[3] inline-flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-[13px] font-semibold text-white ring-1 ring-white/15 backdrop-blur-sm">
+      {kind === "vineyard" && <div className="absolute inset-x-0 top-12 z-[3] flex justify-center px-3"><VineZonePicker /></div>}
+      <button type="button" onClick={(e) => { e.stopPropagation(); openSimTab(kind, "mappa"); }} aria-label="Apri la mappa: disegna l'area e sposta gli elementi"
+        className="absolute bottom-3 right-3 z-[3] inline-flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-[13px] font-semibold text-white outline-none ring-1 ring-white/15 backdrop-blur-sm focus-visible:ring-2 focus-visible:ring-white">
         <MapIcon className="size-4" aria-hidden="true" />Apri la mappa
-      </span>
-    </button>
+      </button>
+    </div>
   );
 
   return (
