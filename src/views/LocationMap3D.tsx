@@ -3,7 +3,7 @@ import { densify, tileRing } from "@/models/drape";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { bedParts, BEDS_3D, crownRing, trapParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts } from "@/models/area-layout";
 import { MIST_RADIUS_M, SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
-import { Crosshair, LoaderCircle, Minus, Plus, RotateCcw } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, LoaderCircle, Minus, Move, Plus, RotateCcw, X } from "lucide-react";
 import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camera";
 
 /**
@@ -29,7 +29,7 @@ type Shape = HTMLElement & { outerCoordinates?: unknown; coordinates?: unknown }
  * shade net one see-through sheet. Heights start from the photographed mesh and every shape is drawn through it, so
  * nothing ends up buried under the photographed ground.
  */
-function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: Array<[number, number]>, sim: SimLayout | null, lift = 0): HTMLElement[] {
+function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: Array<[number, number]>, sim: SimLayout | null, adj: Adjust = NO_ADJUST): HTMLElement[] {
   const out: HTMLElement[] = [];
   if (!Polygon3DElement) return out;
   // Every shape lies FLAT on Google's own ground model (RELATIVE_TO_GROUND, heights in metres above it), drawn through the
@@ -38,7 +38,9 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
   // from another elevation model) everything floated above the piazza. Google's ground matches its own map.
   // Raised or lowered by hand (the 3D view's "Altezza" − / +): Google's ground model can lie under the photographed
   // floor, and shapes laid on it slide when the view tilts; lifted to the floor they stay put.
-  const MODE = "RELATIVE_TO_GROUND", UP = lift;
+  // Moved sideways by hand too (north / east, in metres), as the photographed mesh can sit a little aside of the map.
+  const MODE = "RELATIVE_TO_GROUND", UP = adj.h;
+  const dLat = adj.n / 111_320, dLng = adj.e / (111_320 * Math.cos(((area[0]?.[0] ?? 0) * Math.PI) / 180));
   const flat = true;
   // On a hilly ground a big flat shape cut into the slope and vanished, its long edges ran under it: shapes are laid in
   // small tiles that each follow the ground (models/drape), their outline in short pieces of polyline, and every line
@@ -46,13 +48,13 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
   const DRAPE_STEP = 5, DRAPE_CELL = 8;
   const rawPoly = (o: Record<string, unknown>, ring: Array<[number, number]>, h: number) => {
     const p = new Polygon3DElement({ ...o, altitudeMode: MODE, drawsOccludedSegments: true }) as Shape;
-    p.outerCoordinates = ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: h + UP }));
+    p.outerCoordinates = ring.map(([pLat, pLng]) => ({ lat: pLat + dLat, lng: pLng + dLng, altitude: h + UP }));
     return p;
   };
   const absLine = (o: Record<string, unknown>, coords: Array<{ lat: number; lng: number; h: number }>) => {
     const pl = new Polyline3DElement!({ ...o, altitudeMode: MODE, drawsOccludedSegments: true }) as Shape;
     const vertical = coords.length === 2 && coords[0]!.lat === coords[1]!.lat && coords[0]!.lng === coords[1]!.lng;
-    pl.coordinates = (vertical ? coords : densify(coords, DRAPE_STEP)).map((c) => ({ lat: c.lat, lng: c.lng, altitude: c.h + UP }));
+    pl.coordinates = (vertical ? coords : densify(coords, DRAPE_STEP)).map((c) => ({ lat: c.lat + dLat, lng: c.lng + dLng, altitude: c.h + UP }));
     return pl;
   };
   /** A polygon draped on the ground: tiles for its fill, a densified polyline for its edge; small ones stay whole. */
@@ -200,10 +202,11 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
  * Kept in a pool and never removed from the map — a Marker3DElement taken off the map kept being drawn, so poles taken
  * away stayed on the 3D view: unused badges are sent under the ground and not drawn when hidden.
  */
-function misterBadges(lib: Maps3D, map: HTMLElement, pool: Map<string, HTMLElement>, sim: SimLayout | null, lift = 0) {
-  const mode = "RELATIVE_TO_GROUND", up = lift + 3.9;
+function misterBadges(lib: Maps3D, map: HTMLElement, pool: Map<string, HTMLElement>, sim: SimLayout | null, adj: Adjust = NO_ADJUST) {
+  const mode = "RELATIVE_TO_GROUND", up = adj.h + 3.9;
   const want = new Map<string, [number, number]>();
-  if (sim?.kind === "piazza") sim.data.misters.forEach((m, i) => want.set(`${i}:${i < sim.data.mistersInZones ? "z" : "a"}`, m));
+  const kLng = 111_320 * Math.cos(((sim?.kind === "piazza" ? sim.data.misters[0]?.[0] ?? 0 : 0) * Math.PI) / 180) || 1;
+  if (sim?.kind === "piazza") sim.data.misters.forEach((m, i) => want.set(`${i}:${i < sim.data.mistersInZones ? "z" : "a"}`, [m[0] + adj.n / 111_320, m[1] + adj.e / kLng]));
   for (const [key, mk] of pool) {
     const at = want.get(key) as [number, number] | undefined;
     const m = mk as HTMLElement & { position: unknown; drawsWhenOccluded: boolean; altitudeMode: string };
@@ -224,19 +227,29 @@ function misterBadges(lib: Maps3D, map: HTMLElement, pool: Map<string, HTMLEleme
 }
 
 /** How much the drawing is raised (or lowered) over Google's ground model, per place, set by hand; kept on this device. */
-const LIFT_KEY = "mdt-3d-lift-v1";
-export const LIFT_STEP = 0.5, LIFT_MIN = -5, LIFT_MAX = 20;
+/** The drawing's correction over Google's 3D, per place: h up (m), n north and e east (m); kept on this device. */
+type Adjust = { h: number; n: number; e: number };
+const NO_ADJUST: Adjust = { h: 0, n: 0, e: 0 };
+const ADJUST_KEY = "mdt-3d-adjust-v1", OLD_LIFT_KEY = "mdt-3d-lift-v1";
+export const ADJ_STEP = 0.5, LIFT_MIN = -5, LIFT_MAX = 20, SHIFT_MAX = 30;
 const placeKey = (lat: number, lng: number) => `${lat.toFixed(4)},${lng.toFixed(4)}`;
-function readLift(lat: number, lng: number): number {
-  try { const v = (JSON.parse(localStorage.getItem(LIFT_KEY) ?? "{}") as Record<string, number>)[placeKey(lat, lng)]; return typeof v === "number" ? v : 0; } catch { return 0; }
-}
-function writeLift(lat: number, lng: number, h: number) {
+function readAdjust(lat: number, lng: number): Adjust {
   try {
-    const all = JSON.parse(localStorage.getItem(LIFT_KEY) ?? "{}") as Record<string, number>;
-    if (h === 0) delete all[placeKey(lat, lng)]; else all[placeKey(lat, lng)] = h;
-    localStorage.setItem(LIFT_KEY, JSON.stringify(all));
+    const v = (JSON.parse(localStorage.getItem(ADJUST_KEY) ?? "{}") as Record<string, Adjust>)[placeKey(lat, lng)];
+    if (v) return { h: v.h ?? 0, n: v.n ?? 0, e: v.e ?? 0 };
+    // The height set before sideways moves existed.
+    const old = (JSON.parse(localStorage.getItem(OLD_LIFT_KEY) ?? "{}") as Record<string, number>)[placeKey(lat, lng)];
+    return typeof old === "number" ? { ...NO_ADJUST, h: old } : NO_ADJUST;
+  } catch { return NO_ADJUST; }
+}
+function writeAdjust(lat: number, lng: number, a: Adjust) {
+  try {
+    const all = JSON.parse(localStorage.getItem(ADJUST_KEY) ?? "{}") as Record<string, Adjust>;
+    if (!a.h && !a.n && !a.e) delete all[placeKey(lat, lng)]; else all[placeKey(lat, lng)] = a;
+    localStorage.setItem(ADJUST_KEY, JSON.stringify(all));
   } catch { /* storage off: for this visit only */ }
 }
+const metres = (v: number) => `${v > 0 ? "+" : ""}${v.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} m`;
 
 function applyCamera(map: Map3D, camera: Camera, animate: boolean) {
   if (animate && map.flyCameraTo) { map.flyCameraTo({ endCamera: camera, durationMillis: 900 }); return; }
@@ -257,9 +270,16 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
   // The misting poles' number badges, one per pole and kind, reused for the map's whole life (misterBadges).
   const badges = useRef(new Map<string, HTMLElement>());
   // The drawing's height over Google's ground, set by hand (− / +), per place.
-  const [lift, setLiftState] = useState(0);
-  useEffect(() => { setLiftState(readLift(lat, lng)); }, [lat, lng]);
-  const setLift = (h: number) => { const v = Math.round(Math.max(LIFT_MIN, Math.min(LIFT_MAX, h)) * 2) / 2; setLiftState(v); writeLift(lat, lng, v); };
+  const [adj, setAdjState] = useState<Adjust>(NO_ADJUST);
+  const [adjusting, setAdjusting] = useState(false);
+  useEffect(() => { setAdjState(readAdjust(lat, lng)); setAdjusting(false); }, [lat, lng]);
+  const half = (v: number, lo: number, hi: number) => Math.round(Math.max(lo, Math.min(hi, v)) * 2) / 2;
+  const nudge = (d: Partial<Adjust>) => {
+    const next = { h: half(adj.h + (d.h ?? 0), LIFT_MIN, LIFT_MAX), n: half(adj.n + (d.n ?? 0), -SHIFT_MAX, SHIFT_MAX), e: half(adj.e + (d.e ?? 0), -SHIFT_MAX, SHIFT_MAX) };
+    setAdjState(next); writeAdjust(lat, lng, next);
+  };
+  const resetAdj = () => { setAdjState(NO_ADJUST); writeAdjust(lat, lng, NO_ADJUST); };
+  const adjKey = `${adj.h},${adj.n},${adj.e}`;
   // The map is built once per place: the drawn area and the simulation are laid over it by the next effect, so moving a
   // lever never reloads the photorealistic tiles nor resets the camera.
   useEffect(() => {
@@ -290,7 +310,7 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
     const map = mapRef.current, lib = libs.current;
     if (state !== "ready" || !map || !lib) return;
     if (!lib.Polygon3DElement || area.length < 3) { misterBadges(lib, map, badges.current, null); return; }
-    const floor = lift;
+    const floor = adj;
     const added: HTMLElement[] = [];
     // Laid a moment after the levers stop, so a slide does not rebuild the shapes at every step.
     const timer = window.setTimeout(() => {
@@ -298,7 +318,7 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
       misterBadges(lib, map, badges.current, sim, floor);
     }, 250);
     return () => { window.clearTimeout(timer); added.forEach((node) => node.remove()); };
-  }, [state, areaKey, simKey, lift]);
+  }, [state, areaKey, simKey, adjKey]);
   // The panel grows when 3D opens (and on rotation): re-frame the place once the size settles.
   useEffect(() => {
     const el = host.current;
@@ -320,13 +340,39 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
     <div ref={host} data-map-gestures="" className="absolute inset-0 touch-none" aria-label={`Vista 3D di ${label}`} role="img" />
     {/* Top-left: Google keeps its map-type thumbnail top-right, compass and fullscreen bottom-right, logo bottom-left. */}
     {state === "ready" && <button type="button" onClick={() => recenter(true)} aria-label="Ricentra la vista 3D sul punto" className="absolute left-2 top-2 grid size-9 place-items-center rounded-full border border-border/60 bg-background/90 text-foreground shadow-sm backdrop-blur"><Crosshair className="size-4" aria-hidden="true" /></button>}
-    {/* The drawing's height by hand: Google's ground can lie under the photographed floor and the shapes slide when tilted. */}
-    {state === "ready" && area.length >= 3 && (
-      <div role="group" aria-label="Altezza del disegno sul terreno" className="absolute left-2 top-12 flex items-center gap-1 rounded-full bg-black/55 p-1 text-white ring-1 ring-white/15 backdrop-blur">
-        <button type="button" onClick={() => setLift(lift - LIFT_STEP)} disabled={lift <= LIFT_MIN} aria-label="Abbassa il disegno di mezzo metro" className="grid size-8 place-items-center rounded-full bg-white/10 disabled:opacity-40"><Minus className="size-4" aria-hidden="true" /></button>
-        <span className="min-w-[4.5rem] text-center text-[12px] font-semibold leading-tight" aria-live="polite">Altezza<br /><span className="tabular-nums">{lift > 0 ? "+" : ""}{lift.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} m</span></span>
-        <button type="button" onClick={() => setLift(lift + LIFT_STEP)} disabled={lift >= LIFT_MAX} aria-label="Alza il disegno di mezzo metro" className="grid size-8 place-items-center rounded-full bg-white/10 disabled:opacity-40"><Plus className="size-4" aria-hidden="true" /></button>
-        {lift !== 0 && <button type="button" onClick={() => setLift(0)} aria-label="Altezza automatica" className="grid size-8 place-items-center rounded-full bg-white/10"><RotateCcw className="size-3.5" aria-hidden="true" /></button>}
+    {/* The drawing's position by hand: Google's ground can lie under the photographed floor (the shapes slide when
+        tilted) and the mesh can sit a little aside; raised and moved by half metres until it matches the piazza. */}
+    {state === "ready" && area.length >= 3 && !adjusting && (
+      <button type="button" onClick={() => setAdjusting(true)} className="absolute left-2 top-12 inline-flex h-9 items-center gap-1.5 rounded-full bg-black/55 px-3 text-[13px] font-semibold text-white ring-1 ring-white/15 backdrop-blur">
+        <Move className="size-4" aria-hidden="true" />Regola posizione{adj.h || adj.n || adj.e ? " · regolata" : ""}
+      </button>
+    )}
+    {state === "ready" && area.length >= 3 && adjusting && (
+      <div role="group" aria-label="Regola la posizione del disegno" className="absolute left-2 top-12 w-[12.5rem] space-y-2 rounded-2xl bg-black/65 p-2.5 text-white ring-1 ring-white/15 backdrop-blur">
+        <div className="flex items-center justify-between text-[12px] font-semibold">
+          <span>Regola posizione</span>
+          <button type="button" onClick={() => setAdjusting(false)} aria-label="Chiudi" className="grid size-7 place-items-center rounded-full bg-white/10"><X className="size-3.5" aria-hidden="true" /></button>
+        </div>
+        <div className="flex items-center justify-between gap-1">
+          <button type="button" onClick={() => nudge({ h: -ADJ_STEP })} disabled={adj.h <= LIFT_MIN} aria-label="Abbassa di mezzo metro" className="grid size-8 place-items-center rounded-full bg-white/10 disabled:opacity-40"><Minus className="size-4" aria-hidden="true" /></button>
+          <span className="text-center text-[12px] leading-tight" aria-live="polite">Altezza<br /><span className="font-semibold tabular-nums">{metres(adj.h)}</span></span>
+          <button type="button" onClick={() => nudge({ h: ADJ_STEP })} disabled={adj.h >= LIFT_MAX} aria-label="Alza di mezzo metro" className="grid size-8 place-items-center rounded-full bg-white/10 disabled:opacity-40"><Plus className="size-4" aria-hidden="true" /></button>
+        </div>
+        <div className="grid grid-cols-3 place-items-center gap-1">
+          <span />
+          <button type="button" onClick={() => nudge({ n: ADJ_STEP })} disabled={adj.n >= SHIFT_MAX} aria-label="Sposta a nord di mezzo metro" className="grid size-8 place-items-center rounded-full bg-white/10 disabled:opacity-40"><ArrowUp className="size-4" aria-hidden="true" /></button>
+          <span />
+          <button type="button" onClick={() => nudge({ e: -ADJ_STEP })} disabled={adj.e <= -SHIFT_MAX} aria-label="Sposta a ovest di mezzo metro" className="grid size-8 place-items-center rounded-full bg-white/10 disabled:opacity-40"><ArrowLeft className="size-4" aria-hidden="true" /></button>
+          <Move className="size-4 text-white/50" aria-hidden="true" />
+          <button type="button" onClick={() => nudge({ e: ADJ_STEP })} disabled={adj.e >= SHIFT_MAX} aria-label="Sposta a est di mezzo metro" className="grid size-8 place-items-center rounded-full bg-white/10 disabled:opacity-40"><ArrowRight className="size-4" aria-hidden="true" /></button>
+          <span />
+          <button type="button" onClick={() => nudge({ n: -ADJ_STEP })} disabled={adj.n <= -SHIFT_MAX} aria-label="Sposta a sud di mezzo metro" className="grid size-8 place-items-center rounded-full bg-white/10 disabled:opacity-40"><ArrowDown className="size-4" aria-hidden="true" /></button>
+          <span />
+        </div>
+        <p className="text-center text-[11px] text-white/75 tabular-nums" aria-live="polite">Nord {metres(adj.n)} · Est {metres(adj.e)}</p>
+        {(adj.h !== 0 || adj.n !== 0 || adj.e !== 0) && (
+          <button type="button" onClick={resetAdj} className="mx-auto flex items-center gap-1 text-[12px] font-semibold underline decoration-white/30 underline-offset-4"><RotateCcw className="size-3.5" aria-hidden="true" />Rimetti com'era</button>
+        )}
       </div>
     )}
     {state === "loading" && <div className="absolute inset-0 grid place-items-center text-xs text-muted-foreground"><LoaderCircle className="size-4 animate-spin" aria-label="Caricamento vista 3D" /></div>}
