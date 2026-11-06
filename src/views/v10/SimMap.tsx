@@ -201,7 +201,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} sim={sim} still /></Suspense>
       </ParallaxLayer>
       {/* The map's foot fades into the page (its own colour, light or dark), so the preview melts into what follows. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-[45%] bg-gradient-to-b from-transparent via-background/60 to-background" aria-hidden="true" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-[22%] bg-gradient-to-b from-transparent to-background/85" aria-hidden="true" />
       <span className="pointer-events-none absolute bottom-3 right-3 z-[3] inline-flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-[13px] font-semibold text-white ring-1 ring-white/15 backdrop-blur-sm">
         <MapIcon className="size-4" aria-hidden="true" />Apri la mappa
       </span>

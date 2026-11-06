@@ -343,8 +343,10 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
     {/* The drawing's position by hand: Google's ground can lie under the photographed floor (the shapes slide when
         tilted) and the mesh can sit a little aside; raised and moved by half metres until it matches the piazza. */}
     {state === "ready" && area.length >= 3 && !adjusting && (
-      <button type="button" onClick={() => setAdjusting(true)} className="absolute left-2 top-12 inline-flex h-9 items-center gap-1.5 rounded-full bg-black/55 px-3 text-[13px] font-semibold text-white ring-1 ring-white/15 backdrop-blur">
-        <Move className="size-4" aria-hidden="true" />Regola posizione{adj.h || adj.n || adj.e ? " · regolata" : ""}
+      <button type="button" onClick={() => setAdjusting(true)} aria-label={`Regola posizione del disegno${adj.h || adj.n || adj.e ? " (regolata)" : ""}`} title="Regola posizione"
+        className="absolute left-2 top-12 grid size-9 place-items-center rounded-full bg-black/55 text-white ring-1 ring-white/15 backdrop-blur">
+        <Move className="size-4" aria-hidden="true" />
+        {(adj.h !== 0 || adj.n !== 0 || adj.e !== 0) && <span className="absolute right-0.5 top-0.5 size-2 rounded-full bg-teal-300 ring-2 ring-black/60" aria-hidden="true" />}
       </button>
     )}
     {state === "ready" && area.length >= 3 && adjusting && (
