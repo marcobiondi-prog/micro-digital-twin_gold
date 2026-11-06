@@ -8,6 +8,7 @@ import { clearSectorGate, enterAsGuest, saveProId, useGuest, useLastProId, usePr
 import { proSummary } from "@/models/professional-id";
 import { toast } from "sonner";
 import { useSignedIn } from "@/lib/use-signed-in";
+import { useAccountAvatar } from "@/lib/account-avatar";
 import { hapticTick } from "@/lib/haptics";
 import { type ProKind } from "@/models/professional-id";
 import { openSimTab } from "@/views/v8/console";
@@ -64,6 +65,7 @@ function SectorPage({ start }: { start: ProKind | null }) {
   // The profile of this kind registered before (on this device or in the account): recognised, one tap brings it back
   // with its project's history.
   const previous = useLastProId(kind);
+  const avatar = useAccountAvatar();
   // The page behind does not scroll while this one is up.
   useEffect(() => {
     const html = document.documentElement, before = html.style.overflow;
@@ -94,9 +96,14 @@ function SectorPage({ start }: { start: ProKind | null }) {
             {previous && (
               <div className="space-y-3 rounded-3xl bg-foreground/[0.08] p-5 ring-1 ring-brand-turquoise/40">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-turquoise">Ti abbiamo riconosciuto</p>
-                <div>
-                  <p className="text-xl font-semibold">{previous.name}</p>
-                  <p className="text-sm text-foreground/70">{proSummary(previous)}</p>
+                <div className="flex items-center gap-3.5">
+                  <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-full bg-foreground/10 ring-2 ring-brand-turquoise/50">
+                    {avatar ? <img src={avatar} alt="Immagine del tuo account" referrerPolicy="no-referrer" className="size-full object-cover" /> : <UserRound className="size-7 text-foreground/60" aria-hidden="true" />}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xl font-semibold">{previous.name}</p>
+                    <p className="text-sm text-foreground/70">{proSummary(previous)}</p>
+                  </div>
                 </div>
                 <p className="text-xs text-foreground/60">Ti eri già registrato con questo profilo: continua e ritrovi la cronologia {sector.kind === "funzionario" ? "della piazza" : "del vigneto"}.</p>
                 <button type="button" onClick={() => { void saveProId(previous); toast.success(`Bentornato, ${previous.name}`, { description: `Ritrovi la cronologia ${sector.kind === "funzionario" ? "della piazza" : "del vigneto"}.` }); }}
