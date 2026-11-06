@@ -322,7 +322,11 @@ function ParallaxLayer({ children }: { children: React.ReactNode }) {
     const place = () => {
       frame = 0;
       const r = box.getBoundingClientRect(), vh = window.innerHeight || 1, spare = r.height * 0.25;
-      const ty = Math.max(-spare, Math.min(spare, (vh / 2 - (r.top + r.height / 2)) * 0.55));
+      // Once the preview starts going under the sticky tabs (only its faded foot left in view) the map stops sliding:
+      // it is read as if its top stayed just under the tabs.
+      const under = document.querySelector("[data-sim-tabs]")?.getBoundingClientRect().bottom ?? 0;
+      const top = Math.max(r.top, under);
+      const ty = Math.max(-spare, Math.min(spare, (vh / 2 - (top + r.height / 2)) * 0.55));
       el.style.transform = `translate3d(0, ${ty.toFixed(1)}px, 0)`;
     };
     const ask = () => { if (!frame) frame = requestAnimationFrame(place); };
