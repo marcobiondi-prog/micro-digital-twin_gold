@@ -34,7 +34,7 @@ export function SectionLockCard({ section, className }: { section: Section; clas
       </div>
       {id && id.kind !== need && (
         <p className="rounded-2xl bg-foreground/[0.06] px-4 py-3 text-sm text-muted-foreground">
-          Ora sei identificato come <span className="font-semibold text-foreground">{proSummary(id)}</span>. Un profilo alla volta: se ti identifichi come {KIND_LABEL[need].toLowerCase()}, si blocca la {other === "urban" ? "piazza" : "sezione vigneto"}.
+          Ora sei identificato come <span className="font-semibold text-foreground">{proSummary(id)}</span>.
         </p>
       )}
       <Link to={IDENTIFY_PATH[section]} className="mx-auto inline-flex h-12 items-center gap-2 rounded-full bg-foreground pl-6 pr-2 text-[15px] font-semibold text-background outline-none focus-visible:ring-4 focus-visible:ring-ring/50">

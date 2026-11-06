@@ -321,7 +321,7 @@ export function Choice() {
         <h1 className="sr-only">Da dove vuoi iniziare</h1>
         <Reveal>
           <h2 aria-hidden="true" className="font-display text-[3.4rem] font-extralight leading-[0.95] tracking-tight text-foreground sm:text-7xl">Da dove<br />vuoi iniziare?</h2>
-          <p className="mt-5 max-w-xs text-[15px] leading-relaxed text-foreground/60">Dicci chi sei: ti identifichi qui e si apre la tua simulazione. Un profilo alla volta.</p>
+          <p className="mt-5 max-w-xs text-[15px] leading-relaxed text-foreground/60">Dicci chi sei: ti identifichi qui e si apre la tua simulazione.</p>
         </Reveal>
         <div role="list" aria-label="Da dove vuoi iniziare" className="mt-10 space-y-3">
           {items.map((it) => {
