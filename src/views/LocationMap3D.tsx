@@ -29,7 +29,7 @@ type Shape = HTMLElement & { outerCoordinates?: unknown; coordinates?: unknown }
  * shade net one see-through sheet. Heights start from the photographed mesh and every shape is drawn through it, so
  * nothing ends up buried under the photographed ground.
  */
-function build3DOverlay({ Polygon3DElement, Polyline3DElement, Marker3DElement }: Maps3D, area: Array<[number, number]>, sim: SimLayout | null, groundM = 0): HTMLElement[] {
+function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: Array<[number, number]>, sim: SimLayout | null, groundM = 0): HTMLElement[] {
   const out: HTMLElement[] = [];
   if (!Polygon3DElement) return out;
   // Every shape lies FLAT on Google's own ground model (RELATIVE_TO_GROUND, heights in metres above it), drawn through the
@@ -149,24 +149,17 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement, Marker3DElement }
           else part(p, p.height, PERGOLA_COLORS.beam, 3);
         }
       }
-      // Each mister: the mist on the ground round it, its pole, and a see-through cloud of mist over it.
+      // Each mister: a soft veil of mist on the ground, a slim steel pole with a ring head, and the mist
+      // falling from it as three see-through discs widening downwards. Their numbers are badges kept apart (misterBadges).
       for (const m of sim.data.misters) {
-        if (flat) out.push(absPoly({ fillColor: "rgba(125,211,252,0.3)", strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 }, crownRing(m, MIST_RADIUS_M, 16), 0.24));
-        else ground(crownRing(m, MIST_RADIUS_M, 16), "rgba(125,211,252,0.3)");
-        part({ ring: crownRing(m, 0.12, 6), base: 0, height: 3, color: "#cbd5e1" });
-        part({ ring: crownRing(m, 2.2, 16), base: 2.5, height: 2.7, color: "rgba(224,242,254,0.35)" }, 2.6, "rgba(125,211,252,0.6)", 1);
+        if (flat) out.push(absPoly({ fillColor: "rgba(125,211,252,0.22)", strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 }, crownRing(m, MIST_RADIUS_M, 16), 0.24));
+        else ground(crownRing(m, MIST_RADIUS_M, 16), "rgba(125,211,252,0.22)");
+        part({ ring: crownRing(m, 0.06, 6), base: 0, height: 3, color: "#e2e8f0" });
+        part({ ring: crownRing(m, 0.32, 10), base: 2.95, height: 3.08, color: "#f8fafc" }, 3.08, "#38bdf8", 2);
+        part({ ring: crownRing(m, 0.9, 14), base: 2.55, height: 2.62, color: "rgba(224,242,254,0.32)" }, 2.62, "rgba(125,211,252,0.55)", 1);
+        part({ ring: crownRing(m, 1.7, 16), base: 1.85, height: 1.9, color: "rgba(224,242,254,0.2)" }, 1.9, "rgba(125,211,252,0.35)", 1);
+        part({ ring: crownRing(m, 2.5, 18), base: 1.1, height: 1.14, color: "rgba(224,242,254,0.12)" }, 1.14, "rgba(125,211,252,0.22)", 1);
       }
-      // Each pole's number over it, as in 2D: a sky badge for those in the zones drawn for them, white for the others.
-      sim.data.misters.forEach((m, i) => {
-        try {
-          const inZone = i < sim.data.mistersInZones;
-          const mk = new Marker3DElement({ position: { lat: m[0], lng: m[1], altitude: 3.4 }, altitudeMode: "RELATIVE_TO_GROUND", drawsWhenOccluded: true, sizePreserved: true }) as HTMLElement;
-          const tpl = document.createElement("template");
-          tpl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="11" fill="${inZone ? "#38bdf8" : "#f8fafc"}" stroke="${inZone ? "#e0f2fe" : "#38bdf8"}" stroke-width="2.5"/><text x="13" y="17.5" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="700" fill="${inZone ? "#0b0f15" : "#0369a1"}">${i + 1}</text></svg>`;
-          mk.append(tpl);
-          out.push(mk);
-        } catch { /* an older build without custom markers: the poles alone */ }
-      });
       // Each tree: a dark trunk, then three crown discs each ringed a deeper green, so the layers read as foliage.
       for (const t of sim.data.trees) {
         for (const p of treeParts(t, undefined, 2.85)) {
@@ -200,6 +193,33 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement, Marker3DElement }
   return out;
 }
 
+/**
+ * The misting poles' numbers in 3D, as in 2D: a sky badge for those in the zones drawn for them, white for the others.
+ * Kept in a pool and never removed from the map — a Marker3DElement taken off the map kept being drawn, so poles taken
+ * away stayed on the 3D view: unused badges are sent under the ground and not drawn when hidden.
+ */
+function misterBadges(lib: Maps3D, map: HTMLElement, pool: Map<string, HTMLElement>, sim: SimLayout | null) {
+  const want = new Map<string, [number, number]>();
+  if (sim?.kind === "piazza") sim.data.misters.forEach((m, i) => want.set(`${i}:${i < sim.data.mistersInZones ? "z" : "a"}`, m));
+  for (const [key, mk] of pool) {
+    const at = want.get(key) as [number, number] | undefined;
+    const m = mk as HTMLElement & { position: unknown; drawsWhenOccluded: boolean };
+    if (at) { m.position = { lat: at[0], lng: at[1], altitude: 3.9 }; m.drawsWhenOccluded = true; want.delete(key); }
+    else { m.drawsWhenOccluded = false; m.position = { ...(m.position as object), altitude: -500 }; }
+  }
+  for (const [key, at] of want) {
+    try {
+      const [n, z] = key.split(":"), inZone = z === "z", i = Number(n);
+      const mk = new lib.Marker3DElement({ position: { lat: at[0], lng: at[1], altitude: 3.9 }, altitudeMode: "RELATIVE_TO_GROUND", drawsWhenOccluded: true, sizePreserved: true });
+      const tpl = document.createElement("template");
+      tpl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="11" fill="${inZone ? "#38bdf8" : "#f8fafc"}" stroke="${inZone ? "#e0f2fe" : "#38bdf8"}" stroke-width="2.5"/><text x="13" y="17.5" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="700" fill="${inZone ? "#0b0f15" : "#0369a1"}">${i + 1}</text></svg>`;
+      mk.append(tpl);
+      map.append(mk);
+      pool.set(key, mk);
+    } catch { /* an older build without custom markers: the poles alone */ }
+  }
+}
+
 function applyCamera(map: Map3D, camera: Camera, animate: boolean) {
   if (animate && map.flyCameraTo) { map.flyCameraTo({ endCamera: camera, durationMillis: 900 }); return; }
   Object.assign(map, camera);
@@ -216,6 +236,8 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
     if (map && host.current) applyCamera(map, frameCamera(lat, lng, host.current.clientHeight, altitude.current), animate && !window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   };
   const libs = useRef<Maps3D | null>(null);
+  // The misting poles' number badges, one per pole and kind, reused for the map's whole life (misterBadges).
+  const badges = useRef(new Map<string, HTMLElement>());
   // The map is built once per place: the drawn area and the simulation are laid over it by the next effect, so moving a
   // lever never reloads the photorealistic tiles nor resets the camera.
   useEffect(() => {
@@ -239,16 +261,18 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
       mapRef.current = map;
       setState("ready");
     }).catch(() => { if (!cancelled) setState("error"); });
-    return () => { cancelled = true; mapRef.current = null; el?.replaceChildren(); };
+    return () => { cancelled = true; mapRef.current = null; badges.current.clear(); el?.replaceChildren(); };
   }, [lat, lng, label, apiKey]);
   const areaKey = JSON.stringify(area), simKey = JSON.stringify(sim);
   useEffect(() => {
     const map = mapRef.current, lib = libs.current;
-    if (state !== "ready" || !map || !lib?.Polygon3DElement || area.length < 3) return;
+    if (state !== "ready" || !map || !lib) return;
+    if (!lib.Polygon3DElement || area.length < 3) { misterBadges(lib, map, badges.current, null); return; }
     const added: HTMLElement[] = [];
     // Laid a moment after the levers stop, so a slide does not rebuild the shapes at every step.
     const timer = window.setTimeout(() => {
       for (const node of build3DOverlay(lib, area, sim, altitude.current)) { map.append(node); added.push(node); }
+      misterBadges(lib, map, badges.current, sim);
     }, 250);
     return () => { window.clearTimeout(timer); added.forEach((node) => node.remove()); };
   }, [state, areaKey, simKey]);
