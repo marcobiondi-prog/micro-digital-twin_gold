@@ -17,7 +17,7 @@ describe("aiuole e ciottoli in 3D, like the 2D pattern", () => {
     expect(green / ringAreaM2(patch)).toBeLessThan(0.85);
     // No ground sheet: the paths are pebbles only, packed.
     expect(parts.filter((p) => p.color === BEDS_3D.pebbles)).toHaveLength(0);
-    expect(parts.filter((p) => (BEDS_3D.stones as readonly string[]).includes(p.color)).length).toBeGreaterThan(150);
+    expect(parts.filter((p) => (BEDS_3D.stones as readonly string[]).includes(p.color)).length).toBeGreaterThan(100);
     expect(parts.filter((p) => grass(p.color))).toHaveLength(beds.length);
     expect(parts.every((p) => p.height > p.base && p.base > 0)).toBe(true);
   });
@@ -26,14 +26,28 @@ describe("aiuole e ciottoli in 3D, like the 2D pattern", () => {
     expect(bedParts(rows).beds).toHaveLength(5);
   });
   it("keeps the pieces few on a big lawn and is the same every time", () => {
-    expect(bedParts([box(300, 40)]).beds.length).toBeLessThanOrEqual(70);
+    expect(bedParts([box(300, 40)]).beds.length).toBeLessThanOrEqual(40);
     expect(bedParts([box(30, 20)])).toEqual(bedParts([box(30, 20)]));
     expect(bedParts([]).parts).toHaveLength(0);
   });
   it("never reaches past the drawn area", () => {
     const area: Ring = [[lat, lng], [lat, lng + 10 / k], [lat + 12 / 111_320, lng + 20 / k], [lat + 12 / 111_320, lng]];
-    const { beds, parts } = bedParts([box(21, 12)], 70, area);
+    const { beds, parts } = bedParts([box(21, 12)], 40, area);
     expect(beds.length).toBeGreaterThan(3);
     for (const p of parts) for (const [a, c] of p.ring) expect(ringContains([[lat - 1e-6, lng - 1e-6], [lat - 1e-6, lng + 10.3 / k], [lat + 12.1 / 111_320, lng + 20.3 / k], [lat + 12.1 / 111_320, lng - 1e-6]], a, c)).toBe(true);
+  });
+});
+
+import { piazzaLayout } from "@/models/area-layout";
+describe("aiuole zone in 3D", () => {
+  it("keeps the beds inside a zone drawn for them when the lever was only raised to fill it", () => {
+    const P = (x: number, y: number): [number, number] => [lat + y / 111_320, lng + x / k];
+    const area: Ring = [P(0, 0), P(90, -10), P(100, 60), P(10, 75)];
+    const zone: Ring = [P(30, 20), P(52, 18), P(55, 32), P(33, 35)];
+    const l = piazzaLayout(area, 0, 10, 0, {}, [{ kind: "prato", ring: zone }], 0)!;
+    const lawn = l.patches.filter((p) => p.kind === "lawn");
+    expect(lawn).toHaveLength(1);
+    const { parts } = bedParts(lawn.map((p) => p.ring), 40, area);
+    expect(parts.length).toBeLessThan(200);
   });
 });

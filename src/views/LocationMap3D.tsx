@@ -132,7 +132,7 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
       // (bedParts: a grid of square beds like the 2D, at most 48).
       // On Google's ground model like every other shape, over the area's veil (0,35 m) and the shadows: laid on the
       // photographed mesh instead they wrapped over the real trees' crowns as green wedges.
-      for (const p of bedParts(sim.data.patches.filter((x) => x.kind === "lawn").map((x) => x.ring), 70, area).parts) {
+      for (const p of bedParts(sim.data.patches.filter((x) => x.kind === "lawn").map((x) => x.ring), 40, area).parts) {
         const grass = (BEDS_3D.grass as readonly string[]).includes(p.color);
         part(p, p.height, grass ? BEDS_3D.edge : "rgba(0,0,0,0)", grass ? 2 : 0);
       }

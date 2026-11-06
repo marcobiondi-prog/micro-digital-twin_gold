@@ -170,8 +170,11 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
   const only = !!edits.onlyDrawn;
   const fixedLawn = lawnTarget > 0 || only ? cells.filter((x) => isLawn(x.x, x.y)) : [];
   const fixedShade = shadeTarget > 0 || only ? cells.filter((x) => isShade(x.x, x.y) && !fixedLawn.includes(x)) : [];
-  const nLawn = fixedLawn.length + (only ? 0 : Math.round(Math.max(0, lawnTarget - exactLawnM2) / (c * c)));
-  const nShade = fixedShade.length + (only ? 0 : Math.round(Math.max(0, shadeTarget - exactShadeM2) / (c * c)));
+  // With a zone drawn for it, the rest of the share is laid around it only when it is more than one lever step (10 %
+  // of the usable surface): the lever raised in 10 % steps to fill a zone no longer spills strips out of the zone.
+  const restOf = (target: number, exact: number) => { const r = Math.max(0, target - exact); return exact > 0 && r < usable * 0.1 ? 0 : r; };
+  const nLawn = fixedLawn.length + (only ? 0 : Math.round(restOf(lawnTarget, exactLawnM2) / (c * c)));
+  const nShade = fixedShade.length + (only ? 0 : Math.round(restOf(shadeTarget, exactShadeM2) / (c * c)));
   const reserved = new Set([...fixedLawn, ...fixedShade]);
   // The automatic lawn and pergolas keep off the zones drawn for trees, unless there is no other room.
   const forTrees = new Set(cells.filter((x) => isTrees(x.x, x.y)));
@@ -558,7 +561,7 @@ export const BED_H = { pebbleBase: 0.55, pebble: 0.58, grassBase: 0.6, grass: 0.
  * slices and only the slices wholly inside stay. The band pitch grows while there would be more than `maxBeds` beds,
  * so the view stays light. Fixed pseudo-random flowers and stones, the same on every device. Thin slabs (base > 0).
  */
-export function bedParts(patches: Ring[], maxBeds = 70, area?: Ring): { beds: Ring[]; parts: TreePart[] } {
+export function bedParts(patches: Ring[], maxBeds = 40, area?: Ring): { beds: Ring[]; parts: TreePart[] } {
   const rings = patches.filter((r) => r.length >= 3);
   if (!rings.length) return { beds: [], parts: [] };
   const lats = rings.flat().map((p) => p[0]), lngs = rings.flat().map((p) => p[1]);
@@ -611,30 +614,36 @@ export function bedParts(patches: Ring[], maxBeds = 70, area?: Ring): { beds: Ri
   let seed = 11;
   const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
   const parts: TreePart[] = beds.map((ring, n) => ({ ring, base: BED_H.grassBase, height: BED_H.grass, color: BEDS_3D.grass[n % 2]! }));
-  // Pebbles packed along every path, in rows across it (about every 0,22 m), each nudged a little, at most 320 in all.
+  // Pebbles along every path in two staggered rows (0,25 m apart across it), spaced along it so there are at most 140
+  // in all (every 0,28 m on a small lawn), each whole inside its path.
   const pathM2 = paths.reduce((t, r) => t + ringAreaM2(r), 0);
-  const gap = Math.max(0.22, Math.sqrt(pathM2 / 320));
+  const along = Math.max(0.28, (2 * pathM2) / Math.max(0.3, path) / 140);
+  const dLat = along / 111_320, dLng = 0.25 / kLng;
   let stones = 0;
   for (const r of paths) {
     const la = r.map((p) => p[0]), ln = r.map((p) => p[1]);
     const lo = Math.min(...la), hi = Math.max(...la), a = Math.min(...ln), b = Math.max(...ln);
-    const dLat = gap / 111_320, dLng = gap / kLng;
-    for (let y = lo + dLat / 2; y < hi; y += dLat) for (let x = a + dLng / 2; x < b; x += dLng) {
-      const p: LatLng = [y + (rnd() - 0.5) * dLat * 0.5, x + (rnd() - 0.5) * dLng * 0.5];
-      if (!ringContains(r, p[0], p[1])) continue;
-      parts.push({ ring: crownRing(p, gap * (0.36 + rnd() * 0.14), 7), base: BED_H.flowerBase, height: BED_H.flower, color: BEDS_3D.stones[(stones + Math.floor(rnd() * 3)) % BEDS_3D.stones.length]! });
-      stones++;
+    const cols = Math.max(1, Math.round((b - a) / dLng));
+    for (let ci = 0; ci < cols && stones < 140; ci++) {
+      const x = a + (b - a) * ((ci + 0.5) / cols);
+      for (let y = lo + dLat * (ci % 2 ? 0.75 : 0.25); y < hi && stones < 140; y += dLat) {
+        const disc = crownRing([y + (rnd() - 0.5) * dLat * 0.3, x], 0.09 + rnd() * 0.04, 7);
+        if (!disc.every(([la2, ln2]) => ringContains(r, la2, ln2))) continue;
+        parts.push({ ring: disc, base: BED_H.flowerBase, height: BED_H.flower, color: BEDS_3D.stones[(stones + Math.floor(rnd() * 3)) % BEDS_3D.stones.length]! });
+        stones++;
+      }
     }
   }
-  // Small flowers on the grass, a few per bed, at most 60 in all.
+  // Small flowers on the grass, a few per bed, at most 36 in all.
   let flowers = 0;
   for (const [n, ring] of beds.entries()) {
     const la = ring.map((p) => p[0]), ln = ring.map((p) => p[1]);
     const want = Math.min(4, Math.max(1, Math.round(ringAreaM2(ring) / 8)));
-    for (let k = 0; k < want && flowers < 60; k++) {
+    for (let k = 0; k < want && flowers < 36; k++) {
       const p: LatLng = [Math.min(...la) + rnd() * (Math.max(...la) - Math.min(...la)), Math.min(...ln) + rnd() * (Math.max(...ln) - Math.min(...ln))];
-      if (!ringContains(ring, p[0], p[1])) continue;
-      parts.push({ ring: crownRing(p, 0.18 + rnd() * 0.07, 8), base: BED_H.flowerBase, height: BED_H.flower, color: BEDS_3D.flowers[(n + k) % BEDS_3D.flowers.length]! });
+      const disc = crownRing(p, 0.18 + rnd() * 0.07, 8);
+      if (!disc.every(([la2, ln2]) => ringContains(ring, la2, ln2))) continue;
+      parts.push({ ring: disc, base: BED_H.flowerBase, height: BED_H.flower, color: BEDS_3D.flowers[(n + k) % BEDS_3D.flowers.length]! });
       flowers++;
     }
   }
