@@ -334,7 +334,15 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
     observer.observe(el);
     return () => { observer.disconnect(); window.clearTimeout(timer); };
   });
-  if (rejected) return fallback ? <>{fallback}</> : <p role="status" className="grid h-full w-full place-items-center bg-lab-surface px-3 text-center text-xs text-muted-foreground">Vista 3D non disponibile in questo momento.</p>;
+  // The photographic 3D refused (key, quota or billing): the simplified map instead, and a line saying so.
+  if (rejected) return fallback ? (
+    <div className="relative h-full w-full">
+      {fallback}
+      <p role="status" className="pointer-events-none absolute inset-x-0 bottom-3 z-[3] mx-auto w-fit max-w-[92%] rounded-full bg-black/60 px-3 py-1.5 text-center text-[12px] font-semibold text-white ring-1 ring-white/15 backdrop-blur-sm">
+        Vista 3D fotografica non disponibile ora: mostro la mappa semplificata
+      </p>
+    </div>
+  ) : <p role="status" className="grid h-full w-full place-items-center bg-lab-surface px-3 text-center text-xs text-muted-foreground">Vista 3D non disponibile in questo momento.</p>;
   return <div className="relative h-full w-full overflow-hidden bg-lab-surface">
     {/* touch-none + data-map-gestures: drag, pinch and rotate belong to the 3D map, not to the page. */}
     <div ref={host} data-map-gestures="" className="absolute inset-0 touch-none" aria-label={`Vista 3D di ${label}`} role="img" />
