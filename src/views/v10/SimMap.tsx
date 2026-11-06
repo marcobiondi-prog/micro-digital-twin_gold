@@ -313,6 +313,8 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
  * of the scroll's speed, the other way (at most its spare 25 % each side), so the map seems to lie deeper than the page.
  * Moved by transform once per frame, nothing re-rendered; still with reduced motion.
  */
+/** Where the preview's fade begins (share of its height, the mask's 72 %). */
+const FADE_AT = 0.72;
 function ParallaxLayer({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -322,10 +324,10 @@ function ParallaxLayer({ children }: { children: React.ReactNode }) {
     const place = () => {
       frame = 0;
       const r = box.getBoundingClientRect(), vh = window.innerHeight || 1, spare = r.height * 0.25;
-      // Once the preview starts going under the sticky tabs (only its faded foot left in view) the map stops sliding:
-      // it is read as if its top stayed just under the tabs.
+      // The map slides while the preview goes up under the sticky tabs, and stops where its faded foot begins (FADE_AT
+      // of its height) reaches them: from there only the fade is left in view and the map scrolls with the page.
       const under = document.querySelector("[data-sim-tabs]")?.getBoundingClientRect().bottom ?? 0;
-      const top = Math.max(r.top, under);
+      const top = Math.max(r.top, under - r.height * FADE_AT);
       const ty = Math.max(-spare, Math.min(spare, (vh / 2 - (top + r.height / 2)) * 0.55));
       el.style.transform = `translate3d(0, ${ty.toFixed(1)}px, 0)`;
     };
