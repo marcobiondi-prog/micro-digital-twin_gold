@@ -201,15 +201,17 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   };
   if (preview) return (
     <button type="button" onClick={() => openSimTab(kind, "mappa")} aria-label="Apri la mappa: disegna l'area e sposta gli elementi"
-      className="relative -mx-4 block h-[34vh] min-h-56 w-[calc(100%+2rem)] overflow-hidden bg-card text-left outline-none focus-visible:ring-2 focus-visible:ring-ring sm:mx-0 sm:w-full sm:rounded-3xl">
+      className="relative -mx-4 block h-[34vh] min-h-56 w-[calc(100%+2rem)] overflow-hidden text-left outline-none focus-visible:ring-2 focus-visible:ring-ring sm:mx-0 sm:w-full sm:rounded-3xl">
       <MapReading kind={kind} lat={pin.lat} lng={pin.lng} />
-      <DayNight kind={kind} lat={pin.lat} lng={pin.lng} />
-      {/* Still: the map under the button takes no gesture; the page scrolls over it. */}
-      <ParallaxLayer>
-        <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} sim={sim} still /></Suspense>
-      </ParallaxLayer>
-      {/* The map's foot fades into the page (its own colour, light or dark), so the preview melts into what follows. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-[22%] bg-gradient-to-b from-transparent to-background/85" aria-hidden="true" />
+      {/* The map (and its night veil) fades out at its foot by a mask, so the page itself — its ambient light, in light
+          or dark — shows through: a gradient to a fixed colour left a band of another blue under the map. */}
+      <div className="pointer-events-none absolute inset-0 [-webkit-mask-image:linear-gradient(to_bottom,#000_72%,transparent)] [mask-image:linear-gradient(to_bottom,#000_72%,transparent)]" aria-hidden="true">
+        <DayNight kind={kind} lat={pin.lat} lng={pin.lng} />
+        {/* Still: the map under the button takes no gesture; the page scrolls over it. */}
+        <ParallaxLayer>
+          <Suspense fallback={<div className="h-full w-full" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} sim={sim} still /></Suspense>
+        </ParallaxLayer>
+      </div>
       <span className="pointer-events-none absolute bottom-3 right-3 z-[3] inline-flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-[13px] font-semibold text-white ring-1 ring-white/15 backdrop-blur-sm">
         <MapIcon className="size-4" aria-hidden="true" />Apri la mappa
       </span>
