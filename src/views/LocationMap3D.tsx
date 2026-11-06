@@ -142,8 +142,9 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
       }
       // The shadows of the pergolas and the trees with the sun of the simulation's season and hour, over the lawn.
       for (const r of sim.shadows ?? []) {
-        if (flat) out.push(absPoly({ fillColor: "rgba(11,15,21,0.3)", strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 }, r, 0.25));
-        else ground(r, "rgba(11,15,21,0.3)");
+        // Over the aiuole too (their sods lie 0,60–0,70 m up and hid a shadow laid at 0,25 m), a little darker.
+        if (flat) out.push(absPoly({ fillColor: "rgba(11,15,21,0.4)", strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 }, r, 0.74));
+        else ground(r, "rgba(11,15,21,0.4)");
       }
       for (const pt of sim.data.patches) {
         if (pt.kind !== "shade") continue;
