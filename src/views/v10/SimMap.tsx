@@ -299,8 +299,8 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
 }
 
 /**
- * The preview's map with a parallax while the page scrolls: the layer is 30 % taller than its box and slides at a third
- * of the scroll's speed, the other way (at most its spare 15 % each side), so the map seems to lie deeper than the page.
+ * The preview's map with a parallax while the page scrolls: the layer is 50 % taller than its box and slides at 55 %
+ * of the scroll's speed, the other way (at most its spare 25 % each side), so the map seems to lie deeper than the page.
  * Moved by transform once per frame, nothing re-rendered; still with reduced motion.
  */
 function ParallaxLayer({ children }: { children: React.ReactNode }) {
@@ -311,8 +311,8 @@ function ParallaxLayer({ children }: { children: React.ReactNode }) {
     let frame = 0;
     const place = () => {
       frame = 0;
-      const r = box.getBoundingClientRect(), vh = window.innerHeight || 1, spare = r.height * 0.15;
-      const ty = Math.max(-spare, Math.min(spare, (vh / 2 - (r.top + r.height / 2)) * 0.33));
+      const r = box.getBoundingClientRect(), vh = window.innerHeight || 1, spare = r.height * 0.25;
+      const ty = Math.max(-spare, Math.min(spare, (vh / 2 - (r.top + r.height / 2)) * 0.55));
       el.style.transform = `translate3d(0, ${ty.toFixed(1)}px, 0)`;
     };
     const ask = () => { if (!frame) frame = requestAnimationFrame(place); };
@@ -321,7 +321,7 @@ function ParallaxLayer({ children }: { children: React.ReactNode }) {
     window.addEventListener("resize", ask);
     return () => { cancelAnimationFrame(frame); window.removeEventListener("scroll", ask, { capture: true }); window.removeEventListener("resize", ask); };
   }, []);
-  return <div ref={ref} className="pointer-events-none absolute inset-x-0 -top-[15%] h-[130%] will-change-transform" aria-hidden="true">{children}</div>;
+  return <div ref={ref} className="pointer-events-none absolute inset-x-0 -top-[25%] h-[150%] will-change-transform" aria-hidden="true">{children}</div>;
 }
 
 /** Colour of a temperature on the five-step heat scale: red when too hot, down to turquoise and blue when cool. */
