@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap, Marker } from "maplibre-gl";
 import type { Ring } from "@/models/place-area";
 import { MAX_PINS } from "@/models/drawn-area";
-import { addAreaLayers, addSimLayers, handleElement, misterElement, placePinElement, ringCentre, tagElement, zoneTag, pinElement, setAreaData, setOutlineData, setSimData, setSimGhost, type SimLayout } from "@/views/v10/map-area";
+import { addAreaLayers, addSimLayers, handleElement, misterElement, placePinElement, ringCentre, tagElement, zoneTag, pinElement, setAreaData, setOutlineData, setSimData, setBedData, setSimGhost, type SimLayout } from "@/views/v10/map-area";
 import { ringContains } from "@/models/place-area";
 import type { LatLng } from "@/models/area-layout";
 
@@ -100,10 +100,11 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
       libRef.current = maplibregl;
       map.on("load", () => { addAreaLayers(map); addSimLayers(map, lat); if (!cancelled) setState("ready"); });
       // The aiuole keep their stripes the same size on screen: laid again for the new zoom once it settles.
-      // …and during the zoom too, a few times a second, so the grass never swells under the fingers.
-      let lastBeds = 0;
-      const relay = () => { if (map.getSource("sim-layout")) { lastBeds = Date.now(); setSimData(map, simNow.current); } };
-      map.on("zoom", () => { if (Date.now() - lastBeds > 180) relay(); });
+      // …and during the zoom too, so the grass never swells under the fingers.
+      // Once per frame at most: only the aiuole's own light source is laid again.
+      let frame = 0;
+      const relay = () => { if (frame) return; frame = requestAnimationFrame(() => { frame = 0; try { setBedData(map, simNow.current); } catch { /* the map was removed */ } }); };
+      map.on("zoom", relay);
       map.on("zoomend", relay);
       // Drawing: a tap on the map is a new pin at that spot.
       map.on("click", (e) => {

@@ -1,7 +1,7 @@
 import type { Map as MlMap, GeoJSONSource } from "maplibre-gl";
 import type { Ring } from "@/models/place-area";
 import { ZONE_LABEL, type SubArea, type ZoneKind } from "@/models/drawn-area";
-import { bedParts, crownRing, trapParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
+import { bedParts, BEDS_3D, crownRing, trapParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
 
 /** The drawn area on a maplibre map: a turquoise fill and a white outline, from a ring of [lat, lng] pins. */
 export const AREA_SOURCE = "drawn-area";
@@ -87,8 +87,7 @@ const lineF = (ring: Ring, props: Record<string, unknown>) => ({ type: "Feature"
 const fc = (features: unknown[]) => ({ type: "FeatureCollection", features }) as unknown as Parameters<GeoJSONSource["setData"]>[0];
 
 /** The flat parts (lawn, shade, zones, cloth, drip lines, windbreak) and, in 2D, the trees as points. */
-/** `bedM`: the 2D aiuole's bed width in metres for the map's zoom (a fixed width on screen); 1,2 m when not given. */
-export function simFeatures(sim: SimLayout | null, withTreePoints: boolean, bedM?: number) {
+export function simFeatures(sim: SimLayout | null, withTreePoints: boolean) {
   if (!sim) return fc([]);
   const out: unknown[] = [];
   if (sim.kind === "piazza") {
@@ -97,9 +96,6 @@ export function simFeatures(sim: SimLayout | null, withTreePoints: boolean, bedM
     for (const p of sim.data.patches) if (p.kind === "lawn" || withTreePoints) out.push(poly(p.ring, p.kind === "lawn"
       ? { kind: "lawn", color: SIM_COLORS.lawn, opacity: 0.55 }
       : { kind: "shade", color: SIM_COLORS.shade, opacity: 0.9 }));
-    // In 2D the aiuole are the same beds as in 3D, laid along the outline traced (bedParts): grass strips, pebbles and
-    // flowers as shapes over a gravel ground, so they follow the zone's own direction and stay crisp at every zoom.
-    if (withTreePoints) for (const b of bedParts(sim.data.patches.filter((p) => p.kind === "lawn").map((p) => p.ring), 400, undefined, { bedM: bedM ?? 1.2, maxStones: 6000, maxFlowers: 300, maxSods: 1500 }).parts) out.push(poly(b.ring, { kind: "bed", color: b.color, opacity: 1 }));
     for (const r of sim.shadows ?? []) out.push(poly(r, { kind: "shadow", color: "#0b0f15", opacity: 0.32 }));
     // Misters: the mist they spread (a light blue veil about 3,5 m round) and, in 2D, the pole seen from above.
     for (const m of sim.data.misters) {
@@ -128,6 +124,23 @@ export function simFeatures(sim: SimLayout | null, withTreePoints: boolean, bedM
     // A free zone greyed; the others a see-through veil of their colour.
     out.push(z.kind === "libera" ? poly(z.ring, { kind: "free", color: "#475569", opacity: 0.55 }) : poly(z.ring, { kind: "tint", color: ZONE_COLORS[z.kind], opacity: 0.22 }));
     out.push(lineF([...z.ring, z.ring[0]!], { kind: "zoneline", color: ZONE_COLORS[z.kind], width: 2.5 }));
+  }
+  return fc(out);
+}
+
+/** The 2D aiuole on their own light source, so a zoom redraws only them: the sods as shapes and the pebbles and
+ * flowers as dots of a fixed size on screen (circle layer, radius in px), laid for a bed `bedM` metres wide. */
+export const SIM_BEDS = "sim-beds-src";
+export function bedFeatures(sim: SimLayout | null, bedM: number) {
+  if (!sim || sim.kind !== "piazza") return fc([]);
+  const lawn = sim.data.patches.filter((p) => p.kind === "lawn").map((p) => p.ring);
+  if (!lawn.length) return fc([]);
+  const pxPerM = 10 / bedM, out: unknown[] = [];
+  for (const b of bedParts(lawn, 400, undefined, { bedM, maxStones: 6000, maxFlowers: 300, maxSods: 1500 }).parts) {
+    if ((BEDS_3D.grass as readonly string[]).includes(b.color)) { out.push(poly(b.ring, { kind: "bed", color: b.color })); continue; }
+    const [la, ln] = ringCentre(b.ring), r = Math.hypot((b.ring[0]![0] - la) * 111_320, (b.ring[0]![1] - ln) * 111_320 * Math.cos((la * Math.PI) / 180)) * pxPerM;
+    const flower = (BEDS_3D.flowers as readonly string[]).includes(b.color);
+    out.push({ type: "Feature", properties: { kind: "dot", color: b.color, r: flower ? Math.max(1.6, r) : Math.max(1, r) }, geometry: { type: "Point", coordinates: [ln, la] } });
   }
   return fc(out);
 }
@@ -247,7 +260,10 @@ export function addSimLayers(map: MlMap, _lat: number, raised = false) {
   // In 2D the lawn is the gravel ground under the beds (the beds, pebbles and flowers drawn over it as shapes).
   if (!raised) {
     map.addLayer({ id: "sim-lawn", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "lawn"], paint: { "fill-color": "#b9ab8f", "fill-opacity": 0.95 } }, before);
-    map.addLayer({ id: "sim-beds", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "bed"], paint: { "fill-color": ["get", "color"], "fill-opacity": 1 } }, before);
+    map.addSource(SIM_BEDS, { type: "geojson", data: fc([]) });
+    map.addLayer({ id: "sim-beds", type: "fill", source: SIM_BEDS, filter: ["==", ["get", "kind"], "bed"], paint: { "fill-color": ["get", "color"], "fill-opacity": 1 } }, before);
+    // Pebbles and flowers: dots of a fixed size on screen, so they never swell with the zoom.
+    map.addLayer({ id: "sim-pebbles", type: "circle", source: SIM_BEDS, filter: ["==", ["get", "kind"], "dot"], paint: { "circle-color": ["get", "color"], "circle-radius": ["get", "r"], "circle-opacity": 1 } }, before);
   }
   // The shadows cast on the ground (over the lawn, under the pergolas and the trees), without seams where they overlap.
   map.addLayer({ id: "sim-shadow", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "shadow"], paint: { "fill-color": "#0b0f15", "fill-opacity": 0.32, "fill-antialias": false } }, before);
@@ -287,6 +303,7 @@ export function setSimGhost(map: MlMap, ghost: boolean) {
   set("sim-fill", "fill-opacity", ["*", ["get", "opacity"], k]);
   set("sim-lawn", "fill-opacity", 0.95 * k);
   set("sim-beds", "fill-opacity", k);
+  set("sim-pebbles", "circle-opacity", k);
   set("sim-pergola", "fill-opacity", 0.95 * k);
   set("sim-shadow", "fill-opacity", 0.32 * k);
   set("sim-pergola-frame", "line-opacity", k);
@@ -307,10 +324,15 @@ export function setSimGhost(map: MlMap, ghost: boolean) {
   set("sim-trees", "circle-stroke-opacity", k);
 }
 
+/** Lays the 2D aiuole again for the map's zoom (only their own source), so they keep their size on screen. */
+export function setBedData(map: MlMap, sim: SimLayout | null) {
+  (map.getSource(SIM_BEDS) as GeoJSONSource | undefined)?.setData(bedFeatures(sim, bedWidthAt(map)));
+}
 /** The 2D aiuole's bed width for the map's zoom: about 10 px on screen, whatever the zoom. */
 export const bedWidthAt = (map: MlMap) => (10 * 78_271.517 * Math.cos((map.getCenter().lat * Math.PI) / 180)) / 2 ** map.getZoom();
 export function setSimData(map: MlMap, sim: SimLayout | null, raised = false) {
-  (map.getSource(SIM_SOURCE) as GeoJSONSource | undefined)?.setData(simFeatures(sim, !raised, raised ? undefined : bedWidthAt(map)));
+  (map.getSource(SIM_SOURCE) as GeoJSONSource | undefined)?.setData(simFeatures(sim, !raised));
+  if (!raised) setBedData(map, sim);
   if (raised) (map.getSource(SIM_TREES_3D) as GeoJSONSource | undefined)?.setData(treeCrowns(sim));
 }
 
