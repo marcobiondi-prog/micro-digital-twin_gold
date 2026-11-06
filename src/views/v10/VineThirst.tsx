@@ -21,6 +21,7 @@ import { freshAverage, type SensorKind } from "@/models/sensor-devices";
 import { toast } from "sonner";
 import { hapticTick } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
+import { forecastNeed, loadForecast, vineAdvice, vineWater, waterText, type AdviceTone } from "@/models/vine-advice";
 
 const PHASE_ICON: Record<Pheno, LucideIcon> = { Germogliamento: Sprout, Fioritura: Flower2, Invaiatura: Grape, Maturazione: Wine };
 const PHASE_SHORT: Record<Pheno, string> = { Germogliamento: "Germogli", Fioritura: "Fiori", Invaiatura: "Acini", Maturazione: "Vendemmia" };
@@ -79,7 +80,6 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
   // On the whole vineyard the levers show the average mix (the same everywhere once set from here).
   const avgMix = (ms: VineMix[]): VineMix => ({ irrigation: Math.round(avg(ms.map((m) => m.irrigation)) / 2) * 2, shade: Math.round(avg(ms.map((m) => m.shade)) / 10) * 10, windbreak: Math.round(avg(ms.map((m) => m.windbreak)) / 10) * 10 });
   const mix = all ? avgMix(mixes) : mixes[vine.selected] ?? NO_MIX;
-  const [costOpen, setCostOpen] = useState(false);
   const gaugeRef = useRef<HTMLDivElement>(null);
   const [gaugeSeen, setGaugeSeen] = useState(true);
   useEffect(() => {
@@ -304,30 +304,93 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
         <Lever icon={Wind} label="Frangivento" value={mix.windbreak} step={10} max={VINE_MAX.windbreak} color="text-ok" swatch="bg-ok" onChange={(v) => change({ windbreak: v })} />
       </div>
 
-      {/* Cost per hectare and benefits, folded. */}
-      <div className="rounded-3xl bg-foreground/[0.05]">
-        <button type="button" onClick={() => setCostOpen((o) => !o)} aria-expanded={costOpen} aria-controls="vine-cost-body"
-          className="flex w-full items-center gap-3 rounded-3xl p-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <Wallet className="size-6 shrink-0 text-muted-foreground" aria-hidden="true" />
-          <span className="min-w-0 flex-1">
-            <span className="block text-xs text-muted-foreground">Dettagli costo e benefici{any ? (preset ? ` · ${level.s}` : ` · vicino a ${level.s}`) : ""}</span>
-            <span className="block font-mono text-base font-semibold tabular-nums">{any ? `${euroRange(cost.perHa)} all'ettaro` : "Nessun intervento"}</span>
-          </span>
-          <ChevronDown className={cn("size-5 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", costOpen && "rotate-180")} aria-hidden="true" />
-        </button>
-        <div id="vine-cost-body" hidden={!costOpen} className="space-y-3 px-4 pb-4">
-          <p className="inline-flex items-center gap-1.5 text-sm text-muted-foreground"><Ruler className="size-4 shrink-0" aria-hidden="true" />{surface} · {surfaceNote}</p>
-          <dl className="grid grid-cols-3 gap-2 border-t border-foreground/10 pt-3">
-            {facts.map(({ icon: Icon, value, label }) => (
-              <div key={label} className="flex min-w-0 flex-col items-center gap-1 text-center">
-                <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <div className="flex min-w-0 flex-col-reverse"><dt className="truncate text-[11px] text-muted-foreground">{label}</dt><dd className="font-mono text-sm font-semibold tabular-nums">{value}</dd></div>
-              </div>
-            ))}
-          </dl>
-          <p className="text-[11px] leading-snug text-muted-foreground">Stima indicativa all'ettaro, IVA esclusa, per l'intervento completo: irrigazione a goccia 3.000–6.000 €, teli d'ombra 4.000–8.000 €, frangivento 6.000–12.000 €.</p>
+      {/* No money here: what it gives, what to do now, the water the vines need and the coming days. */}
+      <dl className="grid grid-cols-3 gap-2 rounded-3xl bg-foreground/[0.05] p-4">
+        {facts.map(({ icon: Icon, value, label }) => (
+          <div key={label} className="flex min-w-0 flex-col items-center gap-1 text-center">
+            <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <div className="flex min-w-0 flex-col-reverse"><dt className="truncate text-[11px] text-muted-foreground">{label}</dt><dd className="font-mono text-sm font-semibold tabular-nums">{value}</dd></div>
+          </div>
+        ))}
+      </dl>
+      <VineAdviceCard needs={zonesAfter.map((r) => r.s)} mixes={mixes} m2={m2} surface={`${surface} · ${surfaceNote}`} />
+      <VineForecastCard />
+    </section>
+  );
+}
+
+const TONE_DOT: Record<AdviceTone, string> = { urgent: "bg-danger", soon: "bg-amber-400", ok: "bg-ok" };
+
+/** Cosa fare adesso, then the water: what the vines drink a day and a week, what brings the soil back, what the irrigation gives. */
+function VineAdviceCard({ needs, mixes, m2, surface }: { needs: number[]; mixes: VineMix[]; m2: number; surface: string }) {
+  const vine = useLab().vineyard;
+  const zones = vine.zones.map((z, i) => ({ need: needs[i] ?? 0, moisture: z.moisture, temp: z.temperature, wind: z.wind, rain: z.rain, mix: mixes[i] ?? NO_MIX }));
+  const advice = vineAdvice(zones, vine.phase);
+  const zoneM2 = m2 / Math.max(1, vine.zones.length);
+  const water = vine.zones.map((z, i) => vineWater({ moisture: z.moisture, temp: z.temperature, rain: z.rain, irrigation: mixes[i]?.irrigation ?? 0 }, vine.phase, zoneM2));
+  const total = water.reduce((t, w) => ({ perDay: t.perDay + w.perDay, refill: t.refill + w.refill, given: t.given + w.given }), { perDay: 0, refill: 0, given: 0 });
+  return (
+    <>
+      <section className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4" aria-label="Cosa fare adesso">
+        <h3 className="text-[15px] font-semibold">Cosa fare adesso</h3>
+        <ul className="space-y-2">
+          {advice.map((a) => (
+            <li key={a.text} className="flex items-start gap-2.5 text-sm leading-snug"><span className={cn("mt-1.5 size-2 shrink-0 rounded-full", TONE_DOT[a.tone])} aria-hidden="true" />{a.text}</li>
+          ))}
+        </ul>
+      </section>
+      <section className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4" aria-label="Acqua necessaria">
+        <div className="flex items-baseline justify-between gap-2">
+          <h3 className="text-[15px] font-semibold">Acqua necessaria</h3>
+          <span className="text-xs text-muted-foreground">{surface}</span>
         </div>
-      </div>
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div><p className="font-mono text-base font-semibold tabular-nums">{waterText(total.perDay)}</p><p className="text-[11px] text-muted-foreground">al giorno</p></div>
+          <div><p className="font-mono text-base font-semibold tabular-nums">{waterText(total.perDay * 7)}</p><p className="text-[11px] text-muted-foreground">a settimana</p></div>
+          <div><p className="font-mono text-base font-semibold tabular-nums">{waterText(total.refill)}</p><p className="text-[11px] text-muted-foreground">per il terreno</p></div>
+        </div>
+        <ul className="space-y-1 border-t border-foreground/10 pt-3 text-sm">
+          {water.map((w, i) => (
+            <li key={i} className="flex items-baseline justify-between gap-3">
+              <span className="shrink-0 whitespace-nowrap text-muted-foreground">Zona {i + 1}</span>
+              <span className="text-right"><span className="font-semibold tabular-nums">{waterText(w.perDay)}</span> al giorno{w.refill > 0 ? <> · <span className="font-semibold tabular-nums">{waterText(w.refill)}</span> per il terreno</> : null}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="text-[11px] leading-snug text-muted-foreground">{total.given > 0 ? `L'irrigazione impostata porta ${waterText(total.given)}. ` : ""}Stima indicativa: consumo delle viti dalla temperatura e dalla fase, terreno riportato al 30 % di umidità sui primi 50 cm.</p>
+      </section>
+    </>
+  );
+}
+
+const DAY_NAME = new Intl.DateTimeFormat("it-IT", { weekday: "short" });
+
+/** The coming 7 days at the place: highest temperature, wind, rain and the need of intervention each day would bring. */
+function VineForecastCard() {
+  const vine = useLab().vineyard;
+  const { lat, lng } = vine.location;
+  const q = useQuery({ queryKey: ["vine-forecast", lat.toFixed(2), lng.toFixed(2)], queryFn: () => loadForecast(lat, lng), staleTime: 60 * 60 * 1000 });
+  const days = q.data ? forecastNeed(vine, q.data) : null;
+  return (
+    <section className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4" aria-label="Prossimi 7 giorni">
+      <h3 className="text-[15px] font-semibold">Prossimi 7 giorni</h3>
+      {q.isPending ? <p className="text-sm text-muted-foreground">Leggo le previsioni del luogo…</p>
+        : !days ? <p className="text-sm text-muted-foreground">Previsioni non disponibili ora.</p>
+        : (
+          <>
+            <ul className="-mx-1 flex snap-x gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none]" data-map-gestures="">
+              {days.map((d, i) => (
+                <li key={d.date} className="flex min-w-[3.6rem] flex-1 snap-start flex-col items-center gap-1 rounded-2xl bg-foreground/[0.05] px-1.5 py-2 text-center">
+                  <span className="text-[11px] font-semibold capitalize text-muted-foreground">{i === 0 ? "Oggi" : DAY_NAME.format(new Date(`${d.date}T12:00`))}</span>
+                  <span className="font-mono text-sm font-semibold tabular-nums">{Math.round(d.tmax)}°</span>
+                  <span className="text-[10px] text-muted-foreground">{d.rain >= 2 ? `${Math.round(d.rain)} mm` : `${Math.round(d.wind)} km/h`}</span>
+                  <span className={cn("mt-0.5 rounded-full px-2 py-0.5 font-mono text-[12px] font-semibold tabular-nums text-white", GAIN_BG[stressGain(d.need)])}>{Math.round(d.need)}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-[11px] leading-snug text-muted-foreground">Per ogni giorno: temperatura massima, pioggia (o vento) e il bisogno di intervento su 100 con gli interventi impostati.</p>
+          </>
+        )}
     </section>
   );
 }
