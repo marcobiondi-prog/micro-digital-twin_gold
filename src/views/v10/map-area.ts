@@ -99,7 +99,7 @@ export function simFeatures(sim: SimLayout | null, withTreePoints: boolean, bedM
       : { kind: "shade", color: SIM_COLORS.shade, opacity: 0.9 }));
     // In 2D the aiuole are the same beds as in 3D, laid along the outline traced (bedParts): grass strips, pebbles and
     // flowers as shapes over a gravel ground, so they follow the zone's own direction and stay crisp at every zoom.
-    if (withTreePoints) for (const b of bedParts(sim.data.patches.filter((p) => p.kind === "lawn").map((p) => p.ring), 400, undefined, { bedM: bedM ?? 1.2, maxStones: 900, maxFlowers: 200 }).parts) out.push(poly(b.ring, { kind: "bed", color: b.color, opacity: 1 }));
+    if (withTreePoints) for (const b of bedParts(sim.data.patches.filter((p) => p.kind === "lawn").map((p) => p.ring), 400, undefined, { bedM: bedM ?? 1.2, detail: 0.55, maxStones: 2400, maxFlowers: 260 }).parts) out.push(poly(b.ring, { kind: "bed", color: b.color, opacity: 1 }));
     for (const r of sim.shadows ?? []) out.push(poly(r, { kind: "shadow", color: "#0b0f15", opacity: 0.32 }));
     // Misters: the mist they spread (a light blue veil about 3,5 m round) and, in 2D, the pole seen from above.
     for (const m of sim.data.misters) {
