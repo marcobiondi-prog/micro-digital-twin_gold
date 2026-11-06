@@ -21,12 +21,16 @@ describe("aiuole e ciottoli in 3D, like the 2D pattern", () => {
     expect(parts.filter((p) => grass(p.color))).toHaveLength(beds.length);
     expect(parts.every((p) => p.height > p.base && p.base > 0)).toBe(true);
   });
-  it("runs the beds up and down the map, joined across neighbouring row strips", () => {
+  it("runs the beds up and down the map and cuts them into sods", () => {
     const rows = [box(12, 3, 0, 0), box(12, 3, 0, 3), box(12, 3, 0, 6)];
     const { beds } = bedParts(rows);
-    expect(beds.length).toBeGreaterThanOrEqual(7);
-    // Each bed one piece 9 m tall (north–south), not three east–west strips.
-    for (const b of beds) { const la = b.map((p) => p[0]); expect((Math.max(...la) - Math.min(...la)) * 111_320).toBeGreaterThan(8.9); }
+    expect(beds.length).toBeGreaterThanOrEqual(7 * 5);
+    // Sods 1,2 m wide east–west, cut every ~1,5 m north–south (zolle), never as long east–west strips.
+    for (const b of beds) {
+      const la = b.map((p) => p[0]), ln = b.map((p) => p[1]);
+      expect((Math.max(...ln) - Math.min(...ln)) * k).toBeLessThan(1.25);
+      expect((Math.max(...la) - Math.min(...la)) * 111_320).toBeLessThan(1.9);
+    }
   });
   it("follows a zone traced at an angle: beds square to its outline, on the side nearer north–south, and cut to it", () => {
     const P = (x: number, y: number): [number, number] => [lat + y / 111_320, lng + x / k];
@@ -46,7 +50,7 @@ describe("aiuole e ciottoli in 3D, like the 2D pattern", () => {
     }
   });
   it("keeps the pieces few on a big lawn and is the same every time", () => {
-    expect(bedParts([box(300, 40)]).beds.length).toBeLessThanOrEqual(50);
+    expect(bedParts([box(300, 40)]).beds.length).toBeLessThanOrEqual(120);
     expect(bedParts([box(30, 20)])).toEqual(bedParts([box(30, 20)]));
     expect(bedParts([]).parts).toHaveLength(0);
   });
@@ -68,6 +72,6 @@ describe("aiuole zone in 3D", () => {
     const lawn = l.patches.filter((p) => p.kind === "lawn");
     expect(lawn).toHaveLength(1);
     const { parts } = bedParts(lawn.map((p) => p.ring), 40, area);
-    expect(parts.length).toBeLessThan(200);
+    expect(parts.length).toBeLessThan(400);
   });
 });

@@ -569,13 +569,15 @@ export const BED_H = { pebbleBase: 0.55, pebble: 0.58, grassBase: 0.6, grass: 0.
  * (the drawn outline) a piece reaching past it is cut into 0,5 m slices and only those wholly inside stay. The band pitch
  * grows while there would be more than `maxBeds` beds. Fixed pseudo-random flowers and stones, the same on every device.
  */
+/** The sods (zolle) of the aiuole: paths and gaps 0,25 m wide, sods about 1,5 m long, pebbles 15–21 cm packed in rows. */
+export const SOD = { path: 0.25, length: 1.5, stone: 0.075, stoneVar: 0.03, stoneRow: 0.22, stoneStep: 0.19 } as const;
 /**
  * `opts.bedM`: the beds' width in metres (paths a third of it, stones and flowers in proportion) — the 2D map asks for
  * a fixed width on screen, so the stripes keep their size at every zoom; `detail` shrinks the pebbles and flowers
  * against the beds (pebbles packed closer, more rows on a path); `maxStones` / `maxFlowers` cap the small parts.
  */
-export function bedParts(patches: Ring[], maxBeds = 50, area?: Ring, opts: { bedM?: number; detail?: number; maxStones?: number; maxFlowers?: number } = {}): { beds: Ring[]; parts: TreePart[] } {
-  const sc = (opts.bedM ?? 1.2) / 1.2, d = opts.detail ?? 1, maxStones = opts.maxStones ?? 140, maxFlowers = opts.maxFlowers ?? 36;
+export function bedParts(patches: Ring[], maxBeds = 50, area?: Ring, opts: { bedM?: number; detail?: number; maxStones?: number; maxFlowers?: number; maxSods?: number } = {}): { beds: Ring[]; parts: TreePart[] } {
+  const sc = (opts.bedM ?? 1.2) / 1.2, d = opts.detail ?? 1, maxStones = opts.maxStones ?? 520, maxSods = opts.maxSods ?? 120, maxFlowers = opts.maxFlowers ?? 36;
   const rings = patches.filter((r) => r.length >= 3);
   if (!rings.length) return { beds: [], parts: [] };
   const f = frameOf(rings.flat());
@@ -635,36 +637,58 @@ export function bedParts(patches: Ring[], maxBeds = 50, area?: Ring, opts: { bed
     }
     return { beds, paths, path };
   };
-  let bed = 1.2 * sc, path = 0.4 * sc, lay = layout(bed, path);
+  let bed = 1.2 * sc, path = SOD.path * sc, lay = layout(bed, path);
   for (let k = 0; lay.beds.length > maxBeds && k < 8; k++) { bed *= 1.3; path *= 1.15; lay = layout(bed, path); }
+  // Each bed cut across into sods (zolle) about SOD.length long, with a pebble gap as wide as the paths between them;
+  // the sods get longer while there would be more than maxSods.
+  const spanU = (r: LatLng[]) => [Math.min(...r.map((p) => p[0])), Math.max(...r.map((p) => p[0]))] as const;
+  const cut = (len: number) => {
+    const sods: LatLng[][] = [], gaps: LatLng[][] = [];
+    for (const r of lay.beds) {
+      const [lo, hi] = spanU(r), L = hi - lo, n = Math.max(1, Math.round((L + path) / (len + path))), sl = (L - (n - 1) * path) / n;
+      if (sl <= 0) { sods.push(r); continue; }
+      for (let i = 0; i < n; i++) {
+        const a = lo + i * (sl + path);
+        const sod = clipBox(r, a, a + sl, -1e9, 1e9);
+        if (sod.length >= 3) sods.push(sod);
+        if (i < n - 1) { const g = clipBox(r, a + sl, a + sl + path, -1e9, 1e9); if (g.length >= 3) gaps.push(g); }
+      }
+    }
+    return { sods, gaps };
+  };
+  let sodLen = SOD.length * sc, zolle = cut(sodLen);
+  for (let k = 0; zolle.sods.length > maxSods && k < 10; k++) { sodLen *= 1.4; zolle = cut(sodLen); }
+  lay = { beds: zolle.sods, paths: [...lay.paths, ...zolle.gaps], path };
   let seed = 11;
   const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
   const inUV = (r: LatLng[], p: LatLng) => ringContains(r, p[0], p[1]);
   const discUV = (c: LatLng, rad: number, n: number): LatLng[] => Array.from({ length: n }, (_, i) => [c[0] + Math.cos((2 * Math.PI * i) / n) * rad, c[1] + Math.sin((2 * Math.PI * i) / n) * rad] as LatLng);
   const beds = lay.beds.map((r) => r.map(fromUV));
   const parts: TreePart[] = beds.map((ring, n) => ({ ring, base: BED_H.grassBase, height: BED_H.grass, color: BEDS_3D.grass[n % 2]! }));
-  // Pebbles along every path, in rows across it (a new row every 0,25 m), spaced along it so there are at most 140.
-  const pathLen = lay.paths.reduce((t, r) => t + Math.max(...r.map((p) => p[0])) - Math.min(...r.map((p) => p[0])), 0);
-  const along = Math.max(0.22 * sc * d, pathLen / maxStones);
+  // Pebbles packed along every path and every gap between sods, in rows across it, at most maxStones.
+  const box4 = (r: LatLng[]) => ({ lo: Math.min(...r.map((p) => p[0])), hi: Math.max(...r.map((p) => p[0])), a: Math.min(...r.map((p) => p[1])), b: Math.max(...r.map((p) => p[1])) });
+  const colsOf = (a: number, b: number) => Math.max(1, Math.floor((b - a) / (SOD.stoneRow * sc * d)));
+  const want = lay.paths.reduce((t, r) => { const q = box4(r); return t + colsOf(q.a, q.b) * (q.hi - q.lo); }, 0);
+  const along = Math.max(SOD.stoneStep * sc * d, want / maxStones);
   let stones = 0;
   for (const r of lay.paths) {
     const lo = Math.min(...r.map((p) => p[0])), hi = Math.max(...r.map((p) => p[0])), a = Math.min(...r.map((p) => p[1])), b = Math.max(...r.map((p) => p[1]));
-    const cols = Math.max(1, Math.floor((b - a) / (0.25 * sc * d)));
+    const cols = colsOf(a, b);
     for (let ci = 0; ci < cols && stones < maxStones; ci++) {
       const v = a + (b - a) * ((ci + 0.5) / cols);
       for (let u = lo + along * (ci % 2 ? 0.75 : 0.25); u < hi && stones < maxStones; u += along) {
-        const disc = discUV([u + (rnd() - 0.5) * along * 0.3, v], (0.09 + rnd() * 0.04) * sc * d, 7);
+        const disc = discUV([u + (rnd() - 0.5) * along * 0.3, v], (SOD.stone + rnd() * SOD.stoneVar) * sc * d, 7);
         if (!disc.every((p) => inUV(r, p))) continue;
         parts.push({ ring: disc.map(fromUV), base: BED_H.flowerBase, height: BED_H.flower, color: BEDS_3D.stones[(stones + Math.floor(rnd() * 3)) % BEDS_3D.stones.length]! });
         stones++;
       }
     }
   }
-  // Small flowers on the grass, a few per bed, at most 36 in all.
+  // Small flowers on the grass, about one every 10 m² (a sod gets one now and then), at most maxFlowers.
   let flowers = 0;
   for (const [n, r] of lay.beds.entries()) {
     const lo = Math.min(...r.map((p) => p[0])), hi = Math.max(...r.map((p) => p[0])), a = Math.min(...r.map((p) => p[1])), b = Math.max(...r.map((p) => p[1]));
-    const want = Math.min(4, Math.max(1, Math.round(((hi - lo) * (b - a)) / (8 * sc * sc))));
+    const per = ((hi - lo) * (b - a)) / (10 * sc * sc), want = Math.min(4, Math.floor(per) + (rnd() < per % 1 ? 1 : 0));
     for (let k = 0; k < want && flowers < maxFlowers; k++) {
       const disc = discUV([lo + rnd() * (hi - lo), a + rnd() * (b - a)], (0.18 + rnd() * 0.07) * sc * d, 8);
       if (!disc.every((p) => inUV(r, p))) continue;

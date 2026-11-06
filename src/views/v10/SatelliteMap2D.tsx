@@ -100,7 +100,11 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
       libRef.current = maplibregl;
       map.on("load", () => { addAreaLayers(map); addSimLayers(map, lat); if (!cancelled) setState("ready"); });
       // The aiuole keep their stripes the same size on screen: laid again for the new zoom once it settles.
-      map.on("zoomend", () => { if (map.getSource("sim-layout")) setSimData(map, simNow.current); });
+      // …and during the zoom too, a few times a second, so the grass never swells under the fingers.
+      let lastBeds = 0;
+      const relay = () => { if (map.getSource("sim-layout")) { lastBeds = Date.now(); setSimData(map, simNow.current); } };
+      map.on("zoom", () => { if (Date.now() - lastBeds > 180) relay(); });
+      map.on("zoomend", relay);
       // Drawing: a tap on the map is a new pin at that spot.
       map.on("click", (e) => {
         const { area: ring, drawing: on, onAreaChange: set, outline: big, onOutside: out } = live.current;

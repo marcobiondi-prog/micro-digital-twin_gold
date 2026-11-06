@@ -99,7 +99,7 @@ export function simFeatures(sim: SimLayout | null, withTreePoints: boolean, bedM
       : { kind: "shade", color: SIM_COLORS.shade, opacity: 0.9 }));
     // In 2D the aiuole are the same beds as in 3D, laid along the outline traced (bedParts): grass strips, pebbles and
     // flowers as shapes over a gravel ground, so they follow the zone's own direction and stay crisp at every zoom.
-    if (withTreePoints) for (const b of bedParts(sim.data.patches.filter((p) => p.kind === "lawn").map((p) => p.ring), 400, undefined, { bedM: bedM ?? 1.2, detail: 0.55, maxStones: 2400, maxFlowers: 260 }).parts) out.push(poly(b.ring, { kind: "bed", color: b.color, opacity: 1 }));
+    if (withTreePoints) for (const b of bedParts(sim.data.patches.filter((p) => p.kind === "lawn").map((p) => p.ring), 400, undefined, { bedM: bedM ?? 1.2, maxStones: 6000, maxFlowers: 300, maxSods: 1500 }).parts) out.push(poly(b.ring, { kind: "bed", color: b.color, opacity: 1 }));
     for (const r of sim.shadows ?? []) out.push(poly(r, { kind: "shadow", color: "#0b0f15", opacity: 0.32 }));
     // Misters: the mist they spread (a light blue veil about 3,5 m round) and, in 2D, the pole seen from above.
     for (const m of sim.data.misters) {
@@ -307,8 +307,8 @@ export function setSimGhost(map: MlMap, ghost: boolean) {
   set("sim-trees", "circle-stroke-opacity", k);
 }
 
-/** The 2D aiuole's bed width for the map's zoom: about 12 px on screen, whatever the zoom. */
-export const bedWidthAt = (map: MlMap) => (12 * 78_271.517 * Math.cos((map.getCenter().lat * Math.PI) / 180)) / 2 ** map.getZoom();
+/** The 2D aiuole's bed width for the map's zoom: about 10 px on screen, whatever the zoom. */
+export const bedWidthAt = (map: MlMap) => (10 * 78_271.517 * Math.cos((map.getCenter().lat * Math.PI) / 180)) / 2 ** map.getZoom();
 export function setSimData(map: MlMap, sim: SimLayout | null, raised = false) {
   (map.getSource(SIM_SOURCE) as GeoJSONSource | undefined)?.setData(simFeatures(sim, !raised, raised ? undefined : bedWidthAt(map)));
   if (raised) (map.getSource(SIM_TREES_3D) as GeoJSONSource | undefined)?.setData(treeCrowns(sim));
