@@ -59,7 +59,7 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, medi
       <div ref={swipe.ref} style={swipe.style} className="relative">
       <Panels value={tab} panels={[
         // Simula carries the photos and videos under the simulation, so it stays mounted: the camera dock reaches LabMedia from any tab.
-        { id: "simula", always: true, content: <div className="space-y-6">{simula}<section id={simMediaId(kind)} aria-label="Foto e video" className="fuse-canvas scroll-mt-[calc(var(--nav-h)+5rem)] rounded-t-3xl px-3 pt-4 pb-6 sm:px-5">{media}</section></div> },
+        { id: "simula", always: true, content: <div className="space-y-6">{tab === "simula" && <SimMap kind={kind} preview />}{simula}<section id={simMediaId(kind)} aria-label="Foto e video" className="fuse-canvas scroll-mt-[calc(var(--nav-h)+5rem)] rounded-t-3xl px-3 pt-4 pb-6 sm:px-5">{media}</section></div> },
         { id: "mappa", content: <SimMap kind={kind} /> },
         { id: "sensori", content: sensori },
       ]} />

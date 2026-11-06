@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { toast } from "sonner";
-import { Check, Hand, Lock, MapPin, Moon, PenLine, RotateCcw, Sun, Sunrise, Sunset, Trash2, Undo2, X } from "lucide-react";
+import { Check, Hand, Lock, Map as MapIcon, MapPin, Moon, PenLine, RotateCcw, Sun, Sunrise, Sunset, Trash2, Undo2, X } from "lucide-react";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { openAccount } from "@/lib/camera-dock";
 import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn } from "@/lib/demo-login";
@@ -22,7 +22,7 @@ import { SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v1
 import type { MovedPart } from "@/views/v10/SatelliteMap2D";
 import { drawnAreaFor, freeM2, leversForZones, leversOfZones, lotsOf, MAX_PINS, moveZones, pinsM2, surfaceText, usableM2, ZONE_KINDS, ZONE_LABEL, zoneName, zonesOfArea, type DrawnArea, type SubArea, type ZoneKind } from "@/models/drawn-area";
 import type { Ring } from "@/models/place-area";
-import type { SimKind } from "@/views/v8/console";
+import { openSimTab, type SimKind } from "@/views/v8/console";
 import { PlaceSearch } from "@/views/SimulationGrid";
 
 const OpenMap3D = lazy(() => import("@/views/v10/OpenMap3D").then((m) => ({ default: m.OpenMap3D })));
@@ -41,7 +41,11 @@ function keepSeeded(seen: Set<string>) {
   try { localStorage.setItem(SEEDED_KEY, JSON.stringify([...seen].slice(-200))); } catch { /* kept for this session only */ }
 }
 
-export function SimMap({ kind }: { kind: SimKind }) {
+/**
+ * `preview`: a small still map above the simulation's arc (2D, a third of the screen): the area with what the levers
+ * lay in it, updated live, the reading pill and day/night; no search, no drawing, no gestures — a tap opens Mappa.
+ */
+export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boolean }) {
   const lab = useLab();
   const loc = kind === "urban" ? lab.urban.location : lab.vineyard.location;
   const [name, ...rest] = loc.label.split(" · ");
@@ -149,7 +153,7 @@ export function SimMap({ kind }: { kind: SimKind }) {
   // down by hand later stays down.
   const zoneSig = kind === "urban" && saved ? zonesOfArea(saved).map((z) => `${z.id}:${z.kind}:${z.ring.length}`).join("|") : "";
   useEffect(() => {
-    if (kind !== "urban" || !saved) return;
+    if (preview || kind !== "urban" || !saved) return;
     // "Solo quello disegnato": the levers follow the zones exactly, whenever a zone is drawn, changed or removed.
     if (saved.edits?.onlyDrawn) {
       const u = lab.urban, next = leversOfZones(saved);
@@ -187,6 +191,21 @@ export function SimMap({ kind }: { kind: SimKind }) {
     if (m.part === "tree") { const trees = [...(e.trees ?? [])]; trees[m.index] = m.at; setEdits({ ...e, trees }); }
     else setEdits({ ...e, [m.part === "lawn" ? "lawnAt" : m.part === "shade" ? "shadeAt" : "windAt"]: m.at });
   };
+  if (preview) return (
+    <button type="button" onClick={() => openSimTab(kind, "mappa")} aria-label="Apri la mappa: disegna l'area e sposta gli elementi"
+      className="relative -mx-4 block h-[34vh] min-h-56 w-[calc(100%+2rem)] overflow-hidden bg-card text-left outline-none focus-visible:ring-2 focus-visible:ring-ring sm:mx-0 sm:w-full sm:rounded-3xl">
+      <MapReading kind={kind} lat={pin.lat} lng={pin.lng} />
+      <DayNight kind={kind} lat={pin.lat} lng={pin.lng} />
+      {/* Still: the map under the button takes no gesture; the page scrolls over it. */}
+      <div className="pointer-events-none h-full w-full" aria-hidden="true">
+        <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} sim={sim} still /></Suspense>
+      </div>
+      <span className="pointer-events-none absolute bottom-3 right-3 z-[3] inline-flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-[13px] font-semibold text-white ring-1 ring-white/15 backdrop-blur-sm">
+        <MapIcon className="size-4" aria-hidden="true" />Apri la mappa
+      </span>
+    </button>
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex items-start gap-3">

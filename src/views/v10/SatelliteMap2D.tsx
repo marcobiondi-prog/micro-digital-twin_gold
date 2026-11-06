@@ -35,7 +35,7 @@ const STYLE: StyleSpecification = {
 type Camera = { center: [number, number]; zoom: number; bearing: number };
 type GMap = { moveCamera: (c: { center?: { lat: number; lng: number }; zoom?: number }) => void };
 
-export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawing = false, onAreaChange, sim = null, arranging = false, onMove, outline = null, onOutside, onPinMove }: {
+export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawing = false, onAreaChange, sim = null, arranging = false, onMove, outline = null, onOutside, onPinMove, still = false }: {
   /** The browser key: with it the 2D map uses Google's satellite imagery, like the 3D view. */
   apiKey?: string | undefined;
   lat: number; lng: number; label: string; zoom: number; area?: Ring; drawing?: boolean; onAreaChange?: (ring: Ring) => void;
@@ -45,6 +45,8 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
   outline?: Ring | null; onOutside?: () => void;
   /** The simulation drawn inside the area; while `arranging` its trees and handles can be dragged (onMove). */
   sim?: SimLayout | null; arranging?: boolean; onMove?: (moved: MovedPart) => void;
+  /** A still preview: framed on the drawn area, without its corner pins nor the recenter button. */
+  still?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const under = useRef<HTMLDivElement>(null);
@@ -141,13 +143,20 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
     setOutlineData(map, drawing ? outline : null);
     map.getCanvas().style.cursor = drawing ? "crosshair" : "";
     pins.current.forEach((m) => m.remove());
-    pins.current = area.map(([pLat, pLng], i) => {
+    pins.current = (still ? [] : area).map(([pLat, pLng], i) => {
       const m = new lib.Marker({ element: pinElement(i + 1, drawing), draggable: drawing }).setLngLat([pLng, pLat]).addTo(map);
       m.on("drag", () => { const p = m.getLngLat(), next = live.current.area.map((q, j): [number, number] => (j === i ? [p.lat, p.lng] : q)); setAreaData(map, next, next.length >= 3); });
       m.on("dragend", () => { const p = m.getLngLat(); live.current.onAreaChange?.(live.current.area.map((q, j): [number, number] => (j === i ? [p.lat, p.lng] : q))); });
       return m;
     });
-  }, [area, drawing, state, outline]);
+  }, [area, drawing, state, outline, still]);
+  // The still preview frames the drawn area (or stays on the place without one).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!still || state !== "ready" || !map || area.length < 3) return;
+    const la = area.map((p) => p[0]), ln = area.map((p) => p[1]);
+    map.fitBounds([[Math.min(...ln), Math.min(...la)], [Math.max(...ln), Math.max(...la)]], { padding: { top: 48, bottom: 44, left: 24, right: 24 }, maxZoom: 20, duration: 0 });
+  }, [still, state, area]);
   // The simulation inside the area (hidden while drawing), and while arranging a handle on each tree and on the lawn,
   // the shade or the windbreak, to drag them by hand.
   useEffect(() => {
@@ -188,7 +197,7 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
       {/* Google's map under, maplibre (see-through) over it with everything drawn and the gestures. */}
       <div ref={under} className={`pointer-events-none absolute inset-0 ${googleOn ? "" : "invisible"}`} aria-hidden="true" />
       <div ref={host} className="relative h-full w-full" role="img" aria-label={`Mappa di ${label}`} />
-      {state === "ready" && <button type="button" onClick={recenter} aria-label="Ricentra la mappa sul punto" className="absolute left-2 top-2 grid size-9 place-items-center rounded-full border border-border/60 bg-background/90 text-foreground shadow-sm backdrop-blur"><Crosshair className="size-4" aria-hidden="true" /></button>}
+      {state === "ready" && !still && <button type="button" onClick={recenter} aria-label="Ricentra la mappa sul punto" className="absolute left-2 top-2 grid size-9 place-items-center rounded-full border border-border/60 bg-background/90 text-foreground shadow-sm backdrop-blur"><Crosshair className="size-4" aria-hidden="true" /></button>}
       {/* Google's tiles carry its name on the map, as in the 3D view. */}
       {state === "loading" && <div className="pointer-events-none absolute inset-0 grid place-items-center text-muted-foreground"><LoaderCircle className="size-5 animate-spin" aria-label="Caricamento mappa" /></div>}
       {state === "error" && <p role="status" className="absolute inset-0 grid place-items-center px-4 text-center text-sm text-muted-foreground">Mappa non disponibile in questo momento.</p>}
