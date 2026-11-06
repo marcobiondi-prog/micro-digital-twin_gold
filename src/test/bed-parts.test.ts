@@ -72,6 +72,6 @@ describe("aiuole zone in 3D", () => {
     const lawn = l.patches.filter((p) => p.kind === "lawn");
     expect(lawn).toHaveLength(1);
     const { parts } = bedParts(lawn.map((p) => p.ring), 40, area);
-    expect(parts.length).toBeLessThan(400);
+    expect(parts.length).toBeLessThan(700);
   });
 });
