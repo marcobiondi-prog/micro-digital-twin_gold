@@ -481,7 +481,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
     : [
       ["Luogo", v.location.label],
       ["Fase della vite", v.phase],
-      ["Stress delle viti", `da ${Math.round(vs.before)} a ${Math.round(vs.after)} su 100 · ${thirstWords(vs.after)}`],
+      ["Bisogno di intervento", `da ${Math.round(vs.before)} a ${Math.round(vs.after)} su 100 · ${thirstWords(vs.after)}`],
       ["Livello", vs.level ?? "Nessun intervento"],
       ["Costo indicativo", vs.empty ? "Nessun intervento" : euroRange(vs.cost)],
       ["Superficie", vs.drawn ? `${grouped(vs.m2)} m² disegnati sulla mappa` : vs.measured ? `${grouped(vs.m2)} m² del vigneto` : "1 ettaro di riferimento"],
@@ -490,7 +490,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   const benefits: Array<[string, string]> = ctx === "Urbano"
     ? [[`${ps.co2} kg`, "CO2 l'anno"], [`${grouped(ps.water)} m³`, "Pioggia tenuta"], [`${grouped(ps.shadeM2)} m²`, "All'ombra"]]
     : [[`${vs.safe} di ${vs.zones.length}`, "Zone al sicuro"], [`-${Math.round(vs.mix.pestAnimal * DEFENCE_MAX)}%`, "Parassiti animali"], [`-${Math.round(vs.mix.pestPlant * DEFENCE_MAX)}%`, "Parassiti vegetali"]];
-  const zoneRows: [string, string][] = ctx === "Urbano" ? [] : vs.zones.map((z, i): [string, string] => [`Zona ${i + 1}`, `stress ${Math.round(z.after)} (senza: ${Math.round(z.plain)}) · ${Math.round(z.temp)} °C · ${Math.round(z.moisture)}% acqua`]);
+  const zoneRows: [string, string][] = ctx === "Urbano" ? [] : vs.zones.map((z, i): [string, string] => [`Zona ${i + 1}`, `bisogno di intervento ${Math.round(z.after)} (senza: ${Math.round(z.plain)}) · ${Math.round(z.temp)} °C · ${Math.round(z.moisture)}% acqua`]);
   const noteRows: [string, string][] = ctx === "Urbano" ? [] : notes.slice(0, 8).map((n): [string, string] => [n.d, n.t]);
   const reportRows: [string, string][] = [
     ...resultRows,
@@ -628,7 +628,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
     const cost = (urban ? ps.empty : vs.empty) ? "0 €" : euroRange(urban ? ps.cost : vs.cost);
     card(M, y, CW, 92);
     doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...C.muted);
-    doc.text(clean(urban ? `${pd.sim ? "Come nella simulazione" : pd.fromSim ? "Alla stessa ora della simulazione" : "Nell'ora più calda"} · ${pd.when.toLowerCase()}` : "Stress delle viti · media delle tre zone"), W / 2, y + 10, { align: "center" });
+    doc.text(clean(urban ? `${pd.sim ? "Come nella simulazione" : pd.fromSim ? "Alla stessa ora della simulazione" : "Nell'ora più calda"} · ${pd.when.toLowerCase()}` : "Bisogno di intervento · media delle tre zone"), W / 2, y + 10, { align: "center" });
     const cy = y + 60;
     arc(W / 2, cy, 38, before, after, min, max);
     pill(words, W / 2, cy - 25, STEP[stepIx]!);
@@ -667,7 +667,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
       y += 68;
     } else {
       // The three zones: thirst after the interventions (coloured), without them, air and water.
-      title("Le tre zone", "stress su 100");
+      title("Le tre zone", "bisogno di intervento su 100");
       ensure(40);
       const zw = (CW - 6) / 3;
       vs.zones.forEach((z, i) => {

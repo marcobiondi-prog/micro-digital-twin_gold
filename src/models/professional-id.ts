@@ -89,15 +89,18 @@ export type AgronomoInput = { name: string; licenceType: string; licence: string
 export function checkAgronomo(v: AgronomoInput, today: Date = new Date()): { id: AgronomoId | null; errors: Errors<keyof AgronomoInput> } {
   const errors: Errors<keyof AgronomoInput> = {};
   if (clean(v.name).split(" ").length < 2) errors.name = "Scrivi nome e cognome.";
-  if (v.licenceType !== "consulente" && v.licenceType !== "utilizzatore") errors.licenceType = "Scegli il tipo di patentino.";
-  if (!isLicenceNumber(v.licence)) errors.licence = "Scrivi il numero come è sul patentino (lettere, numeri, / o -).";
-  if (!(REGIONS as readonly string[]).includes(v.region)) errors.region = "Scegli la regione che l'ha rilasciato.";
+  // The licence number is optional: without it, its type and expiry are not asked either; given, it must read right
+  // and come with its type and a valid expiry.
+  const hasLicence = v.licence.trim() !== "";
+  if (hasLicence && v.licenceType !== "consulente" && v.licenceType !== "utilizzatore") errors.licenceType = "Scegli il tipo di patentino.";
+  if (hasLicence && !isLicenceNumber(v.licence)) errors.licence = "Scrivi il numero come è sul patentino (lettere, numeri, / o -).";
+  if (!(REGIONS as readonly string[]).includes(v.region)) errors.region = "Scegli la regione in cui si trova il vigneto o che ha rilasciato il patentino.";
   const exp = /^\d{4}-\d{2}-\d{2}$/.test(v.expires) ? new Date(`${v.expires}T23:59:59`) : null;
-  if (!exp || Number.isNaN(exp.getTime())) errors.expires = "Scrivi la data di scadenza.";
-  else if (exp < today) errors.expires = "Il patentino è scaduto: serve un patentino valido.";
+  if (hasLicence && (!exp || Number.isNaN(exp.getTime()))) errors.expires = "Scrivi la data di scadenza del patentino.";
+  else if (hasLicence && exp && exp < today) errors.expires = "Il patentino è scaduto: serve un patentino valido, oppure lascia vuoto il numero.";
   if (!v.declared) errors.declared = "Conferma che i dati sono tuoi e veri.";
   if (Object.keys(errors).length) return { id: null, errors };
-  return { id: { kind: "agronomo", name: clean(v.name), licenceType: v.licenceType as AgronomoId["licenceType"], licence: v.licence.trim().toUpperCase(), region: v.region, expires: v.expires, at: today.toISOString() }, errors };
+  return { id: { kind: "agronomo", name: clean(v.name), licenceType: (hasLicence ? v.licenceType : "utilizzatore") as AgronomoId["licenceType"], licence: v.licence.trim().toUpperCase(), region: v.region, expires: hasLicence ? v.expires : "", at: today.toISOString() }, errors };
 }
 
 export type FunzionarioInput = { name: string; comune: string; office: string; otherOffice: string; role: string; email: string; badge: string; declared: boolean };
@@ -126,6 +129,6 @@ export function isProId(v: unknown): v is ProId {
 /** One line saying who is identified: "Conduttore del vigneto · patentino CB/1234 (Molise)", "Funzionario comunale · Comune di Campobasso, Ufficio tecnico". */
 export function proSummary(id: ProId): string {
   return id.kind === "agronomo"
-    ? `${KIND_LABEL.agronomo} · patentino ${id.licence} (${id.region})`
+    ? id.licence ? `${KIND_LABEL.agronomo} · patentino ${id.licence} (${id.region})` : `${KIND_LABEL.agronomo} · ${id.region}`
     : `${KIND_LABEL.funzionario} · Comune di ${id.comune}, ${id.office}`;
 }

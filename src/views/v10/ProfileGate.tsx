@@ -12,7 +12,7 @@ export const SECTION_TONE: Record<Section, string> = { urban: "rgb(28 112 210 / 
 const IDENTIFY_PATH = { urban: "/identificazione/funzionario", vineyard: "/identificazione/agronomo" } as const;
 const WHO: Record<Section, { title: string; who: string; how: string }> = {
   urban: { title: "Piazza", who: "La simulazione della piazza è per i funzionari del Comune.", how: "Ti identifichi con il tuo Comune, l'ufficio di appartenenza e l'email del Comune." },
-  vineyard: { title: "Vigneto", who: "La simulazione del vigneto è per i conduttori del vigneto.", how: "Ti identifichi con il patentino fitosanitario: numero, regione e scadenza." },
+  vineyard: { title: "Vigneto", who: "La simulazione del vigneto è per i conduttori del vigneto.", how: "Ti identifichi con nome e regione; il numero del patentino fitosanitario è facoltativo." },
 };
 
 /** Whether this section is open to the profile in use (undefined while the page is not yet on the phone). */

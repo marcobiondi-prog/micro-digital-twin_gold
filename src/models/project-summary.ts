@@ -15,7 +15,7 @@ const avg = (n: number[]) => n.reduce((a, b) => a + b, 0) / Math.max(1, n.length
 export const heatStep = (t: number) => (t >= 39 ? 0 : t >= 36 ? 1 : t >= 30 ? 2 : t >= 26 ? 3 : 4);
 export const heatWords = (t: number) => (t >= 39 ? "Troppo caldo" : t >= 36 ? "Molto caldo" : t >= 30 ? "Caldo" : t >= 18 ? "Si sta bene" : t >= 10 ? "Fresco" : "Freddo");
 export const thirstStep = (s: number) => (s >= 80 ? 0 : s >= 65 ? 1 : s >= 45 ? 2 : s >= 25 ? 3 : 4);
-export const thirstWords = (s: number) => (s >= 65 ? "Stress forte" : s >= 35 ? "Da tenere d'occhio" : "Le viti stanno bene");
+export const thirstWords = (s: number) => (s >= 65 ? "Intervento urgente" : s >= 35 ? "Intervento consigliato" : "Nessun intervento necessario");
 const levelName = (id: string | null) => (id ? comparison.find((c) => c.id === id)?.s ?? null : null);
 
 const PIAZZA_PRESETS = { zero: [3, 10, 10], mvp: [6, 20, 15], roadmap: [12, 40, 30] } as const;

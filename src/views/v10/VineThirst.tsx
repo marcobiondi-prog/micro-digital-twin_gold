@@ -27,7 +27,9 @@ const PHASE_SHORT: Record<Pheno, string> = { Germogliamento: "Germogli", Fioritu
 /** Thirst 0–100 → five-step scale (0 = worst), as in the rest of the vineyard. */
 const stressGain = (s: number) => (s >= 80 ? 0 : s >= 65 ? 1 : s >= 45 ? 2 : s >= 25 ? 3 : 4);
 /** How the vines are, in plain words. */
-const verdict = (s: number) => (s >= 65 ? "Stress forte" : s >= 35 ? "Da tenere d'occhio" : "Le viti stanno bene");
+/** How much intervention the vines need, in plain words: the green, amber and red zones of the arc. */
+const verdict = (s: number) => (s >= 65 ? "Intervento urgente" : s >= 35 ? "Intervento consigliato" : "Nessun intervento necessario");
+const NEED_BANDS = [{ from: 0, to: 35, color: "#22c55e" }, { from: 35, to: 65, color: "#eab308" }, { from: 65, to: 100, color: "#ef4444" }];
 const AIR_MIN = 0, AIR_MAX = 45;
 /** The vine's phase that matches each season (winter keeps the one in hand: the vine rests). */
 const PHASE_OF_SEASON: Partial<Record<Season, Pheno>> = { primavera: "Germogliamento", estate: "Invaiatura", autunno: "Maturazione" };
@@ -181,7 +183,7 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
   const surfaceNote = drawn !== null ? "superficie disegnata" : area.isPending ? "misuro il vigneto…" : measured ? "superficie del vigneto" : "superficie di riferimento (1 ettaro)";
 
   return (
-    <section className="fuse-canvas space-y-5 rounded-t-3xl px-3 pb-6 pt-4 text-foreground sm:px-5" aria-label="Stress del vigneto">
+    <section className="fuse-canvas space-y-5 rounded-t-3xl px-3 pb-6 pt-4 text-foreground sm:px-5" aria-label="Bisogno di intervento del vigneto">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">{reach > 1 ? "Trascina il punto bianco o tocca un livello" : "Ritocca il vigneto qui sotto"}</p>
       </div>
@@ -192,7 +194,7 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
           const on = i === -1 ? all : !all && vine.selected === i;
           const s = i === -1 ? avg(zonesAfter.map((r) => r.s)) : zonesAfter[i]?.s ?? 0;
           return (
-            <button key={i} type="button" role="radio" aria-checked={on} aria-label={`${i === -1 ? "Tutte le zone" : `Zona ${i + 1}`}, stress ${Math.round(s)} su 100`}
+            <button key={i} type="button" role="radio" aria-checked={on} aria-label={`${i === -1 ? "Tutte le zone" : `Zona ${i + 1}`}, bisogno di intervento ${Math.round(s)} su 100`}
               onClick={() => { if (on) return; hapticTick(); setVineyard(i === -1 ? { allZones: true } : { allZones: false, selected: i }); }}
               className={cn("flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 rounded-[1.25rem] px-1 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", on ? "bg-secondary text-secondary-foreground shadow-[0_0_0_2px_var(--foreground)]" : "text-foreground/75 hover:bg-foreground/[0.06]")}>
               <span className="truncate text-[12px] font-semibold">{i === -1 ? "Tutte" : `Zona ${i + 1}`}</span>
@@ -215,24 +217,30 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
       {/* The arc of the vines' thirst: drag the white dot or touch a level. */}
       <div ref={gaugeRef} className="relative mx-auto mt-10 flex max-w-[21rem] flex-col items-center px-7">
         <Gauge before={before} after={after} lowest={lowest} min={dialMin} max={dialMax} stops={reach > 1 ? stops : []} onSlide={slideTo} onStop={applyLevel}
-          unit="" spoken="su 100" label={`Stress della vite da raggiungere, ${scopeName}`} step={1} rightEnd={`${Math.round(before)}`} />
+          unit="" spoken="su 100" label={`Bisogno di intervento da raggiungere, ${scopeName}`} step={1} rightEnd={`${Math.round(before)}`} bands={NEED_BANDS} />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center" aria-live="polite">
           <span className={cn("rounded-full px-3 py-0.5 text-[13px] font-semibold text-white transition-colors duration-300", GAIN_BG[gain])}>{verdict(after)}</span>
           <span className="mt-1 font-display text-6xl font-light leading-none tracking-tight tabular-nums">{Math.round(after)}<span className="text-2xl text-muted-foreground">/100</span></span>
           {/* What the big number is, said under it: the vines' thirst out of 100, and what the interventions take off. */}
-          <span className="mt-1.5 text-center text-[13px] font-semibold leading-tight">Stress delle viti <span className="tabular-nums">{Math.round(before - after) >= 1 ? `· −${Math.round(before - after)} rispetto a oggi` : any ? "· a quest'ora non cambia" : "· nessun intervento"}</span></span>
+          <span className="mt-1.5 text-center text-[13px] font-semibold leading-tight">Bisogno di intervento <span className="tabular-nums">{Math.round(before - after) >= 1 ? `· −${Math.round(before - after)} rispetto a oggi` : any ? "· a quest'ora non cambia" : "· nessun intervento fatto"}</span></span>
         </div>
       </div>
 
       {/* Labels under the arc's two end numbers, as in the piazza: the lowest thirst reachable on the left, the thirst
           without interventions (exact, on the right end); the one the white dot is near lights up, the other dims. */}
       <div className="mx-auto -mt-3 flex w-full max-w-[21rem] justify-between px-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground" aria-hidden="true">
-        <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "left" ? "bg-sky-400/30 text-sky-200" : "bg-sky-400/15 text-sky-300", near === "right" && "opacity-35")}>Stress più basso</span>
+        <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "left" ? "bg-sky-400/30 text-sky-200" : "bg-sky-400/15 text-sky-300", near === "right" && "opacity-35")}>Il minimo possibile</span>
         <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 text-right transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "right" ? "bg-amber-400/25 text-amber-200" : "bg-foreground/[0.08]", near === "left" && "opacity-35")}>Senza interventi</span>
       </div>
 
+      {/* The season's air in the selected area (its middle when drawn): the year's average at this season and hour, or a
+          plain estimate, said so. */}
+      <p className="-mt-1 flex items-center justify-center gap-1.5 text-center text-sm text-muted-foreground">
+        <Thermometer className="size-4" aria-hidden="true" />{clock.real !== null ? "Temperatura stagionale" : "Stima stagionale"} {areaHere ? "dell'area" : "del luogo"} <b className="font-semibold tabular-nums text-foreground">{fmt1(seasonAir)}°</b>
+      </p>
+
       {/* Where the number comes from: the three parts of the thirst (points), the phase's weight and the rain. */}
-      <ul className="mx-auto flex max-w-[22rem] flex-wrap justify-center gap-1.5 px-2 text-[11px] font-semibold" aria-label="Da cosa dipende lo stress">
+      <ul className="mx-auto flex max-w-[22rem] flex-wrap justify-center gap-1.5 px-2 text-[11px] font-semibold" aria-label="Da cosa dipende il bisogno di intervento">
         {[
           { k: "Terreno asciutto", v: `+${Math.round(parts.soil)}`, on: parts.soil >= 0.5 },
           { k: "Caldo", v: `+${Math.round(parts.heat)}`, on: parts.heat >= 0.5 },
@@ -250,7 +258,7 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
 
       {/* The three zones after the interventions, then the phase of the vine and the rain. */}
       <div className="-mt-2 space-y-3">
-        <p className="text-center text-sm text-muted-foreground">Stress della vite, {scopeName}: senza interventi {Math.round(before)}/100</p>
+        <p className="text-center text-sm text-muted-foreground">Bisogno di intervento, {scopeName}: senza interventi {Math.round(before)}/100</p>
         <WhenPicker clock={clock} id="vigneto-when" detail={<>aria {Math.round(seasonAir)}°</>}
           note={clock.pending ? "Leggo l'anno del luogo…" : clock.real !== null ? "Temperatura percepita media dell'ultimo anno in questo luogo, a quella stagione e ora" : "Stima indicativa: i dati reali del luogo non sono disponibili"} />
         <div className="flex items-stretch gap-2">

@@ -19,6 +19,13 @@ describe("professional profile", () => {
     expect(id).toBeNull();
     expect(Object.keys(errors).sort()).toEqual(["declared", "expires", "licence"]);
   });
+  it("accepts a conductor without a licence number: no type nor expiry asked", () => {
+    const { id, errors } = checkAgronomo({ ...agro, licence: "  ", licenceType: "", expires: "" }, today);
+    expect(errors).toEqual({});
+    expect(id?.licence).toBe("");
+    expect(isProId(id)).toBe(true);
+    expect(proSummary(id!)).toBe("Conduttore del vigneto · Molise");
+  });
   it("opens only the piazza to a municipal officer with the town's email", () => {
     const { id } = checkFunzionario(funz, today);
     expect(id?.email).toBe("luca.bianchi@comune.campobasso.it");

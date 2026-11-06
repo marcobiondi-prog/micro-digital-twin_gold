@@ -6,9 +6,9 @@ import { loadPlaceArea } from "@/lib/place-area-client";
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { CloudDrizzle, CloudRain, Leaf, Minus, Plus, Ruler, Sprout, Sun, Thermometer, TreePine, Umbrella, Users, type LucideIcon } from "lucide-react";
+import { CloudDrizzle, CloudRain, Droplets, Wind, Leaf, Minus, Plus, Ruler, Sprout, Sun, Thermometer, TreePine, Umbrella, Users, type LucideIcon } from "lucide-react";
 import { MISTER_COOLING, comparison, piazzaEstimate, type PrototypeId } from "@/models/scenarios";
-import { setUrban, useLab } from "@/models/lab-store";
+import { setUrban, useLab, type RealWeather } from "@/models/lab-store";
 import { REFERENCE_M2, grouped } from "@/models/intervention-cost";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { useSeasonClock, WhenPicker } from "@/views/v10/when";
@@ -69,7 +69,7 @@ export type Stop = { id: PrototypeId; label: string; t: number; on: boolean; nea
  * the dot goes there). Only a finger on the white dot grabs it: it follows the finger exactly, clicks into a stop
  * when close to it, and the piazza follows; arrow keys move it by 0,1 °C, Page Up/Down jump between stops.
  */
-export function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlide, onStop, unit = "°", spoken = "gradi", label = "Calore percepito da raggiungere", step: keyStep = 0.1, rightEnd }: { rightEnd?: string | undefined; before: number; after: number; lowest: number; min: number; max: number; stops: Stop[]; onSlide: (t: number) => void; onStop: (id: PrototypeId) => void; unit?: string; spoken?: string; label?: string; step?: number }) {
+export function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlide, onStop, unit = "°", spoken = "gradi", label = "Calore percepito da raggiungere", step: keyStep = 0.1, rightEnd, bands }: { rightEnd?: string | undefined; bands?: Array<{ from: number; to: number; color: string }> | undefined; before: number; after: number; lowest: number; min: number; max: number; stops: Stop[]; onSlide: (t: number) => void; onStop: (id: PrototypeId) => void; unit?: string; spoken?: string; label?: string; step?: number }) {
   const R = 88, C = Math.PI * R;
   const box = useRef<HTMLDivElement>(null);
   // While sliding, the temperature under the finger (the piazza snaps to whole trees, the dot must not).
@@ -158,9 +158,22 @@ export function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlid
           <linearGradient id="thermo-scale" x1="0" x2="1" y1="0" y2="0">
             <stop offset="0" stopColor="var(--radar-cool)" /><stop offset="0.3" stopColor="var(--radar-mild)" /><stop offset="0.55" stopColor="var(--radar-warm)" /><stop offset="0.78" stopColor="var(--radar-hot)" /><stop offset="1" stopColor="var(--radar-extreme)" />
           </linearGradient>
+          {bands && (
+            <linearGradient id="need-scale" x1="0" x2="1" y1="0" y2="0">
+              {/* The gradient runs across the arc's width, so each band's edge is placed where it falls along x. */}
+              {bands.flatMap((bd) => { const ox = (t: number) => clamp((at(clamp(t, MIN, MAX)).x - 12) / 176, 0, 1); return [<stop key={`${bd.from}a`} offset={ox(bd.from)} stopColor={bd.color} />, <stop key={`${bd.from}b`} offset={ox(bd.to)} stopColor={bd.color} />]; })}
+            </linearGradient>
+          )}
         </defs>
         <path d="M12 100 A88 88 0 0 1 188 100" fill="none" stroke="currentColor" strokeOpacity="0.1" strokeWidth="14" strokeLinecap="round" />
-        <path d="M12 100 A88 88 0 0 1 188 100" fill="none" stroke="url(#thermo-scale)" strokeWidth="14" strokeLinecap="round" strokeDasharray={`${C * share(shown)} ${C}`} className={motion} />
+        {/* Bands (the vineyard's need of intervention): a thin arc outside the track in each zone's colour, so the red
+            zone shows even where the reading has not reached it. */}
+        {bands?.map((bd) => {
+          const s0 = at(Math.max(MIN, bd.from), R + 11), s1 = at(Math.min(MAX, bd.to), R + 11);
+          if (bd.to <= MIN || bd.from >= MAX) return null;
+          return <path key={bd.from} d={`M${s0.x} ${s0.y} A${R + 11} ${R + 11} 0 0 1 ${s1.x} ${s1.y}`} fill="none" stroke={bd.color} strokeOpacity="0.85" strokeWidth="3" />;
+        })}
+        <path d="M12 100 A88 88 0 0 1 188 100" fill="none" stroke={bands ? "url(#need-scale)" : "url(#thermo-scale)"} strokeWidth="14" strokeLinecap="round" strokeDasharray={`${C * share(shown)} ${C}`} className={motion} />
         {stops.map((s) => { const p = at(s.t); return <circle key={s.id} cx={p.x} cy={p.y} r="2.6" fill="var(--background)" opacity="0.9" />; })}
         <circle cx={b.x} cy={b.y} r="5.5" fill="none" stroke="currentColor" strokeOpacity="0.5" strokeWidth="2" />
         <circle cx={a.x} cy={a.y} r={finger === null ? 11 : 13} fill="#fff" stroke="#0d1016" strokeWidth="2.5" className="[filter:drop-shadow(0_2px_4px_rgb(0_0_0/0.4))]" />
@@ -210,6 +223,35 @@ export function Lever({ icon: Icon, label, value, step, max, color, swatch, onCh
  * the piazza feels and says it in words, a chip tells what the last touch gained; then
  * "Cosa ottieni" (no money on screen): the degrees taken off, the yearly benefits, the shade and the people it covers.
  */
+/** The real weather imported for the place: every value the weather gave, each a small tile, and when it was read. */
+function RealWeatherTiles({ air, w }: { air: number | null; w: RealWeather }) {
+  const n1 = (v: number) => v.toLocaleString("it-IT", { maximumFractionDigits: 1 });
+  const tiles: Array<[LucideIcon, string, string]> = [
+    ...(air != null ? [[Thermometer, `${n1(air)}°`, "Aria"] as [LucideIcon, string, string]] : []),
+    ...(w.humidity != null ? [[Droplets, `${Math.round(w.humidity)} %`, "Umidità"] as [LucideIcon, string, string]] : []),
+    ...(w.wind != null ? [[Wind, `${Math.round(w.wind)} km/h`, "Vento"] as [LucideIcon, string, string]] : []),
+    ...(w.groundTemp != null ? [[Sprout, `${n1(w.groundTemp)}°`, "Terreno"] as [LucideIcon, string, string]] : []),
+    ...(w.sun != null ? [[Sun, `${n1(w.sun)} kWh/m²`, "Sole al giorno"] as [LucideIcon, string, string]] : []),
+    ...(w.rainWeek != null ? [[CloudRain, `${Math.round(w.rainWeek)} mm`, "Pioggia, 7 giorni"] as [LucideIcon, string, string]] : []),
+  ];
+  if (!tiles.length) return null;
+  const at = new Date(w.at);
+  return (
+    <div className="space-y-2 rounded-2xl bg-foreground/[0.05] p-3">
+      <p className="text-xs font-semibold text-muted-foreground">Meteo reale importato · {at.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" })} {at.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}</p>
+      <ul className="grid grid-cols-3 gap-2">
+        {tiles.map(([Icon, v, l]) => (
+          <li key={l} className="rounded-xl bg-background/40 px-2 py-1.5 text-center">
+            <Icon className="mx-auto size-4 text-muted-foreground" aria-hidden="true" />
+            <span className="block text-sm font-semibold tabular-nums">{v}</span>
+            <span className="block text-[10px] leading-tight text-muted-foreground">{l}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() => Promise<void>) | undefined }) {
   const urban = useLab().urban;
   // Is the gauge on screen? When not, a compact reading stays pinned under the tabs.
@@ -371,6 +413,7 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
         <WhenPicker clock={clock} id="piazza-when" detail={<>senza interventi {fmt(before)}°</>}
           note={clock.pending ? "Leggo l'anno del luogo…" : realBefore !== null ? "Calore percepito medio dell'ultimo anno in questo luogo" : "Stima indicativa: i dati reali del luogo non sono disponibili"}>
           {onImportWeather && <ImportWeatherButton onImport={onImportWeather} />}
+          {urban.realWeather && <RealWeatherTiles air={urban.realTemp ?? null} w={urban.realWeather} />}
         </WhenPicker>
         {share === 0 && <p className="text-center text-xs text-muted-foreground">A quest'ora non fa caldo: non c'è calore da togliere</p>}
       </div>

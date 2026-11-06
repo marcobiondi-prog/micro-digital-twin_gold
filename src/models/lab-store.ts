@@ -12,7 +12,7 @@ export type LabState = {
   savedAt?: number | null;
   syncedAt?: number | null;
   syncedTargets?: string[] | null;
-  urban: { trees: number; permeable: number; shade: number; misters?: number; location: Loc; treeCells: number[] | null; permeableCells: number[] | null; shadeCells: number[] | null; realTemp?: number | null; area?: DrawnArea | null; places?: PlaceSnap<UrbanSnap>[] };
+  urban: { trees: number; permeable: number; shade: number; misters?: number; location: Loc; treeCells: number[] | null; permeableCells: number[] | null; shadeCells: number[] | null; realTemp?: number | null; realWeather?: RealWeather | null; area?: DrawnArea | null; places?: PlaceSnap<UrbanSnap>[] };
   vineyard: { zones: VineZoneState[]; phase: Pheno; selected: number; allZones: boolean; location: Loc; irrigation?: number; pestAnimal?: number; pestPlant?: number; climateKey?: string; area?: DrawnArea | null; places?: PlaceSnap<VineSnap>[] };
 };
 /** What is kept per place (models/place-memory): the interventions and the area drawn, with its zones and edits. */
@@ -22,6 +22,8 @@ type VineSnap = { zones: VineZoneState[]; selected: number; allZones: boolean; i
 const reanchor = (area: DrawnArea | null, at: Loc) => (area ? { ...area, lat: at.lat, lng: at.lng } : null);
 
 const KEY = "micro-digital-twin-lab";
+/** The place's real weather imported into the piazza (besides the air temperature, kept as realTemp): when, humidity %, wind km/h, ground temperature °C, sun kWh/m² a day and rain mm over the last week. */
+export type RealWeather = { at: string; humidity: number | null; wind: number | null; groundTemp: number | null; sun: number | null; rainWeek: number | null };
 const defaults = (): LabState => ({
   urban: { trees: 6, permeable: 20, shade: 15, location: { label: "Piazza Vittorio Emanuele II · Campobasso · Molise", lat: 41.55837, lng: 14.659698 }, treeCells: null, permeableCells: null, shadeCells: null },
   vineyard: { zones: vineZones.map((z) => ({ temperature: z.temp, moisture: z.moist, wind: z.wind, rain: false })), phase: "Invaiatura" as Pheno, selected: 2, allZones: false, location: { label: "Colline del Molise", lat: 41.83, lng: 14.98 } },

@@ -22,10 +22,15 @@ export function UrbanFlow() {
   const fetchClimate = useServerFn(getRealClimate);
   const importRealWeather = async () => {
     const r = await fetchClimate({ data: { lat: location.lat, lng: location.lng } }).catch(() => null);
-    const t = r?.openMeteo?.temp;
+    const om = r?.openMeteo, nasa = r?.nasa;
+    const t = om?.temp;
     if (t == null) { toast.error("Meteo reale non disponibile, riprova tra poco"); return; }
-    setUrban({ realTemp: Math.round(t * 10) / 10 });
-    toast.success(`Importati ${t.toLocaleString("it-IT")}°C dal meteo reale`);
+    // Besides the air: humidity, wind, the ground's temperature, the sun and the last week's rain.
+    const r1 = (v: number | null | undefined, k = 1) => (v == null ? null : Math.round(v * k) / k);
+    const realWeather = { at: new Date().toISOString(), humidity: r1(om?.humidity), wind: r1(om?.wind), groundTemp: r1(om?.soilTemp, 10), sun: r1(nasa?.solar, 10), rainWeek: r1(nasa?.rain) };
+    setUrban({ realTemp: Math.round(t * 10) / 10, realWeather });
+    const extra = [realWeather.humidity != null && "umidità", realWeather.wind != null && "vento", realWeather.groundTemp != null && "terreno", realWeather.sun != null && "sole", realWeather.rainWeek != null && "pioggia"].filter(Boolean).length;
+    toast.success(`Importati ${t.toLocaleString("it-IT")}°C${extra ? ` e altri ${extra} dati` : ""} dal meteo reale`);
   };
 
   return (

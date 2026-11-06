@@ -363,7 +363,7 @@ export function VineDashboard({ records }: { records: ReactNode }) {
   return (
     <div className="space-y-8" data-testid="dashboard-vitivinicola">
       <ResultCard kind="vineyard" place={place.name} when={<span className="text-xs text-muted-foreground">Media delle tre zone, come le hai lasciate nella simulazione</span>}>
-        <p className="text-center text-sm text-muted-foreground">Stress delle viti</p>
+        <p className="text-center text-sm text-muted-foreground">Bisogno di intervento</p>
         <ResultArc before={before} after={thirst} min={Math.max(0, Math.floor(Math.min(thirst, before) - 8))} max={Math.min(100, Math.ceil(before + 6))} unit=""
           value={`${Math.round(thirst)}`} words={thirstWords(thirst)} step={thirstStep(thirst)} level={sum.level} cost={empty ? "0 €" : euroRange(sum.cost)} />
         <p className="text-center text-sm">
@@ -371,7 +371,7 @@ export function VineDashboard({ records }: { records: ReactNode }) {
         </p>
       </ResultCard>
 
-      <DashSection title="Le tre zone" hint="stress su 100">
+      <DashSection title="Le tre zone" hint="bisogno di intervento su 100">
         <div className="grid grid-cols-3 gap-2">
           {vine.zones.map((z, i) => (
             <DashCard key={i} className="space-y-1 px-3 py-4 text-center">

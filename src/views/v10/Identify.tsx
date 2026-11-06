@@ -68,21 +68,26 @@ function AgronomoForm({ onDone }: { onDone: () => void }) {
   return (
     <form noValidate onSubmit={(e) => { e.preventDefault(); void submit(); }} className="space-y-4">
       <Field label="Nome e cognome" error={errors.name}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!errors.name} autoComplete="name" value={v.name} onChange={(e) => up("name", e.target.value)} className={fieldCls} />}</Field>
-      <div className="space-y-1.5" role="radiogroup" aria-label="Tipo di patentino">
-        <p className="px-1 text-sm font-medium">Tipo di patentino</p>
-        <div className="grid grid-cols-2 gap-2">
-          {([["consulente", "Consulente", "per consigliare"], ["utilizzatore", "Utilizzatore", "per acquisto e uso"]] as const).map(([k, l, s]) => (
-            <button key={k} type="button" role="radio" aria-checked={v.licenceType === k} onClick={() => up("licenceType", k)}
-              className={cn("rounded-2xl px-4 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring", v.licenceType === k ? "bg-foreground text-background" : "bg-foreground/[0.05]")}>
-              <span className="block text-[15px] font-semibold">{l}</span><span className={cn("block text-xs", v.licenceType === k ? "text-background/70" : "text-muted-foreground")}>{s}</span>
-            </button>
-          ))}
-        </div>
-        {errors.licenceType && <p className="px-1 text-xs text-danger">{errors.licenceType}</p>}
-      </div>
-      <Field label="Numero del patentino fitosanitario" hint="Come è scritto sul patentino, per esempio MOL/CB/01234." error={errors.licence}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!errors.licence} autoCapitalize="characters" value={v.licence} onChange={(e) => up("licence", e.target.value)} className={fieldCls} />}</Field>
-      <Field label="Regione che l'ha rilasciato" hint="Scrivi le prime lettere e scegli la regione dall'elenco." error={errors.region}>{(id, d) => <RegionField id={id} describedBy={d} invalid={!!errors.region} value={v.region} onChange={(x) => up("region", x)} />}</Field>
-      <Field label="Scadenza" hint="Il patentino vale 5 anni: deve essere ancora valido." error={errors.expires}>{(id, d) => <input id={id} type="date" aria-describedby={d} aria-invalid={!!errors.expires} value={v.expires} onChange={(e) => up("expires", e.target.value)} className={fieldCls} />}</Field>
+      <Field label="Regione" hint="Dove si trova il vigneto o dove è stato rilasciato il patentino: scrivi le prime lettere e scegli dall'elenco." error={errors.region}>{(id, d) => <RegionField id={id} describedBy={d} invalid={!!errors.region} value={v.region} onChange={(x) => up("region", x)} />}</Field>
+      {/* The licence is optional: its type and expiry are asked only once a number is written. */}
+      <Field label="Numero del patentino fitosanitario (facoltativo)" hint="Se ce l'hai, come è scritto sul patentino, per esempio MOL/CB/01234. Puoi lasciarlo vuoto." error={errors.licence}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!errors.licence} autoCapitalize="characters" value={v.licence} onChange={(e) => up("licence", e.target.value)} className={fieldCls} />}</Field>
+      {v.licence.trim() !== "" && (
+        <>
+          <div className="space-y-1.5" role="radiogroup" aria-label="Tipo di patentino">
+            <p className="px-1 text-sm font-medium">Tipo di patentino</p>
+            <div className="grid grid-cols-2 gap-2">
+              {([["consulente", "Consulente", "per consigliare"], ["utilizzatore", "Utilizzatore", "per acquisto e uso"]] as const).map(([k, l, s2]) => (
+                <button key={k} type="button" role="radio" aria-checked={v.licenceType === k} onClick={() => up("licenceType", k)}
+                  className={cn("rounded-2xl px-4 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring", v.licenceType === k ? "bg-foreground text-background" : "bg-foreground/[0.05]")}>
+                  <span className="block text-[15px] font-semibold">{l}</span><span className={cn("block text-xs", v.licenceType === k ? "text-background/70" : "text-muted-foreground")}>{s2}</span>
+                </button>
+              ))}
+            </div>
+            {errors.licenceType && <p className="px-1 text-xs text-danger">{errors.licenceType}</p>}
+          </div>
+          <Field label="Scadenza del patentino" hint="Il patentino vale 5 anni: deve essere ancora valido." error={errors.expires}>{(id, d) => <input id={id} type="date" aria-describedby={d} aria-invalid={!!errors.expires} value={v.expires} onChange={(e) => up("expires", e.target.value)} className={fieldCls} />}</Field>
+        </>
+      )}
       {/* At the end, the licence's region with its coat of arms. */}
       {findRegion(v.region) && (
         <div className="flex items-center gap-4 rounded-2xl bg-foreground/[0.05] px-4 py-3">
@@ -273,7 +278,7 @@ export function ProfileCard({ kind, go }: { kind: ProKind; go?: () => void }) {
 function profileRows(id: ProId): Array<[string, string]> {
   const since = new Date(id.at).toLocaleDateString("it-IT");
   return id.kind === "agronomo"
-    ? [["Nome", id.name], ["Patentino", `${id.licenceType === "consulente" ? "Consulente" : "Utilizzatore"} · ${id.licence}`], ["Regione", id.region], ["Scadenza", new Date(`${id.expires}T12:00:00`).toLocaleDateString("it-IT")], ["Identificato il", since]]
+    ? [["Nome", id.name], ...(id.licence ? [["Patentino", `${id.licenceType === "consulente" ? "Consulente" : "Utilizzatore"} · ${id.licence}`], ["Regione", id.region], ["Scadenza", new Date(`${id.expires}T12:00:00`).toLocaleDateString("it-IT")]] as Array<[string, string]> : [["Patentino", "Non indicato"], ["Regione", id.region]] as Array<[string, string]>), ["Identificato il", since]]
     : [["Nome", id.name], ["Comune", id.comune], ["Ufficio", id.office], ["Ruolo", id.role], ["Email", id.email], ...(id.badge ? [["Matricola", id.badge] as [string, string]] : []), ["Identificato il", since]];
 }
 

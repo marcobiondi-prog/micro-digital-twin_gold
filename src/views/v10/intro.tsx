@@ -26,7 +26,7 @@ const items: Item[] = [
   { id: "urban", Icon: Building2, name: "Sei un funzionario urbano?", cta: "Identificati come funzionario",
     desc: "Ti identifichi con il Comune, l'ufficio e l'email del Comune: si apre la piazza, dove metti alberi, aiuole e ombra." },
   { id: "vine", Icon: Grape, name: "Sei il conduttore di un vigneto?", cta: "Identificati come conduttore",
-    desc: "Ti identifichi con il patentino fitosanitario: si apre il vigneto, dove regoli acqua e difesa dai parassiti." },
+    desc: "Ti identifichi con nome e regione (il patentino è facoltativo): si apre il vigneto, dove regoli acqua e difesa dai parassiti." },
   // AI_STANDBY: in development, so nothing says what it will do.
   AI_STANDBY
     ? { id: "camera", Icon: ScanLine, name: "Fotocamera AI · in sviluppo", cta: "Apri la fotocamera", desc: "Non è ancora disponibile: arriverà con un prossimo aggiornamento. Intanto puoi scattare foto e video." }
