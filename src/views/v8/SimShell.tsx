@@ -8,8 +8,8 @@ import { SimMap } from "@/views/v10/SimMap";
 import { Ambient, HeroButton, PageHero, Panels, TabRow, openSimTab, showSimMedia, startOnMap, simMediaId, useSimTab, type SimKind, type SimTab } from "./console";
 
 const TABS: ReadonlyArray<{ id: SimTab; label: string; icon: LucideIcon }> = [
-  { id: "simula", label: "Simula", icon: SlidersHorizontal },
   { id: "mappa", label: "Mappa", icon: MapIcon },
+  { id: "simula", label: "Simula", icon: SlidersHorizontal },
   { id: "sensori", label: "Sensori AI", icon: Radar },
 ];
 const TONE: Record<SimKind, string> = { urban: "rgb(28 112 210 / 0.42)", vineyard: "rgb(150 36 110 / 0.42)" };
@@ -20,7 +20,7 @@ function Item({ icon: Icon, label, onSelect }: { icon: LucideIcon; label: string
 
 /**
  * v8 simulator page: ambient light, the place (touch to change it) above a big thin title, Confronta and
- * the ⋮ context menu on the right, then pill tabs (Simula · Mappa · Sensori AI) and one panel.
+ * the ⋮ context menu on the right, then pill tabs (Mappa · Simula · Sensori AI) and one panel.
  * Simula shows the simulation with its photos and videos below it.
  */
 export function SimShell({ kind, place, onCompare, onReset, onSend, simula, media, sensori }: { kind: SimKind; place: string; onCompare?: (() => void) | undefined; onReset: () => void; onSend?: () => void; simula: ReactNode; media: ReactNode; sensori: ReactNode }) {
