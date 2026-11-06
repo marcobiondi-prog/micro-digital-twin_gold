@@ -254,10 +254,10 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         {/* Day and night at the simulation's season and hour, over the 2D and the 3D map alike. */}
         <DayNight kind={kind} lat={pin.lat} lng={pin.lng} />
         {show3d
-          ? <Suspense fallback={<div className="h-full w-full bg-card" />}>{key
+          ? <Suspense fallback={<div className="h-full w-full bg-card" />}><MapLight kind={kind} lat={pin.lat} lng={pin.lng}>{key
             ? <LocationMap3D key={`${loc.lat},${loc.lng}`} lat={pin.lat} lng={pin.lng} label={name ?? ""} apiKey={key} area={ring} sim={sim}
               fallback={<OpenMap3D lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />} />
-            : <OpenMap3D key={`${loc.lat},${loc.lng}`} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />}</Suspense>
+            : <OpenMap3D key={`${loc.lat},${loc.lng}`} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />}</MapLight></Suspense>
           : <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} drawing={drawing || drawingZone}
             onAreaChange={drawingZone ? setZoneDraft : setDraft} sim={editingZone && sim ? { ...sim, inner: (sim.inner ?? []).filter((z) => z.id !== editingZone) } : sim} arranging={arranging} onMove={moved}
             outline={drawingZone ? saved?.ring ?? null : null} onOutside={() => toast("La zona va dentro l'area disegnata")} onPinMove={arranging ? undefined : movePin} /></Suspense>}
@@ -339,7 +339,24 @@ function useDayLight(kind: SimKind, lat: number, lng: number) {
   const when = useSimWhen(kind);
   if (!when) return null;
   const height = sunHeightDeg(lat, lng, when.season, when.hour, when.minute ?? 0, when.dst);
-  return dayLight(height, solarHour(when.hour + (when.minute ?? 0) / 60, lng, when.dst) < 12);
+  return { ...dayLight(height, solarHour(when.hour + (when.minute ?? 0) / 60, lng, when.dst) < 12), height };
+}
+
+/**
+ * The photographic 3D draws itself above any veil laid over it, so its light is changed on the map itself with a CSS
+ * filter following the sun's height: none by day, warmer at dawn and dusk, darker and bluer at twilight and night.
+ */
+export function lightFilter(height: number | null | undefined): string {
+  if (height == null || height >= 10) return "none";
+  if (height >= 0) { const k = 1 - height / 10; return `sepia(${(0.35 * k).toFixed(2)}) saturate(${(1 + 0.2 * k).toFixed(2)}) brightness(${(1 - 0.12 * k).toFixed(2)})`; }
+  if (height >= -6) { const k = -height / 6; return `brightness(${(0.88 - 0.38 * k).toFixed(2)}) saturate(${(1 - 0.3 * k).toFixed(2)}) hue-rotate(${Math.round(12 * k)}deg)`; }
+  return "brightness(0.45) saturate(0.65) hue-rotate(15deg)";
+}
+
+/** Hands the 3D maps the light of the simulation's hour (--map-light-filter, applied to the photographic map's canvas). */
+function MapLight({ kind, lat, lng, children }: { kind: SimKind; lat: number; lng: number; children: React.ReactNode }) {
+  const light = useDayLight(kind, lat, lng);
+  return <div className="h-full w-full" style={{ ["--map-light-filter" as string]: lightFilter(light?.height) }}>{children}</div>;
 }
 
 /** A see-through veil over the map: none by day, golden at dawn and dusk, blue twilight, dark blue at night. */
