@@ -167,6 +167,22 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
     const la = area.map((p) => p[0]), ln = area.map((p) => p[1]);
     map.fitBounds([[Math.min(...ln), Math.min(...la)], [Math.max(...ln), Math.max(...la)]], { padding: { top: 48, bottom: 44, left: 24, right: 24 }, maxZoom: 20, duration: 0 });
   }, [still, state, area]);
+  // The full map opens framed on the drawn area with room around it (about half the box's width, a quarter of a side
+  // left free all round), so the area and what lies beside it show together; the recenter button comes back to it.
+  const frameArea = (duration: number) => {
+    const map = mapRef.current, box = host.current;
+    if (!map || !box || area.length < 3) return false;
+    const la = area.map((p) => p[0]), ln = area.map((p) => p[1]);
+    const w = box.clientWidth, h = box.clientHeight;
+    map.fitBounds([[Math.min(...ln), Math.min(...la)], [Math.max(...ln), Math.max(...la)]], { padding: { top: Math.round(h * 0.24), bottom: Math.round(h * 0.2), left: Math.round(w * 0.26), right: Math.round(w * 0.26) }, maxZoom: 20, duration });
+    return true;
+  };
+  const framed = useRef(false);
+  useEffect(() => {
+    if (still || drawing || state !== "ready" || framed.current) return;
+    if (frameArea(0)) framed.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [still, drawing, state, area.length >= 3]);
   // The simulation inside the area (hidden while drawing), and while arranging a handle on each tree and on the lawn,
   // the shade or the windbreak, to drag them by hand.
   useEffect(() => {
@@ -203,7 +219,10 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
       add(sim.data.windAt, "Frangivento", (to) => moveRef.current?.({ part: "wind", at: to }));
     }
   }, [sim, arranging, drawing, state]);
-  const recenter = () => mapRef.current?.easeTo({ ...camera, duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 800 });
+  const recenter = () => {
+    const d = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 800;
+    if (!frameArea(d)) mapRef.current?.easeTo({ ...camera, duration: d });
+  };
   return (
     <div data-map-gestures="" className="relative h-full w-full touch-none overflow-hidden bg-card">
       {/* Google's map under, maplibre (see-through) over it with everything drawn and the gestures. */}
