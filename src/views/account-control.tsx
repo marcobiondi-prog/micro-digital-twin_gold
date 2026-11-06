@@ -1,4 +1,3 @@
-import { GOOGLE_USAGE_SCOPE } from "@/models/google-usage";
 import { keepProIdInAccount, openSectorGate, saveProId, useProId } from "@/lib/use-pro-id";
 import { DeviceCacheCard } from "@/views/v10/DeviceCache";
 import { getMedia, removeMedia, useLabMedia } from "@/models/lab-media-store";
@@ -371,7 +370,7 @@ export function AccountControl() {
     try {
       // Remember the current section so the post-login reload stays here.
       sessionStorage.setItem("mdt-auth-return", window.location.pathname + window.location.search);
-      const result = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin + window.location.pathname, scopes: GOOGLE_USAGE_SCOPE } });
+      const result = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin + window.location.pathname } });
       if (result.error) setNotice(result.error.message);
     } catch { setNotice("Accesso Google non disponibile. Riprova."); }
     finally { setPending(false); }
