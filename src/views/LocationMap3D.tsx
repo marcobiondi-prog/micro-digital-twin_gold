@@ -3,7 +3,8 @@ import { densify, tileRing } from "@/models/drape";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { bedParts, BEDS_3D, crownRing, trapParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts } from "@/models/area-layout";
 import { MIST_RADIUS_M, SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
-import { Crosshair, LoaderCircle } from "lucide-react";
+import { Crosshair, LoaderCircle, MousePointerClick, RotateCcw } from "lucide-react";
+import { toast } from "sonner";
 import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camera";
 
 /**
@@ -29,28 +30,30 @@ type Shape = HTMLElement & { outerCoordinates?: unknown; coordinates?: unknown }
  * shade net one see-through sheet. Heights start from the photographed mesh and every shape is drawn through it, so
  * nothing ends up buried under the photographed ground.
  */
-function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: Array<[number, number]>, sim: SimLayout | null, groundM = 0): HTMLElement[] {
+function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: Array<[number, number]>, sim: SimLayout | null, groundAbs: number | null = null): HTMLElement[] {
   const out: HTMLElement[] = [];
   if (!Polygon3DElement) return out;
   // Every shape lies FLAT on Google's own ground model (RELATIVE_TO_GROUND, heights in metres above it), drawn through the
   // photographed mesh so it is never hidden. Laid on the mesh vertex by vertex, a corner on a real tree's crown or a roof
   // was lifted metres and the lawn turned into slanted green wedges; laid at an outside ground height (sea-level metres
   // from another elevation model) everything floated above the piazza. Google's ground matches its own map.
-  void groundM;
+  // Aligned by a tap on the piazza's floor (alignedGround): every shape is laid ABSOLUTE at that height instead, so it
+  // sits on the photographed floor and no longer slides with the view's tilt.
+  const MODE = groundAbs == null ? "RELATIVE_TO_GROUND" : "ABSOLUTE", UP = groundAbs ?? 0;
   const flat = true;
   // On a hilly ground a big flat shape cut into the slope and vanished, its long edges ran under it: shapes are laid in
   // small tiles that each follow the ground (models/drape), their outline in short pieces of polyline, and every line
   // gets a point every few metres. Walls (extruded) only get their outline densified.
   const DRAPE_STEP = 5, DRAPE_CELL = 8;
   const rawPoly = (o: Record<string, unknown>, ring: Array<[number, number]>, h: number) => {
-    const p = new Polygon3DElement({ ...o, altitudeMode: "RELATIVE_TO_GROUND", drawsOccludedSegments: true }) as Shape;
-    p.outerCoordinates = ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: h }));
+    const p = new Polygon3DElement({ ...o, altitudeMode: MODE, drawsOccludedSegments: true }) as Shape;
+    p.outerCoordinates = ring.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: h + UP }));
     return p;
   };
   const absLine = (o: Record<string, unknown>, coords: Array<{ lat: number; lng: number; h: number }>) => {
-    const pl = new Polyline3DElement!({ ...o, altitudeMode: "RELATIVE_TO_GROUND", drawsOccludedSegments: true }) as Shape;
+    const pl = new Polyline3DElement!({ ...o, altitudeMode: MODE, drawsOccludedSegments: true }) as Shape;
     const vertical = coords.length === 2 && coords[0]!.lat === coords[1]!.lat && coords[0]!.lng === coords[1]!.lng;
-    pl.coordinates = (vertical ? coords : densify(coords, DRAPE_STEP)).map((c) => ({ lat: c.lat, lng: c.lng, altitude: c.h }));
+    pl.coordinates = (vertical ? coords : densify(coords, DRAPE_STEP)).map((c) => ({ lat: c.lat, lng: c.lng, altitude: c.h + UP }));
     return pl;
   };
   /** A polygon draped on the ground: tiles for its fill, a densified polyline for its edge; small ones stay whole. */
@@ -198,19 +201,20 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
  * Kept in a pool and never removed from the map — a Marker3DElement taken off the map kept being drawn, so poles taken
  * away stayed on the 3D view: unused badges are sent under the ground and not drawn when hidden.
  */
-function misterBadges(lib: Maps3D, map: HTMLElement, pool: Map<string, HTMLElement>, sim: SimLayout | null) {
+function misterBadges(lib: Maps3D, map: HTMLElement, pool: Map<string, HTMLElement>, sim: SimLayout | null, groundAbs: number | null = null) {
+  const mode = groundAbs == null ? "RELATIVE_TO_GROUND" : "ABSOLUTE", up = (groundAbs ?? 0) + 3.9;
   const want = new Map<string, [number, number]>();
   if (sim?.kind === "piazza") sim.data.misters.forEach((m, i) => want.set(`${i}:${i < sim.data.mistersInZones ? "z" : "a"}`, m));
   for (const [key, mk] of pool) {
     const at = want.get(key) as [number, number] | undefined;
-    const m = mk as HTMLElement & { position: unknown; drawsWhenOccluded: boolean };
-    if (at) { m.position = { lat: at[0], lng: at[1], altitude: 3.9 }; m.drawsWhenOccluded = true; want.delete(key); }
+    const m = mk as HTMLElement & { position: unknown; drawsWhenOccluded: boolean; altitudeMode: string };
+    if (at) { m.altitudeMode = mode; m.position = { lat: at[0], lng: at[1], altitude: up }; m.drawsWhenOccluded = true; want.delete(key); }
     else { m.drawsWhenOccluded = false; m.position = { ...(m.position as object), altitude: -500 }; }
   }
   for (const [key, at] of want) {
     try {
       const [n, z] = key.split(":"), inZone = z === "z", i = Number(n);
-      const mk = new lib.Marker3DElement({ position: { lat: at[0], lng: at[1], altitude: 3.9 }, altitudeMode: "RELATIVE_TO_GROUND", drawsWhenOccluded: true, sizePreserved: true });
+      const mk = new lib.Marker3DElement({ position: { lat: at[0], lng: at[1], altitude: up }, altitudeMode: mode, drawsWhenOccluded: true, sizePreserved: true });
       const tpl = document.createElement("template");
       tpl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="11" fill="${inZone ? "#38bdf8" : "#f8fafc"}" stroke="${inZone ? "#e0f2fe" : "#38bdf8"}" stroke-width="2.5"/><text x="13" y="17.5" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="700" fill="${inZone ? "#0b0f15" : "#0369a1"}">${i + 1}</text></svg>`;
       mk.append(tpl);
@@ -218,6 +222,20 @@ function misterBadges(lib: Maps3D, map: HTMLElement, pool: Map<string, HTMLEleme
       pool.set(key, mk);
     } catch { /* an older build without custom markers: the poles alone */ }
   }
+}
+
+/** The piazza's floor height per place, learned from a tap in 3D ("Allinea al terreno"), kept on this device. */
+const GROUND_KEY = "mdt-3d-ground-v1";
+const placeKey = (lat: number, lng: number) => `${lat.toFixed(4)},${lng.toFixed(4)}`;
+function readGround(lat: number, lng: number): number | null {
+  try { const v = (JSON.parse(localStorage.getItem(GROUND_KEY) ?? "{}") as Record<string, number>)[placeKey(lat, lng)]; return typeof v === "number" ? v : null; } catch { return null; }
+}
+function writeGround(lat: number, lng: number, h: number | null) {
+  try {
+    const all = JSON.parse(localStorage.getItem(GROUND_KEY) ?? "{}") as Record<string, number>;
+    if (h == null) delete all[placeKey(lat, lng)]; else all[placeKey(lat, lng)] = h;
+    localStorage.setItem(GROUND_KEY, JSON.stringify(all));
+  } catch { /* storage off: aligned for this visit only */ }
 }
 
 function applyCamera(map: Map3D, camera: Camera, animate: boolean) {
@@ -238,6 +256,25 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
   const libs = useRef<Maps3D | null>(null);
   // The misting poles' number badges, one per pole and kind, reused for the map's whole life (misterBadges).
   const badges = useRef(new Map<string, HTMLElement>());
+  // Aligning: a tap on the piazza's floor tells the height the shapes are laid at (null: on Google's ground model).
+  const [ground, setGround] = useState<number | null>(null);
+  const [aligning, setAligning] = useState(false);
+  useEffect(() => { setGround(readGround(lat, lng)); setAligning(false); }, [lat, lng]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!aligning || state !== "ready" || !map) return;
+    const onClick = (e: Event) => {
+      const at = (e as Event & { position?: { altitude?: number } | null }).position;
+      const h = at?.altitude;
+      if (typeof h !== "number" || !Number.isFinite(h)) { toast("Tocca un punto del pavimento della piazza"); return; }
+      writeGround(lat, lng, h);
+      setGround(h);
+      setAligning(false);
+      toast.success("Allineato al terreno", { description: "Area e interventi sono ora sul pavimento della piazza. Lo ricordo per questo luogo." });
+    };
+    map.addEventListener("gmp-click", onClick);
+    return () => map.removeEventListener("gmp-click", onClick);
+  }, [aligning, state, lat, lng]);
   // The map is built once per place: the drawn area and the simulation are laid over it by the next effect, so moving a
   // lever never reloads the photorealistic tiles nor resets the camera.
   useEffect(() => {
@@ -268,14 +305,15 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
     const map = mapRef.current, lib = libs.current;
     if (state !== "ready" || !map || !lib) return;
     if (!lib.Polygon3DElement || area.length < 3) { misterBadges(lib, map, badges.current, null); return; }
+    const floor = ground;
     const added: HTMLElement[] = [];
     // Laid a moment after the levers stop, so a slide does not rebuild the shapes at every step.
     const timer = window.setTimeout(() => {
-      for (const node of build3DOverlay(lib, area, sim, altitude.current)) { map.append(node); added.push(node); }
-      misterBadges(lib, map, badges.current, sim);
+      for (const node of build3DOverlay(lib, area, sim, floor)) { map.append(node); added.push(node); }
+      misterBadges(lib, map, badges.current, sim, floor);
     }, 250);
     return () => { window.clearTimeout(timer); added.forEach((node) => node.remove()); };
-  }, [state, areaKey, simKey]);
+  }, [state, areaKey, simKey, ground]);
   // The panel grows when 3D opens (and on rotation): re-frame the place once the size settles.
   useEffect(() => {
     const el = host.current;
@@ -297,6 +335,22 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
     <div ref={host} data-map-gestures="" className="absolute inset-0 touch-none" aria-label={`Vista 3D di ${label}`} role="img" />
     {/* Top-left: Google keeps its map-type thumbnail top-right, compass and fullscreen bottom-right, logo bottom-left. */}
     {state === "ready" && <button type="button" onClick={() => recenter(true)} aria-label="Ricentra la vista 3D sul punto" className="absolute left-2 top-2 grid size-9 place-items-center rounded-full border border-border/60 bg-background/90 text-foreground shadow-sm backdrop-blur"><Crosshair className="size-4" aria-hidden="true" /></button>}
+    {/* Align the drawing on the photographed floor: Google's ground model can lie under it and the shapes slide when tilted. */}
+    {state === "ready" && area.length >= 3 && (
+      <div className="absolute left-2 top-12 flex flex-col items-start gap-1.5">
+        <button type="button" aria-pressed={aligning} onClick={() => setAligning((a) => !a)}
+          className={`inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold shadow-sm ring-1 backdrop-blur ${aligning ? "bg-foreground text-background ring-transparent" : "bg-black/55 text-white ring-white/15"}`}>
+          <MousePointerClick className="size-4" aria-hidden="true" />{aligning ? "Annulla" : ground == null ? "Allinea al terreno" : "Allineato · rifai"}
+        </button>
+        {ground != null && !aligning && (
+          <button type="button" onClick={() => { writeGround(lat, lng, null); setGround(null); toast("Allineamento automatico di nuovo"); }}
+            className="inline-flex h-8 items-center gap-1.5 rounded-full bg-black/55 px-3 text-[12px] font-semibold text-white ring-1 ring-white/15 backdrop-blur">
+            <RotateCcw className="size-3.5" aria-hidden="true" />Automatico
+          </button>
+        )}
+      </div>
+    )}
+    {aligning && <p role="status" className="pointer-events-none absolute inset-x-0 bottom-14 mx-auto w-fit max-w-[90%] rounded-full bg-black/65 px-4 py-2 text-center text-[13px] font-semibold text-white ring-1 ring-white/15 backdrop-blur">Tocca il pavimento della piazza, dentro l'area</p>}
     {state === "loading" && <div className="absolute inset-0 grid place-items-center text-xs text-muted-foreground"><LoaderCircle className="size-4 animate-spin" aria-label="Caricamento vista 3D" /></div>}
     {state === "error" && <p role="status" className="absolute inset-0 grid place-items-center px-3 text-center text-xs text-muted-foreground">Vista 3D non disponibile in questo momento.</p>}
   </div>;

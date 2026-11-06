@@ -20,6 +20,8 @@ import type { StyleSpecification } from "maplibre-gl";
  * the rest of the simulation faded behind.
  */
 const ARCGIS = "https://server.arcgisonline.com/ArcGIS/rest/services";
+/** Google's satellite zoom the 2D map goes to at most (its imagery's closest level in most towns); closer, it is enlarged. */
+const GOOGLE_MAX = 21;
 const STYLE: StyleSpecification = {
   version: 8,
   sources: {
@@ -86,13 +88,21 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
         clickableIcons: false, isFractionalZoomEnabled: true, tilt: 0, backgroundColor: "#1d2129",
       }) : null;
       setGoogleOn(!!base);
-      const map = new maplibregl.Map({ container: host.current, style: STYLE, ...camera, maxZoom: base ? 21 : 19, pitchWithRotate: false, cooperativeGestures: false, attributionControl: false });
+      const map = new maplibregl.Map({ container: host.current, style: STYLE, ...camera, maxZoom: base ? 23 : 22, pitchWithRotate: false, cooperativeGestures: false, attributionControl: false });
       map.touchPitch.disable();
       if (base) {
         // Google's satellite map does not turn: the map moves and zooms only, and Google's camera follows every frame
         // (its zoom is one more: its tiles are 256 px, maplibre's 512).
         map.dragRotate.disable(); map.touchZoomRotate.disableRotation();
-        const follow = () => { const c = map.getCenter(); base.moveCamera({ center: { lat: c.lat, lng: c.lng }, zoom: map.getZoom() + 1 }); };
+        // Past Google's own closest imagery (GOOGLE_MAX) its map stays there and is enlarged on screen around the centre,
+        // so one can zoom in further and the drawing stays on the photo.
+        const el = under.current!;
+        const follow = () => {
+          const c = map.getCenter(), z = map.getZoom() + 1, gz = Math.min(z, GOOGLE_MAX);
+          base.moveCamera({ center: { lat: c.lat, lng: c.lng }, zoom: gz });
+          const k = 2 ** (z - gz);
+          el.style.transform = k > 1.001 ? `scale(${k})` : "";
+        };
         map.on("move", follow);
         const hideOpen = () => { for (const l of ["imagery", "places"]) if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "none"); };
         map.on("load", hideOpen);
