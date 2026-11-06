@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { setPinFix, usePinFix } from "@/models/pin-fix";
 import { ringCentroid } from "@/models/place-area";
 import { loadPlaceArea } from "@/lib/place-area-client";
@@ -197,9 +197,9 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
       <MapReading kind={kind} lat={pin.lat} lng={pin.lng} />
       <DayNight kind={kind} lat={pin.lat} lng={pin.lng} />
       {/* Still: the map under the button takes no gesture; the page scrolls over it. */}
-      <div className="pointer-events-none h-full w-full" aria-hidden="true">
+      <ParallaxLayer>
         <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} sim={sim} still /></Suspense>
-      </div>
+      </ParallaxLayer>
       <span className="pointer-events-none absolute bottom-3 right-3 z-[3] inline-flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-[13px] font-semibold text-white ring-1 ring-white/15 backdrop-blur-sm">
         <MapIcon className="size-4" aria-hidden="true" />Apri la mappa
       </span>
@@ -294,6 +294,32 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
       </>}
     </div>
   );
+}
+
+/**
+ * The preview's map with a parallax while the page scrolls: the layer is 30 % taller than its box and slides at a third
+ * of the scroll's speed, the other way (at most its spare 15 % each side), so the map seems to lie deeper than the page.
+ * Moved by transform once per frame, nothing re-rendered; still with reduced motion.
+ */
+function ParallaxLayer({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current, box = el?.parentElement;
+    if (!el || !box || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let frame = 0;
+    const place = () => {
+      frame = 0;
+      const r = box.getBoundingClientRect(), vh = window.innerHeight || 1, spare = r.height * 0.15;
+      const ty = Math.max(-spare, Math.min(spare, (vh / 2 - (r.top + r.height / 2)) * 0.33));
+      el.style.transform = `translate3d(0, ${ty.toFixed(1)}px, 0)`;
+    };
+    const ask = () => { if (!frame) frame = requestAnimationFrame(place); };
+    place();
+    window.addEventListener("scroll", ask, { passive: true, capture: true });
+    window.addEventListener("resize", ask);
+    return () => { cancelAnimationFrame(frame); window.removeEventListener("scroll", ask, { capture: true }); window.removeEventListener("resize", ask); };
+  }, []);
+  return <div ref={ref} className="pointer-events-none absolute inset-x-0 -top-[15%] h-[130%] will-change-transform" aria-hidden="true">{children}</div>;
 }
 
 /** Colour of a temperature on the five-step heat scale: red when too hot, down to turquoise and blue when cool. */
