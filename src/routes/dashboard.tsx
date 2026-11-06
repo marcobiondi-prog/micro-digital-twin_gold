@@ -10,7 +10,6 @@ import { proSummary } from "@/models/professional-id";
 import { clockText, getSimWhen } from "@/models/sim-when";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertTriangle, Download, Plus, Building2, Grape, Copy, Printer, Activity, Trash2, Share2, Mail, LineChart as LineChartIcon, Leaf, NotebookPen, Droplets, Waves } from "lucide-react";
-import { DEFENCE_MAX } from "@/models/vine-interventions";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { addHistory } from "@/lib/use-history";
@@ -421,7 +420,7 @@ function ProgressRing({ pct }: { pct: number }) {
 function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   const labState = useLab();
   const proId = useProId();
-  // "Maria Rossi · Conduttore del vigneto · patentino MOL/CB/01234 (Molise)" on the cover and in the copied text.
+  // "Maria Rossi · Agronomo · patentino MOL/CB/01234 (Molise)" on the cover and in the copied text.
   const author = proId ? `${proId.name} · ${proSummary(proId)}` : "";
   // The simulation's own photos: those taken out of it stay in the Cronologia, not in the report.
   const reportMedia = useSimMedia(ctx === "Urbano" ? "urban" : "vineyard");
@@ -489,7 +488,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
     ];
   const benefits: Array<[string, string]> = ctx === "Urbano"
     ? [[`${ps.co2} kg`, "CO2 l'anno"], [`${grouped(ps.water)} m³`, "Pioggia tenuta"], [`${grouped(ps.shadeM2)} m²`, "All'ombra"]]
-    : [[`${vs.safe} di ${vs.zones.length}`, "Zone al sicuro"], [`-${Math.round(vs.mix.pestAnimal * DEFENCE_MAX)}%`, "Parassiti animali"], [`-${Math.round(vs.mix.pestPlant * DEFENCE_MAX)}%`, "Parassiti vegetali"]];
+    : [[`${vs.safe} di ${vs.zones.length}`, "Zone al sicuro"], [vs.mix.shade ? `-${f1((vs.mix.shade / 100) * 3)}°` : "0°", "Sulle foglie"], [vs.mix.windbreak ? `-${Math.round((vs.mix.windbreak / 100) * 60)}%` : "0%", "Vento"]];
   const zoneRows: [string, string][] = ctx === "Urbano" ? [] : vs.zones.map((z, i): [string, string] => [`Zona ${i + 1}`, `bisogno di intervento ${Math.round(z.after)} (senza: ${Math.round(z.plain)}) · ${Math.round(z.temp)} °C · ${Math.round(z.moisture)}% acqua`]);
   const noteRows: [string, string][] = ctx === "Urbano" ? [] : notes.slice(0, 8).map((n): [string, string] => [n.d, n.t]);
   const reportRows: [string, string][] = [

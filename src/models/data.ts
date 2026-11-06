@@ -190,28 +190,24 @@ export function urbanModel(i: UrbanInput) {
 
 export const phenoPhases = ["Germogliamento", "Fioritura", "Invaiatura", "Maturazione"] as const;
 export type Pheno = (typeof phenoPhases)[number];
-export type VineInput = { moisture: number; temp: number; wind: number; phase: Pheno; rain: boolean; animalPests?: number; plantPests?: number };
+export type VineInput = { moisture: number; temp: number; wind: number; phase: Pheno; rain: boolean };
 const phaseW: Record<Pheno, number> = { Germogliamento: 0.7, Fioritura: 1.15, Invaiatura: 1.2, Maturazione: 1.0 };
 /**
- * Where the vines' stress comes from, in points: dry soil ((35 − moisture %) × 1,6), heat above 24 °C (× 3), wind
- * (km/h × 0,55), animal pests left (× 0,2) and plant pests left (× 0,25), weighed by the vine's phase, less 15 with
- * rain — the same sum vineModel turns into the 0–100 index.
+ * Where the vines' thirst comes from, in points: dry soil ((35 − moisture %) × 1,6), heat above 24 °C (× 3) and wind
+ * (km/h × 0,55), weighed by the vine's phase, less 15 with rain — the same sum vineModel turns into the 0–100 index.
  */
 export const PHASE_WEIGHT = phaseW;
-export const PEST_POINTS = { animal: 0.2, plant: 0.25 } as const;
 export function vineThirstParts(i: VineInput) {
   const soil = Math.max(0, 35 - i.moisture) * 1.6, heat = Math.max(0, i.temp - 24) * 3, wind = i.wind * 0.55;
-  const animals = Math.max(0, i.animalPests ?? 0) * PEST_POINTS.animal, plants = Math.max(0, i.plantPests ?? 0) * PEST_POINTS.plant;
-  return { soil, heat, wind, animals, plants, weight: phaseW[i.phase], rain: i.rain ? 15 : 0 };
+  return { soil, heat, wind, weight: phaseW[i.phase], rain: i.rain ? 15 : 0 };
 }
 export function vineModel(i: VineInput) {
-  const p = vineThirstParts(i);
-  const base = p.soil + p.heat + p.wind + p.animals + p.plants;
-  const s = Math.round(Math.max(0, Math.min(100, base * p.weight - p.rain)));
+  const base = Math.max(0, 35 - i.moisture) * 1.6 + Math.max(0, i.temp - 24) * 3 + i.wind * 0.55;
+  const s = Math.round(Math.max(0, Math.min(100, base * phaseW[i.phase] - (i.rain ? 15 : 0))));
   const risk = s < 35 ? "basso" : s < 65 ? "moderato" : "elevato";
   const priority =
     risk === "elevato"
-      ? i.moisture < 25 ? "Irrigazione di soccorso nelle zone critiche entro 24 h" : (i.animalPests ?? 0) + (i.plantPests ?? 0) > 50 ? "Difesa dai parassiti nelle zone più colpite" : "Riduzione carico termico: gestione della chioma"
+      ? i.moisture < 25 ? "Irrigazione di soccorso nelle zone critiche entro 24 h" : "Riduzione carico termico: ombreggiamento e gestione chioma"
       : risk === "moderato" ? "Monitorare sonde 20/50 cm e ripianificare in 48 h" : "Nessuna azione urgente, proseguire monitoraggio";
   return { s, risk, priority };
 }

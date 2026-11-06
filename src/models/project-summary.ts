@@ -74,14 +74,14 @@ export function vineSummary(vine: LabState["vineyard"], areaM2: number | null): 
   const drawn = drawnM2(vine.area, vine.location);
   const m2 = drawn ?? areaM2 ?? VINE_REFERENCE_M2;
   const cost = mixes.reduce((t, m) => { const c = vineCost(m2 / Math.max(1, mixes.length), m).total; return { lo: t.lo + c.lo, hi: t.hi + c.hi }; }, { lo: 0, hi: 0 });
-  const empty = mixes.every((m) => m.irrigation + m.pestAnimal + m.pestPlant === 0);
+  const empty = mixes.every((m) => m.irrigation + m.shade + m.windbreak === 0);
   const first = mixes[0] ?? NO_MIX;
-  const same = mixes.every((m) => m.irrigation === first.irrigation && m.pestAnimal === first.pestAnimal && m.pestPlant === first.pestPlant);
-  const preset = same ? VINE_LEVELS.find((p) => p.irrigation === first.irrigation && p.pestAnimal === first.pestAnimal && p.pestPlant === first.pestPlant)?.id ?? null : null;
+  const same = mixes.every((m) => m.irrigation === first.irrigation && m.shade === first.shade && m.windbreak === first.windbreak);
+  const preset = same ? VINE_LEVELS.find((p) => p.irrigation === first.irrigation && p.shade === first.shade && p.windbreak === first.windbreak)?.id ?? null : null;
   return {
     before: avg(plain), after: avg(after),
     zones: vine.zones.map((z, i) => ({ after: after[i] ?? 0, plain: plain[i] ?? 0, temp: z.temperature, moisture: z.moisture })),
-    mix: { irrigation: avg(mixes.map((m) => m.irrigation)), pestAnimal: avg(mixes.map((m) => m.pestAnimal)), pestPlant: avg(mixes.map((m) => m.pestPlant)) },
+    mix: { irrigation: avg(mixes.map((m) => m.irrigation)), shade: avg(mixes.map((m) => m.shade)), windbreak: avg(mixes.map((m) => m.windbreak)) },
     same, empty, level: empty ? null : levelName(preset) ?? "Su misura", safe: after.filter((s) => s < 35).length,
     m2, measured: drawn === null && areaM2 !== null, drawn: drawn !== null, cost,
   };
@@ -90,6 +90,6 @@ export function vineSummary(vine: LabState["vineyard"], areaM2: number | null): 
 /** What was put in the vineyard, one line each with its cost per hectare. */
 export const vineMixRows = (s: VineSummary) => [
   { label: "Irrigazione", value: `+${Math.round(s.mix.irrigation)}%`, cost: `${euroRange(VINE_UNIT_COST.irrigation)} l'ettaro` },
-  { label: "Difesa dai parassiti animali", value: `${Math.round(s.mix.pestAnimal)}%`, cost: `${euroRange(VINE_UNIT_COST.pestAnimal)} l'ettaro` },
-  { label: "Difesa dai parassiti vegetali", value: `${Math.round(s.mix.pestPlant)}%`, cost: `${euroRange(VINE_UNIT_COST.pestPlant)} l'ettaro` },
+  { label: "Teli d'ombra", value: `${Math.round(s.mix.shade)}%`, cost: `${euroRange(VINE_UNIT_COST.shade)} l'ettaro` },
+  { label: "Frangivento", value: `${Math.round(s.mix.windbreak)}%`, cost: `${euroRange(VINE_UNIT_COST.windbreak)} l'ettaro` },
 ];

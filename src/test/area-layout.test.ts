@@ -34,20 +34,17 @@ describe("piazza inside the area", () => {
 });
 
 describe("vineyard inside the area", () => {
-  it("splits it in three zones with drip lines on a main pipe, traps and treated rows", () => {
-    const l = vineLayout(ring, [{ irrigation: 20, pestAnimal: 50, pestPlant: 60 }, { irrigation: 0, pestAnimal: 0, pestPlant: 60 }, { irrigation: 8, pestAnimal: 0, pestPlant: 60 }])!;
+  it("splits it in three zones with drip lines, cloth and a windbreak", () => {
+    const l = vineLayout(ring, [{ irrigation: 20, shade: 50, windbreak: 60 }, { irrigation: 0, shade: 0, windbreak: 60 }, { irrigation: 8, shade: 0, windbreak: 60 }])!;
     expect(new Set(l.patches.filter((p) => p.kind === "zone").map((p) => p.zone))).toEqual(new Set([0, 1, 2]));
     expect(l.lines.some((x) => x.kind === "drip" && x.zone === 0)).toBe(true);
     expect(l.lines.some((x) => x.kind === "drip" && x.zone === 1)).toBe(false);
-    expect(l.lines.filter((x) => x.kind === "main").map((x) => x.zone)).toEqual([0, 2]);
-    expect(l.patches.some((p) => p.kind === "treat" && p.zone === 1)).toBe(true);
-    expect(l.traps.length).toBeGreaterThanOrEqual(1);
+    expect(l.patches.some((p) => p.kind === "cloth" && p.zone === 0)).toBe(true);
+    expect(l.lines.filter((x) => x.kind === "wind")).toHaveLength(1);
   });
-  it("has no pipes, traps nor treated rows without interventions", () => {
-    const l = vineLayout(ring, [{ irrigation: 0, pestAnimal: 0, pestPlant: 0 }])!;
-    expect(l.lines.some((x) => x.kind === "drip" || x.kind === "main")).toBe(false);
-    expect(l.traps).toHaveLength(0);
-    expect(l.patches.some((p) => p.kind === "treat")).toBe(false);
+  it("has no windbreak without one", () => {
+    const l = vineLayout(ring, [{ irrigation: 0, shade: 0, windbreak: 0 }])!;
+    expect(l.lines.some((x) => x.kind === "wind")).toBe(false);
   });
 });
 

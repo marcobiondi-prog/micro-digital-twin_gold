@@ -9,12 +9,12 @@ describe("history summary", () => {
     expect(urbanSummary({ trees: 8, permeable: 30, shade: 20, location: loc, treeCells: null, permeableCells: null, shadeCells: null })).toBe("Alberi 8 · aiuole e ciottoli 30% · ombra 20%");
   });
   it("describes the chosen vineyard zone", () => {
-    const v: LabState["vineyard"] = { zones: [zone, { ...zone, irrigation: 4, pestAnimal: 30, pestPlant: 10 }], phase: "Invaiatura", selected: 1, allZones: false, location: loc };
-    expect(vineyardSummary(v)).toBe("Zona 2 · irrigazione +4% · difesa parassiti animali 30% · vegetali 10%");
+    const v: LabState["vineyard"] = { zones: [zone, { ...zone, irrigation: 4, shade: 30, windbreak: 10 }], phase: "Invaiatura", selected: 1, allZones: false, location: loc };
+    expect(vineyardSummary(v)).toBe("Zona 2 · irrigazione +4% · ombra 30% · frangivento 10%");
   });
   it("averages all zones", () => {
-    const v: LabState["vineyard"] = { zones: [{ ...zone, pestAnimal: 10 }, { ...zone, pestAnimal: 30 }], phase: "Invaiatura", selected: 0, allZones: true, location: loc };
+    const v: LabState["vineyard"] = { zones: [{ ...zone, shade: 10 }, { ...zone, shade: 30 }], phase: "Invaiatura", selected: 0, allZones: true, location: loc };
     expect(vineyardSummary(v)).toContain("Tutte le zone");
-    expect(vineyardSummary(v)).toContain("animali 20%");
+    expect(vineyardSummary(v)).toContain("ombra 20%");
   });
 });

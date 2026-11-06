@@ -28,12 +28,12 @@ describe("Riapri", () => {
 
   it("puts every vineyard zone and the scope back", () => {
     const before = getLab().vineyard;
-    const mix = vineyardMix({ ...before, allZones: false, selected: 1, zones: before.zones.map((z, i) => ({ ...z, irrigation: 2 * i, pestAnimal: 10 * i, pestPlant: 20 * i })) });
-    setVineyard((v) => ({ allZones: true, selected: 0, zones: v.zones.map((z) => ({ ...z, irrigation: 0, pestAnimal: 0, pestPlant: 0 })) }));
+    const mix = vineyardMix({ ...before, allZones: false, selected: 1, zones: before.zones.map((z, i) => ({ ...z, irrigation: 2 * i, shade: 10 * i, windbreak: 20 * i })) });
+    setVineyard((v) => ({ allZones: true, selected: 0, zones: v.zones.map((z) => ({ ...z, irrigation: 0, shade: 0, windbreak: 0 })) }));
     reopenHistory(mix);
     const v = getLab().vineyard;
     expect(v.allZones).toBe(false);
     expect(v.selected).toBe(1);
-    expect(v.zones.map((z) => [z.irrigation, z.pestAnimal, z.pestPlant])).toEqual(before.zones.map((_, i) => [2 * i, 10 * i, 20 * i]));
+    expect(v.zones.map((z) => [z.irrigation, z.shade, z.windbreak])).toEqual(before.zones.map((_, i) => [2 * i, 10 * i, 20 * i]));
   });
 });

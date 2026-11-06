@@ -40,7 +40,7 @@ describe("zones inside the area", () => {
     expect(trees.trees.every(([a, b]) => ringContains(east, a, b))).toBe(true);
   });
   it("keeps the vineyard's zones off a free zone", () => {
-    const v = vineLayout(ring, [{ irrigation: 0, pestAnimal: 0, pestPlant: 0 }], {}, [{ kind: "libera", ring: west }])!;
+    const v = vineLayout(ring, [{ irrigation: 0, shade: 0, windbreak: 0 }], {}, [{ kind: "libera", ring: west }])!;
     const centre: [number, number] = [lat + 30 * mLat, lng + 15 * mLng];
     expect(v.patches.some((p) => ringContains(p.ring, centre[0], centre[1]))).toBe(false);
   });

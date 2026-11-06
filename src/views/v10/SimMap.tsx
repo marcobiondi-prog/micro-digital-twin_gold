@@ -489,13 +489,13 @@ function roomText(l: PiazzaLayout) {
 
 /**
  * Under the area: what the map shows inside it (a small legend that follows the levers) and the hand mode: "Sposta
- * elementi" makes each tree and the Aiuole / Ombra labels draggable; "Disposizione automatica" undoes the moves.
+ * elementi" makes each tree and the Prato / Ombra (or Frangivento) labels draggable; "Disposizione automatica" undoes the moves.
  */
 function SimBar({ sim, when, arranging, edited, best, only, canOnly, onArrange, onAuto, onBest, onOnly }: { sim: SimLayout; when?: string | undefined; arranging: boolean; edited: boolean; best: boolean; only: boolean; canOnly: boolean; onArrange: () => void; onAuto: () => void; onBest: () => void; onOnly: () => void }) {
   const m2 = (v: number) => `${Math.round(v).toLocaleString("it-IT")} m²`;
   const legend = sim.kind === "piazza"
     ? [[dot(SIM_COLORS.tree), `Alberi ${sim.data.trees.length} · ${m2(sim.data.trees.length * TREE_SHADE_M2)} di chioma`], [dot(SIM_COLORS.lawn, false), `Aiuole e ciottoli ${m2(sim.data.lawnM2)}`], [dot(SIM_COLORS.shade, false), `Pergolati ${m2(sim.data.shadeM2)}`], [dot("#0b0f15", false), "Ombre"], ...(sim.data.misters.length ? [[dot("#7dd3fc"), `Nebulizzatori ${sim.data.misters.length}${sim.data.mistersInZones ? ` (${sim.data.mistersInZones} nelle tue zone)` : ""}`] as const] : [])] as const
-    : [[dot(thirstColor(10), false), "Zone (colore = stress)"], [dot(SIM_COLORS.drip, false), "Irrigazione · tubo e ali gocciolanti"], [dot(SIM_COLORS.trap), `Trappole ${sim.data.traps.length} · parassiti animali`], [dot(SIM_COLORS.treat, false), "Filari trattati · parassiti vegetali"]] as const;
+    : [[dot(thirstColor(10), false), "Zone (colore = bisogno di intervento)"], [dot(SIM_COLORS.drip, false), "Irrigazione · tubo e ali gocciolanti"], [dot(SIM_COLORS.cloth, false), "Teli d'ombra"], [dot(SIM_COLORS.wind, false), "Frangivento"]] as const;
   return (
     <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4">
       <p className="text-[15px] font-semibold">{sim.kind === "piazza" ? "La piazza nell'area" : "Il vigneto nell'area"}</p>
@@ -505,20 +505,17 @@ function SimBar({ sim, when, arranging, edited, best, only, canOnly, onArrange, 
       {sim.kind === "piazza" && <p className="text-sm text-muted-foreground">{shadowText(sim, when)}{roomText(sim.data)}</p>}
       {sim.kind === "piazza" && (sim.real?.length ?? 0) > 0 && <p className="text-sm text-muted-foreground">Già nell'area: {realCountText(sim.real ?? [])}. Gli interventi non ci vanno sopra (contorni tratteggiati sulla mappa 2D).</p>}
       <p className="text-sm text-muted-foreground">{arranging
-        ? sim.kind === "piazza" ? `Trascina gli alberi, o le etichette Aiuole e Ombra.${(sim.inner ?? []).length ? " Le etichette con ✥ spostano le tue zone con tutto quello che contengono; \"✥ Tutte le zone\" le sposta insieme." : ""}` : "Le etichette con ✥ spostano le tue zone; \"✥ Tutte le zone\" le sposta insieme."
+        ? sim.kind === "piazza" ? `Trascina gli alberi, o le etichette Aiuole e Ombra.${(sim.inner ?? []).length ? " Le etichette con ✥ spostano le tue zone con tutto quello che contengono; \"✥ Tutte le zone\" le sposta insieme." : ""}` : `Trascina l'etichetta Frangivento verso il lato dove lo vuoi.${(sim.inner ?? []).length ? " Le etichette con ✥ spostano le tue zone; \"✥ Tutte le zone\" le sposta insieme." : ""}`
         : only && sim.kind === "piazza"
           ? "Solo quello disegnato da te: aiuole e pergolati sono le tue zone, gli alberi stanno nelle zone Alberi. Le leve della simulazione seguono le zone; se ne cambi una torna la disposizione automatica."
         : best && sim.kind === "piazza"
           ? `Posizione migliore: pergolati, aiuole e alberi dove d'estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno.${sim.data.sunny !== undefined ? ` Al sole per gran parte del giorno: ${Math.round(sim.data.sunny * 100)} % dell'area.` : ""}`
-          : sim.kind === "vigneto" ? "Segue le leve della simulazione: il tubo principale e le ali gocciolanti seguono l'irrigazione, le trappole la difesa dai parassiti animali, i filari trattati quella dai parassiti vegetali."
           : "Segue le leve della simulazione: cambia gli alberi o le percentuali e la mappa si aggiorna."}</p>
       {sim.kind === "piazza" && !canOnly && !only && !arranging && <p className="text-xs text-muted-foreground">Per vedere solo quello che disegni, aggiungi una zona Alberi, Aiuole o Pergolato.</p>}
       <div className="flex flex-wrap gap-2">
-        {(sim.kind === "piazza" || (sim.inner ?? []).length > 0) && (
         <button type="button" onClick={onArrange} aria-pressed={arranging} className={cn(barBtn, arranging ? "bg-foreground text-background" : "bg-foreground/[0.08]")}>
           {arranging ? <><Check className="size-4" aria-hidden="true" />Fatto</> : <><Hand className="size-4" aria-hidden="true" />Sposta elementi</>}
         </button>
-        )}
         {sim.kind === "piazza" && !arranging && (
           <button type="button" onClick={onOnly} disabled={!canOnly && !only} aria-pressed={only} className={cn(barBtn, only ? "bg-brand-turquoise/20 text-brand-turquoise ring-1 ring-brand-turquoise/40" : "bg-foreground/[0.08]", "disabled:opacity-40")}>
             <PenLine className="size-4" aria-hidden="true" />{only ? "Solo disegnato · attivo" : "Solo quello disegnato"}

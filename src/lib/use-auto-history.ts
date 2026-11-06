@@ -12,14 +12,14 @@ const WAIT_MS = 4000;
 const leversOf = (kind: SimKind, lab: ReturnType<typeof useLab>) =>
   kind === "urban"
     ? JSON.stringify([lab.urban.trees, lab.urban.permeable, lab.urban.shade, lab.urban.misters ?? 0])
-    : JSON.stringify([lab.vineyard.irrigation, lab.vineyard.pestAnimal, lab.vineyard.pestPlant, lab.vineyard.zones.map((z) => [z.irrigation, z.pestAnimal, z.pestPlant])]);
+    : JSON.stringify([lab.vineyard.irrigation, lab.vineyard.shade, lab.vineyard.windbreak, lab.vineyard.zones.map((z) => [z.irrigation, z.shade, z.windbreak])]);
 
 /** No lever moved off zero: nothing was put in, so there is no intervention to record. */
 const isEmpty = (kind: SimKind, lab: ReturnType<typeof useLab>) => {
   const m = kind === "urban" ? urbanMix(lab.urban) : vineyardMix(lab.vineyard);
   return m.kind === "piazza"
     ? m.trees === 0 && m.permeable === 0 && m.shade === 0 && !m.misters
-    : m.zones.every((z) => z.irrigation === 0 && z.pestAnimal === 0 && z.pestPlant === 0);
+    : m.zones.every((z) => z.irrigation === 0 && z.shade === 0 && z.windbreak === 0);
 };
 
 /**

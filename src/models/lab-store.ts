@@ -7,17 +7,17 @@ import type { DrawnArea } from "./drawn-area";
 import { movePlace, samePlace, type PlaceSnap } from "./place-memory";
 
 export type Loc = { label: string; lat: number; lng: number };
-export type VineZoneState = { temperature: number; moisture: number; wind: number; rain: boolean; irrigation?: number; pestAnimal?: number; pestPlant?: number; animalPests?: number; plantPests?: number };
+export type VineZoneState = { temperature: number; moisture: number; wind: number; rain: boolean; irrigation?: number; shade?: number; windbreak?: number };
 export type LabState = {
   savedAt?: number | null;
   syncedAt?: number | null;
   syncedTargets?: string[] | null;
   urban: { trees: number; permeable: number; shade: number; misters?: number; location: Loc; treeCells: number[] | null; permeableCells: number[] | null; shadeCells: number[] | null; realTemp?: number | null; realWeather?: RealWeather | null; area?: DrawnArea | null; places?: PlaceSnap<UrbanSnap>[] };
-  vineyard: { zones: VineZoneState[]; phase: Pheno; selected: number; allZones: boolean; location: Loc; irrigation?: number; pestAnimal?: number; pestPlant?: number; climateKey?: string; area?: DrawnArea | null; places?: PlaceSnap<VineSnap>[] };
+  vineyard: { zones: VineZoneState[]; phase: Pheno; selected: number; allZones: boolean; location: Loc; irrigation?: number; shade?: number; windbreak?: number; climateKey?: string; area?: DrawnArea | null; places?: PlaceSnap<VineSnap>[] };
 };
 /** What is kept per place (models/place-memory): the interventions and the area drawn, with its zones and edits. */
 type UrbanSnap = { trees: number; permeable: number; shade: number; misters?: number; area: DrawnArea | null };
-type VineSnap = { zones: VineZoneState[]; selected: number; allZones: boolean; irrigation?: number; pestAnimal?: number; pestPlant?: number; area: DrawnArea | null };
+type VineSnap = { zones: VineZoneState[]; selected: number; allZones: boolean; irrigation?: number; shade?: number; windbreak?: number; area: DrawnArea | null };
 /** The area of a place put back on its (possibly slightly moved) new spot, so it still counts there. */
 const reanchor = (area: DrawnArea | null, at: Loc) => (area ? { ...area, lat: at.lat, lng: at.lng } : null);
 
@@ -68,8 +68,8 @@ export function setVineyard(patch: Partial<LabState["vineyard"]> | ((v: LabState
   let base = state.vineyard;
   const to = p.location;
   if (to && !samePlace(base.location, to)) {
-    const { zones, selected, allZones, irrigation, pestAnimal, pestPlant } = base;
-    const snap: VineSnap = { zones, selected, allZones, area: base.area ?? null, ...(irrigation !== undefined ? { irrigation } : {}), ...(pestAnimal !== undefined ? { pestAnimal } : {}), ...(pestPlant !== undefined ? { pestPlant } : {}) };
+    const { zones, selected, allZones, irrigation, shade, windbreak } = base;
+    const snap: VineSnap = { zones, selected, allZones, area: base.area ?? null, ...(irrigation !== undefined ? { irrigation } : {}), ...(shade !== undefined ? { shade } : {}), ...(windbreak !== undefined ? { windbreak } : {}) };
     const { places, back } = movePlace(base.places, base.location, snap, to);
     base = { ...base, places, ...(back ? { ...back, area: reanchor(back.area, to) } : { area: null }) };
   }
@@ -110,9 +110,9 @@ export function urbanMetrics(u: LabState["urban"]) {
 }
 export function vineMetrics(v: LabState["vineyard"]) {
   const offset = Math.max(-3, Math.min(3, (41.83 - v.location.lat) * 0.6));
-  // The interventions (irrigation, defence from animal and plant pests) act on every zone before the vines' thirst is read.
+  // The interventions (irrigation, shade cloth, windbreak) act on every zone before the vines' thirst is read.
   const zones = v.zones.map((z) => applyZoneMix(z, zoneMixOf(z, vineMixOf(v))));
-  const results = zones.map((z) => vineModel({ moisture: z.moisture, temp: z.temperature + offset, wind: z.wind, phase: v.phase, rain: z.rain, animalPests: z.animalPests ?? 0, plantPests: z.plantPests ?? 0 }));
+  const results = zones.map((z) => vineModel({ moisture: z.moisture, temp: z.temperature + offset, wind: z.wind, phase: v.phase, rain: z.rain }));
   const avg = (n: number[]) => n.reduce((s, x) => s + x, 0) / Math.max(1, n.length);
   return {
     results,
@@ -130,7 +130,7 @@ export function vineThirstPartsOf(v: LabState["vineyard"]) {
   const offset = Math.max(-3, Math.min(3, (41.83 - v.location.lat) * 0.6));
   return v.zones.map((z0) => {
     const z = applyZoneMix(z0, zoneMixOf(z0, vineMixOf(v)));
-    return vineThirstParts({ moisture: z.moisture, temp: z.temperature + offset, wind: z.wind, phase: v.phase, rain: z.rain, animalPests: z.animalPests ?? 0, plantPests: z.plantPests ?? 0 });
+    return vineThirstParts({ moisture: z.moisture, temp: z.temperature + offset, wind: z.wind, phase: v.phase, rain: z.rain });
   });
 }
 

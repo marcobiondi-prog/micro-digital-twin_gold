@@ -57,7 +57,7 @@ describe("intervention-history", () => {
 
   it("keeps a valid mix and refuses a broken one", () => {
     const piazza = { kind: "piazza", trees: 6, permeable: 20, shade: 15 } as const;
-    const vigneto = { kind: "vigneto", zones: [{ irrigation: 8, pestAnimal: 30, pestPlant: 40 }], allZones: true, selected: 0 } as const;
+    const vigneto = { kind: "vigneto", zones: [{ irrigation: 8, shade: 30, windbreak: 40 }], allZones: true, selected: 0 } as const;
     expect(isHistoryMix(piazza) && isHistoryMix(vigneto)).toBe(true);
     expect(isHistoryMix({ kind: "piazza", trees: "6", permeable: 20, shade: 15 })).toBe(false);
     expect(isHistoryMix({ kind: "vigneto", zones: [], allZones: true, selected: 0 })).toBe(false);
@@ -106,7 +106,7 @@ describe("mixRows", () => {
       { label: "Alberi", value: "7" }, { label: "Aiuole e ciottoli", value: "20 %" }, { label: "Ombra", value: "15 %" }] }]);
   });
   it("lists every zone on Tutte, only the chosen one otherwise", () => {
-    const zones = [{ irrigation: 8, pestAnimal: 30, pestPlant: 40 }, { irrigation: 2, pestAnimal: 0, pestPlant: 10 }];
+    const zones = [{ irrigation: 8, shade: 30, windbreak: 40 }, { irrigation: 2, shade: 0, windbreak: 10 }];
     expect(mixRows({ kind: "vigneto", zones, allZones: true, selected: 0 }).map((g) => g.title)).toEqual(["Zona 1", "Zona 2"]);
     const one = mixRows({ kind: "vigneto", zones, allZones: false, selected: 1 });
     expect(one).toHaveLength(1);

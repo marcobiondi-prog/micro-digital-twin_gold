@@ -24,7 +24,7 @@ export function FaqPage() {
     <InfoPage title="Domande frequenti" intro="Costi, tempi e cosa si impara con i tre livelli di intervento, in poche risposte.">
       <div className="space-y-2">
         <Faq q="Che cosa simula l'app?">
-          <p>Due luoghi: una piazza, dove alberi, aiuole e ombra tolgono gradi al calore percepito, e un vigneto, dove irrigazione e difesa dai parassiti animali e vegetali tolgono stress alle viti. Muovi il punto bianco sull'arco o i comandi sotto e vedi subito l'effetto e quanto costa.</p>
+          <p>Due luoghi: una piazza, dove alberi, aiuole e ombra tolgono gradi al calore percepito, e un vigneto, dove irrigazione, teli d'ombra e frangivento tolgono sete alle viti. Muovi il punto bianco sull'arco o i comandi sotto e vedi subito l'effetto e quanto costa.</p>
         </Faq>
         <Faq q="Cosa vogliono dire i tre livelli?">
           <ul>
@@ -42,7 +42,7 @@ export function FaqPage() {
           <p>Gli interventi hanno poi il loro costo, stimato nelle simulazioni (IVA esclusa, solo come ordine di grandezza):</p>
           <ul>
             <li>Piazza: albero {grouped(UNIT_COST.tree.lo)}–{eur(UNIT_COST.tree.hi)} l'uno, aiuole e ciottoli {UNIT_COST.lawnM2.lo}–{UNIT_COST.lawnM2.hi} €/m², ombra {UNIT_COST.shadeM2.lo}–{UNIT_COST.shadeM2.hi} €/m².</li>
-            <li>Vigneto, all'ettaro: irrigazione a goccia {grouped(VINE_UNIT_COST.irrigation.lo)}–{eur(VINE_UNIT_COST.irrigation.hi)}, difesa dai parassiti animali {grouped(VINE_UNIT_COST.pestAnimal.lo)}–{eur(VINE_UNIT_COST.pestAnimal.hi)}, difesa dai parassiti vegetali {grouped(VINE_UNIT_COST.pestPlant.lo)}–{eur(VINE_UNIT_COST.pestPlant.hi)}.</li>
+            <li>Vigneto, all'ettaro: irrigazione a goccia {grouped(VINE_UNIT_COST.irrigation.lo)}–{eur(VINE_UNIT_COST.irrigation.hi)}, teli d'ombra {grouped(VINE_UNIT_COST.shade.lo)}–{eur(VINE_UNIT_COST.shade.hi)}, frangivento {grouped(VINE_UNIT_COST.windbreak.lo)}–{eur(VINE_UNIT_COST.windbreak.hi)}.</li>
           </ul>
         </Faq>
         <Faq q="Quanto tempo serve?">
@@ -359,7 +359,7 @@ export function AboutPage() {
     <InfoPage title="Chi siamo" intro="Micro Digital Twin è un gemello digitale del microclima: una copia al computer di un luogo vero, dove provare gli interventi prima di farli.">
       <InfoCard title="Perché esiste">
         <p>Le estati sono sempre più calde. Nelle piazze il caldo si sente sulla pelle, nei vigneti lo sentono le viti. Spesso però si decide senza poter vedere prima cosa cambia davvero.</p>
-        <p>Con l'app chi amministra un comune, chi coltiva o chi studia può provare alberi, aiuole, ombra, irrigazione o difesa dai parassiti e vedere subito quanto si guadagna e quanto costa.</p>
+        <p>Con l'app chi amministra un comune, chi coltiva o chi studia può provare alberi, aiuole, ombra, irrigazione o frangivento e vedere subito quanto si guadagna e quanto costa.</p>
       </InfoCard>
       <InfoCard title="Cosa facciamo">
         <ul>
