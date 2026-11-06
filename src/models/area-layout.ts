@@ -578,10 +578,13 @@ export function bedParts(patches: Ring[], maxBeds = 50, area?: Ring, opts: { bed
   const rings = patches.filter((r) => r.length >= 3);
   if (!rings.length) return { beds: [], parts: [] };
   const f = frameOf(rings.flat());
-  // The direction of the beds: the longest side of the largest patch.
+  // The direction of the beds: from the longest side of the largest patch.
   const big = rings.reduce((m, r) => (ringAreaM2(r) > ringAreaM2(m) ? r : m), rings[0]!).map((p) => toXY(f, p));
   let ang = Math.PI / 2, best = -1;
   big.forEach((p, i) => { const q = big[(i + 1) % big.length]!, d = dist(p, q); if (d > best) { best = d; ang = Math.atan2(q[1] - p[1], q[0] - p[0]); } });
+  // Vertical on the map: of the zone's two side directions (its longest side and the one square to it), the one
+  // nearer north–south, so the grass runs up and down the screen while still lying square to the outline traced.
+  if (Math.abs(Math.sin(ang)) < Math.abs(Math.cos(ang))) ang += Math.PI / 2;
   const cs = Math.cos(ang), sn = Math.sin(ang);
   // [u, v]: u along the beds, v across them; and back to lat/lng.
   const toUV = (p: LatLng): LatLng => { const [x, y] = toXY(f, p); return [x * cs + y * sn, -x * sn + y * cs]; };

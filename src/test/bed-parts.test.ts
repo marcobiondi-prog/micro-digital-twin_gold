@@ -21,11 +21,14 @@ describe("aiuole e ciottoli in 3D, like the 2D pattern", () => {
     expect(parts.filter((p) => grass(p.color))).toHaveLength(beds.length);
     expect(parts.every((p) => p.height > p.base && p.base > 0)).toBe(true);
   });
-  it("runs the beds along the longest side, across neighbouring row strips", () => {
+  it("runs the beds up and down the map, joined across neighbouring row strips", () => {
     const rows = [box(12, 3, 0, 0), box(12, 3, 0, 3), box(12, 3, 0, 6)];
-    expect(bedParts(rows).beds).toHaveLength(6);
+    const { beds } = bedParts(rows);
+    expect(beds.length).toBeGreaterThanOrEqual(7);
+    // Each bed one piece 9 m tall (north–south), not three east–west strips.
+    for (const b of beds) { const la = b.map((p) => p[0]); expect((Math.max(...la) - Math.min(...la)) * 111_320).toBeGreaterThan(8.9); }
   });
-  it("follows a zone traced at an angle: beds parallel to its long side and cut to its outline", () => {
+  it("follows a zone traced at an angle: beds square to its outline, on the side nearer north–south, and cut to it", () => {
     const P = (x: number, y: number): [number, number] => [lat + y / 111_320, lng + x / k];
     const c = Math.cos(Math.PI / 6), sn = Math.sin(Math.PI / 6);
     const R = (x: number, y: number) => P(x * c - y * sn, x * sn + y * c);
@@ -35,11 +38,11 @@ describe("aiuole e ciottoli in 3D, like the 2D pattern", () => {
     for (const b of beds) {
       // Every corner inside the zone (a hair of tolerance on its edges).
       for (const [a2, b2] of b) expect(ringContains([R(-0.05, -0.05), R(20.05, -0.05), R(20.05, 8.05), R(-0.05, 8.05)], a2, b2)).toBe(true);
-      // Long side at 30°, like the zone's.
+      // Long side at 120°: square to the zone's 30° side, the one of the two nearer vertical.
       const xs = b.map(([la, ln]) => [(ln - lng) * k, (la - lat) * 111_320] as const);
       let best = 0, ang = 0;
       xs.forEach((p, i) => { const q = xs[(i + 1) % xs.length]!; const d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (d > best) { best = d; ang = Math.atan2(q[1] - p[1], q[0] - p[0]); } });
-      expect(Math.abs(Math.sin(ang - Math.PI / 6))).toBeLessThan(0.02);
+      expect(Math.abs(Math.sin(ang - (2 * Math.PI) / 3))).toBeLessThan(0.02);
     }
   });
   it("keeps the pieces few on a big lawn and is the same every time", () => {
