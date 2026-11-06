@@ -15,7 +15,9 @@ describe("aiuole e ciottoli in 3D, like the 2D pattern", () => {
     const green = beds.reduce((t, b) => t + ringAreaM2(b), 0);
     expect(green / ringAreaM2(patch)).toBeGreaterThan(0.72);
     expect(green / ringAreaM2(patch)).toBeLessThan(0.85);
-    expect(parts.filter((p) => p.color === BEDS_3D.pebbles)).toHaveLength(1);
+    // No ground sheet: the paths are pebbles only, packed.
+    expect(parts.filter((p) => p.color === BEDS_3D.pebbles)).toHaveLength(0);
+    expect(parts.filter((p) => (BEDS_3D.stones as readonly string[]).includes(p.color)).length).toBeGreaterThan(150);
     expect(parts.filter((p) => grass(p.color))).toHaveLength(beds.length);
     expect(parts.every((p) => p.height > p.base && p.base > 0)).toBe(true);
   });
@@ -27,5 +29,11 @@ describe("aiuole e ciottoli in 3D, like the 2D pattern", () => {
     expect(bedParts([box(300, 40)]).beds.length).toBeLessThanOrEqual(70);
     expect(bedParts([box(30, 20)])).toEqual(bedParts([box(30, 20)]));
     expect(bedParts([]).parts).toHaveLength(0);
+  });
+  it("never reaches past the drawn area", () => {
+    const area: Ring = [[lat, lng], [lat, lng + 10 / k], [lat + 12 / 111_320, lng + 20 / k], [lat + 12 / 111_320, lng]];
+    const { beds, parts } = bedParts([box(21, 12)], 70, area);
+    expect(beds.length).toBeGreaterThan(3);
+    for (const p of parts) for (const [a, c] of p.ring) expect(ringContains([[lat - 1e-6, lng - 1e-6], [lat - 1e-6, lng + 10.3 / k], [lat + 12.1 / 111_320, lng + 20.3 / k], [lat + 12.1 / 111_320, lng - 1e-6]], a, c)).toBe(true);
   });
 });
