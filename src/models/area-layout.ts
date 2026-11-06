@@ -569,7 +569,12 @@ export const BED_H = { pebbleBase: 0.55, pebble: 0.58, grassBase: 0.6, grass: 0.
  * (the drawn outline) a piece reaching past it is cut into 0,5 m slices and only those wholly inside stay. The band pitch
  * grows while there would be more than `maxBeds` beds. Fixed pseudo-random flowers and stones, the same on every device.
  */
-export function bedParts(patches: Ring[], maxBeds = 50, area?: Ring): { beds: Ring[]; parts: TreePart[] } {
+/**
+ * `opts.bedM`: the beds' width in metres (paths a third of it, stones and flowers in proportion) — the 2D map asks for
+ * a fixed width on screen, so the stripes keep their size at every zoom; `maxStones` / `maxFlowers` cap the small parts.
+ */
+export function bedParts(patches: Ring[], maxBeds = 50, area?: Ring, opts: { bedM?: number; maxStones?: number; maxFlowers?: number } = {}): { beds: Ring[]; parts: TreePart[] } {
+  const sc = (opts.bedM ?? 1.2) / 1.2, maxStones = opts.maxStones ?? 140, maxFlowers = opts.maxFlowers ?? 36;
   const rings = patches.filter((r) => r.length >= 3);
   if (!rings.length) return { beds: [], parts: [] };
   const f = frameOf(rings.flat());
@@ -591,8 +596,9 @@ export function bedParts(patches: Ring[], maxBeds = 50, area?: Ring): { beds: Ri
   const keepInside = (r: R4): R4[] => {
     if (uvInside(rect(r))) return [r];
     const out: R4[] = [];
-    for (let lo = r.lo; lo < r.hi - 1e-6; lo += 0.5) {
-      const hi = Math.min(r.hi, lo + 0.5), sl = { ...r, lo, hi };
+    const st = Math.max(0.1, 0.5 * sc);
+    for (let lo = r.lo; lo < r.hi - 1e-6; lo += st) {
+      const hi = Math.min(r.hi, lo + st), sl = { ...r, lo, hi };
       if (!uvInside(rect(sl))) continue;
       const last = out[out.length - 1];
       if (last && Math.abs(last.hi - lo) < 1e-6) last.hi = hi; else out.push(sl);
@@ -601,7 +607,7 @@ export function bedParts(patches: Ring[], maxBeds = 50, area?: Ring): { beds: Ri
   };
   /** The patches clipped to the band v ∈ [w0, w1] (uv metres), row pieces joined, kept inside the area. */
   const band = (w0: number, w1: number): LatLng[][] => {
-    if (w1 - w0 < 0.05) return [];
+    if (w1 - w0 < 0.02 * sc) return [];
     const pieces = uvRings.map((r) => clipBox(r, u0, u1, w0, w1)).filter((q) => q.length >= 3 && Math.abs(q.reduce((t, p, i) => { const n = q[(i + 1) % q.length]!; return t + p[0] * n[1] - n[0] * p[1]; }, 0)) / 2 > 0.05);
     const isRect = (q: LatLng[]) => q.length === 4 && new Set(q.map((p) => p[0].toFixed(4))).size === 2 && new Set(q.map((p) => p[1].toFixed(4))).size === 2;
     const rects: R4[] = pieces.filter(isRect).map((q) => ({ lo: Math.min(...q.map((p) => p[0])), hi: Math.max(...q.map((p) => p[0])), a: Math.min(...q.map((p) => p[1])), b: Math.max(...q.map((p) => p[1])) })).sort((x, y) => x.lo - y.lo);
@@ -625,7 +631,7 @@ export function bedParts(patches: Ring[], maxBeds = 50, area?: Ring): { beds: Ri
     }
     return { beds, paths, path };
   };
-  let bed = 1.2, path = 0.4, lay = layout(bed, path);
+  let bed = 1.2 * sc, path = 0.4 * sc, lay = layout(bed, path);
   for (let k = 0; lay.beds.length > maxBeds && k < 8; k++) { bed *= 1.3; path *= 1.15; lay = layout(bed, path); }
   let seed = 11;
   const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
@@ -635,15 +641,15 @@ export function bedParts(patches: Ring[], maxBeds = 50, area?: Ring): { beds: Ri
   const parts: TreePart[] = beds.map((ring, n) => ({ ring, base: BED_H.grassBase, height: BED_H.grass, color: BEDS_3D.grass[n % 2]! }));
   // Pebbles along every path, in rows across it (a new row every 0,25 m), spaced along it so there are at most 140.
   const pathLen = lay.paths.reduce((t, r) => t + Math.max(...r.map((p) => p[0])) - Math.min(...r.map((p) => p[0])), 0);
-  const along = Math.max(0.22, pathLen / 140);
+  const along = Math.max(0.22 * sc, pathLen / maxStones);
   let stones = 0;
   for (const r of lay.paths) {
     const lo = Math.min(...r.map((p) => p[0])), hi = Math.max(...r.map((p) => p[0])), a = Math.min(...r.map((p) => p[1])), b = Math.max(...r.map((p) => p[1]));
-    const cols = Math.max(1, Math.floor((b - a) / 0.25));
-    for (let ci = 0; ci < cols && stones < 140; ci++) {
+    const cols = Math.max(1, Math.floor((b - a) / (0.25 * sc)));
+    for (let ci = 0; ci < cols && stones < maxStones; ci++) {
       const v = a + (b - a) * ((ci + 0.5) / cols);
-      for (let u = lo + along * (ci % 2 ? 0.75 : 0.25); u < hi && stones < 140; u += along) {
-        const disc = discUV([u + (rnd() - 0.5) * along * 0.3, v], 0.09 + rnd() * 0.04, 7);
+      for (let u = lo + along * (ci % 2 ? 0.75 : 0.25); u < hi && stones < maxStones; u += along) {
+        const disc = discUV([u + (rnd() - 0.5) * along * 0.3, v], (0.09 + rnd() * 0.04) * sc, 7);
         if (!disc.every((p) => inUV(r, p))) continue;
         parts.push({ ring: disc.map(fromUV), base: BED_H.flowerBase, height: BED_H.flower, color: BEDS_3D.stones[(stones + Math.floor(rnd() * 3)) % BEDS_3D.stones.length]! });
         stones++;
@@ -654,9 +660,9 @@ export function bedParts(patches: Ring[], maxBeds = 50, area?: Ring): { beds: Ri
   let flowers = 0;
   for (const [n, r] of lay.beds.entries()) {
     const lo = Math.min(...r.map((p) => p[0])), hi = Math.max(...r.map((p) => p[0])), a = Math.min(...r.map((p) => p[1])), b = Math.max(...r.map((p) => p[1]));
-    const want = Math.min(4, Math.max(1, Math.round(((hi - lo) * (b - a)) / 8)));
-    for (let k = 0; k < want && flowers < 36; k++) {
-      const disc = discUV([lo + rnd() * (hi - lo), a + rnd() * (b - a)], 0.18 + rnd() * 0.07, 8);
+    const want = Math.min(4, Math.max(1, Math.round(((hi - lo) * (b - a)) / (8 * sc * sc))));
+    for (let k = 0; k < want && flowers < maxFlowers; k++) {
+      const disc = discUV([lo + rnd() * (hi - lo), a + rnd() * (b - a)], (0.18 + rnd() * 0.07) * sc, 8);
       if (!disc.every((p) => inUV(r, p))) continue;
       parts.push({ ring: disc.map(fromUV), base: BED_H.flowerBase, height: BED_H.flower, color: BEDS_3D.flowers[(n + k) % BEDS_3D.flowers.length]! });
       flowers++;

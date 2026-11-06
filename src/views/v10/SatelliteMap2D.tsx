@@ -53,6 +53,9 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
   const pins = useRef<Marker[]>([]);
   const handles = useRef<Marker[]>([]);
   const moveRef = useRef(onMove);
+  // The simulation as last drawn, so a zoom can lay the aiuole again at a fixed width on screen.
+  const simNow = useRef(sim);
+  simNow.current = sim;
   moveRef.current = onMove;
   const pinMoveRef = useRef(onPinMove);
   pinMoveRef.current = onPinMove;
@@ -96,6 +99,8 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
       }
       libRef.current = maplibregl;
       map.on("load", () => { addAreaLayers(map); addSimLayers(map, lat); if (!cancelled) setState("ready"); });
+      // The aiuole keep their stripes the same size on screen: laid again for the new zoom once it settles.
+      map.on("zoomend", () => { if (map.getSource("sim-layout")) setSimData(map, simNow.current); });
       // Drawing: a tap on the map is a new pin at that spot.
       map.on("click", (e) => {
         const { area: ring, drawing: on, onAreaChange: set, outline: big, onOutside: out } = live.current;
