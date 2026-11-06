@@ -57,8 +57,33 @@ export const lastProKind = (): ProKind | null => {
   return l.funzionario && !l.agronomo ? "funzionario" : l.agronomo && !l.funzionario ? "agronomo" : null;
 };
 
+/**
+ * Guest mode: "Entra come ospite" on the sector page lets one in without a professional profile — both simulations
+ * open, to try them. Kept on this device (localStorage mdt-guest-v1); identifying as a profile ends it.
+ */
+const GUEST_KEY = "mdt-guest-v1";
+let guest: boolean | undefined;
+const guestSnap = () => {
+  if (guest === undefined) { try { guest = window.localStorage.getItem(GUEST_KEY) === "1"; } catch { guest = false; } }
+  return guest;
+};
+const setGuestFlag = (on: boolean) => {
+  guest = on;
+  try { if (on) window.localStorage.setItem(GUEST_KEY, "1"); else window.localStorage.removeItem(GUEST_KEY); } catch { /* memory only */ }
+  subs.forEach((f) => f());
+};
+/** Enters as a guest: no profile, both simulations open. */
+export function enterAsGuest() { setGuestFlag(true); clearSectorGate(); }
+/** Leaves guest mode (the sector page shows again). */
+export function leaveGuest() { setGuestFlag(false); }
+export const isGuest = (): boolean => guestSnap();
+/** Whether one entered as a guest (false while the page is not yet on the phone). */
+export function useGuest(): boolean {
+  return useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, guestSnap, () => false);
+}
+
 const set = (id: ProId | null) => {
-  if (id) keepLast(id);
+  if (id) { keepLast(id); if (guestSnap()) { guest = false; try { window.localStorage.removeItem(GUEST_KEY); } catch { /* memory only */ } } }
   current = id;
   try {
     if (id) window.localStorage.setItem(KEY, JSON.stringify(id));

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Building2, Grape, Lock, UserRound } from "lucide-react";
-import { useProId } from "@/lib/use-pro-id";
+import { useGuest, useProId } from "@/lib/use-pro-id";
 import { KIND_LABEL, SECTION_KIND, SECTION_LABEL, proSummary, unlocks, type Section } from "@/models/professional-id";
 import { toast } from "sonner";
 import { Ambient, PageHero, TabRow, openSimTab } from "@/views/v8/console";
@@ -18,7 +18,8 @@ const WHO: Record<Section, { title: string; who: string; how: string }> = {
 /** Whether this section is open to the profile in use (undefined while the page is not yet on the phone). */
 export function useSectionOpen(section: Section): boolean | undefined {
   const id = useProId();
-  return id === undefined ? undefined : unlocks(id, section);
+  const guest = useGuest();
+  return id === undefined ? undefined : unlocks(id, section) || (guest && !id);
 }
 
 /** The lock and the way in: what the section needs, who you are now (one profile at a time) and the white button to identify. */
@@ -55,8 +56,10 @@ export function SectionLockCard({ section, className }: { section: Section; clas
  */
 export function SectionGate({ section, children }: { section: Section; children: ReactNode }) {
   const id = useProId();
+  const guest = useGuest();
   if (id === undefined) return <div className="min-h-[60vh]" />;
-  if (unlocks(id, section)) return <>{children}</>;
+  // A guest (no profile) tries both simulations.
+  if (unlocks(id, section) || (guest && !id)) return <>{children}</>;
   const Icon = section === "urban" ? Building2 : Grape;
   const need = SECTION_KIND[section];
   const done = () => {

@@ -20,7 +20,7 @@ import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
 import { installUiClicks } from "@/lib/ui-sounds";
 import { isChunkError, reloadFresh } from "@/router";
 import { History, Building2, Grape, Info, LayoutDashboard, Lock } from "lucide-react";
-import { getProId, useProId, useSyncProId } from "@/lib/use-pro-id";
+import { getProId, useGuest, useProId, useSyncProId } from "@/lib/use-pro-id";
 import { useSyncMediaArchive } from "@/models/media-archive";
 import { useSyncHistoryArchive } from "@/models/history-archive";
 import { useSyncSimHidden } from "@/models/sim-hidden";
@@ -197,6 +197,7 @@ function emptyTap(target: EventTarget | null): boolean {
 
 function BottomNav() {
   const proId = useProId();
+  const guest = useGuest() && !proId;
   const pathname = useLocation({ select: (l) => l.pathname });
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
@@ -263,7 +264,7 @@ function BottomNav() {
   const item = ({ to, l, I }: NavItem, index: number) => {
     const active = pathname === to || ((pathname.startsWith("/cronologia") || pathname === "/archivio") && to === historyHome(pathname === "/archivio" ? "/archivio" : "/cronologia")) || (to === "/profilo" && isProfilePath(pathname));
     // Piazza and vineyard wear a small lock until the profile that opens them is identified.
-    const locked = (to === "/urbano" || to === "/vigneto") && proId !== undefined && !unlocks(proId, to === "/urbano" ? "urban" : "vineyard");
+    const locked = !guest && (to === "/urbano" || to === "/vigneto") && proId !== undefined && !unlocks(proId, to === "/urbano" ? "urban" : "vineyard");
     const col = index < 2 ? index : index + 1, arc = ARC[col];
     return (
       <li key={to} style={arc ? { transform: `translateY(${arc.y}px) rotate(${arc.tilt}deg)` } : undefined}>
@@ -322,6 +323,7 @@ function BottomNav() {
 
 function SmartNav() {
   const proId = useProId();
+  const guest = useGuest() && !proId;
   const [pinned, setPinned] = useState(false);
   const [placeholderTop, setPlaceholderTop] = useState(0);
   useEffect(() => {
@@ -413,7 +415,7 @@ function SmartNav() {
                   replace={pathname !== "/"}
                   onClick={(e) => { if (goHomeBack(e, n.to, pathname)) return; centerTapped(e.currentTarget, pathname === n.to); }}
                   className={`nav-glass nav-glass-gloss relative shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring ${pathname === n.to ? "nav-glass-on bg-nav-accent text-nav-accent-foreground" : "text-muted-foreground dark:text-nav-accent-foreground"}`}>
-                  {n.l}{(n.to === "/urbano" || n.to === "/vigneto") && proId !== undefined && !unlocks(proId, n.to === "/urbano" ? "urban" : "vineyard") && <Lock className="ml-1 inline size-3.5 align-[-2px]" aria-label="bloccato" />}
+                  {n.l}{!guest && (n.to === "/urbano" || n.to === "/vigneto") && proId !== undefined && !unlocks(proId, n.to === "/urbano" ? "urban" : "vineyard") && <Lock className="ml-1 inline size-3.5 align-[-2px]" aria-label="bloccato" />}
                 </Link>
               ))}
             </div>

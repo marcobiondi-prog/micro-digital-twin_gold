@@ -10,7 +10,7 @@ import { pushBackGuard } from "@/hooks/use-back-close";
 import { deliverFiles, openAccount, requestCapture, setCameraSheetOpen, useCameraSheetOpen, type CaptureAction } from "@/lib/camera-dock";
 import { galleryMultiple, openSystemCamera, supportsSystemCapture } from "@/lib/system-camera";
 import { cn } from "@/lib/utils";
-import { useProId } from "@/lib/use-pro-id";
+import { useGuest, useProId } from "@/lib/use-pro-id";
 import { useLab } from "@/models/lab-store";
 import { splitLocation } from "@/views/SimulationGrid";
 import aiLogo from "@/assets/ai-logo.png";
@@ -89,7 +89,9 @@ export function CameraSheet() {
   const navigate = useNavigate();
   const proId = useProId();
   const lab = useLab();
-  const kind: Kind | null = proId ? (proId.kind === "funzionario" ? "urban" : "vineyard") : null;
+  // A guest (no profile) shoots for the simulation in view, the piazza elsewhere.
+  const guest = useGuest() && !proId;
+  const kind: Kind | null = proId ? (proId.kind === "funzionario" ? "urban" : "vineyard") : guest ? kindOf(pathname) ?? "urban" : null;
   const page = kind === "urban" ? "/urbano" : "/vigneto";
   const here = kind !== null && kindOf(pathname) === kind;
   const place = kind ? splitLocation((kind === "urban" ? lab.urban : lab.vineyard).location.label).name : "";
@@ -221,7 +223,7 @@ export function CameraSheet() {
         <span className="mx-auto -mt-1 h-1.5 w-10 rounded-full bg-foreground/20 sm:hidden" aria-hidden="true" />
         <DialogHeader className="text-left">
           <DialogTitle>Fotocamera</DialogTitle>
-          <DialogDescription>{kind ? (kind === "urban" ? "Foto e video della tua piazza" : "Foto e video del tuo vigneto") : "Per scattare, dicci chi sei"}</DialogDescription>
+          <DialogDescription>{kind ? (guest ? (kind === "urban" ? "Foto e video della piazza" : "Foto e video del vigneto") : kind === "urban" ? "Foto e video della tua piazza" : "Foto e video del tuo vigneto") : "Per scattare, dicci chi sei"}</DialogDescription>
         </DialogHeader>
         {!kind ? (
           <>

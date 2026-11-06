@@ -11,7 +11,7 @@ import { TwinMascot } from "@/views/TwinMascot";
 import { NavigationArrows } from "@/views/navigation-arrows";
 import { THEME_DARK, THEME_META } from "@/views/theme-toggle";
 import { introSeen, markIntroSeen } from "@/lib/intro-seen";
-import { useProId } from "@/lib/use-pro-id";
+import { enterAsGuest, useProId } from "@/lib/use-pro-id";
 import { proSummary, type ProKind } from "@/models/professional-id";
 import { IdentifyForm, profileIntro } from "@/views/v10/Identify";
 
@@ -357,6 +357,11 @@ export function Choice() {
           })}
         </div>
         <div className="mt-auto flex flex-col items-stretch gap-1 pt-10">
+          {!proId && (
+            <Link to="/benvenuto" onClick={() => enterAsGuest()} className="inline-flex h-12 items-center justify-center gap-2 rounded-full text-[15px] font-semibold text-foreground outline-none ring-1 ring-foreground/20 hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-ring">
+              Entra come ospite<ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
+          )}
           <Link to="/benvenuto" className="inline-flex h-12 items-center justify-center rounded-full text-sm font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">Salta, vai al benvenuto</Link>
         </div>
       </section>

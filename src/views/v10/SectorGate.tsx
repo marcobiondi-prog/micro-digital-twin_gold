@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, Building2, Grape, LogIn } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, Grape, LogIn, UserRound } from "lucide-react";
 import { openAccount } from "@/lib/camera-dock";
 import { introSeen } from "@/lib/intro-seen";
-import { clearSectorGate, saveProId, useLastProId, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
+import { clearSectorGate, enterAsGuest, saveProId, useGuest, useLastProId, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
 import { proSummary } from "@/models/professional-id";
 import { toast } from "sonner";
 import { useSignedIn } from "@/lib/use-signed-in";
@@ -37,7 +37,9 @@ export function SectorGate() {
   useEffect(() => setSeen(introSeen()), [pathname]);
   // Asked for by name (leaving a profile or the account, the account panel's rows): shown on any page, on that form.
   const ask = useSectorGateAsk();
-  const shown = id === null && seen && (shownOn(pathname) || ask.at > 0);
+  // A guest passes it (until asked for by name, e.g. from the account panel's identification rows).
+  const guest = useGuest();
+  const shown = id === null && seen && ((shownOn(pathname) && !guest) || ask.at > 0);
   // Signing in to an account that had a profile brings it back: the page goes away and that simulation opens on Mappa.
   const wasShown = useRef(false);
   useEffect(() => {
@@ -111,7 +113,7 @@ function SectorPage({ start }: { start: ProKind | null }) {
           <>
             <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-foreground/60">Micro Digital <span className="text-brand-turquoise">Twin</span></p>
             <h1 className="font-display text-[3.2rem] font-extralight leading-[0.95] tracking-tight sm:text-7xl">Da dove<br />vuoi usarmi?</h1>
-            <p className="max-w-xs text-[15px] leading-relaxed text-foreground/60">Scegli il tuo settore e identificati: si apre la tua simulazione. Un settore alla volta.</p>
+            <p className="max-w-xs text-[15px] leading-relaxed text-foreground/60">Scegli il tuo settore e identificati: si apre la tua simulazione.</p>
             <div role="radiogroup" aria-label="Settore" className="mt-4 space-y-3">
               {SECTORS.map((s) => (
                 <button key={s.kind} type="button" role="radio" aria-checked={false} onClick={() => { hapticTick(); setKind(s.kind); document.querySelector('[aria-label="Da dove vuoi usarmi?"]')?.scrollTo({ top: 0 }); }}
@@ -126,7 +128,15 @@ function SectorPage({ start }: { start: ProKind | null }) {
                 </button>
               ))}
             </div>
-            <div className="mt-auto pt-4">{signIn}</div>
+            <div className="mt-auto space-y-3 pt-4">
+              {signIn}
+              <button type="button" onClick={() => { hapticTick(); enterAsGuest(); toast("Sei entrato come ospite", { description: "Prova la piazza e il vigneto. Quando vuoi, identificati dal tuo account." }); }}
+                className="flex w-full items-center gap-3 rounded-3xl px-5 py-4 text-left outline-none ring-1 ring-foreground/15 transition-colors hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-ring">
+                <UserRound className="size-5 shrink-0 text-foreground/70" aria-hidden="true" />
+                <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Entra come ospite</span><span className="block text-xs text-foreground/60">Prova la piazza e il vigneto senza identificarti.</span></span>
+                <ArrowRight className="size-4 shrink-0 text-foreground/60" aria-hidden="true" />
+              </button>
+            </div>
           </>
         )}
       </section>
