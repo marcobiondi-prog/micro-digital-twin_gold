@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SensorAdvisor } from "@/views/SensorAdvisor";
 import { MySensors } from "@/views/v10/MySensors";
+import { GuestLock, useGuestOnly } from "@/views/v10/ProfileGate";
 import { LabMedia } from "@/views/LabMedia";
 import { splitLocation } from "@/views/SimulationGrid";
 import { UrbanThermometer } from "@/views/v9c/UrbanThermometer";
@@ -40,7 +41,7 @@ export function UrbanFlow() {
       <SimShell kind="urban" place={place.name} onReset={resetUrban}
         simula={<UrbanThermometer onImportWeather={importRealWeather} />}
         media={<LabMedia embedded kind="urban" context={`Alberi ${trees} · aiuole e ciottoli ${permeable}% · ombra ${shade}%`} />}
-        sensori={<div className="space-y-4"><SensorAdvisor embedded kind="urban" /><MySensors kind="urban" /></div>} />
+        sensori={<GuestSensors kind="urban" />} />
     </div>
   );
 }
@@ -75,10 +76,17 @@ export function VineyardFlow() {
       <SimShell kind="vineyard" place={place} onReset={resetVineyard} onSend={() => setSend(true)}
         simula={<VineThirst onImportWeather={importRealWeather} />}
         media={<LabMedia embedded kind="vineyard" context={`${vineyard.allZones ? "Tutte le zone" : `Zona ${vineyard.selected + 1}`} · ${vineyard.phase}`} />}
-        sensori={<div className="space-y-4"><SensorAdvisor embedded kind="vineyard" /><MySensors kind="vineyard" /></div>} />
+        sensori={<GuestSensors kind="vineyard" />} />
       <Dialog open={send} onOpenChange={setSend}>
         <DialogContent><DialogHeader><DialogTitle>Inviare i dati all’agronomo?</DialogTitle></DialogHeader><p className="text-sm text-muted-foreground">Verranno condivisi i dati delle tre zone e gli interventi scelti. L’invio è dimostrativo.</p><DialogFooter><Button variant="secondary" onClick={() => setSend(false)}>Annulla</Button><Button className="bg-vine hover:bg-vine/90" onClick={() => { setSend(false); toast.success("Dati inviati all’agronomo"); }}>Invia</Button></DialogFooter></DialogContent>
       </Dialog>
     </div>
   );
+}
+
+/** Sensori AI: the suggestions and the user's own sensors; a guest sees the lock. */
+function GuestSensors({ kind }: { kind: "urban" | "vineyard" }) {
+  const guest = useGuestOnly();
+  if (guest) return <GuestLock title="Sensori AI" line="Dove mettere i sensori e i tuoi sensori si usano dopo esserti identificato." />;
+  return <div className="space-y-4"><SensorAdvisor embedded kind={kind} /><MySensors kind={kind} /></div>;
 }

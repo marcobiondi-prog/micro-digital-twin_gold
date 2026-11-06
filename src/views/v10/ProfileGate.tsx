@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Building2, Grape, Lock, UserRound } from "lucide-react";
-import { useGuest, useProId } from "@/lib/use-pro-id";
+import { openSectorGate, useGuest, useProId } from "@/lib/use-pro-id";
 import { KIND_LABEL, SECTION_KIND, SECTION_LABEL, proSummary, unlocks, type Section } from "@/models/professional-id";
 import { toast } from "sonner";
 import { Ambient, PageHero, TabRow, openSimTab } from "@/views/v8/console";
@@ -14,6 +14,34 @@ const WHO: Record<Section, { title: string; who: string; how: string }> = {
   urban: { title: "Piazza", who: "La simulazione della piazza è per i funzionari del Comune.", how: "Ti identifichi con il tuo Comune, l'ufficio di appartenenza e l'email del Comune." },
   vineyard: { title: "Vigneto", who: "La simulazione del vigneto è per i conduttori del vigneto.", how: "Ti identifichi con nome e regione; il numero del patentino fitosanitario è facoltativo." },
 };
+
+/** True for a guest: entered without a professional profile (simulations open, saving, sensors and sending locked). */
+export function useGuestOnly(): boolean {
+  const id = useProId();
+  return useGuest() && id === null;
+}
+
+/**
+ * What a guest cannot use (the history saved, Sensori AI, Esporta report, Invia il progetto): a lock, what it is and
+ * the way to identify — the sector page, straight on its form.
+ */
+export function GuestLock({ title, line, className }: { title: string; line: string; className?: string }) {
+  return (
+    <div className={cn("space-y-3 rounded-3xl bg-foreground/[0.05] p-5", className)}>
+      <div className="flex items-start gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-foreground/[0.08]"><Lock className="size-5" aria-hidden="true" /></span>
+        <div className="min-w-0">
+          <p className="text-base font-semibold">{title} <span className="ml-1 rounded-full bg-foreground/[0.08] px-2 py-0.5 align-[2px] text-[11px] font-semibold text-muted-foreground">non per gli ospiti</span></p>
+          <p className="text-sm text-muted-foreground">{line}</p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => openSectorGate("funzionario")} className="inline-flex h-10 items-center gap-2 rounded-full bg-foreground px-4 text-sm font-semibold text-background outline-none focus-visible:ring-2 focus-visible:ring-ring"><Building2 className="size-4" aria-hidden="true" />Identificati come funzionario</button>
+        <button type="button" onClick={() => openSectorGate("agronomo")} className="inline-flex h-10 items-center gap-2 rounded-full bg-foreground/[0.08] px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"><Grape className="size-4" aria-hidden="true" />Come conduttore</button>
+      </div>
+    </div>
+  );
+}
 
 /** Whether this section is open to the profile in use (undefined while the page is not yet on the phone). */
 export function useSectionOpen(section: Section): boolean | undefined {

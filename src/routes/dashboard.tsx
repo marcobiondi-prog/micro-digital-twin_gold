@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { z } from "zod";
 import { useTabSwipe } from "@/lib/use-tab-swipe";
-import { SectionLockCard, useSectionOpen } from "@/views/v10/ProfileGate";
+import { SectionLockCard, useGuestOnly, useSectionOpen } from "@/views/v10/ProfileGate";
 import { HistoryBlock } from "@/views/v10/HistoryBlock";
 import { ProfileIcon } from "@/views/ProfileIcon";
 import { useProId } from "@/lib/use-pro-id";
@@ -901,13 +901,14 @@ function Dashboard() {
   const swipe = useTabSwipe(["Piazza", "Vigneto"] as const, t, setT, own ? noSwipe : undefined);
   const loading = useDashboardLoading(t);
   // Each project shows only to its profile (the piazza to the municipal officer, the vineyard to the agronomist).
+  const guestOnly = useGuestOnly();
   const sectionOpen = useSectionOpen(t === "Piazza" ? "urban" : "vineyard") !== false;
   return (
     <div className="min-w-0">
       <Ambient tone={t === "Piazza" ? "rgb(28 112 210 / 0.38)" : "rgb(150 36 110 / 0.38)"} />
       <LabSyncIndicator />
       {/* v8: a big thin title with the report on the right, then the PS pills. */}
-      <PageHero title="Dashboard" actions={sectionOpen ? <ExportReport ctx={t === "Piazza" ? "Urbano" : "Vitivinicolo"} /> : undefined} />
+      <PageHero title="Dashboard" actions={sectionOpen && !guestOnly ? <ExportReport ctx={t === "Piazza" ? "Urbano" : "Vitivinicolo"} /> : undefined} />
       {proId ? (
         // Identified: in the place of the tabs, who the dashboard is for, leading to the profile page.
         <Link to="/profilo" className="mb-5 mt-3 flex min-w-0 items-center gap-3 rounded-3xl bg-foreground/[0.05] px-4 py-3 outline-none hover:bg-foreground/[0.08] focus-visible:ring-2 focus-visible:ring-ring sm:mb-6">

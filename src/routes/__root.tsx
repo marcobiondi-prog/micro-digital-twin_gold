@@ -19,7 +19,7 @@ import { syncAppOrientation } from "@/lib/ar-orientation";
 import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
 import { installUiClicks } from "@/lib/ui-sounds";
 import { isChunkError, reloadFresh } from "@/router";
-import { History, Building2, Grape, Info, LayoutDashboard, Lock } from "lucide-react";
+import { History, Building2, Grape, Info, LayoutDashboard, Lock, UserRound } from "lucide-react";
 import { getProId, useGuest, useProId, useSyncProId } from "@/lib/use-pro-id";
 import { useSyncMediaArchive } from "@/models/media-archive";
 import { useSyncHistoryArchive } from "@/models/history-archive";
@@ -128,7 +128,9 @@ const nav: ReadonlyArray<{ to: "/benvenuto" | "/urbano" | "/vigneto" | "/dashboa
   { to: "/dashboard", l: "Dashboard" },
 ];
 /** The desktop pills follow the bottom bar: the locked section gives its place to Profilo once a profile is identified. */
-const navFor = (id: ProId | null | undefined) => {
+const navFor = (id: ProId | null | undefined, guest = false) => {
+  // A guest (no profile, both simulations open, nothing saved) has its badge where Benvenuto was.
+  if (guest && !id) return nav.map((n) => (n.to === "/benvenuto" ? { to: "/profilo" as const, l: "Ospite" } : n));
   if (!id) return nav;
   const locked = id.kind === "agronomo" ? "/urbano" : "/vigneto";
   return nav.map((n) => (n.to === locked ? { to: "/profilo" as const, l: id.kind === "agronomo" ? "Profilo conduttore" : "Profilo funzionario" } : n));
@@ -149,7 +151,8 @@ const bottomItems: readonly NavItem[] = [
  * agronomist's leaf badge where Urbano was, the municipal officer's town-hall badge where Vigneto was; it opens that
  * profile's page (/profilo). With no profile both sections stay, locked.
  */
-function itemsFor(id: ProId | null | undefined): readonly NavItem[] {
+function itemsFor(id: ProId | null | undefined, guest = false): readonly NavItem[] {
+  if (guest && !id) return bottomItems.map((b) => (b.to === "/benvenuto" ? { to: "/profilo", l: "Ospite", I: UserRound } : b));
   if (!id) return bottomItems;
   const locked = id.kind === "agronomo" ? "/urbano" : "/vigneto";
   return bottomItems.map((b) => (b.to === locked ? { to: "/profilo", l: id.kind === "agronomo" ? "Conduttore" : "Funzionario", I: KIND_ICON[id.kind] } : b));
@@ -260,7 +263,7 @@ function BottomNav() {
   }, [pathname]);
   // A new page always starts with the bar up.
   useEffect(() => setHidden(false), [pathname]);
-  const items = itemsFor(proId);
+  const items = itemsFor(proId, guest);
   const item = ({ to, l, I }: NavItem, index: number) => {
     const active = pathname === to || ((pathname.startsWith("/cronologia") || pathname === "/archivio") && to === historyHome(pathname === "/archivio" ? "/archivio" : "/cronologia")) || (to === "/profilo" && isProfilePath(pathname));
     // Piazza and vineyard wear a small lock until the profile that opens them is identified.
@@ -268,7 +271,7 @@ function BottomNav() {
     const col = index < 2 ? index : index + 1, arc = ARC[col];
     return (
       <li key={to} style={arc ? { transform: `translateY(${arc.y}px) rotate(${arc.tilt}deg)` } : undefined}>
-        <Link to={to} replace={pathname !== "/"} aria-current={active ? "page" : undefined} aria-label={to === "/profilo" ? `Profilo ${l.toLowerCase()}` : locked ? `${l}, bloccato` : l}
+        <Link to={to} replace={pathname !== "/"} aria-current={active ? "page" : undefined} aria-label={to === "/profilo" ? (guest ? "Profilo ospite" : `Profilo ${l.toLowerCase()}`) : locked ? `${l}, bloccato` : l}
           onClick={(e) => {
             if (goHomeBack(e, to, pathname)) return;
             if (!active) return;
@@ -409,7 +412,7 @@ function SmartNav() {
             className="no-scrollbar min-w-0 touch-pan-x overflow-x-auto"
           >
             <div className="flex items-center gap-1">
-              {navFor(proId).map((n) => (
+              {navFor(proId, guest).map((n) => (
                 <Link key={n.to} to={n.to}
                   aria-current={pathname === n.to || (n.to === "/profilo" && isProfilePath(pathname)) ? "page" : undefined}
                   replace={pathname !== "/"}

@@ -8,6 +8,7 @@ import {
 } from "@/models/intervention-history";
 import { requestSimWhen } from "@/models/sim-when";
 import { setUrban, setVineyard } from "@/models/lab-store";
+import { getProId, isGuest } from "@/lib/use-pro-id";
 
 // The table comes from supabase/migrations (not in the generated types), like the other late tables.
 const table = () => (supabase as any).from("intervention_history");
@@ -18,6 +19,8 @@ const table = () => (supabase as any).from("intervention_history");
  */
 export async function addHistory(flow: HistoryFlow, text: string, place: string, mix: HistoryMix | null = null, when: HistoryWhen | null = null): Promise<void> {
   if (!text.trim()) return;
+  // A guest (no professional profile) simulates but saves nothing.
+  if (isGuest() && !getProId()) return;
   const entry = newEntry(flow, text, place, new Date(), mix, when);
   const { data } = await supabase.auth.getSession();
   if (!data.session) { addLocalHistory(entry); return; }
