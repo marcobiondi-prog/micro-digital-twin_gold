@@ -129,7 +129,7 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
         if (pt.kind === "lawn") continue;
       }
       // The beds on the pebbles: soft rounded flat beds of grass with a darker green edge and round flower spots
-      // (bedParts, thin slabs at 0,5–0,6 m, over the area's veil and the shadows, at most 24 beds so the view stays light).
+      // (bedParts: a grid of square beds like the 2D, at most 48).
       // On Google's ground model like every other shape, over the area's veil (0,35 m) and the shadows: laid on the
       // photographed mesh instead they wrapped over the real trees' crowns as green wedges.
       for (const p of bedParts(sim.data.patches.filter((x) => x.kind === "lawn").map((x) => x.ring)).parts) {
