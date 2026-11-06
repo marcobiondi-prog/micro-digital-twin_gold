@@ -560,97 +560,105 @@ export const BEDS_3D = { pebbles: "#c8b99c", stones: ["#efe8da", "#a39684", "#d9
 export const BED_H = { pebbleBase: 0.55, pebble: 0.58, grassBase: 0.6, grass: 0.65, flowerBase: 0.65, flower: 0.7 } as const;
 
 /**
- * Aiuole e ciottoli in 3D, drawn like the 2D pattern: beds of grass running north–south, 1,2 m wide, with 0,4 m pebble
- * paths between them — the paths are made of stones only (round pebbles in white, sand, grey and brown, packed), no
- * ground sheet under them — and small flowers scattered on the grass. Beds and paths are the patches cut into bands
- * (clipped to them, so they follow the patches' shape), the pieces of row strips stacked over the same band joined into
- * one; with `area` (the drawn outline) every piece is also kept inside it: a piece reaching past it is cut into 0,5 m
- * slices and only the slices wholly inside stay. The band pitch grows while there would be more than `maxBeds` beds,
- * so the view stays light. Fixed pseudo-random flowers and stones, the same on every device. Thin slabs (base > 0).
+ * Aiuole e ciottoli in 3D, drawn like the 2D pattern and following the outline traced: beds of grass 1,2 m wide with
+ * 0,4 m pebble paths between them run parallel to the longest side of the largest patch (a zone drawn by hand: its own
+ * main side; the automatic strips: their rows), cut exactly to the patches' outline — paths made of stones only (round
+ * pebbles in white, sand, grey and brown), no ground sheet — with small flowers scattered on the grass. The work is done
+ * in a local metre frame turned onto that side: the patches are cut into bands across it (clipped to them, so beds and
+ * paths follow every edge of the shape), the pieces of rows stacked over the same band joined into one; with `area`
+ * (the drawn outline) a piece reaching past it is cut into 0,5 m slices and only those wholly inside stay. The band pitch
+ * grows while there would be more than `maxBeds` beds. Fixed pseudo-random flowers and stones, the same on every device.
  */
 export function bedParts(patches: Ring[], maxBeds = 50, area?: Ring): { beds: Ring[]; parts: TreePart[] } {
   const rings = patches.filter((r) => r.length >= 3);
   if (!rings.length) return { beds: [], parts: [] };
-  const lats = rings.flat().map((p) => p[0]), lngs = rings.flat().map((p) => p[1]);
-  const minLat = Math.min(...lats), maxLat = Math.max(...lats), minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
-  const kLng = 111_320 * Math.cos((((minLat + maxLat) / 2) * Math.PI) / 180);
-  const widthM = (maxLng - minLng) * kLng;
+  const f = frameOf(rings.flat());
+  // The direction of the beds: the longest side of the largest patch.
+  const big = rings.reduce((m, r) => (ringAreaM2(r) > ringAreaM2(m) ? r : m), rings[0]!).map((p) => toXY(f, p));
+  let ang = Math.PI / 2, best = -1;
+  big.forEach((p, i) => { const q = big[(i + 1) % big.length]!, d = dist(p, q); if (d > best) { best = d; ang = Math.atan2(q[1] - p[1], q[0] - p[0]); } });
+  const cs = Math.cos(ang), sn = Math.sin(ang);
+  // [u, v]: u along the beds, v across them; and back to lat/lng.
+  const toUV = (p: LatLng): LatLng => { const [x, y] = toXY(f, p); return [x * cs + y * sn, -x * sn + y * cs]; };
+  const fromUV = ([u, v]: LatLng): LatLng => toLL(f, u * cs - v * sn, u * sn + v * cs);
+  const uvRings = rings.map((r) => r.map(toUV));
+  const us = uvRings.flat().map((p) => p[0]), vs = uvRings.flat().map((p) => p[1]);
+  const u0 = Math.min(...us) - 1, u1 = Math.max(...us) + 1, v0 = Math.min(...vs), v1 = Math.max(...vs);
   const inArea = (p: LatLng) => !area || area.length < 3 || ringContains(area, p[0], p[1]);
+  const uvInside = (r: LatLng[]) => r.every((p) => inArea(fromUV(p)));
   type R4 = { lo: number; hi: number; a: number; b: number };
-  const rect = (r: R4): Ring => [[r.lo, r.a], [r.lo, r.b], [r.hi, r.b], [r.hi, r.a]];
-  // A rectangle kept inside the drawn area: whole when its corners are, else its 0,5 m slices that are.
+  const rect = (r: R4): LatLng[] => [[r.lo, r.a], [r.lo, r.b], [r.hi, r.b], [r.hi, r.a]];
   const keepInside = (r: R4): R4[] => {
-    if (rect(r).every(inArea)) return [r];
-    const step = 0.5 / 111_320, out: R4[] = [];
-    for (let lo = r.lo; lo < r.hi - 1e-9; lo += step) {
-      const hi = Math.min(r.hi, lo + step), sl = { ...r, lo, hi };
-      if (!rect(sl).every(inArea)) continue;
+    if (uvInside(rect(r))) return [r];
+    const out: R4[] = [];
+    for (let lo = r.lo; lo < r.hi - 1e-6; lo += 0.5) {
+      const hi = Math.min(r.hi, lo + 0.5), sl = { ...r, lo, hi };
+      if (!uvInside(rect(sl))) continue;
       const last = out[out.length - 1];
-      if (last && Math.abs(last.hi - lo) < 1e-9) last.hi = hi; else out.push(sl);
+      if (last && Math.abs(last.hi - lo) < 1e-6) last.hi = hi; else out.push(sl);
     }
     return out;
   };
-  /** The patches clipped to the lng band [w0, w1], row pieces joined, kept inside the area. */
-  const band = (w0: number, w1: number): Ring[] => {
-    const pieces = rings.map((r) => clipBox(r, minLat - 1, maxLat + 1, w0, w1)).filter((q) => q.length >= 3 && ringAreaM2(q) > 0.05);
-    const rects: R4[] = pieces.filter((q) => q.length === 4).map((q) => ({ lo: Math.min(...q.map((p) => p[0])), hi: Math.max(...q.map((p) => p[0])), a: Math.min(...q.map((p) => p[1])), b: Math.max(...q.map((p) => p[1])) })).sort((x, y) => x.lo - y.lo);
+  /** The patches clipped to the band v ∈ [w0, w1] (uv metres), row pieces joined, kept inside the area. */
+  const band = (w0: number, w1: number): LatLng[][] => {
+    if (w1 - w0 < 0.05) return [];
+    const pieces = uvRings.map((r) => clipBox(r, u0, u1, w0, w1)).filter((q) => q.length >= 3 && Math.abs(q.reduce((t, p, i) => { const n = q[(i + 1) % q.length]!; return t + p[0] * n[1] - n[0] * p[1]; }, 0)) / 2 > 0.05);
+    const isRect = (q: LatLng[]) => q.length === 4 && new Set(q.map((p) => p[0].toFixed(4))).size === 2 && new Set(q.map((p) => p[1].toFixed(4))).size === 2;
+    const rects: R4[] = pieces.filter(isRect).map((q) => ({ lo: Math.min(...q.map((p) => p[0])), hi: Math.max(...q.map((p) => p[0])), a: Math.min(...q.map((p) => p[1])), b: Math.max(...q.map((p) => p[1])) })).sort((x, y) => x.lo - y.lo);
     const merged: R4[] = [];
     for (const r of rects) {
       const last = merged[merged.length - 1];
-      if (last && Math.abs(last.hi - r.lo) < 1e-7 && Math.abs(last.a - r.a) < 1e-7 && Math.abs(last.b - r.b) < 1e-7) last.hi = r.hi;
+      if (last && Math.abs(last.hi - r.lo) < 1e-3 && Math.abs(last.a - r.a) < 1e-3 && Math.abs(last.b - r.b) < 1e-3) last.hi = r.hi;
       else merged.push({ ...r });
     }
-    return [...merged.flatMap(keepInside).map(rect), ...pieces.filter((q) => q.length !== 4 && q.every(inArea))];
+    return [...merged.flatMap(keepInside).map(rect), ...pieces.filter((q) => !isRect(q) && uvInside(q))];
   };
   const layout = (bed: number, path: number) => {
-    const pitch = bed + path, beds: Ring[] = [], paths: Ring[] = [];
-    const n = Math.max(1, Math.round((widthM + path) / pitch));
+    const pitch = bed + path, beds: LatLng[][] = [], paths: LatLng[][] = [];
+    const widthM = v1 - v0, n = Math.max(1, Math.round((widthM + path) / pitch));
     const off = (widthM - (n * pitch - path)) / 2;
-    // Paths before the first bed and after the last one too, wherever the patches reach.
-    paths.push(...band(minLng, minLng + Math.max(0, off) / kLng));
+    paths.push(...band(v0, v0 + Math.max(0, off)));
     for (let i = 0; i < n; i++) {
-      const w0 = minLng + (off + i * pitch) / kLng, w1 = w0 + bed / kLng;
-      beds.push(...band(w0, w1));
-      paths.push(...band(w1, i < n - 1 ? w1 + path / kLng : maxLng));
+      const w0 = v0 + off + i * pitch, w1 = w0 + bed;
+      beds.push(...band(Math.max(v0, w0), Math.min(v1, w1)));
+      paths.push(...band(w1, i < n - 1 ? w1 + path : v1));
     }
-    return { beds, paths };
+    return { beds, paths, path };
   };
   let bed = 1.2, path = 0.4, lay = layout(bed, path);
   for (let k = 0; lay.beds.length > maxBeds && k < 8; k++) { bed *= 1.3; path *= 1.15; lay = layout(bed, path); }
-  const { beds, paths } = lay;
   let seed = 11;
   const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  const inUV = (r: LatLng[], p: LatLng) => ringContains(r, p[0], p[1]);
+  const discUV = (c: LatLng, rad: number, n: number): LatLng[] => Array.from({ length: n }, (_, i) => [c[0] + Math.cos((2 * Math.PI * i) / n) * rad, c[1] + Math.sin((2 * Math.PI * i) / n) * rad] as LatLng);
+  const beds = lay.beds.map((r) => r.map(fromUV));
   const parts: TreePart[] = beds.map((ring, n) => ({ ring, base: BED_H.grassBase, height: BED_H.grass, color: BEDS_3D.grass[n % 2]! }));
-  // Pebbles along every path in staggered rows (about 0,25 m apart across it), spaced along it so there are at most 140
-  // in all (every 0,28 m on a small lawn), each whole inside its path.
-  const pathM2 = paths.reduce((t, r) => t + ringAreaM2(r), 0);
-  const along = Math.max(0.22, pathM2 / Math.max(0.3, path) / 140);
-  const dLat = along / 111_320, dLng = 0.25 / kLng;
+  // Pebbles along every path, in rows across it (a new row every 0,25 m), spaced along it so there are at most 140.
+  const pathLen = lay.paths.reduce((t, r) => t + Math.max(...r.map((p) => p[0])) - Math.min(...r.map((p) => p[0])), 0);
+  const along = Math.max(0.22, pathLen / 140);
   let stones = 0;
-  for (const r of paths) {
-    const la = r.map((p) => p[0]), ln = r.map((p) => p[1]);
-    const lo = Math.min(...la), hi = Math.max(...la), a = Math.min(...ln), b = Math.max(...ln);
-    const cols = Math.max(1, Math.floor((b - a) / dLng));
+  for (const r of lay.paths) {
+    const lo = Math.min(...r.map((p) => p[0])), hi = Math.max(...r.map((p) => p[0])), a = Math.min(...r.map((p) => p[1])), b = Math.max(...r.map((p) => p[1]));
+    const cols = Math.max(1, Math.floor((b - a) / 0.25));
     for (let ci = 0; ci < cols && stones < 140; ci++) {
-      const x = a + (b - a) * ((ci + 0.5) / cols);
-      for (let y = lo + dLat * (ci % 2 ? 0.75 : 0.25); y < hi && stones < 140; y += dLat) {
-        const disc = crownRing([y + (rnd() - 0.5) * dLat * 0.3, x], 0.09 + rnd() * 0.04, 7);
-        if (!disc.every(([la2, ln2]) => ringContains(r, la2, ln2))) continue;
-        parts.push({ ring: disc, base: BED_H.flowerBase, height: BED_H.flower, color: BEDS_3D.stones[(stones + Math.floor(rnd() * 3)) % BEDS_3D.stones.length]! });
+      const v = a + (b - a) * ((ci + 0.5) / cols);
+      for (let u = lo + along * (ci % 2 ? 0.75 : 0.25); u < hi && stones < 140; u += along) {
+        const disc = discUV([u + (rnd() - 0.5) * along * 0.3, v], 0.09 + rnd() * 0.04, 7);
+        if (!disc.every((p) => inUV(r, p))) continue;
+        parts.push({ ring: disc.map(fromUV), base: BED_H.flowerBase, height: BED_H.flower, color: BEDS_3D.stones[(stones + Math.floor(rnd() * 3)) % BEDS_3D.stones.length]! });
         stones++;
       }
     }
   }
   // Small flowers on the grass, a few per bed, at most 36 in all.
   let flowers = 0;
-  for (const [n, ring] of beds.entries()) {
-    const la = ring.map((p) => p[0]), ln = ring.map((p) => p[1]);
-    const want = Math.min(4, Math.max(1, Math.round(ringAreaM2(ring) / 8)));
+  for (const [n, r] of lay.beds.entries()) {
+    const lo = Math.min(...r.map((p) => p[0])), hi = Math.max(...r.map((p) => p[0])), a = Math.min(...r.map((p) => p[1])), b = Math.max(...r.map((p) => p[1]));
+    const want = Math.min(4, Math.max(1, Math.round(((hi - lo) * (b - a)) / 8)));
     for (let k = 0; k < want && flowers < 36; k++) {
-      const p: LatLng = [Math.min(...la) + rnd() * (Math.max(...la) - Math.min(...la)), Math.min(...ln) + rnd() * (Math.max(...ln) - Math.min(...ln))];
-      const disc = crownRing(p, 0.18 + rnd() * 0.07, 8);
-      if (!disc.every(([la2, ln2]) => ringContains(ring, la2, ln2))) continue;
-      parts.push({ ring: disc, base: BED_H.flowerBase, height: BED_H.flower, color: BEDS_3D.flowers[(n + k) % BEDS_3D.flowers.length]! });
+      const disc = discUV([lo + rnd() * (hi - lo), a + rnd() * (b - a)], 0.18 + rnd() * 0.07, 8);
+      if (!disc.every((p) => inUV(r, p))) continue;
+      parts.push({ ring: disc.map(fromUV), base: BED_H.flowerBase, height: BED_H.flower, color: BEDS_3D.flowers[(n + k) % BEDS_3D.flowers.length]! });
       flowers++;
     }
   }

@@ -96,6 +96,9 @@ export function simFeatures(sim: SimLayout | null, withTreePoints: boolean) {
     for (const p of sim.data.patches) if (p.kind === "lawn" || withTreePoints) out.push(poly(p.ring, p.kind === "lawn"
       ? { kind: "lawn", color: SIM_COLORS.lawn, opacity: 0.55 }
       : { kind: "shade", color: SIM_COLORS.shade, opacity: 0.9 }));
+    // In 2D the aiuole are the same beds as in 3D, laid along the outline traced (bedParts): grass strips, pebbles and
+    // flowers as shapes over a gravel ground, so they follow the zone's own direction and stay crisp at every zoom.
+    if (withTreePoints) for (const b of bedParts(sim.data.patches.filter((p) => p.kind === "lawn").map((p) => p.ring)).parts) out.push(poly(b.ring, { kind: "bed", color: b.color, opacity: 1 }));
     for (const r of sim.shadows ?? []) out.push(poly(r, { kind: "shadow", color: "#0b0f15", opacity: 0.32 }));
     // Misters: the mist they spread (a light blue veil about 3,5 m round) and, in 2D, the pole seen from above.
     for (const m of sim.data.misters) {
@@ -228,7 +231,7 @@ export function addSimLayers(map: MlMap, _lat: number, raised = false) {
   if (map.getSource(SIM_SOURCE)) return;
   const before = map.getLayer("drawn-area-line") ? "drawn-area-line" : undefined;
   map.addSource(SIM_SOURCE, { type: "geojson", data: fc([]) });
-  map.addLayer({ id: "sim-fill", type: "fill", source: SIM_SOURCE, filter: ["all", ["==", ["geometry-type"], "Polygon"], ["!=", ["get", "kind"], "shade"], ["!=", ["get", "kind"], "lawn"], ["!=", ["get", "kind"], "zone"], ["!=", ["get", "kind"], "treat"], ["!=", ["get", "kind"], "tint"], ["!=", ["get", "kind"], "shadow"]], paint: { "fill-color": ["get", "color"], "fill-opacity": ["get", "opacity"] } }, before);
+  map.addLayer({ id: "sim-fill", type: "fill", source: SIM_SOURCE, filter: ["all", ["==", ["geometry-type"], "Polygon"], ["!=", ["get", "kind"], "shade"], ["!=", ["get", "kind"], "lawn"], ["!=", ["get", "kind"], "zone"], ["!=", ["get", "kind"], "treat"], ["!=", ["get", "kind"], "tint"], ["!=", ["get", "kind"], "shadow"], ["!=", ["get", "kind"], "bed"]], paint: { "fill-color": ["get", "color"], "fill-opacity": ["get", "opacity"] } }, before);
   // The vineyard: rows of vines on soil tinted by each zone's thirst, a white seam around each zone, the shade nets.
   const thirstTints = [[0x6f, 0x8f, 0x4a], [0x9a, 0x85, 0x3c], [0x9c, 0x5a, 0x3a]] as const;
   VINE_IMAGES.forEach((id, i) => { if (!map.hasImage(id)) map.addImage(id, vineImage(thirstTints[i]!), { pixelRatio: 2 }); });
@@ -240,7 +243,11 @@ export function addSimLayers(map: MlMap, _lat: number, raised = false) {
   // The lawn: mowing stripes and blades of grass, without the hairlines between its row strips.
   if (!map.hasImage(LAWN_IMAGE)) map.addImage(LAWN_IMAGE, lawnImage(), { pixelRatio: 2 });
   // In 3D no ground plane for the lawn: the beds lie on the map's own ground (bedParts, raised); in 2D the beds-and-pebbles pattern.
-  if (!raised) map.addLayer({ id: "sim-lawn", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "lawn"], paint: { "fill-pattern": LAWN_IMAGE, "fill-opacity": 0.95, "fill-antialias": false } }, before);
+  // In 2D the lawn is the gravel ground under the beds (the beds, pebbles and flowers drawn over it as shapes).
+  if (!raised) {
+    map.addLayer({ id: "sim-lawn", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "lawn"], paint: { "fill-color": "#b9ab8f", "fill-opacity": 0.95 } }, before);
+    map.addLayer({ id: "sim-beds", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "bed"], paint: { "fill-color": ["get", "color"], "fill-opacity": 1 } }, before);
+  }
   // The shadows cast on the ground (over the lawn, under the pergolas and the trees), without seams where they overlap.
   map.addLayer({ id: "sim-shadow", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "shadow"], paint: { "fill-color": "#0b0f15", "fill-opacity": 0.32, "fill-antialias": false } }, before);
   // The pergolas seen from above: slats with light between them, and a wooden frame.
@@ -278,6 +285,7 @@ export function setSimGhost(map: MlMap, ghost: boolean) {
   const set = (layer: string, prop: string, value: unknown) => { if (map.getLayer(layer)) map.setPaintProperty(layer, prop as never, value as never); };
   set("sim-fill", "fill-opacity", ["*", ["get", "opacity"], k]);
   set("sim-lawn", "fill-opacity", 0.95 * k);
+  set("sim-beds", "fill-opacity", k);
   set("sim-pergola", "fill-opacity", 0.95 * k);
   set("sim-shadow", "fill-opacity", 0.32 * k);
   set("sim-pergola-frame", "line-opacity", k);

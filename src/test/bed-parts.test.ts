@@ -21,9 +21,26 @@ describe("aiuole e ciottoli in 3D, like the 2D pattern", () => {
     expect(parts.filter((p) => grass(p.color))).toHaveLength(beds.length);
     expect(parts.every((p) => p.height > p.base && p.base > 0)).toBe(true);
   });
-  it("joins the pieces of row strips stacked one on another into one bed per band", () => {
+  it("runs the beds along the longest side, across neighbouring row strips", () => {
     const rows = [box(12, 3, 0, 0), box(12, 3, 0, 3), box(12, 3, 0, 6)];
-    expect(bedParts(rows).beds).toHaveLength(8);
+    expect(bedParts(rows).beds).toHaveLength(6);
+  });
+  it("follows a zone traced at an angle: beds parallel to its long side and cut to its outline", () => {
+    const P = (x: number, y: number): [number, number] => [lat + y / 111_320, lng + x / k];
+    const c = Math.cos(Math.PI / 6), sn = Math.sin(Math.PI / 6);
+    const R = (x: number, y: number) => P(x * c - y * sn, x * sn + y * c);
+    const zone: Ring = [R(0, 0), R(20, 0), R(20, 8), R(0, 8)];
+    const { beds } = bedParts([zone]);
+    expect(beds.length).toBeGreaterThanOrEqual(4);
+    for (const b of beds) {
+      // Every corner inside the zone (a hair of tolerance on its edges).
+      for (const [a2, b2] of b) expect(ringContains([R(-0.05, -0.05), R(20.05, -0.05), R(20.05, 8.05), R(-0.05, 8.05)], a2, b2)).toBe(true);
+      // Long side at 30°, like the zone's.
+      const xs = b.map(([la, ln]) => [(ln - lng) * k, (la - lat) * 111_320] as const);
+      let best = 0, ang = 0;
+      xs.forEach((p, i) => { const q = xs[(i + 1) % xs.length]!; const d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (d > best) { best = d; ang = Math.atan2(q[1] - p[1], q[0] - p[0]); } });
+      expect(Math.abs(Math.sin(ang - Math.PI / 6))).toBeLessThan(0.02);
+    }
   });
   it("keeps the pieces few on a big lawn and is the same every time", () => {
     expect(bedParts([box(300, 40)]).beds.length).toBeLessThanOrEqual(50);
