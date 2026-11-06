@@ -11,11 +11,11 @@ import type { LayoutEdits } from "./area-layout";
  * off the costs), given one intervention (trees, lawn or pergola go there first) or a lot (a part of the project with
  * its own surface and share of the cost).
  */
-export type ZoneKind = "libera" | "alberi" | "prato" | "ombra" | "lotto";
+export type ZoneKind = "libera" | "alberi" | "prato" | "ombra" | "nebulizzatori" | "lotto";
 export type SubArea = { id: string; kind: ZoneKind; ring: Ring; name?: string };
-export const ZONE_LABEL: Record<ZoneKind, string> = { libera: "Da lasciare libera", alberi: "Alberi", prato: "Aiuole", ombra: "Pergolato", lotto: "Lotto" };
+export const ZONE_LABEL: Record<ZoneKind, string> = { libera: "Da lasciare libera", alberi: "Alberi", prato: "Aiuole", ombra: "Pergolato", nebulizzatori: "Nebulizzatori", lotto: "Lotto" };
 /** Which kinds each simulation offers: the vineyard has no trees, lawn or pergolas. */
-export const ZONE_KINDS = { piazza: ["libera", "alberi", "prato", "ombra", "lotto"], vigneto: ["libera", "lotto"] } as const;
+export const ZONE_KINDS = { piazza: ["libera", "alberi", "prato", "ombra", "nebulizzatori", "lotto"], vigneto: ["libera", "lotto"] } as const;
 
 /** `edits`: the simulation's elements moved by hand inside it (models/area-layout); a new outline starts them afresh. `zones`: the smaller areas inside it. */
 export type DrawnArea = { lat: number; lng: number; ring: Ring; edits?: LayoutEdits; zones?: SubArea[] };
@@ -89,8 +89,11 @@ export function zoneSummaryRows(area: DrawnArea | null | undefined, place: { lat
   return rows;
 }
 
-/** The piazza's levers: trees (count), lawn and shade (% of the usable surface). */
-export type PiazzaLevers = { trees: number; permeable: number; shade: number };
+/** The piazza's levers: trees (count), lawn and shade (% of the usable surface), misting poles (count). */
+export type PiazzaLevers = { trees: number; permeable: number; shade: number; misters: number };
+/** About one misting pole every 40 m² of a misters zone (its mist reaches 3,5 m round), 1 to 20. */
+export const M2_PER_MISTER = 40;
+const mistersFor = (m2: number) => (m2 > 0 ? Math.min(20, Math.max(1, Math.round(m2 / M2_PER_MISTER))) : 0);
 /** About one tree every 60 m² of a trees zone (crowns 4 m across, room between them). */
 export const M2_PER_TREE = 60;
 /**
@@ -103,7 +106,8 @@ export function leversOfZones(a: DrawnArea): PiazzaLevers {
   const m2 = (k: ZoneKind) => zones.filter((z) => z.kind === k).reduce((s, z) => s + pinsM2(z.ring), 0);
   const pct = (k: ZoneKind) => (usable > 0 ? Math.min(100, Math.round((100 * m2(k)) / usable)) : 0);
   const trees = zones.filter((z) => z.kind === "alberi").reduce((s, z) => s + Math.max(1, Math.round(pinsM2(z.ring) / M2_PER_TREE)), 0);
-  return { trees: Math.min(30, trees), permeable: pct("prato"), shade: pct("ombra") };
+  const misters = zones.filter((z) => z.kind === "nebulizzatori").reduce((s, z) => s + mistersFor(pinsM2(z.ring)), 0);
+  return { trees: Math.min(30, trees), permeable: pct("prato"), shade: pct("ombra"), misters: Math.min(20, misters) };
 }
 
 /**
@@ -122,6 +126,7 @@ export function leversForZones(a: DrawnArea, now: PiazzaLevers, only?: ReadonlyS
     trees: Math.max(now.trees, treesM2 > 0 ? Math.min(30, Math.max(1, Math.round(treesM2 / M2_PER_TREE))) : 0),
     permeable: Math.max(now.permeable, pct("prato")),
     shade: Math.max(now.shade, pct("ombra")),
+    misters: Math.max(now.misters, mistersFor(m2("nebulizzatori"))),
   };
-  return next.trees === now.trees && next.permeable === now.permeable && next.shade === now.shade ? null : next;
+  return next.trees === now.trees && next.permeable === now.permeable && next.shade === now.shade && next.misters === now.misters ? null : next;
 }

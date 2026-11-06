@@ -33,7 +33,7 @@ export function densify<T extends { lat: number; lng: number }>(pts: T[], stepM:
 }
 
 /** The ring clipped to an axis-aligned box (Sutherland–Hodgman), in lat/lng. */
-function clipBox(ring: LL[], minLat: number, maxLat: number, minLng: number, maxLng: number): LL[] {
+export function clipBox(ring: LL[], minLat: number, maxLat: number, minLng: number, maxLng: number): LL[] {
   let poly = ring;
   const edges: Array<[(p: LL) => boolean, (a: LL, b: LL) => LL]> = [
     [(p) => p[0] >= minLat, (a, b) => { const t = (minLat - a[0]) / (b[0] - a[0]); return [minLat, a[1] + (b[1] - a[1]) * t]; }],
