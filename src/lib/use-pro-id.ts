@@ -140,6 +140,40 @@ export async function keepProIdInAccount(): Promise<void> {
  * Mounted once: on sign-in the account's profile comes to this device, or this device's goes to an account without one;
  * on sign-out the profile leaves this device (kept in the account for the next sign-in).
  */
+/**
+ * Once per account (pro_checked): a profile in use that the account never worked with — a municipal officer's on an
+ * account whose history is all vineyard, or the reverse — came from this device, not from the account (an older
+ * sign-in took the device's profile). When a profile of the kind the account did work with is known (the account's
+ * own registered ones first, then this device's), it is put back with a toast; without one, the sector page opens on
+ * that kind's form.
+ */
+async function checkKind(inUse: ProId, meta: unknown) {
+  if ((meta as { pro_checked?: unknown } | null)?.pro_checked === true) return;
+  const { data, error } = await (supabase as unknown as { from: (t: string) => { select: (c: string) => { limit: (n: number) => Promise<{ data: Array<{ flow: string }> | null; error: unknown }> } } })
+    .from("intervention_history").select("flow").limit(1000);
+  if (error || !data) return;
+  const piazza = data.filter((r) => r.flow === "piazza").length, vigneto = data.filter((r) => r.flow === "vigneto").length;
+  const worked: ProKind | null = vigneto > 0 && piazza === 0 ? "agronomo" : piazza > 0 && vigneto === 0 ? "funzionario" : null;
+  const done = () => supabase.auth.updateUser({ data: { pro_checked: true } }).catch(() => undefined);
+  if (!worked || worked === inUse.kind) { void done(); return; }
+  const prev = (meta as { pro_last?: Record<string, unknown> } | null)?.pro_last?.[worked];
+  const right = isProId(prev) && prev.kind === worked ? prev : lastSnap()[worked] ?? null;
+  if (right) {
+    await saveProId(right);
+    void done();
+    toast(`Ho rimesso il tuo profilo: ${right.name}`, { description: worked === "agronomo" ? "Il tuo account ha sempre lavorato sul vigneto." : "Il tuo account ha sempre lavorato sulla piazza." });
+    return;
+  }
+  // No profile of that kind is known: the wrong one leaves the account (in use and registered) and the sector page
+  // opens on the right form.
+  const own = { ...((meta as { pro_last?: Record<string, unknown> } | null)?.pro_last ?? {}) };
+  delete own[inUse.kind];
+  set(null);
+  void supabase.auth.updateUser({ data: { pro_id: null, pro_last: own, pro_checked: true } }).catch(() => undefined);
+  openSectorGate(worked);
+  toast(worked === "agronomo" ? "Il tuo account ha sempre lavorato sul vigneto" : "Il tuo account ha sempre lavorato sulla piazza", { description: "Identificati di nuovo: ci vuole un minuto." });
+}
+
 export function useSyncProId() {
   useEffect(() => {
     const adopt = (meta: unknown) => {
@@ -147,7 +181,7 @@ export function useSyncProId() {
       const prev = (meta as { pro_last?: Record<string, unknown> } | null)?.pro_last;
       if (prev && typeof prev === "object") for (const k of ["agronomo", "funzionario"] as const) { const p = prev[k]; if (isProId(p) && p.kind === k && !lastSnap()[k]) keepLast(p); }
       const saved = (meta as { pro_id?: unknown } | null)?.pro_id;
-      if (isProId(saved)) { set(saved); return; }
+      if (isProId(saved)) { set(saved); void checkKind(saved, meta); return; }
       // What the account itself registered (never the profiles this device met before signing in, which can be someone
       // else's or a guest's try): the most recent of them comes back by itself.
       const own = (["agronomo", "funzionario"] as const).map((k) => (prev as Record<string, unknown> | undefined)?.[k]).filter((p): p is ProId => isProId(p));
