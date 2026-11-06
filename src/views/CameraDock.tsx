@@ -229,7 +229,7 @@ export function CameraSheet() {
           <>
             <div className="grid grid-cols-2 gap-2">
               <LockedSection icon={Building2} label="Piazza" hint="Per i funzionari del Comune" tone="bg-urban" onClick={() => identify("/identificazione/funzionario")} />
-              <LockedSection icon={Grape} label="Vigneto" hint="Per i conduttori del vigneto" tone="bg-vine" onClick={() => identify("/identificazione/agronomo")} />
+              <LockedSection icon={Grape} label="Vigneto" hint="Per chi lavora nel settore agricolo" tone="bg-vine" onClick={() => identify("/identificazione/agronomo")} />
             </div>
             <p className="text-center text-xs text-muted-foreground">Tocca una sezione per identificarti: ci vuole un minuto.</p>
           </>

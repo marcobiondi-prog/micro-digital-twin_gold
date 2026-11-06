@@ -2,6 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { IdentifyPage } from "@/views/v10/Identify";
 
 export const Route = createFileRoute("/identificazione/agronomo")({
-  head: () => ({ meta: [{ title: "MICRO DIGITAL TWIN — Identificazione conduttore" }] }),
+  head: () => ({ meta: [{ title: "MICRO DIGITAL TWIN — Identificazione agricoltore" }] }),
   component: () => <IdentifyPage kind="agronomo" />,
 });

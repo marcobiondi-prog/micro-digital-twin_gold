@@ -60,7 +60,7 @@ function GuestCard() {
           <span className="grid size-12 shrink-0 place-items-center rounded-full bg-foreground/[0.08]"><UserRound className="size-6" aria-hidden="true" /></span>
           <div className="min-w-0">
             <p className="text-lg font-semibold">Sei entrato come ospite</p>
-            <p className="text-sm text-muted-foreground">Né funzionario né conduttore: usi l'app, ma non tutta.</p>
+            <p className="text-sm text-muted-foreground">Né funzionario né agricoltore: usi l'app, ma non tutta.</p>
           </div>
         </div>
         <div className="rounded-2xl bg-foreground/[0.04] p-4">

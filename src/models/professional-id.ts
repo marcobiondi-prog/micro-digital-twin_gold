@@ -22,7 +22,7 @@ export type ProId = AgronomoId | FunzionarioId;
 /** Which profile opens which section. */
 export const SECTION_KIND: Record<Section, ProKind> = { urban: "funzionario", vineyard: "agronomo" };
 export const KIND_SECTION: Record<ProKind, Section> = { funzionario: "urban", agronomo: "vineyard" };
-export const KIND_LABEL: Record<ProKind, string> = { agronomo: "Conduttore del vigneto", funzionario: "Funzionario comunale" };
+export const KIND_LABEL: Record<ProKind, string> = { agronomo: "Agricoltore", funzionario: "Funzionario comunale" };
 export const SECTION_LABEL: Record<Section, string> = { urban: "piazza", vineyard: "vigneto" };
 
 export const unlocks = (id: ProId | null | undefined, section: Section): boolean => id?.kind === SECTION_KIND[section];
@@ -126,7 +126,7 @@ export function isProId(v: unknown): v is ProId {
   return false;
 }
 
-/** One line saying who is identified: "Conduttore del vigneto · patentino CB/1234 (Molise)", "Funzionario comunale · Comune di Campobasso, Ufficio tecnico". */
+/** One line saying who is identified: "Agricoltore · patentino CB/1234 (Molise)", "Funzionario comunale · Comune di Campobasso, Ufficio tecnico". */
 export function proSummary(id: ProId): string {
   return id.kind === "agronomo"
     ? id.licence ? `${KIND_LABEL.agronomo} · patentino ${id.licence} (${id.region})` : `${KIND_LABEL.agronomo} · ${id.region}`

@@ -12,7 +12,7 @@ export const SECTION_TONE: Record<Section, string> = { urban: "rgb(28 112 210 / 
 const IDENTIFY_PATH = { urban: "/identificazione/funzionario", vineyard: "/identificazione/agronomo" } as const;
 const WHO: Record<Section, { title: string; who: string; how: string }> = {
   urban: { title: "Piazza", who: "La simulazione della piazza è per i funzionari del Comune.", how: "Ti identifichi con il tuo Comune, l'ufficio di appartenenza e l'email del Comune." },
-  vineyard: { title: "Vigneto", who: "La simulazione del vigneto è per i conduttori del vigneto.", how: "Ti identifichi con nome e regione; il numero del patentino fitosanitario è facoltativo." },
+  vineyard: { title: "Vigneto", who: "La simulazione del vigneto è per chi lavora nel settore agricolo.", how: "Ti identifichi con nome e regione; il numero del patentino fitosanitario è facoltativo." },
 };
 
 /** True for a guest: entered without a professional profile (simulations open, saving, sensors and sending locked). */
@@ -37,7 +37,7 @@ export function GuestLock({ title, line, className }: { title: string; line: str
       </div>
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => openSectorGate("funzionario")} className="inline-flex h-10 items-center gap-2 rounded-full bg-foreground px-4 text-sm font-semibold text-background outline-none focus-visible:ring-2 focus-visible:ring-ring"><Building2 className="size-4" aria-hidden="true" />Identificati come funzionario</button>
-        <button type="button" onClick={() => openSectorGate("agronomo")} className="inline-flex h-10 items-center gap-2 rounded-full bg-foreground/[0.08] px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"><Grape className="size-4" aria-hidden="true" />Come conduttore</button>
+        <button type="button" onClick={() => openSectorGate("agronomo")} className="inline-flex h-10 items-center gap-2 rounded-full bg-foreground/[0.08] px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"><Grape className="size-4" aria-hidden="true" />Come agricoltore</button>
       </div>
     </div>
   );

@@ -43,7 +43,7 @@ function Declare({ checked, onChange, error }: { checked: boolean; onChange: (v:
 }
 
 const PAGE: Record<ProKind, { title: string; section: "urban" | "vineyard"; opens: string; locks: string; go: "/urbano" | "/vigneto"; intro: string }> = {
-  agronomo: { title: "Conduttore", section: "vineyard", opens: "il vigneto", locks: "la piazza", go: "/vigneto",
+  agronomo: { title: "Agricoltore", section: "vineyard", opens: "il vigneto", locks: "la piazza", go: "/vigneto",
     intro: "Con il patentino fitosanitario si apre la simulazione del vigneto." },
   funzionario: { title: "Funzionario comunale", section: "urban", opens: "la piazza", locks: "il vigneto", go: "/urbano",
     intro: "Con il tuo Comune, l'ufficio di appartenenza e l'email del Comune si apre la simulazione della piazza." },
