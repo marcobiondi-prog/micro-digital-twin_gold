@@ -1,3 +1,4 @@
+import { getGoogleUsage } from "./google-usage";
 import { useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -186,7 +187,8 @@ export async function refreshMedia(k: MediaKind) {
 /** The cloud space each account has for its photos and videos: uploads stop there. */
 export const CLOUD_QUOTA = 50 * 1024 ** 3;
 /** Bytes the account's files take now (both projects, as listed). */
-export const cloudUsed = () => [...state.urban, ...state.vineyard].reduce((s, m) => s + (m.path ? m.size || 0 : 0), 0);
+/** The cloud space in use: the account's photos and videos plus what its Google account already holds (models/google-usage). */
+export const cloudUsed = () => [...state.urban, ...state.vineyard].reduce((s, m) => s + (m.path ? m.size || 0 : 0), 0) + (getGoogleUsage()?.bytes ?? 0);
 /** Whether this many more bytes still fit in the account's space. */
 export const fitsInCloud = (bytes: number, reserved = 0) => cloudUsed() + reserved + bytes <= CLOUD_QUOTA;
 

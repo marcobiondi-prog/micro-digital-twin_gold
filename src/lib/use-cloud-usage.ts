@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+import { getGoogleUsage, subscribeGoogleUsage } from "@/models/google-usage";
 import { CLOUD_QUOTA, currentMedia, useLabMedia } from "@/models/lab-media-store";
 
 export { CLOUD_QUOTA };
@@ -13,15 +14,19 @@ export function bytesText(n: number): string {
 }
 
 /**
- * The account's cloud space in use: the photos and videos stored in the account (both projects), out of 50 GB.
+ * The account's cloud space in use: the photos and videos stored in the account (both projects) plus the space its
+ * Google account already uses (signed in with Google), out of 50 GB.
  * The device's own files (a guest's, or kept offline) do not count until they are uploaded.
  */
 export function useCloudUsage(enabled: boolean) {
   const urban = useLabMedia("urban"), vineyard = useLabMedia("vineyard");
   useEffect(() => { if (enabled) { void currentMedia("urban"); void currentMedia("vineyard"); } }, [enabled]);
   const inCloud = [...urban, ...vineyard].filter((m) => m.path);
-  const used = inCloud.reduce((s, m) => s + (m.size || 0), 0);
-  return { used, quota: CLOUD_QUOTA, share: Math.min(1, used / CLOUD_QUOTA), files: inCloud.length };
+  const media = inCloud.reduce((s, m) => s + (m.size || 0), 0);
+  // What the Google account already holds (Gmail, Drive, Photos) counts in the same 50 GB, when signed in with Google.
+  const google = useSyncExternalStore(subscribeGoogleUsage, () => getGoogleUsage()?.bytes ?? 0, () => 0);
+  const used = media + google;
+  return { used, media, google, quota: CLOUD_QUOTA, share: Math.min(1, used / CLOUD_QUOTA), files: inCloud.length };
 }
 
 /** The colour of the space in use: turquoise, amber past 80 %, red past 95 %. */

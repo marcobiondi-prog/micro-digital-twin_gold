@@ -1,3 +1,4 @@
+import { GOOGLE_USAGE_SCOPE } from "@/models/google-usage";
 import { keepProIdInAccount, openSectorGate, saveProId, useProId } from "@/lib/use-pro-id";
 import { DeviceCacheCard } from "@/views/v10/DeviceCache";
 import { getMedia, removeMedia, useLabMedia } from "@/models/lab-media-store";
@@ -95,7 +96,7 @@ function StorageRing({ share }: { share: number }) {
 }
 
 /** In the account panel: the cloud space as a bar, how much is used of 50 GB and how much is left. */
-function StorageBar({ used, share }: { used: number; share: number; files: number }) {
+function StorageBar({ used, share, google = 0 }: { used: number; share: number; files: number; google?: number }) {
   const pct = share * 100;
   // The profile's project only: the piazza for the municipal officer, the vineyard for the agronomist; both without one.
   const proId = useProId();
@@ -141,6 +142,7 @@ function StorageBar({ used, share }: { used: number; share: number; files: numbe
       <p className="mt-2 text-xs text-muted-foreground">
         {files === 1 ? "1 foto o video" : `${files} foto e video`} {ofWhat} nel tuo account · liberi {bytesText(Math.max(0, CLOUD_QUOTA - used))}
       </p>
+      {google > 0 && <p className="mt-0.5 text-xs text-muted-foreground">Comprende {bytesText(google)} già usati nel tuo account Google (posta, file e foto).</p>}
       {share >= 0.95 && (
         <p className="mt-1.5 text-xs font-semibold" style={{ color: usageTone(share) }} role="status">
           {CLOUD_QUOTA - used < 50 * 1024 ** 2 ? "Spazio esaurito: i nuovi file restano sul telefono finché non elimini qualche foto o video." : "Quasi pieno: oltre i 50 GB i nuovi file restano sul telefono."}
@@ -369,7 +371,7 @@ export function AccountControl() {
     try {
       // Remember the current section so the post-login reload stays here.
       sessionStorage.setItem("mdt-auth-return", window.location.pathname + window.location.search);
-      const result = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin + window.location.pathname } });
+      const result = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin + window.location.pathname, scopes: GOOGLE_USAGE_SCOPE } });
       if (result.error) setNotice(result.error.message);
     } catch { setNotice("Accesso Google non disponibile. Riprova."); }
     finally { setPending(false); }
@@ -486,7 +488,7 @@ export function AccountControl() {
                 <p className="text-sm font-semibold">{account.guest ? "Sessione ospite" : account.email}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{account.guest ? "Accesso di base su questo dispositivo. Non è un account e non salva dati online." : "Accesso effettuato"}</p>
               </div>
-              {cloudAccount && <StorageBar used={usage.used} share={usage.share} files={usage.files} />}
+              {cloudAccount && <StorageBar used={usage.used} share={usage.share} files={usage.files} google={usage.google} />}
               <DeviceCacheCard />
               {account.guest && <Button variant="outline" className="w-full" onClick={() => { sessionStorage.removeItem(guestKey); setAccount(null); changeMode("signup"); }}>Crea un account</Button>}
               {account && notice && <p role="status" className="text-sm text-muted-foreground">{notice}</p>}
