@@ -24,6 +24,10 @@ import { drawnAreaFor, freeM2, leversForZones, leversOfZones, lotsOf, MAX_PINS, 
 import type { Ring } from "@/models/place-area";
 import { openSimTab, type SimKind } from "@/views/v8/console";
 import { PlaceSearch } from "@/views/SimulationGrid";
+import { loadRealObjects } from "@/lib/real-objects-client";
+import { realCountText, type RealObject } from "@/models/real-objects";
+/** No objects found (a stable empty list, so the layout is not worked out again on every render). */
+const NO_REAL: RealObject[] = [];
 
 const OpenMap3D = lazy(() => import("@/views/v10/OpenMap3D").then((m) => ({ default: m.OpenMap3D })));
 const SatelliteMap2D = lazy(() => import("@/views/v10/SatelliteMap2D").then((m) => ({ default: m.SatelliteMap2D })));
@@ -107,21 +111,25 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   const [arranging, setArranging] = useState(false);
   useEffect(() => { if (!saved) setArranging(false); }, [saved]);
   const reading = usePiazzaReading(), rSeason = reading?.season, rHour = reading?.hour;
+  // What already stands in the drawn area (existing trees, fountains, buildings, monuments): the piazza's interventions keep off it.
+  const realKey = saved && kind === "urban" ? saved.ring.map(([a, b]) => `${a.toFixed(5)},${b.toFixed(5)}`).join(";") : "";
+  const realQ = useQuery({ queryKey: ["real-objects", realKey], queryFn: () => loadRealObjects(saved!.ring), enabled: !!realKey, staleTime: Infinity, retry: 1 });
+  const real = (realKey && realQ.data) || NO_REAL;
   const sim = useMemo<SimLayout | null>(() => {
     if (!saved) return null;
     const edits = saved.edits ?? {}, inner = zonesOfArea(saved);
     if (kind === "urban") {
-      const data = piazzaLayout(saved.ring, lab.urban.trees, lab.urban.permeable, lab.urban.shade, edits, inner, lab.urban.misters ?? 0);
+      const data = piazzaLayout(saved.ring, lab.urban.trees, lab.urban.permeable, lab.urban.shade, edits, inner, lab.urban.misters ?? 0, real.map((o) => o.ring));
       if (!data) return null;
       // The shadows with the sun of the simulation's season and hour (its "when" chip), on the area's place.
       const when = getSimWhen("urban"), season = rSeason ?? when?.season, hour = rHour ?? when?.hour;
       const sun = season !== undefined && hour !== undefined ? sunAt(saved.lat, saved.lng, season, hour, when?.minute ?? 0, when?.dst) : null;
-      return { kind: "piazza", data, inner, shadows: piazzaShadows(data, sun) };
+      return { kind: "piazza", data, inner, shadows: piazzaShadows(data, sun), real };
     }
     const v = lab.vineyard, fallback = vineMixOf(v);
     const data = vineLayout(saved.ring, v.zones.map((z) => zoneMixOf(z, fallback)), edits, inner);
     return data ? { kind: "vigneto", data, thirst: vineMetrics(v).results.map((r) => r.s), inner } : null;
-  }, [saved, kind, lab.urban, lab.vineyard, rSeason, rHour]);
+  }, [saved, kind, lab.urban, lab.vineyard, rSeason, rHour, real]);
   const setZones = (zones: SubArea[]) => {
     if (!saved) return;
     const area = { ...saved, zones };
@@ -487,6 +495,7 @@ function SimBar({ sim, when, arranging, edited, best, only, canOnly, onArrange, 
         {legend.map(([icon, text]) => <li key={text} className="inline-flex items-center gap-1.5">{icon}{text}</li>)}
       </ul>
       {sim.kind === "piazza" && <p className="text-sm text-muted-foreground">{shadowText(sim, when)}{roomText(sim.data)}</p>}
+      {sim.kind === "piazza" && (sim.real?.length ?? 0) > 0 && <p className="text-sm text-muted-foreground">Già nell'area: {realCountText(sim.real ?? [])}. Gli interventi non ci vanno sopra (contorni tratteggiati sulla mappa 2D).</p>}
       <p className="text-sm text-muted-foreground">{arranging
         ? sim.kind === "piazza" ? `Trascina gli alberi, o le etichette Aiuole e Ombra.${(sim.inner ?? []).length ? " Le etichette con ✥ spostano le tue zone con tutto quello che contengono; \"✥ Tutte le zone\" le sposta insieme." : ""}` : "Le etichette con ✥ spostano le tue zone; \"✥ Tutte le zone\" le sposta insieme."
         : only && sim.kind === "piazza"

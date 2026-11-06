@@ -139,16 +139,20 @@ const inZone = (f: Frame, zones: InnerZone[], kind: string) => {
 /**
  * The piazza inside the area: `trees` trees, `lawn` % of it lawn, `shade` % of it under shade, with the hand edits and
  * the smaller zones inside it: nothing goes in a zone left free (and its cells do not count); a "prato" or "ombra" zone
- * is lawn or pergola first, the rest of the lever's share placed automatically; with "alberi" zones the trees go in them.
+ * is lawn or pergola first, the rest of the lever's share placed automatically; with "alberi" zones the trees go in them;
+ * `real` (the objects already standing there) is kept clear of new trees, beds, pergolas and misting poles.
  */
 const exactRings = (zones: InnerZone[], kind: string, as: "lawn" | "shade"): Patch[] =>
   zones.filter((z) => z.kind === kind && z.ring.length >= 3).map((z) => ({ ring: z.ring, kind: as, exact: true }));
 
-export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: number, edits: LayoutEdits = {}, zones: InnerZone[] = [], misters = 0): PiazzaLayout | null {
+export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: number, edits: LayoutEdits = {}, zones: InnerZone[] = [], misters = 0, real: Ring[] = []): PiazzaLayout | null {
   if (ring.length < 3) return null;
   const grid = cellsOf(ring), { f, c, minX, maxX, minY, maxY } = grid;
   const isFree = inZone(f, zones, "libera"), isLawn = inZone(f, zones, "prato"), isShade = inZone(f, zones, "ombra"), isTrees = inZone(f, zones, "alberi"), isMist = inZone(f, zones, "nebulizzatori");
-  const cells = grid.cells.filter((x) => !isFree(x.x, x.y));
+  // What already stands there (models/real-objects: existing trees, fountains, buildings, monuments) is kept clear like a
+  // free zone, without changing the surface the costs count.
+  const isReal = inZone(f, real.filter((r) => r.length >= 3).map((r) => ({ kind: "real", ring: r })), "real");
+  const cells = grid.cells.filter((x) => !isFree(x.x, x.y) && !isReal(x.x, x.y));
   const mistZones = zones.filter((z) => z.kind === "nebulizzatori" && z.ring.length >= 3), mistCells = cells.filter((x) => isMist(x.x, x.y));
   if (!cells.length) return null;
   const cy = (minY + maxY) / 2;
@@ -208,7 +212,7 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
   const treeZones = zones.filter((z) => z.kind === "alberi" && z.ring.length >= 3);
   const n = only && !treeZones.length ? 0 : Math.max(0, Math.round(trees)), box = { minX, maxX, minY, maxY };
   const room = treeZones.length ? treeZones.reduce((s2, z) => s2 + ringAreaM2(z.ring), 0) : ringAreaM2(ring);
-  const allowed = (x: number, y: number) => !isFree(x, y) && (!treeZones.length || isTrees(x, y));
+  const allowed = (x: number, y: number) => !isFree(x, y) && !isReal(x, y) && (!treeZones.length || isTrees(x, y));
   const underShade = (x: number, y: number) => shadeCells.some((sc) => Math.abs(sc.x - x) <= c / 2 + 1 && Math.abs(sc.y - y) <= c / 2 + 1);
   const first = treeSpots(ring, f, n, box, allowed, room);
   let auto = first.spots;
@@ -232,7 +236,7 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
   // A tree moved by hand goes where it was put — even out of a trees zone — as long as its whole crown stays inside the
   // area and its trunk is not in a zone left free.
   const crown = Array.from({ length: 12 }, (_, i) => [Math.cos((i * Math.PI) / 6) * CROWN_REACH_M, Math.sin((i * Math.PI) / 6) * CROWN_REACH_M]);
-  const handFits = (x: number, y: number) => !isFree(x, y) && inside(ring, f, x, y) && crown.every(([dx, dy]) => inside(ring, f, x + dx!, y + dy!));
+  const handFits = (x: number, y: number) => !isFree(x, y) && !isReal(x, y) && inside(ring, f, x, y) && crown.every(([dx, dy]) => inside(ring, f, x + dx!, y + dy!));
   let room1: Array<[number, number]> | null = null;
   const keepInside = (p: LatLng): LatLng => {
     const [x, y] = toXY(f, p);
