@@ -309,18 +309,17 @@ export function vineLayout(ring: Ring, mixes: ZoneMix[], edits: LayoutEdits = {}
       const step = mix.irrigation >= 16 ? 1 : Math.max(1, Math.round(5 - mix.irrigation / 5));
       const rows = new Map<number, Cell[]>();
       for (const cell of mine) rows.set(cell.j, [...(rows.get(cell.j) ?? []), cell]);
-      const fed: number[] = [];
+      // The main pipe runs along the zone's own western edge, row by row (so it bends with an outline that bends, and
+      // never leaves the area): through the west end of every row of the zone, the fed ones joined to it.
+      const ends: Array<[number, number]> = [];
       for (const [j, row] of [...rows].sort((a, b) => a[0] - b[0])) {
-        if (j % step) continue;
         const x0 = Math.min(...row.map((r) => r.x)) - c / 2.5, x1 = Math.max(...row.map((r) => r.x)) + c / 2.5;
+        ends.push([x0, row[0]!.y]);
+        if (j % step) continue;
         lines.push({ kind: "drip", zone: z, line: [toLL(f, x0, row[0]!.y), toLL(f, x1, row[0]!.y)] });
-        fed.push(row[0]!.y);
       }
-      if (fed.length) {
-        const west = Math.min(...mine.map((x) => x.x)) - c / 2.5;
-        const y0 = Math.min(...fed), y1 = Math.max(...fed);
-        lines.push({ kind: "main", zone: z, line: y1 - y0 > 0.5 ? [toLL(f, west, y0), toLL(f, west, y1)] : [toLL(f, west, y0 - c / 3), toLL(f, west, y0 + c / 3)] });
-      }
+      if (ends.length > 1) lines.push({ kind: "main", zone: z, line: ends.map(([x, y]) => toLL(f, x, y)) });
+      else if (ends.length === 1) { const [x, y] = ends[0]!; lines.push({ kind: "main", zone: z, line: [toLL(f, x, y - c / 3), toLL(f, x, y + c / 3)] }); }
     }
   }
   // Seams between neighbouring zones (white in the maps): on every row, a short line where one zone ends and the next begins.
