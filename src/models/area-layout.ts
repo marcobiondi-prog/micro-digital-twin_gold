@@ -569,14 +569,15 @@ export const BED_H = { pebbleBase: 0.55, pebble: 0.58, grassBase: 0.6, grass: 0.
  * (the drawn outline) a piece reaching past it is cut into 0,5 m slices and only those wholly inside stay. The band pitch
  * grows while there would be more than `maxBeds` beds. Fixed pseudo-random flowers and stones, the same on every device.
  */
-/** The sods (zolle) of the aiuole: paths and gaps 0,25 m wide, sods about 1,5 m long, pebbles 15–21 cm packed in rows. */
-export const SOD = { path: 0.25, length: 1.5, stone: 0.075, stoneVar: 0.03, stoneRow: 0.22, stoneStep: 0.19 } as const;
+/** The sods (zolle) of the aiuole: in 2D paths and gaps 0,25 m wide (opts.gap), in 3D a hairline 5 cm (gap3d, too thin
+ * for pebbles, so the sods read as one lawn barely parted); sods about 1,5 m long, pebbles 15–21 cm packed in rows. */
+export const SOD = { path: 0.25, gap3d: 0.05, length: 1.5, stone: 0.075, stoneVar: 0.03, stoneRow: 0.22, stoneStep: 0.19 } as const;
 /**
  * `opts.bedM`: the beds' width in metres (paths a third of it, stones and flowers in proportion) — the 2D map asks for
- * a fixed width on screen, so the stripes keep their size at every zoom; `detail` shrinks the pebbles and flowers
+ * a fixed width on screen, so the stripes keep their size at every zoom; `gap`: the paths and gaps between sods in metres (SOD.gap3d when not given); `detail` shrinks the pebbles and flowers
  * against the beds (pebbles packed closer, more rows on a path); `maxStones` / `maxFlowers` cap the small parts.
  */
-export function bedParts(patches: Ring[], maxBeds = 50, area?: Ring, opts: { bedM?: number; detail?: number; maxStones?: number; maxFlowers?: number; maxSods?: number } = {}): { beds: Ring[]; parts: TreePart[] } {
+export function bedParts(patches: Ring[], maxBeds = 50, area?: Ring, opts: { bedM?: number; detail?: number; maxStones?: number; maxFlowers?: number; maxSods?: number; gap?: number } = {}): { beds: Ring[]; parts: TreePart[] } {
   const sc = (opts.bedM ?? 1.2) / 1.2, d = opts.detail ?? 1, maxStones = opts.maxStones ?? 520, maxSods = opts.maxSods ?? 120, maxFlowers = opts.maxFlowers ?? 36;
   const rings = patches.filter((r) => r.length >= 3);
   if (!rings.length) return { beds: [], parts: [] };
@@ -637,7 +638,7 @@ export function bedParts(patches: Ring[], maxBeds = 50, area?: Ring, opts: { bed
     }
     return { beds, paths, path };
   };
-  let bed = 1.2 * sc, path = SOD.path * sc, lay = layout(bed, path);
+  let bed = 1.2 * sc, path = (opts.gap ?? SOD.gap3d) * sc, lay = layout(bed, path);
   for (let k = 0; lay.beds.length > maxBeds && k < 8; k++) { bed *= 1.3; path *= 1.15; lay = layout(bed, path); }
   // Each bed cut across into sods (zolle) about SOD.length long, with a pebble gap as wide as the paths between them;
   // the sods get longer while there would be more than maxSods.

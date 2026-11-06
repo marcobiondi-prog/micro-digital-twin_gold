@@ -1,7 +1,7 @@
 import type { Map as MlMap, GeoJSONSource } from "maplibre-gl";
 import type { Ring } from "@/models/place-area";
 import { ZONE_LABEL, type SubArea, type ZoneKind } from "@/models/drawn-area";
-import { bedParts, BEDS_3D, crownRing, trapParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
+import { bedParts, BEDS_3D, SOD, crownRing, trapParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
 
 /** The drawn area on a maplibre map: a turquoise fill and a white outline, from a ring of [lat, lng] pins. */
 export const AREA_SOURCE = "drawn-area";
@@ -136,7 +136,7 @@ export function bedFeatures(sim: SimLayout | null, bedM: number) {
   const lawn = sim.data.patches.filter((p) => p.kind === "lawn").map((p) => p.ring);
   if (!lawn.length) return fc([]);
   const pxPerM = 10 / bedM, out: unknown[] = [];
-  for (const b of bedParts(lawn, 400, undefined, { bedM, maxStones: 6000, maxFlowers: 300, maxSods: 1500 }).parts) {
+  for (const b of bedParts(lawn, 400, undefined, { bedM, gap: SOD.path, maxStones: 6000, maxFlowers: 300, maxSods: 1500 }).parts) {
     if ((BEDS_3D.grass as readonly string[]).includes(b.color)) { out.push(poly(b.ring, { kind: "bed", color: b.color })); continue; }
     const [la, ln] = ringCentre(b.ring), r = Math.hypot((b.ring[0]![0] - la) * 111_320, (b.ring[0]![1] - ln) * 111_320 * Math.cos((la * Math.PI) / 180)) * pxPerM;
     const flower = (BEDS_3D.flowers as readonly string[]).includes(b.color);

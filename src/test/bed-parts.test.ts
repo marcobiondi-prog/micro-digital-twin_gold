@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bedParts, BEDS_3D } from "@/models/area-layout";
+import { bedParts, BEDS_3D, SOD } from "@/models/area-layout";
 import { ringContains, ringAreaM2, type Ring } from "@/models/place-area";
 
 const lat = 41.56, lng = 14.66, k = 111_320 * Math.cos((lat * Math.PI) / 180);
@@ -7,9 +7,16 @@ const box = (w: number, h: number, dx = 0, dy = 0): Ring => [[lat + dy / 111_320
 const grass = (c: string) => (BEDS_3D.grass as readonly string[]).includes(c);
 
 describe("aiuole e ciottoli in 3D, like the 2D pattern", () => {
-  it("lays a pebble ground and north–south beds of grass 1,2 m wide with 0,4 m of path between them", () => {
+  it("in 3D parts the sods by a hairline only, too thin for pebbles", () => {
     const patch = box(21, 12);
     const { beds, parts } = bedParts([patch]);
+    const green = beds.reduce((t, b) => t + ringAreaM2(b), 0);
+    expect(green / ringAreaM2(patch)).toBeGreaterThan(0.9);
+    expect(parts.filter((p) => (BEDS_3D.stones as readonly string[]).includes(p.color))).toHaveLength(0);
+  });
+  it("in 2D lays sods of grass 1,2 m wide with 0,25 m pebble paths between them", () => {
+    const patch = box(21, 12);
+    const { beds, parts } = bedParts([patch], 50, undefined, { gap: SOD.path });
     expect(beds.length).toBeGreaterThanOrEqual(8);
     for (const b of beds) for (const [a, c] of b) expect(ringContains(box(21.01, 12.01, -0.005, -0.005), a, c)).toBe(true);
     const green = beds.reduce((t, b) => t + ringAreaM2(b), 0);
