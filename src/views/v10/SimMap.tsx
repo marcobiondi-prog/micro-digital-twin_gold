@@ -50,7 +50,6 @@ function keepSeeded(seen: Set<string>) {
  * lay in it, updated live, the reading pill and day/night; no search, no drawing, no gestures — a tap opens Mappa.
  */
 export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boolean }) {
-  const { stickRef, stickTop } = usePreviewStick(preview);
   const lab = useLab();
   const loc = kind === "urban" ? lab.urban.location : lab.vineyard.location;
   const [name, ...rest] = loc.label.split(" · ");
@@ -201,9 +200,8 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
     else setEdits({ ...e, [m.part === "lawn" ? "lawnAt" : m.part === "shade" ? "shadeAt" : "windAt"]: m.at });
   };
   if (preview) return (
-    <button type="button" ref={stickRef} onClick={() => openSimTab(kind, "mappa")} aria-label="Apri la mappa: disegna l'area e sposta gli elementi"
-      style={stickTop == null ? undefined : { top: stickTop }}
-      className="sticky z-[5] -mx-4 block h-[34vh] backdrop-blur-xl min-h-56 w-[calc(100%+2rem)] overflow-hidden text-left outline-none focus-visible:ring-2 focus-visible:ring-ring sm:mx-0 sm:w-full sm:rounded-3xl">
+    <button type="button" onClick={() => openSimTab(kind, "mappa")} aria-label="Apri la mappa: disegna l'area e sposta gli elementi"
+      className="relative -mx-4 block h-[34vh] min-h-56 w-[calc(100%+2rem)] overflow-hidden text-left outline-none focus-visible:ring-2 focus-visible:ring-ring sm:mx-0 sm:w-full sm:rounded-3xl">
       <MapReading kind={kind} lat={pin.lat} lng={pin.lng} />
       {/* The map (and its night veil) fades out at its foot by a mask, so the page itself — its ambient light, in light
           or dark — shows through: a gradient to a fixed colour left a band of another blue under the map. */}
@@ -308,31 +306,6 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
       </>}
     </div>
   );
-}
-
-/**
- * The preview stops scrolling away once only its faded foot is left under the sticky tabs: it sticks there (a strip of
- * PREVIEW_STRIP px of map with the fade showing under the tabs), and the page goes on scrolling under it.
- */
-const PREVIEW_STRIP = 84;
-function usePreviewStick(on: boolean) {
-  const stickRef = useRef<HTMLButtonElement>(null);
-  const [stickTop, setStickTop] = useState<number | null>(null);
-  useEffect(() => {
-    if (!on) return;
-    const measure = () => {
-      const el = stickRef.current, tabs = document.querySelector("[data-sim-tabs]");
-      if (!el || !tabs) return;
-      const tabsH = tabs.getBoundingClientRect().height, navH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--nav-h")) || 0;
-      setStickTop(Math.round(navH + tabsH - el.offsetHeight + PREVIEW_STRIP));
-    };
-    measure();
-    window.addEventListener("resize", measure);
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
-    if (stickRef.current) ro?.observe(stickRef.current);
-    return () => { window.removeEventListener("resize", measure); ro?.disconnect(); };
-  }, [on]);
-  return { stickRef, stickTop };
 }
 
 /**
