@@ -1,5 +1,6 @@
 import type { Map as MlMap, GeoJSONSource } from "maplibre-gl";
-import type { Ring } from "@/models/place-area";
+import { ringContains, type Ring } from "@/models/place-area";
+import { clipBox } from "@/models/drape";
 import { ZONE_LABEL, type SubArea, type ZoneKind } from "@/models/drawn-area";
 import { bedParts, BEDS_3D, SOD, crownRing, trapParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
 
@@ -107,7 +108,7 @@ export function simFeatures(sim: SimLayout | null, withTreePoints: boolean) {
   } else {
     // Zones: rows of vines on soil tinted by their stress; treated rows (plant pests): a fine spray over them.
     for (const p of sim.data.patches) out.push(poly(p.ring, p.kind === "zone"
-      ? { kind: "zone", pattern: VINE_IMAGES[thirstStepOf(sim.thirst[p.zone ?? 0] ?? 0)], color: thirstColor(sim.thirst[p.zone ?? 0] ?? 0), opacity: 0.9 }
+      ? { kind: "zone", pattern: VINE_IMAGES[thirstStepOf(sim.thirst[p.zone ?? 0] ?? 0)], soil: VINE_SOIL[thirstStepOf(sim.thirst[p.zone ?? 0] ?? 0)], color: thirstColor(sim.thirst[p.zone ?? 0] ?? 0), opacity: 0.9 }
       : { kind: "treat", color: SIM_COLORS.treat, opacity: 0.85 }));
     // Each zone also gets a see-through veil of its thirst colour on top, so the three zones stand apart at a glance.
     for (const p of sim.data.patches) if (p.kind === "zone") out.push(poly(p.ring, { kind: "tint", color: thirstColor(sim.thirst[p.zone ?? 0] ?? 0), opacity: 0.3 }));
@@ -128,14 +129,64 @@ export function simFeatures(sim: SimLayout | null, withTreePoints: boolean) {
   return fc(out);
 }
 
+/** Metres → degrees at a latitude. */
+const M_LAT = 111_320;
+/**
+ * Thin strips across a ring at a fixed screen size: bands `width` metres wide every `pitch` metres, anchored on a world
+ * grid (so neighbouring row strips line up), north–south ("lng" bands) or east–west ("lat" bands), cut to the ring.
+ * The pitch grows while there would be more than `cap` strips.
+ */
+function strips(ring: Ring, axis: "lat" | "lng", pitch: number, width: number, cap: number): Ring[] {
+  if (ring.length < 3) return [];
+  const la = ring.map((p) => p[0]), ln = ring.map((p) => p[1]);
+  const kLng = M_LAT * Math.cos((((Math.min(...la) + Math.max(...la)) / 2) * Math.PI) / 180);
+  const k = axis === "lat" ? M_LAT : kLng, lo = axis === "lat" ? Math.min(...la) : Math.min(...ln), hi = axis === "lat" ? Math.max(...la) : Math.max(...ln);
+  let step = pitch / k, w = width / k;
+  while ((hi - lo) / step > cap) { step *= 1.5; w *= 1.5; }
+  const out: Ring[] = [];
+  for (let x = Math.floor(lo / step) * step; x < hi; x += step) {
+    const piece = axis === "lat" ? clipBox(ring, x, x + w, -180, 180) : clipBox(ring, -90, 90, x, x + w);
+    if (piece.length >= 3) out.push(piece as Ring);
+  }
+  return out;
+}
+/** Points on a world grid every `step` metres inside a ring (fewer, spaced wider, past `cap`). */
+function dotGrid(ring: Ring, step: number, cap: number): [number, number][] {
+  if (ring.length < 3) return [];
+  const la = ring.map((p) => p[0]), ln = ring.map((p) => p[1]);
+  const kLng = M_LAT * Math.cos((((Math.min(...la) + Math.max(...la)) / 2) * Math.PI) / 180);
+  const W = (Math.max(...ln) - Math.min(...ln)) * kLng, H = (Math.max(...la) - Math.min(...la)) * M_LAT;
+  let s = step;
+  while ((W / s) * (H / s) > cap) s *= 1.4;
+  const dLa = s / M_LAT, dLn = s / kLng, out: [number, number][] = [];
+  for (let a = Math.floor(Math.min(...la) / dLa) * dLa; a < Math.max(...la); a += dLa) {
+    // Every other row shifted half a step, so the droplets scatter instead of lining up.
+    const shift = Math.abs(Math.round(a / dLa)) % 2 ? dLn / 2 : 0;
+    for (let b = Math.floor(Math.min(...ln) / dLn) * dLn + shift; b < Math.max(...ln); b += dLn) if (ringContains(ring, a, b)) out.push([a, b]);
+  }
+  return out;
+}
+
 /** The 2D aiuole on their own light source, so a zoom redraws only them: the sods as shapes and the pebbles and
  * flowers as dots of a fixed size on screen (circle layer, radius in px), laid for a bed `bedM` metres wide. */
 export const SIM_BEDS = "sim-beds-src";
 export function bedFeatures(sim: SimLayout | null, bedM: number) {
-  if (!sim || sim.kind !== "piazza") return fc([]);
+  if (!sim) return fc([]);
+  const out: unknown[] = [], mPx = bedM / 10;
+  if (sim.kind !== "piazza") {
+    // The vineyard: rows of vines across each zone (a 2 px green row every 5 px) and the treated rows' droplets
+    // (a dot every 6 px), all a fixed size on screen.
+    for (const p of sim.data.patches) {
+      if (p.kind === "zone") for (const r of strips(p.ring, "lat", 5 * mPx, 2 * mPx, 2500)) out.push(poly(r, { kind: "vinerow" }));
+      else for (const d of dotGrid(p.ring, 6 * mPx, 2500)) out.push({ type: "Feature", properties: { kind: "spray" }, geometry: { type: "Point", coordinates: [d[1], d[0]] } });
+    }
+    return fc(out);
+  }
+  // The pergolas: their slats as dark 1 px gaps every 4 px, north–south, over the wood.
+  for (const p of sim.data.patches) if (p.kind === "shade") for (const r of strips(p.ring, "lng", 4 * mPx, 1 * mPx, 3000)) out.push(poly(r, { kind: "slat" }));
   const lawn = sim.data.patches.filter((p) => p.kind === "lawn").map((p) => p.ring);
-  if (!lawn.length) return fc([]);
-  const pxPerM = 10 / bedM, out: unknown[] = [];
+  if (!lawn.length) return fc(out);
+  const pxPerM = 10 / bedM;
   for (const b of bedParts(lawn, 400, undefined, { bedM, gap: SOD.path, maxStones: 6000, maxFlowers: 300, maxSods: 1500 }).parts) {
     if ((BEDS_3D.grass as readonly string[]).includes(b.color)) { out.push(poly(b.ring, { kind: "bed", color: b.color })); continue; }
     const [la, ln] = ringCentre(b.ring), r = Math.hypot((b.ring[0]![0] - la) * 111_320, (b.ring[0]![1] - ln) * 111_320 * Math.cos((la * Math.PI) / 180)) * pxPerM;
@@ -157,6 +208,8 @@ export const treeCrowns = (sim: SimLayout | null) => fc(!sim ? [] : (sim.kind ==
 /** The vineyard's 2D images: rows of vines on soil tinted by stress (three steps), the spray over treated rows. */
 export const VINE_IMAGES = ["vine-ok", "vine-watch", "vine-thirst"] as const;
 export const SPRAY_IMAGE = "treated-rows";
+/** The vineyard's soil in 2D by stress step (the rows are drawn over it as strips of a fixed size on screen). */
+const VINE_SOIL = ["#6f8f4a", "#9a853c", "#9c5a3a"] as const;
 const thirstStepOf = (s: number) => (s >= 65 ? 2 : s >= 35 ? 1 : 0);
 type Img = { width: number; height: number; data: Uint8Array };
 const blank = (w: number, h: number): Img => ({ width: w, height: h, data: new Uint8Array(w * h * 4) });
@@ -245,22 +298,26 @@ export function addSimLayers(map: MlMap, _lat: number, raised = false) {
   if (map.getSource(SIM_SOURCE)) return;
   const before = map.getLayer("drawn-area-line") ? "drawn-area-line" : undefined;
   map.addSource(SIM_SOURCE, { type: "geojson", data: fc([]) });
+  // In 2D every texture (vine rows, droplets, pergola slats, the aiuole) is drawn as shapes of a fixed size on screen on
+  // their own source, laid again on every zoom (setBedData): an image pattern grows up to 2× between whole zoom levels.
+  if (!raised) map.addSource(SIM_BEDS, { type: "geojson", data: fc([]) });
   map.addLayer({ id: "sim-fill", type: "fill", source: SIM_SOURCE, filter: ["all", ["==", ["geometry-type"], "Polygon"], ["!=", ["get", "kind"], "shade"], ["!=", ["get", "kind"], "lawn"], ["!=", ["get", "kind"], "zone"], ["!=", ["get", "kind"], "treat"], ["!=", ["get", "kind"], "tint"], ["!=", ["get", "kind"], "shadow"], ["!=", ["get", "kind"], "bed"]], paint: { "fill-color": ["get", "color"], "fill-opacity": ["get", "opacity"] } }, before);
   // The vineyard: rows of vines on soil tinted by each zone's thirst, a white seam around each zone, the shade nets.
   const thirstTints = [[0x6f, 0x8f, 0x4a], [0x9a, 0x85, 0x3c], [0x9c, 0x5a, 0x3a]] as const;
   VINE_IMAGES.forEach((id, i) => { if (!map.hasImage(id)) map.addImage(id, vineImage(thirstTints[i]!), { pixelRatio: 2 }); });
   if (!map.hasImage(SPRAY_IMAGE)) map.addImage(SPRAY_IMAGE, sprayImage(), { pixelRatio: 2 });
-  map.addLayer({ id: "sim-vine", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "zone"], paint: { "fill-pattern": ["get", "pattern"], "fill-opacity": 0.92, "fill-antialias": false } }, before);
+  map.addLayer({ id: "sim-vine", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "zone"], paint: raised ? { "fill-pattern": ["get", "pattern"], "fill-opacity": 0.92, "fill-antialias": false } : { "fill-color": ["get", "soil"], "fill-opacity": 0.92, "fill-antialias": false } }, before);
+  if (!raised) map.addLayer({ id: "sim-vinerows", type: "fill", source: SIM_BEDS, filter: ["==", ["get", "kind"], "vinerow"], paint: { "fill-color": "#2f6e2a", "fill-opacity": 0.95, "fill-antialias": false } }, before);
   // The veils over the zones, without seams between their row strips.
   map.addLayer({ id: "sim-tint", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "tint"], paint: { "fill-color": ["get", "color"], "fill-opacity": ["get", "opacity"], "fill-antialias": false } }, before);
-  map.addLayer({ id: "sim-net", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "treat"], paint: { "fill-pattern": SPRAY_IMAGE, "fill-opacity": 0.9, "fill-antialias": false } }, before);
+  if (raised) map.addLayer({ id: "sim-net", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "treat"], paint: { "fill-pattern": SPRAY_IMAGE, "fill-opacity": 0.9, "fill-antialias": false } }, before);
+  else map.addLayer({ id: "sim-spray", type: "circle", source: SIM_BEDS, filter: ["==", ["get", "kind"], "spray"], paint: { "circle-color": "#ccfbf1", "circle-radius": 1.1, "circle-stroke-color": "#5eead4", "circle-stroke-width": 0.6, "circle-opacity": 0.95 } }, before);
   // The lawn: mowing stripes and blades of grass, without the hairlines between its row strips.
   if (!map.hasImage(LAWN_IMAGE)) map.addImage(LAWN_IMAGE, lawnImage(), { pixelRatio: 2 });
   // In 3D no ground plane for the lawn: the beds lie on the map's own ground (bedParts, raised); in 2D the beds-and-pebbles pattern.
   // In 2D the lawn is the gravel ground under the beds (the beds, pebbles and flowers drawn over it as shapes).
   if (!raised) {
     map.addLayer({ id: "sim-lawn", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "lawn"], paint: { "fill-color": "#b9ab8f", "fill-opacity": 0.95 } }, before);
-    map.addSource(SIM_BEDS, { type: "geojson", data: fc([]) });
     map.addLayer({ id: "sim-beds", type: "fill", source: SIM_BEDS, filter: ["==", ["get", "kind"], "bed"], paint: { "fill-color": ["get", "color"], "fill-opacity": 1 } }, before);
     // Pebbles and flowers: dots of a fixed size on screen, so they never swell with the zoom.
     map.addLayer({ id: "sim-pebbles", type: "circle", source: SIM_BEDS, filter: ["==", ["get", "kind"], "dot"], paint: { "circle-color": ["get", "color"], "circle-radius": ["get", "r"], "circle-opacity": 1 } }, before);
@@ -269,7 +326,8 @@ export function addSimLayers(map: MlMap, _lat: number, raised = false) {
   map.addLayer({ id: "sim-shadow", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "shadow"], paint: { "fill-color": "#0b0f15", "fill-opacity": 0.32, "fill-antialias": false } }, before);
   // The pergolas seen from above: slats with light between them, and a wooden frame.
   if (!map.hasImage(SLATS_IMAGE)) map.addImage(SLATS_IMAGE, slatsImage(), { pixelRatio: 2 });
-  map.addLayer({ id: "sim-pergola", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "shade"], paint: { "fill-pattern": SLATS_IMAGE, "fill-opacity": 0.95 } }, before);
+  map.addLayer({ id: "sim-pergola", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "shade"], paint: raised ? { "fill-pattern": SLATS_IMAGE, "fill-opacity": 0.95 } : { "fill-color": PERGOLA_COLORS.slat, "fill-opacity": 0.95 } }, before);
+  if (!raised) map.addLayer({ id: "sim-slats", type: "fill", source: SIM_BEDS, filter: ["==", ["get", "kind"], "slat"], paint: { "fill-color": "#5a3b1c", "fill-opacity": 0.75, "fill-antialias": false } }, before);
   map.addLayer({ id: "sim-pergola-frame", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "shade"], paint: { "line-color": PERGOLA_COLORS.beam, "line-width": 1.5 } }, before);
   // Irrigation: the main pipe (a thick dark blue line with a light core) and the drip lines (a blue pipe with light
   // drippers along it, every ~1 m at street zoom, and a faint wet band on the soil under each).
@@ -311,6 +369,10 @@ export function setSimGhost(map: MlMap, ghost: boolean) {
   set("sim-vine", "fill-opacity", 0.92 * k);
   set("sim-tint", "fill-opacity", ["*", ["get", "opacity"], k]);
   set("sim-net", "fill-opacity", 0.9 * k);
+  set("sim-vinerows", "fill-opacity", 0.95 * k);
+  set("sim-spray", "circle-opacity", 0.95 * k);
+  set("sim-spray", "circle-stroke-opacity", k);
+  set("sim-slats", "fill-opacity", 0.75 * k);
   set("sim-drip-pipe", "line-opacity", k);
   set("sim-drip-dots", "line-opacity", k);
   set("sim-drip-wet", "line-opacity", 0.35 * k);
