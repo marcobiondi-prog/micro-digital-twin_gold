@@ -21,16 +21,17 @@ import { IdentifyForm, profileIntro } from "@/views/v10/Identify";
  * tutorial and ends on the choice; the "i" in the header shows the tutorial only and goes back where it was.
  */
 
-type Item = { id: "camera" | "urban" | "vine"; Icon: typeof Building2; name: string; desc: string; cta: string };
+type Item = { id: "camera" | "urban" | "vine"; Icon: typeof Building2; name: string; who: string; desc: string; cta: string };
+// The same two sectors as the sector page ("Da dove vuoi usarmi?"), then the AI camera.
 const items: Item[] = [
-  { id: "urban", Icon: Building2, name: "Sei un funzionario urbano?", cta: "Identificati come funzionario",
-    desc: "Ti identifichi con il Comune, l'ufficio e l'email del Comune: si apre la piazza, dove metti alberi, aiuole e ombra." },
-  { id: "vine", Icon: Grape, name: "Sei il conduttore di un vigneto?", cta: "Identificati come conduttore",
-    desc: "Ti identifichi con nome e regione (il patentino è facoltativo): si apre il vigneto, dove regoli acqua e difesa dai parassiti." },
-  // AI_STANDBY: in development, so nothing says what it will do.
+  { id: "urban", Icon: Building2, name: "Settore urbano", who: "Per i funzionari del Comune", cta: "Identificati come funzionario",
+    desc: "Si apre la piazza: alberi, aiuole e ombra contro il caldo." },
+  { id: "vine", Icon: Grape, name: "Settore agricolo", who: "Per i conduttori del vigneto", cta: "Identificati come conduttore",
+    desc: "Si apre il vigneto: acqua e difesa dai parassiti per le viti." },
+  // AI_STANDBY: in development, so nothing says what it will do, and it cannot be opened from here.
   AI_STANDBY
-    ? { id: "camera", Icon: ScanLine, name: "Fotocamera AI · in sviluppo", cta: "Apri la fotocamera", desc: "Non è ancora disponibile: arriverà con un prossimo aggiornamento. Intanto puoi scattare foto e video." }
-    : { id: "camera", Icon: ScanLine, name: "Fotocamera AI", cta: "Inizia con Fotocamera AI", desc: "Inquadra una pianta: riconosce la specie e il fresco che regala." },
+    ? { id: "camera", Icon: ScanLine, name: "Fotocamera AI", who: "Per tutti", cta: "", desc: "Non è ancora disponibile: arriverà con un prossimo aggiornamento." }
+    : { id: "camera", Icon: ScanLine, name: "Fotocamera AI", who: "Per tutti", cta: "Inizia con Fotocamera AI", desc: "Inquadra una pianta: riconosce la specie e il fresco che regala." },
 ];
 const KIND_OF = { urban: "funzionario", vine: "agronomo" } as const;
 
@@ -277,8 +278,8 @@ export function Tutorial() {
 }
 
 /**
- * The choice (/scegli): one big question, three numbered ways in — "Sei un funzionario urbano?", "Sei il conduttore di un vigneto?",
- * the AI camera — one white button and the way to the welcome page. The identification happens here: the white button
+ * The choice (/scegli): one big question and the sector page's cards — Settore urbano, Settore agricolo — plus the AI
+ * camera (shown "In sviluppo" and not tappable while AI_STANDBY), and the way to the welcome page. The identification happens here: the white button
  * of a profile shows its form in place, and once identified its simulation opens.
  */
 export function Choice() {
@@ -286,8 +287,6 @@ export function Choice() {
   useEffect(() => { markIntroSeen(); }, []);
   const navigate = useNavigate();
   const ai = useAiReadyHome();
-  const [sel, setSel] = useState(0);
-  const item = items[sel] ?? items[0]!;
   const proId = useProId();
   const [identify, setIdentify] = useState<ProKind | null>(null);
   const go = (it: Item) => void navigate({ to: it.id === "urban" ? "/urbano" : "/vigneto" });
@@ -297,9 +296,6 @@ export function Choice() {
     if (proId?.kind === KIND_OF[it.id]) go(it);
     else { setIdentify(KIND_OF[it.id]); window.scrollTo({ top: 0, behavior: "instant" }); }
   };
-  const ctaOf = (it: Item) => (it.id !== "camera" && proId?.kind === KIND_OF[it.id] ? `Entra ${it.id === "urban" ? "nella piazza" : "nel vigneto"}` : it.cta);
-  const rows = useRef<Array<HTMLButtonElement | null>>([]);
-  const pick = (i: number) => { if (i === sel) return; hapticTick(); setSel(i); };
   if (identify) {
     const it = items.find((x) => x.id !== "camera" && KIND_OF[x.id] === identify)!;
     return (
@@ -327,42 +323,40 @@ export function Choice() {
           <h2 aria-hidden="true" className="font-display text-[3.4rem] font-extralight leading-[0.95] tracking-tight text-foreground sm:text-7xl">Da dove<br />vuoi iniziare?</h2>
           <p className="mt-5 max-w-xs text-[15px] leading-relaxed text-foreground/60">Dicci chi sei: ti identifichi qui e si apre la tua simulazione. Un profilo alla volta.</p>
         </Reveal>
-        <div role="radiogroup" aria-label="Da dove vuoi iniziare" className="mt-10 space-y-1"
-          onKeyDown={(e) => {
-            const d = e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : e.key === "ArrowUp" || e.key === "ArrowLeft" ? -1 : 0;
-            if (!d) return;
-            e.preventDefault();
-            const n = (sel + d + items.length) % items.length;
-            pick(n); rows.current[n]?.focus();
-          }}>
-          {items.map((it, i) => {
-            const on = i === sel;
-            return (
-              <button key={it.id} ref={(el) => { rows.current[i] = el; }} type="button" role="radio" aria-checked={on} tabIndex={on ? 0 : -1}
-                onClick={() => (on ? open(it) : pick(i))}
-                className="group relative flex w-full items-start gap-5 py-3 pl-5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                {/* The chosen one carries a white line on its left edge, the others fade back. */}
-                <span className={`absolute left-0 top-3 w-[2px] rounded-full bg-foreground transition-all duration-300 motion-reduce:transition-none ${on ? "h-[calc(100%-1.5rem)] opacity-100" : "h-0 opacity-0"}`} aria-hidden="true" />
-                <span className={`font-mono text-sm tabular-nums transition-colors duration-300 ${on ? "text-foreground" : "text-foreground/35"}`}>0{i + 1}</span>
+        <div role="list" aria-label="Da dove vuoi iniziare" className="mt-10 space-y-3">
+          {items.map((it) => {
+            const off = it.id === "camera" && AI_STANDBY;
+            const mine = it.id !== "camera" && proId?.kind === KIND_OF[it.id];
+            const body = (
+              <>
+                {it.id === "camera" && ai && !off
+                  ? <img src={aiLogo} alt="" aria-hidden="true" className="size-8 shrink-0 rounded-lg bg-white p-1" />
+                  : <it.Icon className={`size-8 shrink-0 ${off ? "text-foreground/40" : "text-brand-turquoise"}`} strokeWidth={1.5} aria-hidden="true" />}
                 <span className="min-w-0 flex-1">
-                  <span className={`flex items-center gap-3 font-display text-[1.75rem] font-light leading-tight transition-colors duration-300 ${on ? "text-foreground" : "text-foreground/40 group-hover:text-foreground/70"}`}>
+                  <span className="flex flex-wrap items-center gap-2 text-xl font-semibold">
                     {it.name}
-                    {it.id === "camera" && ai ? <img src={aiLogo} alt="" aria-hidden="true" className={`size-6 rounded-md bg-white p-0.5 ${on ? "" : "opacity-50 grayscale"}`} /> : <it.Icon className="size-5 opacity-70" strokeWidth={1.5} aria-hidden="true" />}
+                    {off && <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-300 ring-1 ring-amber-300/30">In sviluppo</span>}
+                    {mine && <span className="rounded-full bg-brand-turquoise/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-turquoise">Il tuo profilo</span>}
                   </span>
-                  <span className={`grid transition-[grid-template-rows,opacity] duration-300 motion-reduce:transition-none ${on ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
-                    <span className="overflow-hidden text-[15px] leading-snug text-foreground/60"><span className="block pt-1">{it.desc}</span></span>
-                  </span>
+                  <span className="block text-sm text-foreground/70">{it.who}</span>
+                  <span className="mt-1 block text-xs text-foreground/55">{mine ? `Entra ${it.id === "urban" ? "nella piazza" : "nel vigneto"}: ${it.desc.replace(/^Si apre [^:]+: /, "")}` : it.desc}</span>
                 </span>
-              </button>
+                {!off && <ArrowRight className="size-5 shrink-0 text-foreground/60" aria-hidden="true" />}
+              </>
+            );
+            const card = "flex w-full items-center gap-4 rounded-3xl p-5 text-left ring-1";
+            return (
+              <div key={it.id} role="listitem">
+                {off
+                  // Not ready yet: shown, but it opens nothing.
+                  ? <div aria-disabled="true" className={`${card} bg-foreground/[0.04] text-foreground/60 ring-foreground/[0.06]`}>{body}</div>
+                  : <button type="button" onClick={() => { hapticTick(); open(it); }}
+                      className={`${card} bg-foreground/[0.07] outline-none ring-foreground/10 transition-colors hover:bg-foreground/[0.11] focus-visible:ring-2 focus-visible:ring-foreground`}>{body}</button>}
+              </div>
             );
           })}
         </div>
         <div className="mt-auto flex flex-col items-stretch gap-1 pt-10">
-          <button type="button" onClick={() => open(item)}
-            className="inline-flex h-14 items-center justify-between rounded-full bg-foreground pl-7 pr-2 text-base font-semibold text-background outline-none transition-transform focus-visible:ring-4 focus-visible:ring-ring/50 active:scale-[0.98] motion-reduce:active:scale-100">
-            <span>{ctaOf(item)}</span>
-            <span className="grid size-10 place-items-center rounded-full bg-background text-foreground"><ArrowRight className="size-5" aria-hidden="true" /></span>
-          </button>
           <Link to="/benvenuto" className="inline-flex h-12 items-center justify-center rounded-full text-sm font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">Salta, vai al benvenuto</Link>
         </div>
       </section>
