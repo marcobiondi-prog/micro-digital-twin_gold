@@ -292,7 +292,7 @@ function BottomNav() {
   const light = focusing ? (focusCol === null ? null : PS_LIGHT[focusCol]) : index < 0 ? null : PS_LIGHT[index < 2 ? index : index + 1];
   const caption = focusing ? (homeFocus === "camera" ? "Fotocamera AI" : homeFocus === "urban" ? "Urbano" : "Vigneto") : current?.l ?? "";
   return (
-    <nav aria-label="Menu principale" className={`ps-nav fixed inset-x-0 bottom-0 z-[999999998] transition-transform duration-300 motion-reduce:transition-none sm:hidden ${hidden ? "translate-y-[calc(100%-14px)]" : "translate-y-0"}`}>
+    <nav aria-label="Menu principale" className={`ps-nav fixed inset-x-0 bottom-0 z-[999999998] transition-transform duration-300 motion-reduce:transition-none sm:hidden ${hidden ? "translate-y-[calc(100%-3px)]" : "translate-y-0"}`}>
       {/* PlayStation-app slab: a frosted slate arch for the icons with a darker crescent laid over its foot; a straight light slides along the crescent's edge under the open page, whose name sits in the crescent; the AI camera rises in the middle. */}
       <div className="relative h-[108px]">
         <div className="ps-nav-glass pointer-events-none absolute inset-0" aria-hidden="true" />
