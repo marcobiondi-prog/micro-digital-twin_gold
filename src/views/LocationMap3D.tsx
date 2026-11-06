@@ -1,7 +1,7 @@
 import { isKeyRejected, loadGoogleMaps, onKeyRejected } from "@/lib/google-maps-js";
 import { densify, tileRing } from "@/models/drape";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { bedParts, BEDS_3D, crownRing, hedgeParts, netParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts } from "@/models/area-layout";
+import { bedParts, BEDS_3D, crownRing, hedgeParts, netParts, vineRowParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts } from "@/models/area-layout";
 import { MIST_RADIUS_M, SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, LoaderCircle, Minus, Move, Plus, RotateCcw, X } from "lucide-react";
 import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camera";
@@ -174,6 +174,8 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
       }
     } else if (sim?.kind === "vigneto") {
       for (const pt of sim.data.patches) if (pt.kind === "zone") ground(pt.ring, `${thirstColor(sim.thirst[pt.zone ?? 0] ?? 0)}59`);
+      // The vines in relief: a low green wall per row across each zone, standing on the ground (kept to 160 rows).
+      for (const p of vineRowParts(sim.data.patches.filter((x) => x.kind === "zone").map((x) => x.ring), 160, true)) part(p, p.height, "#2a5a22", 1);
       // The shade cloth: a see-through dark sheet on corner posts; the windbreak: a hedge along its edge.
       for (const p of sim.data.patches.filter((x) => x.kind === "cloth").flatMap((x) => netParts(x.ring, true))) part(p, p.height, "#0b1220", 2);
       for (const p of sim.data.lines.filter((l) => l.kind === "wind").flatMap((l) => hedgeParts(l.line, l.strength ?? 0))) part(p, p.height, "#1d4a1b", 1);

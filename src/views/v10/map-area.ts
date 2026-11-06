@@ -3,7 +3,7 @@ import { ringContains, type Ring } from "@/models/place-area";
 import type { RealObject } from "@/models/real-objects";
 import { clipBox } from "@/models/drape";
 import { ZONE_LABEL, type SubArea, type ZoneKind } from "@/models/drawn-area";
-import { bedParts, BEDS_3D, SOD, crownRing, hedgeParts, netParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
+import { bedParts, BEDS_3D, SOD, crownRing, hedgeParts, netParts, vineRowParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
 
 /** The drawn area on a maplibre map: a turquoise fill and a white outline, from a ring of [lat, lng] pins. */
 export const AREA_SOURCE = "drawn-area";
@@ -204,7 +204,7 @@ export const ringCentre = (ring: Ring): [number, number] => [ring.reduce((a, p) 
 /** What stands up in 3D: each tree and a wooden pergola over each shade strip; in the vineyard the hedge and the shade nets. */
 export const treeCrowns = (sim: SimLayout | null) => fc(!sim ? [] : (sim.kind === "piazza"
   ? [...bedParts(sim.data.patches.filter((p) => p.kind === "lawn").map((p) => p.ring)).parts.map((p) => ({ ...p, base: p.base - 0.55, height: p.height - 0.55 })), ...sim.data.misters.flatMap((m) => [{ ring: crownRing(m, 0.08, 6), base: 0, height: 3, color: "#cbd5e1" }, { ring: crownRing(m, 0.32, 10), base: 2.95, height: 3.08, color: "#f8fafc" }]), ...sim.data.trees.flatMap((t) => treeParts(t)), ...sim.data.patches.filter((p) => p.kind === "shade").flatMap((p) => (p.exact ? pergolaRingParts(p.ring) : pergolaParts(p.ring)))]
-  : [...sim.data.lines.filter((l) => l.kind === "wind").flatMap((l) => hedgeParts(l.line, l.strength ?? 0)), ...sim.data.patches.filter((p) => p.kind === "cloth").flatMap((p) => netParts(p.ring))]
+  : [...vineRowParts(sim.data.patches.filter((p) => p.kind === "zone").map((p) => p.ring), 400), ...sim.data.lines.filter((l) => l.kind === "wind").flatMap((l) => hedgeParts(l.line, l.strength ?? 0)), ...sim.data.patches.filter((p) => p.kind === "cloth").flatMap((p) => netParts(p.ring))]
 ).map((p) => poly(p.ring, { kind: "raised", base: p.base, height: p.height, color: p.color })));
 
 /** The vineyard's images (open 3D): rows of vines on soil tinted by the need (three steps), the shade net. */

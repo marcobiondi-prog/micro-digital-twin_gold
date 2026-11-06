@@ -704,6 +704,38 @@ export function bedParts(patches: Ring[], maxBeds = 50, area?: Ring, opts: { bed
   return { beds, parts };
 }
 
+/**
+ * The vines in 3D: rows of vines across each zone (east–west, like the 2D), each row a low green wall 0,8 m wide and
+ * 1,6 m tall standing on the ground (`lite`: one wall; else a darker foot up to 0,7 m and the leafy part over it), rows
+ * 2,5 m apart, kept 0,4 m off the ends of their strip; the spacing grows while there would be more than `max` rows.
+ * The zone patches are the axis-aligned row strips of vineLayout, so each one is a rectangle in the local frame.
+ */
+export const VINE_ROW = { pitch: 2.5, width: 0.8, height: 1.6, foot: 0.7, leaf: "#3f7d32", leafTop: "#5a9e45", foot3d: "#4a3b2a" } as const;
+export function vineRowParts(zones: Ring[], max = 160, lite = false): TreePart[] {
+  const rings = zones.filter((r) => r.length >= 4);
+  if (!rings.length) return [];
+  const f = frameOf(rings.flat());
+  const boxes = rings.map((r) => { const xy = r.map((p) => toXY(f, p)); const xs = xy.map((q) => q[0]), ys = xy.map((q) => q[1]); return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) }; });
+  const y0 = Math.min(...boxes.map((b) => b.y0));
+  const rowsAt = (pitch: number) => boxes.flatMap((b) => {
+    const out: Array<{ x0: number; x1: number; y: number }> = [];
+    for (let k = Math.ceil((b.y0 - y0 - pitch / 2) / pitch); ; k++) {
+      const y = y0 + pitch / 2 + k * pitch;
+      if (y > b.y1 - VINE_ROW.width / 2) break;
+      if (y < b.y0 + VINE_ROW.width / 2) continue;
+      if (b.x1 - b.x0 > 1.2) out.push({ x0: b.x0 + 0.4, x1: b.x1 - 0.4, y });
+    }
+    return out;
+  });
+  let pitch: number = VINE_ROW.pitch, rows = rowsAt(pitch);
+  for (let k = 0; rows.length > max && k < 12; k++) { pitch *= 1.25; rows = rowsAt(pitch); }
+  const h = VINE_ROW.width / 2;
+  const box = (r: { x0: number; x1: number; y: number }, half: number): Ring => [toLL(f, r.x0, r.y - half), toLL(f, r.x1, r.y - half), toLL(f, r.x1, r.y + half), toLL(f, r.x0, r.y + half)];
+  return rows.flatMap((r): TreePart[] => lite
+    ? [{ ring: box(r, h), base: 0, height: VINE_ROW.height, color: VINE_ROW.leaf }]
+    : [{ ring: box(r, h * 0.35), base: 0, height: VINE_ROW.foot, color: VINE_ROW.foot3d }, { ring: box(r, h), base: VINE_ROW.foot, height: VINE_ROW.height - 0.15, color: VINE_ROW.leaf }, { ring: box(r, h * 0.85), base: VINE_ROW.height - 0.15, height: VINE_ROW.height, color: VINE_ROW.leafTop }]);
+}
+
 /** Vineyard 3D colours: the hedge of the windbreak and the shade net. */
 export const VINE_3D = { hedge: "#2f6b2a", hedgeTop: "#3d8a35", net: "#1f2933" } as const;
 

@@ -116,7 +116,8 @@ export function useProId(): ProId | null | undefined {
 export async function saveProId(id: ProId | null): Promise<void> {
   set(id);
   const { data } = await supabase.auth.getSession();
-  if (data.session) await supabase.auth.updateUser({ data: { pro_id: id, pro_last: lastSnap() } }).catch(() => undefined);
+  // pro_left: the profile was left on purpose ("Esci dal profilo"), so the next sign-in does not bring it back by itself.
+  if (data.session) await supabase.auth.updateUser({ data: { pro_id: id, pro_last: lastSnap(), pro_left: id === null } }).catch(() => undefined);
 }
 
 /** Before signing out: the profile on this device goes into the account (if a save had failed), so the next sign-in brings it back. */
@@ -136,8 +137,16 @@ export function useSyncProId() {
       const prev = (meta as { pro_last?: Record<string, unknown> } | null)?.pro_last;
       if (prev && typeof prev === "object") for (const k of ["agronomo", "funzionario"] as const) { const p = prev[k]; if (isProId(p) && p.kind === k && !lastSnap()[k]) keepLast(p); }
       const saved = (meta as { pro_id?: unknown } | null)?.pro_id;
-      if (isProId(saved)) set(saved);
-      else if (snapshot()) void supabase.auth.updateUser({ data: { pro_id: snapshot() } }).catch(() => undefined);
+      if (isProId(saved)) { set(saved); return; }
+      if (snapshot()) { void supabase.auth.updateUser({ data: { pro_id: snapshot() } }).catch(() => undefined); return; }
+      if ((meta as { pro_left?: unknown } | null)?.pro_left === true) return;
+      // The account has no profile in use (left, or lost by an earlier sign-out) but registered one before: signing in
+      // brings it back by itself — the most recent of the account's registered profiles — so a conductor who signs in
+      // is a conductor again, with no form to fill.
+      const known = (["agronomo", "funzionario"] as const).map((k) => lastSnap()[k]).filter((p): p is ProId => !!p)
+        .filter((p) => !prev || isProId((prev as Record<string, unknown>)[p.kind]));
+      const back = known.sort((x, y) => (y.at > x.at ? 1 : -1))[0];
+      if (back) { set(back); void supabase.auth.updateUser({ data: { pro_id: back } }).catch(() => undefined); toast(`Bentornato, ${back.name}`, { description: "Sei entrato con il tuo profilo professionale." }); }
     };
     void supabase.auth.getSession().then(({ data }) => { if (data.session) adopt(data.session.user.user_metadata); });
     // Signing out of the personal account signs out of the professional profile too (it stays saved in the account
