@@ -4,7 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { ArrowRight, Bug, CloudRain, Droplets, Leaf, Lock, Mail, MapPin, Send, ShieldCheck, Sparkles, Sun, TreePine, Umbrella, Wind, type LucideIcon } from "lucide-react";
+import { ArrowRight, Bug, CloudDrizzle, CloudRain, Sprout, Droplets, Leaf, Lock, Mail, MapPin, Send, ShieldCheck, Sparkles, Sun, TreePine, Umbrella, Wind, type LucideIcon } from "lucide-react";
 import { DEFENCE_MAX } from "@/models/vine-interventions";
 import { useLab, type LabState } from "@/models/lab-store";
 import { getPiazzaReading, usePiazzaReading, type PiazzaReading } from "@/models/sim-reading";
@@ -337,7 +337,7 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
       <DashSection title="Cosa hai messo" hint={`${grouped(m2)} m² ${sum.drawn ? "disegnati" : sum.measured ? "della piazza" : "di riferimento"}`}>
         <MixRows total={empty ? "Nessun intervento" : euroRange(sum.cost)}
           note="Costi indicativi IVA esclusa, da verificare con un preventivo."
-          rows={piazzaMix(urban, sum).map((r, i) => ({ ...r, icon: [TreePine, Sun, Umbrella][i]! }))} />
+          rows={piazzaMix(urban, sum).map((r, i) => ({ ...r, icon: [TreePine, Sprout, Umbrella, CloudDrizzle][i] ?? TreePine }))} />
       </DashSection>
       <ZoneRows rows={zoneSummaryRows(urban.area, urban.location, sum.cost, empty, euroRange)} />
 
@@ -395,7 +395,7 @@ export function VineDashboard({ records }: { records: ReactNode }) {
       <DashSection title="Cosa hai messo" hint={sum.drawn ? `${grouped(m2)} m² disegnati` : sum.measured ? `${grouped(m2)} m² del vigneto` : "1 ettaro di riferimento"}>
         <MixRows total={empty ? "Nessun intervento" : euroRange(sum.cost)}
           note={same ? "Costi indicativi IVA esclusa, da verificare con un preventivo." : "Media delle tre zone (ognuna ha il suo intervento). Costi indicativi IVA esclusa."}
-          rows={vineMixRows(sum).map((r, i) => ({ ...r, icon: [Droplets, Umbrella, Wind][i]! }))} />
+          rows={vineMixRows(sum).map((r, i) => ({ ...r, icon: [Droplets, Bug, Leaf][i] ?? Droplets }))} />
       </DashSection>
       <ZoneRows rows={zoneSummaryRows(vine.area, vine.location, sum.cost, empty, euroRange)} />
 
