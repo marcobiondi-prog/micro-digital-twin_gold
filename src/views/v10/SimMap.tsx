@@ -20,7 +20,7 @@ import { usePiazzaReading } from "@/models/sim-reading";
 import { Thermometer } from "lucide-react";
 import { SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import type { MovedPart } from "@/views/v10/SatelliteMap2D";
-import { drawnAreaFor, freeM2, leversForZones, leversOfZones, lotsOf, MAX_PINS, pinsM2, surfaceText, usableM2, ZONE_KINDS, ZONE_LABEL, zoneName, zonesOfArea, type DrawnArea, type SubArea, type ZoneKind } from "@/models/drawn-area";
+import { drawnAreaFor, freeM2, leversForZones, leversOfZones, lotsOf, MAX_PINS, moveZones, pinsM2, surfaceText, usableM2, ZONE_KINDS, ZONE_LABEL, zoneName, zonesOfArea, type DrawnArea, type SubArea, type ZoneKind } from "@/models/drawn-area";
 import type { Ring } from "@/models/place-area";
 import type { SimKind } from "@/views/v8/console";
 import { PlaceSearch } from "@/views/SimulationGrid";
@@ -175,6 +175,15 @@ export function SimMap({ kind }: { kind: SimKind }) {
   };
   const moved = (m: MovedPart) => {
     const e = saved?.edits ?? {};
+    if (m.part === "zones") {
+      if (!saved) return;
+      const next = moveZones(saved, m.ids, m.at[0] - m.from[0], m.at[1] - m.from[1]);
+      // Refused past the outline: the area is set again as it was, so the handle goes back to its place.
+      if (!next) toast.error("Le zone devono restare dentro l'area disegnata", { description: "Spostale un po' meno: sono tornate dov'erano." });
+      else toast.success(m.ids.length > 1 ? `Spostate ${m.ids.length} zone con quello che contengono` : "Zona spostata con quello che contiene");
+      if (kind === "urban") setUrban({ area: next ?? { ...saved } }); else setVineyard({ area: next ?? { ...saved } });
+      return;
+    }
     if (m.part === "tree") { const trees = [...(e.trees ?? [])]; trees[m.index] = m.at; setEdits({ ...e, trees }); }
     else setEdits({ ...e, [m.part === "lawn" ? "lawnAt" : m.part === "shade" ? "shadeAt" : "windAt"]: m.at });
   };
@@ -415,7 +424,7 @@ function SimBar({ sim, when, arranging, edited, best, only, canOnly, onArrange, 
       </ul>
       {sim.kind === "piazza" && <p className="text-sm text-muted-foreground">{shadowText(sim, when)}{roomText(sim.data)}</p>}
       <p className="text-sm text-muted-foreground">{arranging
-        ? sim.kind === "piazza" ? "Trascina gli alberi, o le etichette Aiuole e Ombra per spostare quelle zone." : ""
+        ? sim.kind === "piazza" ? `Trascina gli alberi, o le etichette Aiuole e Ombra.${(sim.inner ?? []).length ? " Le etichette con ✥ spostano le tue zone con tutto quello che contengono; \"✥ Tutte le zone\" le sposta insieme." : ""}` : "Le etichette con ✥ spostano le tue zone; \"✥ Tutte le zone\" le sposta insieme."
         : only && sim.kind === "piazza"
           ? "Solo quello disegnato da te: aiuole e pergolati sono le tue zone, gli alberi stanno nelle zone Alberi. Le leve della simulazione seguono le zone; se ne cambi una torna la disposizione automatica."
         : best && sim.kind === "piazza"
@@ -424,7 +433,7 @@ function SimBar({ sim, when, arranging, edited, best, only, canOnly, onArrange, 
           : "Segue le leve della simulazione: cambia gli alberi o le percentuali e la mappa si aggiorna."}</p>
       {sim.kind === "piazza" && !canOnly && !only && !arranging && <p className="text-xs text-muted-foreground">Per vedere solo quello che disegni, aggiungi una zona Alberi, Aiuole o Pergolato.</p>}
       <div className="flex flex-wrap gap-2">
-        {sim.kind === "piazza" && (
+        {(sim.kind === "piazza" || (sim.inner ?? []).length > 0) && (
         <button type="button" onClick={onArrange} aria-pressed={arranging} className={cn(barBtn, arranging ? "bg-foreground text-background" : "bg-foreground/[0.08]")}>
           {arranging ? <><Check className="size-4" aria-hidden="true" />Fatto</> : <><Hand className="size-4" aria-hidden="true" />Sposta elementi</>}
         </button>

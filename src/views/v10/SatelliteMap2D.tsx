@@ -7,7 +7,7 @@ import { ringContains } from "@/models/place-area";
 import type { LatLng } from "@/models/area-layout";
 
 /** Something moved by hand on the map: a tree (its index) or the lawn's, the shade's or the windbreak's handle. */
-export type MovedPart = { part: "tree"; index: number; at: LatLng } | { part: "lawn" | "shade" | "wind"; at: LatLng };
+export type MovedPart = { part: "tree"; index: number; at: LatLng } | { part: "lawn" | "shade" | "wind"; at: LatLng } | { part: "zones"; ids: string[]; from: LatLng; at: LatLng };
 import { Crosshair, LoaderCircle } from "lucide-react";
 import { isKeyRejected, loadGoogleMaps, onKeyRejected } from "@/lib/google-maps-js";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -152,13 +152,20 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
     if (sim?.kind === "vigneto" && !drawing) sim.data.zones.forEach((z, i) => handles.current.push(new lib.Marker({ element: tagElement(`Zona ${i + 1}`) }).setLngLat([z[1], z[0]]).addTo(map)));
     // Every misting pole numbered, in the zones drawn for them first (solid) then those the app placed (white).
     if (sim?.kind === "piazza" && !drawing) sim.data.misters.forEach((m, i) => handles.current.push(new lib.Marker({ element: misterElement(i + 1, i < sim.data.mistersInZones) }).setLngLat([m[1], m[0]]).addTo(map)));
-    if (sim && !drawing) for (const z of sim.inner ?? []) { if (z.ring.length < 3) continue; const c = ringCentre(z.ring); handles.current.push(new lib.Marker({ element: tagElement(zoneTag(z)) }).setLngLat([c[1], c[0]]).addTo(map)); }
+    if (sim && !drawing && !arranging) for (const z of sim.inner ?? []) { if (z.ring.length < 3) continue; const c = ringCentre(z.ring); handles.current.push(new lib.Marker({ element: tagElement(zoneTag(z)) }).setLngLat([c[1], c[0]]).addTo(map)); }
     if (!arranging || drawing || !sim) return;
     const add = (at: LatLng, label: string | null, done: (to: LatLng) => void) => {
       const m = new lib.Marker({ element: handleElement(label), draggable: true }).setLngLat([at[1], at[0]]).addTo(map);
       m.on("dragend", () => { const p = m.getLngLat(); done([p.lat, p.lng]); });
       handles.current.push(m);
     };
+    // The zones drawn by hand move as a group, with all they hold: a handle on each, and one for all of them together.
+    const inner = (sim.inner ?? []).filter((z) => z.ring.length >= 3);
+    for (const z of inner) { const c = ringCentre(z.ring); add(c, `✥ ${zoneTag(z)}`, (to) => moveRef.current?.({ part: "zones", ids: [z.id], from: c, at: to })); }
+    if (inner.length >= 2) {
+      const all = ringCentre(inner.flatMap((z) => z.ring));
+      add(all, "✥ Tutte le zone", (to) => moveRef.current?.({ part: "zones", ids: inner.map((z) => z.id), from: all, at: to }));
+    }
     if (sim.kind === "piazza") {
       sim.data.trees.forEach((t, index) => add(t, null, (to) => moveRef.current?.({ part: "tree", index, at: to })));
       if (sim.data.patches.some((p) => p.kind === "lawn")) add(sim.data.lawnAt, "Aiuole", (to) => moveRef.current?.({ part: "lawn", at: to }));

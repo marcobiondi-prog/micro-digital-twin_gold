@@ -1,4 +1,4 @@
-import { ringAreaM2, type Ring } from "./place-area";
+import { ringAreaM2, ringContains, type Ring } from "./place-area";
 import type { LayoutEdits } from "./area-layout";
 
 /**
@@ -129,4 +129,22 @@ export function leversForZones(a: DrawnArea, now: PiazzaLevers, only?: ReadonlyS
     misters: Math.max(now.misters, mistersFor(m2("nebulizzatori"))),
   };
   return next.trees === now.trees && next.permeable === now.permeable && next.shade === now.shade && next.misters === now.misters ? null : next;
+}
+
+/**
+ * The zones `ids` moved together by (dLat, dLng), with everything they hold (their trees, aiuole, pergolas, poles are
+ * laid from the zone, so they follow; trees placed by hand inside them move along). Null when a moved zone would reach
+ * past the drawn area's outline, so the move is refused and nothing changes.
+ */
+export function moveZones(a: DrawnArea, ids: readonly string[], dLat: number, dLng: number): DrawnArea | null {
+  const set = new Set(ids);
+  const zones = zonesOf(a);
+  const moving = zones.filter((z) => set.has(z.id));
+  if (!moving.length) return null;
+  const shift = (r: Ring): Ring => r.map(([la, ln]) => [la + dLat, ln + dLng] as [number, number]);
+  const moved = zones.map((z) => (set.has(z.id) ? { ...z, ring: shift(z.ring) } : z));
+  if (moved.some((z) => set.has(z.id) && !z.ring.every(([la, ln]) => ringContains(a.ring, la, ln)))) return null;
+  // Trees placed by hand inside a moved zone go with it.
+  const trees = a.edits?.trees?.map((t) => (t && moving.some((z) => ringContains(z.ring, t[0], t[1])) ? [t[0] + dLat, t[1] + dLng] as [number, number] : t));
+  return { ...a, zones: moved, ...(a.edits ? { edits: { ...a.edits, ...(trees ? { trees } : {}) } } : {}) };
 }
