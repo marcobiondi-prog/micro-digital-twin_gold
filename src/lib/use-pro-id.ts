@@ -112,90 +112,102 @@ export function useProId(): ProId | null | undefined {
   return useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, snapshot, () => undefined);
 }
 
+/**
+ * The kinds of profile the account itself registered (user data pro_own): a profile counts as the account's only when it
+ * was identified, or picked again, while signed in to it. A profile that reached the account any other way — an older
+ * sign-in uploaded the one this device had, a guest's try, someone else's — is not its own and never comes back by itself.
+ */
+type Meta = { pro_id?: unknown; pro_last?: Record<string, unknown>; pro_left?: unknown; pro_own?: unknown } | null;
+const KINDS = ["agronomo", "funzionario"] as const;
+const ownOf = (meta: unknown): ProKind[] | null => {
+  const v = (meta as Meta)?.pro_own;
+  return Array.isArray(v) ? KINDS.filter((k) => v.includes(k)) : null;
+};
+
 /** The account's own registered profiles, plus the one now in use: never the other profiles this device knows. */
-const accountLast = (meta: unknown, id: ProId | null): Record<string, ProId> => {
-  const prev = (meta as { pro_last?: Record<string, unknown> } | null)?.pro_last ?? {};
+const accountLast = (meta: unknown, id: ProId | null, own: ProKind[]): Record<string, ProId> => {
+  const prev = (meta as Meta)?.pro_last ?? {};
   const out: Record<string, ProId> = {};
-  for (const k of ["agronomo", "funzionario"] as const) { const p = prev[k]; if (isProId(p) && p.kind === k) out[k] = p; }
+  for (const k of own) { const p = prev[k]; if (isProId(p) && p.kind === k) out[k] = p; }
   if (id) out[id.kind] = id;
   return out;
 };
+const withKind = (own: ProKind[], id: ProId | null) => (id && !own.includes(id.kind) ? [...own, id.kind] : own);
 
-/** Saves the profile (null removes it) on this device and, signed in, in the account. */
+/** Saves the profile (null removes it) on this device and, signed in, in the account, as the account's own. */
 export async function saveProId(id: ProId | null): Promise<void> {
   set(id);
   const { data } = await supabase.auth.getSession();
+  if (!data.session) return;
+  const meta = data.session.user.user_metadata, own = withKind(ownOf(meta) ?? [], id);
   // pro_left: the profile was left on purpose ("Esci dal profilo"), so the next sign-in does not bring it back by itself.
-  if (data.session) await supabase.auth.updateUser({ data: { pro_id: id, pro_last: accountLast(data.session.user.user_metadata, id), pro_left: id === null } }).catch(() => undefined);
+  await supabase.auth.updateUser({ data: { pro_id: id, pro_last: accountLast(meta, id, own), pro_own: own, pro_left: id === null } }).catch(() => undefined);
 }
 
-/** Before signing out: the profile on this device goes into the account (if a save had failed), so the next sign-in brings it back. */
+/** Before signing out: the profile in use (identified while signed in, so the account's own) is kept in the account. */
 export async function keepProIdInAccount(): Promise<void> {
   const id = snapshot();
   const { data } = await supabase.auth.getSession();
-  if (id && data.session) await supabase.auth.updateUser({ data: { pro_id: id, pro_last: accountLast(data.session.user.user_metadata, id) } }).catch(() => undefined);
+  if (!id || !data.session) return;
+  const meta = data.session.user.user_metadata, own = withKind(ownOf(meta) ?? [], id);
+  await supabase.auth.updateUser({ data: { pro_id: id, pro_last: accountLast(meta, id, own), pro_own: own } }).catch(() => undefined);
+}
+
+/**
+ * Accounts saved before pro_own: their own kinds are read once from what they did — the kinds whose project has
+ * interventions in the account's history. An account with no history owns none, and is asked to identify again.
+ */
+async function legacyOwn(): Promise<ProKind[] | null> {
+  const { data, error } = await (supabase as unknown as { from: (t: string) => { select: (c: string) => { limit: (n: number) => Promise<{ data: Array<{ flow: string }> | null; error: unknown }> } } })
+    .from("intervention_history").select("flow").limit(1000);
+  if (error || !data) return null;
+  const out: ProKind[] = [];
+  if (data.some((r) => r.flow === "vigneto")) out.push("agronomo");
+  if (data.some((r) => r.flow === "piazza")) out.push("funzionario");
+  return out;
 }
 
 /**
  * Mounted once: on sign-in the account's profile comes to this device, or this device's goes to an account without one;
  * on sign-out the profile leaves this device (kept in the account for the next sign-in).
  */
-/**
- * Once per account (pro_checked): a profile in use that the account never worked with — a municipal officer's on an
- * account whose history is all vineyard, or the reverse — came from this device, not from the account (an older
- * sign-in took the device's profile). When a profile of the kind the account did work with is known (the account's
- * own registered ones first, then this device's), it is put back with a toast; without one, the sector page opens on
- * that kind's form.
- */
-async function checkKind(inUse: ProId, meta: unknown) {
-  if ((meta as { pro_checked?: unknown } | null)?.pro_checked === true) return;
-  const { data, error } = await (supabase as unknown as { from: (t: string) => { select: (c: string) => { limit: (n: number) => Promise<{ data: Array<{ flow: string }> | null; error: unknown }> } } })
-    .from("intervention_history").select("flow").limit(1000);
-  if (error || !data) return;
-  const piazza = data.filter((r) => r.flow === "piazza").length, vigneto = data.filter((r) => r.flow === "vigneto").length;
-  const worked: ProKind | null = vigneto > 0 && piazza === 0 ? "agronomo" : piazza > 0 && vigneto === 0 ? "funzionario" : null;
-  const done = () => supabase.auth.updateUser({ data: { pro_checked: true } }).catch(() => undefined);
-  if (!worked || worked === inUse.kind) { void done(); return; }
-  const prev = (meta as { pro_last?: Record<string, unknown> } | null)?.pro_last?.[worked];
-  const right = isProId(prev) && prev.kind === worked ? prev : lastSnap()[worked] ?? null;
-  if (right) {
-    await saveProId(right);
-    void done();
-    toast(`Ho rimesso il tuo profilo: ${right.name}`, { description: worked === "agronomo" ? "Il tuo account ha sempre lavorato sul vigneto." : "Il tuo account ha sempre lavorato sulla piazza." });
-    return;
-  }
-  // No profile of that kind is known: the wrong one leaves the account (in use and registered) and the sector page
-  // opens on the right form.
-  const own = { ...((meta as { pro_last?: Record<string, unknown> } | null)?.pro_last ?? {}) };
-  delete own[inUse.kind];
-  set(null);
-  void supabase.auth.updateUser({ data: { pro_id: null, pro_last: own, pro_checked: true } }).catch(() => undefined);
-  openSectorGate(worked);
-  toast(worked === "agronomo" ? "Il tuo account ha sempre lavorato sul vigneto" : "Il tuo account ha sempre lavorato sulla piazza", { description: "Identificati di nuovo: ci vuole un minuto." });
-}
-
 export function useSyncProId() {
   useEffect(() => {
-    const adopt = (meta: unknown) => {
-      // The profiles registered before with this account come to this device too.
-      const prev = (meta as { pro_last?: Record<string, unknown> } | null)?.pro_last;
-      if (prev && typeof prev === "object") for (const k of ["agronomo", "funzionario"] as const) { const p = prev[k]; if (isProId(p) && p.kind === k && !lastSnap()[k]) keepLast(p); }
-      const saved = (meta as { pro_id?: unknown } | null)?.pro_id;
-      if (isProId(saved)) { set(saved); void checkKind(saved, meta); return; }
-      // What the account itself registered (never the profiles this device met before signing in, which can be someone
-      // else's or a guest's try): the most recent of them comes back by itself.
-      const own = (["agronomo", "funzionario"] as const).map((k) => (prev as Record<string, unknown> | undefined)?.[k]).filter((p): p is ProId => isProId(p));
-      if ((meta as { pro_left?: unknown } | null)?.pro_left === true) return;
-      const back = own.sort((x, y) => (y.at > x.at ? 1 : -1))[0];
-      if (back) { set(back); void supabase.auth.updateUser({ data: { pro_id: back } }).catch(() => undefined); toast(`Bentornato, ${back.name}`, { description: "Sei entrato con il tuo profilo professionale." }); return; }
-      // A brand-new account with no profile of its own takes the one identified on this device.
-      if (snapshot()) void supabase.auth.updateUser({ data: { pro_id: snapshot() } }).catch(() => undefined);
+    let adopted = "";
+    const adopt = async (userId: string, meta: unknown) => {
+      if (adopted === userId) return;
+      adopted = userId;
+      const legacy = ownOf(meta) === null;
+      const own = ownOf(meta) ?? (await legacyOwn());
+      if (own === null) { adopted = ""; return; } // history not readable now: decide at the next sign-in or opening
+      const prev = (meta as Meta)?.pro_last ?? {};
+      // The account's own registered profiles come to this device too ("Continua come …" on its form).
+      for (const k of own) { const p = prev[k]; if (isProId(p) && p.kind === k && !lastSnap()[k]) keepLast(p); }
+      const saved = (meta as Meta)?.pro_id;
+      const mine = (p: unknown): p is ProId => isProId(p) && own.includes(p.kind);
+      const left = (meta as Meta)?.pro_left === true;
+      const back = mine(saved) ? saved : left ? null : own.map((k) => prev[k]).filter(mine).sort((x, y) => (y.at > x.at ? 1 : -1))[0] ?? null;
+      const clean = { pro_id: back, pro_last: accountLast(meta, back, own), pro_own: own };
+      const dirty = legacy || (saved != null && !mine(saved)) || KINDS.some((k) => prev[k] != null && !own.includes(k));
+      if (back) {
+        set(back);
+        if (dirty || !mine(saved)) void supabase.auth.updateUser({ data: clean }).catch(() => undefined);
+        if (!mine(saved)) toast(`Bentornato, ${back.name}`, { description: "Sei entrato con il tuo profilo professionale." });
+        return;
+      }
+      // The account never registered a profile of its own: none is given to it (not even this device's); the sector
+      // page asks to choose the sector and identify, or to enter as a guest.
+      set(null);
+      if (dirty) void supabase.auth.updateUser({ data: clean }).catch(() => undefined);
+      if (!left && !guestSnap()) openSectorGate(null);
+      if (saved != null && !mine(saved)) toast("Questo account non ha ancora un profilo professionale", { description: "Scegli il settore e identificati, oppure entra come ospite." });
     };
-    void supabase.auth.getSession().then(({ data }) => { if (data.session) adopt(data.session.user.user_metadata); });
+    void supabase.auth.getSession().then(({ data }) => { if (data.session) void adopt(data.session.user.id, data.session.user.user_metadata); });
     // Signing out of the personal account signs out of the professional profile too (it stays saved in the account
     // and comes back with the next sign-in).
     const { data } = supabase.auth.onAuthStateChange((event, s) => {
-      if (event === "SIGNED_IN" && s) adopt(s.user.user_metadata);
+      if (event === "SIGNED_IN" && s) void adopt(s.user.id, s.user.user_metadata);
+      if (event === "SIGNED_OUT") adopted = "";
       if (event === "SIGNED_OUT" && snapshot()) {
         const was = snapshot()!.kind;
         set(null);
