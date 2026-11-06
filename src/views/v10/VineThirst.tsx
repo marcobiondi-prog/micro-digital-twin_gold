@@ -229,8 +229,8 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
       {/* Labels under the arc's two end numbers, as in the piazza: the lowest thirst reachable on the left, the thirst
           without interventions (exact, on the right end); the one the white dot is near lights up, the other dims. */}
       <div className="mx-auto -mt-3 flex w-full max-w-[21rem] justify-between px-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground" aria-hidden="true">
-        <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "left" ? "bg-sky-400/30 text-sky-200" : "bg-sky-400/15 text-sky-300", near === "right" && "opacity-35")}>Il minimo possibile</span>
-        <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 text-right transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "right" ? "bg-amber-400/25 text-amber-200" : "bg-foreground/[0.08]", near === "left" && "opacity-35")}>Senza interventi</span>
+        <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "left" ? "bg-sky-500/20 text-sky-800 dark:bg-sky-400/30 dark:text-sky-200" : "bg-sky-500/10 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300", near === "right" && "opacity-50 dark:opacity-35")}>Il minimo possibile</span>
+        <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 text-right transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "right" ? "bg-amber-400/30 text-amber-900 dark:bg-amber-400/25 dark:text-amber-200" : "bg-foreground/[0.08] text-foreground/75", near === "left" && "opacity-50 dark:opacity-35")}>Senza interventi</span>
       </div>
 
       {/* The season's air in the selected area (its middle when drawn): the year's average at this season and hour, or a
