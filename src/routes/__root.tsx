@@ -182,6 +182,19 @@ const PS_LIGHT: Record<number, { left: string; top: string; tilt: string }> = {
 // curve's drop between 10 % and 30 % (≈ 6 px) and each icon tilts with the edge's tangent, like the light on the crescent.
 const ARC: Record<number, { y: number; tilt: number }> = { 0: { y: 6, tilt: -6 }, 1: { y: 0, tilt: -3 }, 3: { y: 0, tilt: 3 }, 4: { y: 6, tilt: 6 } };
 
+/** Elements a tap belongs to, so it never lowers the bottom bar. */
+const TAP_OWNERS = "a,button,input,select,textarea,label,summary,option,video,canvas,[contenteditable],[role=button],[role=link],[role=slider],[role=tab],[role=radio],[role=checkbox],[role=switch],[role=menuitem],[role=option],[role=combobox],[role=dialog],[role=alertdialog],[data-map-gestures],[data-sys-camera-root],[data-no-nav-tap],nav,.maplibregl-map";
+/** True when a tap landed on an empty part of the page: no control, field, map or dialog under it, nothing clickable. */
+function emptyTap(target: EventTarget | null): boolean {
+  if (!(target instanceof Element) || target.closest(TAP_OWNERS)) return false;
+  if (document.documentElement.hasAttribute("data-sys-camera")) return false;
+  // Clickable cards and rows wear a pointer cursor even without a button role.
+  for (let el: Element | null = target; el && el !== document.body; el = el.parentElement) {
+    if (getComputedStyle(el).cursor === "pointer") return false;
+  }
+  return true;
+}
+
 function BottomNav() {
   const proId = useProId();
   const pathname = useLocation({ select: (l) => l.pathname });
@@ -217,12 +230,35 @@ function BottomNav() {
         setHidden(false);
       }
     };
+    // A still tap on an empty part of the screen (touch or pen) lowers the bar for more room, another one brings it
+    // back. Taps on controls, fields, maps, dialogs and the bar itself never toggle it.
+    let down: { x: number; y: number; t: number; id: number } | null = null;
+    const onDown = (e: PointerEvent) => {
+      down = e.pointerType === "mouse" || !e.isPrimary ? null : { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId };
+    };
+    const onUp = (e: PointerEvent) => {
+      const d = down;
+      down = null;
+      if (!d || d.id !== e.pointerId || performance.now() - d.t > 500) return;
+      if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 10) return;
+      if (!emptyTap(e.target)) return;
+      setHidden((h) => !h);
+    };
+    const onCancel = () => { down = null; };
     window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("pointerdown", onDown, { passive: true });
+    window.addEventListener("pointerup", onUp, { passive: true });
+    window.addEventListener("pointercancel", onCancel, { passive: true });
     return () => {
       window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
       ro.disconnect();
     };
   }, [pathname]);
+  // A new page always starts with the bar up.
+  useEffect(() => setHidden(false), [pathname]);
   const items = itemsFor(proId);
   const item = ({ to, l, I }: NavItem, index: number) => {
     const active = pathname === to || ((pathname.startsWith("/cronologia") || pathname === "/archivio") && to === historyHome(pathname === "/archivio" ? "/archivio" : "/cronologia")) || (to === "/profilo" && isProfilePath(pathname));
@@ -256,7 +292,7 @@ function BottomNav() {
   const light = focusing ? (focusCol === null ? null : PS_LIGHT[focusCol]) : index < 0 ? null : PS_LIGHT[index < 2 ? index : index + 1];
   const caption = focusing ? (homeFocus === "camera" ? "Fotocamera AI" : homeFocus === "urban" ? "Urbano" : "Vigneto") : current?.l ?? "";
   return (
-    <nav aria-label="Menu principale" className={`ps-nav fixed inset-x-0 bottom-0 z-[999999998] transition-transform duration-300 motion-reduce:transition-none sm:hidden ${hidden ? "translate-y-full" : "translate-y-0"}`}>
+    <nav aria-label="Menu principale" className={`ps-nav fixed inset-x-0 bottom-0 z-[999999998] transition-transform duration-300 motion-reduce:transition-none sm:hidden ${hidden ? "translate-y-[calc(100%+4rem)]" : "translate-y-0"}`}>
       {/* PlayStation-app slab: a frosted slate arch for the icons with a darker crescent laid over its foot; a straight light slides along the crescent's edge under the open page, whose name sits in the crescent; the AI camera rises in the middle. */}
       <div className="relative h-[108px]">
         <div className="ps-nav-glass pointer-events-none absolute inset-0" aria-hidden="true" />
