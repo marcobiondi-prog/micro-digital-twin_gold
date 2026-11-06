@@ -26,7 +26,7 @@ type Item = { id: "camera" | "urban" | "vine"; Icon: typeof Building2; name: str
 const items: Item[] = [
   { id: "urban", Icon: Building2, name: "Settore urbano", who: "Per i funzionari del Comune", cta: "Identificati come funzionario",
     desc: "Si apre la piazza: alberi, aiuole e ombra contro il caldo." },
-  { id: "vine", Icon: Grape, name: "Settore agricolo", who: "Per i conduttori del vigneto", cta: "Identificati come conduttore",
+  { id: "vine", Icon: Grape, name: "Settore agricolo", who: "Per chi lavora nel settore agricolo", cta: "Identificati per il settore agricolo",
     desc: "Si apre il vigneto: acqua, ombra e frangivento contro la sete delle viti." },
   // AI_STANDBY: in development, so nothing says what it will do, and it cannot be opened from here.
   AI_STANDBY
