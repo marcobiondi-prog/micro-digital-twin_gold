@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSwipeBack } from "@/lib/use-swipe-back";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, Building2, Grape, LogIn, Trash2, UserRound, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, Grape, LogIn, Mail, Trash2, UserRound, X } from "lucide-react";
 import { openAccount } from "@/lib/camera-dock";
 import { introSeen } from "@/lib/intro-seen";
 import { clearSectorGate, enterAsGuest, forgetKnownProId, type KnownProId, saveProId, useAccountSector, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
@@ -110,6 +110,11 @@ export function KnownProfiles({ kind }: { kind: ProKind }) {
  * initials), the name, the profile, the account's email, a white "Continua come …" and a bin that asks in place before
  * taking the profile off the phone. Flat with reduced motion.
  */
+/** The card's line under the name: the licence and region, or the town and office (the kind is in the card's chip). */
+const detailOf = (k: ProId) => k.kind === "agronomo"
+  ? (k.licence ? `Patentino ${k.licence} · ${k.region}` : `Regione ${k.region}`)
+  : `Comune di ${k.comune} · ${k.office}`;
+
 function ProfileCarousel({ known, onPick }: { known: KnownProId[]; onPick: (k: KnownProId) => void }) {
   const row = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
@@ -151,31 +156,48 @@ function ProfileCarousel({ known, onPick }: { known: KnownProId[]; onPick: (k: K
   return (
     <div className="space-y-3">
       <div ref={row} role="list" aria-label="Profili registrati" data-map-gestures=""
-        className="no-scrollbar -mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-[18%] py-3 touch-pan-x [scrollbar-width:none]">
+        className="no-scrollbar -mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-[13%] py-3 touch-pan-x [scrollbar-width:none]">
         {known.map((k, i) => (
-          <div key={keyOf(k)} role="listitem" className="w-[64%] shrink-0 snap-center">
-            <div className="relative flex h-full flex-col items-center gap-2 rounded-3xl bg-[oklch(0.25_0.016_258)] p-5 text-center shadow-[0_18px_40px_-14px_rgb(0_0_0/0.7),inset_0_1px_0_rgb(255_255_255/0.08)] ring-1 ring-white/10 transition-[opacity] will-change-transform">
-              <button type="button" onClick={() => setAsking(asking === keyOf(k) ? null : keyOf(k))} aria-label={`Elimina ${k.name} da questo telefono`} title="Elimina da questo telefono"
-                className="absolute right-2.5 top-2.5 grid size-9 place-items-center rounded-full text-foreground/50 outline-none hover:bg-white/10 hover:text-red-300 focus-visible:ring-2 focus-visible:ring-brand-turquoise">
-                <Trash2 className="size-4" aria-hidden="true" />
-              </button>
-              <span className="mt-1 grid size-20 place-items-center overflow-hidden rounded-full bg-brand-turquoise/15 text-2xl font-semibold text-brand-turquoise ring-2 ring-brand-turquoise/50" aria-hidden="true">
-                {k.acct?.pic ? <img src={k.acct.pic} alt="" referrerPolicy="no-referrer" className="size-full object-cover" /> : initials(k.name)}
+          <div key={keyOf(k)} role="listitem" className="w-[74%] shrink-0 snap-center">
+            <div data-active={i === active || undefined}
+              className={`group relative flex h-full flex-col items-center overflow-hidden rounded-[28px] p-5 pt-4 text-center ring-1 transition-[box-shadow,opacity] duration-300 will-change-transform ${k.kind === "agronomo" ? "bg-[linear-gradient(165deg,oklch(0.36_0.07_150/0.95),oklch(0.22_0.03_200)_55%,oklch(0.17_0.015_258))]" : "bg-[linear-gradient(165deg,oklch(0.38_0.08_250/0.95),oklch(0.23_0.04_240)_55%,oklch(0.17_0.015_258))]"} ring-white/12 shadow-[0_22px_44px_-16px_rgb(0_0_0/0.8),inset_0_1px_0_rgb(255_255_255/0.14)] data-[active]:shadow-[0_22px_48px_-14px_rgb(0_0_0/0.8),0_0_34px_-6px_rgb(45_212_191/0.45),inset_0_1px_0_rgb(255_255_255/0.18)] data-[active]:ring-brand-turquoise/45`}>
+              {/* A soft light from the top, like the app's ambient. */}
+              <span aria-hidden="true" className="pointer-events-none absolute -top-16 left-1/2 size-48 -translate-x-1/2 rounded-full bg-white/10 blur-2xl" />
+              <div className="relative flex w-full items-center justify-between gap-2">
+                <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-black/25 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/85 ring-1 ring-white/10">
+                  {k.kind === "agronomo" ? <Grape className="size-3.5 text-emerald-300" aria-hidden="true" /> : <Building2 className="size-3.5 text-sky-300" aria-hidden="true" />}
+                  {k.kind === "agronomo" ? "Agricoltore" : "Funzionario"}
+                </span>
+                <button type="button" onClick={() => setAsking(asking === keyOf(k) ? null : keyOf(k))} aria-label={`Elimina ${k.name} da questo telefono`} title="Elimina da questo telefono"
+                  className="grid size-9 shrink-0 place-items-center rounded-full bg-black/25 text-white/70 outline-none ring-1 ring-white/10 transition-colors hover:bg-red-500/80 hover:text-white focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+                  <Trash2 className="size-4" aria-hidden="true" />
+                </button>
+              </div>
+              {/* The account picture in a turquoise ring with a glow (the initials without one). */}
+              <span className="relative mt-3 rounded-full bg-[conic-gradient(from_200deg,#2dd4bf,#38bdf8,#a78bfa,#2dd4bf)] p-[3px] shadow-[0_0_28px_-4px_rgb(45_212_191/0.55)]" aria-hidden="true">
+                <span className="grid size-[84px] place-items-center overflow-hidden rounded-full bg-[oklch(0.2_0.02_220)] text-2xl font-semibold text-brand-turquoise ring-2 ring-black/40">
+                  {k.acct?.pic ? <img src={k.acct.pic} alt="" referrerPolicy="no-referrer" className="size-full object-cover" /> : initials(k.name)}
+                </span>
               </span>
-              <p className="w-full truncate text-lg font-semibold">{k.name}</p>
-              <p className="text-xs leading-snug text-foreground/65 [overflow-wrap:anywhere]">{proSummary(k)}</p>
-              {k.acct?.email && <p className="w-full truncate text-xs text-foreground/50">{k.acct.email}</p>}
+              <p className="relative mt-3 w-full truncate font-display text-xl font-semibold tracking-tight text-white">{k.name}</p>
+              <p className="relative mt-0.5 text-[13px] leading-snug text-white/70 [overflow-wrap:anywhere]">{detailOf(k)}</p>
+              {k.acct?.email && (
+                <span className="relative mt-2.5 inline-flex max-w-full items-center gap-1.5 rounded-2xl bg-black/25 px-3 py-1.5 text-left text-[11.5px] leading-tight text-white/80 ring-1 ring-white/10">
+                  <Mail className="size-3.5 shrink-0 text-brand-turquoise" aria-hidden="true" /><span className="min-w-0 break-normal">{/* A long address breaks before the @, never inside the domain. */}{k.acct.email.split("@")[0]}<wbr />@{k.acct.email.split("@").slice(1).join("@")}</span>
+                </span>
+              )}
+              <span aria-hidden="true" className="min-h-4 flex-1" />
               {asking === keyOf(k) ? (
-                <div role="alertdialog" aria-label={`Eliminare ${k.name}?`} className="mt-auto w-full space-y-2 pt-1">
-                  <p className="text-xs text-foreground/70">Eliminare questo profilo dal telefono? Resta nel suo account.</p>
+                <div role="alertdialog" aria-label={`Eliminare ${k.name}?`} className="relative w-full space-y-2">
+                  <p className="text-xs text-white/75">Eliminare questo profilo dal telefono? Resta nel suo account.</p>
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => setAsking(null)} className="h-10 flex-1 rounded-full bg-white/10 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">Annulla</button>
+                    <button type="button" onClick={() => setAsking(null)} className="h-10 flex-1 rounded-full bg-white/12 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">Annulla</button>
                     <button type="button" onClick={() => { setAsking(null); forgetKnownProId(k); toast(`${k.name} eliminato da questo telefono`); }} className="h-10 flex-1 rounded-full bg-red-500 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-white">Elimina</button>
                   </div>
                 </div>
               ) : (
                 <button type="button" onClick={() => (i === active ? onPick(k) : go(i))} aria-label={`Continua come ${k.name}`}
-                  className="mt-auto inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-full bg-white px-3 text-sm font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+                  className="relative inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-full bg-white px-3 text-sm font-semibold text-black shadow-[0_8px_20px_-8px_rgb(0_0_0/0.6)] outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
                   <span className="truncate">Continua</span><ArrowRight className="size-4 shrink-0" aria-hidden="true" />
                 </button>
               )}
