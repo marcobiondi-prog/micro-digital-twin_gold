@@ -698,18 +698,21 @@ function ArchiveBlock({ shots: all, keys, defaultOpen = false }: { shots: Shot[]
               <p className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{m.name}</p>
               <div className="overflow-hidden rounded-xl bg-foreground/[0.05]">
                 {m.piles.map((p) => (
-                  <button key={p.key} type="button" aria-expanded={shown === p.key} onClick={() => setShown(shown === p.key ? null : p.key)}
+                  <Fragment key={p.key}>
+                  <button type="button" aria-expanded={shown === p.key} onClick={() => setShown(shown === p.key ? null : p.key)}
                     className="flex w-full items-center gap-3 border-b border-foreground/[0.06] px-3 py-2.5 text-left outline-none last:border-0 focus-visible:bg-foreground/[0.06]">
                     <FolderClosed className="size-5 shrink-0 text-brand-turquoise" aria-hidden="true" />
                     <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold tabular-nums">{p.label}</span><span className="block text-xs tabular-nums text-muted-foreground">{archivedOn(p.shots.map((x) => marks[`${x.flow}-${x.id}`]))}</span></span>
                     <span className="text-right text-xs text-muted-foreground">{countText(p.shots)}</span>
                     <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform ${shown === p.key ? "rotate-180" : ""}`} aria-hidden="true" />
                   </button>
+                  {/* The folder opens right under itself, not at the end of the list. */}
+                  {current?.key === p.key && <div className="border-b border-foreground/[0.06] p-2 last:border-0"><OpenPile key={current.key} pile={current} archived onClose={() => setShown(null)} /></div>}
+                  </Fragment>
                 ))}
               </div>
             </div>
           ))}
-          {current && <OpenPile key={current.key} pile={current} archived onClose={() => setShown(null)} />}
         </div>
       )}
     </div>
@@ -1097,18 +1100,21 @@ function HistoryArchiveBlock({ items, defaultOpen = false }: { items: SourcedEnt
               <p className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{m.name}</p>
               <div className="overflow-hidden rounded-xl bg-foreground/[0.05]">
                 {m.days.map((g) => (
-                  <button key={g.key} type="button" aria-expanded={shown === g.key} onClick={() => setShown(shown === g.key ? null : g.key)}
+                  <Fragment key={g.key}>
+                  <button type="button" aria-expanded={shown === g.key} onClick={() => setShown(shown === g.key ? null : g.key)}
                     className="flex w-full items-center gap-3 border-b border-foreground/[0.06] px-3 py-2.5 text-left outline-none last:border-0 focus-visible:bg-foreground/[0.06]">
                     <FolderClosed className="size-5 shrink-0 text-violet-600 dark:text-violet-300" aria-hidden="true" />
                     <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold tabular-nums">{g.label}</span><span className="block text-xs tabular-nums text-muted-foreground">{archivedOn(g.items.map((e) => marks[e.id]), "Archiviato")}</span></span>
                     <span className="text-right text-xs text-muted-foreground">{entriesText(g.items.length)}</span>
                     <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform ${shown === g.key ? "rotate-180" : ""}`} aria-hidden="true" />
                   </button>
+                  {/* The day opens right under its own folder, not at the end of the list. */}
+                  {current?.key === g.key && <div className="border-b border-foreground/[0.06] p-2 last:border-0"><ArchivedDay key={current.key} label={current.label} items={current.items} onClose={() => setShown(null)} /></div>}
+                  </Fragment>
                 ))}
               </div>
             </div>
           ))}
-          {current && <ArchivedDay key={current.key} label={current.label} items={current.items} onClose={() => setShown(null)} />}
         </div>
       )}
     </div>
