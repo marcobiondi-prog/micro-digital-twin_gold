@@ -35,7 +35,7 @@ const STYLE: StyleSpecification = {
 };
 
 type Camera = { center: [number, number]; zoom: number; bearing: number };
-type GMap = { moveCamera: (c: { center?: { lat: number; lng: number }; zoom?: number }) => void };
+type GMap = { moveCamera: (c: { center?: { lat: number; lng: number }; zoom?: number }) => void; addListener?: (event: string, f: () => void) => unknown };
 /** Google's service saying how close its satellite photos go at a spot (often 19–20 outside town centres). */
 type MaxZoom = { getMaxZoomAtLatLng: (at: { lat: number; lng: number }) => Promise<{ zoom?: number }> };
 /** Until the service answers: a closeness Google has nearly everywhere, so the map never opens on its grey "no imagery" tiles. */
@@ -114,8 +114,12 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
         };
         map.on("move", follow);
         follow();
-        const hideOpen = () => { for (const l of ["imagery", "places"]) if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "none"); };
-        map.on("load", hideOpen);
+        // The open imagery stays on until Google's own photos have actually arrived (its first "tilesloaded"): a Google map
+        // that draws nothing (a refused service, a blocked request, a place without photos) no longer leaves the map empty.
+        let googleTiles = false, styleLoaded = false;
+        const hideOpen = () => { if (!googleTiles || !styleLoaded) return; for (const l of ["imagery", "places"]) if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "none"); };
+        map.on("load", () => { styleLoaded = true; hideOpen(); });
+        base.addListener?.("tilesloaded", () => { googleTiles = true; hideOpen(); });
         // A key refused for this address: back to the open imagery.
         offKey = onKeyRejected(() => { setGoogleOn(false); for (const l of ["imagery", "places"]) if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "visible"); });
       }
