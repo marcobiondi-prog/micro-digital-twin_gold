@@ -871,9 +871,16 @@ function OfficeScopePills({ value, office, offices }: { value: OfficeScope; offi
     ...names.map((name) => ({ id: `office:${name}` as OfficeScope, label: name, n: offices[name] ?? 0 })),
   ];
   const row = useRef<HTMLDivElement>(null);
-  useEffect(() => { row.current?.querySelector<HTMLElement>("[aria-checked=true]")?.scrollIntoView({ block: "nearest", inline: "nearest" }); }, [value]);
+  // Bring the chosen pill into view by scrolling the row only: scrollIntoView also scrolled the page down to it,
+  // so the dashboard opened at its history instead of its top.
+  useEffect(() => {
+    const r = row.current, a = r?.querySelector<HTMLElement>("[aria-checked=true]");
+    if (!r || !a) return;
+    if (a.offsetLeft < r.scrollLeft) r.scrollLeft = a.offsetLeft;
+    else if (a.offsetLeft + a.offsetWidth > r.scrollLeft + r.clientWidth) r.scrollLeft = a.offsetLeft + a.offsetWidth - r.clientWidth;
+  }, [value]);
   return (
-    <div ref={row} role="radiogroup" aria-label="Uffici" data-map-gestures="" className="flex touch-pan-x gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+    <div ref={row} role="radiogroup" aria-label="Uffici" data-map-gestures="" className="relative flex touch-pan-x gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
       {opts.map((o) => (
         <button key={o.id} type="button" role="radio" aria-checked={value === o.id} onClick={() => setOfficeScope(o.id)}
           aria-label={`${o.label}: ${o.n === 1 ? "1 intervento" : `${o.n} interventi`}`}
