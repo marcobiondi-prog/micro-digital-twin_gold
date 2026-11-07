@@ -4,8 +4,9 @@ import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Building2, Grape, LogIn, Mail, Trash2, UserRound, X } from "lucide-react";
 import { openAccount } from "@/lib/camera-dock";
+import { supabase } from "@/integrations/supabase/client";
 import { introSeen } from "@/lib/intro-seen";
-import { clearSectorGate, enterAsGuest, forgetKnownProId, rememberWantedSector, type KnownProId, saveProId, useAccountSector, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
+import { clearSectorGate, enterAsGuest, forgetKnownProId, keepProIdInAccount, rememberWantedSector, type KnownProId, saveProId, useAccountSector, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
 import { proSummary } from "@/models/professional-id";
 import { toast } from "sonner";
 import { useSignedIn } from "@/lib/use-signed-in";
@@ -68,17 +69,33 @@ export function SectorGate() {
 export function KnownProfiles({ kind }: { kind: ProKind }) {
   const all = useKnownProIds(kind);
   const accEmail = useAccountSector()?.email ?? null;
-  // Signed in, only this account's profiles (and those not tied to any account yet): another account's never shows.
-  const known = accEmail ? all.filter((k) => !k.acct?.email || k.acct.email === accEmail) : all;
-  const avatar = useAccountAvatar();
   const acc = useAccountSector();
-  const pick = async (k: ProId) => { if (!(await saveProId(k))) return; toast.success(`Bentornato, ${k.name}`, { description: `Ritrovi la cronologia ${k.kind === "funzionario" ? "della piazza" : "del vigneto"}.` }); };
-  // Signed in to an account of the other sector, these profiles cannot be used (the form below says why).
-  if (!known.length || (acc?.kind && acc.kind !== kind)) return null;
+  const avatar = useAccountAvatar();
+  // Every profile of the sector registered on this phone shows. Signed in, a profile tied to another personal account
+  // is not taken over: its card offers to sign in with that account instead.
+  const foreign = (k: KnownProId) => !!accEmail && !!k.acct?.email && k.acct.email !== accEmail;
+  // Signed in to an account of the other sector, its own profiles of this sector cannot be used (the form below says
+  // why); the other accounts' ones still show, to sign in with them.
+  const known = acc?.kind && acc.kind !== kind ? all.filter(foreign) : all;
+  const pick = async (k: KnownProId) => {
+    if (foreign(k)) {
+      // Sign out of this account (its profile kept in it) and open the sign-in: the sector stays wanted, so once in
+      // with that account its own profile of this sector comes back.
+      rememberWantedSector(kind);
+      await keepProIdInAccount();
+      await supabase.auth.signOut().catch(() => undefined);
+      toast(`Accedi con ${k.acct!.email}`, { description: `Il profilo di ${k.name} è legato a quell'account.` });
+      openAccount();
+      return;
+    }
+    if (!(await saveProId(k))) return;
+    toast.success(`Bentornato, ${k.name}`, { description: `Ritrovi la cronologia ${k.kind === "funzionario" ? "della piazza" : "del vigneto"}.` });
+  };
+  if (!known.length) return null;
   if (known.length > 0) return (
     <div className="space-y-2">
       {known.length > 1 && <p className="px-1 text-sm text-foreground/70">Su questo telefono ci sono {known.length} profili {kind === "funzionario" ? "del settore urbano" : "del settore agricolo"}: scorri e scegli chi sei.</p>}
-      <ProfileCarousel known={known} onPick={(k) => void pick(k)} />
+      <ProfileCarousel known={known} foreign={foreign} onPick={(k) => void pick(k)} />
     </div>
   );
   return (
@@ -105,7 +122,7 @@ export function KnownProfiles({ kind }: { kind: ProKind }) {
                 ) : (
                   <>
                     <p className="text-sm text-foreground/70">Su questo telefono si sono registrati {known.length} profili {kind === "funzionario" ? "del settore urbano" : "del settore agricolo"}: scegli chi sei e ritrovi la tua cronologia.</p>
-                    <ProfileCarousel known={known} onPick={(k) => void pick(k)} />
+                    <ProfileCarousel known={known} foreign={foreign} onPick={(k) => void pick(k)} />
                   </>
                 )}
               </div>
@@ -119,7 +136,7 @@ export function KnownProfiles({ kind }: { kind: ProKind }) {
  * initials), the name, the profile, the account's email, a white "Continua come …" and a bin that asks in place before
  * taking the profile off the phone. Flat with reduced motion.
  */
-function ProfileCarousel({ known, onPick }: { known: KnownProId[]; onPick: (k: KnownProId) => void }) {
+function ProfileCarousel({ known, foreign, onPick }: { known: KnownProId[]; foreign: (k: KnownProId) => boolean; onPick: (k: KnownProId) => void }) {
   const row = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
   const [asking, setAsking] = useState<string | null>(null);
@@ -191,10 +208,14 @@ function ProfileCarousel({ known, onPick }: { known: KnownProId[]; onPick: (k: K
                 </div>
               ) : (
                 <>
-                  <p className="text-xs text-foreground/60">Ti eri già registrato con questo profilo: continua e ritrovi la cronologia {k.kind === "funzionario" ? "della piazza" : "del vigneto"}.</p>
-                  <button type="button" onClick={() => (i === active ? onPick(k) : go(i))} aria-label={`Continua come ${k.name}`}
+                  <p className="text-xs text-foreground/60">{foreign(k)
+                    ? <>Questo profilo è di un altro account: accedi con {k.acct?.email} e ritrovi la cronologia {k.kind === "funzionario" ? "della piazza" : "del vigneto"}.</>
+                    : <>Ti eri già registrato con questo profilo: continua e ritrovi la cronologia {k.kind === "funzionario" ? "della piazza" : "del vigneto"}.</>}</p>
+                  <button type="button" onClick={() => (i === active ? onPick(k) : go(i))} aria-label={foreign(k) ? `Accedi con l'account di ${k.name}` : `Continua come ${k.name}`}
                     className="mt-auto inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
-                    <span className="truncate">Continua come {k.name.trim().split(/\s+/)[0]}</span><ArrowRight className="size-4 shrink-0" aria-hidden="true" />
+                    {foreign(k)
+                      ? <><LogIn className="size-4 shrink-0" aria-hidden="true" /><span className="truncate">Accedi come {k.name.trim().split(/\s+/)[0]}</span></>
+                      : <><span className="truncate">Continua come {k.name.trim().split(/\s+/)[0]}</span><ArrowRight className="size-4 shrink-0" aria-hidden="true" /></>}
                   </button>
                 </>
               )}
