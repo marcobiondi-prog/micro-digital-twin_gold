@@ -53,9 +53,9 @@ export function searchRegions(query: string): string[] {
 /** The region with exactly this name (accents, case and apostrophes aside), with its own spelling. */
 export const findRegion = (name: string): string | undefined => { const q = fold(name); return q ? REGIONS.find((r) => fold(r) === q) : undefined; };
 
+/** The offices that deal with the town's spaces (urban planning, public works, green, mobility); any other is written by name. */
 export const OFFICES = [
-  "Ufficio tecnico", "Lavori pubblici", "Urbanistica", "Edilizia privata", "Ambiente e verde pubblico", "Mobilità e traffico", "Patrimonio",
-  "Protezione civile", "Polizia locale", "Sviluppo economico", "Cultura e turismo", "Servizi sociali", "Segreteria e Giunta", "Altro",
+  "Urbanistica", "Ufficio tecnico", "Lavori pubblici", "Edilizia privata", "Ambiente e verde pubblico", "Mobilità e traffico", "Patrimonio", "Altro",
 ] as const;
 
 /** The offices matching what was typed (all of them, "Altro" aside, when nothing is), names starting with it first. */
