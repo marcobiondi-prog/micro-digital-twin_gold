@@ -189,19 +189,19 @@ export function MySensors({ kind }: { kind: "urban" | "vineyard" }) {
           <label className="block text-xs font-semibold">Nome
             <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder={kind === "urban" ? "Termometro sotto il pergolato" : "Sonda filare 3"} className="mt-1 h-10 w-full rounded-full border border-input bg-background px-3 text-sm font-normal" />
           </label>
-          <fieldset>
+          <fieldset className="min-w-0">
             <legend className="text-xs font-semibold">Cosa misura</legend>
-            <div className="mt-1 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]" data-map-gestures role="radiogroup">
+            <div className="mt-1 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Cosa misura">
               {KIND_LIST.map((k) => (
                 <button key={k} type="button" role="radio" aria-checked={sKind === k} onClick={() => setSKind(k)}
-                  className={cn("shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold", sKind === k ? "bg-foreground text-background" : "bg-background/60 text-muted-foreground")}>{SENSOR_KINDS[k].label}</button>
+                  className={cn("max-w-full rounded-full px-3 py-1.5 text-left text-xs font-semibold", sKind === k ? "bg-foreground text-background" : "bg-background/60 text-muted-foreground")}>{SENSOR_KINDS[k].label}</button>
               ))}
             </div>
           </fieldset>
           {kind === "vineyard" && (
-            <fieldset>
+            <fieldset className="min-w-0">
               <legend className="text-xs font-semibold">Zona</legend>
-              <div className="mt-1 flex gap-1.5" role="radiogroup">
+              <div className="mt-1 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Zona">
                 {[null, 0, 1, 2].map((z) => (
                   <button key={String(z)} type="button" role="radio" aria-checked={zone === z} onClick={() => setZone(z)}
                     className={cn("rounded-full px-3 py-1.5 text-xs font-semibold", zone === z ? "bg-foreground text-background" : "bg-background/60 text-muted-foreground")}>{z === null ? "Tutto il vigneto" : `Zona ${z + 1}`}</button>
