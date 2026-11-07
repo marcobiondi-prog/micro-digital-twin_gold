@@ -865,10 +865,10 @@ function WhenLine({ e }: { e: HistoryEntry }) {
 function OfficeScopePills({ value, office, offices }: { value: OfficeScope; office: string; offices: Record<string, number> }) {
   const total = Object.values(offices).reduce((t, n) => t + n, 0);
   const names = [...new Set([...OFFICES.filter((o) => o !== "Altro"), ...Object.keys(offices)])].filter((o) => o !== office);
-  const opts: Array<{ id: OfficeScope; label: string }> = [
-    { id: "mine", label: `Il mio ufficio · ${office}${offices[office] ? ` · ${offices[office]}` : ""}` },
-    { id: "all", label: `Tutti gli uffici${total ? ` · ${total}` : ""}` },
-    ...names.map((n) => ({ id: `office:${n}` as OfficeScope, label: `${n}${offices[n] ? ` · ${offices[n]}` : ""}` })),
+  const opts: Array<{ id: OfficeScope; label: string; n: number }> = [
+    { id: "mine", label: `Il mio ufficio · ${office}`, n: offices[office] ?? 0 },
+    { id: "all", label: "Tutti gli uffici", n: total },
+    ...names.map((name) => ({ id: `office:${name}` as OfficeScope, label: name, n: offices[name] ?? 0 })),
   ];
   const row = useRef<HTMLDivElement>(null);
   useEffect(() => { row.current?.querySelector<HTMLElement>("[aria-checked=true]")?.scrollIntoView({ block: "nearest", inline: "nearest" }); }, [value]);
@@ -876,8 +876,12 @@ function OfficeScopePills({ value, office, offices }: { value: OfficeScope; offi
     <div ref={row} role="radiogroup" aria-label="Uffici" data-map-gestures="" className="flex touch-pan-x gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
       {opts.map((o) => (
         <button key={o.id} type="button" role="radio" aria-checked={value === o.id} onClick={() => setOfficeScope(o.id)}
-          className={cn("h-9 shrink-0 whitespace-nowrap rounded-full px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", value === o.id ? "bg-foreground text-background" : "bg-foreground/[0.08] text-foreground/80")}>
+          aria-label={`${o.label}: ${o.n === 1 ? "1 intervento" : `${o.n} interventi`}`}
+          className={cn("inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full pl-4 pr-1.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", value === o.id ? "bg-foreground text-background" : "bg-foreground/[0.08] text-foreground/80")}>
           {o.label}
+          {/* The count in a round badge of its own, so it stands out from the name. */}
+          <span aria-hidden="true" className={cn("grid h-6 min-w-6 place-items-center rounded-full px-1.5 text-xs font-bold tabular-nums",
+            value === o.id ? "bg-brand-turquoise text-black" : o.n ? "bg-brand-turquoise/20 text-brand-turquoise ring-1 ring-brand-turquoise/50" : "bg-foreground/10 text-foreground/50")}>{o.n}</span>
         </button>
       ))}
     </div>
