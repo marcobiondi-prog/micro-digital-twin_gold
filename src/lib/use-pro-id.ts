@@ -454,13 +454,23 @@ export function useSyncProId() {
       const owned0 = ownOf(meta) ?? worked;
       if (owned0 === null) { adopted = ""; return; } // history not readable now: decide at the next sign-in or opening
       // A kind the account worked on is its own, whatever its saved data say.
-      const owned = [...new Set([...owned0, ...(worked ?? [])])];
-      const prev = (meta as Meta)?.pro_last ?? {};
+      const owned1 = [...new Set([...owned0, ...(worked ?? [])])];
+      const prev0 = (meta as Meta)?.pro_last ?? {};
       const saved = (meta as Meta)?.pro_id;
+      const email = await accountEmail(userId);
+      // The other way round too: profiles this phone tied to this account (recognised with its email, or picked
+      // with "Continua come …" before signing in) are its own, so signing in enters them by itself.
+      const tied: Partial<Record<ProKind, ProId>> = {};
+      if (email) for (const k of KNOWN_KINDS) {
+        const p = (knownSnap()[k] as KnownProId[]).find((q) => q.acct?.email?.toLowerCase() === email.toLowerCase());
+        if (p) { const { acct: _a, ...id } = p; void _a; tied[k] = id as ProId; }
+      }
+      const prev: Partial<Record<ProKind, ProId>> = { ...prev0 };
+      for (const k of KNOWN_KINDS) if (tied[k] && !isProId(prev[k])) prev[k] = tied[k];
+      const owned = [...new Set([...owned1, ...KNOWN_KINDS.filter((k) => !!tied[k])])];
       // A profile this phone knows as another personal account's (tied to another email: picked here while signed in
       // to this account by mistake) is not this account's own, even if it reached its data: dropped from it, with the
       // sector it gave, before the account's sector is read.
-      const email = await accountEmail(userId);
       // A profile of a kind the account has interventions of is the account's own even if this phone tied it to
       // another email (a tie made by mistake): the account's history wins, and the phone's tie is put right.
       const foreign = (p: unknown) => isProId(p) && !!email && !(worked ?? []).includes(p.kind) && KNOWN_KINDS.some((k) => (knownSnap()[k] as KnownProId[]).some((q) => sameProfile(q, p) && !!q.acct?.email && q.acct.email !== email));
@@ -498,8 +508,8 @@ export function useSyncProId() {
       if (pickedAt >= startedAt) return;
       // The other sector's registered profile stays saved in the account (pro_own and pro_last keep every kind owned),
       // only unused while the account is of this sector.
-      const clean = { pro_id: back, pro_last: accountLast(meta, back, ownedClean), pro_own: ownedClean, pro_sector: sector };
-      const dirty = ownedClean.length !== owned.length || legacy || (saved != null && !mine(saved)) || KINDS.some((k) => prev[k] != null && !owned.includes(k)) || rawSector !== sector;
+      const clean = { pro_id: back, pro_last: accountLast({ ...(meta as object), pro_last: prev }, back, ownedClean), pro_own: ownedClean, pro_sector: sector };
+      const dirty = ownedClean.length !== owned.length || legacy || KNOWN_KINDS.some((k) => !!tied[k] && !isProId(prev0[k])) || (saved != null && !mine(saved)) || KINDS.some((k) => prev[k] != null && !owned.includes(k)) || rawSector !== sector;
       if (back) {
         set(back);
         if (dirty || !mine(saved)) void supabase.auth.updateUser({ data: clean }).catch(() => undefined);
