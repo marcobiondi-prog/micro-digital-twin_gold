@@ -6,7 +6,7 @@ import { openAccount } from "@/lib/camera-dock";
 import { biometricAvailable, biometricName, biometricOn, disableBiometric, enableBiometric, useBiometricAccounts, useBiometricOn, verifyBiometric } from "@/lib/biometric";
 import { hasAccountSession, leaveAccount, signInAs, switchToAccount } from "@/lib/account-sessions";
 import { supabase } from "@/integrations/supabase/client";
-import { dropProIdOnDevice, getKnownProIds, getProId, keepProIdInAccount, openSectorGate, type KnownProId, rememberWantedSector, saveProId, sectorOf, useKnownProIds } from "@/lib/use-pro-id";
+import { dropProIdOnDevice, getKnownProIds, getProId, getSectorGateKind, keepProIdInAccount, openSectorGate, type KnownProId, rememberWantedSector, saveProId, sectorOf, useKnownProIds } from "@/lib/use-pro-id";
 import { type ProId } from "@/models/professional-id";
 
 /**
@@ -197,6 +197,22 @@ export function BiometricSignIn({ onDone }: { onDone?: () => void }) {
     try {
       const email = k.acct!.email!;
       const bio = available && biometricOn(proBioKey(k));
+      // The sector page is open on the other sector: one account, one sector — the account comes in but its profile
+      // does not; that sector's form shows the lock page ("Questo account è del settore …").
+      const asked = getSectorGateKind();
+      if (asked && asked !== k.kind) {
+        if (hasAccountSession(email)) {
+          if (bio && !(await checkProfileBiometric(k))) return;
+          if ((await switchToAccount(email)) !== true) { toast.error("Questo account va riconnesso", { description: "Entra una volta con la password o con Google." }); return; }
+          onDone?.();
+          openSectorGate(asked);
+          return;
+        }
+        rememberWantedSector(asked);
+        onDone?.();
+        await signInAs(email, { provider: k.acct?.provider, back: asked === "funzionario" ? "/urbano" : "/vigneto" });
+        return;
+      }
       if (hasAccountSession(email)) {
         if (await enterWithProfile(k, bio ? {} : { recognised: true })) onDone?.();
         return;

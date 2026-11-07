@@ -265,6 +265,8 @@ type GateAsk = { kind: ProKind | null; at: number };
 let gateAsk: GateAsk = { kind: null, at: 0 };
 const gateSubs = new Set<() => void>();
 export function openSectorGate(kind: ProKind | null) { gateAsk = { kind, at: Date.now() }; gateSubs.forEach((f) => f()); }
+/** The sector the sector page is open on, read outside React. */
+export const getSectorGateKind = (): ProKind | null => (gateAsk.at ? gateAsk.kind : null);
 export function clearSectorGate() { if (gateAsk.at) { gateAsk = { kind: null, at: 0 }; gateSubs.forEach((f) => f()); } }
 export function useSectorGateAsk(): GateAsk {
   return useSyncExternalStore((f) => { gateSubs.add(f); return () => { gateSubs.delete(f); }; }, () => gateAsk, () => gateAsk);
@@ -464,7 +466,7 @@ export const openingSettled: Promise<void> = typeof window === "undefined" ? Pro
 export function useSyncProId() {
   useEffect(() => {
     let adopted = "";
-    const adopt = async (userId: string, meta: unknown) => {
+    const adopt = async (userId: string, meta: unknown, signIn = false) => {
       if (adopted === userId) return;
       adopted = userId;
       const startedAt = Date.now();
@@ -540,8 +542,20 @@ export function useSyncProId() {
         prev[adding] = autoMade;
         if (!ownedClean.includes(adding)) ownedClean.push(adding);
       }
-      const own = sector ? ownedClean.filter((k) => k === sector) : ownedClean;
       const entering = gateAsk.kind ?? wantedSector();
+      // Signing in just now from the other sector's form (its "Aggiungi account", or the sector page open on it) with an
+      // account already of a sector: nothing enters — no profile is put in use — and that form opens, where the lock page
+      // says the account is of the other sector, with "Esci e usa un altro account".
+      const target = signIn ? adding0 ?? entering : null;
+      if (savedHolds && target && target !== savedSector) {
+        rememberWantedSector(null);
+        setAccountSector({ kind: savedSector, email, name: nameOf(meta) });
+        if (pickedAt >= startedAt) return;
+        set(null);
+        openSectorGate(target);
+        return;
+      }
+      const own = sector ? ownedClean.filter((k) => k === sector) : ownedClean;
       rememberWantedSector(null);
       // The account's own registered profiles come to this device too ("Continua come …" on its form).
       for (const k of own) { const p = prev[k]; if (isProId(p) && p.kind === k) { if (!lastSnap()[k]) keepLast(p); else keepKnown(p); } }
@@ -588,7 +602,7 @@ export function useSyncProId() {
     const { data } = supabase.auth.onAuthStateChange((event, s) => {
       if (event !== "SIGNED_OUT" && s) publish(s.user);
       if (event === "SIGNED_OUT") publish(null);
-      if (event === "SIGNED_IN" && s) void adopt(s.user.id, s.user.user_metadata).finally(() => settleOpening());
+      if (event === "SIGNED_IN" && s) void adopt(s.user.id, s.user.user_metadata, true).finally(() => settleOpening());
       if (event === "SIGNED_OUT") adopted = "";
       if (event === "SIGNED_OUT" && snapshot()) {
         const was = snapshot()!.kind;
