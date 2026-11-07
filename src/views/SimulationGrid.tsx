@@ -164,7 +164,14 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
   useEffect(() => { if (readGps() && appAllowed("posizione")) { const keep = keepRef.current; saveGpsPaused(keep); setLocating(true); setGps(true); setPaused(keep); } }, []);
   // Position revoked inside the app (Account → Autorizzazioni): the GPS goes off at once.
   const positionAllowed = useAppAllowed("posizione");
-  useEffect(() => { if (!positionAllowed) { setGps(false); setLocating(false); } }, [positionAllowed]);
+  useEffect(() => {
+    if (positionAllowed) return;
+    setGps((on) => {
+      if (on) toast("GPS spento", { description: "Hai revocato la posizione nell'app: la mappa non segue più dove sei." });
+      return false;
+    });
+    setLocating(false);
+  }, [positionAllowed]);
   const placeRef = useRef(initial); placeRef.current = initial;
   const selectRef = useRef(onSelect); selectRef.current = onSelect;
   useEffect(() => {
@@ -206,7 +213,11 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
   };
   const locate = () => {
     if (gps && paused) { resume(); return; }
-    if (gps) { setGps(false); saveGps(false); setPaused(false); saveGpsPaused(false); setLocating(false); return; }
+    if (gps) {
+      setGps(false); saveGps(false); setPaused(false); saveGpsPaused(false); setLocating(false);
+      toast("GPS spento", { description: "La mappa non segue più la tua posizione. Toccalo di nuovo per riaccenderlo." });
+      return;
+    }
     if (!guardUse("posizione")) return;
     setError(null); setLocating(true); setGps(true); saveGps(true);
   };
