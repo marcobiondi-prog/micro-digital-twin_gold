@@ -2,6 +2,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { isProId, type ProId, type ProKind } from "@/models/professional-id";
+import { getAccountAvatar } from "@/lib/account-avatar";
 
 /**
  * The professional profile in use: kept on this device (localStorage) and, signed in, in the account's user data too,
@@ -67,16 +68,52 @@ const knownSnap = (): Known => {
   for (const k of KNOWN_KINDS) { const p = lastSnap()[k]; if (p && !out[k].some((q) => sameProfile(q, p))) out[k] = [...out[k], p]; }
   return (known = out);
 };
-const keepKnown = (id: ProId) => {
+/** The personal account a profile was registered with: its email and a small copy of its picture (a data URL, so a
+ * signed link that expires never leaves the list without a face). */
+export type KnownAccount = { email?: string; pic?: string };
+export type KnownProId = ProId & { acct?: KnownAccount };
+const saveKnown = () => { try { window.localStorage.setItem(KNOWN_KEY, JSON.stringify(known)); } catch { /* memory only */ } };
+const keepKnown = (id: ProId, acct?: KnownAccount) => {
   const k = knownSnap();
-  known = { ...k, [id.kind]: [id, ...k[id.kind].filter((p) => !sameProfile(p, id))].slice(0, KNOWN_MAX) };
-  try { window.localStorage.setItem(KNOWN_KEY, JSON.stringify(known)); } catch { /* memory only */ }
+  const old = k[id.kind].find((p) => sameProfile(p, id)) as KnownProId | undefined;
+  const keep = acct ?? old?.acct;
+  const entry: KnownProId = keep ? { ...id, acct: keep } : { ...id };
+  known = { ...k, [id.kind]: [entry, ...k[id.kind].filter((p) => !sameProfile(p, id))].slice(0, KNOWN_MAX) };
+  saveKnown();
+  if (!acct) void attachAccount(id);
 };
+/** A 96 px JPEG of the account picture, or the picture's own link when it cannot be read (another site's picture). */
+async function smallPicture(src: string | null): Promise<string | undefined> {
+  if (!src) return undefined;
+  if (src.startsWith("data:")) return src;
+  try {
+    const blob = await (await fetch(src)).blob();
+    const bmp = await createImageBitmap(blob);
+    const side = 96, s = Math.min(bmp.width, bmp.height);
+    const c = document.createElement("canvas"); c.width = side; c.height = side;
+    c.getContext("2d")!.drawImage(bmp, (bmp.width - s) / 2, (bmp.height - s) / 2, s, s, 0, 0, side, side);
+    return c.toDataURL("image/jpeg", 0.8);
+  } catch { return /supabase\.co\/storage/.test(src) ? undefined : src; }
+}
+/** Ties a profile just registered (or brought back) to the personal account signed in now: its email and picture. */
+async function attachAccount(id: ProId) {
+  const { data } = await supabase.auth.getSession();
+  const user = data.session?.user;
+  if (!user) return;
+  const acct: KnownAccount = { ...(user.email ? { email: user.email } : {}) };
+  const pic = await smallPicture(getAccountAvatar());
+  if (pic) acct.pic = pic;
+  const k = knownSnap();
+  if (!k[id.kind].some((p) => sameProfile(p, id))) return;
+  known = { ...k, [id.kind]: k[id.kind].map((p) => (sameProfile(p, id) ? { ...p, acct } : p)) };
+  saveKnown();
+  subs.forEach((f) => f());
+}
 /** Takes a profile off this device's list of profiles registered before (it stays in the account it was saved to). */
 export function forgetKnownProId(id: ProId) {
   const k = knownSnap();
   known = { ...k, [id.kind]: k[id.kind].filter((p) => !sameProfile(p, id)) };
-  try { window.localStorage.setItem(KNOWN_KEY, JSON.stringify(known)); } catch { /* memory only */ }
+  saveKnown();
   const l = lastSnap();
   if (l[id.kind] && sameProfile(l[id.kind]!, id)) {
     const rest = { ...l }; const next = known[id.kind][0];
@@ -94,7 +131,7 @@ const keepLast = (id: ProId) => {
 };
 const EMPTY_KNOWN: Known = { agronomo: [], funzionario: [] };
 /** Every profile of that kind registered before on this device (or brought by the account), newest first. */
-export function useKnownProIds(kind: ProKind | null): ProId[] {
+export function useKnownProIds(kind: ProKind | null): KnownProId[] {
   const all = useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, knownSnap, () => EMPTY_KNOWN);
   return kind ? all[kind] : [];
 }

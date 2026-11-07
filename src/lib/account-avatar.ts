@@ -14,3 +14,5 @@ export function setAccountAvatar(next: string | null) {
 export function useAccountAvatar(): string | null {
   return useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, () => url, () => null);
 }
+/** The picture now shown, read outside React (kept with a professional profile when it is registered). */
+export const getAccountAvatar = (): string | null => url;

@@ -77,11 +77,12 @@ export function KnownProfiles({ kind }: { kind: ProKind }) {
                   <>
                     <div className="flex items-center gap-3.5">
                       <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-full bg-foreground/10 ring-2 ring-brand-turquoise/50">
-                        {avatar ? <img src={avatar} alt="Immagine del tuo account" referrerPolicy="no-referrer" className="size-full object-cover" /> : <UserRound className="size-7 text-foreground/60" aria-hidden="true" />}
+                        {(known[0]!.acct?.pic ?? avatar) ? <img src={known[0]!.acct?.pic ?? avatar!} alt="Immagine dell'account" referrerPolicy="no-referrer" className="size-full object-cover" /> : <UserRound className="size-7 text-foreground/60" aria-hidden="true" />}
                       </span>
                       <div className="min-w-0">
                         <p className="text-xl font-semibold">{known[0]!.name}</p>
                         <p className="text-sm text-foreground/70">{proSummary(known[0]!)}</p>
+                        {known[0]!.acct?.email && <p className="text-xs text-foreground/55 [overflow-wrap:anywhere]">{known[0]!.acct.email}</p>}
                       </div>
                     </div>
                     <p className="text-xs text-foreground/60">Ti eri già registrato con questo profilo: continua e ritrovi la cronologia {kind === "funzionario" ? "della piazza" : "del vigneto"}.</p>
@@ -96,12 +97,16 @@ export function KnownProfiles({ kind }: { kind: ProKind }) {
                     <ul className="space-y-2" aria-label="Profili registrati">
                       {known.map((k) => (
                         <li key={`${k.name}-${k.at}`} className="flex items-center gap-2 rounded-2xl bg-foreground/[0.06] ring-1 ring-foreground/10">
-                          <button type="button" onClick={() => pick(k)} aria-label={`Continua come ${k.name}, ${proSummary(k)}`}
+                          <button type="button" onClick={() => pick(k)} aria-label={`Continua come ${k.name}, ${proSummary(k)}${k.acct?.email ? `, ${k.acct.email}` : ""}`}
                             className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl p-3 text-left outline-none transition-colors hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-brand-turquoise">
-                            <span className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-turquoise/15 text-base font-semibold text-brand-turquoise ring-1 ring-brand-turquoise/40" aria-hidden="true">{initials(k.name)}</span>
+                            {/* The picture of the personal account it was registered with, else its initials. */}
+                            <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-full bg-brand-turquoise/15 text-base font-semibold text-brand-turquoise ring-1 ring-brand-turquoise/40" aria-hidden="true">
+                              {k.acct?.pic ? <img src={k.acct.pic} alt="" referrerPolicy="no-referrer" className="size-full object-cover" /> : initials(k.name)}
+                            </span>
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-[15px] font-semibold">{k.name}</span>
                               <span className="block text-xs leading-snug text-foreground/65 [overflow-wrap:anywhere]">{proSummary(k)}</span>
+                              {k.acct?.email && <span className="block text-xs leading-snug text-foreground/50 [overflow-wrap:anywhere]">{k.acct.email}</span>}
                             </span>
                             <ArrowRight className="size-4 shrink-0 text-foreground/60" aria-hidden="true" />
                           </button>
