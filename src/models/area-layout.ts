@@ -295,14 +295,21 @@ export function vineLayout(ring: Ring, mixes: ZoneMix[], edits: LayoutEdits = {}
   const sorted = [...cells].sort((a, b) => a.x - b.x || a.y - b.y);
   const zoneOf = new Map<Cell, number>(sorted.map((cell, k) => [cell, Math.min(n - 1, Math.floor((k * n) / sorted.length))]));
   const patches: Patch[] = [], lines: Line[] = [], zones: LatLng[] = [];
+  // "Solo quello disegnato": only the zones drawn for an intervention carry one; "Posizione migliore": the shade cloth
+  // on each zone's cells most in the summer sun (models/sun-exposure) instead of from the north.
+  const only = !!edits.onlyDrawn, best = !!edits.best && !only;
+  const ys = grid.xy.map((p) => p[1]);
+  const sun = best ? sunPath((Math.min(...ys) + Math.max(...ys)) / 2 / M + f.lat0) : [];
+  const sunOf = new Map<Cell, number>();
+  const sunny = (x: Cell) => { let v = sunOf.get(x); if (v === undefined) { v = sunShare(grid.xy, sun, x.x, x.y); sunOf.set(x, v); } return v; };
   for (let z = 0; z < n; z++) {
-    const mine = cells.filter((x) => zoneOf.get(x) === z), mix = mixes[z] ?? { irrigation: 0, shade: 0, windbreak: 0 };
+    const mine = cells.filter((x) => zoneOf.get(x) === z), mix = only ? { irrigation: 0, shade: 0, windbreak: 0 } : mixes[z] ?? { irrigation: 0, shade: 0, windbreak: 0 };
     if (!mine.length) continue;
     patches.push(...strips(f, c, mine, "zone", z));
     const mx = mine.reduce((s, x) => s + x.x, 0) / mine.length, my = mine.reduce((s, x) => s + x.y, 0) / mine.length;
     zones.push(toLL(f, mx, my));
     // Shade cloth: that share of the zone's cells, the northern rows first.
-    const cloth = [...mine].sort((a, b) => b.y - a.y || a.x - b.x).slice(0, Math.round((Math.max(0, Math.min(100, mix.shade)) / 100) * mine.length));
+    const cloth = [...mine].sort(best ? (a, b) => sunny(b) - sunny(a) || b.y - a.y : (a, b) => b.y - a.y || a.x - b.x).slice(0, Math.round((Math.max(0, Math.min(100, mix.shade)) / 100) * mine.length));
     patches.push(...strips(f, c, cloth, "cloth", z));
     // Irrigation: a main pipe along the zone's western end and a drip line on the rows, joined to it.
     if (mix.irrigation > 0) {
@@ -371,7 +378,7 @@ export function vineLayout(ring: Ring, mixes: ZoneMix[], edits: LayoutEdits = {}
     if (up && zoneOf.get(up) !== zoneOf.get(cell)) lines.push({ kind: "seam", line: [toLL(f, cell.x - c / 2, cell.y + c / 2), toLL(f, cell.x + c / 2, cell.y + c / 2)] });
   }
   // Windbreak: the edge nearest its handle (by default the westernmost edge), when there is any windbreak.
-  const strength = mixes.reduce((s, m) => s + m.windbreak, 0) / n;
+  const strength = only ? 0 : mixes.reduce((s, m) => s + m.windbreak, 0) / n;
   const mids = xy.map((p, i) => { const q = xy[(i + 1) % xy.length]!; return [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2] as [number, number]; });
   const target = edits.windAt ? toXY(f, edits.windAt) : mids.reduce((b, m) => (m[0] < b[0] ? m : b), mids[0]!);
   const e = mids.reduce((b, m, i) => (dist(m, target) < dist(mids[b]!, target) ? i : b), 0);

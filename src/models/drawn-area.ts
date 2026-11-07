@@ -151,6 +151,18 @@ export function vineLeversForZones(a: DrawnArea, now: { irrigation: number; shad
   return next.irrigation === now.irrigation && next.shade === now.shade && next.windbreak === now.windbreak ? null : next;
 }
 
+/** "Solo quello disegnato" in the vineyard: the levers set from the zones only — full drip (+16 %) with an Irrigazione
+ * zone, the Teli zones' share of the usable surface in 10 % steps, windbreak 70 % with a Frangivento zone, else 0. */
+export function vineLeversOfZones(a: DrawnArea): { irrigation: number; shade: number; windbreak: number } {
+  const usable = usableM2(a) || 1;
+  const m2 = (k: ZoneKind) => zonesOf(a).filter((z) => z.kind === k).reduce((s, z) => s + pinsM2(z.ring), 0);
+  return {
+    irrigation: m2("irrigazione") > 0 ? 16 : 0,
+    shade: m2("teli") > 0 ? Math.min(100, Math.max(10, Math.round((100 * m2("teli")) / usable / 10) * 10)) : 0,
+    windbreak: m2("frangivento") > 0 ? 70 : 0,
+  };
+}
+
 /**
  * The zones `ids` moved together by (dLat, dLng), with everything they hold (their trees, aiuole, pergolas, poles are
  * laid from the zone, so they follow; trees placed by hand inside them move along). Null when a moved zone would reach

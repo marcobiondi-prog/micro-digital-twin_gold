@@ -21,7 +21,7 @@ import { usePiazzaReading } from "@/models/sim-reading";
 import { Thermometer } from "lucide-react";
 import { SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import type { MovedPart } from "@/views/v10/SatelliteMap2D";
-import { drawnAreaFor, freeM2, leversForZones, vineLeversForZones, VINE_ZONE_KINDS, leversOfZones, lotsOf, MAX_PINS, moveZones, pinsM2, surfaceText, usableM2, ZONE_KINDS, ZONE_LABEL, zoneName, zonesOfArea, type DrawnArea, type SubArea, type ZoneKind } from "@/models/drawn-area";
+import { drawnAreaFor, freeM2, leversForZones, vineLeversForZones, vineLeversOfZones, VINE_ZONE_KINDS, leversOfZones, lotsOf, MAX_PINS, moveZones, pinsM2, surfaceText, usableM2, ZONE_KINDS, ZONE_LABEL, zoneName, zonesOfArea, type DrawnArea, type SubArea, type ZoneKind } from "@/models/drawn-area";
 import type { Ring } from "@/models/place-area";
 import { openSimTab, type SimKind } from "@/views/v8/console";
 import { PlaceSearch } from "@/views/SimulationGrid";
@@ -165,6 +165,12 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
     if (preview || !saved) return;
     // The vineyard: an Irrigazione, Teli d'ombra or Frangivento zone raises that lever on every vineyard zone (once per zone).
     if (kind === "vineyard") {
+      // "Solo quello disegnato": the levers follow the zones exactly.
+      if (saved.edits?.onlyDrawn) {
+        const next = vineLeversOfZones(saved), v = lab.vineyard;
+        if (v.zones.some((z) => z.irrigation !== next.irrigation || z.shade !== next.shade || z.windbreak !== next.windbreak)) setVineyard({ zones: v.zones.map((z) => ({ ...z, ...next })) });
+        return;
+      }
       const seen = seededZones(), fresh = new Set<string>();
       for (const z of zonesOfArea(saved)) if ((VINE_ZONE_KINDS as readonly string[]).includes(z.kind) && !seen.has(`${z.id}:${z.kind}`)) fresh.add(z.id);
       if (!fresh.size) return;
@@ -330,10 +336,17 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
       <AreaBar drawing={drawing} pins={ring.length} m2={ring.length >= 3 ? pinsM2(ring) : null} saved={!!saved} vineyard={kind === "vineyard"}
         onStart={() => { setArranging(false); startDrawing(); }} onUndo={() => setDraft((d) => d.slice(0, -1))} onCancel={() => setDrawing(false)} onFinish={finish} onRemove={remove} />
       {sim && !drawing && <SimBar sim={sim} when={reading?.when} arranging={arranging} edited={!!saved?.edits && Object.keys(saved.edits).length > 0} best={!!saved?.edits?.best}
-        only={!!saved?.edits?.onlyDrawn} canOnly={!!saved && zonesOfArea(saved).some((z) => ["alberi", "prato", "ombra", "nebulizzatori"].includes(z.kind))}
+        only={!!saved?.edits?.onlyDrawn} canOnly={!!saved && zonesOfArea(saved).some((z) => (kind === "urban" ? ["alberi", "prato", "ombra", "nebulizzatori"] : [...VINE_ZONE_KINDS] as string[]).includes(z.kind))}
         onOnly={() => {
           if (!saved) return;
-          if (saved.edits?.onlyDrawn) { setEdits({}); toast("Torna la disposizione automatica", { description: "Le leve tornano a mettere aiuole, pergolati e alberi anche fuori dalle zone." }); return; }
+          if (saved.edits?.onlyDrawn) { setEdits({}); toast("Torna la disposizione automatica", { description: kind === "urban" ? "Le leve tornano a mettere aiuole, pergolati e alberi anche fuori dalle zone." : "Le leve tornano a mettere irrigazione, teli e frangivento anche fuori dalle zone." }); return; }
+          if (kind === "vineyard") {
+            const next = vineLeversOfZones(saved);
+            setVineyard((v) => ({ zones: v.zones.map((z) => ({ ...z, ...next })), area: { ...saved, edits: { onlyDrawn: true } } }));
+            setArranging(false);
+            toast.success("Solo quello disegnato da te", { description: `Irrigazione +${next.irrigation} % · Teli ${next.shade} % · Frangivento ${next.windbreak} %: il bisogno di intervento conta solo le tue zone.` });
+            return;
+          }
           const next = leversOfZones(saved);
           setUrban({ ...next, treeCells: null, permeableCells: null, shadeCells: null, area: { ...saved, edits: { onlyDrawn: true } } });
           setArranging(false);
@@ -343,7 +356,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         onBest={() => {
           setEdits({ best: true });
           setArranging(false);
-          toast.success("Elementi nella posizione migliore", { description: "Pergolati, aiuole e alberi dove d'estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno all'area." });
+          toast.success("Elementi nella posizione migliore", { description: kind === "urban" ? "Pergolati, aiuole e alberi dove d'estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno all'area." : "I teli d'ombra sulle parti di ogni zona dove d'estate batte più sole (ore 10–18)." });
         }} />}
       {saved && !drawing && <ZonesBar area={saved} flow={kind === "urban" ? "piazza" : "vigneto"} onAdd={startZone} onEdit={editZone} onRemove={(id) => setZones(zonesOfArea(saved).filter((z) => z.id !== id))} />}
       </>}
@@ -551,22 +564,22 @@ function SimBar({ sim, when, arranging, edited, best, only, canOnly, onArrange, 
       {sim.kind === "piazza" && (sim.real?.length ?? 0) > 0 && <p className="text-sm text-muted-foreground">Già nell'area: {realCountText(sim.real ?? [])}. Gli interventi non ci vanno sopra (contorni tratteggiati sulla mappa 2D).</p>}
       <p className="text-sm text-muted-foreground">{arranging
         ? sim.kind === "piazza" ? `Trascina gli alberi, o le etichette Aiuole e Ombra.${(sim.inner ?? []).length ? " Le etichette con ✥ spostano le tue zone con tutto quello che contengono; \"✥ Tutte le zone\" le sposta insieme." : ""}` : `Trascina l'etichetta Frangivento verso il lato dove lo vuoi.${(sim.inner ?? []).length ? " Le etichette con ✥ spostano le tue zone; \"✥ Tutte le zone\" le sposta insieme." : ""}`
-        : only && sim.kind === "piazza"
-          ? "Solo quello disegnato da te: aiuole e pergolati sono le tue zone, gli alberi stanno nelle zone Alberi. Le leve della simulazione seguono le zone; se ne cambi una torna la disposizione automatica."
-        : best && sim.kind === "piazza"
-          ? `Posizione migliore: pergolati, aiuole e alberi dove d'estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno.${sim.data.sunny !== undefined ? ` Al sole per gran parte del giorno: ${Math.round(sim.data.sunny * 100)} % dell'area.` : ""}`
+        : only
+          ? sim.kind === "piazza" ? "Solo quello disegnato da te: aiuole e pergolati sono le tue zone, gli alberi stanno nelle zone Alberi. Le leve della simulazione seguono le zone; se ne cambi una torna la disposizione automatica." : "Solo quello disegnato da te: irrigazione, teli e frangivento stanno nelle tue zone. Le leve della simulazione seguono le zone; se ne cambi una torna la disposizione automatica."
+        : best
+          ? sim.kind === "piazza" ? `Posizione migliore: pergolati, aiuole e alberi dove d'estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno.${sim.data.sunny !== undefined ? ` Al sole per gran parte del giorno: ${Math.round(sim.data.sunny * 100)} % dell'area.` : ""}` : "Posizione migliore: i teli d'ombra sulle parti di ogni zona dove d'estate batte più sole (ore 10–18)."
           : "Segue le leve della simulazione: cambia gli alberi o le percentuali e la mappa si aggiorna."}</p>
-      {sim.kind === "piazza" && !canOnly && !only && !arranging && <p className="text-xs text-muted-foreground">Per vedere solo quello che disegni, aggiungi una zona Alberi, Aiuole o Pergolato.</p>}
+      {!canOnly && !only && !arranging && <p className="text-xs text-muted-foreground">Per vedere solo quello che disegni, aggiungi una zona {sim.kind === "piazza" ? "Alberi, Aiuole o Pergolato" : "Irrigazione, Teli d'ombra o Frangivento"}.</p>}
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={onArrange} aria-pressed={arranging} className={cn(barBtn, arranging ? "bg-foreground text-background" : "bg-foreground/[0.08]")}>
           {arranging ? <><Check className="size-4" aria-hidden="true" />Fatto</> : <><Hand className="size-4" aria-hidden="true" />Sposta elementi</>}
         </button>
-        {sim.kind === "piazza" && !arranging && (
+        {!arranging && (
           <button type="button" onClick={onOnly} disabled={!canOnly && !only} aria-pressed={only} className={cn(barBtn, only ? "bg-brand-turquoise/20 text-brand-turquoise ring-1 ring-brand-turquoise/40" : "bg-foreground/[0.08]", "disabled:opacity-40")}>
             <PenLine className="size-4" aria-hidden="true" />{only ? "Solo disegnato · attivo" : "Solo quello disegnato"}
           </button>
         )}
-        {sim.kind === "piazza" && !arranging && !only && (
+        {!arranging && !only && (
           <button type="button" onClick={onBest} aria-pressed={best} className={cn(barBtn, best ? "bg-brand-turquoise/20 text-brand-turquoise ring-1 ring-brand-turquoise/40" : "bg-foreground/[0.08]")}>
             <Sun className="size-4" aria-hidden="true" />{best ? "Posizione migliore · attiva" : "Posizione migliore"}
           </button>

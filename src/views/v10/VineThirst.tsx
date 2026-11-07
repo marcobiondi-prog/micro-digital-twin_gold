@@ -132,9 +132,16 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
   const cost = { total: targets.reduce((t, i) => ({ lo: t.lo + zoneCost(i).lo, hi: t.hi + zoneCost(i).hi }), { lo: 0, hi: 0 }), perHa: vineCost(m2, mix).perHa };
 
   // Every zone keeps its own mix written down, so the scope can change without the others moving.
-  const change = (patch: Partial<VineMix>) => setVineyard((v) => ({
-    zones: v.zones.map((z, i) => ({ ...z, ...(mixes[i] ?? NO_MIX), ...(targets.includes(i) ? { ...mix, ...patch } : {}) })),
-  }));
+  // With "Solo quello disegnato" on the map, a lever moved by hand goes back to the automatic layout (said once).
+  const change = (patch: Partial<VineMix>) => {
+    const a = vine.area;
+    const dropOnly = !!a?.edits?.onlyDrawn;
+    setVineyard((v) => ({
+      zones: v.zones.map((z, i) => ({ ...z, ...(mixes[i] ?? NO_MIX), ...(targets.includes(i) ? { ...mix, ...patch } : {}) })),
+      ...(dropOnly && a ? { area: { ...a, edits: (({ onlyDrawn: _off, ...rest }) => rest)(a.edits ?? {}) } } : {}),
+    }));
+    if (dropOnly) toast("Torna la disposizione automatica", { description: "Hai cambiato una leva: irrigazione, teli e frangivento vanno anche fuori dalle zone disegnate." });
+  };
   // Air temperature of the scope, simulated by hand (15–45 °C): the base the interventions start from.
   const airShown = Math.round(avg(targets.map((i) => vine.zones[i]?.temperature ?? 0)));
   const setAir = (v: number) => {

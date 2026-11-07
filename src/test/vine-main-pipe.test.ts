@@ -41,3 +41,19 @@ describe("vineyard zones with an intervention", () => {
     expect(zoned.lines.some((l) => l.kind === "wind")).toBe(true);
   });
 });
+
+describe("vineyard: only what was drawn", () => {
+  it("keeps the levers' cloth, drip lines and hedge off, the zones' ones on", async () => {
+    const { vineLayout } = await import("@/models/area-layout");
+    const lat = 41.8, lng = 14.9, dLat = 60 / 111320, dLng = 80 / (111320 * Math.cos((lat * Math.PI) / 180));
+    const ring: Array<[number, number]> = [[lat - dLat, lng - dLng], [lat - dLat, lng + dLng], [lat + dLat, lng + dLng], [lat + dLat, lng - dLng]];
+    const full = { irrigation: 20, shade: 100, windbreak: 100 };
+    const zone: Array<[number, number]> = [[lat - dLat / 2, lng - dLng / 2], [lat - dLat / 2, lng], [lat + dLat / 2, lng], [lat + dLat / 2, lng - dLng / 2]];
+    const auto = vineLayout(ring, [full, full, full])!;
+    const only = vineLayout(ring, [full, full, full], { onlyDrawn: true }, [{ kind: "teli", ring: zone }])!;
+    expect(only.lines.filter((l) => l.kind === "drip").length).toBe(0);
+    expect(only.lines.some((l) => l.kind === "wind")).toBe(false);
+    expect(only.patches.filter((p) => p.kind === "cloth").length).toBeGreaterThan(0);
+    expect(only.patches.filter((p) => p.kind === "cloth").length).toBeLessThan(auto.patches.filter((p) => p.kind === "cloth").length);
+  });
+});
