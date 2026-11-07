@@ -106,7 +106,7 @@ async function attachAccount(id: ProId) {
   const k = knownSnap();
   const entry = (k[id.kind] as KnownProId[]).find((p) => sameProfile(p, id));
   // A profile already tied to another personal account stays that account's.
-  if (!entry || (entry.acct?.email && entry.acct.email !== acct.email)) return;
+  if (!entry || (entry.acct?.email && entry.acct.email.toLowerCase() !== acct.email?.toLowerCase())) return;
   known = { ...k, [id.kind]: k[id.kind].map((p) => (sameProfile(p, id) ? { ...p, acct } : p)) };
   saveKnown();
   subs.forEach((f) => f());
@@ -130,7 +130,7 @@ export async function syncKnownAccounts(): Promise<void> {
   for (const kind of KNOWN_KINDS) {
     next[kind] = (k[kind] as KnownProId[]).map((p) => {
       const saved = lastOf[kind];
-      const mine = p.acct?.email === email || (isProId(saved) && sameProfile(p, saved)) || (!p.acct && inUse != null && sameProfile(p, inUse));
+      const mine = p.acct?.email?.toLowerCase() === email.toLowerCase() || (isProId(saved) && sameProfile(p, saved)) || (!p.acct && inUse != null && sameProfile(p, inUse));
       if (!mine) return p;
       const provider = user.app_metadata?.provider ? String(user.app_metadata.provider) : p.acct?.provider;
       const acct: KnownAccount = { email, ...((pic ?? p.acct?.pic) ? { pic: pic ?? p.acct!.pic! } : {}), ...(provider ? { provider } : {}) };
@@ -185,7 +185,7 @@ function retieKnown(id: ProId, email: string) {
   const k = knownSnap();
   let changed = false;
   const list = (k[id.kind] as KnownProId[]).map((p) => {
-    if (!sameProfile(p, id) || p.acct?.email === email) return p;
+    if (!sameProfile(p, id) || p.acct?.email?.toLowerCase() === email.toLowerCase()) return p;
     changed = true;
     return { ...p, acct: { email, ...(p.acct?.email === email ? { pic: p.acct?.pic } : {}) } };
   });
@@ -374,7 +374,7 @@ export async function saveProId(id: ProId | null): Promise<boolean> {
   const sector = data.session ? sectorOf(meta) : null;
   // Another personal account's profile (tied on this phone to another email) cannot be taken by this account.
   const email = data.session?.user.email;
-  if (id && email && (knownSnap()[id.kind] as KnownProId[]).some((q) => sameProfile(q, id) && !!q.acct?.email && q.acct.email !== email)) {
+  if (id && email && (knownSnap()[id.kind] as KnownProId[]).some((q) => sameProfile(q, id) && !!q.acct?.email && q.acct.email.toLowerCase() !== email.toLowerCase())) {
     toast.error("Questo profilo è di un altro account", { description: "Identificati con i tuoi dati, oppure accedi con l’account di quel profilo." });
     return false;
   }
@@ -405,7 +405,7 @@ export async function keepProIdInAccount(): Promise<void> {
   if (sector && sector !== id.kind) return;
   // Every kind the account registered stays owned (a sector switched back finds its profile again).
   const own = withKind(ownOf(meta) ?? [], id);
-  await supabase.auth.updateUser({ data: { pro_id: id, pro_last: accountLast(meta, id, own), pro_own: own } }).catch(() => undefined);
+  await supabase.auth.updateUser({ data: { pro_id: id, pro_last: accountLast(meta, id, own), pro_own: own, pro_left: false } }).catch(() => undefined);
 }
 
 /**
@@ -478,7 +478,7 @@ export function useSyncProId() {
       // sector it gave, before the account's sector is read.
       // A profile of a kind the account has interventions of is the account's own even if this phone tied it to
       // another email (a tie made by mistake): the account's history wins, and the phone's tie is put right.
-      const foreign = (p: unknown) => isProId(p) && !!email && !(worked ?? []).includes(p.kind) && KNOWN_KINDS.some((k) => (knownSnap()[k] as KnownProId[]).some((q) => sameProfile(q, p) && !!q.acct?.email && q.acct.email !== email));
+      const foreign = (p: unknown) => isProId(p) && !!email && !(worked ?? []).includes(p.kind) && KNOWN_KINDS.some((k) => (knownSnap()[k] as KnownProId[]).some((q) => sameProfile(q, p) && !!q.acct?.email && q.acct.email.toLowerCase() !== email.toLowerCase()));
       const ownedClean = owned.filter((k) => !foreign(prev[k]) && !(isProId(saved) && saved.kind === k && foreign(saved)));
       const rawSector = (meta as { pro_sector?: unknown } | null)?.pro_sector;
       // One account, one sector: only the account's own sector counts (an older account owning both keeps the one in
@@ -505,7 +505,11 @@ export function useSyncProId() {
       // The account's own registered profiles come to this device too ("Continua come …" on its form).
       for (const k of own) { const p = prev[k]; if (isProId(p) && p.kind === k) { if (!lastSnap()[k]) keepLast(p); else keepKnown(p); } }
       const mine = (p: unknown): p is ProId => isProId(p) && own.includes(p.kind) && !foreign(p);
-      const left = (meta as Meta)?.pro_left === true;
+      // "Esci dal profilo" now leaves the personal account too, so a sign-in always means "enter my profile": an older
+      // pro_left (written when leaving a profile kept the account signed in) no longer holds the profile back — it
+      // kept both accounts from being recognised — and is cleared.
+      const staleLeft = (meta as Meta)?.pro_left === true;
+      const left = false;
       const back = mine(saved) ? saved : left ? null : own.map((k) => prev[k]).filter(mine).sort((x, y) => (y.at > x.at ? 1 : -1))[0] ?? null;
       setAccountSector({ kind: sector, email, name: nameOf(meta) });
       // A profile chosen on this device while the account was being read (the history check takes a moment) wins: the
@@ -513,8 +517,8 @@ export function useSyncProId() {
       if (pickedAt >= startedAt) return;
       // The other sector's registered profile stays saved in the account (pro_own and pro_last keep every kind owned),
       // only unused while the account is of this sector.
-      const clean = { pro_id: back, pro_last: accountLast({ ...(meta as object), pro_last: prev }, back, ownedClean), pro_own: ownedClean, pro_sector: sector };
-      const dirty = ownedClean.length !== owned.length || legacy || KNOWN_KINDS.some((k) => !!tied[k] && !isProId(prev0[k])) || (saved != null && !mine(saved)) || KINDS.some((k) => prev[k] != null && !owned.includes(k)) || rawSector !== sector;
+      const clean = { pro_id: back, pro_last: accountLast({ ...(meta as object), pro_last: prev }, back, ownedClean), pro_own: ownedClean, pro_sector: sector, pro_left: false };
+      const dirty = ownedClean.length !== owned.length || legacy || KNOWN_KINDS.some((k) => !!tied[k] && !isProId(prev0[k])) || (saved != null && !mine(saved)) || KINDS.some((k) => prev[k] != null && !owned.includes(k)) || rawSector !== sector || staleLeft;
       if (back) {
         set(back);
         if (dirty || !mine(saved)) void supabase.auth.updateUser({ data: clean }).catch(() => undefined);
