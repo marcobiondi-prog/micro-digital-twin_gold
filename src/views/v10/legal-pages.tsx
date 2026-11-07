@@ -211,8 +211,13 @@ export function LicensesPage() {
           <li>Posizione: per trovare il luogo sulla mappa e per il GPS che ti segue. La posizione arriva dai sistemi satellitari qui sopra e non viene condivisa con altri.</li>
           <li>Fotocamera e microfono: per scattare foto, lo scatto multiplo e i video con l’audio. Foto e video restano nella tua simulazione, sul telefono o nel tuo account.</li>
           <li>Notifiche: per avvisarti del cambio dell’ora, anche con l’app in sottofondo.</li>
+          <li>Riconoscimento biometrico (Face ID o Touch ID su iPhone, impronta digitale o volto su Android, Windows Hello sul computer): solo se lo attivi su un profilo professionale, per rientrare in quel profilo e nel suo account senza password. Il riconoscimento lo fa il telefono: impronta e volto non escono mai dal telefono e l’app riceve solo il «sì» o il «no». Lo spegni quando vuoi dal profilo o dal pannello account.</li>
         </ul>
         <p>Il permesso vero lo dà e lo toglie il telefono. Posizione e fotocamera le puoi revocare anche dentro l’app, in qualsiasi momento, in <PageLink to="/privacy/autorizzazioni">Autorizzazioni</PageLink>: lì trovi anche dove toglierle dalle impostazioni del telefono.</p>
+      </InfoCard>
+      <InfoCard title="Riconoscimento biometrico">
+        <p>L’accesso con Face ID, Touch ID, impronta o volto usa le passkey, lo standard aperto Web Authentication (WebAuthn) del W3C e della FIDO Alliance, attraverso il riconoscimento già presente nel telefono o nel computer. L’app conserva solo un codice della chiave, su questo dispositivo.</p>
+        <p>Face ID e Touch ID sono marchi di Apple Inc.; Windows Hello è un marchio di Microsoft Corporation; i marchi appartengono ai loro titolari.</p>
       </InfoCard>
       <InfoCard title="Software">
         <p>Le librerie open source con cui è fatta l’app, con la loro licenza.</p>
