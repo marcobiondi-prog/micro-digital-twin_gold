@@ -124,19 +124,9 @@ export function KnownProfiles({ kind, onPicked }: { kind: ProKind; onPicked?: ()
   };
   // No profile of this sector on the phone yet (often the vineyard, the first time): the quick "Aggiungi account"
   // still shows, on its own, so another personal account can sign in here and bring its profile.
-  if (!known.length) return (
-    <div className="flex items-center gap-3.5 rounded-3xl border-2 border-dashed border-brand-turquoise/45 bg-[oklch(0.24_0.016_258/0.7)] p-4">
-      <span className="grid size-12 shrink-0 place-items-center rounded-full bg-brand-turquoise/15 text-brand-turquoise ring-2 ring-brand-turquoise/50" aria-hidden="true"><UserPlus className="size-6" /></span>
-      <div className="min-w-0 flex-1">
-        <p className="font-semibold">Aggiungi account</p>
-        <p className="text-xs text-foreground/65">Entra con un account Google o email {kind === "funzionario" ? "del settore urbano" : "del settore agricolo"}: il suo profilo si aggiunge qui.</p>
-      </div>
-      <button type="button" onClick={() => void addAccount()}
-        className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-white px-4 text-sm font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
-        <Plus className="size-4" aria-hidden="true" />Aggiungi
-      </button>
-    </div>
-  );
+  // No profile of this sector on the phone yet: the same carousel as the other sector, with only its last slide,
+  // "Aggiungi account".
+  if (!known.length) return <ProfileCarousel known={[]} foreign={foreign} onPick={(k) => void pick(k)} onAdd={() => void addAccount()} />;
   if (known.length > 0) return (
     <div className="space-y-2">
       {known.length > 1 && <p className="px-1 text-sm text-foreground/70">Su questo telefono ci sono {known.length} profili {kind === "funzionario" ? "del settore urbano" : "del settore agricolo"}: scorri e scegli chi sei.</p>}
@@ -231,7 +221,7 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
   return (
     <div className="space-y-3">
       <div ref={row} role="list" aria-label="Profili registrati" data-map-gestures=""
-        className="no-scrollbar -mx-6 flex snap-x snap-mandatory gap-3 overflow-x-auto px-[11%] py-4 touch-pan-x [scrollbar-width:none] sm:-mx-0">
+        className={`no-scrollbar -mx-6 flex snap-x snap-mandatory gap-3 overflow-x-auto px-[11%] py-4 touch-pan-x [scrollbar-width:none] sm:-mx-0 ${known.length ? "" : "justify-center"}`}>
         {known.map((k, i) => (
           <div key={keyOf(k)} role="listitem" className="w-[78%] shrink-0 snap-center">
             <div data-active={i === active || undefined}
