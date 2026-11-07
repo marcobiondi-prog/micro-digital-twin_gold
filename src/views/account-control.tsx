@@ -1,8 +1,9 @@
 import { keepProIdInAccount, openSectorGate, saveProId, useProId } from "@/lib/use-pro-id";
 import { DeviceCacheCard } from "@/views/v10/DeviceCache";
 import { AccountDevices } from "@/views/v10/AccountDevices";
-import { BiometricCard, BiometricSignIn } from "@/views/v10/Biometric";
 import { biometricOn } from "@/lib/biometric";
+import { proBioKey } from "@/views/v10/Biometric";
+import { getKnownProIds } from "@/lib/use-pro-id";
 import { leaveAccount } from "@/lib/account-sessions";
 import { dropProIdOnDevice } from "@/lib/use-pro-id";
 import { getMedia, removeMedia, useLabMedia } from "@/models/lab-media-store";
@@ -362,9 +363,10 @@ export function AccountControl() {
     queryClient.clear();
     if (!account?.guest) {
       await keepProIdInAccount();
-      // With the biometric sign-in on, "Esci" keeps the account on this phone (not ended), to enter it again with a
-      // glance or a touch; the professional profile leaves the device as with any sign-out.
-      if (account?.email && biometricOn(account.email)) {
+      // A professional profile of this account with Face ID / fingerprint on: "Esci" keeps the account on this phone
+      // (not ended), so taking that profile up again with a glance or a touch enters the account too; the profile
+      // leaves the device as with any sign-out.
+      if (account?.email && getKnownProIds().some((k) => k.acct?.email?.toLowerCase() === account.email.toLowerCase() && biometricOn(proBioKey(k)))) {
         dropProIdOnDevice();
         leaveAccount({ openPanel: false });
         return;
@@ -544,7 +546,6 @@ export function AccountControl() {
                 <p className="mt-1 text-xs text-muted-foreground">{account.guest ? "Accesso di base su questo dispositivo. Non è un account e non salva dati online." : "Accesso effettuato"}</p>
               </div>
               {cloudAccount && <StorageBar used={usage.used} share={usage.share} files={usage.files} google={usage.google} />}
-              {cloudAccount && account?.email && <BiometricCard email={account.email} />}
               {cloudAccount && <AccountDevices />}
               <DeviceCacheCard />
               {account.guest && <Button variant="outline" className="w-full" onClick={() => { sessionStorage.removeItem(guestKey); setAccount(null); changeMode("signup"); }}>Crea un account</Button>}
@@ -554,7 +555,6 @@ export function AccountControl() {
             </section>
           ) : (
             <section className="space-y-4">
-              <BiometricSignIn onDone={() => setOpen(false)} />
               <div className="flex gap-1 border-b" aria-label="Modalità account">
                 <Button variant="ghost" className={`rounded-none border-b-2 px-3 ${mode === "signin" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"}`} onClick={() => changeMode("signin")}>Accedi</Button>
                 <Button variant="ghost" className={`rounded-none border-b-2 px-3 ${mode === "signup" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"}`} onClick={() => changeMode("signup")}>Registrati</Button>

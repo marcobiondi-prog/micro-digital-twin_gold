@@ -5,6 +5,8 @@ import { useLocation, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Building2, Grape, LogIn, Mail, Pencil, Trash2, UserRound, X } from "lucide-react";
 import { openAccount } from "@/lib/camera-dock";
 import { leaveAccount, switchToAccount } from "@/lib/account-sessions";
+import { BioIcon, checkProfileBiometric, ProfileBioButton, proBioKey } from "@/views/v10/Biometric";
+import { useBiometricOn } from "@/lib/biometric";
 import { supabase } from "@/integrations/supabase/client";
 import { introSeen } from "@/lib/intro-seen";
 import { clearSectorGate, enterAsGuest, forgetKnownProId, dropProIdOnDevice, keepProIdInAccount, rememberWantedSector, renameKnownProId, sectorOf, switchAccountSector, type KnownProId, saveProId, useAccountSector, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
@@ -79,6 +81,8 @@ export function KnownProfiles({ kind }: { kind: ProKind }) {
   // why); the other accounts' ones still show, to sign in with them.
   const known = acc?.kind && acc.kind !== kind ? all.filter(foreign) : all;
   const pick = async (k: KnownProId) => {
+    // Face ID / fingerprint on for this profile: asked first.
+    if (!(await checkProfileBiometric(k))) return;
     const target = k.acct?.email ?? null;
     const flow = k.kind === "funzionario" ? "della piazza" : "del vigneto";
     // The profile's personal account is entered with it: at once when it is kept on this phone (no password, no
@@ -217,6 +221,7 @@ function ProfileCarousel({ known, foreign, onPick }: { known: KnownProId[]; fore
               <div className="flex items-center justify-between gap-2">
                 <p className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-turquoise">Ti abbiamo riconosciuto</p>
                 <div className="-mr-1.5 -mt-1.5 flex shrink-0">
+                <ProfileBioButton id={k} />
                 <button type="button" onClick={() => { setAsking(null); if (editing === keyOf(k)) setEditing(null); else { setEditing(keyOf(k)); setDraft(k.name); } }} aria-label={`Cambia il nome di ${k.name}`} title="Cambia nome"
                   className="grid size-9 place-items-center rounded-full text-foreground/50 outline-none transition-colors hover:bg-foreground/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand-turquoise">
                   <Pencil className="size-4" aria-hidden="true" />
@@ -264,7 +269,7 @@ function ProfileCarousel({ known, foreign, onPick }: { known: KnownProId[]; fore
                     className="mt-auto inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
                     {foreign(k)
                       ? <><LogIn className="size-4 shrink-0" aria-hidden="true" /><span className="truncate">Accedi come {k.name.trim().split(/\s+/)[0]}</span></>
-                      : <><span className="truncate">Continua come {k.name.trim().split(/\s+/)[0]}</span><ArrowRight className="size-4 shrink-0" aria-hidden="true" /></>}
+                      : <ContinueLabel k={k} />}
                   </button>
                 </>
               )}
@@ -277,6 +282,15 @@ function ProfileCarousel({ known, foreign, onPick }: { known: KnownProId[]; fore
       </div>}
     </div>
   );
+}
+
+/** "Continua come <name>", or with Face ID / fingerprint on for the profile, its icon and "con Face ID". */
+function ContinueLabel({ k }: { k: KnownProId }) {
+  const bio = useBiometricOn(proBioKey(k));
+  const first = k.name.trim().split(/\s+/)[0];
+  return bio
+    ? <><BioIcon className="size-4 shrink-0" /><span className="truncate">Continua come {first}</span></>
+    : <><span className="truncate">Continua come {first}</span><ArrowRight className="size-4 shrink-0" aria-hidden="true" /></>;
 }
 
 /** Two letters for a profile's round badge in the list ("Marco Biondi" → "MB"). */

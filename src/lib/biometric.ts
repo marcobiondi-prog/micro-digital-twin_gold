@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from "react";
 
 /**
- * Sign-in with the phone's biometrics (Face ID or Touch ID on iPhone, fingerprint or face on Android, Windows Hello on a
+ * The phone's biometrics on each professional profile (views/v10/Biometric: keys "pro:<kind>:<at>"), asked before
+ * taking a profile up again. Sign-in with the phone's biometrics (Face ID or Touch ID on iPhone, fingerprint or face on Android, Windows Hello on a
  * computer), through the browser's own passkey prompt (WebAuthn, platform authenticator, user verification required).
  *
  * It unlocks a personal account kept on this phone (lib/account-sessions): turned on for an account, entering it —
@@ -59,13 +60,13 @@ export function useBiometricAccounts(): string[] {
 }
 
 /** Turns the biometric sign-in on for this account: the phone asks its biometrics once to make the key. */
-export async function enableBiometric(email: string): Promise<{ ok: boolean; reason?: string }> {
+export async function enableBiometric(email: string, label = email): Promise<{ ok: boolean; reason?: string }> {
   try {
     const cred = await navigator.credentials.create({
       publicKey: {
         challenge: random(32),
         rp: { name: "Micro Digital Twin", id: window.location.hostname },
-        user: { id: random(16), name: email, displayName: email },
+        user: { id: random(16), name: label, displayName: label },
         pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
         authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required", residentKey: "discouraged" },
         timeout: 60_000,

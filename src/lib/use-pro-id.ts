@@ -201,6 +201,8 @@ const keepLast = (id: ProId) => {
 };
 const EMPTY_KNOWN: Known = { agronomo: [], funzionario: [] };
 /** Every profile of that kind registered before on this device (or brought by the account), newest first. */
+/** Every profile kept on this phone, both kinds. */
+export function getKnownProIds(): KnownProId[] { const k = knownSnap(); return [...k.agronomo, ...k.funzionario] as KnownProId[]; }
 export function useKnownProIds(kind: ProKind | null): KnownProId[] {
   const all = useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, knownSnap, () => EMPTY_KNOWN);
   return kind ? all[kind] : [];

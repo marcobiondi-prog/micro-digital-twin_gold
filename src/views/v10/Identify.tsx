@@ -7,6 +7,7 @@ import { dropProIdOnDevice, keepProIdInAccount, saveProId, switchAccountSector, 
 import { supabase } from "@/integrations/supabase/client";
 import { openAccount } from "@/lib/camera-dock";
 import { leaveAccount } from "@/lib/account-sessions";
+import { ProfileBioRow } from "@/views/v10/Biometric";
 import { loadComuni } from "@/lib/comuni";
 import { findComune, searchComuni, townDomain, type Comune } from "@/models/comuni";
 import { findRegion, officeOf, searchOffices, searchRegions } from "@/models/professional-id";
@@ -362,6 +363,7 @@ export function ProfileCard({ kind, go }: { kind: ProKind; go?: () => void }) {
           <Icon className="size-5" aria-hidden="true" />Vai {kind === "agronomo" ? "al vigneto" : "alla piazza"}
         </button>
       )}
+      <ProfileBioRow id={mine} />
       <button type="button" onClick={() => void leave()} className="flex h-11 w-full items-center justify-center gap-2 rounded-full text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
         <LogOut className="size-4" aria-hidden="true" />Esci dal profilo
       </button>
