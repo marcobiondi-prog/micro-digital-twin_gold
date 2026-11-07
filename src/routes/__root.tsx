@@ -561,7 +561,13 @@ function RootComponent() {
         sessionStorage.removeItem("mdt-auth-return");
         const pro = getProId();
         if (pro) openSimTab(pro.kind === "agronomo" ? "vineyard" : "urban", "mappa");
-        void navigate({ href: pro ? (pro.kind === "agronomo" ? "/vigneto" : "/urbano") : back ?? window.location.pathname, replace: true });
+        const target = pro ? (pro.kind === "agronomo" ? "/vigneto" : "/urbano") : back ?? window.location.pathname;
+        // Back from the simulation returns to the page that was open before Google's account chooser (not to the
+        // chooser itself): that page takes this entry's place and the simulation is pushed after it.
+        if (back && back !== target) {
+          await navigate({ href: back, replace: true });
+          void navigate({ href: target });
+        } else void navigate({ href: target, replace: true });
       })();
       return;
     }

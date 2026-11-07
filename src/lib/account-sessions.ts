@@ -99,7 +99,7 @@ export async function signInAs(email: string, opts: { provider?: string | undefi
   if (google) {
     const back = opts.back ?? window.location.pathname + window.location.search;
     try { sessionStorage.setItem("mdt-auth-return", back); } catch { /* none */ }
-    const r = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin + back.split("?")[0], queryParams: { login_hint: email } } });
+    const r = await googleOAuth(window.location.origin + back.split("?")[0], { login_hint: email });
     if (!r.error) return;
   }
   window.dispatchEvent(new CustomEvent("mdt-open-account", { detail: { email } }));
@@ -112,6 +112,17 @@ export async function signInAs(email: string, opts: { provider?: string | undefi
 export async function addGoogleAccount(): Promise<boolean> {
   const back = window.location.pathname + window.location.search;
   try { sessionStorage.setItem("mdt-auth-return", back); } catch { /* none */ }
-  const r = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin + window.location.pathname, queryParams: { prompt: "select_account" } } });
+  const r = await googleOAuth(window.location.origin + window.location.pathname, { prompt: "select_account" });
   return !r.error;
+}
+
+/**
+ * Google's sign-in, opened in place of the page (location.replace): the page left is not kept twice in the history,
+ * and back from the app after the sign-in returns to it rather than to Google's account chooser.
+ */
+export async function googleOAuth(redirectTo: string, queryParams?: Record<string, string>): Promise<{ error: Error | null }> {
+  const r = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo, skipBrowserRedirect: true, ...(queryParams ? { queryParams } : {}) } });
+  if (r.error || !r.data?.url) return { error: r.error ?? new Error("Accesso Google non disponibile") };
+  window.location.replace(r.data.url);
+  return { error: null };
 }

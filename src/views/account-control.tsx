@@ -4,7 +4,7 @@ import { AccountDevices } from "@/views/v10/AccountDevices";
 import { biometricOn } from "@/lib/biometric";
 import { BiometricSignIn, leaveProfile, ProfileBioSwitch, proBioKey } from "@/views/v10/Biometric";
 import { getKnownProIds } from "@/lib/use-pro-id";
-import { leaveAccount } from "@/lib/account-sessions";
+import { googleOAuth, leaveAccount } from "@/lib/account-sessions";
 import { keepLink, keptLink, LINK_TTL_S } from "@/lib/signed-links";
 import { dropProIdOnDevice } from "@/lib/use-pro-id";
 import { getMedia, removeMedia, useLabMedia } from "@/models/lab-media-store";
@@ -428,7 +428,7 @@ export function AccountControl() {
     try {
       // Remember the current section so the post-login reload stays here.
       sessionStorage.setItem("mdt-auth-return", window.location.pathname + window.location.search);
-      const result = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin + window.location.pathname } });
+      const result = await googleOAuth(window.location.origin + window.location.pathname);
       if (result.error) setNotice(result.error.message);
     } catch { setNotice("Accesso Google non disponibile. Riprova."); }
     finally { setPending(false); }
