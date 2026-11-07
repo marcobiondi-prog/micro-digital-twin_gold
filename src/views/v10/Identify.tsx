@@ -248,6 +248,8 @@ export function IdentifyForm({ kind, onDone }: { kind: ProKind; onDone: () => vo
 
 const SECTOR_NAME: Record<ProKind, string> = { funzionario: "urbano", agronomo: "agricolo" };
 const SECTOR_PLACE: Record<ProKind, string> = { funzionario: "la piazza", agronomo: "il vigneto" };
+/** "Entra come <own profile>" on the lock: off for now (only the notice and "Esci e usa un altro account"); true restores it. */
+const LOCK_ENTER_OWN = false;
 /**
  * Signed in to a personal account of the other sector: each account is for one sector only, so this one cannot open
  * the other sector's profile — sign out and use (or create) another personal account for it.
@@ -258,6 +260,7 @@ export function AccountSectorLock({ kind, account, email }: { kind: ProKind; acc
   // from the other sector's form never leaves one stuck on the lock.
   const [own, setOwn] = useState<ProId | null>(null);
   useEffect(() => {
+    if (!LOCK_ENTER_OWN) return;
     void supabase.auth.getSession().then(({ data }) => {
       const p = (data.session?.user.user_metadata as { pro_last?: Record<string, unknown> } | undefined)?.pro_last?.[account];
       setOwn(isProId(p) && p.kind === account ? p : null);
