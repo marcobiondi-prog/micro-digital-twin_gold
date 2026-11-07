@@ -2,7 +2,7 @@ import { historyHome } from "@/lib/back-to";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { UpdatePill } from "@/views/UpdatePill";
 import { Outlet, Link, createRootRouteWithContext, useLocation, useNavigate, useRouter, HeadContent, Scripts, type ErrorComponentProps } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
@@ -470,15 +470,14 @@ function RootComponent() {
   const navigate = useNavigate();
   const location = useLocation();
   const slidePath = useRef<string | null>(null);
-  useEffect(() => {
-    // Each page slides in from the side its menu entry sits on: a later entry from the right, an earlier one from the left.
+  useLayoutEffect(() => {
+    // Every page opens sliding in from the right towards the left, like a page pushed on a phone (laid out before
+    // paint, so it never shows at rest first); none on the app's first page nor with reduced motion.
     const prev = slidePath.current;
     slidePath.current = location.pathname;
     const main = document.getElementById("main-content");
     if (!prev || prev === location.pathname || !main || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const a = nav.findIndex((n) => n.to === prev), b = nav.findIndex((n) => n.to === location.pathname);
-    const from = a >= 0 && b >= 0 && b < a ? -40 : 40;
-    main.animate([{ opacity: 0, transform: `translateX(${from}px)` }, { opacity: 1, transform: "translateX(0)" }], { duration: 300, easing: "cubic-bezier(0.22, 1, 0.36, 1)" });
+    main.animate([{ transform: "translate3d(100%,0,0)", opacity: 0.6 }, { transform: "translate3d(0,0,0)", opacity: 1 }], { duration: 380, easing: "cubic-bezier(0.22, 1, 0.36, 1)" });
   }, [location.pathname]);
   useEffect(() => {
     // No pinch-zoom on phones or tablets. user-scalable=no is ignored by iPadOS Safari, by
