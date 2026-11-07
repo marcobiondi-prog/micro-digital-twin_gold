@@ -5,12 +5,13 @@ import { getMedia, removeMedia, useLabMedia } from "@/models/lab-media-store";
 import { CLOUD_QUOTA, bytesText, usageTone, useCloudUsage } from "@/lib/use-cloud-usage";
 import { ProfileIcon } from "@/views/ProfileIcon";
 import { proSummary } from "@/models/professional-id";
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ComponentType, type FormEvent } from "react";
+import { useCallback, useContext, useEffect, useRef, useState, type ChangeEvent, type ComponentType, type FormEvent } from "react";
 import { LogOut, UserRound, Mail, LockKeyhole, Camera, ShieldCheck, ChevronRight, LoaderCircle, Trash2, RefreshCw } from "lucide-react";
 import { useUpdateProgress } from "@/lib/update-progress";
 import { buildLabel, checkForUpdate } from "@/lib/app-version";
 import { Link } from "@tanstack/react-router";
-import { InfoNav, type InfoPath } from "@/views/v10/InfoPage";
+import { InfoNav, InfoPage, type InfoPath } from "@/views/v10/InfoPage";
+import { useSignedIn } from "@/lib/use-signed-in";
 import { pushBackGuard } from "@/hooks/use-back-close";
 import { PermissionsPage } from "@/views/v10/Permissions";
 import { AboutPage, ContactsPage, CookiePage, FaqPage, LicensesPage, PlansPage, PrivacyPage, PrivacyPrefsPage, TermsPage } from "@/views/v10/legal-pages";
@@ -83,6 +84,35 @@ const LINK_GROUPS: Array<{ title: string; links: Array<[string, InfoPath]> }> = 
   { title: "Privacy", links: [["Informativa sui cookie", "/privacy/cookie"], ["Informativa sulla privacy", "/privacy/informativa"], ["Preferenze privacy", "/privacy/preferenze"], ["Autorizzazioni", "/privacy/autorizzazioni"]] },
   { title: "Legale", links: [["Licenze", "/legale/licenze"], ["Termini di servizio", "/legale/termini"]] },
 ];
+
+/** The panel's "Piani e informazioni" page: the grouped rows, each opening its own page (back returns here). */
+function InfoMenu() {
+  const nav = useContext(InfoNav);
+  const { signedIn, demo } = useSignedIn();
+  const premium = signedIn || demo;
+  return (
+    <InfoPage title="Piani e informazioni">
+      <nav aria-label="Piani e informazioni" className="space-y-3">
+        {LINK_GROUPS.map((g) => (
+          <section key={g.title} className="rounded-3xl bg-foreground/[0.05] px-5 py-3">
+            <h3 className="py-2 text-base font-semibold">{g.title}</h3>
+            <ul>
+              {g.links.map(([label, to]) => (
+                <li key={to}>
+                  <button type="button" onClick={() => nav?.open(to)} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl text-left text-[15px] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+                    <span className="min-w-0 flex-1">{label}</span>
+                    {to === "/piani" && <span className="shrink-0 text-sm text-muted-foreground">Il tuo: {premium ? "Premium" : "Free"}</span>}
+                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </nav>
+    </InfoPage>
+  );
+}
 
 /** The ring round the account picture: a faint track and the share of the 50 GB in use (always a sliver once something is stored). */
 function StorageRing({ share }: { share: number }) {
@@ -379,15 +409,21 @@ export function AccountControl() {
   };
 
   // The pages open inside the panel, which stays open: the arrow, a swipe to the right or the phone's Back return to the list.
-  const [page, setPage] = useState<InfoPath | null>(null);
-  const openPage = (to: InfoPath) => {
+  // "menu" is the page listing Piani, Progetto, Aiuto, Privacy and Legale; a page opened from it goes back to it.
+  const [page, setPage] = useState<InfoPath | "menu" | null>(null);
+  const fromMenu = useRef(false);
+  const openPage = (to: InfoPath | "menu") => {
     if (!page) window.history.pushState({ ...(window.history.state ?? {}), __panel: true, __accountPage: true }, "");
+    fromMenu.current = page === "menu" && to !== "menu" ? true : to === "menu" ? false : fromMenu.current;
     setPage(to);
     document.querySelector(".account-panel")?.scrollTo({ top: 0 });
   };
-  const closePage = () => { if (window.history.state?.__accountPage) window.history.back(); else setPage(null); };
-  // While a page shows, the Back gesture returns to the list instead of closing the panel.
-  useEffect(() => (page ? pushBackGuard(() => { setPage(null); return true; }) : undefined), [page]);
+  const closePage = () => {
+    if (page !== "menu" && fromMenu.current) { fromMenu.current = false; setPage("menu"); return; }
+    if (window.history.state?.__accountPage) window.history.back(); else setPage(null);
+  };
+  // While a page shows, the Back gesture returns to the menu or the list instead of closing the panel.
+  useEffect(() => (page ? pushBackGuard(() => { if (page !== "menu" && fromMenu.current) { fromMenu.current = false; setPage("menu"); } else setPage(null); return true; }) : undefined), [page]);
   const changeOpen = (next: boolean) => {
     // Closing with a page open drops its history step too (the panel's own step goes with the panel).
     if (!next && page) { setPage(null); if (window.history.state?.__accountPage) window.history.back(); }
@@ -418,7 +454,7 @@ export function AccountControl() {
         </span>
       <DialogContent ref={placePanel} overlayClassName="account-overlay" className="account-panel flex max-h-[min(680px,90dvh)] w-[min(420px,calc(100vw-2rem))] flex-col gap-0 overflow-y-auto rounded-lg border bg-popover p-0 text-popover-foreground shadow-xl sm:rounded-lg">
         {page ? (() => {
-          const Page = PAGES[page];
+          const Page = page === "menu" ? InfoMenu : PAGES[page];
           return (
             // A page inside the panel: it slides in, follows a finger dragging it to the right and goes back past 70 px.
             <div className="touch-pan-y px-5 py-5 animate-in fade-in-0 slide-in-from-right-6 duration-200 motion-reduce:animate-none"
@@ -519,25 +555,13 @@ export function AccountControl() {
               {DEMO_LOGIN_AVAILABLE && <Button variant="outline" className="w-full border-dashed" onClick={() => { setDemoSignedIn(true); setOpen(false); }}>Simula l’accesso (solo anteprima)</Button>}
             </section>
           )}
-          {/* Help, privacy and legal, as grouped rows; each opens its own page. */}
-          <nav aria-label="Aiuto e informazioni" className="space-y-3 border-t pt-6">
-            {LINK_GROUPS.map((g) => (
-              <section key={g.title} className="rounded-3xl bg-foreground/[0.05] px-5 py-3">
-                <h3 className="py-2 text-base font-semibold">{g.title}</h3>
-                <ul>
-                  {g.links.map(([label, to]) => (
-                    <li key={to}>
-                      <button type="button" onClick={() => openPage(to)} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl text-left text-[15px] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
-                        <span className="min-w-0 flex-1">{label}</span>
-                        {to === "/piani" && <span className="shrink-0 text-sm text-muted-foreground">Il tuo: {premiumPlan ? "Premium" : "Free"}</span>}
-                        <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-          </nav>
+          {/* Plans, project, help, privacy and legal live on their own page in the panel: one row here opens it. */}
+          <div className="border-t pt-6">
+            <button type="button" onClick={() => openPage("menu")} className="flex w-full items-center gap-3 rounded-3xl bg-foreground/[0.05] px-5 py-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <span className="min-w-0 flex-1"><span className="block text-base font-semibold">Piani e informazioni</span><span className="block text-sm text-muted-foreground">Piano {premiumPlan ? "Premium" : "Free"} · Chi siamo · Aiuto · Privacy · Legale</span></span>
+              <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            </button>
+          </div>
           <AppVersion />
           {/* Twin closes the panel: still (no animation, no name), smiling. */}
           <TwinStill className="mx-auto block h-16 w-auto" />
