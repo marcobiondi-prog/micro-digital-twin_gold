@@ -1,6 +1,8 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useSwipeBack } from "@/lib/use-swipe-back";
+import { useBackClose } from "@/hooks/use-back-close";
+import { openSimTab } from "@/views/v8/console";
 import { ArrowLeft, ArrowRight, Building2, Grape, ScanLine, X } from "lucide-react";
 import { openAccount, setCameraSheetOpen } from "@/lib/camera-dock";
 import { AI_STANDBY } from "@/lib/ai-standby";
@@ -12,7 +14,7 @@ import { TwinMascot } from "@/views/TwinMascot";
 import { NavigationArrows } from "@/views/navigation-arrows";
 import { THEME_DARK, THEME_META } from "@/views/theme-toggle";
 import { introSeen, markIntroSeen } from "@/lib/intro-seen";
-import { enterAsGuest, useProId } from "@/lib/use-pro-id";
+import { enterAsGuest, getProId, useProId } from "@/lib/use-pro-id";
 import { proSummary, type ProKind } from "@/models/professional-id";
 import { IdentifyForm, profileIntro } from "@/views/v10/Identify";
 
@@ -184,8 +186,19 @@ export function Tutorial() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setAgain(fromInfo());
-    setSkip(introSeen() && !params.has("rivedi") && !params.has("scenario"));
+    const skipNow = introSeen() && !params.has("rivedi") && !params.has("scenario");
+    setSkip(skipNow);
     window.scrollTo(0, 0);
+    if (!skipNow) return;
+    // Reached again later (Back from /scegli, an old link): the root's landing runs only on a fresh open, so this page
+    // moves on by itself instead of staying an empty dark screen.
+    const vine = getProId()?.kind === "agronomo";
+    const id = window.setTimeout(() => {
+      if (window.location.pathname !== "/") return;
+      openSimTab(vine ? "vineyard" : "urban", "mappa");
+      void navigate({ to: vine ? "/vigneto" : "/urbano", replace: true });
+    }, 450);
+    return () => window.clearTimeout(id);
   }, []);
   const count = STEPS.length + 1;
   const last = page === count - 1;
@@ -295,6 +308,8 @@ export function Choice() {
   const formRef = useRef<HTMLDivElement>(null);
   const backToChoice = useCallback(() => setIdentify(null), []);
   useSwipeBack(formRef, identify ? backToChoice : null);
+  // The phone's Back (and its edge-swipe gesture) closes the form too, instead of leaving the page for the tutorial.
+  useBackClose(identify !== null, backToChoice);
   const go = (it: Item) => void navigate({ to: it.id === "urban" ? "/urbano" : "/vigneto" });
   const open = (it: Item) => {
     if (it.id === "camera") { setCameraSheetOpen(true); return; }

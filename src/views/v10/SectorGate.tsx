@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSwipeBack } from "@/lib/use-swipe-back";
+import { useBackClose } from "@/hooks/use-back-close";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Building2, Grape, LogIn, UserRound } from "lucide-react";
@@ -67,6 +68,8 @@ function SectorPage({ start }: { start: ProKind | null }) {
   const formRef = useRef<HTMLElement>(null);
   const backToSectors = useCallback(() => setKind(null), []);
   useSwipeBack(formRef, kind ? backToSectors : null);
+  // The phone's Back closes the form and shows the two sectors again.
+  useBackClose(kind !== null, backToSectors);
   // The profile of this kind registered before (on this device or in the account): recognised, one tap brings it back
   // with its project's history.
   const previous = useLastProId(kind);
