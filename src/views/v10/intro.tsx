@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Building2, Grape, ScanLine, X } from "lucide-react";
-import { setCameraSheetOpen } from "@/lib/camera-dock";
+import { openAccount, setCameraSheetOpen } from "@/lib/camera-dock";
 import { AI_STANDBY } from "@/lib/ai-standby";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { useInstalledApp } from "@/lib/installed-app";
@@ -288,6 +288,7 @@ export function Choice() {
   const navigate = useNavigate();
   const ai = useAiReadyHome();
   const proId = useProId();
+  const { signedIn } = useSignedIn();
   const [identify, setIdentify] = useState<ProKind | null>(null);
   const go = (it: Item) => void navigate({ to: it.id === "urban" ? "/urbano" : "/vigneto" });
   const open = (it: Item) => {
@@ -362,7 +363,12 @@ export function Choice() {
               Entra come ospite<ArrowRight className="size-4" aria-hidden="true" />
             </Link>
           )}
-          <Link to="/benvenuto" className="inline-flex h-12 items-center justify-center rounded-full text-sm font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">Salta, vai al benvenuto</Link>
+          {/* Who already has an account signs in here: the account's own profile comes back and its simulation opens. */}
+          {!signedIn && (
+            <button type="button" onClick={openAccount} className="inline-flex h-12 items-center justify-center gap-1.5 rounded-full text-sm font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+              Hai già un account?<span className="text-foreground">Accedi</span>
+            </button>
+          )}
         </div>
       </section>
     </div>

@@ -591,6 +591,8 @@ function RootComponent() {
       >
         Salta al contenuto principale
       </a>
+      {/* The entrance pages have no header, but their "Accedi" opens the account panel: its control is mounted hidden. */}
+      {intro && <div hidden><AccountControl /></div>}
       {/* The opening page (/) stands alone: no header, no menus, no footer. */}
       {!intro && <>
       {/* v8: a solid console top bar painted with the page's own ambient light, so it carries the same shades without being see-through. */}
