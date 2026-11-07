@@ -478,6 +478,12 @@ function wantedSector(): ProKind | null {
  */
 /** Settles once the opening's session read (and, signed in, the account's profile) is done: the preloader waits for it. */
 let settleOpening: () => void = () => {};
+/** Resolves once the next sign-in's account has been read (its profile in use, or the sector page asked). */
+let adoptWaiters: Array<() => void> = [];
+export function nextAdoptDone(ms = 7000): Promise<void> {
+  return new Promise((r) => { adoptWaiters.push(r); setTimeout(r, ms); });
+}
+function flushAdopt() { const w = adoptWaiters; adoptWaiters = []; w.forEach((f) => f()); }
 export const openingSettled: Promise<void> = typeof window === "undefined" ? Promise.resolve() : new Promise((r) => { settleOpening = r; });
 export function useSyncProId() {
   useEffect(() => {
@@ -538,7 +544,7 @@ export function useSyncProId() {
       const onlyWorked: ProKind | null = worked && worked.length === 1 ? worked[0]! : null;
       // Added with "Aggiungi account" from a sector's form: an account with no sector yet (never used in the app) goes
       // to that sector. One account, one sector: an account already of the other sector keeps it.
-      const adding0 = fromSignIn ? takeAddingSector() : null;
+      const adding0 = fromSignIn || signIn ? takeAddingSector() : null;
       const adding = adding0 && !savedSector && !onlyWorked ? adding0 : null;
       // One account, one sector: an account whose saved sector has its own profile stays there, whatever form or page
       // it signs in from; only an account with no sector yet (or whose saved sector has no profile of its own, a wrong
@@ -622,7 +628,7 @@ export function useSyncProId() {
     const { data } = supabase.auth.onAuthStateChange((event, s) => {
       if (event !== "SIGNED_OUT" && s) publish(s.user);
       if (event === "SIGNED_OUT") publish(null);
-      if (event === "SIGNED_IN" && s) void adopt(s.user.id, s.user.user_metadata, true).finally(() => settleOpening());
+      if (event === "SIGNED_IN" && s) void adopt(s.user.id, s.user.user_metadata, true).finally(() => { settleOpening(); flushAdopt(); });
       if (event === "SIGNED_OUT") { adopted = ""; clearLockAsk(); }
       if (event === "SIGNED_OUT" && snapshot()) {
         const was = snapshot()!.kind;

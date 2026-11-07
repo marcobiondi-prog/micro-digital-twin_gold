@@ -1,4 +1,7 @@
 import { preloadNext } from "@/lib/preloader";
+import { googleInApp } from "@/lib/google-one-tap";
+import { getProId, getSectorGateKind, nextAdoptDone } from "@/lib/use-pro-id";
+import { goInApp } from "@/lib/app-nav";
 import { supabase } from "@/integrations/supabase/client";
 import { disableBiometric, verifyBiometric } from "@/lib/biometric";
 
@@ -121,6 +124,19 @@ export async function addGoogleAccount(): Promise<boolean> {
  * and back from the app after the sign-in returns to it rather than to Google's account chooser.
  */
 export async function googleOAuth(redirectTo: string, queryParams?: Record<string, string>): Promise<{ error: Error | null }> {
+  // First Google's chooser inside the app (no window of Google's left behind the app); its pages only when it cannot show.
+  const hint = queryParams?.["login_hint"];
+  const inApp = await googleInApp(hint ? { loginHint: hint } : {});
+  if (inApp !== "unavailable") {
+    try { localStorage.removeItem("mdt-auth-return"); } catch { /* none */ }
+    if (inApp === "signed") {
+      // The account is read (its profile, or the sector page with its form or the lock), then its simulation opens.
+      await nextAdoptDone();
+      const pro = getProId();
+      if (pro && !getSectorGateKind()) goInApp(pro.kind === "agronomo" ? "/vigneto" : "/urbano");
+    }
+    return { error: null };
+  }
   const r = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo, skipBrowserRedirect: true, ...(queryParams ? { queryParams } : {}) } });
   if (r.error || !r.data?.url) return { error: r.error ?? new Error("Accesso Google non disponibile") };
   // Google's pages then stand in the history after this one: back in the app, the root steps back past them to the
