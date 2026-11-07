@@ -5,7 +5,7 @@ import { ArrowLeft, ArrowRight, BadgeCheck, Building2, Grape, LogOut, ShieldChec
 import { saveProId, useProId, openSectorGate } from "@/lib/use-pro-id";
 import { loadComuni } from "@/lib/comuni";
 import { findComune, searchComuni, townDomain, type Comune } from "@/models/comuni";
-import { findRegion, officeOf, searchOffices, searchRegions } from "@/models/professional-id";
+import { findRegion, officeEmail, officeOf, searchOffices, searchRegions } from "@/models/professional-id";
 import { TownCrest } from "@/views/v10/TownCrest";
 import { cn } from "@/lib/utils";
 import {
@@ -46,7 +46,7 @@ const PAGE: Record<ProKind, { title: string; section: "urban" | "vineyard"; open
   agronomo: { title: "Agricoltore", section: "vineyard", opens: "il vigneto", locks: "la piazza", go: "/vigneto",
     intro: "Con il patentino fitosanitario si apre la simulazione del vigneto." },
   funzionario: { title: "Funzionario comunale", section: "urban", opens: "la piazza", locks: "il vigneto", go: "/urbano",
-    intro: "Con il tuo Comune, l'ufficio di appartenenza e l'email del Comune si apre la simulazione della piazza." },
+    intro: "Con il tuo Comune, l'ufficio di appartenenza e la tua email si apre la simulazione della piazza." },
 };
 
 function AgronomoForm({ onDone }: { onDone: () => void }) {
@@ -201,7 +201,7 @@ function FunzionarioForm({ onDone }: { onDone: () => void }) {
         <select id={id} aria-describedby={d} aria-invalid={!!errors.role} value={v.role} onChange={(e) => up("role", e.target.value)} className={fieldCls}>
           <option value="" className={optionCls}>Scegli il ruolo</option>{ROLES.map((r) => <option key={r} value={r} className={optionCls}>{r}</option>)}
         </select>)}</Field>
-      <Field label="Email del Comune" hint={`Quella istituzionale, per esempio nome.cognome@${townDomain(town ?? "Campobasso")}.`} error={errors.email}>{(id, d) => <input id={id} type="email" inputMode="email" autoComplete="email" aria-describedby={d} aria-invalid={!!errors.email} value={v.email} onChange={(e) => up("email", e.target.value)} className={fieldCls} />}</Field>
+      <Field label="La tua email" hint={`Anche personale. Nella scheda compare l'email dell'ufficio scelto${v.office && town ? `: ${officeEmail(v.office === "Altro" ? v.otherOffice : v.office, town)}` : ""}.`} error={errors.email}>{(id, d) => <input id={id} type="email" inputMode="email" autoComplete="email" aria-describedby={d} aria-invalid={!!errors.email} value={v.email} onChange={(e) => up("email", e.target.value)} className={fieldCls} />}</Field>
       <Field label="Matricola (facoltativa)" hint="Il numero del tuo badge o della matricola, se vuoi aggiungerlo." error={errors.badge}>{(id, d) => <input id={id} aria-describedby={d} value={v.badge} onChange={(e) => up("badge", e.target.value)} className={fieldCls} />}</Field>
       {/* At the end, the picked town with its coat of arms. */}
       {town && (
@@ -253,7 +253,7 @@ export function ProfileCard({ kind, go }: { kind: ProKind; go?: () => void }) {
       <dl className="divide-y divide-foreground/10 rounded-2xl bg-foreground/[0.05] px-4">
         {profileRows(mine).map(([k, v]) => {
           // The email opens the phone's email app, written to that address.
-          const val = k === "Email" && v
+          const val = (k === "Email" || k === "Email personale") && v
             ? <a href={`mailto:${v}`} className="rounded-sm underline decoration-foreground/25 decoration-1 underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring">{v}</a>
             : v;
           // A long value (the email) goes on its own line under its label, whole, instead of breaking mid-word beside it.
@@ -279,7 +279,7 @@ function profileRows(id: ProId): Array<[string, string]> {
   const since = new Date(id.at).toLocaleDateString("it-IT");
   return id.kind === "agronomo"
     ? [["Nome", id.name], ...(id.licence ? [["Patentino", `${id.licenceType === "consulente" ? "Consulente" : "Utilizzatore"} · ${id.licence}`], ["Regione", id.region], ["Scadenza", new Date(`${id.expires}T12:00:00`).toLocaleDateString("it-IT")]] as Array<[string, string]> : [["Patentino", "Non indicato"], ["Regione", id.region]] as Array<[string, string]>), ["Identificato il", since]]
-    : [["Nome", id.name], ["Comune", id.comune], ["Ufficio", id.office], ["Ruolo", id.role], ["Email", id.email], ...(id.badge ? [["Matricola", id.badge] as [string, string]] : []), ["Identificato il", since]];
+    : [["Nome", id.name], ["Comune", id.comune], ["Ufficio", id.office], ["Ruolo", id.role], ["Email", officeEmail(id.office, id.comune)], ...(id.email && id.email !== officeEmail(id.office, id.comune) ? [["Email personale", id.email] as [string, string]] : []), ...(id.badge ? [["Matricola", id.badge] as [string, string]] : []), ["Identificato il", since]];
 }
 
 /**

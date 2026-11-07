@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 export const SECTION_TONE: Record<Section, string> = { urban: "rgb(28 112 210 / 0.42)", vineyard: "rgb(150 36 110 / 0.42)" };
 const IDENTIFY_PATH = { urban: "/identificazione/funzionario", vineyard: "/identificazione/agronomo" } as const;
 const WHO: Record<Section, { title: string; who: string; how: string }> = {
-  urban: { title: "Piazza", who: "La simulazione della piazza è per i funzionari del Comune.", how: "Ti identifichi con il tuo Comune, l'ufficio di appartenenza e l'email del Comune." },
+  urban: { title: "Piazza", who: "La simulazione della piazza è per i funzionari del Comune.", how: "Ti identifichi con il tuo Comune, l'ufficio di appartenenza e la tua email." },
   vineyard: { title: "Vigneto", who: "La simulazione del vigneto è per chi lavora nel settore agricolo.", how: "Ti identifichi con nome e regione; il numero del patentino fitosanitario è facoltativo." },
 };
 

@@ -7,7 +7,7 @@ import { ProfileCard } from "@/views/v10/Identify";
 
 const WAY: Record<ProKind, { to: "/identificazione/agronomo" | "/identificazione/funzionario"; icon: LucideIcon; opens: string; with: string }> = {
   agronomo: { to: "/identificazione/agronomo", icon: Grape, opens: "Apre il vigneto", with: "Con il patentino fitosanitario" },
-  funzionario: { to: "/identificazione/funzionario", icon: Building2, opens: "Apre la piazza", with: "Con il Comune, l'ufficio e l'email del Comune" },
+  funzionario: { to: "/identificazione/funzionario", icon: Building2, opens: "Apre la piazza", with: "Con il Comune, l'ufficio e la tua email" },
 };
 
 function Way({ kind }: { kind: ProKind }) {

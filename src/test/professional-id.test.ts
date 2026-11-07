@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { REGION_QID, regionCrestQuery, checkAgronomo, checkFunzionario, findRegion, officeOf, searchOffices, isProId, isTownEmail, isLicenceNumber, proSummary, searchRegions, unlocks } from "@/models/professional-id";
+import { officeEmail, REGION_QID, regionCrestQuery, checkAgronomo, checkFunzionario, findRegion, officeOf, searchOffices, isProId, isTownEmail, isLicenceNumber, proSummary, searchRegions, unlocks } from "@/models/professional-id";
 
 const today = new Date("2026-10-29T12:00:00");
 const agro = { name: "Maria Rossi", licenceType: "consulente", licence: "mol/cb/01234", region: "Molise", expires: "2029-05-31", declared: true };
@@ -33,10 +33,16 @@ describe("professional profile", () => {
     expect(unlocks(id, "vineyard")).toBe(false);
     expect(unlocks(null, "urban")).toBe(false);
   });
-  it("asks for the office's name with Altro and for a town email", () => {
+  it("asks for the office's name with Altro and takes a personal email", () => {
     const { errors } = checkFunzionario({ ...funz, office: "Altro", email: "luca@gmail.com" }, today);
-    expect(Object.keys(errors).sort()).toEqual(["email", "otherOffice"]);
+    expect(Object.keys(errors).sort()).toEqual(["otherOffice"]);
+    expect(Object.keys(checkFunzionario({ ...funz, email: "luca.gmail" }, today).errors)).toEqual(["email"]);
     expect(checkFunzionario({ ...funz, office: "Altro", otherOffice: "Protezione civile" }, today).id?.office).toBe("Protezione civile");
+  });
+  it("builds the chosen office's email at its town", () => {
+    expect(officeEmail("Ambiente e verde pubblico", "Campobasso")).toBe("ambiente@comune.campobasso.it");
+    expect(officeEmail("Ufficio tecnico", "San Giuliano del Sannio")).toBe("ufficiotecnico@comune.sangiulianodelsannio.it");
+    expect(officeEmail("Mobilità e traffico", "Forlì")).toBe("mobilita@comune.forli.it");
   });
   it("reads town emails and licence numbers", () => {
     expect(isTownEmail("a.b@comune.roma.it")).toBe(true);

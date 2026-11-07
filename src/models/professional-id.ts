@@ -4,7 +4,7 @@
  * town's email. One profile at a time: identifying as one locks the other section.
  * The data are checked for their form only (no public register can be queried): the user declares they are true.
  */
-import { fold } from "./comuni";
+import { fold, townDomain } from "./comuni";
 
 export type Section = "urban" | "vineyard";
 export type ProKind = "agronomo" | "funzionario";
@@ -83,6 +83,17 @@ const clean = (s: string) => s.trim().replace(/\s+/g, " ");
 /** A licence number as the regions write it: letters, digits and / - . , 4–30 characters, at least one digit. */
 export const isLicenceNumber = (s: string) => /^[A-Za-z0-9][A-Za-z0-9/.\- ]{2,28}[A-Za-z0-9]$/.test(s.trim()) && /\d/.test(s);
 /** A town's email: …@comune.nome.it (or …@comune-nome.it, …@nome.comune.it). */
+/** Any well-formed email (a personal one is fine for the municipal officer too). */
+export const isEmail = (s: string) => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(s.trim());
+/**
+ * The email of the office chosen, at its town: the office's name before " e ", without accents or spaces, at
+ * comune.<town>.it — "ambiente@comune.campobasso.it", "ufficiotecnico@…", "lavoripubblici@…". Built from the usual
+ * pattern of Italian town offices, not looked up: it shows where the office is reached, not a checked address.
+ */
+export function officeEmail(office: string, comune: string): string {
+  const head = fold(office.split(/\s+e\s+/i)[0] ?? "").replace(/[^a-z0-9]/g, "");
+  return `${head || "protocollo"}@${townDomain(comune)}`;
+}
 export const isTownEmail = (s: string) => /^[^@\s]+@(?:[a-z0-9-]+\.)*[a-z0-9-]*comune[a-z0-9-]*(?:\.[a-z0-9-]+)*\.it$/i.test(s.trim());
 
 export type AgronomoInput = { name: string; licenceType: string; licence: string; region: string; expires: string; declared: boolean };
@@ -111,7 +122,7 @@ export function checkFunzionario(v: FunzionarioInput, today: Date = new Date()):
   if (!(OFFICES as readonly string[]).includes(v.office)) errors.office = "Scegli l'ufficio di appartenenza.";
   else if (v.office === "Altro" && clean(v.otherOffice).length < 3) errors.otherOffice = "Scrivi il nome dell'ufficio.";
   if (!(ROLES as readonly string[]).includes(v.role)) errors.role = "Scegli il tuo ruolo.";
-  if (!isTownEmail(v.email)) errors.email = "Usa l'email del Comune, per esempio nome.cognome@comune.campobasso.it.";
+  if (!isEmail(v.email)) errors.email = "Scrivi un'email valida, per esempio nome.cognome@gmail.com.";
   if (!v.declared) errors.declared = "Conferma che i dati sono tuoi e veri.";
   if (Object.keys(errors).length) return { id: null, errors };
   return { id: { kind: "funzionario", name: clean(v.name), comune: clean(v.comune), office: v.office === "Altro" ? clean(v.otherOffice) : v.office, role: v.role, email: v.email.trim().toLowerCase(), badge: clean(v.badge), at: today.toISOString() }, errors };
