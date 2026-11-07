@@ -4,9 +4,10 @@ import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Building2, Grape, LogIn, Mail, Pencil, Trash2, UserRound, X } from "lucide-react";
 import { openAccount } from "@/lib/camera-dock";
+import { leaveAccount, switchToAccount } from "@/lib/account-sessions";
 import { supabase } from "@/integrations/supabase/client";
 import { introSeen } from "@/lib/intro-seen";
-import { clearSectorGate, enterAsGuest, forgetKnownProId, keepProIdInAccount, rememberWantedSector, renameKnownProId, type KnownProId, saveProId, useAccountSector, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
+import { clearSectorGate, enterAsGuest, forgetKnownProId, dropProIdOnDevice, keepProIdInAccount, rememberWantedSector, renameKnownProId, sectorOf, switchAccountSector, type KnownProId, saveProId, useAccountSector, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
 import { proSummary } from "@/models/professional-id";
 import { toast } from "sonner";
 import { useSignedIn } from "@/lib/use-signed-in";
@@ -78,18 +79,38 @@ export function KnownProfiles({ kind }: { kind: ProKind }) {
   // why); the other accounts' ones still show, to sign in with them.
   const known = acc?.kind && acc.kind !== kind ? all.filter(foreign) : all;
   const pick = async (k: KnownProId) => {
-    if (foreign(k)) {
-      // Sign out of this account (its profile kept in it) and open the sign-in: the sector stays wanted, so once in
-      // with that account its own profile of this sector comes back.
+    const target = k.acct?.email ?? null;
+    const flow = k.kind === "funzionario" ? "della piazza" : "del vigneto";
+    // The profile's personal account is entered with it: at once when it is kept on this phone (no password, no
+    // Google), else the sign-in opens for it.
+    if (target && target !== accEmail) {
       rememberWantedSector(kind);
-      await keepProIdInAccount();
-      await supabase.auth.signOut().catch(() => undefined);
-      toast(`Accedi con ${k.acct!.email}`, { description: `Il profilo di ${k.name} è legato a quell'account.` });
+      if (accEmail) await keepProIdInAccount();
+      if (await switchToAccount(target)) {
+        // Its account goes to this profile's sector (the person chose it), then the profile is put in use.
+        const { data } = await supabase.auth.getSession();
+        const sec = sectorOf(data.session?.user.user_metadata);
+        if (sec && sec !== k.kind) await switchAccountSector(k.kind);
+        await saveProId(k);
+        toast.success(`Bentornato, ${k.name}`, { description: `Sei entrato anche con il tuo account ${target}.` });
+        // A clean start on that account's simulation: every list and cache read again for it.
+        window.location.assign(k.kind === "funzionario" ? "/urbano" : "/vigneto");
+        return;
+      }
+      if (accEmail) {
+        // Signed in to another account: left (kept on the phone for the way back), then the sign-in opens.
+        toast(`Accedi con ${target}`, { description: `Il profilo di ${k.name} è legato a quell'account.` });
+        dropProIdOnDevice();
+        leaveAccount();
+        return;
+      }
+      if (!(await saveProId(k))) return;
+      toast(`Bentornato, ${k.name} · Accedi con ${target}`, { description: "Collega il tuo account personale: da qui in poi entrerà da solo con il profilo." });
       openAccount();
       return;
     }
     if (!(await saveProId(k))) return;
-    toast.success(`Bentornato, ${k.name}`, { description: `Ritrovi la cronologia ${k.kind === "funzionario" ? "della piazza" : "del vigneto"}.` });
+    toast.success(`Bentornato, ${k.name}`, { description: `Ritrovi la cronologia ${flow}.` });
   };
   if (!known.length) return null;
   if (known.length > 0) return (
@@ -235,7 +256,7 @@ function ProfileCarousel({ known, foreign, onPick }: { known: KnownProId[]; fore
               ) : (
                 <>
                   <p className="text-xs text-foreground/60">{foreign(k)
-                    ? <>Questo profilo è di un altro account: accedi con {k.acct?.email} e ritrovi la cronologia {k.kind === "funzionario" ? "della piazza" : "del vigneto"}.</>
+                    ? <>Entri anche con il suo account personale {k.acct?.email} e ritrovi la cronologia {k.kind === "funzionario" ? "della piazza" : "del vigneto"}.</>
                     : <>Ti eri già registrato con questo profilo: continua e ritrovi la cronologia {k.kind === "funzionario" ? "della piazza" : "del vigneto"}.</>}</p>
                   <button type="button" onClick={() => (i === active ? onPick(k) : go(i))} aria-label={foreign(k) ? `Accedi con l'account di ${k.name}` : `Continua come ${k.name}`}
                     className="mt-auto inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">

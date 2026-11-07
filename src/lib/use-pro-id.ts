@@ -240,6 +240,8 @@ export function useGuest(): boolean {
   return useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, guestSnap, () => false);
 }
 
+/** Drops the profile in use from this device only (the account keeps it), when leaving the account for another. */
+export function dropProIdOnDevice() { set(null); }
 const set = (id: ProId | null) => {
   if (id) { keepLast(id); if (guestSnap()) { guest = false; try { window.localStorage.removeItem(GUEST_KEY); } catch { /* memory only */ } } }
   current = id;

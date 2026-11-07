@@ -3,9 +3,10 @@ import { useSwipeBack } from "@/lib/use-swipe-back";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, BadgeCheck, Building2, Grape, LogOut, ShieldCheck } from "lucide-react";
-import { keepProIdInAccount, saveProId, switchAccountSector, useAccountSector, useProId, openSectorGate } from "@/lib/use-pro-id";
+import { dropProIdOnDevice, keepProIdInAccount, saveProId, switchAccountSector, useAccountSector, useProId, openSectorGate } from "@/lib/use-pro-id";
 import { supabase } from "@/integrations/supabase/client";
 import { openAccount } from "@/lib/camera-dock";
+import { leaveAccount } from "@/lib/account-sessions";
 import { loadComuni } from "@/lib/comuni";
 import { findComune, searchComuni, townDomain, type Comune } from "@/models/comuni";
 import { findRegion, officeOf, searchOffices, searchRegions } from "@/models/professional-id";
@@ -279,9 +280,9 @@ export function AccountSectorLock({ kind, account, email }: { kind: ProKind; acc
   const other = async () => {
     setBusy(true);
     await keepProIdInAccount();
-    await supabase.auth.signOut().catch(() => undefined);
-    setBusy(false);
-    openAccount();
+    // Leaves this account without ending it: kept on the phone, it comes back in one tap from its profile.
+    dropProIdOnDevice();
+    leaveAccount();
   };
   return (
     <div className="space-y-3 rounded-3xl bg-foreground/[0.07] p-5 ring-1 ring-amber-400/40">

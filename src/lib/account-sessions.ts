@@ -1,0 +1,73 @@
+import { supabase } from "@/integrations/supabase/client";
+
+/**
+ * The personal accounts used on this phone, so that picking a recognised professional profile signs in its personal
+ * account too, with no password nor Google round trip (like switching account in a phone's mail app).
+ *
+ * Every session seen (sign-in, opening, each token refresh) is kept per email in localStorage mdt-account-sessions-v1,
+ * always its latest tokens. Switching to another account sets that account's kept session (supabase setSession), which
+ * does not end the one left: it stays kept for the way back. An explicit "Esci" ends the session for good (signOut),
+ * so that account is forgotten here and needs its sign-in again next time.
+ */
+const KEY = "mdt-account-sessions-v1";
+const OPEN_AFTER = "mdt-open-account-after";
+type Saved = { userId: string; email: string; access_token: string; refresh_token: string; at: number };
+
+const read = (): Record<string, Saved> => {
+  try { return JSON.parse(window.localStorage.getItem(KEY) ?? "{}") as Record<string, Saved>; } catch { return {}; }
+};
+const write = (v: Record<string, Saved>) => { try { window.localStorage.setItem(KEY, JSON.stringify(v)); } catch { /* none */ } };
+const norm = (e: string) => e.trim().toLowerCase();
+
+/** Is the account with this email kept on this phone (so it can be entered in one tap)? */
+export function hasAccountSession(email: string | null | undefined): boolean {
+  return !!email && !!read()[norm(email)];
+}
+
+let installed = false;
+let current: string | null = null;
+let leaving = false;
+/** Mounted once by the root: keeps every session seen, forgets the one ended by an explicit sign-out. */
+export function installAccountSessions() {
+  if (installed || typeof window === "undefined") return;
+  installed = true;
+  supabase.auth.onAuthStateChange((event, s) => {
+    if (s?.user.email && s.refresh_token) {
+      const email = norm(s.user.email);
+      current = email;
+      write({ ...read(), [email]: { userId: s.user.id, email, access_token: s.access_token, refresh_token: s.refresh_token, at: Date.now() } });
+    } else if (event === "SIGNED_OUT" && current && !leaving) {
+      // Signed out on purpose (or ended elsewhere): that session no longer works.
+      const all = read(); delete all[current]; write(all); current = null;
+    }
+  });
+  // The panel asked to open after leaving an account without ending it (see leaveAccount).
+  try { if (sessionStorage.getItem(OPEN_AFTER)) { sessionStorage.removeItem(OPEN_AFTER); setTimeout(() => window.dispatchEvent(new Event("mdt-open-account")), 600); } } catch { /* none */ }
+}
+
+/** Enters the kept account with this email; false when it is not kept here or its session no longer works. */
+export async function switchToAccount(email: string): Promise<boolean> {
+  const s = read()[norm(email)];
+  if (!s) return false;
+  const { data, error } = await supabase.auth.setSession({ access_token: s.access_token, refresh_token: s.refresh_token });
+  if (error || !data.session) {
+    const all = read(); delete all[norm(email)]; write(all);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Leaves the signed-in account without ending its session (it stays kept here for the way back) and reloads the page
+ * signed out, with the account panel open to sign in with another one.
+ */
+export function leaveAccount() {
+  leaving = true;
+  try {
+    supabase.auth.stopAutoRefresh();
+    const key = (supabase.auth as unknown as { storageKey?: string }).storageKey;
+    if (key) { window.localStorage.removeItem(key); window.localStorage.removeItem(`${key}-code-verifier`); window.localStorage.removeItem(`${key}-user`); }
+    sessionStorage.setItem(OPEN_AFTER, "1");
+  } catch { /* none */ }
+  window.location.reload();
+}

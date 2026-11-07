@@ -21,6 +21,7 @@ import { installUiClicks } from "@/lib/ui-sounds";
 import { isChunkError, reloadFresh } from "@/router";
 import { History, Building2, Grape, Info, LayoutDashboard, Lock, UserRound } from "lucide-react";
 import { getProId, useGuest, useProId, useSyncProId } from "@/lib/use-pro-id";
+import { installAccountSessions } from "@/lib/account-sessions";
 import { useSyncMediaArchive } from "@/models/media-archive";
 import { useSyncHistoryArchive } from "@/models/history-archive";
 import { useSyncSimHidden } from "@/models/sim-hidden";
@@ -436,6 +437,8 @@ function SmartNav() {
 function RootComponent() {
   // The professional profile follows the account: adopted on sign-in, or uploaded to an account without one.
   useSyncProId();
+  // Every personal account used on this phone is kept, so a recognised profile enters its account in one tap.
+  useEffect(() => { installAccountSessions(); }, []);
   useSyncMediaArchive();
   useSyncHistoryArchive();
   useSyncSimHidden();
