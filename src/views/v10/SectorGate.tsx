@@ -2,10 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSwipeBack } from "@/lib/use-swipe-back";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, Building2, Grape, LogIn, UserRound, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, Grape, LogIn, Trash2, UserRound, X } from "lucide-react";
 import { openAccount } from "@/lib/camera-dock";
 import { introSeen } from "@/lib/intro-seen";
-import { clearSectorGate, enterAsGuest, forgetKnownProId, saveProId, useAccountSector, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
+import { clearSectorGate, enterAsGuest, forgetKnownProId, type KnownProId, saveProId, useAccountSector, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
 import { proSummary } from "@/models/professional-id";
 import { toast } from "sonner";
 import { useSignedIn } from "@/lib/use-signed-in";
@@ -96,32 +96,97 @@ export function KnownProfiles({ kind }: { kind: ProKind }) {
                 ) : (
                   <>
                     <p className="text-sm text-foreground/70">Su questo telefono si sono registrati {known.length} profili {kind === "funzionario" ? "del settore urbano" : "del settore agricolo"}: scegli chi sei e ritrovi la tua cronologia.</p>
-                    <ul className="space-y-2" aria-label="Profili registrati">
-                      {known.map((k) => (
-                        <li key={`${k.name}-${k.at}`} className="flex items-center gap-2 rounded-2xl bg-foreground/[0.06] ring-1 ring-foreground/10">
-                          <button type="button" onClick={() => void pick(k)} aria-label={`Continua come ${k.name}, ${proSummary(k)}${k.acct?.email ? `, ${k.acct.email}` : ""}`}
-                            className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl p-3 text-left outline-none transition-colors hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-brand-turquoise">
-                            {/* The picture of the personal account it was registered with, else its initials. */}
-                            <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-full bg-brand-turquoise/15 text-base font-semibold text-brand-turquoise ring-1 ring-brand-turquoise/40" aria-hidden="true">
-                              {k.acct?.pic ? <img src={k.acct.pic} alt="" referrerPolicy="no-referrer" className="size-full object-cover" /> : initials(k.name)}
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-[15px] font-semibold">{k.name}</span>
-                              <span className="block text-xs leading-snug text-foreground/65 [overflow-wrap:anywhere]">{proSummary(k)}</span>
-                              {k.acct?.email && <span className="block text-xs leading-snug text-foreground/50 [overflow-wrap:anywhere]">{k.acct.email}</span>}
-                            </span>
-                            <ArrowRight className="size-4 shrink-0 text-foreground/60" aria-hidden="true" />
-                          </button>
-                          <button type="button" onClick={() => forgetKnownProId(k)} aria-label={`Togli ${k.name} da questo telefono`} title="Togli da questo telefono"
-                            className="mr-1.5 grid size-9 shrink-0 place-items-center rounded-full text-foreground/50 outline-none hover:bg-foreground/[0.08] hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand-turquoise">
-                            <X className="size-4" aria-hidden="true" />
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
+                    <ProfileCarousel known={known} onPick={(k) => void pick(k)} />
                   </>
                 )}
               </div>
+  );
+}
+
+
+/**
+ * More profiles of one sector on this phone, as a 3D carousel of cards: the cards slide sideways (scroll snap, one in
+ * the middle), the ones aside turn away and step back in depth; each card shows the account picture (else the
+ * initials), the name, the profile, the account's email, a white "Continua come …" and a bin that asks in place before
+ * taking the profile off the phone. Flat with reduced motion.
+ */
+function ProfileCarousel({ known, onPick }: { known: KnownProId[]; onPick: (k: KnownProId) => void }) {
+  const row = useRef<HTMLDivElement>(null);
+  const [active, setActive] = useState(0);
+  const [asking, setAsking] = useState<string | null>(null);
+  const keyOf = (k: KnownProId) => `${k.kind}-${k.name}-${k.at}`;
+  useEffect(() => {
+    const el = row.current;
+    if (!el) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let frame = 0;
+    const paint = () => {
+      frame = 0;
+      const mid = el.scrollLeft + el.clientWidth / 2;
+      let best = 0, bestD = Infinity;
+      Array.from(el.children).forEach((c, i) => {
+        const card = c as HTMLElement;
+        const d = (card.offsetLeft + card.offsetWidth / 2 - mid) / card.offsetWidth; // −1 … 1 for the neighbours
+        if (Math.abs(d) < bestD) { bestD = Math.abs(d); best = i; }
+        if (reduce) return;
+        const t = Math.max(-1.5, Math.min(1.5, d));
+        const inner = card.firstElementChild as HTMLElement | null;
+        if (inner) {
+          inner.style.transform = `perspective(900px) translateZ(${-Math.abs(t) * 120}px) rotateY(${-t * 38}deg)`;
+          inner.style.opacity = String(1 - Math.min(0.55, Math.abs(t) * 0.45));
+        }
+      });
+      setActive(best);
+    };
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(paint); };
+    paint();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => { el.removeEventListener("scroll", onScroll); window.removeEventListener("resize", onScroll); if (frame) cancelAnimationFrame(frame); };
+  }, [known.length]);
+  const go = (i: number) => {
+    const el = row.current, card = el?.children[i] as HTMLElement | undefined;
+    if (el && card) el.scrollTo({ left: card.offsetLeft - (el.clientWidth - card.offsetWidth) / 2, behavior: "smooth" });
+  };
+  return (
+    <div className="space-y-3">
+      <div ref={row} role="list" aria-label="Profili registrati" data-map-gestures=""
+        className="no-scrollbar -mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-[18%] py-3 touch-pan-x [scrollbar-width:none]">
+        {known.map((k, i) => (
+          <div key={keyOf(k)} role="listitem" className="w-[64%] shrink-0 snap-center">
+            <div className="relative flex h-full flex-col items-center gap-2 rounded-3xl bg-[oklch(0.25_0.016_258)] p-5 text-center shadow-[0_18px_40px_-14px_rgb(0_0_0/0.7),inset_0_1px_0_rgb(255_255_255/0.08)] ring-1 ring-white/10 transition-[opacity] will-change-transform">
+              <button type="button" onClick={() => setAsking(asking === keyOf(k) ? null : keyOf(k))} aria-label={`Elimina ${k.name} da questo telefono`} title="Elimina da questo telefono"
+                className="absolute right-2.5 top-2.5 grid size-9 place-items-center rounded-full text-foreground/50 outline-none hover:bg-white/10 hover:text-red-300 focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+                <Trash2 className="size-4" aria-hidden="true" />
+              </button>
+              <span className="mt-1 grid size-20 place-items-center overflow-hidden rounded-full bg-brand-turquoise/15 text-2xl font-semibold text-brand-turquoise ring-2 ring-brand-turquoise/50" aria-hidden="true">
+                {k.acct?.pic ? <img src={k.acct.pic} alt="" referrerPolicy="no-referrer" className="size-full object-cover" /> : initials(k.name)}
+              </span>
+              <p className="w-full truncate text-lg font-semibold">{k.name}</p>
+              <p className="text-xs leading-snug text-foreground/65 [overflow-wrap:anywhere]">{proSummary(k)}</p>
+              {k.acct?.email && <p className="w-full truncate text-xs text-foreground/50">{k.acct.email}</p>}
+              {asking === keyOf(k) ? (
+                <div role="alertdialog" aria-label={`Eliminare ${k.name}?`} className="mt-auto w-full space-y-2 pt-1">
+                  <p className="text-xs text-foreground/70">Eliminare questo profilo dal telefono? Resta nel suo account.</p>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setAsking(null)} className="h-10 flex-1 rounded-full bg-white/10 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">Annulla</button>
+                    <button type="button" onClick={() => { setAsking(null); forgetKnownProId(k); toast(`${k.name} eliminato da questo telefono`); }} className="h-10 flex-1 rounded-full bg-red-500 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-white">Elimina</button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" onClick={() => (i === active ? onPick(k) : go(i))} aria-label={`Continua come ${k.name}`}
+                  className="mt-auto inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-full bg-white px-3 text-sm font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+                  <span className="truncate">Continua</span><ArrowRight className="size-4 shrink-0" aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex justify-center gap-1.5" aria-hidden="true">
+        {known.map((k, i) => <button key={keyOf(k)} type="button" tabIndex={-1} onClick={() => go(i)} className={`h-1.5 rounded-full transition-all ${i === active ? "w-5 bg-brand-turquoise" : "w-1.5 bg-white/30"}`} />)}
+      </div>
+    </div>
   );
 }
 
