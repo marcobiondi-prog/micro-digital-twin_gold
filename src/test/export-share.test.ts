@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { forShare } from "@/views/v10/ExportSheet";
 
 describe("forShare", () => {
-  it("keeps the kinds the phone's share window takes, typed by their extension", () => {
+  it("keeps the kinds the phone’s share window takes, typed by their extension", () => {
     expect(forShare("report.pdf", new Blob(["x"]))?.type).toBe("application/pdf");
     expect(forShare("tabella.csv", new Blob(["x"], { type: "text/csv;charset=utf-8" }))?.type).toBe("text/csv");
     expect(forShare("foto.JPG", new Blob(["x"], { type: "application/octet-stream" }))?.type).toBe("image/jpeg");

@@ -9,7 +9,7 @@ const area: Ring = [at(0, 0), at(40, 0), at(40, 30), at(0, 30)];
 const allIn = (r: Ring) => r.every(([a, b]) => ringContains(area, a, b));
 
 describe("everything the simulation draws stays inside the drawn area", () => {
-  it("keeps every tree's whole crown inside, even with many trees", () => {
+  it("keeps every tree’s whole crown inside, even with many trees", () => {
     for (const n of [1, 6, 30]) {
       const l = piazzaLayout(area, n, 40, 30)!;
       expect(l.trees).toHaveLength(n);

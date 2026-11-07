@@ -13,7 +13,7 @@ const ring: Array<[number, number]> = [
 describe("vineyard main pipe", () => {
   const layout = vineLayout(ring, [16, 16, 16].map((irrigation) => ({ irrigation, shade: 0, windbreak: 0 })))!;
   const mains = layout.lines.filter((l) => l.kind === "main");
-  it("follows the zone's western edge row by row and stays inside the area", () => {
+  it("follows the zone’s western edge row by row and stays inside the area", () => {
     expect(mains.length).toBe(3);
     for (const m of mains) {
       expect(m.line.length).toBeGreaterThan(2);

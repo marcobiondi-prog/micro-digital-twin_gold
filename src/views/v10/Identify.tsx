@@ -52,7 +52,7 @@ const PAGE: Record<ProKind, { title: string; section: "urban" | "vineyard"; open
   agronomo: { title: "Agricoltore", section: "vineyard", opens: "il vigneto", locks: "la piazza", go: "/vigneto",
     intro: "Con il patentino fitosanitario si apre la simulazione del vigneto." },
   funzionario: { title: "Funzionario comunale", section: "urban", opens: "la piazza", locks: "il vigneto", go: "/urbano",
-    intro: "Con il tuo Comune, l'ufficio di appartenenza e la tua email si apre la simulazione della piazza." },
+    intro: "Con il tuo Comune, l’ufficio di appartenenza e la tua email si apre la simulazione della piazza." },
 };
 
 function AgronomoForm({ onDone }: { onDone: () => void }) {
@@ -75,9 +75,9 @@ function AgronomoForm({ onDone }: { onDone: () => void }) {
   return (
     <form noValidate onSubmit={(e) => { e.preventDefault(); void submit(); }} className="space-y-4">
       <Field label="Nome e cognome" error={errors.name}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!errors.name} autoComplete="name" value={v.name} onChange={(e) => up("name", e.target.value)} className={fieldCls} />}</Field>
-      <Field label="Regione" hint="Dove si trova il vigneto o dove è stato rilasciato il patentino: scrivi le prime lettere e scegli dall'elenco." error={errors.region}>{(id, d) => <RegionField id={id} describedBy={d} invalid={!!errors.region} value={v.region} onChange={(x) => up("region", x)} />}</Field>
+      <Field label="Regione" hint="Dove si trova il vigneto o dove è stato rilasciato il patentino: scrivi le prime lettere e scegli dall’elenco." error={errors.region}>{(id, d) => <RegionField id={id} describedBy={d} invalid={!!errors.region} value={v.region} onChange={(x) => up("region", x)} />}</Field>
       {/* The licence is optional: its type and expiry are asked only once a number is written. */}
-      <Field label="Numero del patentino fitosanitario (facoltativo)" hint="Se ce l'hai, come è scritto sul patentino, per esempio MOL/CB/01234. Puoi lasciarlo vuoto." error={errors.licence}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!errors.licence} autoCapitalize="characters" value={v.licence} onChange={(e) => up("licence", e.target.value)} className={fieldCls} />}</Field>
+      <Field label="Numero del patentino fitosanitario (facoltativo)" hint="Se ce l’hai, come è scritto sul patentino, per esempio MOL/CB/01234. Puoi lasciarlo vuoto." error={errors.licence}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!errors.licence} autoCapitalize="characters" value={v.licence} onChange={(e) => up("licence", e.target.value)} className={fieldCls} />}</Field>
       {v.licence.trim() !== "" && (
         <>
           <div className="space-y-1.5" role="radiogroup" aria-label="Tipo di patentino">
@@ -164,7 +164,7 @@ function ComuneField(props: { id: string; describedBy: string | undefined; inval
 
 /** The office field: every listed office as soon as it is touched, narrowed as one types; an office not listed is written by name. */
 function OfficeField(props: { id: string; describedBy: string | undefined; invalid: boolean; value: string; onChange: (v: string) => void }) {
-  return <SuggestField {...props} label="Uffici" placeholder="Scrivi o scegli l'ufficio" onPick={() => undefined}
+  return <SuggestField {...props} label="Uffici" placeholder="Scrivi o scegli l’ufficio" onPick={() => undefined}
     suggest={(q) => searchOffices(q).map((o): Suggestion => [o, ""])} />;
 }
 
@@ -196,7 +196,7 @@ function FunzionarioForm({ onDone }: { onDone: () => void }) {
     // The town must be a real Italian one, written as in the list (its spelling is taken from there).
     const towns = await loadComuni();
     const town = towns.length ? findComune(towns, v.comune) : undefined;
-    if (towns.length && !town && !e.comune) e.comune = "Scegli il tuo Comune dall'elenco dei comuni italiani.";
+    if (towns.length && !town && !e.comune) e.comune = "Scegli il tuo Comune dall’elenco dei comuni italiani.";
     if (town && id && id.kind === "funzionario") { id.comune = town[0]; id.istat = town[3]; }
     setErrors(e);
     if (Object.keys(e).length) return;
@@ -207,13 +207,13 @@ function FunzionarioForm({ onDone }: { onDone: () => void }) {
   return (
     <form noValidate onSubmit={(e) => { e.preventDefault(); void submit(); }} className="space-y-4">
       <Field label="Nome e cognome" error={errors.name}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!errors.name} autoComplete="name" value={v.name} onChange={(e) => up("name", e.target.value)} className={fieldCls} />}</Field>
-      <Field label="Comune" hint="Scrivi le prime lettere e scegli il tuo Comune dall'elenco." error={errors.comune}>{(id, d) => <ComuneField id={id} describedBy={d} invalid={!!errors.comune} value={v.comune} onChange={(x) => up("comune", x)} onPick={setTown} />}</Field>
-      <Field label="Ufficio di appartenenza" hint="Scegli dall'elenco o scrivi il nome del tuo ufficio." error={errors.office ?? errors.otherOffice}>{(id, d) => <OfficeField id={id} describedBy={d} invalid={!!(errors.office ?? errors.otherOffice)} value={v.office} onChange={(x) => up("office", x)} />}</Field>
+      <Field label="Comune" hint="Scrivi le prime lettere e scegli il tuo Comune dall’elenco." error={errors.comune}>{(id, d) => <ComuneField id={id} describedBy={d} invalid={!!errors.comune} value={v.comune} onChange={(x) => up("comune", x)} onPick={setTown} />}</Field>
+      <Field label="Ufficio di appartenenza" hint="Scegli dall’elenco o scrivi il nome del tuo ufficio." error={errors.office ?? errors.otherOffice}>{(id, d) => <OfficeField id={id} describedBy={d} invalid={!!(errors.office ?? errors.otherOffice)} value={v.office} onChange={(x) => up("office", x)} />}</Field>
       <Field label="Ruolo" error={errors.role}>{(id, d) => (
         <select id={id} aria-describedby={d} aria-invalid={!!errors.role} value={v.role} onChange={(e) => up("role", e.target.value)} className={fieldCls}>
           <option value="" className={optionCls}>Scegli il ruolo</option>{ROLES.map((r) => <option key={r} value={r} className={optionCls}>{r}</option>)}
         </select>)}</Field>
-      <Field label="La tua email" hint="Anche personale. Nella scheda compare l'email ufficiale dell'ufficio scelto, presa dall'elenco delle pubbliche amministrazioni." error={errors.email}>{(id, d) => <input id={id} type="email" inputMode="email" autoComplete="email" aria-describedby={d} aria-invalid={!!errors.email} value={v.email} onChange={(e) => up("email", e.target.value)} className={fieldCls} />}</Field>
+      <Field label="La tua email" hint="Anche personale. Nella scheda compare l’email ufficiale dell’ufficio scelto, presa dall’elenco delle pubbliche amministrazioni." error={errors.email}>{(id, d) => <input id={id} type="email" inputMode="email" autoComplete="email" aria-describedby={d} aria-invalid={!!errors.email} value={v.email} onChange={(e) => up("email", e.target.value)} className={fieldCls} />}</Field>
       <Field label="Matricola (facoltativa)" hint="Il numero del tuo badge o della matricola, se vuoi aggiungerlo." error={errors.badge}>{(id, d) => <input id={id} aria-describedby={d} value={v.badge} onChange={(e) => up("badge", e.target.value)} className={fieldCls} />}</Field>
       {/* At the end, the picked town with its coat of arms. */}
       {town && (
@@ -275,7 +275,7 @@ export function AccountSectorLock({ kind, account, email }: { kind: ProKind; acc
     const ok = await switchAccountSector(kind);
     setBusy(false);
     setAsking(false);
-    if (ok) toast.success(`Ora questo account è del settore ${SECTOR_NAME[kind]}`, { description: `Il profilo ${account === "agronomo" ? "agricolo" : "urbano"} resta salvato nell'account.` });
+    if (ok) toast.success(`Ora questo account è del settore ${SECTOR_NAME[kind]}`, { description: `Il profilo ${account === "agronomo" ? "agricolo" : "urbano"} resta salvato nell’account.` });
     else toast.error("Non sono riuscito a cambiare settore", { description: "Controlla la connessione e riprova." });
   };
   const other = async () => {
@@ -289,7 +289,7 @@ export function AccountSectorLock({ kind, account, email }: { kind: ProKind; acc
     <div className="space-y-3 rounded-3xl bg-foreground/[0.07] p-5 ring-1 ring-amber-400/40">
       <p className="flex items-center gap-2 text-[15px] font-semibold"><ShieldCheck className="size-5 shrink-0 text-amber-300" aria-hidden="true" />Questo account è del settore {SECTOR_NAME[account]}</p>
       <p className="text-sm leading-relaxed text-foreground/70">
-        {email ? <>L'account <span className="font-semibold text-foreground [overflow-wrap:anywhere]">{email}</span></> : "Il tuo account"} è legato a {SECTOR_PLACE[account]}: ogni account personale vale per un solo settore. Per il settore {SECTOR_NAME[kind]} puoi spostare qui questo account, oppure accedere con un altro.
+        {email ? <>L’account <span className="font-semibold text-foreground [overflow-wrap:anywhere]">{email}</span></> : "Il tuo account"} è legato a {SECTOR_PLACE[account]}: ogni account personale vale per un solo settore. Per il settore {SECTOR_NAME[kind]} puoi spostare qui questo account, oppure accedere con un altro.
       </p>
       {own && !asking && (
         <button type="button" disabled={busy} onClick={() => void enterOwn()}
@@ -302,8 +302,8 @@ export function AccountSectorLock({ kind, account, email }: { kind: ProKind; acc
         </button>
       )}
       {asking ? (
-        <div role="alertdialog" aria-label="Cambiare settore all'account?" className="space-y-3 rounded-2xl bg-foreground/[0.06] p-4">
-          <p className="text-sm leading-relaxed">Usare questo account per il settore {SECTOR_NAME[kind]}? Il profilo {account === "agronomo" ? "agricolo" : "urbano"} resta salvato nell'account, ma finché l'account è del settore {SECTOR_NAME[kind]} non apre {SECTOR_PLACE[account]}.</p>
+        <div role="alertdialog" aria-label="Cambiare settore all’account?" className="space-y-3 rounded-2xl bg-foreground/[0.06] p-4">
+          <p className="text-sm leading-relaxed">Usare questo account per il settore {SECTOR_NAME[kind]}? Il profilo {account === "agronomo" ? "agricolo" : "urbano"} resta salvato nell’account, ma finché l’account è del settore {SECTOR_NAME[kind]} non apre {SECTOR_PLACE[account]}.</p>
           <div className="flex gap-2">
             <button type="button" onClick={() => setAsking(false)} className="h-11 flex-1 rounded-full bg-foreground/[0.08] text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">Annulla</button>
             <button type="button" disabled={busy} onClick={() => void switchHere()} className="h-11 flex-1 rounded-full bg-white text-sm font-semibold text-black outline-none disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-brand-turquoise">{busy ? "Cambio…" : "Cambia settore"}</button>
@@ -376,7 +376,7 @@ function profileRows(id: ProId, office?: { mail: string; official: boolean }, ac
   const since = new Date(id.at).toLocaleDateString("it-IT");
   return id.kind === "agronomo"
     ? [["Nome", id.name], ...(id.licence ? [["Patentino", `${id.licenceType === "consulente" ? "Consulente" : "Utilizzatore"} · ${id.licence}`], ["Regione", id.region], ["Scadenza", new Date(`${id.expires}T12:00:00`).toLocaleDateString("it-IT")]] as Array<[string, string]> : [["Patentino", "Non indicato"], ["Regione", id.region]] as Array<[string, string]>), ...(account ? [["Email", account] as [string, string]] : []), ["Identificato il", since]]
-    : [["Nome", id.name], ["Comune", id.comune], ["Ufficio", id.office], ["Ruolo", id.role], ...(office ? [[office.official ? "Email dell'ufficio" : "Email dell'ufficio (indicativa)", office.mail] as [string, string]] : []), ...((account ?? id.email) && (account ?? id.email) !== office?.mail ? [["Email personale", (account ?? id.email)!] as [string, string]] : []), ...(id.badge ? [["Matricola", id.badge] as [string, string]] : []), ["Identificato il", since]];
+    : [["Nome", id.name], ["Comune", id.comune], ["Ufficio", id.office], ["Ruolo", id.role], ...(office ? [[office.official ? "Email dell’ufficio" : "Email dell’ufficio (indicativa)", office.mail] as [string, string]] : []), ...((account ?? id.email) && (account ?? id.email) !== office?.mail ? [["Email personale", (account ?? id.email)!] as [string, string]] : []), ...(id.badge ? [["Matricola", id.badge] as [string, string]] : []), ["Identificato il", since]];
 }
 
 /**
@@ -413,7 +413,7 @@ export function IdentifyPage({ kind }: { kind: ProKind }) {
           <p className="text-[15px] leading-relaxed text-muted-foreground">{p.intro}</p>
           {id && <p className="rounded-2xl bg-foreground/[0.06] px-4 py-3 text-sm text-muted-foreground">Ora sei identificato come <span className="font-semibold text-foreground">{proSummary(id)}</span>: identificandoti qui, quel profilo viene sostituito e {p.locks} si blocca.</p>}
           <IdentifyForm kind={kind} onDone={done} />
-          <p className="px-1 text-xs text-muted-foreground">I dati restano su questo dispositivo e, se hai fatto l'accesso, nel tuo account. Puoi uscire dal profilo quando vuoi.</p>
+          <p className="px-1 text-xs text-muted-foreground">I dati restano su questo dispositivo e, se hai fatto l’accesso, nel tuo account. Puoi uscire dal profilo quando vuoi.</p>
         </>
       )}
     </div>

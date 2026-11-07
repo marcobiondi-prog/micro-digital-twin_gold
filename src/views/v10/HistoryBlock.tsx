@@ -148,7 +148,7 @@ function ShotViewer({ shots, start, onClose }: { shots: Shot[]; start: number; o
       const a = document.createElement("a"); a.href = url; a.download = file?.name ?? s.name;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
-      setNote(file ? "Qui la condivisione non c'è: salvata in Download." : "Il telefono non condivide questo tipo di file: salvato in Download.");
+      setNote(file ? "Qui la condivisione non c’è: salvata in Download." : "Il telefono non condivide questo tipo di file: salvato in Download.");
     } catch { setNote("File non raggiungibile: controlla la connessione."); }
   };
   /** Deleted for good, from the account or from this device; the viewer moves on to the next one, or closes. */
@@ -203,7 +203,7 @@ function ShotViewer({ shots, start, onClose }: { shots: Shot[]; start: number; o
           <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto touch-pan-x" data-map-gestures="">
             {zone && <span className="shrink-0 rounded-full bg-foreground/[0.07] px-3 py-1.5 text-[12.5px]">Zona: {zone}</span>}
             {nearWhen && <span className="shrink-0 rounded-full bg-foreground/[0.07] px-3 py-1.5 text-[12.5px]">{SEASON_LABEL[nearWhen.season]} · {whenClock(nearWhen)}</span>}
-            <span className="shrink-0 rounded-full bg-foreground/[0.07] px-3 py-1.5 text-[12.5px]">{s.flow === "piazza" ? "Piazza" : "Vigneto"} · {({ foto: "foto", multiplo: "scatto multiplo", ai: s.kind === "video" ? "video con l'AI" : "foto con l'AI", video: "video" } as const)[shotKind(s)]}</span>
+            <span className="shrink-0 rounded-full bg-foreground/[0.07] px-3 py-1.5 text-[12.5px]">{s.flow === "piazza" ? "Piazza" : "Vigneto"} · {({ foto: "foto", multiplo: "scatto multiplo", ai: s.kind === "video" ? "video con l’AI" : "foto con l’AI", video: "video" } as const)[shotKind(s)]}</span>
           </div>
           {note && <p role="status" className="mt-3 text-center text-[13px] text-brand-turquoise">{note}</p>}
           {ask ? (
@@ -650,7 +650,7 @@ function ArchiveBlock({ shots: all, keys, defaultOpen = false }: { shots: Shot[]
   // Sub-categories: one kind at a time (single photos, multiple shots, AI shots, videos), restored on their own too.
   const [kind, setKind] = useState<ShotKind | "tutti">("tutti");
   const shots = useMemo(() => (kind === "tutti" ? all : all.filter((s) => shotKind(s) === kind)), [all, kind]);
-  const kindLabel = kind === "tutti" ? "" : ({ foto: "le foto", multiplo: "gli scatti multipli", ai: "quelle con l'AI", video: "i video" } as const)[kind];
+  const kindLabel = kind === "tutti" ? "" : ({ foto: "le foto", multiplo: "gli scatti multipli", ai: "quelle con l’AI", video: "i video" } as const)[kind];
   const piles = useMemo(() => pilesOf(shots), [shots]);
   const isoOf = (p: Pile) => { const s0 = p.shots[0]; if (!s0?.at) return ""; const d = new Date(s0.at); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
   const list = day ? piles.filter((p) => isoOf(p) === day) : piles;
@@ -666,7 +666,7 @@ function ArchiveBlock({ shots: all, keys, defaultOpen = false }: { shots: Shot[]
     <div className="rounded-2xl bg-foreground/[0.04]">
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-3 px-4 py-3.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-2xl">
         <ArchiveIcon kind="foto" />
-        <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Archivio foto e video</span><span className="block text-xs text-muted-foreground">{all.length ? `${piles.length === 1 ? "1 giorno" : `${piles.length} giorni`} · ${countText(shots)}` : `${keys.length === 1 ? "1 file" : `${keys.length} file`} archiviati`} · {signedIn ? "nell'account" : "su questo dispositivo"}</span></span>
+        <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Archivio foto e video</span><span className="block text-xs text-muted-foreground">{all.length ? `${piles.length === 1 ? "1 giorno" : `${piles.length} giorni`} · ${countText(shots)}` : `${keys.length === 1 ? "1 file" : `${keys.length} file`} archiviati`} · {signedIn ? "nell’account" : "su questo dispositivo"}</span></span>
         <ChevronDown className={`size-5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
       {open && (
@@ -691,8 +691,8 @@ function ArchiveBlock({ shots: all, keys, defaultOpen = false }: { shots: Shot[]
               <ArchiveRestore className="size-4" aria-hidden="true" />Ripristina tutto · {keys.length === 1 ? "1 file" : `${keys.length} file`}
             </button>
           )}
-          {!day && shots.length > 0 && <SaveArchive shots={shots} what={kind === "tutti" ? "tutto l'archivio" : kindLabel} zipName={`archivio${kind === "tutti" ? "" : `-${kind}`}-${new Date().toISOString().slice(0, 10)}.zip`} />}
-          {!day && shots.length > 0 && <DeleteArchive shots={shots} what={kind === "tutti" ? "tutto l'archivio" : kindLabel} onDone={() => { setShown(null); if (kind !== "tutti") setKind("tutti"); }} />}
+          {!day && shots.length > 0 && <SaveArchive shots={shots} what={kind === "tutti" ? "tutto l’archivio" : kindLabel} zipName={`archivio${kind === "tutti" ? "" : `-${kind}`}-${new Date().toISOString().slice(0, 10)}.zip`} />}
+          {!day && shots.length > 0 && <DeleteArchive shots={shots} what={kind === "tutti" ? "tutto l’archivio" : kindLabel} onDone={() => { setShown(null); if (kind !== "tutti") setKind("tutti"); }} />}
           {months.map((m) => (
             <div key={m.name}>
               <p className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{m.name}</p>
@@ -792,7 +792,7 @@ function DeleteArchive({ shots, what, onDone }: { shots: Shot[]; what: string; o
       const urban = shots.filter((s) => s.flow === "piazza"), vine = shots.filter((s) => s.flow === "vigneto");
       if (urban.length) await removeMedia("urban", urban);
       if (vine.length) await removeMedia("vineyard", vine);
-      toast.success(`Eliminati dall'archivio: ${countText(shots)}`);
+      toast.success(`Eliminati dall’archivio: ${countText(shots)}`);
       setAsk(false);
       onDone();
     } catch (e) {
@@ -801,7 +801,7 @@ function DeleteArchive({ shots, what, onDone }: { shots: Shot[]; what: string; o
     } finally { setBusy(false); }
   };
   return ask ? (
-    <div role="alertdialog" aria-label="Eliminare l'archivio?" className="rounded-2xl bg-destructive/10 p-3.5 text-sm">
+    <div role="alertdialog" aria-label="Eliminare l’archivio?" className="rounded-2xl bg-destructive/10 p-3.5 text-sm">
       <p className="font-semibold">Eliminare {what}?</p>
       <p className="mt-0.5 text-muted-foreground">{countText(shots)} archiviati vengono eliminati per sempre. Non si possono recuperare.</p>
       <div className="mt-3 flex gap-2">
@@ -824,17 +824,17 @@ function ArchiveAll({ shots, kind }: { shots: Shot[]; kind: ShotKind | "tutti" }
   const [ask, setAsk] = useState(false);
   useEffect(() => { setAsk(false); }, [kind]);
   if (shots.length < 2) return null;
-  const what = kind === "tutti" ? "tutto" : ({ foto: "le foto", multiplo: "gli scatti multipli", ai: "quelle con l'AI", video: "i video" } as const)[kind];
+  const what = kind === "tutti" ? "tutto" : ({ foto: "le foto", multiplo: "gli scatti multipli", ai: "quelle con l’AI", video: "i video" } as const)[kind];
   const days = pilesOf(shots).length;
   const go = () => {
     archiveMedia(shots.map((s) => `${s.flow}-${s.id}`));
     setAsk(false);
-    toast.success(`Archiviati: ${countText(shots)}`, { description: "Li ritrovi nell'Archivio, divisi per giorno." });
+    toast.success(`Archiviati: ${countText(shots)}`, { description: "Li ritrovi nell’Archivio, divisi per giorno." });
   };
   return ask ? (
     <div role="alertdialog" aria-label="Archiviare tutto?" className="rounded-2xl bg-foreground/[0.06] p-3.5 text-sm">
       <p className="font-semibold">Archiviare {what}?</p>
-      <p className="mt-0.5 text-muted-foreground">{countText(shots)} di {days === 1 ? "1 giorno" : `${days} giorni`} vanno nell'Archivio. Non si cancella niente: li puoi ripristinare quando vuoi.</p>
+      <p className="mt-0.5 text-muted-foreground">{countText(shots)} di {days === 1 ? "1 giorno" : `${days} giorni`} vanno nell’Archivio. Non si cancella niente: li puoi ripristinare quando vuoi.</p>
       <div className="mt-3 flex gap-2">
         <button type="button" onClick={() => setAsk(false)} className="h-10 flex-1 rounded-full bg-foreground/[0.08] font-semibold">Annulla</button>
         <button type="button" onClick={go} className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full bg-white font-semibold text-black"><Archive className="size-4" aria-hidden="true" />Archivia {shots.length}</button>
@@ -994,10 +994,10 @@ function ArchiveAllEntries({ items }: { items: SourcedEntry[] }) {
   return ask ? (
     <div role="alertdialog" aria-label="Archiviare tutti gli interventi?" className="rounded-2xl bg-foreground/[0.06] p-3.5 text-sm">
       <p className="font-semibold">Archiviare tutti gli interventi?</p>
-      <p className="mt-0.5 text-muted-foreground">{entriesText(items.length)} di {days === 1 ? "1 giorno" : `${days} giorni`} vanno nell'Archivio. Non si cancella niente: li puoi ripristinare quando vuoi.</p>
+      <p className="mt-0.5 text-muted-foreground">{entriesText(items.length)} di {days === 1 ? "1 giorno" : `${days} giorni`} vanno nell’Archivio. Non si cancella niente: li puoi ripristinare quando vuoi.</p>
       <div className="mt-3 flex gap-2">
         <button type="button" onClick={() => setAsk(false)} className="h-10 flex-1 rounded-full bg-foreground/[0.08] font-semibold">Annulla</button>
-        <button type="button" onClick={() => { archiveHistory(items.map((e) => e.id)); setAsk(false); toast.success(`Archiviati: ${entriesText(items.length)}`, { description: "Li ritrovi nell'Archivio degli interventi, divisi per giorno." }); }}
+        <button type="button" onClick={() => { archiveHistory(items.map((e) => e.id)); setAsk(false); toast.success(`Archiviati: ${entriesText(items.length)}`, { description: "Li ritrovi nell’Archivio degli interventi, divisi per giorno." }); }}
           className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full bg-white font-semibold text-black"><Archive className="size-4" aria-hidden="true" />Archivia {items.length}</button>
       </div>
     </div>
@@ -1083,7 +1083,7 @@ function HistoryArchiveBlock({ items, defaultOpen = false }: { items: SourcedEnt
     <div className="rounded-2xl bg-foreground/[0.04]">
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <ArchiveIcon kind="interventi" />
-        <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Archivio interventi</span><span className="block text-xs text-muted-foreground">{days.length === 1 ? "1 giorno" : `${days.length} giorni`} · {entriesText(items.length)} · {signedIn ? "nell'account" : "su questo dispositivo"}</span><span className="block text-xs tabular-nums text-muted-foreground">{archivedOn(items.map((e) => marks[e.id]), "Archiviati")}</span></span>
+        <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Archivio interventi</span><span className="block text-xs text-muted-foreground">{days.length === 1 ? "1 giorno" : `${days.length} giorni`} · {entriesText(items.length)} · {signedIn ? "nell’account" : "su questo dispositivo"}</span><span className="block text-xs tabular-nums text-muted-foreground">{archivedOn(items.map((e) => marks[e.id]), "Archiviati")}</span></span>
         <ChevronDown className={`size-5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
       {open && (
@@ -1104,7 +1104,7 @@ function HistoryArchiveBlock({ items, defaultOpen = false }: { items: SourcedEnt
               className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-foreground/10 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <Download className="size-4" aria-hidden="true" />Salva sul telefono · {entriesText(items.length)}
             </button>
-            <ConfirmDelete label={`Elimina tutto l'archivio · ${items.length}`} title="Eliminare tutto l'archivio degli interventi?" body={`${entriesText(items.length)} archiviati vengono eliminati per sempre${signedIn ? ", anche dal tuo account" : ""}.`} run={() => deleteEntries(items)} />
+            <ConfirmDelete label={`Elimina tutto l’archivio · ${items.length}`} title="Eliminare tutto l’archivio degli interventi?" body={`${entriesText(items.length)} archiviati vengono eliminati per sempre${signedIn ? ", anche dal tuo account" : ""}.`} run={() => deleteEntries(items)} />
           </>}
           {months.map((m) => (
             <div key={m.name}>
@@ -1158,7 +1158,7 @@ export function ArchiveOnly() {
   if (keys.length === 0 && archivedEntries.length === 0) return (
     <div className="flex flex-col items-center gap-3 rounded-2xl bg-foreground/[0.04] px-6 py-10 text-center">
       <Archive className="size-8 text-muted-foreground" aria-hidden="true" />
-      <p className="font-semibold">L'archivio è vuoto</p>
+      <p className="font-semibold">L’archivio è vuoto</p>
       <p className="text-sm text-muted-foreground">Gli interventi, le foto e i video che archivi dalla cronologia finiscono qui, divisi per giorno.</p>
     </div>
   );
@@ -1290,8 +1290,8 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
         {groups.length === 0 ? visibleShots.length > 0 ? null : (
           <DashCard className="flex flex-col items-center gap-2 py-8 text-center">
             <History className="size-7 text-muted-foreground" aria-hidden="true" />
-            <p className="text-[15px] font-medium">{loading ? "Carico la cronologia…" : archivedEntries.length ? "Gli interventi sono tutti nell'archivio" : f === "tutti" ? "Ancora nessun intervento" : `Ancora nessun intervento ${f === "piazza" ? "nella piazza" : "nel vigneto"}`}</p>
-            {!loading && !archivedEntries.length && <p className="max-w-xs text-sm text-muted-foreground">Quando cambi alberi, aiuole, ombra o irrigazione nella simulazione, l’intervento si registra da solo e lo trovi qui, con foto e video.</p>}
+            <p className="text-[15px] font-medium">{loading ? "Carico la cronologia…" : archivedEntries.length ? "Gli interventi sono tutti nell’archivio" : f === "tutti" ? "Ancora nessun intervento" : `Ancora nessun intervento ${f === "piazza" ? "nella piazza" : "nel vigneto"}`}</p>
+            {!loading && !archivedEntries.length && <p className="max-w-xs text-sm text-muted-foreground">Quando cambi alberi, aiuole, ombra o irrigazione nella simulazione, ogni modifica viene salvata in automatico e la trovi qui, con foto e video.</p>}
           </DashCard>
         ) : groups.map((g) => compact
           ? <DayTab key={g.key} label={g.label} items={g.items} />

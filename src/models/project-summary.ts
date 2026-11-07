@@ -54,10 +54,10 @@ export function piazzaSummary(urban: LabState["urban"], season: Season, profile:
 
 /** What was put in the piazza, one line each with its unit cost (shared by the dashboard rows and the report). */
 export const piazzaMix = (urban: LabState["urban"], s: PiazzaSummary) => [
-  { label: "Alberi", value: `${urban.trees}`, cost: `${euroRange(UNIT_COST.tree)} l'uno` },
+  { label: "Alberi", value: `${urban.trees}`, cost: `${euroRange(UNIT_COST.tree)} l’uno` },
   { label: "Aiuole e ciottoli", value: `${urban.permeable}%`, cost: `${grouped(s.lawnM2)} m² · ${euroRange(UNIT_COST.lawnM2)} al m²` },
   { label: "Ombra", value: `${urban.shade}%`, cost: `${grouped(s.shadeArea)} m² · ${euroRange(UNIT_COST.shadeM2)} al m²` },
-  { label: "Nebulizzatori", value: `${urban.misters ?? 0}`, cost: `${euroRange(UNIT_COST.mister)} l'uno` },
+  { label: "Nebulizzatori", value: `${urban.misters ?? 0}`, cost: `${euroRange(UNIT_COST.mister)} l’uno` },
 ];
 
 export type VineSummary = {
@@ -89,7 +89,7 @@ export function vineSummary(vine: LabState["vineyard"], areaM2: number | null): 
 
 /** What was put in the vineyard, one line each with its cost per hectare. */
 export const vineMixRows = (s: VineSummary) => [
-  { label: "Irrigazione", value: `+${Math.round(s.mix.irrigation)}%`, cost: `${euroRange(VINE_UNIT_COST.irrigation)} l'ettaro` },
-  { label: "Teli d'ombra", value: `${Math.round(s.mix.shade)}%`, cost: `${euroRange(VINE_UNIT_COST.shade)} l'ettaro` },
-  { label: "Frangivento", value: `${Math.round(s.mix.windbreak)}%`, cost: `${euroRange(VINE_UNIT_COST.windbreak)} l'ettaro` },
+  { label: "Irrigazione", value: `+${Math.round(s.mix.irrigation)}%`, cost: `${euroRange(VINE_UNIT_COST.irrigation)} l’ettaro` },
+  { label: "Teli d’ombra", value: `${Math.round(s.mix.shade)}%`, cost: `${euroRange(VINE_UNIT_COST.shade)} l’ettaro` },
+  { label: "Frangivento", value: `${Math.round(s.mix.windbreak)}%`, cost: `${euroRange(VINE_UNIT_COST.windbreak)} l’ettaro` },
 ];

@@ -384,7 +384,7 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
         </div>
         <p className="text-center text-[11px] text-white/75 tabular-nums" aria-live="polite">Nord {metres(adj.n)} · Est {metres(adj.e)}</p>
         {(adj.h !== 0 || adj.n !== 0 || adj.e !== 0) && (
-          <button type="button" onClick={resetAdj} className="mx-auto flex items-center gap-1 text-[12px] font-semibold underline decoration-white/30 underline-offset-4"><RotateCcw className="size-3.5" aria-hidden="true" />Rimetti com'era</button>
+          <button type="button" onClick={resetAdj} className="mx-auto flex items-center gap-1 text-[12px] font-semibold underline decoration-white/30 underline-offset-4"><RotateCcw className="size-3.5" aria-hidden="true" />Rimetti com’era</button>
         )}
       </div>
     )}

@@ -237,7 +237,7 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
           <span className={cn("rounded-full px-3 py-0.5 text-[13px] font-semibold text-white transition-colors duration-300", GAIN_BG[gain])}>{verdict(after)}</span>
           <span className="mt-1 font-display text-6xl font-light leading-none tracking-tight tabular-nums">{Math.round(after)}<span className="text-2xl text-muted-foreground">/100</span></span>
           {/* What the big number is, said under it: the vines' thirst out of 100, and what the interventions take off. */}
-          <span className="mt-1.5 text-center text-[13px] font-semibold leading-tight">Bisogno di intervento <span className="tabular-nums">{Math.round(before - after) >= 1 ? `· −${Math.round(before - after)} rispetto a oggi` : any ? "· a quest'ora non cambia" : "· nessun intervento fatto"}</span></span>
+          <span className="mt-1.5 text-center text-[13px] font-semibold leading-tight">Bisogno di intervento <span className="tabular-nums">{Math.round(before - after) >= 1 ? `· −${Math.round(before - after)} rispetto a oggi` : any ? "· a quest’ora non cambia" : "· nessun intervento fatto"}</span></span>
         </div>
       </div>
 
@@ -251,7 +251,7 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
       {/* The season's air in the selected area (its middle when drawn): the year's average at this season and hour, or a
           plain estimate, said so. */}
       <p className="-mt-1 flex items-center justify-center gap-1.5 text-center text-sm text-muted-foreground">
-        <Thermometer className="size-4" aria-hidden="true" />{clock.real !== null ? "Temperatura stagionale" : "Stima stagionale"} {areaHere ? "dell'area" : "del luogo"} <b className="font-semibold tabular-nums text-foreground">{fmt1(seasonAir)}°</b>
+        <Thermometer className="size-4" aria-hidden="true" />{clock.real !== null ? "Temperatura stagionale" : "Stima stagionale"} {areaHere ? "dell’area" : "del luogo"} <b className="font-semibold tabular-nums text-foreground">{fmt1(seasonAir)}°</b>
       </p>
 
       {/* Where the number comes from: the three parts of the thirst (points), the phase's weight and the rain. */}
@@ -273,7 +273,7 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
       <div className="-mt-2 space-y-3">
         <p className="text-center text-sm text-muted-foreground">Bisogno di intervento, {scopeName}: senza interventi {Math.round(before)}/100</p>
         <WhenPicker clock={clock} id="vigneto-when" detail={<>aria {Math.round(seasonAir)}°</>}
-          note={clock.pending ? "Leggo l'anno del luogo…" : clock.real !== null ? "Temperatura percepita media dell'ultimo anno in questo luogo, a quella stagione e ora" : "Stima indicativa: i dati reali del luogo non sono disponibili"} />
+          note={clock.pending ? "Leggo l’anno del luogo…" : clock.real !== null ? "Temperatura percepita media dell’ultimo anno in questo luogo, a quella stagione e ora" : "Stima indicativa: i dati reali del luogo non sono disponibili"} />
         <div className="flex items-stretch gap-2">
           <div className="grid flex-1 grid-cols-4 gap-1 rounded-3xl bg-foreground/[0.04] p-1" role="radiogroup" aria-label="Fase della vite">
             {phenoPhases.map((p) => {
@@ -307,7 +307,7 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
       {/* Fine-tuning by hand: always open, one line each. */}
       <div className="space-y-3" role="group" aria-label={`Interventi, ${scopeName}`}>
         <Lever icon={Droplets} label="Irrigazione" value={mix.irrigation} step={2} max={VINE_MAX.irrigation} color="text-water" swatch="bg-water" shown={`+${mix.irrigation}%`} onChange={(v) => change({ irrigation: v })} />
-        <Lever icon={Umbrella} label="Teli d'ombra" value={mix.shade} step={10} max={VINE_MAX.shade} color="text-urban" swatch="bg-urban" onChange={(v) => change({ shade: v })} />
+        <Lever icon={Umbrella} label="Teli d’ombra" value={mix.shade} step={10} max={VINE_MAX.shade} color="text-urban" swatch="bg-urban" onChange={(v) => change({ shade: v })} />
         <Lever icon={Wind} label="Frangivento" value={mix.windbreak} step={10} max={VINE_MAX.windbreak} color="text-ok" swatch="bg-ok" onChange={(v) => change({ windbreak: v })} />
       </div>
 
@@ -393,7 +393,7 @@ function VineAccordion({ needs, mixes, m2, surface }: { needs: number[]; mixes: 
             </li>
           ))}
         </ul>
-        <p className="text-[11px] leading-snug text-muted-foreground">{total.given > 0 ? `L'irrigazione impostata porta ${waterText(total.given)}. ` : ""}Stima indicativa: consumo delle viti dalla temperatura e dalla fase, terreno riportato al 30 % di umidità sui primi 50 cm.</p>
+        <p className="text-[11px] leading-snug text-muted-foreground">{total.given > 0 ? `L’irrigazione impostata porta ${waterText(total.given)}. ` : ""}Stima indicativa: consumo delle viti dalla temperatura e dalla fase, terreno riportato al 30 % di umidità sui primi 50 cm.</p>
       </AccItem>
       <AccItem id="forecast" open={open === "forecast"} onToggle={toggle} icon={CalendarDays} title="Prossimi 7 giorni"
         summary={q.isPending ? "Leggo le previsioni…" : !days || !peak ? "Previsioni non disponibili ora" : `Il giorno più critico: ${peak === days[0] ? "oggi" : DAY_NAME.format(new Date(`${peak.date}T12:00`))}, ${Math.round(peak.tmax)}° · ${Math.round(peak.need)}/100`}>

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { GNSS, gnssLogoQuery, gnssLogosFrom } from "@/models/gnss";
 
 describe("gnss logos", () => {
-  it("asks for every system's article", () => {
+  it("asks for every system’s article", () => {
     const q = gnssLogoQuery();
     for (const g of GNSS) for (const a of g.articles) expect(q).toContain(`"${a}"@en`);
     expect(q).toContain("wdt:P154");

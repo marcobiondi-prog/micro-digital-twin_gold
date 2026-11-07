@@ -14,9 +14,9 @@ type ZoneNow = { need: number; moisture: number; temp: number; wind: number; rai
 
 const PHASE_CHECK: Record<Pheno, string> = {
   Germogliamento: "Germogli: controlla le gelate tardive nelle notti fredde.",
-  Fioritura: "Fioritura: caldo e siccità riducono l'allegagione, tieni il terreno umido.",
+  Fioritura: "Fioritura: caldo e siccità riducono l’allegagione, tieni il terreno umido.",
   Invaiatura: "Invaiatura: guarda gli acini esposti al sole del pomeriggio, rischiano scottature.",
-  Maturazione: "Maturazione: riduci l'acqua nelle due settimane prima della vendemmia.",
+  Maturazione: "Maturazione: riduci l’acqua nelle due settimane prima della vendemmia.",
 };
 
 /** "Zona 2", "Zone 1 e 3", "Zone 1, 2 e 3". */
@@ -43,9 +43,9 @@ export function vineAdvice(zones: ZoneNow[], phase: Pheno): Advice[] {
   const windy = pick((z) => !z.rain && z.wind >= 15 && z.mix.windbreak < 50);
   const items: Array<Advice & { rank: number }> = [];
   if (dry.length) { const m = Math.min(...dry.map((i) => zones[i]!.moisture)); items.push({ rank: 30 - m, tone: m < 18 ? "urgent" : "soon", text: `${zonesText(dry)}: terreno asciutto (${dry.map((i) => `${Math.round(zones[i]!.moisture)} %`).join(", ")}), irriga a goccia nelle prime ore del mattino.` }); }
-  if (hot.length) { const t = Math.max(...hot.map((i) => zones[i]!.temp)); items.push({ rank: t - 20, tone: t >= 36 ? "urgent" : "soon", text: `${zonesText(hot)}: fino a ${Math.round(t)} °C, stendi i teli d'ombra nelle ore più calde.` }); }
+  if (hot.length) { const t = Math.max(...hot.map((i) => zones[i]!.temp)); items.push({ rank: t - 20, tone: t >= 36 ? "urgent" : "soon", text: `${zonesText(hot)}: fino a ${Math.round(t)} °C, stendi i teli d’ombra nelle ore più calde.` }); }
   if (windy.length) { const w = Math.max(...windy.map((i) => zones[i]!.wind)); items.push({ rank: w / 2, tone: "soon", text: `${zonesText(windy)}: vento a ${Math.round(w)} km/h che asciuga le foglie, rinforza il frangivento.` }); }
-  if (rainy.length) items.push({ rank: 0, tone: "ok", text: `${zonesText(rainy)}: piove, sospendi l'irrigazione.` });
+  if (rainy.length) items.push({ rank: 0, tone: "ok", text: `${zonesText(rainy)}: piove, sospendi l’irrigazione.` });
   out.push(...items.sort((a, b) => b.rank - a.rank).map(({ tone, text }) => ({ tone, text })));
   out.push({ tone: "ok", text: PHASE_CHECK[phase] });
   return out;

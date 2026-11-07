@@ -3,7 +3,7 @@ import { changeCalendar, changeHands, changeNotice, clockOffset, dstShift, place
 
 describe("world-clock", () => {
   const t = Date.UTC(2026, 9, 30, 12, 7); // 30 Oct 2026, 12:07 UTC
-  it("reads the instant in the place's own zone", () => {
+  it("reads the instant in the place’s own zone", () => {
     expect(placeTime(t, "Europe/Rome")).toEqual({ month: 9, hour: 13, minute: 7 });
     expect(placeTime(t, "Asia/Tokyo")).toEqual({ month: 9, hour: 21, minute: 7 });
     expect(placeTime(t, "America/New_York")).toEqual({ month: 9, hour: 8, minute: 7 });
@@ -56,14 +56,14 @@ describe("world-clock", () => {
     expect(changeHands(at, "Europe/Rome")).toEqual({ from: "03:00", to: "02:00" });
     expect(changeHands(Date.UTC(2027, 2, 28, 1), "Europe/Rome")).toEqual({ from: "02:00", to: "03:00" });
     expect(changeNotice(at - 40 * 3_600_000, "Europe/Rome")).toBeNull();
-    expect(changeNotice(at - 30 * 3_600_000, "Europe/Rome")?.text).toBe("Domani notte torna l'ora solare: alle 03:00 le lancette vanno alle 02:00.");
+    expect(changeNotice(at - 30 * 3_600_000, "Europe/Rome")?.text).toBe("Domani notte torna l’ora solare: alle 03:00 le lancette vanno alle 02:00.");
     const before = changeNotice(at - 5 * 3_600_000, "Europe/Rome");
     expect(before?.ahead).toBe(true);
-    expect(before?.text.startsWith("Stanotte torna l'ora solare")).toBe(true);
+    expect(before?.text.startsWith("Stanotte torna l’ora solare")).toBe(true);
     const after = changeNotice(at + 6 * 3_600_000, "Europe/Rome");
     expect(after?.ahead).toBe(false);
     expect(after?.key).toBe(before?.key);
-    expect(after?.text).toContain("è tornata l'ora solare");
+    expect(after?.text).toContain("è tornata l’ora solare");
     expect(changeNotice(at + 13 * 3_600_000, "Europe/Rome")).toBeNull();
     expect(changeNotice(at, "Asia/Tokyo")).toBeNull();
   });
@@ -71,7 +71,7 @@ describe("world-clock", () => {
     const ics = changeCalendar(Date.UTC(2026, 9, 25, 1), "solare", { from: "03:00", to: "02:00" }, Date.UTC(2026, 9, 20));
     expect(ics).toContain("DTSTART:20261025T010000Z");
     expect(ics).toContain("TRIGGER:-PT6H");
-    expect(ics).toContain("SUMMARY:Torna l'ora solare");
+    expect(ics).toContain("SUMMARY:Torna l’ora solare");
   });
 });
 

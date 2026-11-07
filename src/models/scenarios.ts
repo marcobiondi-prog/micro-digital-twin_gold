@@ -18,8 +18,8 @@ export const places = {
 };
 
 export const problem = [
-  { key: "piazza" as const, q: ["Perché la piazza è insopportabile d'estate?", "Dove manca l'ombra?", "Cosa conviene fare prima?"], tags: ["Isola di calore", "Stress termico", "Mancanza d'ombra"] },
-  { key: "vigneto" as const, q: ["Le viti stanno soffrendo?", "Quale zona irrigare per prima?", "Quando chiamare l'agronomo?"], tags: ["Terreno asciutto", "Foglie stanche", "Stress termico"] },
+  { key: "piazza" as const, q: ["Perché la piazza è insopportabile d’estate?", "Dove manca l’ombra?", "Cosa conviene fare prima?"], tags: ["Isola di calore", "Stress termico", "Mancanza d’ombra"] },
+  { key: "vigneto" as const, q: ["Le viti stanno soffrendo?", "Quale zona irrigare per prima?", "Quando chiamare l’agronomo?"], tags: ["Terreno asciutto", "Foglie stanche", "Stress termico"] },
 ];
 
 export const zeroSources = [
@@ -51,7 +51,7 @@ export type PrototypeLevel = {
 /** Three prototyping levels framed with Design Thinking terminology. */
 export const comparison: PrototypeLevel[] = [
   {
-    id: "zero", s: "Subito, gratis", dt: "Con i dati che ci sono già",
+    id: "zero", s: "Interventi leggeri", dt: "Con i dati che ci sono già",
     def: "Dati aperti, meteo e osservazioni a mano: si capisce subito se l’idea serve, prima di comprare strumenti.",
     cost: "0 €", prec: "Bassa (±3 °C)", time: "Subito",
     test: {
@@ -60,7 +60,7 @@ export const comparison: PrototypeLevel[] = [
     },
   },
   {
-    id: "mvp", s: "Pochi sensori", dt: "Una prova sul posto", chosen: true,
+    id: "mvp", s: "Interventi medi", dt: "Una prova sul posto", chosen: true,
     def: "Pochi sensori messi nei punti giusti: si impara molto spendendo poco, in poche settimane.",
     cost: "€€", prec: "Media (±1 °C)", time: "Settimane",
     test: {

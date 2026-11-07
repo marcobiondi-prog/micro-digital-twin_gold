@@ -29,7 +29,7 @@ export const Route = createFileRoute("/api/public/external-approval")({
         const { req } = await findRequest(t.data);
         if (!req) return page("Link non valido", "<h1>Link non valido</h1><p>Richiesta non trovata o scaduta.</p>", 404);
         if (req.status !== "attesa") return page("Parere già registrato", `<h1>Parere già registrato</h1><p>${esc(req.entity)}: ${req.status === "approvato" ? "approvato" : "respinto"}.</p>`);
-        return page("Richiesta di parere", `<h1>Richiesta di parere</h1><p>Ente: <b>${esc(req.entity)}</b><br>Esprimi il parere sull'intervento di mitigazione climatica proposto.</p>
+        return page("Richiesta di parere", `<h1>Richiesta di parere</h1><p>Ente: <b>${esc(req.entity)}</b><br>Esprimi il parere sull’intervento di mitigazione climatica proposto.</p>
 <form method="post"><input type="hidden" name="token" value="${t.data}"><button class="ok" name="decision" value="approvato">Approva</button><button class="no" name="decision" value="respinto">Respingi</button></form>`);
       },
       POST: async ({ request }) => {

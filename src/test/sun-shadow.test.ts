@@ -10,7 +10,7 @@ const area: Ring = [at(0, 0), at(60, 0), at(60, 40), at(0, 40)];
 const centreOf = (r: Ring) => [r.reduce((s, p) => s + p[0], 0) / r.length, r.reduce((s, p) => s + p[1], 0) / r.length] as const;
 
 describe("the map draws the m² the simulation counts", () => {
-  it("lawn and pergolas cover their lever's share of the area, within one cell", () => {
+  it("lawn and pergolas cover their lever’s share of the area, within one cell", () => {
     const l = piazzaLayout(area, 0, 30, 20)!;
     expect(l.lawnTarget).toBe(720);
     expect(l.shadeTarget).toBe(480);
@@ -20,12 +20,12 @@ describe("the map draws the m² the simulation counts", () => {
     expect(Math.abs(drawn("shade") - 480)).toBeLessThanOrEqual(cell);
     expect(Math.abs(l.lawnM2 - drawn("lawn"))).toBeLessThan(5);
   });
-  it("each tree's crown is the 30 m² of shade the simulation counts", () => {
+  it("each tree’s crown is the 30 m² of shade the simulation counts", () => {
     expect(Math.PI * TREE_RADIUS_M ** 2).toBeCloseTo(TREE_SHADE_M2, 5);
   });
 });
 
-describe("shadows follow the simulation's sun", () => {
+describe("shadows follow the simulation’s sun", () => {
   const l = piazzaLayout(area, 1, 0, 20)!;
   it("turns the clock into solar time, an hour less with ora legale", () => {
     expect(solarHour(13, 15, "legale")).toBeCloseTo(12);
@@ -57,7 +57,7 @@ describe("shadows follow the simulation's sun", () => {
   });
 });
 
-describe("day and night on the map follow the simulation's hour", async () => {
+describe("day and night on the map follow the simulation’s hour", async () => {
   const { dayLight, sunHeightDeg } = await import("@/models/sun-shadow");
   it("is day at summer noon and night at winter 22:00", () => {
     expect(dayLight(sunHeightDeg(41.56, 14.66, "estate", 13, 0, "legale"), false).phase).toBe("giorno");

@@ -67,7 +67,7 @@ async function freshModules() {
 }
 
 describe("caricamento in background dei file del Lab", () => {
-  it("i file caricati come ospite finiscono nell'elenco anche senza pannello montato, per scheda", async () => {
+  it("i file caricati come ospite finiscono nell’elenco anche senza pannello montato, per scheda", async () => {
     const { uploader, store } = await freshModules();
     const foto = new File(["foto"], "piazza.jpg", { type: "image/jpeg" });
     const clip = new File(["clip"], "vigneto.mp4", { type: "video/mp4" });
@@ -86,7 +86,7 @@ describe("caricamento in background dei file del Lab", () => {
     expect(data.size).toBe(2);
   });
 
-  it("i file senza formato riconosciuto sono marcati in errore e non entrano nell'elenco", async () => {
+  it("i file senza formato riconosciuto sono marcati in errore e non entrano nell’elenco", async () => {
     const { uploader, store } = await freshModules();
     const strano = new File(["x"], "appunto.txt", { type: "text/plain" });
 
@@ -152,7 +152,7 @@ describe("caricamento multiplo in parallelo", () => {
   });
 });
 
-describe("senza rete con l'accesso", () => {
+describe("senza rete con l’accesso", () => {
   it("una foto che non riesce a salire per la rete resta sul telefono, in elenco, invece di andare persa", async () => {
     vi.resetModules();
     data.clear();

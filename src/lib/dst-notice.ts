@@ -21,7 +21,7 @@ export async function askChangeNotifications(): Promise<NotifyState> {
   const p = await Notification.requestPermission();
   if (p !== "granted") return p === "denied" ? "denied" : "off";
   try { localStorage.setItem(NOTIFY_KEY, "1"); } catch { /* storage off */ }
-  void notify("Avvisi del cambio dell'ora attivi", "Ti avviso la sera prima del cambio, quando l'app è aperta.");
+  void notify("Avvisi del cambio dell’ora attivi", "Ti avviso la sera prima del cambio, quando l’app è aperta.");
   return "on";
 }
 
@@ -54,8 +54,8 @@ export function useDstNotice() {
       const key = `${n.key}:${n.ahead ? "prima" : "dopo"}`;
       if (seen(key)) return;
       markSeen(key);
-      toast(n.ahead ? "Cambio dell'ora" : "Ora cambiata", { description: n.text, duration: 12_000 });
-      if (changeNotificationsOn() === "on") void notify(n.ahead ? "Cambio dell'ora" : "Ora cambiata", n.text);
+      toast(n.ahead ? "Cambio dell’ora" : "Ora cambiata", { description: n.text, duration: 12_000 });
+      if (changeNotificationsOn() === "on") void notify(n.ahead ? "Cambio dell’ora" : "Ora cambiata", n.text);
     };
     const first = window.setTimeout(check, 2500);
     const id = window.setInterval(check, 30 * 60_000);

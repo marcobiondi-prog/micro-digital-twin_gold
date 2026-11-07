@@ -4,7 +4,7 @@ import { getLab, setUrban, setVineyard } from "@/models/lab-store";
 const A = { label: "Piazza A", lat: 41.5, lng: 14.6 }, B = { label: "Piazza B", lat: 41.6, lng: 14.7 };
 const area = (at: { lat: number; lng: number }) => ({ lat: at.lat, lng: at.lng, ring: [[at.lat, at.lng], [at.lat + 1e-4, at.lng], [at.lat, at.lng + 1e-4]] as Array<[number, number]>, edits: { onlyDrawn: true } });
 
-describe("changing place keeps each place's simulation", () => {
+describe("changing place keeps each place’s simulation", () => {
   beforeEach(() => setUrban({ location: A }));
   it("brings back the interventions and the area drawn when coming back", () => {
     setUrban({ location: A, trees: 12, permeable: 40, shade: 30, area: area(A) });
@@ -21,7 +21,7 @@ describe("changing place keeps each place's simulation", () => {
     expect([getLab().urban.trees, getLab().urban.permeable]).toEqual([3, 10]);
     expect(getLab().urban.area?.lat).toBe(B.lat);
   });
-  it("keeps the vineyard's zone mixes per place", () => {
+  it("keeps the vineyard’s zone mixes per place", () => {
     setVineyard({ location: A });
     setVineyard((v) => ({ zones: v.zones.map((z) => ({ ...z, irrigation: 12 })), area: area(A) }));
     setVineyard({ location: B });
@@ -32,7 +32,7 @@ describe("changing place keeps each place's simulation", () => {
   });
 });
 
-describe("Torna all'ultima posizione", () => {
+describe("Torna all’ultima posizione", () => {
   it("offers the last place left, with its name", async () => {
     const { lastPlace } = await import("@/models/place-memory");
     setUrban({ location: A });

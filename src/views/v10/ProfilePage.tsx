@@ -7,7 +7,7 @@ import { ProfileCard } from "@/views/v10/Identify";
 
 const WAY: Record<ProKind, { to: "/identificazione/agronomo" | "/identificazione/funzionario"; icon: LucideIcon; opens: string; with: string }> = {
   agronomo: { to: "/identificazione/agronomo", icon: Grape, opens: "Apre il vigneto", with: "Con il patentino fitosanitario" },
-  funzionario: { to: "/identificazione/funzionario", icon: Building2, opens: "Apre la piazza", with: "Con il Comune, l'ufficio e la tua email" },
+  funzionario: { to: "/identificazione/funzionario", icon: Building2, opens: "Apre la piazza", with: "Con il Comune, l’ufficio e la tua email" },
 };
 
 function Way({ kind }: { kind: ProKind }) {
@@ -48,7 +48,7 @@ export function ProfilePage() {
   );
 }
 
-const GUEST_CAN = ["La simulazione della piazza e quella del vigneto", "La mappa in 2D, il luogo e l'area disegnata", "Foto e video", "La dashboard"];
+const GUEST_CAN = ["La simulazione della piazza e quella del vigneto", "La mappa in 2D, il luogo e l’area disegnata", "Foto e video", "La dashboard"];
 const GUEST_CANNOT = ["La cronologia degli interventi: da ospite non si registra", "Sensori AI", "Esporta report e Invia il progetto"];
 
 /** The guest's profile: what one can use without identifying, what not, the two ways to identify and "Esci da ospite". */
@@ -60,7 +60,7 @@ function GuestCard() {
           <span className="grid size-12 shrink-0 place-items-center rounded-full bg-foreground/[0.08]"><UserRound className="size-6" aria-hidden="true" /></span>
           <div className="min-w-0">
             <p className="text-lg font-semibold">Sei entrato come ospite</p>
-            <p className="text-sm text-muted-foreground">Né funzionario né agricoltore: usi l'app, ma non tutta.</p>
+            <p className="text-sm text-muted-foreground">Né funzionario né agricoltore: usi l’app, ma non tutta.</p>
           </div>
         </div>
         <div className="rounded-2xl bg-foreground/[0.04] p-4">

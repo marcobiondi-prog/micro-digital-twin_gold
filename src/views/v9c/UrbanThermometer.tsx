@@ -6,7 +6,7 @@ import { loadPlaceArea } from "@/lib/place-area-client";
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { CloudDrizzle, CloudRain, Droplets, Wind, Leaf, Minus, Plus, Ruler, Sprout, Sun, Thermometer, TreePine, Umbrella, Users, type LucideIcon } from "lucide-react";
+import { CloudDrizzle, CloudRain, Droplets, Info, Wind, Leaf, Minus, Plus, Ruler, Sprout, Sun, Thermometer, TreePine, Umbrella, Users, type LucideIcon } from "lucide-react";
 import { MISTER_COOLING, comparison, piazzaEstimate, type PrototypeId } from "@/models/scenarios";
 import { setUrban, useLab, type RealWeather } from "@/models/lab-store";
 import { REFERENCE_M2, grouped } from "@/models/intervention-cost";
@@ -54,10 +54,18 @@ function mixFor(gain: number): { trees: number; permeable: number; shade: number
   const last = PATH[PATH.length - 1]!;
   return { trees: last.trees, permeable: last.permeable, shade: last.shade };
 }
-/** How it feels, in plain words and on the five-step scale (0 = worst; the cool end reads blue). */
-const feeling = (t: number): { text: string; step: number; bg?: string } =>
-  t >= 39 ? { text: "Troppo caldo", step: 0 } : t >= 36 ? { text: "Molto caldo", step: 1 } : t >= 30 ? { text: "Caldo", step: 2 }
-    : t >= 18 ? { text: "Si sta bene", step: 4 } : t >= 10 ? { text: "Fresco", step: 4, bg: "bg-water" } : { text: "Freddo", step: 4, bg: "bg-urban" };
+/**
+ * The comfort class of a perceived temperature, calculated (not fixed), on the five-step scale (0 = worst; the cool
+ * end reads blue): caldo estremo above 46°, caldo molto forte 38–46°, caldo forte 32–38°, caldo moderato 26–32°,
+ * below 26° nessun disagio da caldo.
+ */
+export const comfortClass = (t: number): string =>
+  t >= 46 ? "Caldo estremo" : t >= 38 ? "Caldo molto forte" : t >= 32 ? "Caldo forte" : t >= 26 ? "Caldo moderato" : "Nessun disagio da caldo";
+const feeling = (t: number): { text: string; step: number; bg?: string } => {
+  const text = comfortClass(t);
+  return t >= 46 ? { text, step: 0 } : t >= 38 ? { text, step: 1 } : t >= 32 ? { text, step: 2 } : t >= 26 ? { text, step: 3 }
+    : t >= 18 ? { text, step: 4 } : t >= 10 ? { text, step: 4, bg: "bg-water" } : { text, step: 4, bg: "bg-urban" };
+};
 
 
 /** A level as a stop on the arc: where its ready piazza would bring the perceived heat now. */
@@ -69,7 +77,7 @@ export type Stop = { id: PrototypeId; label: string; t: number; on: boolean; nea
  * the dot goes there). Only a finger on the white dot grabs it: it follows the finger exactly, clicks into a stop
  * when close to it, and the piazza follows; arrow keys move it by 0,1 °C, Page Up/Down jump between stops.
  */
-export function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlide, onStop, unit = "°", spoken = "gradi", label = "Calore percepito da raggiungere", step: keyStep = 0.1, rightEnd, bands }: { rightEnd?: string | undefined; bands?: Array<{ from: number; to: number; color: string }> | undefined; before: number; after: number; lowest: number; min: number; max: number; stops: Stop[]; onSlide: (t: number) => void; onStop: (id: PrototypeId) => void; unit?: string; spoken?: string; label?: string; step?: number }) {
+export function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlide, onStop, unit = "°", spoken = "gradi", label = "Temperatura percepita da raggiungere", step: keyStep = 0.1, rightEnd, bands }: { rightEnd?: string | undefined; bands?: Array<{ from: number; to: number; color: string }> | undefined; before: number; after: number; lowest: number; min: number; max: number; stops: Stop[]; onSlide: (t: number) => void; onStop: (id: PrototypeId) => void; unit?: string; spoken?: string; label?: string; step?: number }) {
   const R = 88, C = Math.PI * R;
   const box = useRef<HTMLDivElement>(null);
   // While sliding, the temperature under the finger (the piazza snaps to whole trees, the dot must not).
@@ -211,7 +219,7 @@ export function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlid
 }
 
 /** One intervention on one line: − / +, its icon, name and value, and ten marks that fill as it grows. */
-export function Lever({ icon: Icon, label, value, step, max, color, swatch, onChange, shown }: { icon: LucideIcon; label: string; value: number; step: number; max: number; color: string; swatch: string; onChange: (v: number) => void; shown?: string }) {
+export function Lever({ icon: Icon, label, value, step, max, color, swatch, onChange, shown, hint }: { icon: LucideIcon; label: string; value: number; step: number; max: number; color: string; swatch: string; onChange: (v: number) => void; shown?: string; hint?: string }) {
   const set = (v: number) => { const n = clamp(v, 0, max); if (n !== value) { hapticTick(); onChange(n); } };
   const filled = Math.round((value / max) * MARKS);
   const btn = "grid size-12 shrink-0 place-items-center rounded-2xl bg-foreground/[0.07] text-foreground outline-none transition-[background-color,transform] duration-150 hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring active:scale-90 disabled:opacity-30 motion-reduce:active:scale-100";
@@ -221,14 +229,32 @@ export function Lever({ icon: Icon, label, value, step, max, color, swatch, onCh
       <div className="min-w-0 flex-1" aria-live="polite">
         <div className="flex items-center gap-2">
           <Icon className={cn("size-5 shrink-0", color)} aria-hidden="true" />
-          <span className="truncate text-[15px] font-semibold">{label}</span>
+          <span className="min-w-0 text-[15px] font-semibold leading-tight">{label}</span>
           <span className="ml-auto shrink-0 font-mono text-sm font-semibold tabular-nums">{shown ?? `${value}${step === 1 ? "" : "%"}`}</span>
         </div>
+        {hint && <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{hint}</p>}
         <div className="mt-1.5 grid grid-cols-10 gap-1" aria-hidden="true">
           {Array.from({ length: MARKS }, (_, k) => <span key={k} className={cn("h-2 rounded-full transition-colors duration-200 motion-reduce:transition-none", k < filled ? swatch : "bg-foreground/10")} />)}
         </div>
       </div>
       <button type="button" className={btn} onClick={() => set(value + step)} disabled={value >= max} aria-label={`Più ${label.toLowerCase()}`}><Plus className="size-5" aria-hidden="true" /></button>
+    </div>
+  );
+}
+
+/** "Temperatura percepita" with an ⓘ that opens one line on what it combines. */
+function PerceivedInfo() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mx-auto -mt-1 max-w-[21rem] text-center">
+      <p className="inline-flex items-center gap-1.5 text-sm font-semibold">
+        Temperatura percepita
+        <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label="Che cos’è la temperatura percepita"
+          className="grid size-7 place-items-center rounded-full text-muted-foreground outline-none hover:bg-foreground/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+          <Info className="size-4" aria-hidden="true" />
+        </button>
+      </p>
+      {open && <p className="mt-0.5 text-xs leading-snug text-muted-foreground">Combina temperatura dell’aria, sole, umidità e vento: è il caldo che senti davvero.</p>}
     </div>
   );
 }
@@ -365,10 +391,10 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
   }));
 
   const facts: Array<{ icon: LucideIcon; value: string; label: string }> = [
-    { icon: Leaf, value: `${co2} kg`, label: "CO₂ l'anno" },
-    { icon: CloudRain, value: `${water} m³`, label: "Pioggia tenuta" },
-    { icon: Sun, value: `${grouped(shadeM2)} m²`, label: "All'ombra" },
-    { icon: Users, value: `≈ ${grouped(Math.floor(shadeM2 / 2))}`, label: "Persone all'ombra" },
+    { icon: Leaf, value: `${co2} kg`, label: "CO₂ assorbita all’anno" },
+    { icon: CloudRain, value: `${water} m³`, label: "Acqua piovana trattenuta (m³/anno)" },
+    { icon: Sun, value: `${grouped(shadeM2)} m²`, label: "All’ombra" },
+    { icon: Users, value: `≈ ${grouped(Math.floor(shadeM2 / 2))}`, label: "Posti all’ombra (capienza teorica, 2 m² a persona)" },
   ];
   const surface = area.isPending ? "…" : `${grouped(m2)} m²`;
   const surfaceNote = drawn !== null ? "Superficie disegnata" : area.isPending ? "Misuro la piazza…" : measured ? "Superficie della piazza" : "Superficie di riferimento";
@@ -377,7 +403,7 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
     <section className="fuse-canvas space-y-5 rounded-t-3xl px-3 pb-6 pt-4 text-foreground sm:px-5" aria-label="Termometro della piazza">
       {/* 1 · How to use it, and the costs-and-times table one touch away. */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground">{share > 0.01 ? "Trascina il punto bianco o tocca un livello" : "Ritocca la piazza qui sotto"}</p>
+        <p className="text-sm text-muted-foreground">{share > 0.01 ? "Trascina il punto bianco o tocca un livello" : "Modifica gli interventi"}</p>
       </div>
 
       {/* The simulation stays the focus: once the gauge scrolls away, its reading rides under the tabs. */}
@@ -398,7 +424,7 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center" aria-live="polite">
           <span className={cn("rounded-full px-3 py-0.5 text-[13px] font-semibold text-white transition-colors duration-300", feel.bg ?? GAIN_BG[feel.step])}>{feel.text}</span>
           <span className="mt-1 font-display text-6xl font-light leading-none tracking-tight tabular-nums">{fmt(after)}°</span>
-          <span className="mt-1.5 font-mono text-sm font-semibold tabular-nums">{gainNow > 0.05 ? `−${fmt(gainNow)}° rispetto a oggi` : est.dT > 0.05 ? "A quest'ora non serve" : "Nessun intervento"}</span>
+          <span className="mt-1.5 text-xs font-semibold">{gainNow > 0.05 ? <><span className="font-mono text-sm tabular-nums">−{fmt(gainNow)}°</span> rispetto a senza interventi</> : est.dT > 0.05 ? "A quest’ora non serve" : "Nessun intervento"}</span>
         </div>
       </div>
 
@@ -407,9 +433,11 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
       <div className="mx-auto -mt-3 flex w-full max-w-[21rem] justify-between px-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground" aria-hidden="true">
         {/* The label the white dot is near lights up, the other dims: near the seasonal average the right one turns warm,
             near the coolest the left one turns bright blue. */}
-        <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "left" ? "bg-sky-500/20 text-sky-800 dark:bg-sky-400/30 dark:text-sky-200" : "bg-sky-500/10 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300", near === "right" && "opacity-50 dark:opacity-35")}>Il più fresco</span>
-        <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 text-right transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "right" ? "bg-amber-400/30 text-amber-900 dark:bg-amber-400/25 dark:text-amber-200" : "bg-foreground/[0.08] text-foreground/75", near === "left" && "opacity-50 dark:opacity-35")}>{realBefore !== null ? "Media stagionale" : "Stima stagionale"} {areaHere ? "dell'area" : "del luogo"}</span>
+        <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "left" ? "bg-sky-500/20 text-sky-800 dark:bg-sky-400/30 dark:text-sky-200" : "bg-sky-500/10 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300", near === "right" && "opacity-50 dark:opacity-35")}>Minimo raggiungibile</span>
+        <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 text-right transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "right" ? "bg-amber-400/30 text-amber-900 dark:bg-amber-400/25 dark:text-amber-200" : "bg-foreground/[0.08] text-foreground/75", near === "left" && "opacity-50 dark:opacity-35")}>{realBefore !== null ? "Media stagionale" : "Stima stagionale"}</span>
       </div>
+      {/* What the big number is: the perceived temperature, with an info button that says what it combines. */}
+      <PerceivedInfo />
       {/* Under the arc: the place's real temperature right now (the reading without interventions is in the chip below). */}
       {/* The user's own sensors, when one has read the air in the last 2 hours, come first. */}
       {mySensorAir ? (
@@ -419,44 +447,44 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
         </p>
       ) : typeof realNow.data === "number" && (
         <p className="-mt-1 flex items-center justify-center gap-1.5 text-center text-sm text-muted-foreground">
-          <Thermometer className="size-4" aria-hidden="true" />Temperatura reale adesso {areaHere ? "nell'area" : "nel luogo"} <b className="font-semibold tabular-nums text-foreground">{fmt(realNow.data)}°</b>
+          <Thermometer className="size-4" aria-hidden="true" />Temperatura dell’aria ora <b className="font-semibold tabular-nums text-foreground">{fmt(realNow.data)}°</b>
         </p>
       )}
 
       {/* When: one chip under the gauge (season, hour, live dot); touching it opens the season and hour controls. */}
       <div className="-mt-2 space-y-2">
         <WhenPicker clock={clock} id="piazza-when" detail={<>senza interventi {fmt(before)}°</>}
-          note={clock.pending ? "Leggo l'anno del luogo…" : realBefore !== null ? "Calore percepito medio dell'ultimo anno in questo luogo" : "Stima indicativa: i dati reali del luogo non sono disponibili"}>
+          note={clock.pending ? "Leggo l’anno del luogo…" : realBefore !== null ? "Calore percepito medio degli ultimi 12 mesi (fonte: Open-Meteo)" : "Stima indicativa: i dati reali del luogo non sono disponibili"}>
           {onImportWeather && <ImportWeatherButton onImport={onImportWeather} />}
           {urban.realWeather && <RealWeatherTiles air={urban.realTemp ?? null} w={urban.realWeather} />}
         </WhenPicker>
-        {share === 0 && <p className="text-center text-xs text-muted-foreground">A quest'ora non fa caldo: non c'è calore da togliere</p>}
+        {share === 0 && <p className="text-center text-xs text-muted-foreground">A quest’ora non fa caldo: gli interventi non cambiano il comfort.</p>}
       </div>
 
       {/* 3 · Fine-tuning by hand: always open, one line each. */}
-      <div className="space-y-3" role="group" aria-label="Ritocca a mano">
+      <div className="space-y-3" role="group" aria-label="Modifica gli interventi">
         <Lever icon={TreePine} label="Alberi" value={urban.trees} step={1} max={30} color="text-ok" swatch="bg-ok" onChange={(v) => change({ trees: v })} />
-        <Lever icon={Sprout} label="Aiuole e ciottoli" value={urban.permeable} step={10} max={100} color="text-radar-mild" swatch="bg-radar-mild" onChange={(v) => change({ permeable: v })} />
-        <Lever icon={Umbrella} label="Ombra" value={urban.shade} step={10} max={100} color="text-urban" swatch="bg-urban" onChange={(v) => change({ shade: v })} />
-        <Lever icon={CloudDrizzle} label="Nebulizzatori" value={misters} step={1} max={20} color="text-sky-300" swatch="bg-sky-400" onChange={(v) => change({ misters: v })} />
+        <Lever icon={Sprout} label="Superfici verdi e permeabili (% della piazza)" value={urban.permeable} step={10} max={100} color="text-radar-mild" swatch="bg-radar-mild" onChange={(v) => change({ permeable: v })} />
+        <Lever icon={Umbrella} label="Coperture ombreggianti (% della piazza)" hint="Tende, pergole, pensiline." value={urban.shade} step={10} max={100} color="text-urban" swatch="bg-urban" onChange={(v) => change({ shade: v })} />
+        <Lever icon={CloudDrizzle} label="Nebulizzatori" hint="Funzionano meglio con aria secca e poco vento; effetto locale, vicino agli ugelli." value={misters} step={1} max={20} color="text-sky-300" swatch="bg-sky-400" onChange={(v) => change({ misters: v })} />
       </div>
 
       {/* 4 · What the piazza gets: the degrees taken off, then the yearly benefits and the shade, always in view. */}
       <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4" aria-label="Cosa ottieni">
         <p className="text-[15px] font-semibold">Cosa ottieni</p>
         <p className="text-sm text-muted-foreground">{gainNow > 0.05
-          ? <>Il calore percepito scende di <b className="font-semibold tabular-nums text-foreground">{fmt(gainNow)}°</b>: da {fmt(before)}° a {fmt(after)}°, {feel.text.toLowerCase()}.</>
-          : urban.trees + urban.permeable + urban.shade + misters > 0 ? <>A quest'ora non fa abbastanza caldo perché gli interventi tolgano gradi: i benefici qui sotto restano.</> : <>Nessun intervento: muovi il punto sull'arco o le leve.</>}</p>
+          ? <>Il calore percepito scende di <b className="font-semibold tabular-nums text-foreground">{fmt(gainNow)}°</b> (da {fmt(before)}° a {fmt(after)}°). Livello: {feel.text.toLowerCase()}.</>
+          : urban.trees + urban.permeable + urban.shade + misters > 0 ? <>A quest’ora non c’è stress da caldo: l’effetto rinfrescante è trascurabile. Gli altri benefici restano validi.</> : <>Nessun intervento: muovi il punto sull’arco o le leve.</>}</p>
         <dl className="grid grid-cols-2 gap-2">
           {facts.map(({ icon: Icon, value, label }) => (
             <div key={label} className="flex min-w-0 items-center gap-2.5 rounded-2xl bg-foreground/[0.04] px-3 py-2.5">
               <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <div className="flex min-w-0 flex-col-reverse"><dt className="truncate text-[11px] text-muted-foreground">{label}</dt><dd className="font-mono text-sm font-semibold tabular-nums">{value}</dd></div>
+              <div className="flex min-w-0 flex-col-reverse"><dt className="text-[11px] leading-tight text-muted-foreground">{label}</dt><dd className="font-mono text-sm font-semibold tabular-nums">{value}</dd></div>
             </div>
           ))}
         </dl>
         <p className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><Ruler className="size-3.5 shrink-0" aria-hidden="true" />{surface} · {surfaceNote.toLowerCase()}</p>
-        <p className="text-[11px] leading-snug text-muted-foreground">Stime indicative su un anno: 22 kg di CO₂ per albero, 700 mm di pioggia di cui il 60 % trattenuto da aiuole e ciottoli, 2 m² d'ombra a persona.</p>
+        <p className="text-[11px] leading-snug text-muted-foreground">Stime indicative su un anno: 22 kg di CO₂ per albero. Ipotesi: 700 mm di pioggia l’anno; le superfici verdi e permeabili ne trattengono fino al 60%. 2 m² d’ombra a persona.</p>
       </div>
     </section>
   );

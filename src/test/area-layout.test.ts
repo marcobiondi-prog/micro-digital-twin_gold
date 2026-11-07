@@ -14,7 +14,7 @@ describe("piazza inside the area", () => {
     expect(l.trees).toHaveLength(12);
     expect(l.trees.every(([a, b]) => ringContains(ring, a, b))).toBe(true);
   });
-  it("covers about the lever's share with lawn and shade, not overlapping", () => {
+  it("covers about the lever’s share with lawn and shade, not overlapping", () => {
     const l = piazzaLayout(ring, 0, 40, 20)!, total = ringAreaM2(ring);
     expect(patchArea("lawn", l) / total).toBeGreaterThan(0.33);
     expect(patchArea("lawn", l) / total).toBeLessThan(0.47);
@@ -91,7 +91,7 @@ describe("zones drawn by hand", () => {
   // A 24 m × 20 m trees zone in the middle of the area.
   const zLat = 20 / 111_195, zLng = 24 / (111_195 * Math.cos((lat * Math.PI) / 180));
   const zone: Array<[number, number]> = [[lat + dLat / 2 - zLat / 2, lng + dLng / 2 - zLng / 2], [lat + dLat / 2 - zLat / 2, lng + dLng / 2 + zLng / 2], [lat + dLat / 2 + zLat / 2, lng + dLng / 2 + zLng / 2], [lat + dLat / 2 + zLat / 2, lng + dLng / 2 - zLng / 2]];
-  it("keep every tree's whole crown inside its trees zone", async () => {
+  it("keep every tree’s whole crown inside its trees zone", async () => {
     const { TREE_RADIUS_M } = await import("@/models/area-layout");
     const l = piazzaLayout(ring, 6, 0, 0, {}, [{ kind: "alberi", ring: zone }])!;
     expect(l.trees).toHaveLength(6);

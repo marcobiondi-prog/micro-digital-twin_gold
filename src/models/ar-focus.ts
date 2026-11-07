@@ -12,19 +12,19 @@ type FocusOption = { id: ArFocus; label: string; hint: string; prompt: string; s
 export const AR_FOCUS: Record<ArKind, readonly FocusOption[]> = {
   urban: [
     { id: "tree", label: "Alberi e ombra", hint: "Inquadra chioma e tronco: stima ombra e raffrescamento per i pedoni.",
-      prompt: "Obiettivo urbano: alberatura stradale o di piazza. Privilegia chioma, tronco e specie arborea; l'ombra serve al comfort dei pedoni.",
+      prompt: "Obiettivo urbano: alberatura stradale o di piazza. Privilegia chioma, tronco e specie arborea; l’ombra serve al comfort dei pedoni.",
       seeks: "vegetation", missing: "Nessun albero inquadrato: punta chioma o tronco e riprova.",
       phases: [{ tag: "Chioma e tronco", status: "Rilevamento di chioma e tronco…" }, { tag: "Verifica botanica", status: "Confronto botanico e stima dell’ombra…" }],
       summary: { title: "Alberi e ombra", empty: "Albero non identificato", idle: "Inquadra chioma o tronco e avvia la scansione.", note: "Simulazione da chioma tipica · massimo −3 °C · ombre sovrapponibili · temperatura non misurata" } },
     { id: "ground", label: "Suolo e depavimentazione", hint: "Inquadra la pavimentazione: permeabilità e possibilità di depavimentare.",
-      prompt: "Obiettivo urbano: superficie e pavimentazione. Privilegia soil e survey: asfalto, cemento, lastricato o terra; nella note indica se la depavimentazione (aiuola, pozzo drenante) è fattibile e l'accumulo di calore apparente.",
+      prompt: "Obiettivo urbano: superficie e pavimentazione. Privilegia soil e survey: asfalto, cemento, lastricato o terra; nella note indica se la depavimentazione (aiuola, pozzo drenante) è fattibile e l’accumulo di calore apparente.",
       seeks: "ground", missing: "Nessuna pavimentazione o suolo riconosciuto: inquadra la superficie a terra e riprova.",
       phases: [{ tag: "Superficie", status: "Rilevamento della pavimentazione…" }, { tag: "Analisi del suolo", status: "Stima di permeabilità e calore…" }],
       summary: { title: "Suolo e calore", empty: "Suolo non classificato", idle: "Inquadra la pavimentazione e avvia la scansione.", note: "Permeabilità e calore apparenti dalla foto · verifica con sonda e prova del terreno · temperatura non misurata" } },
   ],
   vineyard: [
     { id: "leaf", label: "Foglia e varietà", hint: "Avvicinati a 20–30 cm da una foglia: forma, lobi e segni di stress.",
-      prompt: "Obiettivo vitivinicolo: singola foglia da vicino. Privilegia l'ampelografia (lobi, seni, dentatura, nervature) e nell'evidence segnala segni visibili di stress termico, clorosi o scottature, senza diagnosi certe.",
+      prompt: "Obiettivo vitivinicolo: singola foglia da vicino. Privilegia l’ampelografia (lobi, seni, dentatura, nervature) e nell’evidence segnala segni visibili di stress termico, clorosi o scottature, senza diagnosi certe.",
       seeks: "vegetation", missing: "Nessuna foglia inquadrata: avvicinati a 20–30 cm da una foglia di vite e riprova.",
       phases: [{ tag: "Morfologia fogliare", status: "Rilevamento della morfologia fogliare…" }, { tag: "Verifica varietale", status: "Confronto ampelografico e segni di stress…" }],
       summary: { title: "Foglia e stress", empty: "Foglia non identificata", idle: "Avvicinati a 20–30 cm da una foglia e avvia la scansione.", note: "Varietà e stress indicativi dalla forma fogliare · nessuna diagnosi · temperatura non misurata" } },

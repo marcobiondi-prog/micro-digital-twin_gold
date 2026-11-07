@@ -8,7 +8,7 @@ export type ShotKind = "foto" | "multiplo" | "ai" | "video";
 export const SHOT_KINDS: Array<{ id: ShotKind; label: string; one: string; many: string }> = [
   { id: "foto", label: "Foto", one: "foto", many: "foto" },
   { id: "multiplo", label: "Scatto multiplo", one: "scatto multiplo", many: "scatti multipli" },
-  { id: "ai", label: "Con l'AI", one: "con l'AI", many: "con l'AI" },
+  { id: "ai", label: "Con l’AI", one: "con l’AI", many: "con l’AI" },
   { id: "video", label: "Video", one: "video", many: "video" },
 ];
 

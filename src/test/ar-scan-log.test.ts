@@ -19,7 +19,7 @@ describe("ar-scan-log", () => {
     expect(rows[1]![1]).toBe("Piazza · suolo Asfalto · permeabilità bassa · non piantabile");
   });
 
-  it("keeps each scan's real photo for Esito, across reloads, until the scans are cleared", () => {
+  it("keeps each scan’s real photo for Esito, across reloads, until the scans are cleared", () => {
     clearScans("urban");
     const id = recordScan({ ...base, result: "Ficus", soil: null, count: 0, totalCooling: null, totalShade: null, species: null, photo: "data:image/jpeg;base64,AA" });
     const none = recordScan({ ...base, result: "Terreno", soil: null, count: 0, totalCooling: null, totalShade: null, species: null });

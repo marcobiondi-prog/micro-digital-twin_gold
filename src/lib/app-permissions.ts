@@ -13,8 +13,8 @@ export type PermState = "granted" | "denied" | "prompt" | "unsupported";
 
 export const PERMS: Array<{ kind: PermKind; title: string; why: string }> = [
   { kind: "posizione", title: "Posizione", why: "Per trovare il luogo sulla mappa e seguirti col GPS." },
-  { kind: "fotocamera", title: "Fotocamera e microfono", why: "Per scattare foto, lo scatto multiplo e i video con l'audio." },
-  { kind: "notifiche", title: "Notifiche", why: "Per avvisarti del cambio dell'ora, anche con l'app in sottofondo." },
+  { kind: "fotocamera", title: "Fotocamera e microfono", why: "Per scattare foto, lo scatto multiplo e i video con l’audio." },
+  { kind: "notifiche", title: "Notifiche", why: "Per avvisarti del cambio dell’ora, anche con l’app in sottofondo." },
 ];
 
 const ASKED_KEY = "mdt-perms-asked-v1";
@@ -90,11 +90,11 @@ export function howToChange(state: PermState): string {
   const ua = navigator.userAgent;
   const installed = typeof window !== "undefined" && (window.matchMedia?.("(display-mode: standalone)").matches || window.matchMedia?.("(display-mode: fullscreen)").matches || (navigator as { standalone?: boolean }).standalone === true);
   const verb = state === "granted" ? "toglierlo" : "riattivarlo";
-  if (/iPhone|iPad|iPod/i.test(ua)) return `Per ${verb}: Impostazioni dell'iPhone → Safari → Impostazioni per i siti web (fotocamera, microfono, posizione); le notifiche in Impostazioni → Notifiche.`;
+  if (/iPhone|iPad|iPod/i.test(ua)) return `Per ${verb}: Impostazioni dell’iPhone → Safari → Impostazioni per i siti web (fotocamera, microfono, posizione); le notifiche in Impostazioni → Notifiche.`;
   if (/Android/i.test(ua)) return installed
-    ? `Per ${verb}: tieni premuta l'icona dell'app → Informazioni app → Autorizzazioni, oppure in Chrome tocca ⋮ → Impostazioni → Impostazioni sito.`
-    : `Per ${verb}: tocca l'icona a sinistra dell'indirizzo in Chrome → Autorizzazioni, oppure ⋮ → Impostazioni → Impostazioni sito.`;
-  return `Per ${verb}: fai clic sull'icona a sinistra dell'indirizzo nel browser → Impostazioni sito.`;
+    ? `Per ${verb}: tieni premuta l’icona dell’app → Informazioni app → Autorizzazioni, oppure in Chrome tocca ⋮ → Impostazioni → Impostazioni sito.`
+    : `Per ${verb}: tocca l’icona a sinistra dell’indirizzo in Chrome → Autorizzazioni, oppure ⋮ → Impostazioni → Impostazioni sito.`;
+  return `Per ${verb}: fai clic sull’icona a sinistra dell’indirizzo nel browser → Impostazioni sito.`;
 }
 
 /** The three states, read again on return to the app and whenever the browser reports a change; each change after the first reading is said once. */
@@ -147,13 +147,13 @@ export function useAppAllowed(kind: AppKind): boolean {
   return useSyncExternalStore((f) => { offSubs.add(f); return () => { offSubs.delete(f); }; }, () => appAllowed(kind), () => true);
 }
 export const revokedMessage = (kind: AppKind) => kind === "posizione"
-  ? "La posizione è revocata per l'app: riattivala in Account → Autorizzazioni."
-  : "La fotocamera è revocata per l'app: riattivala in Account → Autorizzazioni.";
+  ? "La posizione è revocata per l’app: riattivala in Account → Autorizzazioni."
+  : "La fotocamera è revocata per l’app: riattivala in Account → Autorizzazioni.";
 /** At a place that would use it: true when allowed, else says so with a "Riattiva" and returns false. */
 export function guardUse(kind: AppKind): boolean {
   if (appAllowed(kind)) return true;
   toast(revokedMessage(kind), {
-    action: { label: "Riattiva", onClick: () => { setAppAllowed(kind, true); toast(kind === "posizione" ? "Posizione di nuovo consentita all'app." : "Fotocamera di nuovo consentita all'app."); } },
+    action: { label: "Riattiva", onClick: () => { setAppAllowed(kind, true); toast(kind === "posizione" ? "Posizione di nuovo consentita all’app." : "Fotocamera di nuovo consentita all’app."); } },
     duration: 8000,
   });
   return false;

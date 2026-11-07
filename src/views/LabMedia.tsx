@@ -197,7 +197,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
       if (opened) return;
       toast.error(captureMode ? "Il dispositivo non ha aperto la fotocamera" : "Il dispositivo non ha aperto la galleria", {
         description:
-          "Questa versione dell'app non consente l'accesso ai file. Apri il sito nel browser per scattare o caricare foto e video.",
+          "Questa versione dell’app non consente l’accesso ai file. Apri il sito nel browser per scattare o caricare foto e video.",
         action: {
           label: "Apri nel browser",
           onClick: () => window.open(window.location.href, "_blank", "noopener"),
@@ -454,7 +454,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
             <p className="min-w-0 truncate text-xs text-muted-foreground">
               {userId
                 ? "\n"
-                : "Modalità ospite: i dati non vengono salvati nel cloud."}
+                : "Salvato su questo dispositivo (in modalità ospite non va nel cloud)."}
             </p>
             <div className={`lab-media-actions flex flex-nowrap gap-2 rounded-full ${embedded ? "!p-0" : "simulation-selector-capsule"}`} role="group" aria-label={`Azioni sui file ${kind === "urban" ? "della piazza" : "del vigneto"}`}>
               {aiReady && (

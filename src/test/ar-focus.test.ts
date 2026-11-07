@@ -3,7 +3,7 @@ import { AR_FOCUS, arFocusOption, defaultArFocus, scanMissing, scanPrecheck } fr
 describe("AI camera per tab", () => {
   it("urban offers trees and ground", () => expect(AR_FOCUS.urban.map(o => o.id)).toEqual(["tree", "ground"]));
   it("vineyard offers leaf, canopy and interrow", () => expect(AR_FOCUS.vineyard.map(o => o.id)).toEqual(["leaf", "canopy", "interrow"]));
-  it("other tab's target falls back", () => expect(arFocusOption("vineyard", "ground").id).toBe(defaultArFocus("vineyard")));
+  it("other tab’s target falls back", () => expect(arFocusOption("vineyard", "ground").id).toBe(defaultArFocus("vineyard")));
   it("stops a vegetation scan before the AI when no vegetation is locked, never a ground scan", () => {
     expect(scanPrecheck("urban", "tree", false)).toMatch(/Nessun albero/);
     // A usable frame without a colour lock still reaches the AI (dark foliage, shade, backlight).
@@ -21,7 +21,7 @@ describe("AI camera per tab", () => {
     expect(scanMissing("vineyard", "interrow", { plant: false, ground: true })).toBeNull();
     expect(scanMissing("vineyard", "interrow", { plant: true, ground: false })).toMatch(/interfilare/);
   });
-  it("names each section's own two scan steps in both branches", () => {
+  it("names each section’s own two scan steps in both branches", () => {
     for (const options of Object.values(AR_FOCUS)) {
       const statuses = options.map(o => o.phases.map(p => p.status).join(" | "));
       expect(new Set(statuses).size).toBe(options.length);

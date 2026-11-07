@@ -10,7 +10,7 @@ describe("history by office", () => {
     expect(byOf(e)).toEqual(by);
     expect(byOf({ ...e, by: null })).toEqual(by);
   });
-  it("tells the office's entries apart; older entries count as its own", () => {
+  it("tells the office’s entries apart; older entries count as its own", () => {
     const mine = newEntry("piazza", "a", "p", new Date(), mix, null, by);
     const other = newEntry("piazza", "b", "p", new Date(), mix, null, { ...by, office: "Lavori pubblici" });
     const old = newEntry("piazza", "c", "p", new Date(), mix);

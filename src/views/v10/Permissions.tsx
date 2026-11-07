@@ -29,14 +29,14 @@ function PermRow({ kind, title, why, state, busy, note, onAsk, app }: {
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-semibold">{title}</span>
           {revoked
-            ? <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-400">Revocato nell'app</span>
+            ? <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-400">Revocato nell’app</span>
             : state && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide", CHIP[state])}>{STATE_LABEL[state]}</span>}
         </div>
         <p className="mt-0.5 text-sm text-muted-foreground">{why}</p>
         {app && state !== "unsupported" && (
           <button type="button" role="switch" aria-checked={app.on} onClick={() => app.onToggle(!app.on)}
             className="mt-2.5 flex w-full items-center gap-3 rounded-xl bg-foreground/[0.06] px-3 py-2.5 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <span className="min-w-0 flex-1 font-medium">{app.on ? "L'app può usarla" : "L'app non la usa"}</span>
+            <span className="min-w-0 flex-1 font-medium">{app.on ? "L’app può usarla" : "L’app non la usa"}</span>
             <span className={cn("relative h-7 w-12 shrink-0 rounded-full transition-colors motion-reduce:transition-none", app.on ? "bg-brand-turquoise" : "bg-foreground/20")} aria-hidden="true">
               <span className={cn("absolute top-0.5 size-6 rounded-full bg-white shadow transition-transform motion-reduce:transition-none", app.on ? "translate-x-[1.375rem]" : "translate-x-0.5")} />
             </span>
@@ -52,7 +52,7 @@ function PermRow({ kind, title, why, state, busy, note, onAsk, app }: {
           </button>
         )}
         {!revoked && state === "denied" && (
-          <span className="mt-2 inline-flex items-center gap-1.5 text-xs text-danger"><Lock className="size-3.5" aria-hidden="true" /> L'app non può più chiederlo da sola</span>
+          <span className="mt-2 inline-flex items-center gap-1.5 text-xs text-danger"><Lock className="size-3.5" aria-hidden="true" /> L’app non può più chiederlo da sola</span>
         )}
       </div>
     </div>
@@ -105,7 +105,7 @@ export function PermissionsSheet() {
         <span className="mx-auto -mt-1 h-1.5 w-10 rounded-full bg-foreground/20 sm:hidden" aria-hidden="true" />
         <DialogHeader className="text-left">
           <DialogTitle>Autorizzazioni</DialogTitle>
-          <DialogDescription>Per funzionare bene l'app ha bisogno di tre permessi. Il telefono te li chiede uno alla volta.</DialogDescription>
+          <DialogDescription>Per funzionare bene l’app ha bisogno di tre permessi. Il telefono te li chiede uno alla volta.</DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
           {PERMS.map((p) => (
@@ -139,8 +139,8 @@ export function PermissionsPage() {
     setAppAllowed(kind, on);
     const what = kind === "posizione" ? "Posizione" : "Fotocamera";
     setNote(kind, on
-      ? `${what} di nuovo consentita all'app.`
-      : kind === "posizione" ? "Posizione revocata: l'app non la chiede più e il GPS della mappa si spegne." : "Fotocamera revocata: l'app non apre più foto, video né scatto multiplo. La galleria resta.");
+      ? `${what} di nuovo consentita all’app.`
+      : kind === "posizione" ? "Posizione revocata: l’app non la chiede più e il GPS della mappa si spegne." : "Fotocamera revocata: l’app non apre più foto, video né scatto multiplo. La galleria resta.");
     if (on && states?.[kind] === "prompt") void ask(kind);
   };
   const appOf = (kind: PermKind) => (kind === "posizione" ? { on: posOn, onToggle: toggleApp("posizione") } : kind === "fotocamera" ? { on: camOn, onToggle: toggleApp("fotocamera") } : undefined);
@@ -159,16 +159,16 @@ export function PermissionsPage() {
     if (on && states?.notifiche !== "granted") {
       const s = await ask("notifiche");
       setNotify(s === "granted");
-      setMsg(s === "granted" ? "Avvisi del cambio dell'ora accesi." : "Senza il permesso delle notifiche gli avvisi restano dentro l'app.");
+      setMsg(s === "granted" ? "Avvisi del cambio dell’ora accesi." : "Senza il permesso delle notifiche gli avvisi restano dentro l’app.");
       return;
     }
     setNotify(on);
     try { if (on) localStorage.setItem(NOTIFY_KEY, "1"); else localStorage.removeItem(NOTIFY_KEY); } catch { /* storage off */ }
-    setMsg(on ? "Avvisi del cambio dell'ora accesi." : "Avvisi sul telefono spenti: il cambio dell'ora te lo dico solo dentro l'app.");
+    setMsg(on ? "Avvisi del cambio dell’ora accesi." : "Avvisi sul telefono spenti: il cambio dell’ora te lo dico solo dentro l’app.");
   };
   const row = "flex min-h-14 w-full items-center gap-3 rounded-2xl px-1 text-left";
   return (
-    <InfoPage title="Autorizzazioni" intro="Cosa può usare l'app sul tuo telefono. Posizione e fotocamera le revochi qui quando vuoi, con l'interruttore.">
+    <InfoPage title="Autorizzazioni" intro="Cosa può usare l’app sul tuo telefono. Posizione e fotocamera le revochi qui quando vuoi, con l’interruttore.">
       <div className="space-y-2">
         {PERMS.map((p) => (
           <PermRow key={p.kind} {...p} state={states?.[p.kind]} busy={busy === p.kind} note={notes[p.kind] ?? null} onAsk={() => void ask(p.kind)} app={appOf(p.kind)} />
@@ -177,13 +177,13 @@ export function PermissionsPage() {
       <button type="button" onClick={() => void refresh().then(() => setMsg("Stato aggiornato."))} className="h-11 w-full rounded-full bg-foreground/[0.08] text-sm font-semibold">
         Ho cambiato le impostazioni: aggiorna
       </button>
-      <InfoCard title="Nell'app">
+      <InfoCard title="Nell’app">
         <label className={row}>
           <span className="min-w-0 flex-1">GPS sempre attivo sulla mappa<span className="block text-sm text-muted-foreground">{posOn ? "La mappa segue la tua posizione quando ti sposti." : "Spento finché la posizione è revocata."}</span></span>
           <input type="checkbox" className="size-6 accent-current" checked={gps && posOn} disabled={!posOn} onChange={(e) => toggleGps(e.target.checked)} />
         </label>
         <label className={row}>
-          <span className="min-w-0 flex-1">Avvisi del cambio dell'ora sul telefono<span className="block text-sm text-muted-foreground">La sera prima, anche con l'app in sottofondo.</span></span>
+          <span className="min-w-0 flex-1">Avvisi del cambio dell’ora sul telefono<span className="block text-sm text-muted-foreground">La sera prima, anche con l’app in sottofondo.</span></span>
           <input type="checkbox" className="size-6 accent-current" checked={notify && states?.notifiche === "granted"} disabled={states?.notifiche === "denied" || states?.notifiche === "unsupported"} onChange={(e) => void toggleNotify(e.target.checked)} />
         </label>
         {msg && <p className="text-sm font-medium" role="status">{msg}</p>}

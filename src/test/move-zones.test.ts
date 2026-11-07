@@ -21,7 +21,7 @@ describe("moving the zones drawn by hand", () => {
     const next = moveZones(area, ["a", "b"], 5 * m, 5 * k)!;
     expect(next.zones!.every((z, i) => Math.abs(z.ring[0]![0] - area.zones![i]!.ring[0]![0] - 5 * m) < 1e-9)).toBe(true);
   });
-  it("refuses a move past the drawn area's outline", () => {
+  it("refuses a move past the drawn area’s outline", () => {
     expect(moveZones(area, ["b"], 45 * m, 0)).toBeNull();
     expect(moveZones(area, ["x"], 1 * m, 0)).toBeNull();
   });

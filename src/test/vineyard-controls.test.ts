@@ -3,7 +3,7 @@ import { applyVineyardScenario, closestVineyardScenario, updateVineyardControl, 
 
 const zones = [34, 36, 38].map((temperature) => ({ temperature, moisture: 55, wind: 8, rain: false }));
 describe("Vineyard slider consistency", () => {
-  it("keeps Budget Sostenuto's half degree in single-zone and average controls", () => {
+  it("keeps Budget Sostenuto’s half degree in single-zone and average controls", () => {
     const result = applyVineyardScenario(zones, 15, 2.5, null);
     expect(vineyardControlValue(result, 2, "temperature")).toBe(35.5);
     expect(vineyardControlValue(result, null, "temperature")).toBe(33.5);

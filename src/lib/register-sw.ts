@@ -38,7 +38,7 @@ export async function registerServiceWorker() {
   const tellReady = () => {
     if (told) return;
     told = true;
-    void import("sonner").then(({ toast }) => toast("Nuova versione dell'app pronta", {
+    void import("sonner").then(({ toast }) => toast("Nuova versione dell’app pronta", {
       description: "Tocca Aggiorna per usarla subito.",
       duration: Infinity,
       // Aggiorna loads the version online for sure: a reload that checks it landed, else a clean one.

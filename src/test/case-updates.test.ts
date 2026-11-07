@@ -18,7 +18,7 @@ describe("Current case data",()=>{
     expect(new Set(publications.map(p=>p.url)).size).toBe(6);
     expect(sourcePublications({results:results.slice(0,4)},"https://www.mdpi.com").map(p=>p.title)).toEqual(["New","Old","Undated"]);
   });
-  it("searches each case on its publisher's whole domain, not only the subdomain of the reference page",()=>{
+  it("searches each case on its publisher’s whole domain, not only the subdomain of the reference page",()=>{
     expect(cases.map(c=>sourceDomain(c.sourceUrl))).toEqual(["urban-initiative.eu","ssph-journal.org","sciencespo.fr","copernicus.org","isprambiente.gov.it","termolionline.it","consorzioiserniavenafro.it","worldcitiessummit.com.sg","urbreath.eu","aqua4d.com","bewaterwise.com","trentinodigitale.it","mdpi.com","acs.org"]);
     expect(sourcePublications({results:[{title:"Main site",url:"https://aqua4d.com/news/2025"}]},"https://news.aqua4d.com/report.pdf")).toHaveLength(1);
   });

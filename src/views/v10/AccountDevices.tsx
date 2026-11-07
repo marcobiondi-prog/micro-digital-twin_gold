@@ -38,14 +38,14 @@ export function AccountDevices() {
   };
   const drop = async (d: AccountDevice) => {
     const ok = await remove(d.id);
-    setMsg(ok ? `${d.label || "Dispositivo"} tolto dall'elenco. Se è ancora collegato, ricompare al prossimo uso: per farlo uscire usa "Esci da tutti i dispositivi".` : "Non sono riuscito a toglierlo: riprova.");
+    setMsg(ok ? `${d.label || "Dispositivo"} tolto dall’elenco. Se è ancora collegato, ricompare al prossimo uso: per farlo uscire usa "Esci da tutti i dispositivi".` : "Non sono riuscito a toglierlo: riprova.");
   };
   return (
     <div className="rounded-md border bg-muted/40 p-4">
       <p className="text-sm font-semibold">Dispositivi collegati</p>
       <p className="mt-0.5 text-xs text-muted-foreground">Telefoni e computer da cui sei entrato con questo account. Li vedi solo tu.</p>
       {!ready ? (
-        <p className="mt-3 text-xs text-muted-foreground">L'elenco non è ancora attivo.</p>
+        <p className="mt-3 text-xs text-muted-foreground">L’elenco non è ancora attivo.</p>
       ) : loading && devices.length === 0 ? (
         <p className="mt-3 text-xs text-muted-foreground">Carico…</p>
       ) : (
@@ -60,7 +60,7 @@ export function AccountDevices() {
                   <p className="text-xs text-muted-foreground">Ultimo uso {seenText(d.last_seen)} · primo accesso {new Date(d.first_seen).toLocaleDateString("it-IT")}</p>
                 </div>
                 {!mine && (
-                  <button type="button" onClick={() => void drop(d)} aria-label={`Togli ${d.label || "il dispositivo"} dall'elenco`} className="grid size-9 shrink-0 place-items-center rounded-full bg-foreground/[0.08] outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <button type="button" onClick={() => void drop(d)} aria-label={`Togli ${d.label || "il dispositivo"} dall’elenco`} className="grid size-9 shrink-0 place-items-center rounded-full bg-foreground/[0.08] outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <X className="size-4" aria-hidden="true" />
                   </button>
                 )}
@@ -72,7 +72,7 @@ export function AccountDevices() {
       {msg && <p role="status" className="mt-2 text-xs text-muted-foreground">{msg}</p>}
       {ready && (ask ? (
         <div role="alertdialog" aria-label="Uscire da tutti i dispositivi?" className="mt-3 space-y-2">
-          <p className="text-xs">Esco dall'account su tutti i dispositivi, anche su questo. Per rientrare dovrai accedere di nuovo.</p>
+          <p className="text-xs">Esco dall’account su tutti i dispositivi, anche su questo. Per rientrare dovrai accedere di nuovo.</p>
           <div className="flex gap-2">
             <button type="button" onClick={() => setAsk(false)} disabled={busy} className="h-9 flex-1 rounded-full bg-foreground/[0.08] text-sm font-semibold">Annulla</button>
             <button type="button" onClick={() => void outAll()} disabled={busy} className="h-9 flex-1 rounded-full bg-danger text-sm font-semibold text-danger-foreground disabled:opacity-60">{busy ? "Esco…" : "Esci da tutti"}</button>

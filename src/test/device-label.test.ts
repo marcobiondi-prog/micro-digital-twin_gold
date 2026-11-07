@@ -13,7 +13,7 @@ describe("device label", () => {
 import { mergeSameDevices } from "@/models/device-label";
 describe("same device merged", () => {
   const row = (id: string, device_id: string, label: string, first: string, last: string) => ({ id, device_id, label, first_seen: first, last_seen: last });
-  it("keeps one row per label, this device's own when it is there", () => {
+  it("keeps one row per label, this device’s own when it is there", () => {
     const rows = [
       row("a", "me", "XQ-FE72 · Android · app installata", "2026-11-07T05:00", "2026-11-07T06:00"),
       row("b", "old1", "XQ-FE72 · Android · app installata", "2026-11-07T03:00", "2026-11-07T05:30"),

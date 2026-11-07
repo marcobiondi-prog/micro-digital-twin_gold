@@ -144,7 +144,7 @@ const STAGE_TONES = [
 /** Demo entries shown to guests; signed-in users get their own saved log. */
 const DEFAULT_LOG: { d: string; t: string }[] = [
   { d: "02/10", t: "Rilievo termico in piazza" },
-  { d: "28/09", t: "Scenario condiviso con l'ufficio tecnico" },
+  { d: "28/09", t: "Scenario condiviso con l’ufficio tecnico" },
 ];
 
 /** Premium records of the piazza: the approval cycle with the public bodies, the log of interventions and the AI plan. */
@@ -256,7 +256,7 @@ function UrbanRecords() {
       // Simulated sign-in (previews): the email is prepared without the answer link, which needs a real account.
       editApproval(e, { status: "attesa", sent: new Date().toISOString().slice(0, 10) });
       addLog(`Richiesta di parere inviata: ${e}`);
-      window.location.href = `mailto:?subject=${encodeURIComponent(`Richiesta di parere · ${e}`)}&body=${encodeURIComponent(`Gentile ${approvals[e]?.ref || "referente"},\n\nle chiediamo un parere sull'intervento in ${lab.location.label}: ${lab.trees} alberi, ${lab.permeable}% di prato, ${lab.shade}% di ombra.\n\nMicro Digital Twin`)}`;
+      window.location.href = `mailto:?subject=${encodeURIComponent(`Richiesta di parere · ${e}`)}&body=${encodeURIComponent(`Gentile ${approvals[e]?.ref || "referente"},\n\nle chiediamo un parere sull’intervento in ${lab.location.label}: ${lab.trees} alberi, ${lab.permeable}% di prato, ${lab.shade}% di ombra.\n\nMicro Digital Twin`)}`;
       toast("Email pronta", { description: "In anteprima manca il link di risposta: serve un account vero." });
       return;
     }
@@ -266,8 +266,8 @@ function UrbanRecords() {
     editApproval(e, { status: "attesa", sent: new Date().toISOString().slice(0, 10) });
     addLog(`Richiesta di parere inviata: ${e}`);
     try { await navigator.clipboard.writeText(link); } catch { /* clipboard optional */ }
-    window.location.href = `mailto:?subject=${encodeURIComponent(`Richiesta di parere · ${e}`)}&body=${encodeURIComponent(`Gentile ${approvals[e]?.ref || "referente"},\n\nper esprimere il parere sull'intervento apra questo link:\n${link}\n\nMicro Digital Twin`)}`;
-    toast.success("Link copiato e email pronta", { description: "La barra avanzerà quando l'ente risponde." });
+    window.location.href = `mailto:?subject=${encodeURIComponent(`Richiesta di parere · ${e}`)}&body=${encodeURIComponent(`Gentile ${approvals[e]?.ref || "referente"},\n\nper esprimere il parere sull’intervento apra questo link:\n${link}\n\nMicro Digital Twin`)}`;
+    toast.success("Link copiato e email pronta", { description: "La barra avanzerà quando l’ente risponde." });
   };
   // Pick up decisions made by bodies through the email link.
   useEffect(() => {
@@ -353,7 +353,7 @@ function UrbanRecords() {
            </div>
         </DashCard>
       </DashSection>
-          <DashSection title="Piano suggerito dall'AI"><FieldAI kind="urban" onAdd={addLog} /></DashSection>
+          <DashSection title="Piano suggerito dall’AI"><FieldAI kind="urban" onAdd={addLog} /></DashSection>
         </div>
       </PremiumPart>
     </div>
@@ -393,7 +393,7 @@ function VineRecords() {
       </DashSection>
       <SendProject flow="vigneto" />
       <PremiumPart locked={VINE_LOCKED}>
-        <DashSection title="Piano suggerito dall'AI"><FieldAI onAdd={addNote} /></DashSection>
+        <DashSection title="Piano suggerito dall’AI"><FieldAI onAdd={addNote} /></DashSection>
       </PremiumPart>
     </div>
   );
@@ -487,7 +487,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
       ...zoneSummaryRows(v.area, v.location, vs.cost, vs.empty, euroRange),
     ];
   const benefits: Array<[string, string]> = ctx === "Urbano"
-    ? [[`${ps.co2} kg`, "CO2 l'anno"], [`${grouped(ps.water)} m³`, "Pioggia tenuta"], [`${grouped(ps.shadeM2)} m²`, "All'ombra"]]
+    ? [[`${ps.co2} kg`, "CO2 assorbita all’anno"], [`${grouped(ps.water)} m³`, "Acqua piovana trattenuta (m³/anno)"], [`${grouped(ps.shadeM2)} m²`, "All’ombra"]]
     : [[`${vs.safe} di ${vs.zones.length}`, "Zone al sicuro"], [vs.mix.shade ? `-${f1((vs.mix.shade / 100) * 3)}°` : "0°", "Sulle foglie"], [vs.mix.windbreak ? `-${Math.round((vs.mix.windbreak / 100) * 60)}%` : "0%", "Vento"]];
   const zoneRows: [string, string][] = ctx === "Urbano" ? [] : vs.zones.map((z, i): [string, string] => [`Zona ${i + 1}`, `bisogno di intervento ${Math.round(z.after)} (senza: ${Math.round(z.plain)}) · ${Math.round(z.temp)} °C · ${Math.round(z.moisture)}% acqua`]);
   const noteRows: [string, string][] = ctx === "Urbano" ? [] : notes.slice(0, 8).map((n): [string, string] => [n.d, n.t]);
@@ -627,7 +627,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
     const cost = (urban ? ps.empty : vs.empty) ? "0 €" : euroRange(urban ? ps.cost : vs.cost);
     card(M, y, CW, 92);
     doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...C.muted);
-    doc.text(clean(urban ? `${pd.sim ? "Come nella simulazione" : pd.fromSim ? "Alla stessa ora della simulazione" : "Nell'ora più calda"} · ${pd.when.toLowerCase()}` : "Bisogno di intervento · media delle tre zone"), W / 2, y + 10, { align: "center" });
+    doc.text(clean(urban ? `${pd.sim ? "Come nella simulazione" : pd.fromSim ? "Alla stessa ora della simulazione" : "Nell’ora più calda"} · ${pd.when.toLowerCase()}` : "Bisogno di intervento · media delle tre zone"), W / 2, y + 10, { align: "center" });
     const cy = y + 60;
     arc(W / 2, cy, 38, before, after, min, max);
     pill(words, W / 2, cy - 25, STEP[stepIx]!);

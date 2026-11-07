@@ -82,7 +82,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" },
       { title: "MICRO DIGITAL TWIN" },
-      { name: "description", content: "Micro digital twin per l'adattamento climatico urbano e vitivinicolo." },
+      { name: "description", content: "Micro digital twin per l’adattamento climatico urbano e vitivinicolo." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "theme-color", content: THEME_DARK },

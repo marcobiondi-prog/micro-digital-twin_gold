@@ -101,7 +101,7 @@ describe("intervention-history", () => {
 });
 
 describe("mixRows", () => {
-  it("reads the piazza's levers", () => {
+  it("reads the piazza’s levers", () => {
     expect(mixRows({ kind: "piazza", trees: 7, permeable: 20, shade: 15 })).toEqual([{ title: "Piazza", rows: [
       { label: "Alberi", value: "7" }, { label: "Aiuole e ciottoli", value: "20 %" }, { label: "Ombra", value: "15 %" }] }]);
   });
@@ -116,7 +116,7 @@ describe("mixRows", () => {
 });
 
 describe("season and hour kept in the mix", () => {
-  it("reads them from the mix when the entry's own fields are missing", () => {
+  it("reads them from the mix when the entry’s own fields are missing", () => {
     const e = newEntry("piazza", "Alberi 3", "Piazza", new Date(), { kind: "piazza", trees: 3, permeable: 0, shade: 0 }, { season: "autunno", hour: 18 });
     expect(e.mix?.when).toEqual({ season: "autunno", hour: 18 });
     expect(whenOf({ ...e, season: null, hour: null })).toEqual({ season: "autunno", hour: 18 });
@@ -125,7 +125,7 @@ describe("season and hour kept in the mix", () => {
 });
 
 describe("groupByDay", () => {
-  it("puts each day's interventions in one group headed gg/mm/aaaa, newest first", () => {
+  it("puts each day’s interventions in one group headed gg/mm/aaaa, newest first", () => {
     const at = (iso: string) => ({ ...newEntry("piazza", "x", "p"), at: new Date(iso).toISOString() });
     const g = groupByDay([at("2026-10-28T10:00:00"), at("2026-10-29T19:24:00"), at("2026-10-29T18:51:00")]);
     expect(g.map((d) => [d.label, d.items.length])).toEqual([["29/10/2026", 2], ["28/10/2026", 1]]);

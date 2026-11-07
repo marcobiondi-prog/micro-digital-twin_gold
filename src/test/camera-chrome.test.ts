@@ -9,7 +9,7 @@ describe("camera chrome", () => {
     expect(cameraChromeMode({ fullscreenEnabled: true, documentElement: { requestFullscreen: () => Promise.resolve() } })).toBe("fullscreen");
     expect(cameraChromeMode({ fullscreenEnabled: false, documentElement: {} })).toBe("dark-bars");
   });
-  it("keeps the camera's own rotation unless fullscreen handed rotation to Android", async () => {
+  it("keeps the camera’s own rotation unless fullscreen handed rotation to Android", async () => {
     await enterCameraChrome();
     expect(cameraRotatesNatively()).toBe(false);
     exitCameraChrome();

@@ -316,12 +316,12 @@ export function ExportSheet({ open, onOpenChange, flow, place, author, media, pr
         if (dest === "email") setSent(true);
         if (files.length) await saveAll(files, job?.zip);
         window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        if (files.length) say(files.length === 1 ? "Il file è in Download: allegalo all'email con la graffetta." : "I file sono in Download (cartella zip): allegali all'email con la graffetta.");
+        if (files.length) say(files.length === 1 ? "Il file è in Download: allegalo all’email con la graffetta." : "I file sono in Download (cartella zip): allegali all’email con la graffetta.");
         return;
       }
       // Share: the phone's own window with every app (WhatsApp, Telegram, Drive, Gmail…), the files attached.
       if (typeof navigator.share !== "function") {
-        if (files.length) { await saveAll(files, job?.zip); say("Qui la condivisione non c'è: file salvati in Download."); }
+        if (files.length) { await saveAll(files, job?.zip); say("Qui la condivisione non c’è: file salvati in Download."); }
         return;
       }
       const { turns, apart } = shareable;
@@ -348,7 +348,7 @@ export function ExportSheet({ open, onOpenChange, flow, place, author, media, pr
     }
   };
 
-  const destLabel: Record<Dest, string> = { email: "Apri l'email", share: shareable.turns.length > 1 ? `Condividi · parte ${Math.min(turn + 1, shareable.turns.length)} di ${shareable.turns.length}` : "Condividi", save: (job?.files.length ?? 0) > 1 ? "Salva la cartella zip" : "Salva sul telefono" };
+  const destLabel: Record<Dest, string> = { email: "Apri l’email", share: shareable.turns.length > 1 ? `Condividi · parte ${Math.min(turn + 1, shareable.turns.length)} di ${shareable.turns.length}` : "Condividi", save: (job?.files.length ?? 0) > 1 ? "Salva la cartella zip" : "Salva sul telefono" };
   const prepPct = (() => {
     if (!job) return 0;
     const parts = (on.report ? 1 : 0) + (sendMedia ? 1 : 0) + 0.2;
@@ -403,7 +403,7 @@ export function ExportSheet({ open, onOpenChange, flow, place, author, media, pr
                   </Box>
                   <p className="mx-0.5 mb-2 mt-4 text-[13px] font-semibold text-muted-foreground">Opzioni</p>
                   <Box>
-                    <ToggleRow title="Comprimi le foto" sub={sendMedia && fullMediaBytes > mediaBytes + 1000 && lighter ? <>Più leggere per l'email · <s className="opacity-60">{sizeText(fullMediaBytes)}</s> → <span className="text-brand-turquoise">{sizeText(mediaBytes)}</span></> : "Più leggere per l'email"} on={lighter} onChange={() => setLighter((x) => !x)} disabled={!sendMedia} />
+                    <ToggleRow title="Comprimi le foto" sub={sendMedia && fullMediaBytes > mediaBytes + 1000 && lighter ? <>Più leggere per l’email · <s className="opacity-60">{sizeText(fullMediaBytes)}</s> → <span className="text-brand-turquoise">{sizeText(mediaBytes)}</span></> : "Più leggere per l’email"} on={lighter} onChange={() => setLighter((x) => !x)} disabled={!sendMedia} />
                     <ToggleRow title="Pagine chiare" sub="Report su fondo bianco, per stampare" on={light} onChange={() => setLight((x) => !x)} disabled={!on.report} />
                   </Box>
                   <button type="button" onClick={nextFromCosa} disabled={nothing}

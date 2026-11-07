@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 export const SECTION_TONE: Record<Section, string> = { urban: "rgb(28 112 210 / 0.42)", vineyard: "rgb(150 36 110 / 0.42)" };
 const IDENTIFY_PATH = { urban: "/identificazione/funzionario", vineyard: "/identificazione/agronomo" } as const;
 const WHO: Record<Section, { title: string; who: string; how: string }> = {
-  urban: { title: "Piazza", who: "La simulazione della piazza è per i funzionari del Comune.", how: "Ti identifichi con il tuo Comune, l'ufficio di appartenenza e la tua email." },
+  urban: { title: "Piazza", who: "La simulazione della piazza è per i funzionari del Comune.", how: "Ti identifichi con il tuo Comune, l’ufficio di appartenenza e la tua email." },
   vineyard: { title: "Vigneto", who: "La simulazione del vigneto è per chi lavora nel settore agricolo.", how: "Ti identifichi con nome e regione; il numero del patentino fitosanitario è facoltativo." },
 };
 
@@ -122,7 +122,7 @@ export function SectionGate({ section, children }: { section: Section; children:
         {/* Who identified as this profile on this phone before continues with one tap (a list when there are more). */}
         <KnownProfiles kind={need} />
         <IdentifyForm kind={need} onDone={done} />
-        <p className="px-1 text-xs text-muted-foreground">I dati restano su questo dispositivo e, se hai fatto l'accesso, nel tuo account. Puoi uscire dal profilo quando vuoi, da Profilo nella barra in basso.</p>
+        <p className="px-1 text-xs text-muted-foreground">I dati restano su questo dispositivo e, se hai fatto l’accesso, nel tuo account. Puoi uscire dal profilo quando vuoi, da Profilo nella barra in basso.</p>
       </div>
     </div>
   );

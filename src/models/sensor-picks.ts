@@ -37,16 +37,16 @@ export function readModelJson(text: string): { sintesi?: unknown; sensori?: unkn
 
 /** What each kind of place means for the heat, in plain words, and how urgent a sensor there is. */
 const PLACE: Record<string, { word: string; priority: Priority; why: string }> = {
-  kindergarten: { word: "Asilo", priority: "alta", why: "Bambini piccoli all'aperto nelle ore calde" },
-  school: { word: "Scuola", priority: "alta", why: "Bambini e ragazzi all'aperto, anche a fine primavera e inizio estate" },
+  kindergarten: { word: "Asilo", priority: "alta", why: "Bambini piccoli all’aperto nelle ore calde" },
+  school: { word: "Scuola", priority: "alta", why: "Bambini e ragazzi all’aperto, anche a fine primavera e inizio estate" },
   hospital: { word: "Ospedale", priority: "alta", why: "Persone fragili e chi le accompagna, spesso in attesa fuori" },
-  clinic: { word: "Ambulatorio", priority: "alta", why: "Persone fragili in attesa all'aperto" },
+  clinic: { word: "Ambulatorio", priority: "alta", why: "Persone fragili in attesa all’aperto" },
   nursing_home: { word: "Residenza per anziani", priority: "alta", why: "Anziani, i più esposti al caldo" },
   playground: { word: "Parco giochi", priority: "media", why: "Bambini al sole, spesso su superfici scure" },
-  marketplace: { word: "Mercato", priority: "media", why: "Molte persone ferme all'aperto nelle ore centrali" },
-  park: { word: "Parco", priority: "bassa", why: "Punto di confronto con un'area verde più fresca" },
+  marketplace: { word: "Mercato", priority: "media", why: "Molte persone ferme all’aperto nelle ore centrali" },
+  park: { word: "Parco", priority: "bassa", why: "Punto di confronto con un’area verde più fresca" },
   parking: { word: "Parcheggio", priority: "media", why: "Grande superficie di asfalto che si scalda e trattiene il calore" },
-  bus_stop: { word: "Fermata dell'autobus", priority: "media", why: "Persone in attesa sotto il sole" },
+  bus_stop: { word: "Fermata dell’autobus", priority: "media", why: "Persone in attesa sotto il sole" },
 };
 const RANK: Record<Priority, number> = { alta: 0, media: 1, bassa: 2 };
 const SECTORS = ["nord", "nord-est", "est", "sud-est", "sud", "sud-ovest", "ovest", "nord-ovest"];
@@ -91,7 +91,7 @@ export function fallbackPicks(kind: "urban" | "vineyard", lat: number, lng: numb
     if (!free(p)) continue;
     out.push(kind === "urban"
       ? { nome: `Strada a ${side}`, luogo: `Circa 350 m a ${side} della piazza`, ...p, priorita: "bassa", motivi: ["Copre una parte della zona ancora senza misure", gapText(p)] }
-      : { nome: side === "sud" ? "Versante sud" : side === "nord" ? "Versante nord" : `Bordo ${side}`, luogo: side === "sud" ? "Versante sud, il più esposto al sole" : side === "nord" ? "Versante nord, più fresco: punto di confronto" : `Bordo ${side} del vigneto, esposto al vento`, ...p, priorita: side === "sud" ? "alta" : side === "nord" ? "bassa" : "media", motivi: [side === "sud" ? "Le viti qui soffrono di più il caldo del pomeriggio" : side === "nord" ? "Mostra quanto cambia il caldo tra un versante e l'altro" : "Il vento cambia la temperatura sulle foglie", gapText(p)] });
+      : { nome: side === "sud" ? "Versante sud" : side === "nord" ? "Versante nord" : `Bordo ${side}`, luogo: side === "sud" ? "Versante sud, il più esposto al sole" : side === "nord" ? "Versante nord, più fresco: punto di confronto" : `Bordo ${side} del vigneto, esposto al vento`, ...p, priorita: side === "sud" ? "alta" : side === "nord" ? "bassa" : "media", motivi: [side === "sud" ? "Le viti qui soffrono di più il caldo del pomeriggio" : side === "nord" ? "Mostra quanto cambia il caldo tra un versante e l’altro" : "Il vento cambia la temperatura sulle foglie", gapText(p)] });
   }
   return out.slice(0, Math.max(3, want));
 }

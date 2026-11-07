@@ -17,7 +17,7 @@ describe("Riapri", () => {
     expect(u.treeCells).toBeNull();
   });
 
-  it("asks the simulation to open on the entry's season and hour", () => {
+  it("asks the simulation to open on the entry’s season and hour", () => {
     clearRequestedWhen("urban");
     reopenHistory(urbanMix(getLab().urban), { season: "inverno", hour: 7 });
     expect(peekRequestedWhen("urban")).toEqual({ season: "inverno", hour: 7 });

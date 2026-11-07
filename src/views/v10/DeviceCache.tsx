@@ -25,7 +25,7 @@ export function DeviceCacheCard() {
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-semibold">Cache del dispositivo</p>
-          <p className="text-xs tabular-nums text-muted-foreground">{bytes === null ? "Pagine e mappe salvate per l'uso offline" : `${bytesText(bytes)} di pagine e mappe salvate`}</p>
+          <p className="text-xs tabular-nums text-muted-foreground">{bytes === null ? "Pagine e mappe salvate per l’uso offline" : `${bytesText(bytes)} di pagine e mappe salvate`}</p>
         </div>
         <button type="button" onClick={() => void empty()} disabled={busy}
           className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-foreground/[0.08] px-3.5 text-xs font-semibold outline-none hover:bg-foreground/[0.14] focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">

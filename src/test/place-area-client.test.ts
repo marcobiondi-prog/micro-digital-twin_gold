@@ -8,7 +8,7 @@ const square = { type: "way", tags: { place: "square", name: "Piazza" }, geometr
 afterEach(() => vi.unstubAllGlobals());
 
 describe("loadPlaceArea", () => {
-  it("keeps the server's answer when it has one", async () => {
+  it("keeps the server’s answer when it has one", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     const r = await loadPlaceArea(async () => ({ centre: [1, 2] }), 41.56, 14.66);

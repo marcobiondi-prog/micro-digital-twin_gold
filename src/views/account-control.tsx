@@ -66,14 +66,14 @@ const bucket = "account-avatars";
 function authMessage(error: { code?: string | undefined; message: string }) {
   switch (error.code) {
     case "invalid_credentials": return "Email o password non corretti. Se non hai ancora un account, registrati.";
-    case "email_not_confirmed": return "Devi prima confermare l'email: apri il link che ti abbiamo inviato.";
+    case "email_not_confirmed": return "Devi prima confermare l’email: apri il link che ti abbiamo inviato.";
     case "user_already_exists": return "Esiste già un account con questa email. Accedi oppure reimposta la password.";
     case "weak_password": return "Password troppo debole: usa almeno 6 caratteri.";
     case "over_email_send_rate_limit": return "Troppe email inviate. Riprova più tardi.";
-    case "email_address_not_authorized": return "Il servizio email non può scrivere a questo indirizzo. L'amministratore deve configurare l'invio email.";
+    case "email_address_not_authorized": return "Il servizio email non può scrivere a questo indirizzo. L’amministratore deve configurare l’invio email.";
     case "email_address_invalid": return "Indirizzo email non valido.";
     case "signup_disabled": return "Le registrazioni sono disattivate.";
-    default: return /sending confirmation email/i.test(error.message) ? "Invio dell'email di conferma non riuscito. L'amministratore deve configurare l'invio email." : error.message;
+    default: return /sending confirmation email/i.test(error.message) ? "Invio dell’email di conferma non riuscito. L’amministratore deve configurare l’invio email." : error.message;
   }
 }
 
@@ -240,7 +240,7 @@ export function AccountControl() {
   const saveAvatar = useCallback(async (userId: string, selected: Choice, file?: File | null) => {
     let path: string | null = null;
     if (selected === "upload") {
-      if (!file) throw new Error("Scegli un'immagine prima di salvare.");
+      if (!file) throw new Error("Scegli un’immagine prima di salvare.");
       const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
       path = `${userId}/${crypto.randomUUID()}.${extension}`;
       const { error } = await supabase.storage.from(bucket).upload(path, file, { contentType: file.type });
@@ -272,7 +272,7 @@ export function AccountControl() {
     if (account?.id) {
       setSavingAvatar(true);
       try { await saveAvatar(account.id, selected, file); }
-      catch { setNotice("Non è stato possibile salvare l'immagine. Riprova."); }
+      catch { setNotice("Non è stato possibile salvare l’immagine. Riprova."); }
       finally { setSavingAvatar(false); }
     } else {
       setChoice(selected);
@@ -289,7 +289,7 @@ export function AccountControl() {
     event.target.value = "";
     if (!file) return;
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 2 * 1024 * 1024) {
-      setNotice("Scegli un'immagine JPG, PNG o WebP fino a 2 MB.");
+      setNotice("Scegli un’immagine JPG, PNG o WebP fino a 2 MB.");
       return;
     }
     void selectAvatar("upload", file);
@@ -341,7 +341,7 @@ export function AccountControl() {
       const selected = draftFileRef.current ? "upload" : (pending && suggestions.some((item) => item.id === pending) ? pending as Choice : null);
       if (selected) {
         try { await saveAvatar(user.id, selected, draftFileRef.current); }
-        catch { if (active) setNotice("Non è stato possibile salvare l'immagine. Riprova."); }
+        catch { if (active) setNotice("Non è stato possibile salvare l’immagine. Riprova."); }
       }
     };
     void supabase.auth.getUser().then(({ data }) => void loadUser(data.user));
@@ -393,7 +393,7 @@ export function AccountControl() {
     try {
       if (mode === "reset") {
         const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
-        setNotice(error ? authMessage(error) : "Se l'indirizzo è registrato, riceverai un link per reimpostare la password.");
+        setNotice(error ? authMessage(error) : "Se l’indirizzo è registrato, riceverai un link per reimpostare la password.");
       } else if (mode === "signup") {
         const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
         // With email confirmation off Supabase signs the user in right away.
@@ -401,13 +401,13 @@ export function AccountControl() {
         else if (data.session) { setPassword(""); setNotice(""); }
         // An existing confirmed email returns a user without identities instead of an error.
         else if (data.user && data.user.identities?.length === 0) setNotice(authMessage({ code: "user_already_exists", message: "" }));
-        else setNotice("Controlla la tua email per confermare l'account prima di accedere.");
+        else setNotice("Controlla la tua email per confermare l’account prima di accedere.");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) setNotice(authMessage(error));
         else { setPassword(""); setNotice(""); }
       }
-    } catch { setNotice("Impossibile completare l'operazione. Riprova."); }
+    } catch { setNotice("Impossibile completare l’operazione. Riprova."); }
     finally { setPending(false); }
   };
 
@@ -525,7 +525,7 @@ export function AccountControl() {
           {mode !== "reset" && <section className="space-y-3" aria-label="Immagine account">
             <div className="flex items-center gap-3">
               {avatar("size-14")}
-              <div><h3 className="text-sm font-semibold">Immagine account</h3><p className="text-xs text-muted-foreground">{account?.id ? "Scegli un'immagine per il tuo account" : "Scegli un'immagine da usare quando accedi"}</p></div>
+              <div><h3 className="text-sm font-semibold">Immagine account</h3><p className="text-xs text-muted-foreground">{account?.id ? "Scegli un’immagine per il tuo account" : "Scegli un’immagine da usare quando accedi"}</p></div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {suggestions.map((item) => <Button key={item.id} type="button" variant="ghost" size="icon" disabled={savingAvatar} aria-label={`Scegli ${item.label}`} aria-pressed={choice === item.id} title={item.label} className={`size-12 shrink-0 rounded-full p-0.5 ${choice === item.id ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`} onClick={() => void selectAvatar(item.id)}><img src={item.src} alt="" className="size-full rounded-full" /></Button>)}
@@ -570,9 +570,11 @@ export function AccountControl() {
                 <Button type="submit" className="w-full" disabled={pending}>{pending ? "Attendi…" : mode === "reset" ? "Invia link" : mode === "signup" ? "Crea account" : "Accedi"}</Button>
               </form>
               {mode === "signin" && <Button variant="link" className="h-auto px-0" onClick={() => changeMode("reset")}>Password dimenticata?</Button>}
-              {mode === "reset" && <Button variant="link" className="h-auto px-0" onClick={() => changeMode("signin")}>Torna all'accesso</Button>}
+              {mode === "reset" && <Button variant="link" className="h-auto px-0" onClick={() => changeMode("signin")}>Torna all’accesso</Button>}
               {mode !== "reset" && googleEnabled && <><div className="flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />oppure<span className="h-px flex-1 bg-border" /></div><Button variant="outline" className="w-full" disabled={pending} onClick={() => void googleSignIn()}><GoogleLogo />{mode === "signup" ? "Registrati con Google" : "Accedi con Google"}</Button></>}
-              <Button variant="ghost" className="w-full" onClick={enterGuest}>Continua come ospite</Button>
+              {/* Kept apart from the sign-in buttons, so the two labels never read as one. */}
+              {" "}
+              <div className="border-t pt-4"><Button variant="ghost" className="w-full" onClick={enterGuest}>Continua come ospite</Button></div>
               {DEMO_LOGIN_AVAILABLE && <Button variant="outline" className="w-full border-dashed" onClick={() => { setDemoSignedIn(true); setOpen(false); }}>Simula l’accesso (solo anteprima)</Button>}
             </section>
           )}
@@ -605,7 +607,7 @@ function AppVersion() {
   };
   return (
     <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-2 rounded-2xl bg-foreground/[0.05] p-3 text-center">
-      <p className="text-sm text-muted-foreground">Versione dell'app · <span className="tabular-nums text-foreground">{buildLabel()}</span></p>
+      <p className="text-sm text-muted-foreground">Versione dell’app · <span className="tabular-nums text-foreground">{buildLabel()}</span></p>
       <button type="button" onClick={() => void check()} disabled={state === "checking" || state === "updated"}
         className="inline-flex h-10 items-center gap-2 rounded-full bg-foreground/10 px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">
         <RefreshCw className={`size-4 ${state === "checking" || state === "updated" ? "animate-spin" : ""}`} aria-hidden="true" />
@@ -616,7 +618,7 @@ function AppVersion() {
       <div className="flex h-4 w-full items-center justify-center">
         {install.phase !== "idle"
           ? <UpdateBar pct={install.pct} searching={install.phase === "checking"} />
-          : <p role="status" className="text-xs leading-4 text-muted-foreground">{state === "latest" ? "Hai già l'ultima versione." : state === "offline" ? "Senza rete: riprova quando sei connesso." : ""}</p>}
+          : <p role="status" className="text-xs leading-4 text-muted-foreground">{state === "latest" ? "Hai già l’ultima versione." : state === "offline" ? "Senza rete: riprova quando sei connesso." : ""}</p>}
       </div>
     </div>
   );

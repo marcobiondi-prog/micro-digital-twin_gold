@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
  * then "Salvato" for a moment, then nothing visible (the status stays for screen readers).
  * It floats at the top of the page, so it never takes a row of its own.
  */
+const SAVED = "Salvato su questo dispositivo (in modalità ospite non va nel cloud).";
+
 export function LabSyncIndicator({ className }: { className?: string }) {
   const { savedAt } = useLab();
   const [phase, setPhase] = useState<"idle" | "saving" | "saved">("idle");
@@ -21,10 +23,10 @@ export function LabSyncIndicator({ className }: { className?: string }) {
   }, [savedAt]);
   return (
     <div role="status" aria-live="polite" className={cn(phase === "idle" ? "sr-only" : "pointer-events-none fixed inset-x-0 top-[calc(var(--nav-h)+0.75rem)] z-[999999999] flex justify-center px-4 animate-in fade-in slide-in-from-top-1 duration-200 motion-reduce:animate-none", className)}>
-      {phase === "idle" ? "Dati delle simulazioni salvati" : (
+      {phase === "idle" ? SAVED : (
         <span className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-xs font-medium shadow-md">
           {phase === "saving" ? <LoaderCircle className="size-4 shrink-0 animate-spin text-primary motion-reduce:animate-none" aria-hidden="true" /> : <CheckCircle2 className="size-4 shrink-0 text-ok" aria-hidden="true" />}
-          {phase === "saving" ? "Salvataggio…" : "Salvato"}
+          {phase === "saving" ? "Salvataggio…" : SAVED}
         </span>
       )}
     </div>

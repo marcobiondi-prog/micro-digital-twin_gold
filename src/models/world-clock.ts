@@ -112,19 +112,19 @@ export function changeNotice(ms: number, tz: string): { key: string; at: number;
   const past = summerTime(ms - 12 * H, tz).next;
   if (past && past.at <= ms) {
     const h = changeHands(past.at, tz);
-    return { key: `${tz}@${past.at}`, at: past.at, ahead: false, text: `Stanotte ${past.to === "solare" ? "è tornata l'ora solare" : "è arrivata l'ora legale"}: le lancette sono passate dalle ${h.from} alle ${h.to}. L'ora dell'app è già giusta.` };
+    return { key: `${tz}@${past.at}`, at: past.at, ahead: false, text: `Stanotte ${past.to === "solare" ? "è tornata l’ora solare" : "è arrivata l’ora legale"}: le lancette sono passate dalle ${h.from} alle ${h.to}. L’ora dell’app è già giusta.` };
   }
   const next = summerTime(ms, tz).next;
   if (!next || next.at - ms > 36 * H) return null;
   const h = changeHands(next.at, tz);
   const when = next.at - ms <= 24 * H ? "Stanotte" : "Domani notte";
-  return { key: `${tz}@${next.at}`, at: next.at, ahead: true, text: `${when} ${next.to === "solare" ? "torna l'ora solare" : "arriva l'ora legale"}: alle ${h.from} le lancette vanno alle ${h.to}.` };
+  return { key: `${tz}@${next.at}`, at: next.at, ahead: true, text: `${when} ${next.to === "solare" ? "torna l’ora solare" : "arriva l’ora legale"}: alle ${h.from} le lancette vanno alle ${h.to}.` };
 }
 
 /** A calendar file with a reminder the evening before the change (the alarm rings 6 hours before it). */
 export function changeCalendar(at: number, to: "solare" | "legale", hands: { from: string; to: string }, now = Date.now()): string {
   const stamp = (t: number) => new Date(t).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-  const title = to === "solare" ? "Torna l'ora solare" : "Arriva l'ora legale";
+  const title = to === "solare" ? "Torna l’ora solare" : "Arriva l’ora legale";
   const note = `Alle ${hands.from} le lancette vanno alle ${hands.to}.`;
   return [
     "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Micro Digital Twin//Cambio ora//IT", "CALSCALE:GREGORIAN", "BEGIN:VEVENT",

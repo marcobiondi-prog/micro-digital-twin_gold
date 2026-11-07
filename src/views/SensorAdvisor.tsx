@@ -47,7 +47,7 @@ export function SensorAdvisor({ kind, embedded = false }: { kind: "urban" | "vin
         return;
       } catch { await new Promise((ok) => setTimeout(ok, 1200)); }
     }
-    setError(navigator.onLine ? "Il servizio non risponde: riprova tra poco. Se continua, esci e rientra nell'account." : "Senza rete: riprova quando sei connesso.");
+    setError(navigator.onLine ? "Il servizio non risponde: riprova tra poco. Se continua, esci e rientra nell’account." : "Senza rete: riprova quando sei connesso.");
     setLoading(false);
   };
 
@@ -57,7 +57,7 @@ export function SensorAdvisor({ kind, embedded = false }: { kind: "urban" | "vin
     return (
       <Card className="flex items-center gap-3 p-4">
         <span className="relative grid size-11 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground"><Radar className="size-5" aria-hidden="true" /><span className="absolute -bottom-1 -right-1 grid size-5 place-items-center rounded-full bg-foreground text-background ring-2 ring-card"><Lock className="size-3" aria-hidden="true" /></span></span>
-        <p className="min-w-0 flex-1 text-sm text-muted-foreground">L’AI suggerisce dove mettere i sensori di calore {kind === "urban" ? "nella piazza" : "nel vigneto"}. Accedi per usarla.</p>
+        <p className="min-w-0 flex-1 text-sm text-muted-foreground">L’AI suggerisce dove installare le centraline microclimatiche (temperatura, umidità, irraggiamento) {kind === "urban" ? "nella piazza" : "nel vigneto"}. Accedi per usarla.</p>
         <Button size="sm" className="shrink-0 rounded-full" onClick={openAccount}>Accedi</Button>
       </Card>
     );

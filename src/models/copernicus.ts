@@ -109,8 +109,8 @@ export function satelliteLine(context: SatelliteContext | null): string | null {
 export function satellitePrompt(context: SatelliteContext | null | undefined): string {
   if (!context || (context.ndvi === undefined && context.surfaceTemp === undefined)) return "";
   const facts = [
-    context.ndvi !== undefined ? `NDVI medio Sentinel-2 dell'area (~250 m) ${context.ndvi.toFixed(2)} del ${context.ndviDate ?? "periodo recente"} (${ndviLabel(context.ndvi).toLowerCase()})` : null,
+    context.ndvi !== undefined ? `NDVI medio Sentinel-2 dell’area (~250 m) ${context.ndvi.toFixed(2)} del ${context.ndviDate ?? "periodo recente"} (${ndviLabel(context.ndvi).toLowerCase()})` : null,
     context.surfaceTemp !== undefined ? `temperatura della superficie Sentinel-3 (~1 km, passaggio del mattino) ${context.surfaceTemp.toFixed(1)} °C del ${context.tempDate ?? "periodo recente"}` : null,
   ].filter(Boolean).join("; ");
-  return `Dati satellitari Copernicus dell'area circostante (contesto, NON misure della pianta o del terreno inquadrati): ${facts}. Usali solo per contestualizzare heatNote (es. area poco verde o superficie calda) citandoli come "dati satellitari dell'area"; non cambiano specie, conteggi o box.`;
+  return `Dati satellitari Copernicus dell’area circostante (contesto, NON misure della pianta o del terreno inquadrati): ${facts}. Usali solo per contestualizzare heatNote (es. area poco verde o superficie calda) citandoli come "dati satellitari dell’area"; non cambiano specie, conteggi o box.`;
 }

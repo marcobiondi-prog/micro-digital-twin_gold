@@ -189,7 +189,7 @@ function UsersTab({ selfId }: { selfId: string }) {
                   </Button>
                   <Confirm
                     title="Eliminare questo utente?"
-                    description={`L'account ${u.email ?? u.id}, il profilo, la dashboard, i pareri e i file caricati verranno eliminati definitivamente.`}
+                    description={`L’account ${u.email ?? u.id}, il profilo, la dashboard, i pareri e i file caricati verranno eliminati definitivamente.`}
                     action="Elimina"
                     onConfirm={() => delM.mutate({ userId: u.id })}
                     trigger={<Button size="sm" variant="ghost" className="text-destructive" disabled={u.id === selfId || delM.isPending} title="Elimina"><Trash2 /><span className="sr-only">Elimina</span></Button>}
@@ -284,7 +284,7 @@ function AiTab() {
   const clearM = useAdminMutation((v: { scope: string }) => clearAiPause({ data: v }), "Servizio AI riattivato", ["ai"]);
   return (
     <div>
-      <p className="text-sm text-muted-foreground">Quando il fornitore AI rifiuta l'accesso (credito esaurito o chiave non valida) il riconoscimento AR si mette in pausa per non ripetere richieste inutili. Riattivalo dopo aver risolto il problema.</p>
+      <p className="text-sm text-muted-foreground">Quando il fornitore AI rifiuta l’accesso (credito esaurito o chiave non valida) il riconoscimento AR si mette in pausa per non ripetere richieste inutili. Riattivalo dopo aver risolto il problema.</p>
       <TableCard loading={q.isPending} error={q.error} empty={!q.data?.pauses.length}>
         <Table>
           <TableHeader><TableRow><TableHead>Ambito</TableHead><TableHead>Codice</TableHead><TableHead>Motivo</TableHead><TableHead>Dal</TableHead><TableHead className="text-right">Azioni</TableHead></TableRow></TableHeader>

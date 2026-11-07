@@ -28,7 +28,7 @@ export function useMediaSync() {
       const moved = await syncDeviceMedia(user, (n) => { id = toast.loading(n === 1 ? "Porto 1 foto o video nel tuo account…" : `Porto ${n} foto e video nel tuo account…`); });
       if (id !== undefined) {
         if (moved) toast.success(moved === 1 ? "1 file ora è nel tuo account" : `${moved} file ora sono nel tuo account`, { id, description: "Li vedi da tutti i tuoi dispositivi." });
-        else toast.error("Non sono riuscito a portarli nell'account: riprovo più tardi", { id });
+        else toast.error("Non sono riuscito a portarli nell’account: riprovo più tardi", { id });
       }
       if (!moved) { await refreshMedia("urban"); await refreshMedia("vineyard"); }
     };

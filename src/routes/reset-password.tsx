@@ -10,7 +10,7 @@ export const Route = createFileRoute("/reset-password")({
     { title: "Reimposta password — MICRO DIGITAL TWIN" },
     { name: "description", content: "Imposta una nuova password per il tuo account MICRO DIGITAL TWIN." },
     { property: "og:title", content: "Reimposta password — MICRO DIGITAL TWIN" },
-    { property: "og:description", content: "Recupera l'accesso al tuo account MICRO DIGITAL TWIN." },
+    { property: "og:description", content: "Recupera l’accesso al tuo account MICRO DIGITAL TWIN." },
     { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" },
   ] }),
   component: ResetPassword,
@@ -43,7 +43,7 @@ function ResetPassword() {
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setPending(true);
     const { error } = await supabase.auth.updateUser({ password });
-    setMessage(error ? error.message : "Password aggiornata. Ora puoi tornare all'app.");
+    setMessage(error ? error.message : "Password aggiornata. Ora puoi tornare all’app.");
     if (!error) { setValid(false); setPassword(""); }
     setPending(false);
   };

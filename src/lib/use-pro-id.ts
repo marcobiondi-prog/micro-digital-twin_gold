@@ -375,12 +375,12 @@ export async function saveProId(id: ProId | null): Promise<boolean> {
   // Another personal account's profile (tied on this phone to another email) cannot be taken by this account.
   const email = data.session?.user.email;
   if (id && email && (knownSnap()[id.kind] as KnownProId[]).some((q) => sameProfile(q, id) && !!q.acct?.email && q.acct.email !== email)) {
-    toast.error("Questo profilo è di un altro account", { description: "Identificati con i tuoi dati, oppure accedi con l'account di quel profilo." });
+    toast.error("Questo profilo è di un altro account", { description: "Identificati con i tuoi dati, oppure accedi con l’account di quel profilo." });
     return false;
   }
   // Signed in to an account of the other sector: refused (the form shows why and how to use another account).
   if (id && sector && sector !== id.kind) {
-    toast.error(`Questo account è del settore ${sector === "funzionario" ? "urbano" : "agricolo"}`, { description: "Per l'altro settore accedi con un altro account personale." });
+    toast.error(`Questo account è del settore ${sector === "funzionario" ? "urbano" : "agricolo"}`, { description: "Per l’altro settore accedi con un altro account personale." });
     return false;
   }
   pickedAt = Date.now();

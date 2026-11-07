@@ -103,7 +103,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   };
   const startDrawing = () => { setView("2d"); setDraft(saved?.ring ?? []); setDrawing(true); };
   const finish = () => {
-    if (draft.length < 3) { toast("Servono almeno 3 pin per chiudere l'area"); return; }
+    if (draft.length < 3) { toast("Servono almeno 3 pin per chiudere l’area"); return; }
     save(draft); setDrawing(false);
     toast.success("Area salvata", { description: `${surfaceText(pinsM2(draft))}: la usano i costi e i benefici.` });
   };
@@ -220,7 +220,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
       if (!saved) return;
       const next = moveZones(saved, m.ids, m.at[0] - m.from[0], m.at[1] - m.from[1]);
       // Refused past the outline: the area is set again as it was, so the handle goes back to its place.
-      if (!next) toast.error("Le zone devono restare dentro l'area disegnata", { description: "Spostale un po' meno: sono tornate dov'erano." });
+      if (!next) toast.error("Le zone devono restare dentro l’area disegnata", { description: "Spostale un po' meno: sono tornate dov’erano." });
       else toast.success(m.ids.length > 1 ? `Spostate ${m.ids.length} zone con quello che contengono` : "Zona spostata con quello che contiene");
       if (kind === "urban") setUrban({ area: next ?? { ...saved } }); else setVineyard({ area: next ?? { ...saved } });
       return;
@@ -260,7 +260,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         </ParallaxLayer>
       </div>
       {kind === "vineyard" && <div className="absolute inset-x-0 top-12 z-[3] flex justify-center px-3"><VineZonePicker /></div>}
-      <button type="button" onClick={(e) => { e.stopPropagation(); openSimTab(kind, "mappa"); }} aria-label="Apri la mappa: disegna l'area e sposta gli elementi"
+      <button type="button" onClick={(e) => { e.stopPropagation(); openSimTab(kind, "mappa"); }} aria-label="Apri la mappa: disegna l’area e sposta gli elementi"
         className="absolute bottom-3 right-3 z-[3] inline-flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-[13px] font-semibold text-white outline-none ring-1 ring-white/15 backdrop-blur-sm focus-visible:ring-2 focus-visible:ring-white">
         <MapIcon className="size-4" aria-hidden="true" />Apri la mappa
       </button>
@@ -291,10 +291,10 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         </div>
       </div>
       {hint && !signedIn && (
-        <p role="status" className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">La vista 3D è per chi ha fatto l'accesso.
+        <p role="status" className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">La vista 3D è per chi ha fatto l’accesso.
           <button type="button" onClick={openAccount} className="font-semibold text-foreground underline underline-offset-4">Accedi</button>
           {/* Previews only: unlock the 3D view on this device without an account. */}
-          {DEMO_LOGIN_AVAILABLE && <button type="button" onClick={() => { setDemoSignedIn(true); setView("3d"); }} className="font-semibold text-foreground underline underline-offset-4">Simula l'accesso</button>}
+          {DEMO_LOGIN_AVAILABLE && <button type="button" onClick={() => { setDemoSignedIn(true); setView("3d"); }} className="font-semibold text-foreground underline underline-offset-4">Simula l’accesso</button>}
         </p>
       )}
       {/* The place is chosen here: search it or use the device position; the map follows. */}
@@ -307,7 +307,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
           <p role="status" className="pointer-events-none absolute left-1/2 top-12 z-[3] -translate-x-1/2 whitespace-nowrap rounded-full bg-black/45 px-3 py-1 text-[12px] font-semibold text-white ring-1 ring-white/15 backdrop-blur-sm [text-shadow:0_1px_2px_rgb(0_0_0/.6)]">
             <span className="mr-1 inline-block size-2.5 rounded-full bg-sky-400 align-middle ring-2 ring-sky-100" aria-hidden="true" />
             Nebulizzatori {sim.data.misters.length}
-            {sim.data.mistersInZones > 0 && <span className="font-normal text-white/80"> · {sim.data.mistersInZones} nelle tue zone{sim.data.misters.length > sim.data.mistersInZones ? ` · ${sim.data.misters.length - sim.data.mistersInZones} messi dall'app` : ""}</span>}
+            {sim.data.mistersInZones > 0 && <span className="font-normal text-white/80"> · {sim.data.mistersInZones} nelle tue zone{sim.data.misters.length > sim.data.mistersInZones ? ` · ${sim.data.misters.length - sim.data.mistersInZones} messi dall’app` : ""}</span>}
           </p>
         )}
         {/* Day and night at the simulation's season and hour, over the 2D and the 3D map alike. */}
@@ -319,7 +319,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
             : <OpenMap3D key={`${loc.lat},${loc.lng}`} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />}</MapLight></Suspense>
           : <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} drawing={drawing || drawingZone}
             onAreaChange={drawingZone ? setZoneDraft : setDraft} sim={editingZone && sim ? { ...sim, inner: (sim.inner ?? []).filter((z) => z.id !== editingZone) } : sim} arranging={arranging} onMove={moved}
-            outline={drawingZone ? saved?.ring ?? null : null} onOutside={() => toast("La zona va dentro l'area disegnata")} onPinMove={arranging ? undefined : movePin} /></Suspense>}
+            outline={drawingZone ? saved?.ring ?? null : null} onOutside={() => toast("La zona va dentro l’area disegnata")} onPinMove={arranging ? undefined : movePin} /></Suspense>}
       </div>
       {/* The pin can be put right by hand on the 2D map; a pin moved by hand can go back to the automatic one. */}
       {!drawing && !drawingZone && !arranging && (
@@ -356,7 +356,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         onBest={() => {
           setEdits({ best: true });
           setArranging(false);
-          toast.success("Elementi nella posizione migliore", { description: kind === "urban" ? "Pergolati, aiuole e alberi dove d'estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno all'area." : "I teli d'ombra sulle parti di ogni zona dove d'estate batte più sole (ore 10–18)." });
+          toast.success("Elementi nella posizione migliore", { description: kind === "urban" ? "Pergolati, aiuole e alberi dove d’estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno all’area." : "I teli d’ombra sulle parti di ogni zona dove d’estate batte più sole (ore 10–18)." });
         }} />}
       {saved && !drawing && <ZonesBar area={saved} flow={kind === "urban" ? "piazza" : "vigneto"} onAdd={startZone} onEdit={editZone} onRemove={(id) => setZones(zonesOfArea(saved).filter((z) => z.id !== id))} />}
       </>}
@@ -451,7 +451,7 @@ function MapReading({ kind, lat, lng }: { kind: SimKind; lat: number; lng: numbe
   if (kind === "urban") {
     if (!piazza) return null;
     ({ before, after } = piazza);
-    what = `Calore percepito · ${piazza.when}`;
+    what = `Temperatura percepita · ${piazza.when}`;
   } else {
     const zones = vine.zones;
     if (!zones.length) return null;
@@ -473,7 +473,7 @@ function MapReading({ kind, lat, lng }: { kind: SimKind; lat: number; lng: numbe
           <span aria-hidden="true" className="text-white/50">→</span>
           <span style={{ color: heatTone(after) }}>{deg(after)}</span>
           <span className="ml-0.5 text-[11px] font-semibold text-emerald-300">−{gain.toLocaleString("it-IT")}°</span>
-        </> : <><span style={{ color: heatTone(after) }}>{deg(after)}</span>{placed && kind === "urban" && <span className="ml-1 text-[11px] font-normal text-white/75">· a quest'ora non serve</span>}</>}
+        </> : <><span style={{ color: heatTone(after) }}>{deg(after)}</span>{placed && kind === "urban" && <span className="ml-1 text-[11px] font-normal text-white/75">· A quest’ora non serve rinfrescare</span>}</>}
       </p>
       <span className="sr-only">{gain > 0.05 ? what : `${what} · senza interventi`}</span>
     </div>
@@ -492,8 +492,8 @@ function AreaBar({ drawing, pins, m2, saved, vineyard, onStart, onUndo, onCancel
 }) {
   if (drawing) {
     return (
-      <div role="group" aria-label="Disegna l'area" className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4">
-        <p className="text-[15px] font-semibold">Tocca la mappa sugli angoli dell'area</p>
+      <div role="group" aria-label="Disegna l’area" className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4">
+        <p className="text-[15px] font-semibold">Tocca la mappa sugli angoli dell’area</p>
         <p className="text-sm text-muted-foreground" aria-live="polite">
           {pins === 0 ? `Metti un pin su ogni angolo del${vineyard ? " vigneto" : "la piazza"}; trascinali per correggerli.` : `${pins} pin${m2 !== null ? ` · ${surfaceText(m2)}` : " · ne servono almeno 3"}${pins >= MAX_PINS ? " · massimo raggiunto" : ""}`}
         </p>
@@ -514,7 +514,7 @@ function AreaBar({ drawing, pins, m2, saved, vineyard, onStart, onUndo, onCancel
         </span>
         <div className="flex gap-2">
           <button type="button" onClick={onStart} className={cn(barBtn, "bg-foreground/[0.08]")}><PenLine className="size-4" aria-hidden="true" />Modifica</button>
-          <button type="button" onClick={onRemove} aria-label="Cancella l'area disegnata" className={cn(barBtn, "bg-foreground/[0.08] px-3")}><Trash2 className="size-4" aria-hidden="true" /></button>
+          <button type="button" onClick={onRemove} aria-label="Cancella l’area disegnata" className={cn(barBtn, "bg-foreground/[0.08] px-3")}><Trash2 className="size-4" aria-hidden="true" /></button>
         </div>
       </div>
     );
@@ -523,8 +523,8 @@ function AreaBar({ drawing, pins, m2, saved, vineyard, onStart, onUndo, onCancel
     <button type="button" onClick={onStart} className="flex w-full items-center gap-3 rounded-3xl bg-foreground/[0.05] p-4 text-left outline-none hover:bg-foreground/[0.08] focus-visible:ring-2 focus-visible:ring-ring">
       <span className="grid size-11 shrink-0 place-items-center rounded-full bg-foreground text-background"><PenLine className="size-5" aria-hidden="true" /></span>
       <span className="min-w-0">
-        <span className="block text-[15px] font-semibold">Disegna l'area</span>
-        <span className="block text-sm text-muted-foreground">Metti i pin sugli angoli del{vineyard ? " vigneto" : "la piazza"}: la superficie si userà nei costi.</span>
+        <span className="block text-[15px] font-semibold">Disegna l’area</span>
+        <span className="block text-sm text-muted-foreground">Metti i pin sugli angoli: useremo la superficie per stimare i costi.</span>
       </span>
     </button>
   );
@@ -536,13 +536,13 @@ const dot = (color: string, round = true) => <span className={cn("inline-block s
 function shadowText(sim: Extract<SimLayout, { kind: "piazza" }>, when?: string) {
   const at = when ? ` (${when.toLowerCase()})` : "";
   if (!sim.data.trees.length && !sim.data.shadeM2) return "";
-  return sim.shadows?.length ? `Le ombre seguono il sole della simulazione${at}: si allungano col sole basso e girano con le ore. ` : `A quest'ora${at} il sole è sotto l'orizzonte: niente ombre. `;
+  return sim.shadows?.length ? `Le ombre seguono il sole della simulazione${at}: si allungano col sole basso e girano con le ore. ` : `A quest’ora${at} il sole è sotto l’orizzonte: niente ombre. `;
 }
 /** Says when the area has no room for all the m² the simulation counts. */
 function roomText(l: PiazzaLayout) {
   const short = (got: number, want: number) => want > 0 && got < want * 0.95 - 10;
   const parts = [short(l.lawnM2, l.lawnTarget) && `aiuole ${l.lawnTarget.toLocaleString("it-IT")} m²`, short(l.shadeM2, l.shadeTarget) && `pergolati ${l.shadeTarget.toLocaleString("it-IT")} m²`].filter(Boolean);
-  return parts.length ? `La simulazione conta ${parts.join(" e ")}: nell'area disegnata c'è posto per meno.` : "Aiuole e pergolati hanno sulla mappa gli stessi m² contati dalla simulazione.";
+  return parts.length ? `La simulazione conta ${parts.join(" e ")}: nell’area disegnata c’è posto per meno.` : "Aiuole e pergolati hanno sulla mappa gli stessi m² contati dalla simulazione.";
 }
 
 /**
@@ -553,23 +553,23 @@ function SimBar({ sim, when, arranging, edited, best, only, canOnly, onArrange, 
   const m2 = (v: number) => `${Math.round(v).toLocaleString("it-IT")} m²`;
   const legend = sim.kind === "piazza"
     ? [[dot(SIM_COLORS.tree), `Alberi ${sim.data.trees.length} · ${m2(sim.data.trees.length * TREE_SHADE_M2)} di chioma`], [dot(SIM_COLORS.lawn, false), `Aiuole e ciottoli ${m2(sim.data.lawnM2)}`], [dot(SIM_COLORS.shade, false), `Pergolati ${m2(sim.data.shadeM2)}`], [dot("#0b0f15", false), "Ombre"], ...(sim.data.misters.length ? [[dot("#7dd3fc"), `Nebulizzatori ${sim.data.misters.length}${sim.data.mistersInZones ? ` (${sim.data.mistersInZones} nelle tue zone)` : ""}`] as const] : [])] as const
-    : [[dot(thirstColor(10), false), "Zone (colore = bisogno di intervento)"], [dot(SIM_COLORS.drip, false), "Irrigazione · tubo e ali gocciolanti"], [dot(SIM_COLORS.cloth, false), "Teli d'ombra"], [dot(SIM_COLORS.wind, false), "Frangivento"]] as const;
+    : [[dot(thirstColor(10), false), "Zone (colore = bisogno di intervento)"], [dot(SIM_COLORS.drip, false), "Irrigazione · tubo e ali gocciolanti"], [dot(SIM_COLORS.cloth, false), "Teli d’ombra"], [dot(SIM_COLORS.wind, false), "Frangivento"]] as const;
   return (
     <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4">
-      <p className="text-[15px] font-semibold">{sim.kind === "piazza" ? "La piazza nell'area" : "Il vigneto nell'area"}</p>
+      <p className="text-[15px] font-semibold">{sim.kind === "piazza" ? "La piazza nell’area" : "Il vigneto nell’area"}</p>
       <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-muted-foreground" aria-label="Legenda">
         {legend.map(([icon, text]) => <li key={text} className="inline-flex items-center gap-1.5">{icon}{text}</li>)}
       </ul>
       {sim.kind === "piazza" && <p className="text-sm text-muted-foreground">{shadowText(sim, when)}{roomText(sim.data)}</p>}
-      {sim.kind === "piazza" && (sim.real?.length ?? 0) > 0 && <p className="text-sm text-muted-foreground">Già nell'area: {realCountText(sim.real ?? [])}. Gli interventi non ci vanno sopra (contorni tratteggiati sulla mappa 2D).</p>}
+      {sim.kind === "piazza" && (sim.real?.length ?? 0) > 0 && <p className="text-sm text-muted-foreground">Già nell’area: {realCountText(sim.real ?? [])}. Gli interventi non ci vanno sopra (contorni tratteggiati sulla mappa 2D).</p>}
       <p className="text-sm text-muted-foreground">{arranging
-        ? sim.kind === "piazza" ? `Trascina gli alberi, o le etichette Aiuole e Ombra.${(sim.inner ?? []).length ? " Le etichette con ✥ spostano le tue zone con tutto quello che contengono; \"✥ Tutte le zone\" le sposta insieme." : ""}` : `Trascina l'etichetta Frangivento verso il lato dove lo vuoi.${(sim.inner ?? []).length ? " Le etichette con ✥ spostano le tue zone; \"✥ Tutte le zone\" le sposta insieme." : ""}`
+        ? sim.kind === "piazza" ? `Trascina gli alberi, o le etichette Aiuole e Ombra.${(sim.inner ?? []).length ? " Le etichette con ✥ spostano le tue zone con tutto quello che contengono; \"✥ Tutte le zone\" le sposta insieme." : ""}` : `Trascina l’etichetta Frangivento verso il lato dove lo vuoi.${(sim.inner ?? []).length ? " Le etichette con ✥ spostano le tue zone; \"✥ Tutte le zone\" le sposta insieme." : ""}`
         : only
           ? sim.kind === "piazza" ? "Solo quello disegnato da te: aiuole e pergolati sono le tue zone, gli alberi stanno nelle zone Alberi. Le leve della simulazione seguono le zone; se ne cambi una torna la disposizione automatica." : "Solo quello disegnato da te: irrigazione, teli e frangivento stanno nelle tue zone. Le leve della simulazione seguono le zone; se ne cambi una torna la disposizione automatica."
         : best
-          ? sim.kind === "piazza" ? `Posizione migliore: pergolati, aiuole e alberi dove d'estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno.${sim.data.sunny !== undefined ? ` Al sole per gran parte del giorno: ${Math.round(sim.data.sunny * 100)} % dell'area.` : ""}` : "Posizione migliore: i teli d'ombra sulle parti di ogni zona dove d'estate batte più sole (ore 10–18)."
+          ? sim.kind === "piazza" ? `Posizione migliore: pergolati, aiuole e alberi dove d’estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno.${sim.data.sunny !== undefined ? ` Al sole per gran parte del giorno: ${Math.round(sim.data.sunny * 100)} % dell’area.` : ""}` : "Posizione migliore: i teli d’ombra sulle parti di ogni zona dove d’estate batte più sole (ore 10–18)."
           : "Segue le leve della simulazione: cambia gli alberi o le percentuali e la mappa si aggiorna."}</p>
-      {!canOnly && !only && !arranging && <p className="text-xs text-muted-foreground">Per vedere solo quello che disegni, aggiungi una zona {sim.kind === "piazza" ? "Alberi, Aiuole o Pergolato" : "Irrigazione, Teli d'ombra o Frangivento"}.</p>}
+      {!canOnly && !only && !arranging && <p className="text-xs text-muted-foreground">Per vedere solo quello che disegni, aggiungi una zona {sim.kind === "piazza" ? "Alberi, Aiuole o Pergolato" : "Irrigazione, Teli d’ombra o Frangivento"}.</p>}
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={onArrange} aria-pressed={arranging} className={cn(barBtn, arranging ? "bg-foreground text-background" : "bg-foreground/[0.08]")}>
           {arranging ? <><Check className="size-4" aria-hidden="true" />Fatto</> : <><Hand className="size-4" aria-hidden="true" />Sposta elementi</>}
@@ -593,11 +593,11 @@ function SimBar({ sim, when, arranging, edited, best, only, canOnly, onArrange, 
 const ZONE_HINT: Record<ZoneKind, string> = {
   libera: "Resta vuota (una fontana, una strada, un parcheggio) e la sua superficie si toglie dai costi.",
   alberi: "Gli alberi della simulazione vanno qui dentro.",
-  prato: "Qui ci sono aiuole e ciottoli, poi il resto della percentuale dove c'è posto.",
-  ombra: "Qui c'è un pergolato, poi il resto della percentuale dove c'è posto.",
+  prato: "Qui ci sono aiuole e ciottoli, poi il resto della percentuale dove c’è posto.",
+  ombra: "Qui c’è un pergolato, poi il resto della percentuale dove c’è posto.",
   nebulizzatori: "I nebulizzatori vanno qui dentro: circa uno ogni 40 m².",
-  irrigazione: "Qui le viti hanno l'irrigazione a goccia su ogni filare, con il tubo principale lungo il bordo.",
-  teli: "Qui le viti stanno sotto i teli d'ombra.",
+  irrigazione: "Qui le viti hanno l’irrigazione a goccia su ogni filare, con il tubo principale lungo il bordo.",
+  teli: "Qui le viti stanno sotto i teli d’ombra.",
   frangivento: "Qui va la siepe frangivento, lungo il lato più lungo della zona.",
   lotto: "Una parte del progetto, con la sua superficie e la sua quota di costo.",
 };
@@ -624,8 +624,8 @@ function ZoneDrawBar({ kind, pins, m2, editing, kinds, onKind, onUndo, onCancel,
         </div>
       )}
       <p className="text-sm text-muted-foreground" aria-live="polite">{editing
-        ? `Trascina i pin per spostare gli angoli, tocca dentro l'area per aggiungerne uno. ${pins} pin${m2 !== null ? ` · ${surfaceText(m2)}` : ""}`
-        : pins === 0 ? `Tocca dentro l'area sugli angoli della zona. ${ZONE_HINT[kind]}` : `${pins} pin${m2 !== null ? ` · ${surfaceText(m2)}` : " · ne servono almeno 3"}`}</p>
+        ? `Trascina i pin per spostare gli angoli, tocca dentro l’area per aggiungerne uno. ${pins} pin${m2 !== null ? ` · ${surfaceText(m2)}` : ""}`
+        : pins === 0 ? `Tocca dentro l’area sugli angoli della zona. ${ZONE_HINT[kind]}` : `${pins} pin${m2 !== null ? ` · ${surfaceText(m2)}` : " · ne servono almeno 3"}`}</p>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={onUndo} disabled={pins === 0} className={cn(barBtn, "bg-foreground/[0.08]")}><Undo2 className="size-4" aria-hidden="true" />Ultimo pin</button>
         <button type="button" onClick={onCancel} className={cn(barBtn, "bg-foreground/[0.08]")}><X className="size-4" aria-hidden="true" />Esci</button>
@@ -645,7 +645,7 @@ function ZonesBar({ area, flow, onAdd, onEdit, onRemove }: { area: DrawnArea; fl
   const shareOf = (id: string) => lots.find((l) => l.id === id)?.share;
   return (
     <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4">
-      <p className="text-[15px] font-semibold">Zone dentro l'area</p>
+      <p className="text-[15px] font-semibold">Zone dentro l’area</p>
       {zones.length > 0 ? (
         <ul className="divide-y divide-foreground/10">
           {zones.map((z) => (
@@ -660,7 +660,7 @@ function ZonesBar({ area, flow, onAdd, onEdit, onRemove }: { area: DrawnArea; fl
             </li>
           ))}
         </ul>
-      ) : <p className="text-sm text-muted-foreground">Disegna dentro l'area le parti da lasciare libere, quelle con un intervento preciso o i lotti del progetto.</p>}
+      ) : <p className="text-sm text-muted-foreground">Disegna dentro l’area le parti da lasciare libere, quelle con un intervento preciso o i lotti del progetto.</p>}
       {free > 0 && <p className="text-sm text-muted-foreground">Superficie per gli interventi: <span className="font-semibold text-foreground">{surfaceText(usableM2(area))}</span> ({surfaceText(free)} lasciati liberi)</p>}
       {choosing ? (
         <div className="flex flex-wrap gap-2" role="group" aria-label="Che zona vuoi disegnare?">

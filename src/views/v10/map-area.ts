@@ -436,3 +436,16 @@ export function handleElement(label: string | null): HTMLElement {
   }
   return el;
 }
+
+/** The map's own words for screen readers, in Italian (the library says "Map", "Map marker"…). */
+export const MAP_LOCALE: Record<string, string> = {
+  "Map.Title": "Mappa",
+  "Marker.Title": "Segnaposto",
+  "Popup.Close": "Chiudi",
+  "NavigationControl.ZoomIn": "Ingrandisci",
+  "NavigationControl.ZoomOut": "Riduci",
+  "NavigationControl.ResetBearing": "Orienta a nord",
+  "GeolocateControl.FindMyLocation": "Trova la mia posizione",
+  "FullscreenControl.Enter": "Schermo intero",
+  "FullscreenControl.Exit": "Esci dallo schermo intero",
+};

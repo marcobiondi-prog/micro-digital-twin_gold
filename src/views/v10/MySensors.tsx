@@ -29,9 +29,9 @@ function KeyBox({ token, kind, onDone }: { token: string; kind: SensorKind; onDo
       </div>
       <p className="text-muted-foreground">Il sensore manda le letture a questo indirizzo con la chiave. Esempio:</p>
       <pre className="overflow-x-auto whitespace-pre rounded-lg bg-background/60 p-2 font-mono text-[10.5px] leading-snug" data-map-gestures>{example}</pre>
-      <p className="text-muted-foreground">Va bene anche più valori insieme, per esempio {"{"}"temperature": 27.5, "humidity": 40{"}"}, o un elenco "readings" con l'ora di ogni misura.</p>
+      <p className="text-muted-foreground">Va bene anche più valori insieme, per esempio {"{"}"temperature": 27.5, "humidity": 40{"}"}, o un elenco "readings" con l’ora di ogni misura.</p>
       <div className="flex gap-2">
-        <Button size="sm" variant="secondary" className="rounded-full" onClick={() => copy("ex", example)}>{copied === "ex" ? "Copiato" : "Copia l'esempio"}</Button>
+        <Button size="sm" variant="secondary" className="rounded-full" onClick={() => copy("ex", example)}>{copied === "ex" ? "Copiato" : "Copia l’esempio"}</Button>
         <Button size="sm" className="rounded-full" onClick={onDone}>Fatto</Button>
       </div>
     </div>
@@ -175,7 +175,7 @@ export function MySensors({ kind }: { kind: "urban" | "vineyard" }) {
               </div>
             </fieldset>
           )}
-          <p className="text-xs text-muted-foreground">Posizione: {spot ? spot.label : area ? "il centro dell'area disegnata" : "il luogo della simulazione"} ({(spot?.lat ?? cLat).toFixed(5)}, {(spot?.lng ?? cLng).toFixed(5)})</p>
+          <p className="text-xs text-muted-foreground">Posizione: {spot ? spot.label : area ? "il centro dell’area disegnata" : "il luogo della simulazione"} ({(spot?.lat ?? cLat).toFixed(5)}, {(spot?.lng ?? cLng).toFixed(5)})</p>
           <div className="flex gap-2">
             <Button type="button" variant="ghost" className="rounded-full" onClick={() => { setForm(false); setSpot(null); }}>Annulla</Button>
             <Button type="submit" className="rounded-full" disabled={busy || !name.trim()}>{busy ? "Aggiungo…" : "Aggiungi sensore"}</Button>

@@ -10,7 +10,7 @@ export const Route = createFileRoute("/")({
       { title: "MICRO DIGITAL TWIN — Dal rischio climatico alla scelta informata" },
       { name: "description", content: "Due simulazioni, urbana e del vigneto, per confrontare interventi di adattamento climatico." },
       { property: "og:title", content: "MICRO DIGITAL TWIN — Dal rischio climatico alla scelta informata" },
-      { property: "og:description", content: "Simula una piazza o un vigneto e misura l'effetto degli interventi." },
+      { property: "og:description", content: "Simula una piazza o un vigneto e misura l’effetto degli interventi." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],

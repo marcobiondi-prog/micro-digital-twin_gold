@@ -13,7 +13,7 @@ import type { LayoutEdits } from "./area-layout";
  */
 export type ZoneKind = "libera" | "alberi" | "prato" | "ombra" | "nebulizzatori" | "irrigazione" | "teli" | "frangivento" | "lotto";
 export type SubArea = { id: string; kind: ZoneKind; ring: Ring; name?: string };
-export const ZONE_LABEL: Record<ZoneKind, string> = { libera: "Da lasciare libera", alberi: "Alberi", prato: "Aiuole", ombra: "Pergolato", nebulizzatori: "Nebulizzatori", irrigazione: "Irrigazione", teli: "Teli d'ombra", frangivento: "Frangivento", lotto: "Lotto" };
+export const ZONE_LABEL: Record<ZoneKind, string> = { libera: "Da lasciare libera", alberi: "Alberi", prato: "Aiuole", ombra: "Pergolato", nebulizzatori: "Nebulizzatori", irrigazione: "Irrigazione", teli: "Teli d’ombra", frangivento: "Frangivento", lotto: "Lotto" };
 /** Which kinds each simulation offers: the piazza its trees, aiuole, pergolas and misters; the vineyard its drip lines, shade cloth and windbreak. */
 export const ZONE_KINDS = { piazza: ["libera", "alberi", "prato", "ombra", "nebulizzatori", "lotto"], vigneto: ["libera", "irrigazione", "teli", "frangivento", "lotto"] } as const;
 /** The vineyard's interventions as zones: drip lines, shade cloth and a windbreak go where they are drawn. */

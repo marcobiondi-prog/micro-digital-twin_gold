@@ -9,8 +9,8 @@ import { planInterventions, type Intervention } from "@/controllers/field-ai.fun
 const prioTone: Record<string, string> = { alta: "bg-danger/15 text-danger", media: "bg-warn/15 text-warn", bassa: "bg-ok/15 text-ok" };
 
 const COPY = {
-  vineyard: { title: "Osservazioni di campo → interventi prioritari con l'AI", hint: "Descrivi ciò che osservi nel vigneto: l'AI propone interventi per lo stress idrico, il calore e la salute delle viti ordinati per priorità. Suggerimenti indicativi, da verificare con un agronomo.", ph: "Es. foglie ingiallite zona B, acini raggrinziti sul lato sud, suolo secco a 20 cm…", opts: ["Germogliamento", "Fioritura", "Invaiatura", "Maturazione"], def: "Invaiatura", label: "Fase fenologica", tone: "bg-vine", text: "text-vine", hover: "hover:bg-vine/10", added: "Aggiunto al quaderno" },
-  urban: { title: "Osservazioni sul posto → interventi prioritari con l'AI", hint: "Descrivi ciò che vedi nell'area: l'AI propone interventi contro il calore ordinati per priorità. Suggerimenti indicativi, da verificare con l'ufficio tecnico.", ph: "Es. asfalto rovente vicino alla fermata, panchine senza ombra, fontanella guasta…", opts: ["Piazza", "Strada", "Scuola", "Parcheggio", "Parco"], def: "Piazza", label: "Tipo di area", tone: "bg-urban", text: "text-urban", hover: "hover:bg-urban/10", added: "Aggiunto al registro" },
+  vineyard: { title: "Osservazioni di campo → interventi prioritari con l’AI", hint: "Descrivi ciò che osservi nel vigneto: l’AI propone interventi per lo stress idrico, il calore e la salute delle viti ordinati per priorità. Suggerimenti indicativi, da verificare con un agronomo.", ph: "Es. foglie ingiallite zona B, acini raggrinziti sul lato sud, suolo secco a 20 cm…", opts: ["Germogliamento", "Fioritura", "Invaiatura", "Maturazione"], def: "Invaiatura", label: "Fase fenologica", tone: "bg-vine", text: "text-vine", hover: "hover:bg-vine/10", added: "Aggiunto al quaderno" },
+  urban: { title: "Osservazioni sul posto → interventi prioritari con l’AI", hint: "Descrivi ciò che vedi nell’area: l’AI propone interventi contro il calore ordinati per priorità. Suggerimenti indicativi, da verificare con l’ufficio tecnico.", ph: "Es. asfalto rovente vicino alla fermata, panchine senza ombra, fontanella guasta…", opts: ["Piazza", "Strada", "Scuola", "Parcheggio", "Parco"], def: "Piazza", label: "Tipo di area", tone: "bg-urban", text: "text-urban", hover: "hover:bg-urban/10", added: "Aggiunto al registro" },
 } as const;
 
 export function FieldAI({ onAdd, kind = "vineyard" }: { onAdd: (t: string) => void; kind?: "urban" | "vineyard" }) {
@@ -48,7 +48,7 @@ export function FieldAI({ onAdd, kind = "vineyard" }: { onAdd: (t: string) => vo
           <button type="button" onClick={submit} disabled={!signedIn || loading || obs.trim().length < 3} className={`rounded-full ${c.tone} px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50`}>{loading ? "Analisi in corso…" : "Genera interventi"}</button>
         </div>
       </div>
-      {!signedIn && <p className="mt-3 text-xs text-muted-foreground">Accedi con un account per generare gli interventi con l'AI.</p>}
+      {!signedIn && <p className="mt-3 text-xs text-muted-foreground">Accedi con un account per generare gli interventi con l’AI.</p>}
       {error && <p role="alert" className="mt-3 rounded-xl bg-danger/10 p-3 text-sm text-danger">{error}</p>}
       {result && (
         <div className="mt-4 space-y-2" aria-live="polite">

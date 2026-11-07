@@ -11,7 +11,7 @@ describe("taking files out of a simulation", () => {
   beforeEach(() => { localStorage.clear(); vi.resetModules(); });
   const item = (id: string) => ({ id, path: id, name: id, size: 1, url: "x", kind: "image" as const });
 
-  it("hides them from the simulation only: the project's list (the Cronologia) keeps them", async () => {
+  it("hides them from the simulation only: the project’s list (the Cronologia) keeps them", async () => {
     const store = await import("@/models/lab-media-store");
     const sim = await import("@/models/sim-hidden");
     const a = item("u/urban/1-a.jpg"), b = item("u/urban/2-b.jpg");

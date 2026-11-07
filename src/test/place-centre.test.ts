@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { placeArea, ringCentroid } from "@/models/place-area";
 
-describe("the place's centre", () => {
+describe("the place’s centre", () => {
   it("is the middle of the shape, not the mean of its corners", () => {
     // An L-ish shape with many corners crowded on one side: the corners' mean is pulled there, the centroid is not.
     const square: Array<[number, number]> = [[0, 0], [0, 0.001], [0.001, 0.001], [0.001, 0.0009], [0.001, 0.0008], [0.001, 0.0007], [0.001, 0]];

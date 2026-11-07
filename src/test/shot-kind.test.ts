@@ -17,7 +17,7 @@ describe("shot kinds", () => {
 });
 
 describe("shot labels", () => {
-  it("labels every kind, the AI camera's multiple shot included", async () => {
+  it("labels every kind, the AI camera’s multiple shot included", async () => {
     const { shotLabel } = await import("@/models/shot-kind");
     expect(shotLabel({ name: "IMG_1.jpg", kind: "image" })).toBe("Foto");
     expect(shotLabel({ name: "multiplo-1.jpg", kind: "image" })).toBe("Multiplo");

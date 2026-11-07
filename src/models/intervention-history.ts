@@ -193,7 +193,7 @@ export function mixRows(mix: HistoryMix): { title: string; rows: MixRow[] }[] {
   const zones = mix.allZones ? mix.zones.map((z, i) => [z, i] as const) : [[mix.zones[mix.selected] ?? mix.zones[0]!, mix.selected] as const];
   return zones.map(([z, i]) => ({ title: `Zona ${i + 1}`, rows: [
     { label: "Irrigazione", value: `+${z.irrigation} %` },
-    { label: "Teli d'ombra", value: `${z.shade} %` },
+    { label: "Teli d’ombra", value: `${z.shade} %` },
     { label: "Frangivento", value: `${z.windbreak} %` },
   ] }));
 }

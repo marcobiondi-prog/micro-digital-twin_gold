@@ -190,8 +190,8 @@ async function runQueue(
     toast.success(done === 1 ? "File caricato" : `${done} file caricati`, {
       description:
         done === 1
-          ? "Il file è nell'elenco e finirà nel report."
-          : "I file sono nell'elenco e finiranno nel report.",
+          ? "Il file è nell’elenco e finirà nel report."
+          : "I file sono nell’elenco e finiranno nel report.",
     });
 
   // Le righe di stato restano visibili un attimo, poi spariscono da sole.

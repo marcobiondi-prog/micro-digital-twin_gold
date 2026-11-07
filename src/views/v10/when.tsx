@@ -96,12 +96,12 @@ export function WhenPicker({ clock, id, detail, note, children }: { clock: Seaso
           ))}
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => { hapticTick(); setLive(false); setHour((h) => (h + 23) % 24); }} aria-label="Un'ora prima" className="grid size-11 shrink-0 place-items-center rounded-full bg-foreground/[0.07] outline-none focus-visible:ring-2 focus-visible:ring-ring"><ChevronLeft className="size-5" aria-hidden="true" /></button>
+          <button type="button" onClick={() => { hapticTick(); setLive(false); setHour((h) => (h + 23) % 24); }} aria-label="Un’ora prima" className="grid size-11 shrink-0 place-items-center rounded-full bg-foreground/[0.07] outline-none focus-visible:ring-2 focus-visible:ring-ring"><ChevronLeft className="size-5" aria-hidden="true" /></button>
           <span className="flex min-w-0 flex-1 items-center justify-center gap-2" aria-live="polite">
             <Clock className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <span className="font-mono text-xl font-semibold tabular-nums">{clockText(hour, minute)}</span>
           </span>
-          <button type="button" onClick={() => { hapticTick(); setLive(false); setHour((h) => (h + 1) % 24); }} aria-label="Un'ora dopo" className="grid size-11 shrink-0 place-items-center rounded-full bg-foreground/[0.07] outline-none focus-visible:ring-2 focus-visible:ring-ring"><ChevronRight className="size-5" aria-hidden="true" /></button>
+          <button type="button" onClick={() => { hapticTick(); setLive(false); setHour((h) => (h + 1) % 24); }} aria-label="Un’ora dopo" className="grid size-11 shrink-0 place-items-center rounded-full bg-foreground/[0.07] outline-none focus-visible:ring-2 focus-visible:ring-ring"><ChevronRight className="size-5" aria-hidden="true" /></button>
           <button type="button" aria-pressed={live} onClick={() => { hapticTick(); setLive(true); }}
             className={cn("inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", live ? "bg-foreground text-background" : "bg-foreground/[0.07]")}>Adesso</button>
         </div>
@@ -195,7 +195,7 @@ function SummerLine({ tz, now, mode }: { tz: string; now: number; mode: DstMode 
   const when = st.next && (() => {
     const h = changeHands(st.next.at, tz);
     const day = new Date(st.next.at).toLocaleDateString("it-IT", { timeZone: tz, weekday: "long", day: "numeric", month: "long" });
-    return `${st.next.to === "legale" ? "arriva l'ora legale" : "torna l'ora solare"} ${day}: alle ${h.from} le lancette vanno alle ${h.to}`;
+    return `${st.next.to === "legale" ? "arriva l’ora legale" : "torna l’ora solare"} ${day}: alle ${h.from} le lancette vanno alle ${h.to}`;
   })();
   return (
     <span className="basis-full text-muted-foreground">

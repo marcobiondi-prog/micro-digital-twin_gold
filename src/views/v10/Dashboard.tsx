@@ -172,7 +172,7 @@ function SeasonPills({ value, onChange, only }: { value: Season; onChange: (s: S
           );
         })}
       </div>
-      {only && <p className="text-center text-xs text-muted-foreground">La stagione e l'ora si cambiano nella simulazione</p>}
+      {only && <p className="text-center text-xs text-muted-foreground">La stagione e l’ora si cambiano nella simulazione</p>}
     </div>
   );
 }
@@ -198,8 +198,8 @@ export function SendProject({ flow }: { flow: "piazza" | "vigneto" }) {
         <div className="flex items-start gap-3">
           <Send className="mt-0.5 size-5 shrink-0 text-brand-turquoise" aria-hidden="true" />
           <p className="min-w-0 flex-1 text-sm text-muted-foreground">{piazza
-            ? "Manda il progetto della piazza al Comune, all'ufficio tecnico o a chi vuoi: report, tabella, dati per la mappa e foto, per email o con le app del telefono."
-            : "Manda il progetto del vigneto all'azienda, al consulente o a chi vuoi: report, tabella, dati per la mappa e foto, per email o con le app del telefono."}</p>
+            ? "Manda il progetto della piazza al Comune, all’ufficio tecnico o a chi vuoi: report, tabella, dati per la mappa e foto, per email o con le app del telefono."
+            : "Manda il progetto del vigneto all’azienda, al consulente o a chi vuoi: report, tabella, dati per la mappa e foto, per email o con le app del telefono."}</p>
         </div>
         <button type="button" onClick={openProjectSend} className="mt-3 inline-flex h-11 items-center gap-2 rounded-full bg-foreground px-5 text-sm font-semibold text-background outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <Send className="size-4" aria-hidden="true" />{piazza ? "Invia il progetto della piazza" : "Invia il progetto del vigneto"}
@@ -219,7 +219,7 @@ export function PremiumPart({ locked, children }: { locked: Locked[]; children: 
     <section className="space-y-3" aria-label="Premium">
       <div className="flex items-center gap-2 px-1">
         <h2 className="text-lg font-semibold tracking-tight">Premium</h2>
-        <span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-semibold", signedIn ? "bg-ok/15 text-ok" : "bg-foreground/[0.08] text-muted-foreground")}>{signedIn ? "attivo" : "con l'accesso"}</span>
+        <span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-semibold", signedIn ? "bg-ok/15 text-ok" : "bg-foreground/[0.08] text-muted-foreground")}>{signedIn ? "attivo" : "con l’accesso"}</span>
       </div>
       {signedIn ? children : (
         <div className="space-y-3">
@@ -236,7 +236,7 @@ export function PremiumPart({ locked, children }: { locked: Locked[]; children: 
           </ul>
           <div className="flex flex-wrap items-center gap-2 px-1">
             <button type="button" onClick={openAccount} className="inline-flex h-11 items-center rounded-full bg-foreground px-5 text-sm font-semibold text-background outline-none focus-visible:ring-2 focus-visible:ring-ring">Accedi per sbloccare</button>
-            {DEMO_LOGIN_AVAILABLE && <button type="button" onClick={() => setDemoSignedIn(true)} className="inline-flex h-11 items-center rounded-full bg-foreground/[0.08] px-5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">Simula l'accesso</button>}
+            {DEMO_LOGIN_AVAILABLE && <button type="button" onClick={() => setDemoSignedIn(true)} className="inline-flex h-11 items-center rounded-full bg-foreground/[0.08] px-5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">Simula l’accesso</button>}
             <span className="text-xs text-muted-foreground">Premium è gratis con la registrazione.</span>
           </div>
         </div>
@@ -252,9 +252,9 @@ function useSeasonProfile(lat: number, lng: number) {
 }
 
 export const URBAN_LOCKED: Locked[] = [
-  { icon: Mail, title: "Email agli enti per l'approvazione", line: "Comune, Soprintendenza e Ufficio tecnico: richiesta via email e risposta con un link" },
+  { icon: Mail, title: "Email agli enti per l’approvazione", line: "Comune, Soprintendenza e Ufficio tecnico: richiesta via email e risposta con un link" },
   { icon: ShieldCheck, title: "Iter di approvazione salvato", line: "Lo stato di ogni ente e del progetto, nel tuo account" },
-  { icon: Sparkles, title: "Piano suggerito dall'AI", line: "Descrivi cosa vedi: l'AI propone gli interventi in ordine di priorità" },
+  { icon: Sparkles, title: "Piano suggerito dall’AI", line: "Descrivi cosa vedi: l’AI propone gli interventi in ordine di priorità" },
 ];
 
 /** Piazza: the summary of the project, then its records (the free log, then the Premium approvals and AI plan). */
@@ -262,7 +262,7 @@ export const URBAN_LOCKED: Locked[] = [
 function ZoneRows({ rows }: { rows: Array<[string, string]> }) {
   if (!rows.length) return null;
   return (
-    <DashSection title="Zone dell'area">
+    <DashSection title="Zone dell’area">
       <DashCard className="py-1 sm:py-1">
         <dl className="divide-y divide-foreground/10">
           {rows.map(([k, v]) => (
@@ -296,11 +296,11 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
     <div className="space-y-8" data-testid="dashboard-urbana">
       <ResultCard kind="urban" place={place.name}
         when={<SeasonPills value={season} onChange={setDashSeason} only={reading?.season} />}>
-        <p className="text-center text-sm text-muted-foreground">{dash.sim ? "Come nella simulazione" : dash.fromSim ? "Alla stessa ora della simulazione" : "Nell'ora più calda"} · {dash.when.toLowerCase()}</p>
+        <p className="text-center text-sm text-muted-foreground">{dash.sim ? "Come nella simulazione" : dash.fromSim ? "Alla stessa ora della simulazione" : "Nell’ora più calda"} · {dash.when.toLowerCase()}</p>
         <ResultArc before={before} after={after} min={dash.min} max={dash.max} unit="°"
           value={`${fmt1(after)}°`} words={heatWords(after)} step={heatStep(after)} bg={after < 10 ? "bg-urban" : after < 18 ? "bg-water" : undefined} level={sum.level} cost={empty ? "0 €" : euroRange(sum.cost)} />
         <p className="text-center text-sm">
-          {before - after >= 0.05 ? <>Da <b>{fmt1(before)}°</b> a <b className={GAIN_TEXT[heatStep(after)]}>{fmt1(after)}°</b> percepiti: <b>−{fmt1(before - after)}°</b></> : empty ? "Nessun intervento: apri la simulazione per provarne uno." : (dash.fromSim ? "A quest'ora gli interventi non cambiano il calore." : "In questa stagione gli interventi non cambiano il calore.")}
+          {before - after >= 0.05 ? <>Da <b>{fmt1(before)}°</b> a <b className={GAIN_TEXT[heatStep(after)]}>{fmt1(after)}°</b> percepiti: <b>−{fmt1(before - after)}°</b></> : empty ? "Nessun intervento: apri la simulazione per provarne uno." : (dash.fromSim ? "A quest’ora gli interventi non cambiano il calore." : "In questa stagione gli interventi non cambiano il calore.")}
         </p>
       </ResultCard>
 
@@ -330,9 +330,9 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
 
       <DashSection title="Cosa ottieni" hint="stima annua">
         <Facts items={[
-          { icon: Leaf, value: `${sum.co2} kg`, label: "CO₂ l'anno" },
-          { icon: CloudRain, value: `${grouped(sum.water)} m³`, label: "Pioggia tenuta" },
-          { icon: Sun, value: `${grouped(sum.shadeM2)} m²`, label: "All'ombra" },
+          { icon: Leaf, value: `${sum.co2} kg`, label: "CO₂ assorbita all’anno" },
+          { icon: CloudRain, value: `${grouped(sum.water)} m³`, label: "Acqua piovana trattenuta (m³/anno)" },
+          { icon: Sun, value: `${grouped(sum.shadeM2)} m²`, label: "All’ombra" },
         ]} />
       </DashSection>
 
@@ -349,7 +349,7 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
 }
 
 export const VINE_LOCKED: Locked[] = [
-  { icon: Sparkles, title: "Piano suggerito dall'AI", line: "Descrivi cosa vedi nel vigneto: l'AI propone gli interventi in ordine di priorità" },
+  { icon: Sparkles, title: "Piano suggerito dall’AI", line: "Descrivi cosa vedi nel vigneto: l’AI propone gli interventi in ordine di priorità" },
 ];
 
 /** Vigneto: the summary of the project, then its records (the free field notebook, then the Premium AI plan). */

@@ -72,7 +72,7 @@ describe("file ospite del Lab (per scheda, persistenti sul dispositivo)", () => 
     expect(vineyard[0]!.id).toBe("v1");
   });
 
-  it("il passaggio a Vitivinicolo non svuota l'elenco di Urbano", async () => {
+  it("il passaggio a Vitivinicolo non svuota l’elenco di Urbano", async () => {
     const store = await freshStore();
     await store.saveGuestFile("urban", new Blob(["a"]), { id: "u2", name: "a.jpg", size: 1, url: "blob:a", kind: "image" });
     expect(await store.ensureMedia("urban", null)).toHaveLength(1);

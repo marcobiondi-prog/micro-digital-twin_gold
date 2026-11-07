@@ -135,7 +135,7 @@ export function KnownProfiles({ kind }: { kind: ProKind }) {
                   <>
                     <div className="flex items-center gap-3.5">
                       <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-full bg-foreground/10 ring-2 ring-brand-turquoise/50">
-                        {(known[0]!.acct?.pic ?? avatar) ? <img src={known[0]!.acct?.pic ?? avatar!} alt="Immagine dell'account" referrerPolicy="no-referrer" className="size-full object-cover" /> : <UserRound className="size-7 text-foreground/60" aria-hidden="true" />}
+                        {(known[0]!.acct?.pic ?? avatar) ? <img src={known[0]!.acct?.pic ?? avatar!} alt="Immagine dell’account" referrerPolicy="no-referrer" className="size-full object-cover" /> : <UserRound className="size-7 text-foreground/60" aria-hidden="true" />}
                       </span>
                       <div className="min-w-0">
                         <p className="text-xl font-semibold">{known[0]!.name}</p>
@@ -268,7 +268,7 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
                   <p className="text-xs text-foreground/60">{foreign(k)
                     ? <>Entri anche con il suo account personale {k.acct?.email} e ritrovi la cronologia {k.kind === "funzionario" ? "della piazza" : "del vigneto"}.</>
                     : <>Ti eri già registrato con questo profilo: continua e ritrovi la cronologia {k.kind === "funzionario" ? "della piazza" : "del vigneto"}.</>}</p>
-                  <button type="button" onClick={() => (i === active ? onPick(k) : go(i))} aria-label={foreign(k) ? `Accedi con l'account di ${k.name}` : `Continua come ${k.name}`}
+                  <button type="button" onClick={() => (i === active ? onPick(k) : go(i))} aria-label={foreign(k) ? `Accedi con l’account di ${k.name}` : `Continua come ${k.name}`}
                     className="mt-auto inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
                     {foreign(k)
                       ? <><LogIn className="size-4 shrink-0" aria-hidden="true" /><span className="truncate">Accedi come {k.name.trim().split(/\s+/)[0]}</span></>
@@ -357,7 +357,7 @@ function SectorPage({ start }: { start: ProKind | null }) {
     </button>
   );
   return (
-    <div role="dialog" aria-modal="true" aria-label="Da dove vuoi usarmi?" className="dark fixed inset-0 z-[999999999] isolate overflow-y-auto overscroll-contain bg-background px-6 text-foreground [color-scheme:dark] sm:px-12">
+    <div role="dialog" aria-modal="true" aria-label="Scegli il settore" className="dark fixed inset-0 z-[999999999] isolate overflow-y-auto overscroll-contain bg-background px-6 text-foreground [color-scheme:dark] sm:px-12">
       <Backdrop />
       <section ref={formRef} className="mx-auto flex min-h-full max-w-xl flex-col gap-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(3rem+env(safe-area-inset-top))]">
         {sector ? (
@@ -379,7 +379,7 @@ function SectorPage({ start }: { start: ProKind | null }) {
             <p className="max-w-xs text-[15px] leading-relaxed text-foreground/60">Scegli il tuo settore e identificati: si apre la tua simulazione.</p>
             <div role="radiogroup" aria-label="Settore" className="mt-4 space-y-3">
               {SECTORS.map((s) => (
-                <button key={s.kind} type="button" role="radio" aria-checked={false} onClick={() => { hapticTick(); setKind(s.kind); document.querySelector('[aria-label="Da dove vuoi usarmi?"]')?.scrollTo({ top: 0 }); }}
+                <button key={s.kind} type="button" role="radio" aria-checked={false} onClick={() => { hapticTick(); setKind(s.kind); document.querySelector('[aria-label="Scegli il settore"]')?.scrollTo({ top: 0 }); }}
                   className="flex w-full items-center gap-4 rounded-3xl bg-foreground/[0.07] p-5 text-left outline-none ring-1 ring-foreground/10 transition-colors hover:bg-foreground/[0.11] focus-visible:ring-2 focus-visible:ring-foreground">
                   <s.Icon className="size-8 shrink-0 text-brand-turquoise" strokeWidth={1.5} aria-hidden="true" />
                   <span className="min-w-0 flex-1">

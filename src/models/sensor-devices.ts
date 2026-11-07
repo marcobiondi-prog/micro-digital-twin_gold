@@ -7,9 +7,9 @@ export type SensorKind = "temperatura" | "superficie" | "umidita_aria" | "umidit
 export type SensorFlow = "piazza" | "vigneto";
 
 export const SENSOR_KINDS: Record<SensorKind, { label: string; unit: string; min: number; max: number; aliases: string[] }> = {
-  temperatura: { label: "Temperatura dell'aria", unit: "°C", min: -40, max: 70, aliases: ["temperature", "temp", "t", "air_temperature"] },
+  temperatura: { label: "Temperatura dell’aria", unit: "°C", min: -40, max: 70, aliases: ["temperature", "temp", "t", "air_temperature"] },
   superficie: { label: "Temperatura delle superfici (termico)", unit: "°C", min: -40, max: 90, aliases: ["surface", "surface_temperature", "ir", "thermal", "termico"] },
-  umidita_aria: { label: "Umidità dell'aria", unit: "%", min: 0, max: 100, aliases: ["humidity", "rh", "umidita"] },
+  umidita_aria: { label: "Umidità dell’aria", unit: "%", min: 0, max: 100, aliases: ["humidity", "rh", "umidita"] },
   umidita_suolo: { label: "Umidità del terreno", unit: "%", min: 0, max: 100, aliases: ["soil_moisture", "soil", "moisture", "suolo"] },
   vento: { label: "Vento", unit: "km/h", min: 0, max: 200, aliases: ["wind", "wind_speed", "wind_kmh"] },
   pioggia: { label: "Pioggia", unit: "mm", min: 0, max: 500, aliases: ["rain", "rain_mm", "precipitation"] },

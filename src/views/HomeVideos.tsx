@@ -259,7 +259,7 @@ function VideoPlayer({ kind, onClose, fullscreen, onExpand, playerRef, startAt =
       {/* With <source> children a missing file fires error on the last source, not on <video>. */}
       <source src={kind === "promo" ? promoWebm.url : tutorialWebm.url} type="video/webm" onError={() => { setLoading(false); setError(true); }} />
     </video>
-    {muted && autoStart && <Button className="home-video-unmute" size="sm" onClick={toggleMuted}><Volume2 />Tocca per l'audio</Button>}
+    {muted && autoStart && <Button className="home-video-unmute" size="sm" onClick={toggleMuted}><Volume2 />Tocca per l’audio</Button>}
     <div className="home-video-toolbar">
         <Button variant="ghost" size="icon" aria-label="Chiudi video" title="Chiudi video" onClick={onClose}><X /></Button>
     </div>

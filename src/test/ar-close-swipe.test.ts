@@ -3,7 +3,7 @@ import { BACK_EDGE_PX, isArCloseSwipe, isCameraCloseGesture, isEdgeBackSwipe } f
 
 const W = 400;
 describe("shared camera close gestures", () => {
-  it("closes sideways only from Android's back strip at the screen's edges, moving inwards", () => {
+  it("closes sideways only from Android’s back strip at the screen’s edges, moving inwards", () => {
     expect(isCameraCloseGesture(-100, 5, 350, 741, { startX: W - 10, width: W, dx: -100, dy: 5 })).toBe(true);
     expect(isCameraCloseGesture(100, 5, 350, 741, { startX: 8, width: W, dx: 100, dy: 5 })).toBe(true);
     expect(isEdgeBackSwipe(BACK_EDGE_PX, W, 80, 0)).toBe(true);

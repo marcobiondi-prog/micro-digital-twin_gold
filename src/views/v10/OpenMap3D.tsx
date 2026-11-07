@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Crosshair, LoaderCircle } from "lucide-react";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Ring } from "@/models/place-area";
-import { addAreaLayers, addSimLayers, placePinElement, setAreaData, setSimData, SIM_TREES_3D, type SimLayout } from "@/views/v10/map-area";
+import { addAreaLayers, addSimLayers, placePinElement, setAreaData, setSimData, SIM_TREES_3D, type SimLayout, MAP_LOCALE } from "@/views/v10/map-area";
 import type { GeoJSONSource, Map as MlMap } from "maplibre-gl";
 import { useSimWhen } from "@/models/sim-when";
 import { sunAt } from "@/models/sun-shadow";
@@ -32,7 +32,7 @@ export function OpenMap3D({ lat, lng, label, zoom, area = [], sim = null }: { la
     setState("loading");
     void import("maplibre-gl").then(({ default: maplibregl }) => {
       if (cancelled || !host.current) return;
-      const map = new maplibregl.Map({ container: host.current, style: STYLE, ...camera, maxPitch: 75, attributionControl: false });
+      const map = new maplibregl.Map({ container: host.current, style: STYLE, locale: MAP_LOCALE, ...camera, maxPitch: 75, attributionControl: false });
       map.on("load", () => {
         // The style already raises buildings only at close zoom: make sure they stand up wherever there are heights.
         if (!map.getLayer("building-3d") && map.getSource("openmaptiles")) {

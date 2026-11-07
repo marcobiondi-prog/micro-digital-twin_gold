@@ -11,7 +11,7 @@ const pois = [
 ];
 
 describe("sensor suggestions", () => {
-  it("reads the model's JSON inside fences and with trailing commas", () => {
+  it("reads the model’s JSON inside fences and with trailing commas", () => {
     expect(readModelJson('Ecco:\n```json\n{"sintesi":"ok","sensori":[{"nome":"A",},],}\n```')).toEqual({ sintesi: "ok", sensori: [{ nome: "A" }] });
     expect(readModelJson("nessun json")).toBeNull();
   });
@@ -28,7 +28,7 @@ describe("sensor suggestions", () => {
     expect(picks.length).toBeGreaterThanOrEqual(3);
     expect(picks.some((p) => p.nome === "Versante sud")).toBe(true);
   });
-  it("drops the AI's points out of the area or on a sensor and fills up to three", () => {
+  it("drops the AI’s points out of the area or on a sensor and fills up to three", () => {
     const raw = [
       { nome: "Lontano", luogo: "x", ...at(5000, 0), priorita: "alta", motivi: ["a"] },
       { nome: "Sul sensore", luogo: "y", ...at(0, 20), priorita: "alta", motivi: ["b"] },

@@ -11,7 +11,7 @@ describe("lab media zip", () => {
 });
 
 describe("lab media share key", () => {
-  it("cambia quando cambia l'elenco", async () => {
+  it("cambia quando cambia l’elenco", async () => {
     const { shareKey } = await import("@/models/lab-media-sender");
     expect(shareKey([{ id: "a", url: "u1" }])).not.toBe(shareKey([{ id: "a", url: "u1" }, { id: "b", url: "u2" }]));
   });
@@ -43,12 +43,12 @@ describe("lab media secondo tocco su Condividi", () => {
 });
 
 describe("lab media app Android installata", () => {
-  it("riconosce la WebView dell'app ma non Chrome", async () => {
+  it("riconosce la WebView dell’app ma non Chrome", async () => {
     const { isAndroidWebView } = await import("@/models/lab-media-sender");
     expect(isAndroidWebView("Mozilla/5.0 (Linux; Android 15; Pixel; wv) AppleWebKit/537.36 Version/4.0 Chrome/130 Mobile")).toBe(true);
     expect(isAndroidWebView("Mozilla/5.0 (Linux; Android 15; Pixel) AppleWebKit/537.36 Chrome/130 Mobile Safari/537.36")).toBe(false);
   });
-  it("l'intent Condividi porta testo e link al selettore di sistema", async () => {
+  it("l’intent Condividi porta testo e link al selettore di sistema", async () => {
     const { androidShareIntent } = await import("@/models/lab-media-sender");
     const u = androidShareIntent("ZIP: https://x.y/a b", "Foto");
     expect(u.startsWith("intent:#Intent;action=android.intent.action.SEND;type=text/plain;")).toBe(true);

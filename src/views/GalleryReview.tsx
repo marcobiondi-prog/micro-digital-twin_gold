@@ -91,7 +91,7 @@ export function GalleryReview({ kind, files, zones, onAddMore, onConfirm, onClos
               </div>
               {zones.length > 0 && (
                 <div>
-                  <div className="mb-2 flex justify-between text-xs font-bold uppercase tracking-[0.06em] text-muted-foreground"><span>Dove l'hai scattata?</span><span>facoltativo</span></div>
+                  <div className="mb-2 flex justify-between text-xs font-bold uppercase tracking-[0.06em] text-muted-foreground"><span>Dove l’hai scattata?</span><span>facoltativo</span></div>
                   <div role="radiogroup" aria-label="Zona" className="no-scrollbar -mx-5 flex gap-1.5 overflow-x-auto px-5 touch-pan-x" data-map-gestures="">
                     {[null, ...zones].map((z) => (
                       <button key={z ?? "tutta"} type="button" role="radio" aria-checked={zone === z} onClick={() => setZone(z)}

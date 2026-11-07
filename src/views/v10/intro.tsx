@@ -56,7 +56,7 @@ function Reveal({ children, className = "" }: { children: ReactNode; className?:
 
 /** The four steps of the tutorial, each with a white line drawing (every stroke has pathLength 1, so it can draw itself). */
 const STEPS: Array<{ title: string; text: string; art: ReactNode }> = [
-  { title: "Trova il luogo", text: "Nella scheda Mappa cerchi il luogo o accendi il GPS, che resta attivo e ti segue. Lo guardi in 2D o 3D, ne disegni l'area con i puntini e la dividi in zone e lotti.",
+  { title: "Trova il luogo", text: "Nella scheda Mappa cerchi il luogo o accendi il GPS, che resta attivo e ti segue. Lo guardi in 2D o 3D, disegni il perimetro dell’area mettendo i pin sugli angoli e la dividi in zone e lotti.",
     art: <>
       <path pathLength={1} d="M14 30 L50 20 L100 30 L146 20 V78 L100 88 L50 78 L14 88 Z" strokeOpacity="0.45" />
       <path pathLength={1} d="M34 46 L66 34 L96 44 L88 72 L46 74 Z" />
@@ -65,7 +65,7 @@ const STEPS: Array<{ title: string; text: string; art: ReactNode }> = [
       <path pathLength={1} d="M124 58 C120 53 116 49 116 44 A8 8 0 0 1 132 44 C132 49 128 53 124 58 Z" />
       <path pathLength={1} d="M114 30 A14 14 0 0 1 134 30 M108 24 A22 22 0 0 1 140 24" strokeOpacity="0.6" />
     </> },
-  { title: "Capisci quando hai bisogno del mio intervento", text: "Sull'arco scegli quanto rinfrescare: vedi subito i gradi in meno.",
+  { title: "Scegli quanto rinfrescare", text: "Sull’indicatore scegli il comfort che vuoi raggiungere: vedi subito di quanto scende il calore percepito.",
     art: <>
       <path pathLength={1} d="M30 84 A50 50 0 0 1 130 84" strokeWidth="6" strokeOpacity="0.25" />
       <path pathLength={1} d="M30 84 A50 50 0 0 1 98 37" strokeWidth="6" />
@@ -330,7 +330,7 @@ export function Choice() {
           <p className="text-[15px] leading-relaxed text-foreground/60">{profileIntro(identify)}</p>
           {proId && <p className="rounded-2xl bg-foreground/[0.06] px-4 py-3 text-sm text-foreground/70">Ora sei identificato come <span className="font-semibold text-foreground">{proSummary(proId)}</span>: identificandoti qui, quel profilo viene sostituito.</p>}
           <IdentifyForm kind={identify} onDone={() => go(it)} />
-          <p className="px-1 text-xs text-foreground/50">I dati restano su questo dispositivo e, se hai fatto l'accesso, nel tuo account. Puoi uscire dal profilo quando vuoi, dal pannello account.</p>
+          <p className="px-1 text-xs text-foreground/50">I dati restano su questo dispositivo e, se hai fatto l’accesso, nel tuo account. Puoi uscire dal profilo quando vuoi, dal pannello account.</p>
         </section>
       </div>
     );
