@@ -282,7 +282,9 @@ export function AccountSectorLock({ kind, account, email }: { kind: ProKind; acc
     await keepProIdInAccount();
     // Leaves this account without ending it: kept on the phone, it comes back in one tap from its profile.
     dropProIdOnDevice();
-    leaveAccount();
+    // Back to the sector choice, never the account panel: from there "Hai già un account? Accedi" or a sector's form.
+    rememberWantedSector(null);
+    leaveAccount({ openPanel: false, to: "/benvenuto" });
   };
   // "Indietro" leaves this account too (kept on the phone, not ended) and goes back to the sector choice.
   const back = async () => {
