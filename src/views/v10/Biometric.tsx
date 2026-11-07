@@ -2,8 +2,7 @@ import { goInApp } from "@/lib/app-nav";
 import { useEffect, useState } from "react";
 import { Fingerprint, ScanFace, UserRound } from "lucide-react";
 import { toast } from "sonner";
-import { openAccount } from "@/lib/camera-dock";
-import { biometricAvailable, biometricName, biometricOn, disableBiometric, enableBiometric, useBiometricAccounts, useBiometricOn, verifyBiometric } from "@/lib/biometric";
+import { biometricAvailable, biometricName, markUnlocked, biometricOn, disableBiometric, enableBiometric, useBiometricAccounts, useBiometricOn, verifyBiometric } from "@/lib/biometric";
 import { hasAccountSession, leaveAccount, signInAs, switchToAccount } from "@/lib/account-sessions";
 import { supabase } from "@/integrations/supabase/client";
 import { dropProIdOnDevice, getKnownProIds, getProId, getSectorGateKind, keepProIdInAccount, openSectorGate, type KnownProId, rememberWantedSector, saveProId, sectorOf, useKnownProIds } from "@/lib/use-pro-id";
@@ -162,9 +161,15 @@ export function useBiometricAutoEnter() {
       const all = getKnownProIds().filter((k) => biometricOn(proBioKey(k)) && !!k.acct?.email && hasAccountSession(k.acct.email));
       const k = (cur && all.find((x) => proBioKey(x) === proBioKey(cur))) ?? all.sort((a, b) => (b.at > a.at ? 1 : -1))[0];
       if (!k) return;
+      // The recognition only unlocks the app: it stays on the sector page (the two sectors), where the person picks the
+      // sector and the profile — asked no second time for a few minutes. Nothing is entered by itself.
       const r = await verifyBiometric(proBioKey(k));
-      if (r.ok) { await enterWithProfile(k, { recognised: true }); return; }
-      openAccount();
+      if (r.ok) {
+        markUnlocked();
+        toast.success("App sbloccata", { description: "Scegli il settore: il tuo profilo ti aspetta lì." });
+        return;
+      }
+      toast("Sblocco non riuscito", { description: "Scegli il settore e il tuo profilo: il riconoscimento ti verrà chiesto lì." });
     }, 900);
     return () => { done = true; window.clearTimeout(t); };
   }, []);
