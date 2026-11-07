@@ -27,6 +27,7 @@ import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn, useDemoSignedIn } from "@/lib/de
 import { OPEN_ACCOUNT_EVENT } from "@/lib/camera-dock";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { setAccountAvatar } from "@/lib/account-avatar";
+import { syncKnownAccounts } from "@/lib/use-pro-id";
 import seedling from "@/assets/avatar-seedling.svg";
 import city from "@/assets/avatar-city.svg";
 import sun from "@/assets/avatar-sun.svg";
@@ -439,7 +440,11 @@ export function AccountControl() {
 
   const displayedAvatar = (choice === "upload" ? draftPreview ?? avatarUrl : suggestions.find((item) => item.id === choice)?.src ?? account?.googleAvatar) ?? undefined;
   const signedAvatar = account && !account.guest ? displayedAvatar ?? null : null;
-  useEffect(() => { setAccountAvatar(signedAvatar); }, [signedAvatar]);
+  useEffect(() => {
+    setAccountAvatar(signedAvatar);
+    // The profiles on this phone that are this account's get its picture and email ("Ti abbiamo riconosciuto").
+    if (cloudAccount) void syncKnownAccounts();
+  }, [signedAvatar, cloudAccount]);
   const avatar = (size: string) => <Avatar className={`${size} border border-border bg-muted`}><AvatarImage src={displayedAvatar} alt="Immagine account" referrerPolicy="no-referrer" className="object-cover" /><AvatarFallback><UserRound className="size-1/2" aria-hidden="true" /></AvatarFallback></Avatar>;
 
 

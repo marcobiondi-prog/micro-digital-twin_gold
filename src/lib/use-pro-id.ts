@@ -109,6 +109,38 @@ async function attachAccount(id: ProId) {
   saveKnown();
   subs.forEach((f) => f());
 }
+/**
+ * Brings the signed-in account's email and picture to the profiles on this phone that are its own: those already tied
+ * to its email, its registered profiles (pro_last) and the one in use — so profiles registered before the list kept
+ * accounts get their picture and email too. Run by the account control whenever the account's picture is known.
+ */
+export async function syncKnownAccounts(): Promise<void> {
+  const { data } = await supabase.auth.getSession();
+  const user = data.session?.user;
+  if (!user?.email) return;
+  const email = user.email;
+  const lastOf = (user.user_metadata as { pro_last?: Record<string, unknown> } | null)?.pro_last ?? {};
+  const pic = await smallPicture(getAccountAvatar());
+  const k = knownSnap();
+  const inUse = current ?? null;
+  let changed = false;
+  const next: Known = { agronomo: [], funzionario: [] };
+  for (const kind of KNOWN_KINDS) {
+    next[kind] = (k[kind] as KnownProId[]).map((p) => {
+      const saved = lastOf[kind];
+      const mine = p.acct?.email === email || (isProId(saved) && sameProfile(p, saved)) || (!p.acct && inUse != null && sameProfile(p, inUse));
+      if (!mine) return p;
+      const acct: KnownAccount = { email, ...((pic ?? p.acct?.pic) ? { pic: pic ?? p.acct!.pic! } : {}) };
+      if (p.acct?.email === acct.email && p.acct?.pic === acct.pic) return p;
+      changed = true;
+      return { ...p, acct };
+    });
+  }
+  if (!changed) return;
+  known = next;
+  saveKnown();
+  subs.forEach((f) => f());
+}
 /** Takes a profile off this device's list of profiles registered before (it stays in the account it was saved to). */
 export function forgetKnownProId(id: ProId) {
   const k = knownSnap();
