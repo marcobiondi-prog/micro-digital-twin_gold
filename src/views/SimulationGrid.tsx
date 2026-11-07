@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { vineyardControlValue, updateVineyardControl, type VineyardControl } from "@/models/vineyard-controls";
 import { setUrban, setVineyard, useLab } from "@/models/lab-store";
 import { toast } from "sonner";
+import { drawnAreaFor } from "@/models/drawn-area";
 import { lastPlace } from "@/models/place-memory";
 import { getGooglePlace, reverseGoogleLocation, searchGoogleLocation, suggestGoogleLocations, type LocationSuggestion, type SearchedLocation } from "@/controllers/geo.functions";
 import { searchOsmLocation, reverseOsmLocation, suggestOsmLocations } from "@/controllers/osm-geo.functions";
@@ -91,7 +92,7 @@ function metresBetween(a: { lat: number; lng: number }, b: { lat: number; lng: n
   return Math.hypot(x, y) * 6371000;
 }
 
-function LocationSearch({ initial, onSelect, bare = false, previous = null }: { initial: SearchedLocation; onSelect: (location: SearchedLocation) => void; bare?: boolean; previous?: SearchedLocation | null }) {
+function LocationSearch({ initial, onSelect, bare = false, previous = null, keepPlace = false }: { initial: SearchedLocation; onSelect: (location: SearchedLocation) => void; bare?: boolean; previous?: SearchedLocation | null; keepPlace?: boolean }) {
   const searchLocation = useServerFn(searchGoogleLocation);
   const [query, setQuery] = useState("");
   const reverseGoogle = useServerFn(reverseGoogleLocation);
@@ -154,8 +155,11 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null }: { 
   const pauseFollow = () => { if (gpsRef.current) { setPaused(true); saveGpsPaused(true); } };
   const gpsRef = useRef(false); gpsRef.current = gps;
   // Read after mounting, so the server's page and the first render agree.
-  // Every opening follows the phone again: a place chosen by hand pauses the GPS only until the map is opened anew.
-  useEffect(() => { if (readGps() && appAllowed("posizione")) { saveGpsPaused(false); setLocating(true); setGps(true); setPaused(false); } }, []);
+  // Every opening switches the GPS on and follows the phone, except where there is work to keep: a place with an area
+  // drawn stays put (the GPS on but paused, "Seguimi di nuovo" to follow), so opening the map never takes the
+  // simulation away from the piazza or vineyard being designed.
+  const keepRef = useRef(keepPlace); keepRef.current = keepPlace;
+  useEffect(() => { if (readGps() && appAllowed("posizione")) { const keep = keepRef.current; saveGpsPaused(keep); setLocating(true); setGps(true); setPaused(keep); } }, []);
   // Position revoked inside the app (Account → Autorizzazioni): the GPS goes off at once.
   const positionAllowed = useAppAllowed("posizione");
   useEffect(() => { if (!positionAllowed) { setGps(false); setLocating(false); } }, [positionAllowed]);
@@ -426,7 +430,9 @@ export function PlaceSearch({ kind }: { kind: "urban" | "vineyard" }) {
   const location: SearchedLocation = kind === "urban" ? lab.urban.location : lab.vineyard.location;
   // The last place left (models/place-memory): one tap brings it back, with its simulation and drawn area.
   const previous = lastPlace<unknown>(kind === "urban" ? lab.urban.places : lab.vineyard.places, location);
-  return <LocationSearch bare initial={location} previous={previous} onSelect={(next) => (kind === "urban" ? setUrban({ location: next }) : setVineyard({ location: next }))} />;
+  // A place with an area drawn is kept when the map opens: the GPS does not move it by itself.
+  const keepPlace = !!drawnAreaFor(kind === "urban" ? lab.urban.area : lab.vineyard.area, location);
+  return <LocationSearch bare initial={location} previous={previous} keepPlace={keepPlace} onSelect={(next) => (kind === "urban" ? setUrban({ location: next }) : setVineyard({ location: next }))} />;
 }
 
 export function LocationCard({ kind }: { kind: "urban" | "vineyard" }) {
