@@ -13,7 +13,7 @@ import { useOfficeEmail } from "@/lib/office-email";
 import { TownCrest } from "@/views/v10/TownCrest";
 import { cn } from "@/lib/utils";
 import {
-  checkAgronomo, checkFunzionario, KIND_LABEL, ROLES, proSummary,
+  checkAgronomo, checkFunzionario, isProId, KIND_LABEL, ROLES, proSummary,
   type AgronomoInput, type Errors, type FunzionarioInput, type ProId, type ProKind,
 } from "@/models/professional-id";
 import { Ambient, PageHero } from "@/views/v8/console";
@@ -245,6 +245,22 @@ const SECTOR_PLACE: Record<ProKind, string> = { funzionario: "la piazza", agrono
 export function AccountSectorLock({ kind, account, email }: { kind: ProKind; account: ProKind; email: string | null }) {
   const [busy, setBusy] = useState(false);
   const [asking, setAsking] = useState(false);
+  // The account's own profile of its sector (saved in the account): entering with it is the first way on, so signing in
+  // from the other sector's form never leaves one stuck on the lock.
+  const [own, setOwn] = useState<ProId | null>(null);
+  useEffect(() => {
+    void supabase.auth.getSession().then(({ data }) => {
+      const p = (data.session?.user.user_metadata as { pro_last?: Record<string, unknown> } | undefined)?.pro_last?.[account];
+      setOwn(isProId(p) && p.kind === account ? p : null);
+    });
+  }, [account]);
+  const enterOwn = async () => {
+    if (!own) return;
+    setBusy(true);
+    const ok = await saveProId(own);
+    setBusy(false);
+    if (ok) toast.success(`Bentornato, ${own.name}`, { description: `Si apre ${SECTOR_PLACE[account]}.` });
+  };
   // Moves this account to the sector of the form: its profile of that kind comes back (or the form asks for it).
   const switchHere = async () => {
     setBusy(true);
@@ -267,6 +283,16 @@ export function AccountSectorLock({ kind, account, email }: { kind: ProKind; acc
       <p className="text-sm leading-relaxed text-foreground/70">
         {email ? <>L'account <span className="font-semibold text-foreground [overflow-wrap:anywhere]">{email}</span></> : "Il tuo account"} è legato a {SECTOR_PLACE[account]}: ogni account personale vale per un solo settore. Per il settore {SECTOR_NAME[kind]} puoi spostare qui questo account, oppure accedere con un altro.
       </p>
+      {own && !asking && (
+        <button type="button" disabled={busy} onClick={() => void enterOwn()}
+          className="flex w-full items-center gap-3 rounded-2xl bg-white p-3 pl-4 text-left text-black outline-none disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold">Entra come {own.name}</span>
+            <span className="block text-xs text-black/60 [overflow-wrap:anywhere]">{proSummary(own)} · apre {SECTOR_PLACE[account]}</span>
+          </span>
+          <ArrowRight className="size-4 shrink-0" aria-hidden="true" />
+        </button>
+      )}
       {asking ? (
         <div role="alertdialog" aria-label="Cambiare settore all'account?" className="space-y-3 rounded-2xl bg-foreground/[0.06] p-4">
           <p className="text-sm leading-relaxed">Usare questo account per il settore {SECTOR_NAME[kind]}? Il profilo {account === "agronomo" ? "agricolo" : "urbano"} resta salvato nell'account, ma finché l'account è del settore {SECTOR_NAME[kind]} non apre {SECTOR_PLACE[account]}.</p>
@@ -277,7 +303,7 @@ export function AccountSectorLock({ kind, account, email }: { kind: ProKind; acc
         </div>
       ) : (
         <button type="button" disabled={busy} onClick={() => setAsking(true)}
-          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white px-4 text-[15px] font-semibold text-black outline-none disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+          className={`inline-flex h-12 w-full items-center justify-center gap-2 rounded-full px-4 text-[15px] font-semibold outline-none ${own ? "bg-foreground/[0.12] text-foreground" : "bg-white text-black"} disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-brand-turquoise`}>
           {kind === "agronomo" ? <Grape className="size-4" aria-hidden="true" /> : <Building2 className="size-4" aria-hidden="true" />}Usa questo account per il settore {SECTOR_NAME[kind]}
         </button>
       )}
