@@ -90,7 +90,10 @@ export const reverseGoogleLocation = createServerFn({ method: "POST" })
     if (!response.ok) { console.error(`Reverse geocoding failed [${response.status}]: ${await response.text()}`); return { error: "Indirizzo non disponibile." }; }
     const body = await response.json() as { results?: GoogleGeocodeResult[] };
     const first = body.results?.[0];
-    return { location: { label: first ? locationLabel("La mia posizione", first.formatted_address, (first.address_components ?? []).map(({ long_name, types }) => ({ longText: long_name, types }))) : "La mia posizione", lat: data.lat, lng: data.lng } };
+    // Named by its street (or town) rather than "La mia posizione", so the page's title says where one is.
+    const parts = (first?.address_components ?? []).map(({ long_name, types }) => ({ longText: long_name, types }));
+    const named = parts.find((p) => p.types.includes("route"))?.longText ?? parts.find((p) => p.types.includes("locality"))?.longText ?? "La mia posizione";
+    return { location: { label: first ? locationLabel(named, first.formatted_address, parts) : "La mia posizione", lat: data.lat, lng: data.lng } };
   });
 
 const suggestInput = z.object({ query: z.string().trim().min(2).max(160), sessionToken: z.string().max(64).optional() });

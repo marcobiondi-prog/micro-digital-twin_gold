@@ -129,7 +129,7 @@ export function AmbientPools({ className }: { className?: string }) {
   );
 }
 
-export function PageHero({ kicker, kickerIcon: KIcon, onKicker, title, actions }: { kicker?: string; kickerIcon?: LucideIcon; onKicker?: () => void; title: string; actions?: ReactNode }) {
+export function PageHero({ kicker, kickerIcon: KIcon, onKicker, title, actions, small = false }: { kicker?: string; kickerIcon?: LucideIcon; onKicker?: () => void; title: string; actions?: ReactNode; small?: boolean }) {
   const k = kicker && (
     <span className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
       {KIcon && <KIcon className="size-4 shrink-0" aria-hidden="true" />}<span className="truncate">{kicker}</span>
@@ -139,7 +139,7 @@ export function PageHero({ kicker, kickerIcon: KIcon, onKicker, title, actions }
     <div className="flex items-end gap-3">
       <div className="min-w-0 flex-1">
         {k && (onKicker ? <button type="button" onClick={onKicker} className="-mx-1 max-w-full rounded-md px-1 py-0.5 text-left outline-none hover:bg-foreground/10 focus-visible:ring-2 focus-visible:ring-ring">{k}</button> : k)}
-        <h1 className="mt-0.5 truncate font-display text-4xl font-light tracking-tight text-foreground sm:text-5xl">{title}</h1>
+        <h1 className={cn("mt-0.5 font-display font-light tracking-tight text-foreground", small ? "line-clamp-2 text-2xl leading-tight sm:text-3xl" : "truncate text-4xl sm:text-5xl")}>{title}</h1>
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2 pb-1">{actions}</div>}
     </div>

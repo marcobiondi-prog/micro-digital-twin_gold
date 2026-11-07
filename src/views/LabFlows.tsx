@@ -38,7 +38,7 @@ export function UrbanFlow() {
     <div className="space-y-4">
       <LabSyncIndicator />
       {/* No Confronta here: the three levels are compared inside the thermometer itself. */}
-      <SimShell kind="urban" place={place.name} onReset={resetUrban}
+      <SimShell kind="urban" place={location.label} onReset={resetUrban}
         simula={<UrbanThermometer onImportWeather={importRealWeather} />}
         media={<LabMedia embedded kind="urban" context={`Alberi ${trees} · aiuole e ciottoli ${permeable}% · ombra ${shade}%`} />}
         sensori={<GuestSensors kind="urban" />} />
@@ -67,7 +67,7 @@ export function VineyardFlow() {
     setVineyard({ zones });
     toast.success(`Importati ${om.temp.toLocaleString("it-IT")}°C${soil != null ? ` e umidità suolo ${Math.round(soil)}%` : ""} dal meteo reale`);
   };
-  const place = splitLocation(vineyard.location.label).name;
+  const place = vineyard.location.label;
 
   return (
     <div className="space-y-4">

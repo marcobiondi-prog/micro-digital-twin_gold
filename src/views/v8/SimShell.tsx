@@ -20,27 +20,40 @@ const TONE: Record<SimKind, string> = { urban: "rgb(28 112 210 / 0.42)", vineyar
  * through --sim-tabs-shift on the page (a transform, like the bar).
  */
 function useHideOnScroll(bar: RefObject<HTMLDivElement | null>, root: RefObject<HTMLDivElement | null>) {
-  // Straight on the DOM, no React state: a re-render of the whole page at every switch made the slide stutter.
+  // The bar follows the scroll like a hand on it: once half the map has gone up past it, scrolling down pushes it up out
+  // of the screen by as much as the page moved, scrolling up brings it down the same way (no jump, no fade). Straight
+  // on the DOM, once per frame, with no React state.
   useEffect(() => {
-    let lastY = window.scrollY, hidden = false;
-    const set = (on: boolean) => {
-      if (on === hidden) return;
-      hidden = on;
+    let lastY = window.scrollY, off = 0, frame = 0;
+    const apply = () => {
+      frame = 0;
       const el = bar.current;
-      if (el) { if (on) el.setAttribute("data-hidden", ""); else el.removeAttribute("data-hidden"); }
-      root.current?.style.setProperty("--sim-tabs-shift", on ? "-3rem" : "0rem");
+      if (!el) return;
+      const h = el.offsetHeight + (parseFloat(getComputedStyle(el).top) || 0) + 8;
+      el.style.transform = off ? `translate3d(0, ${-off.toFixed(1)}px, 0)` : "";
+      if (off >= h - 1) el.setAttribute("data-hidden", ""); else el.removeAttribute("data-hidden");
+      root.current?.style.setProperty("--sim-tabs-shift", `${(-Math.min(off, h) * 0.8).toFixed(1)}px`);
     };
     const onScroll = () => {
       const y = window.scrollY, dy = y - lastY;
-      if (Math.abs(dy) < 6) return;
       lastY = y;
-      if (dy < 0) { set(false); return; }
-      // The bar stays until half the map (or the map preview) has gone up past it.
-      const map = [...document.querySelectorAll("[data-sim-map-box]")].map((e) => e.getBoundingClientRect()).find((r) => r.height > 0), b = bar.current?.getBoundingClientRect();
-      set(map ? map.top + map.height / 2 < (b?.bottom ?? 0) : y > 160);
+      const el = bar.current;
+      if (!el) return;
+      const h = el.offsetHeight + (parseFloat(getComputedStyle(el).top) || 0) + 8;
+      if (dy > 0) {
+        // The bar stays until half the map (or the map preview) has gone up past it.
+        const map = [...document.querySelectorAll("[data-sim-map-box]")].map((e) => e.getBoundingClientRect()).find((r) => r.height > 0);
+        const barBottom = el.getBoundingClientRect().bottom + off;
+        const pastHalf = map ? map.top + map.height / 2 < barBottom : y > 160;
+        if (!pastHalf) return;
+      }
+      const next = Math.max(0, Math.min(h, y <= 0 ? 0 : off + dy));
+      if (next === off) return;
+      off = next;
+      if (!frame) frame = requestAnimationFrame(apply);
     };
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => { cancelAnimationFrame(frame); window.removeEventListener("scroll", onScroll); };
   }, [bar, root]);
 }
 
@@ -58,6 +71,11 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, medi
   // Entering the page always starts on Mappa (unless a tab was asked for on the way in).
   useLayoutEffect(() => startOnMap(kind), [kind]);
   const go = (t: SimTab) => openSimTab(kind, t);
+  // The title is the place chosen (its name, the rest of its address in the small line above with the section);
+  // a position from the GPS reads its street or town instead of "La mia posizione".
+  const parts = place.split(" · ").map((x) => x.trim()).filter(Boolean);
+  const own = parts[0]?.startsWith("La mia posizione") && parts.length > 1 ? parts.slice(1) : parts;
+  const title = own[0] ?? place, kicker = [kind === "urban" ? "Piazza" : "Vigneto", ...own.slice(1)].join(" · ");
   const barRef = useRef<HTMLDivElement>(null), rootRef = useRef<HTMLDivElement>(null);
   useHideOnScroll(barRef, rootRef);
   // The place is shown and changed in the Mappa tab.
@@ -68,7 +86,7 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, medi
   return (
     <div ref={rootRef} className="space-y-4">
       <Ambient tone={TONE[kind]} />
-      <PageHero kicker={place} kickerIcon={MapPin} onKicker={toMap} title={kind === "urban" ? "Piazza" : "Vigneto"}
+      <PageHero small kicker={kicker} kickerIcon={MapPin} onKicker={toMap} title={title}
         actions={<>
           {onCompare && <HeroButton icon={Scale} label="Confronta" onClick={onCompare} showLabel />}
           <DropdownMenu>
@@ -84,7 +102,7 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, medi
             </DropdownMenuContent>
           </DropdownMenu>
         </>} />
-      <div ref={barRef} data-sim-tabs="" className="sticky top-[var(--nav-h)] z-[999999997] -mx-4 translate-y-0 bg-transparent px-4 py-2 backdrop-blur-xl transition-transform duration-300 will-change-transform motion-reduce:transition-none data-[hidden]:pointer-events-none data-[hidden]:-translate-y-[calc(100%+var(--nav-h,0px)+0.5rem)]">
+      <div ref={barRef} data-sim-tabs="" className="sticky top-[var(--nav-h)] z-[999999997] -mx-4 bg-transparent px-4 py-2 backdrop-blur-xl will-change-transform data-[hidden]:pointer-events-none">
         <TabRow label="Sezioni" items={TABS} value={tab} onChange={go} />
       </div>
       {/* The open tab follows the finger and the next slides in once it turns; nothing peeks beside it. */}
