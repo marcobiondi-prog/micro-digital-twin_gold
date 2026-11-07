@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -170,38 +170,15 @@ export function TabRow<T extends string>({ items, value, onChange, label, fill }
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     r.scrollTo({ left: a.offsetLeft - (r.clientWidth - a.offsetWidth) / 2, behavior: reduce || quiet() ? "auto" : "smooth" });
   }, [value]);
-  // The slate pill is one element under the tabs that glides from the old tab to the new one (left and width), on
-  // the tutorial's curve; on the first layout, a resize or a quiet switch it is simply put there, never animated.
-  const pill = useRef<HTMLSpanElement>(null);
-  const placed = useRef(false);
-  useLayoutEffect(() => {
-    const put = (animate: boolean) => {
-      const el = pill.current, a = active.current;
-      if (!el || !a) return;
-      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      el.style.transition = animate && placed.current && !reduce && !quiet() ? "transform 320ms cubic-bezier(0.22,1,0.36,1), width 320ms cubic-bezier(0.22,1,0.36,1)" : "none";
-      el.style.width = `${a.offsetWidth}px`;
-      el.style.transform = `translate3d(${a.offsetLeft}px,0,0)`;
-      el.style.opacity = "1";
-      placed.current = true;
-    };
-    put(true);
-    // ResizeObserver reports once as soon as it observes: that first report is not a resize (it would cut the glide).
-    let first = true;
-    const ro = new ResizeObserver(() => { if (first) { first = false; return; } put(false); });
-    if (row.current) ro.observe(row.current);
-    return () => ro.disconnect();
-  }, [value, items.length]);
   return (
     <div ref={row} role="tablist" aria-label={label} className={cn("no-scrollbar relative flex gap-1.5", fill ? "w-full" : "-mx-4 snap-x overflow-x-auto px-4 touch-pan-x")}>
-      <span ref={pill} aria-hidden="true" className="pointer-events-none absolute left-0 top-0 h-11 rounded-full bg-secondary opacity-0 shadow-[inset_0_1px_0_rgb(255_255_255/0.12)] will-change-transform" />
       {items.map(({ id, label: l, icon: Icon }) => {
         const on = id === value;
         return (
           <button key={id} ref={on ? active : undefined} type="button" role="tab" aria-selected={on} onClick={() => onChange(id)}
             className={cn("inline-flex h-11 snap-center items-center gap-2 whitespace-nowrap rounded-full px-5 text-[15px] font-semibold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
               fill ? "min-w-0 flex-1 justify-center" : "shrink-0",
-              "relative", on ? "text-secondary-foreground" : "text-foreground/85 hover:bg-foreground/[0.06]")}>
+              on ? "bg-secondary text-secondary-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]" : "text-foreground/85 hover:bg-foreground/[0.06]")}>
             {Icon && <Icon className="size-4" aria-hidden="true" />}{l}
           </button>
         );
