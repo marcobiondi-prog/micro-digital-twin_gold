@@ -1,4 +1,4 @@
-import { useLayoutEffect, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { Camera, Images, Map as MapIcon, MapPin, EllipsisVertical, Radar, RotateCcw, Scale, Send, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { setCameraSheetOpen } from "@/lib/camera-dock";
@@ -14,6 +14,31 @@ const TABS: ReadonlyArray<{ id: SimTab; label: string; icon: LucideIcon }> = [
 ];
 const TONE: Record<SimKind, string> = { urban: "rgb(28 112 210 / 0.42)", vineyard: "rgb(150 36 110 / 0.42)" };
 
+/**
+ * The sticky tabs leave room while scrolling down (more of the map preview and the simulation on screen) and come back
+ * on scrolling up or near the top of the page, like the bottom bar; the sticky readings under them move up with them
+ * through --sim-tabs-gap on the document.
+ */
+function useHideOnScroll() {
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    let lastY = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY, dy = y - lastY;
+      if (Math.abs(dy) < 6) return;
+      lastY = y;
+      setHidden(dy > 0 && y > 160);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  useEffect(() => {
+    document.documentElement.style.setProperty("--sim-tabs-gap", hidden ? "0.75rem" : "3.75rem");
+    return () => { document.documentElement.style.removeProperty("--sim-tabs-gap"); };
+  }, [hidden]);
+  return hidden;
+}
+
 function Item({ icon: Icon, label, onSelect }: { icon: LucideIcon; label: string; onSelect: () => void }) {
   return <DropdownMenuItem onSelect={onSelect} className="min-h-12 gap-3 rounded-xl px-3 text-[15px] font-medium focus:bg-accent focus:text-accent-foreground"><Icon className="size-5 text-muted-foreground" aria-hidden="true" />{label}</DropdownMenuItem>;
 }
@@ -28,6 +53,7 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, medi
   // Entering the page always starts on Mappa (unless a tab was asked for on the way in).
   useLayoutEffect(() => startOnMap(kind), [kind]);
   const go = (t: SimTab) => openSimTab(kind, t);
+  const tabsHidden = useHideOnScroll();
   // The place is shown and changed in the Mappa tab.
   const toMap = () => go("mappa");
   // A sideways swipe drags the panel with the finger and turns to the neighbouring tab, like the tutorial's slides; sliders, maps and rows that scroll sideways keep their own moves.
@@ -52,7 +78,7 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, medi
             </DropdownMenuContent>
           </DropdownMenu>
         </>} />
-      <div data-sim-tabs="" className="sticky top-[var(--nav-h)] z-[999999997] -mx-4 bg-transparent px-4 py-2 backdrop-blur-xl transition-[top] duration-300">
+      <div data-sim-tabs="" data-hidden={tabsHidden || undefined} className={`sticky top-[var(--nav-h)] z-[999999997] -mx-4 bg-transparent px-4 py-2 backdrop-blur-xl transition-[top,transform,opacity] duration-300 motion-reduce:transition-none ${tabsHidden ? "pointer-events-none -translate-y-[calc(100%+var(--nav-h,0px)+0.5rem)] opacity-0" : ""}`}>
         <TabRow label="Sezioni" items={TABS} value={tab} onChange={go} />
       </div>
       {/* The open tab follows the finger and the next slides in once it turns; nothing peeks beside it. */}

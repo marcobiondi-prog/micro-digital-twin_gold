@@ -347,7 +347,8 @@ function ParallaxLayer({ children }: { children: React.ReactNode }) {
       const r = box.getBoundingClientRect(), vh = window.innerHeight || 1, spare = r.height * 0.25;
       // The map slides while the preview goes up under the sticky tabs, and stops where its faded foot begins (FADE_AT
       // of its height) reaches them: from there only the fade is left in view and the map scrolls with the page.
-      const under = document.querySelector("[data-sim-tabs]")?.getBoundingClientRect().bottom ?? 0;
+      // Tabs hidden while scrolling down (SimShell): the screen's top edge.
+      const tabs = document.querySelector("[data-sim-tabs]"), under = tabs && !tabs.hasAttribute("data-hidden") ? tabs.getBoundingClientRect().bottom : 0;
       const top = Math.max(r.top, under - r.height * FADE_AT);
       const ty = Math.max(-spare, Math.min(spare, (vh / 2 - (top + r.height / 2)) * 0.55));
       el.style.transform = `translate3d(0, ${ty.toFixed(1)}px, 0)`;
