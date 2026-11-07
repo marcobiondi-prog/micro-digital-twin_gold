@@ -518,9 +518,10 @@ export function useSyncProId() {
       // An account that only ever worked on one project is of that project's sector (a saved sector of the other one,
       // written by mistake, is put right), unless the person is entering the other sector with its own profile.
       const onlyWorked: ProKind | null = worked && worked.length === 1 ? worked[0]! : null;
-      // Added on purpose with "Aggiungi account" from a sector's form: the account goes to that sector, whatever it
-      // was before (its other profile stays saved in it), so any account can be added to either sector.
-      const adding = fromSignIn ? takeAddingSector() : null;
+      // Added with "Aggiungi account" from a sector's form: an account with no sector yet (never used in the app) goes
+      // to that sector. One account, one sector: an account already of the other sector keeps it.
+      const adding0 = fromSignIn ? takeAddingSector() : null;
+      const adding = adding0 && !savedSector && !onlyWorked ? adding0 : null;
       const sector: ProKind | null = adding ?? wanted ?? onlyWorked ?? savedSector;
       if (email) for (const k of worked ?? []) { const p = prev[k]; if (isProId(p)) retieKnown(p, email); }
       const own = sector ? ownedClean.filter((k) => k === sector) : ownedClean;
