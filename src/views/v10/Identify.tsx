@@ -252,10 +252,7 @@ export function ProfileCard({ kind, go }: { kind: ProKind; go?: () => void }) {
       </div>
       <dl className="divide-y divide-foreground/10 rounded-2xl bg-foreground/[0.05] px-4">
         {profileRows(mine).map(([k, v]) => {
-          // The email opens the phone's email app, written to that address.
-          const val = (k === "Email" || k === "Email personale") && v
-            ? <a href={`mailto:${v}`} className="rounded-sm underline decoration-foreground/25 decoration-1 underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring">{v}</a>
-            : v;
+          const val = v;
           // A long value (the email) goes on its own line under its label, whole, instead of breaking mid-word beside it.
           return v.length > 24
             ? <div key={k} className="py-3"><dt className="text-sm text-muted-foreground">{k}</dt><dd className="mt-1 text-[15px] font-medium [overflow-wrap:anywhere]">{val}</dd></div>
