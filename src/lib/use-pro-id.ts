@@ -524,6 +524,18 @@ export function useSyncProId() {
       const adding = adding0 && !savedSector && !onlyWorked ? adding0 : null;
       const sector: ProKind | null = adding ?? wanted ?? onlyWorked ?? savedSector;
       if (email) for (const k of worked ?? []) { const p = prev[k]; if (isProId(p)) retieKnown(p, email); }
+      // A new account added from a sector's form gets its profile of that sector made at once from the Google account
+      // (its name, its email; the other details empty, to fill in later from the profile), with no form to fill.
+      let autoMade: ProId | null = null;
+      if (adding && !isProId(prev[adding])) {
+        const name = nameOf(meta) ?? (email ? email.split("@")[0]! : "Nuovo profilo");
+        const at = new Date().toISOString();
+        autoMade = adding === "agronomo"
+          ? { kind: "agronomo", name, licenceType: "utilizzatore", licence: "", region: "", expires: "", at }
+          : { kind: "funzionario", name, comune: "", office: "", role: "", email: email ?? "", badge: "", at };
+        prev[adding] = autoMade;
+        if (!ownedClean.includes(adding)) ownedClean.push(adding);
+      }
       const own = sector ? ownedClean.filter((k) => k === sector) : ownedClean;
       const entering = gateAsk.kind ?? wantedSector();
       rememberWantedSector(null);
@@ -543,11 +555,12 @@ export function useSyncProId() {
       // The other sector's registered profile stays saved in the account (pro_own and pro_last keep every kind owned),
       // only unused while the account is of this sector.
       const clean = { pro_id: back, pro_last: accountLast({ ...(meta as object), pro_last: prev }, back, ownedClean), pro_own: ownedClean, pro_sector: sector, pro_left: false };
-      const dirty = ownedClean.length !== owned.length || legacy || KNOWN_KINDS.some((k) => !!tied[k] && !isProId(prev0[k])) || (saved != null && !mine(saved)) || KINDS.some((k) => prev[k] != null && !owned.includes(k)) || rawSector !== sector || staleLeft;
+      const dirty = ownedClean.length !== owned.length || legacy || KNOWN_KINDS.some((k) => !!tied[k] && !isProId(prev0[k])) || (saved != null && !mine(saved)) || KINDS.some((k) => prev[k] != null && !owned.includes(k)) || rawSector !== sector || staleLeft || !!autoMade;
       if (back) {
         set(back);
         if (dirty || !mine(saved)) void supabase.auth.updateUser({ data: clean }).catch(() => undefined);
-        if (!mine(saved)) toast(`Bentornato, ${back.name}`, { description: "Sei entrato con il tuo profilo professionale." });
+        if (autoMade) toast.success(`Account aggiunto: ${email ?? back.name}`, { description: `Ho creato il suo profilo ${back.kind === "agronomo" ? "da agricoltore" : "da funzionario"}: lo trovi tra i profili. I dettagli li completi quando vuoi dal profilo.` });
+        else if (!mine(saved)) toast(`Bentornato, ${back.name}`, { description: "Sei entrato con il tuo profilo professionale." });
         return;
       }
       // The account never registered a profile of its own: none is given to it (not even this device's); the sector

@@ -140,6 +140,6 @@ export function isProId(v: unknown): v is ProId {
 /** One line saying who is identified: "Agricoltore · patentino CB/1234 (Molise)", "Funzionario comunale · Comune di Campobasso, Ufficio tecnico". */
 export function proSummary(id: ProId): string {
   return id.kind === "agronomo"
-    ? id.licence ? `${KIND_LABEL.agronomo} · patentino ${id.licence} (${id.region})` : `${KIND_LABEL.agronomo} · ${id.region}`
-    : `${KIND_LABEL.funzionario} · Comune di ${id.comune}, ${id.office}`;
+    ? id.licence ? `${KIND_LABEL.agronomo} · patentino ${id.licence}${id.region ? ` (${id.region})` : ""}` : id.region ? `${KIND_LABEL.agronomo} · ${id.region}` : KIND_LABEL.agronomo
+    : id.comune ? `${KIND_LABEL.funzionario} · Comune di ${id.comune}${id.office ? `, ${id.office}` : ""}` : KIND_LABEL.funzionario;
 }
