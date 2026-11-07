@@ -1,16 +1,15 @@
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * Google's sign-in inside the app, with no page of Google's in between: the browser's own account chooser for Google
- * (FedCM, navigator.credentials.get with Google's identity provider) shows as a sheet over the app and hands back
- * Google's ID token, which Supabase turns into a session (signInWithIdToken). The installed app no longer opens Google
+ * Google's sign-in inside the app, with no page of Google's in between: Google's own library (Google Identity
+ * Services, through the browser's FedCM chooser) shows the accounts as a sheet over the app and hands back Google's ID
+ * token, which Supabase turns into a session (signInWithIdToken). The installed app no longer opens Google
  * in a window of its own — that window stayed behind the app, and the phone's Back landed on it.
  *
  * The client is the same OAuth client the Supabase Google provider uses; its "Authorized JavaScript origins" must list
  * the app's address.
  */
 export const GOOGLE_CLIENT_ID = "359809801969-2aq36gro41tmgdkbu7u8n663cg5v8tdv.apps.googleusercontent.com";
-const GOOGLE_FEDCM = "https://accounts.google.com/gsi/fedcm.json";
 
 async function sha256Hex(text: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
@@ -35,42 +34,65 @@ function claimsOf(jwt: string): Record<string, unknown> {
   } catch { return {}; }
 }
 
+type Moment = { isNotDisplayed?: () => boolean; isSkippedMoment?: () => boolean };
+type Gis = { accounts: { id: { initialize: (o: Record<string, unknown>) => void; prompt: (cb?: (n: Moment) => void) => void; cancel: () => void } } };
+declare global { interface Window { google?: Gis } }
+
+let loading: Promise<Gis | null> | null = null;
+/** Google's own sign-in library (it asks the browser's chooser with the parameters Google expects). */
+function loadGis(): Promise<Gis | null> {
+  if (window.google?.accounts?.id) return Promise.resolve(window.google);
+  loading ??= new Promise((resolve) => {
+    const s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client";
+    s.async = true;
+    const t = setTimeout(() => { loading = null; resolve(null); }, 8000);
+    s.onload = () => { clearTimeout(t); resolve(window.google?.accounts?.id ? window.google : null); };
+    s.onerror = () => { clearTimeout(t); loading = null; resolve(null); };
+    document.head.appendChild(s);
+  });
+  return loading;
+}
+
 /**
- * "signed" once the session is in, "cancelled" when the person closed the chooser, "unavailable" when it could not be
- * shown (no FedCM in this browser, Google not answering, an origin not allowed, the chooser closed — the browser does
- * not tell these apart): then the caller uses the redirect to Google's pages instead.
+ * "signed" once the session is in, "unavailable" when the chooser could not be used (no library, not shown, closed,
+ * refused, no answer in 30 s — the browser does not tell these apart): then the caller uses the redirect to Google's
+ * pages instead. ("cancelled" is kept for callers; nothing returns it now.)
  */
 export async function googleInApp(opts: { loginHint?: string } = {}): Promise<"signed" | "cancelled" | "unavailable"> {
-  if (typeof window === "undefined" || !crypto?.subtle || !("IdentityCredential" in window) || !navigator.credentials) return "unavailable";
+  if (typeof window === "undefined" || !crypto?.subtle) return "unavailable";
+  const gis = await loadGis();
+  if (!gis) return "unavailable";
   const raw = [...crypto.getRandomValues(new Uint8Array(24))].map((b) => b.toString(16).padStart(2, "0")).join("");
   const nonce = await sha256Hex(raw);
-  // The browser answers late or never when it cannot show the chooser (it hides the reason on purpose): 30 s at most.
-  const stop = new AbortController();
-  const timer = setTimeout(() => stop.abort(), 30_000);
-  let cred: { token?: unknown } | null = null;
-  try {
-    cred = (await navigator.credentials.get({
-      signal: stop.signal,
-      mediation: "required",
-      identity: {
-        context: "signin",
-        providers: [{
-          configURL: GOOGLE_FEDCM,
-          clientId: GOOGLE_CLIENT_ID,
-          nonce,
-          params: { nonce },
-          ...(opts.loginHint ? { loginHint: opts.loginHint } : {}),
-        }],
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (r: "signed" | "unavailable") => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (r !== "signed") { try { gis.accounts.id.cancel(); } catch { /* none */ } }
+      resolve(r);
+    };
+    const timer = setTimeout(() => finish("unavailable"), 30_000);
+    gis.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      nonce,
+      auto_select: false,
+      cancel_on_tap_outside: true,
+      use_fedcm_for_prompt: true,
+      itp_support: true,
+      context: "signin",
+      ...(opts.loginHint ? { login_hint: opts.loginHint } : {}),
+      callback: async (res: { credential?: string }) => {
+        const token = idTokenOf(res?.credential);
+        if (!token) { finish("unavailable"); return; }
+        // The nonce goes to Supabase only when Google put it in the token (else Supabase refuses a nonce it cannot match).
+        const withNonce = claimsOf(token)["nonce"] === nonce;
+        const { error } = await supabase.auth.signInWithIdToken({ provider: "google", token, ...(withNonce ? { nonce: raw } : {}) });
+        finish(error ? "unavailable" : "signed");
       },
-    } as CredentialRequestOptions)) as { token?: unknown } | null;
-  } catch {
-    // Refused, closed or never shown: the browser does not say which, so Google's own pages take over.
-    return "unavailable";
-  } finally { clearTimeout(timer); }
-  const token = idTokenOf(cred?.token);
-  if (!token) return "unavailable";
-  // The nonce goes to Supabase only when Google put it in the token (else Supabase refuses a nonce it cannot match).
-  const withNonce = claimsOf(token)["nonce"] === nonce;
-  const { error } = await supabase.auth.signInWithIdToken({ provider: "google", token, ...(withNonce ? { nonce: raw } : {}) });
-  return error ? "unavailable" : "signed";
+    });
+    gis.accounts.id.prompt((n) => { if (n.isNotDisplayed?.() || n.isSkippedMoment?.()) finish("unavailable"); });
+  });
 }
