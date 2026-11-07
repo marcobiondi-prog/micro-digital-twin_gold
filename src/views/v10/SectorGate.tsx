@@ -5,7 +5,7 @@ import { useLocation, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Building2, Grape, LogIn, UserRound, X } from "lucide-react";
 import { openAccount } from "@/lib/camera-dock";
 import { introSeen } from "@/lib/intro-seen";
-import { clearSectorGate, enterAsGuest, forgetKnownProId, saveProId, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
+import { clearSectorGate, enterAsGuest, forgetKnownProId, saveProId, useAccountSector, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
 import { proSummary } from "@/models/professional-id";
 import { toast } from "sonner";
 import { useSignedIn } from "@/lib/use-signed-in";
@@ -68,8 +68,10 @@ export function SectorGate() {
 export function KnownProfiles({ kind }: { kind: ProKind }) {
   const known = useKnownProIds(kind);
   const avatar = useAccountAvatar();
-  const pick = (k: ProId) => { void saveProId(k); toast.success(`Bentornato, ${k.name}`, { description: `Ritrovi la cronologia ${k.kind === "funzionario" ? "della piazza" : "del vigneto"}.` }); };
-  if (!known.length) return null;
+  const acc = useAccountSector();
+  const pick = async (k: ProId) => { if (!(await saveProId(k))) return; toast.success(`Bentornato, ${k.name}`, { description: `Ritrovi la cronologia ${k.kind === "funzionario" ? "della piazza" : "del vigneto"}.` }); };
+  // Signed in to an account of the other sector, these profiles cannot be used (the form below says why).
+  if (!known.length || (acc?.kind && acc.kind !== kind)) return null;
   return (
               <div className="space-y-3 rounded-3xl bg-foreground/[0.08] p-5 ring-1 ring-brand-turquoise/40">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-turquoise">Ti abbiamo riconosciuto</p>
@@ -86,7 +88,7 @@ export function KnownProfiles({ kind }: { kind: ProKind }) {
                       </div>
                     </div>
                     <p className="text-xs text-foreground/60">Ti eri già registrato con questo profilo: continua e ritrovi la cronologia {kind === "funzionario" ? "della piazza" : "del vigneto"}.</p>
-                    <button type="button" onClick={() => pick(known[0]!)}
+                    <button type="button" onClick={() => void pick(known[0]!)}
                       className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white text-[15px] font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
                       Continua come {known[0]!.name}<ArrowRight className="size-4" aria-hidden="true" />
                     </button>
@@ -97,7 +99,7 @@ export function KnownProfiles({ kind }: { kind: ProKind }) {
                     <ul className="space-y-2" aria-label="Profili registrati">
                       {known.map((k) => (
                         <li key={`${k.name}-${k.at}`} className="flex items-center gap-2 rounded-2xl bg-foreground/[0.06] ring-1 ring-foreground/10">
-                          <button type="button" onClick={() => pick(k)} aria-label={`Continua come ${k.name}, ${proSummary(k)}${k.acct?.email ? `, ${k.acct.email}` : ""}`}
+                          <button type="button" onClick={() => void pick(k)} aria-label={`Continua come ${k.name}, ${proSummary(k)}${k.acct?.email ? `, ${k.acct.email}` : ""}`}
                             className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl p-3 text-left outline-none transition-colors hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-brand-turquoise">
                             {/* The picture of the personal account it was registered with, else its initials. */}
                             <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-full bg-brand-turquoise/15 text-base font-semibold text-brand-turquoise ring-1 ring-brand-turquoise/40" aria-hidden="true">
@@ -151,6 +153,7 @@ function SectorPage({ start }: { start: ProKind | null }) {
   // The profile of this kind registered before (on this device or in the account): recognised, one tap brings it back
   // with its project's history.
   const known = useKnownProIds(kind);
+  const acct = useAccountSector();
   // The page behind does not scroll while this one is up.
   useEffect(() => {
     const html = document.documentElement, before = html.style.overflow;
@@ -180,7 +183,7 @@ function SectorPage({ start }: { start: ProKind | null }) {
             <p className="text-[15px] leading-relaxed text-foreground/60">{profileIntro(sector.kind)}</p>
             <KnownProfiles kind={sector.kind} />
             {signIn}
-            {known.length > 0 && <p className="px-1 pt-2 text-sm font-semibold text-foreground/70">Oppure registra un altro profilo</p>}
+            {known.length > 0 && !(acct?.kind && acct.kind !== sector.kind) && <p className="px-1 pt-2 text-sm font-semibold text-foreground/70">Oppure registra un altro profilo</p>}
             <IdentifyForm kind={sector.kind} onDone={done} />
           </>
         ) : (

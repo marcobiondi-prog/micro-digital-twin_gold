@@ -222,17 +222,61 @@ const accountLast = (meta: unknown, id: ProId | null, own: ProKind[]): Record<st
 };
 const withKind = (own: ProKind[], id: ProId | null) => (id && !own.includes(id.kind) ? [...own, id.kind] : own);
 
+/**
+ * One personal account, one sector: an account belongs to the sector of its first professional profile (user data
+ * pro_sector — set when the account first identifies; for accounts saved before it, the kind it owns, or with both the
+ * one in use, else the most recent). Signed in to it, the other sector's profiles cannot be identified nor picked: the
+ * other sector needs another personal account (IdentifyForm shows AccountSectorLock instead).
+ */
+export function sectorOf(meta: unknown): ProKind | null {
+  const m = meta as (Meta & { pro_sector?: unknown }) | null;
+  if (m?.pro_sector === "agronomo" || m?.pro_sector === "funzionario") return m.pro_sector;
+  const own = ownOf(meta) ?? [];
+  if (own.length === 1) return own[0]!;
+  if (own.length > 1) {
+    if (isProId(m?.pro_id) && own.includes(m.pro_id.kind)) return m.pro_id.kind;
+    const prev = m?.pro_last ?? {};
+    const latest = own.map((k) => prev[k]).filter((p): p is ProId => isProId(p)).sort((x, y) => (y.at > x.at ? 1 : -1))[0];
+    if (latest) return latest.kind;
+  }
+  return null;
+}
+export type AccountSector = { kind: ProKind | null; email: string | null };
+let accountSector: AccountSector | null = null;
+const sectorSubs = new Set<() => void>();
+const setAccountSector = (next: AccountSector | null) => {
+  if (next?.kind === accountSector?.kind && next?.email === accountSector?.email && !next === !accountSector) return;
+  accountSector = next;
+  sectorSubs.forEach((f) => f());
+};
+/** The signed-in personal account's sector and email (null signed out, or while not read yet). */
+export function useAccountSector(): AccountSector | null {
+  return useSyncExternalStore((f) => { sectorSubs.add(f); return () => { sectorSubs.delete(f); }; }, () => accountSector, () => null);
+}
+/** Whether the signed-in account may use a profile of this kind (always, signed out or with no sector yet). */
+export const accountAllows = (kind: ProKind): boolean => !accountSector?.kind || accountSector.kind === kind;
+
 /** Saves the profile (null removes it) on this device and, signed in, in the account, as the account's own. */
 /** When a profile was last chosen on this device (identified, picked again or left): a sign-in being read meanwhile does not override it. */
 let pickedAt = 0;
-export async function saveProId(id: ProId | null): Promise<void> {
+export async function saveProId(id: ProId | null): Promise<boolean> {
+  const { data } = await supabase.auth.getSession();
+  const meta = data.session?.user.user_metadata;
+  const sector = data.session ? sectorOf(meta) : null;
+  // Signed in to an account of the other sector: refused (the form shows why and how to use another account).
+  if (id && sector && sector !== id.kind) {
+    toast.error(`Questo account è del settore ${sector === "funzionario" ? "urbano" : "agricolo"}`, { description: "Per l'altro settore accedi con un altro account personale." });
+    return false;
+  }
   pickedAt = Date.now();
   set(id);
-  const { data } = await supabase.auth.getSession();
-  if (!data.session) return;
-  const meta = data.session.user.user_metadata, own = withKind(ownOf(meta) ?? [], id);
+  if (!data.session) return true;
+  const own = withKind((ownOf(meta) ?? []).filter((k) => !sector || k === sector), id);
+  const proSector = sector ?? id?.kind ?? null;
+  if (proSector) setAccountSector({ kind: proSector, email: data.session.user.email ?? null });
   // pro_left: the profile was left on purpose ("Esci dal profilo"), so the next sign-in does not bring it back by itself.
-  await supabase.auth.updateUser({ data: { pro_id: id, pro_last: accountLast(meta, id, own), pro_own: own, pro_left: id === null } }).catch(() => undefined);
+  await supabase.auth.updateUser({ data: { pro_id: id, pro_last: accountLast(meta, id, own), pro_own: own, pro_left: id === null, ...(proSector ? { pro_sector: proSector } : {}) } }).catch(() => undefined);
+  return true;
 }
 
 /** Before signing out: the profile in use (identified while signed in, so the account's own) is kept in the account. */
@@ -240,7 +284,10 @@ export async function keepProIdInAccount(): Promise<void> {
   const id = snapshot();
   const { data } = await supabase.auth.getSession();
   if (!id || !data.session) return;
-  const meta = data.session.user.user_metadata, own = withKind(ownOf(meta) ?? [], id);
+  const meta = data.session.user.user_metadata;
+  const sector = sectorOf(meta);
+  if (sector && sector !== id.kind) return;
+  const own = withKind((ownOf(meta) ?? []).filter((k) => !sector || k === sector), id);
   await supabase.auth.updateUser({ data: { pro_id: id, pro_last: accountLast(meta, id, own), pro_own: own } }).catch(() => undefined);
 }
 
@@ -270,8 +317,12 @@ export function useSyncProId() {
       adopted = userId;
       const startedAt = Date.now();
       const legacy = ownOf(meta) === null;
-      const own = ownOf(meta) ?? (await legacyOwn());
-      if (own === null) { adopted = ""; return; } // history not readable now: decide at the next sign-in or opening
+      const owned = ownOf(meta) ?? (await legacyOwn());
+      if (owned === null) { adopted = ""; return; } // history not readable now: decide at the next sign-in or opening
+      // One account, one sector: only the account's own sector counts (an older account owning both keeps the one in
+      // use, else its most recent), written once as pro_sector.
+      const sector = sectorOf({ ...(meta as object), pro_own: owned });
+      const own = sector ? owned.filter((k) => k === sector) : owned;
       const prev = (meta as Meta)?.pro_last ?? {};
       // The account's own registered profiles come to this device too ("Continua come …" on its form).
       for (const k of own) { const p = prev[k]; if (isProId(p) && p.kind === k) { if (!lastSnap()[k]) keepLast(p); else keepKnown(p); } }
@@ -282,8 +333,8 @@ export function useSyncProId() {
       // A profile chosen on this device while the account was being read (the history check takes a moment) wins: the
       // account's older one would replace it — a farmer just picked on the vineyard's page turned back into an officer.
       if (pickedAt >= startedAt) return;
-      const clean = { pro_id: back, pro_last: accountLast(meta, back, own), pro_own: own };
-      const dirty = legacy || (saved != null && !mine(saved)) || KINDS.some((k) => prev[k] != null && !own.includes(k));
+      const clean = { pro_id: back, pro_last: accountLast(meta, back, own), pro_own: own, ...(sector ? { pro_sector: sector } : {}) };
+      const dirty = legacy || (saved != null && !mine(saved)) || KINDS.some((k) => prev[k] != null && !own.includes(k)) || (sector != null && (meta as { pro_sector?: unknown } | null)?.pro_sector !== sector) || owned.length !== own.length;
       if (back) {
         set(back);
         if (dirty || !mine(saved)) void supabase.auth.updateUser({ data: clean }).catch(() => undefined);
@@ -297,10 +348,14 @@ export function useSyncProId() {
       if (!left && !guestSnap()) openSectorGate(null);
       if (saved != null && !mine(saved)) toast("Questo account non ha ancora un profilo professionale", { description: "Scegli il settore e identificati, oppure entra come ospite." });
     };
-    void supabase.auth.getSession().then(({ data }) => { if (data.session) void adopt(data.session.user.id, data.session.user.user_metadata); });
+    const publish = (user: { email?: string | null; user_metadata?: unknown } | null | undefined) =>
+      setAccountSector(user ? { kind: sectorOf(user.user_metadata), email: user.email ?? null } : null);
+    void supabase.auth.getSession().then(({ data }) => { publish(data.session?.user); if (data.session) void adopt(data.session.user.id, data.session.user.user_metadata); });
     // Signing out of the personal account signs out of the professional profile too (it stays saved in the account
     // and comes back with the next sign-in).
     const { data } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event !== "SIGNED_OUT" && s) publish(s.user);
+      if (event === "SIGNED_OUT") publish(null);
       if (event === "SIGNED_IN" && s) void adopt(s.user.id, s.user.user_metadata);
       if (event === "SIGNED_OUT") adopted = "";
       if (event === "SIGNED_OUT" && snapshot()) {
