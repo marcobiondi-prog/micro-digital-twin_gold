@@ -128,9 +128,14 @@ export function KnownProfiles({ kind, onPicked }: { kind: ProKind; onPicked?: ()
   // still shows, on its own, so another personal account can sign in here and bring its profile.
   // No profile of this sector on the phone yet: the same carousel as the other sector, with only its last slide,
   // "Aggiungi account".
-  if (!known.length) return <ProfileCarousel known={[]} foreign={foreign} onPick={(k) => void pick(k)} onAdd={() => void addAccount()} />;
+  // The account just added (signed in, of this sector or of none yet) with no profile of this sector on the phone: it
+  // is in, and shows here at once — its picture and email — with one step left, the profile below.
+  const freshAccount = !!accEmail && (!acc?.kind || acc.kind === kind) && !all.some((k) => k.acct?.email?.toLowerCase() === accEmail.toLowerCase());
+  const fresh = freshAccount && <NewAccountCard email={accEmail!} pic={avatar} kind={kind} />;
+  if (!known.length) return <div className="space-y-3">{fresh}<ProfileCarousel known={[]} foreign={foreign} onPick={(k) => void pick(k)} onAdd={() => void addAccount()} /></div>;
   if (known.length > 0) return (
     <div className="space-y-2">
+      {fresh}
       {known.length > 1 && <p className="px-1 text-sm text-foreground/70">Su questo telefono ci sono {known.length} profili {kind === "funzionario" ? "del settore urbano" : "del settore agricolo"}: scorri e scegli chi sei.</p>}
       <ProfileCarousel known={known} foreign={foreign} onPick={(k) => void pick(k)} onAdd={() => void addAccount()} />
     </div>
@@ -410,6 +415,30 @@ function SectorPage({ start }: { start: ProKind | null }) {
           </>
         )}
       </section>
+    </div>
+  );
+}
+
+/** The personal account just added, still without its profile of this sector: shown at once, with the step left. */
+function NewAccountCard({ email, pic, kind }: { email: string; pic: string | null; kind: ProKind }) {
+  const toForm = () => {
+    const field = document.querySelector<HTMLInputElement>('[aria-label="Scegli il settore"] input[autocomplete="name"]');
+    field?.scrollIntoView({ behavior: "smooth", block: "center" });
+    window.setTimeout(() => field?.focus({ preventScroll: true }), 350);
+  };
+  return (
+    <div className="flex items-center gap-3.5 rounded-3xl bg-brand-turquoise/[0.12] p-4 ring-2 ring-brand-turquoise/60 shadow-[0_0_28px_-8px_oklch(0.72_0.15_190/0.7)]">
+      <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-full bg-foreground/10 ring-2 ring-brand-turquoise/60">
+        {pic ? <img src={pic} alt="Immagine dell’account" referrerPolicy="no-referrer" className="size-full object-cover" /> : <UserRound className="size-7 text-foreground/60" aria-hidden="true" />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-turquoise">Account aggiunto</p>
+        <p className="break-all text-[15px] font-semibold">{email}</p>
+        <p className="text-xs text-foreground/70">Ultimo passo: registra qui sotto il suo profilo {kind === "funzionario" ? "della piazza" : "del vigneto"}. Poi lo ritrovi tra i profili.</p>
+      </div>
+      <button type="button" onClick={toForm} className="inline-flex h-11 shrink-0 items-center gap-1 rounded-full bg-white px-4 text-sm font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+        Completa<ArrowRight className="size-4" aria-hidden="true" />
+      </button>
     </div>
   );
 }
