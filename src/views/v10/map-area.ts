@@ -68,7 +68,7 @@ export function pinElement(n: number, drawing: boolean): HTMLElement {
 /** `shadows`: the piazza's shadows at the simulation's season and hour (models/area-layout piazzaShadows); none at night. */
 export type SimLayout = ({ kind: "piazza"; data: PiazzaLayout; shadows?: Ring[]; real?: RealObject[] } | { kind: "vigneto"; data: VineLayout; thirst: number[] }) & { inner?: SubArea[] };
 /** The outline colour of each kind of inner zone. */
-export const ZONE_COLORS: Record<ZoneKind, string> = { libera: "#cbd5e1", alberi: "#4ade80", prato: "#86efac", ombra: PERGOLA_COLORS.slat, nebulizzatori: "#7dd3fc", lotto: "#fbbf24" };
+export const ZONE_COLORS: Record<ZoneKind, string> = { libera: "#cbd5e1", alberi: "#4ade80", prato: "#86efac", ombra: PERGOLA_COLORS.slat, nebulizzatori: "#7dd3fc", irrigazione: "#38bdf8", teli: "#94a3b8", frangivento: "#22c55e", lotto: "#fbbf24" };
 /** A zone's short name on the map. */
 export const zoneTag = (z: SubArea) => (z.kind === "lotto" ? z.name ?? "Lotto" : z.kind === "libera" ? "Libera" : ZONE_LABEL[z.kind]);
 export const SIM_SOURCE = "sim-layout";

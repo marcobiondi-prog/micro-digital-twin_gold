@@ -21,7 +21,7 @@ import { usePiazzaReading } from "@/models/sim-reading";
 import { Thermometer } from "lucide-react";
 import { SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import type { MovedPart } from "@/views/v10/SatelliteMap2D";
-import { drawnAreaFor, freeM2, leversForZones, leversOfZones, lotsOf, MAX_PINS, moveZones, pinsM2, surfaceText, usableM2, ZONE_KINDS, ZONE_LABEL, zoneName, zonesOfArea, type DrawnArea, type SubArea, type ZoneKind } from "@/models/drawn-area";
+import { drawnAreaFor, freeM2, leversForZones, vineLeversForZones, VINE_ZONE_KINDS, leversOfZones, lotsOf, MAX_PINS, moveZones, pinsM2, surfaceText, usableM2, ZONE_KINDS, ZONE_LABEL, zoneName, zonesOfArea, type DrawnArea, type SubArea, type ZoneKind } from "@/models/drawn-area";
 import type { Ring } from "@/models/place-area";
 import { openSimTab, type SimKind } from "@/views/v8/console";
 import { PlaceSearch } from "@/views/SimulationGrid";
@@ -160,9 +160,31 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   // and its lever is too low to fill it, the lever is raised so its trees, lawn or pergola show on the 2D and 3D maps
   // (and count in the temperature and the costs). Each zone (id and kind) is seeded once per device, so a lever turned
   // down by hand later stays down.
-  const zoneSig = kind === "urban" && saved ? zonesOfArea(saved).map((z) => `${z.id}:${z.kind}:${z.ring.length}`).join("|") : "";
+  const zoneSig = saved ? zonesOfArea(saved).map((z) => `${z.id}:${z.kind}:${z.ring.length}`).join("|") : "";
   useEffect(() => {
-    if (preview || kind !== "urban" || !saved) return;
+    if (preview || !saved) return;
+    // The vineyard: an Irrigazione, Teli d'ombra or Frangivento zone raises that lever on every vineyard zone (once per zone).
+    if (kind === "vineyard") {
+      const seen = seededZones(), fresh = new Set<string>();
+      for (const z of zonesOfArea(saved)) if ((VINE_ZONE_KINDS as readonly string[]).includes(z.kind) && !seen.has(`${z.id}:${z.kind}`)) fresh.add(z.id);
+      if (!fresh.size) return;
+      for (const z of zonesOfArea(saved)) if (fresh.has(z.id)) seen.add(`${z.id}:${z.kind}`);
+      keepSeeded(seen);
+      const v = lab.vineyard, legacy = vineMixOf(v);
+      let changed = false;
+      const zones = v.zones.map((z) => {
+        const now = zoneMixOf(z, legacy), next = vineLeversForZones(saved, now, fresh);
+        if (!next) return z;
+        changed = true;
+        return { ...z, ...next };
+      });
+      if (!changed) return;
+      setVineyard({ zones });
+      const names = [...new Set(zonesOfArea(saved).filter((z) => fresh.has(z.id)).map((z) => ZONE_LABEL[z.kind]))].join(" · ");
+      toast.success("Interventi messi nelle zone", { description: `${names}: li vedi sulla mappa 2D e 3D e contano nella simulazione.` });
+      return;
+    }
+    if (kind !== "urban") return;
     // "Solo quello disegnato": the levers follow the zones exactly, whenever a zone is drawn, changed or removed.
     if (saved.edits?.onlyDrawn) {
       const u = lab.urban, next = leversOfZones(saved);
@@ -561,6 +583,9 @@ const ZONE_HINT: Record<ZoneKind, string> = {
   prato: "Qui ci sono aiuole e ciottoli, poi il resto della percentuale dove c'è posto.",
   ombra: "Qui c'è un pergolato, poi il resto della percentuale dove c'è posto.",
   nebulizzatori: "I nebulizzatori vanno qui dentro: circa uno ogni 40 m².",
+  irrigazione: "Qui le viti hanno l'irrigazione a goccia su ogni filare, con il tubo principale lungo il bordo.",
+  teli: "Qui le viti stanno sotto i teli d'ombra.",
+  frangivento: "Qui va la siepe frangivento, lungo il lato più lungo della zona.",
   lotto: "Una parte del progetto, con la sua superficie e la sua quota di costo.",
 };
 

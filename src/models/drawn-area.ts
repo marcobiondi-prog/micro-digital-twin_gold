@@ -11,11 +11,13 @@ import type { LayoutEdits } from "./area-layout";
  * off the costs), given one intervention (trees, lawn or pergola go there first) or a lot (a part of the project with
  * its own surface and share of the cost).
  */
-export type ZoneKind = "libera" | "alberi" | "prato" | "ombra" | "nebulizzatori" | "lotto";
+export type ZoneKind = "libera" | "alberi" | "prato" | "ombra" | "nebulizzatori" | "irrigazione" | "teli" | "frangivento" | "lotto";
 export type SubArea = { id: string; kind: ZoneKind; ring: Ring; name?: string };
-export const ZONE_LABEL: Record<ZoneKind, string> = { libera: "Da lasciare libera", alberi: "Alberi", prato: "Aiuole", ombra: "Pergolato", nebulizzatori: "Nebulizzatori", lotto: "Lotto" };
-/** Which kinds each simulation offers: the vineyard has no trees, lawn or pergolas. */
-export const ZONE_KINDS = { piazza: ["libera", "alberi", "prato", "ombra", "nebulizzatori", "lotto"], vigneto: ["libera", "lotto"] } as const;
+export const ZONE_LABEL: Record<ZoneKind, string> = { libera: "Da lasciare libera", alberi: "Alberi", prato: "Aiuole", ombra: "Pergolato", nebulizzatori: "Nebulizzatori", irrigazione: "Irrigazione", teli: "Teli d'ombra", frangivento: "Frangivento", lotto: "Lotto" };
+/** Which kinds each simulation offers: the piazza its trees, aiuole, pergolas and misters; the vineyard its drip lines, shade cloth and windbreak. */
+export const ZONE_KINDS = { piazza: ["libera", "alberi", "prato", "ombra", "nebulizzatori", "lotto"], vigneto: ["libera", "irrigazione", "teli", "frangivento", "lotto"] } as const;
+/** The vineyard's interventions as zones: drip lines, shade cloth and a windbreak go where they are drawn. */
+export const VINE_ZONE_KINDS = ["irrigazione", "teli", "frangivento"] as const;
 
 /** `edits`: the simulation's elements moved by hand inside it (models/area-layout); a new outline starts them afresh. `zones`: the smaller areas inside it. */
 export type DrawnArea = { lat: number; lng: number; ring: Ring; edits?: LayoutEdits; zones?: SubArea[] };
@@ -129,6 +131,24 @@ export function leversForZones(a: DrawnArea, now: PiazzaLevers, only?: ReadonlyS
     misters: Math.max(now.misters, mistersFor(m2("nebulizzatori"))),
   };
   return next.trees === now.trees && next.permeable === now.permeable && next.shade === now.shade && next.misters === now.misters ? null : next;
+}
+
+/**
+ * The vineyard's levers raised so the zones drawn for an intervention hold it (only raising, every vineyard zone alike):
+ * irrigation at least +8 % with an Irrigazione zone, shade cloth at least the Teli zones' share of the usable surface
+ * (in 10 % steps), windbreak at least 40 % with a Frangivento zone. Null when nothing changes.
+ */
+export function vineLeversForZones(a: DrawnArea, now: { irrigation: number; shade: number; windbreak: number }, only?: ReadonlySet<string>): { irrigation: number; shade: number; windbreak: number } | null {
+  const usable = usableM2(a);
+  if (usable <= 0) return null;
+  const zones = zonesOf(a).filter((z) => !only || only.has(z.id));
+  const m2 = (k: ZoneKind) => zones.filter((z) => z.kind === k).reduce((s, z) => s + pinsM2(z.ring), 0);
+  const next = {
+    irrigation: Math.max(now.irrigation, m2("irrigazione") > 0 ? 8 : 0),
+    shade: Math.max(now.shade, m2("teli") > 0 ? Math.min(100, Math.ceil((100 * m2("teli")) / usable / 10) * 10) : 0),
+    windbreak: Math.max(now.windbreak, m2("frangivento") > 0 ? 40 : 0),
+  };
+  return next.irrigation === now.irrigation && next.shade === now.shade && next.windbreak === now.windbreak ? null : next;
 }
 
 /**

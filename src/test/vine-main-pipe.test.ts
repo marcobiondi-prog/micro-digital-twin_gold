@@ -24,3 +24,20 @@ describe("vineyard main pipe", () => {
     expect(Math.max(...west) - Math.min(...west)).toBeGreaterThan(1e-5);
   });
 });
+
+describe("vineyard zones with an intervention", () => {
+  it("lays drip lines, cloth and a hedge where the zones are drawn", async () => {
+    const { vineLayout } = await import("@/models/area-layout");
+    const lat = 41.8, lng = 14.9, dLat = 60 / 111320, dLng = 80 / (111320 * Math.cos((lat * Math.PI) / 180));
+    const ring: Array<[number, number]> = [[lat - dLat, lng - dLng], [lat - dLat, lng + dLng], [lat + dLat, lng + dLng], [lat + dLat, lng - dLng]];
+    const box = (a: number, b: number): Array<[number, number]> => [[lat - dLat / 2, lng + dLng * a], [lat - dLat / 2, lng + dLng * b], [lat + dLat / 2, lng + dLng * b], [lat + dLat / 2, lng + dLng * a]];
+    const none = { irrigation: 0, shade: 0, windbreak: 0 };
+    const plain = vineLayout(ring, [none, none, none])!;
+    const zoned = vineLayout(ring, [none, none, none], {}, [{ kind: "irrigazione", ring: box(-0.8, -0.3) }, { kind: "teli", ring: box(-0.2, 0.3) }, { kind: "frangivento", ring: box(0.4, 0.9) }])!;
+    expect(plain.lines.filter((l) => l.kind === "drip").length).toBe(0);
+    expect(zoned.lines.filter((l) => l.kind === "drip").length).toBeGreaterThan(0);
+    expect(zoned.lines.some((l) => l.kind === "main")).toBe(true);
+    expect(zoned.patches.some((p) => p.kind === "cloth")).toBe(true);
+    expect(zoned.lines.some((l) => l.kind === "wind")).toBe(true);
+  });
+});

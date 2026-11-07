@@ -322,6 +322,36 @@ export function vineLayout(ring: Ring, mixes: ZoneMix[], edits: LayoutEdits = {}
       else if (ends.length === 1) { const [x, y] = ends[0]!; lines.push({ kind: "main", zone: z, line: [toLL(f, x, y - c / 3), toLL(f, x, y + c / 3)] }); }
     }
   }
+  // Zones drawn for an intervention hold it whatever the levers: shade cloth over a Teli zone, drip lines on every row
+  // of an Irrigazione zone with its main pipe along the zone's western edge, a hedge along a Frangivento zone's longest side.
+  const isCloth = inZone(f, inner, "teli"), isDrip = inZone(f, inner, "irrigazione");
+  const clothCells = cells.filter((x) => isCloth(x.x, x.y));
+  if (clothCells.length) patches.push(...strips(f, c, clothCells, "cloth", zoneOf.get(clothCells[0]!) ?? 0));
+  const dripCells = cells.filter((x) => isDrip(x.x, x.y));
+  if (dripCells.length) {
+    const rowsIn = new Map<number, Cell[]>();
+    for (const cell of dripCells) rowsIn.set(cell.j, [...(rowsIn.get(cell.j) ?? []), cell]);
+    const ends: Array<[number, number]> = [];
+    for (const [, row] of [...rowsIn].sort((a, b) => a[0] - b[0])) {
+      const x0 = Math.min(...row.map((r) => r.x)) - c / 2.5, x1 = Math.max(...row.map((r) => r.x)) + c / 2.5;
+      ends.push([x0, row[0]!.y]);
+      lines.push({ kind: "drip", zone: zoneOf.get(row[0]!) ?? 0, line: [toLL(f, x0, row[0]!.y), toLL(f, x1, row[0]!.y)] });
+    }
+    if (ends.length > 1) lines.push({ kind: "main", zone: zoneOf.get(dripCells[0]!) ?? 0, line: ends.map(([x, y]) => toLL(f, x, y)) });
+  }
+  for (const z of inner.filter((q) => q.kind === "frangivento" && q.ring.length >= 3)) {
+    const zxy = z.ring.map((p) => toXY(f, p));
+    let e0 = 0, best = 0;
+    zxy.forEach((p, i) => { const l = dist(p, zxy[(i + 1) % zxy.length]!); if (l > best) { best = l; e0 = i; } });
+    const a = zxy[e0]!, b = zxy[(e0 + 1) % zxy.length]!, len = best;
+    if (len < 1) continue;
+    const ux = (b[0] - a[0]) / len, uy = (b[1] - a[1]) / len, mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+    let nx = -uy, ny = ux;
+    const [mLat, mLng] = toLL(f, mx + nx, my + ny);
+    if (!ringContains(z.ring, mLat, mLng)) { nx = -nx; ny = -ny; }
+    const strengthZ = 70, off = hedgeWidthM(strengthZ) / 2 + 0.4, cut = Math.min(off, len / 2 - 0.1);
+    lines.push({ kind: "wind", strength: strengthZ, line: [toLL(f, a[0] + ux * cut + nx * off, a[1] + uy * cut + ny * off), toLL(f, b[0] - ux * cut + nx * off, b[1] - uy * cut + ny * off)] });
+  }
   // Seams between neighbouring zones (white in the maps): on every row, a short line where one zone ends and the next begins.
   const rows = new Map<number, Cell[]>();
   for (const cell of cells) rows.set(cell.j, [...(rows.get(cell.j) ?? []), cell]);
