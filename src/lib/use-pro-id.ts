@@ -385,6 +385,21 @@ async function accountEmail(userId: string): Promise<string | null> {
 }
 
 /**
+ * The sector whose form is open (the sector page), kept for 15 minutes in sessionStorage so a sign-in with Google — which
+ * leaves the page and comes back — still knows which sector the person was entering.
+ */
+const WANTED_KEY = "mdt-sector-wanted";
+export function rememberWantedSector(kind: ProKind | null) {
+  try { if (kind) sessionStorage.setItem(WANTED_KEY, JSON.stringify({ kind, at: Date.now() })); else sessionStorage.removeItem(WANTED_KEY); } catch { /* none */ }
+}
+function wantedSector(): ProKind | null {
+  try {
+    const v = JSON.parse(sessionStorage.getItem(WANTED_KEY) ?? "null") as { kind?: unknown; at?: number } | null;
+    return v && (v.kind === "agronomo" || v.kind === "funzionario") && Date.now() - (v.at ?? 0) < 15 * 60_000 ? v.kind : null;
+  } catch { return null; }
+}
+
+/**
  * Mounted once: on sign-in the account's profile comes to this device, or this device's goes to an account without one;
  * on sign-out the profile leaves this device (kept in the account for the next sign-in).
  */
@@ -409,13 +424,21 @@ export function useSyncProId() {
       const rawSector = (meta as { pro_sector?: unknown } | null)?.pro_sector;
       // One account, one sector: only the account's own sector counts (an older account owning both keeps the one in
       // use, else its most recent), written once as pro_sector.
-      const sector = sectorOf({
+      const savedSector = sectorOf({
         ...(meta as object), pro_own: ownedClean,
         pro_sector: typeof rawSector === "string" && ownedClean.includes(rawSector as ProKind) ? rawSector : null,
         pro_id: foreign(saved) ? null : saved,
         pro_last: Object.fromEntries(Object.entries(prev).filter(([, p]) => !foreign(p))),
       });
+      // Signing in from one sector's form (the sector page asked for it, or the piazza / vineyard page is open) with an
+      // account that registered that sector's profile: the account goes to that sector — the person asked for it — even
+      // if its saved sector was the other one.
+      const path = typeof window === "undefined" ? "" : window.location.pathname;
+      const wanted: ProKind | null = gateAsk.kind ?? wantedSector() ?? (path.startsWith("/urbano") ? "funzionario" : path.startsWith("/vigneto") ? "agronomo" : null);
+      const wantedProfile = wanted ? prev[wanted] : null;
+      const sector: ProKind | null = wanted && ownedClean.includes(wanted) && isProId(wantedProfile) && !foreign(wantedProfile) ? wanted : savedSector;
       const own = sector ? ownedClean.filter((k) => k === sector) : ownedClean;
+      rememberWantedSector(null);
       // The account's own registered profiles come to this device too ("Continua come …" on its form).
       for (const k of own) { const p = prev[k]; if (isProId(p) && p.kind === k) { if (!lastSnap()[k]) keepLast(p); else keepKnown(p); } }
       const mine = (p: unknown): p is ProId => isProId(p) && own.includes(p.kind) && !foreign(p);

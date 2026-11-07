@@ -5,7 +5,7 @@ import { useLocation, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Building2, Grape, LogIn, Mail, Trash2, UserRound, X } from "lucide-react";
 import { openAccount } from "@/lib/camera-dock";
 import { introSeen } from "@/lib/intro-seen";
-import { clearSectorGate, enterAsGuest, forgetKnownProId, type KnownProId, saveProId, useAccountSector, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
+import { clearSectorGate, enterAsGuest, forgetKnownProId, rememberWantedSector, type KnownProId, saveProId, useAccountSector, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
 import { proSummary } from "@/models/professional-id";
 import { toast } from "sonner";
 import { useSignedIn } from "@/lib/use-signed-in";
@@ -219,6 +219,8 @@ function SectorPage({ start }: { start: ProKind | null }) {
   // On a sector's form a swipe to the right goes back to the two sectors, like "Indietro".
   const formRef = useRef<HTMLElement>(null);
   const backToSectors = useCallback(() => setKind(null), []);
+  // The sector being entered, remembered across a sign-in with Google (which leaves the page and comes back).
+  useEffect(() => { if (kind) rememberWantedSector(kind); }, [kind]);
   useSwipeBack(formRef, kind ? backToSectors : null);
   // The phone's Back closes the form and shows the two sectors again: a same-page history step while a form is open,
   // taken back when the form is closed by hand — but not when the whole page goes away because a profile is in (the
