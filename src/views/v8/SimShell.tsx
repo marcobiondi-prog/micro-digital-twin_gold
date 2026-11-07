@@ -20,8 +20,8 @@ const TONE: Record<SimKind, string> = { urban: "rgb(28 112 210 / 0.42)", vineyar
  * through --sim-tabs-shift on the page (a transform, like the bar).
  */
 function useHideOnScroll(bar: RefObject<HTMLDivElement | null>, root: RefObject<HTMLDivElement | null>) {
-  // The bar follows the scroll like a hand on it: once half the map has gone up past it, scrolling down pushes it up out
-  // of the screen by as much as the page moved, scrolling up brings it down the same way (no jump, no fade). Straight
+  // The bar follows the scroll the other way round (as asked): past half the map, scrolling up (back towards the top)
+  // lifts it out of the screen by as much as the page moved, scrolling down lowers it back the same way (no jump, no fade). Straight
   // on the DOM, once per frame, with no React state.
   useEffect(() => {
     let lastY = window.scrollY, off = 0, frame = 0;
@@ -40,14 +40,14 @@ function useHideOnScroll(bar: RefObject<HTMLDivElement | null>, root: RefObject<
       const el = bar.current;
       if (!el) return;
       const h = el.offsetHeight + (parseFloat(getComputedStyle(el).top) || 0) + 8;
-      if (dy > 0) {
+      if (dy < 0) {
         // The bar stays until half the map (or the map preview) has gone up past it.
         const map = [...document.querySelectorAll("[data-sim-map-box]")].map((e) => e.getBoundingClientRect()).find((r) => r.height > 0);
         const barBottom = el.getBoundingClientRect().bottom + off;
         const pastHalf = map ? map.top + map.height / 2 < barBottom : y > 160;
         if (!pastHalf) return;
       }
-      const next = Math.max(0, Math.min(h, y <= 0 ? 0 : off + dy));
+      const next = Math.max(0, Math.min(h, y <= 0 ? 0 : off - dy));
       if (next === off) return;
       off = next;
       if (!frame) frame = requestAnimationFrame(apply);
