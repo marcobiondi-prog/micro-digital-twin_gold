@@ -152,6 +152,8 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
   const [paused, setPaused] = useState(false);
   const pausedRef = useRef(false); pausedRef.current = paused;
   const lastFix = useRef<{ lat: number; lng: number } | null>(null);
+  // How precise the fix that set the place was (metres).
+  const appliedAcc = useRef(Infinity);
   const pauseFollow = () => { if (gpsRef.current) { setPaused(true); saveGpsPaused(true); } };
   const gpsRef = useRef(false); gpsRef.current = gps;
   // Read after mounting, so the server's page and the first render agree.
@@ -176,7 +178,12 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
       lastFix.current = here;
       setLocating(false);
       // With no place chosen yet the first fix sets it, however near.
-      if (pausedRef.current || busy || (!placeRef.current.pending && metresBetween(placeRef.current, here) < GPS_STEP_M)) return;
+      // A coarse first fix (from the network, hundreds of metres off) is put right as soon as a sharper one comes:
+      // a fix much more precise than the one the place came from moves it even within the 100 m step.
+      const acc = coords.accuracy || 9999, moved = metresBetween(placeRef.current, here);
+      const sharper = acc < appliedAcc.current / 2 && moved > Math.max(15, acc);
+      if (pausedRef.current || busy || (!placeRef.current.pending && moved < GPS_STEP_M && !sharper)) return;
+      appliedAcc.current = acc;
       busy = true;
       const fallback = { label: `La mia posizione (${here.lat.toFixed(4)}, ${here.lng.toFixed(4)})`, ...here };
       try { const result = await reverseGoogle({ data: here }); if (live) selectRef.current(result.location ?? fallback); }
@@ -186,7 +193,7 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
       if (geoError.code === 1) { setGps(false); saveGps(false); setError("Permesso di posizione negato. Abilitalo nelle impostazioni del browser."); }
       else setError("Posizione non disponibile per ora: il GPS resta attivo e riprova da solo.");
     }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 15000 });
-    return () => { live = false; lastFix.current = null; navigator.geolocation.clearWatch(id); };
+    return () => { live = false; lastFix.current = null; appliedAcc.current = Infinity; navigator.geolocation.clearWatch(id); };
   }, [gps, reverseGoogle]);
   // Back to following the phone: at once to the last position known, then on with every move.
   const resume = () => {

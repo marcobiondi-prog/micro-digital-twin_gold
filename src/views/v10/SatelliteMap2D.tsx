@@ -36,6 +36,10 @@ const STYLE: StyleSpecification = {
 
 type Camera = { center: [number, number]; zoom: number; bearing: number };
 type GMap = { moveCamera: (c: { center?: { lat: number; lng: number }; zoom?: number }) => void };
+/** Google's service saying how close its satellite photos go at a spot (often 19–20 outside town centres). */
+type MaxZoom = { getMaxZoomAtLatLng: (at: { lat: number; lng: number }) => Promise<{ zoom?: number }> };
+/** Until the service answers: a closeness Google has nearly everywhere, so the map never opens on its grey "no imagery" tiles. */
+const GOOGLE_SAFE = 19;
 
 export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawing = false, onAreaChange, sim = null, arranging = false, onMove, outline = null, onOutside, onPinMove, still = false }: {
   /** The browser key: with it the 2D map uses Google's satellite imagery, like the 3D view. */
@@ -79,12 +83,12 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
     // under a see-through maplibre that keeps the area, the zones and the simulation and leads the camera; without
     // it, or with the key refused, the open imagery of the style.
     const google = apiKey && !isKeyRejected()
-      ? loadGoogleMaps(apiKey).then((g) => g.maps.importLibrary("maps") as Promise<{ Map: new (el: HTMLElement, o: Record<string, unknown>) => GMap }>).catch(() => null)
+      ? loadGoogleMaps(apiKey).then((g) => g.maps.importLibrary("maps") as Promise<{ Map: new (el: HTMLElement, o: Record<string, unknown>) => GMap; MaxZoomService?: new () => MaxZoom }>).catch(() => null)
       : Promise.resolve(null);
     void Promise.all([import("maplibre-gl"), google]).then(([{ default: maplibregl }, gmaps]) => {
       if (cancelled || !host.current) return;
       const base = gmaps && under.current ? new gmaps.Map(under.current, {
-        center: { lat, lng }, zoom: zoom + 1, mapTypeId: "hybrid", disableDefaultUI: true, gestureHandling: "none", keyboardShortcuts: false,
+        center: { lat, lng }, zoom: Math.min(zoom + 1, GOOGLE_SAFE), mapTypeId: "hybrid", disableDefaultUI: true, gestureHandling: "none", keyboardShortcuts: false,
         clickableIcons: false, isFractionalZoomEnabled: true, tilt: 0, backgroundColor: "#1d2129",
       }) : null;
       setGoogleOn(!!base);
@@ -96,14 +100,20 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
         map.dragRotate.disable(); map.touchZoomRotate.disableRotation();
         // Past Google's own closest imagery (GOOGLE_MAX) its map stays there and is enlarged on screen around the centre,
         // so one can zoom in further and the drawing stays on the photo.
+        // Where Google's photos stop sooner (outside town centres) its own grey "no imagery" tiles came up and the map
+        // read empty: the closest zoom with photos at the place is asked once and Google never goes past it.
         const el = under.current!;
+        let cap = GOOGLE_SAFE;
+        const Svc = gmaps?.MaxZoomService;
+        if (Svc) void new Svc().getMaxZoomAtLatLng({ lat, lng }).then((r) => { if (r.zoom && !cancelled) { cap = Math.min(GOOGLE_MAX, r.zoom); follow(); } }, () => undefined);
         const follow = () => {
-          const c = map.getCenter(), z = map.getZoom() + 1, gz = Math.min(z, GOOGLE_MAX);
+          const c = map.getCenter(), z = map.getZoom() + 1, gz = Math.min(z, cap);
           base.moveCamera({ center: { lat: c.lat, lng: c.lng }, zoom: gz });
           const k = 2 ** (z - gz);
           el.style.transform = k > 1.001 ? `scale(${k})` : "";
         };
         map.on("move", follow);
+        follow();
         const hideOpen = () => { for (const l of ["imagery", "places"]) if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "none"); };
         map.on("load", hideOpen);
         // A key refused for this address: back to the open imagery.

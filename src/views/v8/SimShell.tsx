@@ -15,7 +15,7 @@ const TABS: ReadonlyArray<{ id: SimTab; label: string; icon: LucideIcon }> = [
 const TONE: Record<SimKind, string> = { urban: "rgb(28 112 210 / 0.42)", vineyard: "rgb(150 36 110 / 0.42)" };
 
 /**
- * The sticky tabs leave room while scrolling down (more of the map preview and the simulation on screen) and come back
+ * The sticky tabs leave room while scrolling down, once half the map has gone up past them (more of the map preview and the simulation on screen) and come back
  * on scrolling up or near the top of the page, like the bottom bar; the sticky readings under them move up with them
  * through --sim-tabs-gap on the document.
  */
@@ -27,7 +27,10 @@ function useHideOnScroll() {
       const y = window.scrollY, dy = y - lastY;
       if (Math.abs(dy) < 6) return;
       lastY = y;
-      setHidden(dy > 0 && y > 160);
+      // The bar stays until half the map (or the map preview) has gone up past it.
+      const map = [...document.querySelectorAll("[data-sim-map-box]")].map((e) => e.getBoundingClientRect()).find((r) => r.height > 0), bar = document.querySelector("[data-sim-tabs]")?.getBoundingClientRect();
+      const pastHalf = map && map.height > 0 ? map.top + map.height / 2 < (bar?.bottom ?? 0) : y > 160;
+      setHidden(dy > 0 && pastHalf);
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);

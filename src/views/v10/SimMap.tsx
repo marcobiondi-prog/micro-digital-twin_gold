@@ -219,7 +219,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   );
   if (preview) return (
     // The whole preview opens the Mappa tab; in the vineyard the zone pills over it choose the simulation's scope.
-    <div onClick={() => openSimTab(kind, "mappa")}
+    <div data-sim-map-box="" onClick={() => openSimTab(kind, "mappa")}
       className="relative -mx-4 block h-[34vh] min-h-56 w-[calc(100%+2rem)] cursor-pointer overflow-hidden text-left sm:mx-0 sm:w-full sm:rounded-3xl">
       <MapReading kind={kind} lat={pin.lat} lng={pin.lng} />
       {/* The map (and its night veil) fades out at its foot by a mask, so the page itself — its ambient light, in light
@@ -271,7 +271,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
       )}
       {/* The place is chosen here: search it or use the device position; the map follows. */}
       <PlaceSearch kind={kind} />
-      <div className="relative -mx-4 h-[52vh] min-h-72 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
+      <div data-sim-map-box="" className="relative -mx-4 h-[52vh] min-h-72 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
         {/* The temperature the interventions bring, on the map itself (2D and 3D), following the levers live. */}
         <MapReading kind={kind} lat={pin.lat} lng={pin.lng} />
         {/* How many misting poles the map shows, exactly: those in the zones drawn for them and those the app placed. */}
