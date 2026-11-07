@@ -24,6 +24,7 @@ import { useProId } from "@/lib/use-pro-id";
 import { SEASON_LABEL } from "@/models/season-climate";
 import { DashCard, DashSection } from "@/views/v10/Dashboard";
 import { cn } from "@/lib/utils";
+import { OFFICES } from "@/models/professional-id";
 import { clearHistory, removeHistory, setOfficeScope, useHistory, useOfficeScope, type OfficeScope } from "@/lib/use-history";
 import { archiveHistory, restoreHistory, useHistoryArchive } from "@/models/history-archive";
 import { byOf, groupByDay, whenClock, whenOf, type HistoryEntry, type HistoryFlow, type HistorySource, type SourcedEntry } from "@/models/intervention-history";
@@ -854,11 +855,22 @@ function WhenLine({ e }: { e: HistoryEntry }) {
 }
 
 /** One intervention: its time, what was set, the simulated season and hour, the place, where it is kept and "Apri". */
-/** "Il mio ufficio · Tutti gli uffici": which offices' piazza interventions the history shows. */
-function OfficeScopePills({ value, office, others }: { value: OfficeScope; office: string; others: number }) {
-  const opts: Array<{ id: OfficeScope; label: string }> = [{ id: "mine", label: `Il mio ufficio · ${office}` }, { id: "all", label: `Tutti gli uffici${others ? ` · +${others}` : ""}` }];
+/**
+ * Which office's piazza interventions the history shows: "Il mio ufficio", "Tutti gli uffici", then every office of the
+ * list (and any other that recorded something), each with how many it has — one swipeable row, the chosen one revealed.
+ */
+function OfficeScopePills({ value, office, offices }: { value: OfficeScope; office: string; offices: Record<string, number> }) {
+  const total = Object.values(offices).reduce((t, n) => t + n, 0);
+  const names = [...new Set([...OFFICES.filter((o) => o !== "Altro"), ...Object.keys(offices)])].filter((o) => o !== office);
+  const opts: Array<{ id: OfficeScope; label: string }> = [
+    { id: "mine", label: `Il mio ufficio · ${office}${offices[office] ? ` · ${offices[office]}` : ""}` },
+    { id: "all", label: `Tutti gli uffici${total ? ` · ${total}` : ""}` },
+    ...names.map((n) => ({ id: `office:${n}` as OfficeScope, label: `${n}${offices[n] ? ` · ${offices[n]}` : ""}` })),
+  ];
+  const row = useRef<HTMLDivElement>(null);
+  useEffect(() => { row.current?.querySelector<HTMLElement>("[aria-checked=true]")?.scrollIntoView({ block: "nearest", inline: "nearest" }); }, [value]);
   return (
-    <div role="radiogroup" aria-label="Uffici" className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+    <div ref={row} role="radiogroup" aria-label="Uffici" data-map-gestures="" className="flex touch-pan-x gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
       {opts.map((o) => (
         <button key={o.id} type="button" role="radio" aria-checked={value === o.id} onClick={() => setOfficeScope(o.id)}
           className={cn("h-9 shrink-0 whitespace-nowrap rounded-full px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", value === o.id ? "bg-foreground text-background" : "bg-foreground/[0.08] text-foreground/80")}>
@@ -1174,7 +1186,7 @@ const COMPACT_DAYS = 5, COMPACT_SHOTS = 12;
  * Each entry offers "Apri", which opens it on its own page to read (/cronologia/$id). Signed in it lives in the account, otherwise on this device.
  */
 export function HistoryBlock({ compact = false, flow: asked }: { compact?: boolean; flow?: HistoryFlow }) {
-  const { entries: all, otherOffices, where, loading, failed, reload } = useHistory();
+  const { entries: all, otherOffices, offices, where, loading, failed, reload } = useHistory();
   const officeScope = useOfficeScope();
   // Identified, the history is that profile's project only: the piazza for the municipal officer, the vineyard for the agronomist.
   const proId = useProId();
@@ -1287,7 +1299,7 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
     setClearing(true);
     // The archive is kept: with archived entries in this tab only the others go.
     // Only the shown entries go when the archive or other offices' entries are kept.
-    const keepArchive = all.some((e) => shownIn(filter)(e.flow) && hArch[e.id]) || (officeScope === "mine" && otherOffices > 0);
+    const keepArchive = all.some((e) => shownIn(filter)(e.flow) && hArch[e.id]) || (officeScope !== "all" && otherOffices > 0);
     const ok = keepArchive ? await removeHistory(entries.map((e) => e.id)) : await clearHistory(filter === "tutti" ? undefined : filter);
     setClearing(false);
     setConfirm(false);
@@ -1300,7 +1312,7 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
       <div ref={area} className="space-y-3">
       {!compact && !flow && <TabRow label="Luogo" items={FILTERS} value={filter} onChange={(v) => setFilter(v as Filter)} />}
       {/* A municipal officer: the interventions of the office in use, or of every office of the account. */}
-      {proId?.kind === "funzionario" && flow !== "vigneto" && <OfficeScopePills value={officeScope} office={proId.office} others={otherOffices} />}
+      {proId?.kind === "funzionario" && flow !== "vigneto" && <OfficeScopePills value={officeScope} office={proId.office} offices={offices} />}
       {/* Tutti · Piazza · Vigneto turn with a sideways swipe on the list, like the tutorial's screens. */}
       <div ref={swipe.ref} style={swipe.style} className="relative space-y-3">
       {failed && <DashCard><p className="text-sm text-muted-foreground">Non riesco a leggere la cronologia del tuo account. Vedi solo quella di questo dispositivo.</p></DashCard>}

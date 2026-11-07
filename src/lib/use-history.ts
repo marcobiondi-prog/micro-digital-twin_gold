@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSignedIn } from "@/lib/use-signed-in";
 import {
   addLocalHistory, clearLocalHistory, removeLocalHistory, isHistoryEntry, localHistory, mergeHistory, newEntry, serverLocalHistory, subscribeLocalHistory,
-  ofOffice, type HistoryBy, type HistoryEntry, type HistoryFlow, type SourcedEntry, type HistoryMix, type HistoryWhen,
+  byOf, ofOffice, type HistoryBy, type HistoryEntry, type HistoryFlow, type SourcedEntry, type HistoryMix, type HistoryWhen,
 } from "@/models/intervention-history";
 import { requestSimWhen } from "@/models/sim-when";
 import { setUrban, setVineyard } from "@/models/lab-store";
@@ -135,12 +135,13 @@ export function reopenHistory(mix: HistoryMix, when: HistoryWhen | null = null) 
  * Which piazza interventions the municipal officer sees: only those of the office in use ("mine", the default; entries
  * recorded before the office was kept count as its own) or every office's ("all"). Kept on this device (mdt-history-office-v1).
  */
-export type OfficeScope = "mine" | "all";
+/** "mine", "all", or the name of one office ("office:<name>"), to see only that office's interventions. */
+export type OfficeScope = "mine" | "all" | `office:${string}`;
 const SCOPE_KEY = "mdt-history-office-v1";
 let scope: OfficeScope | undefined;
 const scopeSubs = new Set<() => void>();
 const scopeSnap = (): OfficeScope => {
-  if (scope === undefined) { try { scope = localStorage.getItem(SCOPE_KEY) === "all" ? "all" : "mine"; } catch { scope = "mine"; } }
+  if (scope === undefined) { try { const v = localStorage.getItem(SCOPE_KEY) ?? ""; scope = v === "all" || v.startsWith("office:") ? (v as OfficeScope) : "mine"; } catch { scope = "mine"; } }
   return scope;
 };
 export function setOfficeScope(next: OfficeScope) {
@@ -153,7 +154,7 @@ export function useOfficeScope(): OfficeScope {
 }
 
 /** The history to show: the account's for signed-in users (plus what a failed save left here), this device's for the others. */
-export function useHistory(opts: { allOffices?: boolean } = {}): { entries: SourcedEntry[]; otherOffices: number; where: "account" | "device"; loading: boolean; failed: boolean; reload: () => void } {
+export function useHistory(opts: { allOffices?: boolean } = {}): { entries: SourcedEntry[]; otherOffices: number; offices: Record<string, number>; where: "account" | "device"; loading: boolean; failed: boolean; reload: () => void } {
   const officeScope = useOfficeScope();
   const pro = useProId();
   const { signedIn, demo } = useSignedIn();
@@ -190,9 +191,20 @@ export function useHistory(opts: { allOffices?: boolean } = {}): { entries: Sour
   // A municipal officer sees the piazza interventions of the office in use, unless every office is asked for.
   const office = pro?.kind === "funzionario" ? { comune: pro.comune, office: pro.office } : null;
   const otherOffices = office ? entries.filter((e) => e.flow === "piazza" && !ofOffice(e, office)).length : 0;
-  const shown = useMemo(() => (office && officeScope === "mine" && !opts.allOffices ? entries.filter((e) => e.flow !== "piazza" || ofOffice(e, office)) : entries),
-    [entries, office?.comune, office?.office, officeScope, opts.allOffices]); // eslint-disable-line react-hooks/exhaustive-deps
+  // How many piazza interventions each office recorded (by its name; entries recorded before the office was kept count as the office in use).
+  const offices = useMemo(() => {
+    const out: Record<string, number> = {};
+    if (!office) return out;
+    for (const e of entries) if (e.flow === "piazza") { const name = byOf(e)?.office ?? office.office; out[name] = (out[name] ?? 0) + 1; }
+    return out;
+  }, [entries, office?.office]); // eslint-disable-line react-hooks/exhaustive-deps
+  const shown = useMemo(() => {
+    if (!office || opts.allOffices || officeScope === "all") return entries;
+    const only = officeScope === "mine" ? office.office : officeScope.slice("office:".length);
+    const same = (a: string) => a.trim().toLocaleLowerCase("it") === only.trim().toLocaleLowerCase("it");
+    return entries.filter((e) => e.flow !== "piazza" || (officeScope === "mine" ? ofOffice(e, office) : same(byOf(e)?.office ?? office.office)));
+  }, [entries, office?.comune, office?.office, officeScope, opts.allOffices]); // eslint-disable-line react-hooks/exhaustive-deps
   return account
-    ? { entries: shown, otherOffices, where: "account", loading, failed, reload: () => void load() }
-    : { entries: shown, otherOffices, where: "device", loading: false, failed: false, reload: () => undefined };
+    ? { entries: shown, otherOffices, offices, where: "account", loading, failed, reload: () => void load() }
+    : { entries: shown, otherOffices, offices, where: "device", loading: false, failed: false, reload: () => undefined };
 }
