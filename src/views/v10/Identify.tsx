@@ -5,7 +5,8 @@ import { ArrowLeft, ArrowRight, BadgeCheck, Building2, Grape, LogOut, ShieldChec
 import { saveProId, useProId, openSectorGate } from "@/lib/use-pro-id";
 import { loadComuni } from "@/lib/comuni";
 import { findComune, searchComuni, townDomain, type Comune } from "@/models/comuni";
-import { findRegion, officeEmail, officeOf, searchOffices, searchRegions } from "@/models/professional-id";
+import { findRegion, officeOf, searchOffices, searchRegions } from "@/models/professional-id";
+import { useOfficeEmail } from "@/lib/office-email";
 import { TownCrest } from "@/views/v10/TownCrest";
 import { cn } from "@/lib/utils";
 import {
@@ -201,7 +202,7 @@ function FunzionarioForm({ onDone }: { onDone: () => void }) {
         <select id={id} aria-describedby={d} aria-invalid={!!errors.role} value={v.role} onChange={(e) => up("role", e.target.value)} className={fieldCls}>
           <option value="" className={optionCls}>Scegli il ruolo</option>{ROLES.map((r) => <option key={r} value={r} className={optionCls}>{r}</option>)}
         </select>)}</Field>
-      <Field label="La tua email" hint={`Anche personale. Nella scheda compare l'email dell'ufficio scelto${v.office && town ? `: ${officeEmail(v.office === "Altro" ? v.otherOffice : v.office, town)}` : ""}.`} error={errors.email}>{(id, d) => <input id={id} type="email" inputMode="email" autoComplete="email" aria-describedby={d} aria-invalid={!!errors.email} value={v.email} onChange={(e) => up("email", e.target.value)} className={fieldCls} />}</Field>
+      <Field label="La tua email" hint="Anche personale. Nella scheda compare l'email ufficiale dell'ufficio scelto, presa dall'elenco delle pubbliche amministrazioni." error={errors.email}>{(id, d) => <input id={id} type="email" inputMode="email" autoComplete="email" aria-describedby={d} aria-invalid={!!errors.email} value={v.email} onChange={(e) => up("email", e.target.value)} className={fieldCls} />}</Field>
       <Field label="Matricola (facoltativa)" hint="Il numero del tuo badge o della matricola, se vuoi aggiungerlo." error={errors.badge}>{(id, d) => <input id={id} aria-describedby={d} value={v.badge} onChange={(e) => up("badge", e.target.value)} className={fieldCls} />}</Field>
       {/* At the end, the picked town with its coat of arms. */}
       {town && (
@@ -237,6 +238,9 @@ export function ProfileCard({ kind, go }: { kind: ProKind; go?: () => void }) {
   const id = useProId();
   const mine = id?.kind === kind ? id : null;
   const Icon = kind === "agronomo" ? Grape : Building2;
+  // The office's official email (from the public administrations' register), else the usual pattern, marked indicative.
+  const town = mine?.kind === "funzionario" ? mine : null;
+  const officeMail = useOfficeEmail(town?.comune ?? "", town?.office ?? "", town?.istat);
   if (!mine) return null;
   const leave = async () => {
     await saveProId(null);
@@ -251,7 +255,7 @@ export function ProfileCard({ kind, go }: { kind: ProKind; go?: () => void }) {
         {mine.kind === "funzionario" ? <TownCrest name={mine.comune} istat={mine.istat} size={52} label /> : <TownCrest name={mine.region} region size={52} label />}
       </div>
       <dl className="divide-y divide-foreground/10 rounded-2xl bg-foreground/[0.05] px-4">
-        {profileRows(mine).map(([k, v]) => {
+        {profileRows(mine, town ? officeMail : undefined).map(([k, v]) => {
           const val = v;
           // A long value (the email) goes on its own line under its label, whole, instead of breaking mid-word beside it.
           return v.length > 24
@@ -272,11 +276,11 @@ export function ProfileCard({ kind, go }: { kind: ProKind; go?: () => void }) {
 }
 
 /** The profile's data as label · value rows. */
-function profileRows(id: ProId): Array<[string, string]> {
+function profileRows(id: ProId, office?: { mail: string; official: boolean }): Array<[string, string]> {
   const since = new Date(id.at).toLocaleDateString("it-IT");
   return id.kind === "agronomo"
     ? [["Nome", id.name], ...(id.licence ? [["Patentino", `${id.licenceType === "consulente" ? "Consulente" : "Utilizzatore"} · ${id.licence}`], ["Regione", id.region], ["Scadenza", new Date(`${id.expires}T12:00:00`).toLocaleDateString("it-IT")]] as Array<[string, string]> : [["Patentino", "Non indicato"], ["Regione", id.region]] as Array<[string, string]>), ["Identificato il", since]]
-    : [["Nome", id.name], ["Comune", id.comune], ["Ufficio", id.office], ["Ruolo", id.role], ["Email", officeEmail(id.office, id.comune)], ...(id.email && id.email !== officeEmail(id.office, id.comune) ? [["Email personale", id.email] as [string, string]] : []), ...(id.badge ? [["Matricola", id.badge] as [string, string]] : []), ["Identificato il", since]];
+    : [["Nome", id.name], ["Comune", id.comune], ["Ufficio", id.office], ["Ruolo", id.role], ...(office ? [[office.official ? "Email dell'ufficio" : "Email dell'ufficio (indicativa)", office.mail] as [string, string]] : []), ...(id.email && id.email !== office?.mail ? [["Email personale", id.email] as [string, string]] : []), ...(id.badge ? [["Matricola", id.badge] as [string, string]] : []), ["Identificato il", since]];
 }
 
 /**

@@ -201,6 +201,7 @@ export function LicensesPage() {
             <LogoTiles items={GNSS_TILES} cacheKey="mdt-gnss-logo-v1" label="Sistemi satellitari" />
           </li>
           <li>Elenco dei comuni italiani: dati ISTAT (2020) da comuni-json di Matteo Contrini, licenza MIT.</li>
+          <li>Email degli uffici comunali: Indice dei domicili digitali della Pubblica Amministrazione (IPA), AgID, dati aperti con licenza CC BY 4.0.</li>
           <li>Stemmi dei comuni e delle regioni e loghi dei sistemi satellitari da Wikimedia Commons (trovati tramite Wikidata): autore e licenza nella pagina di ogni file. I loghi appartengono ai rispettivi titolari e sono mostrati solo come riconoscimento.</li>
         </ul>
       </InfoCard>
