@@ -1,5 +1,6 @@
 import { keepProIdInAccount, openSectorGate, saveProId, useProId } from "@/lib/use-pro-id";
 import { DeviceCacheCard } from "@/views/v10/DeviceCache";
+import { AccountDevices } from "@/views/v10/AccountDevices";
 import { getMedia, removeMedia, useLabMedia } from "@/models/lab-media-store";
 import { CLOUD_QUOTA, bytesText, usageTone, useCloudUsage } from "@/lib/use-cloud-usage";
 import { ProfileIcon } from "@/views/ProfileIcon";
@@ -491,6 +492,7 @@ export function AccountControl() {
                 <p className="mt-1 text-xs text-muted-foreground">{account.guest ? "Accesso di base su questo dispositivo. Non è un account e non salva dati online." : "Accesso effettuato"}</p>
               </div>
               {cloudAccount && <StorageBar used={usage.used} share={usage.share} files={usage.files} google={usage.google} />}
+              {cloudAccount && <AccountDevices />}
               <DeviceCacheCard />
               {account.guest && <Button variant="outline" className="w-full" onClick={() => { sessionStorage.removeItem(guestKey); setAccount(null); changeMode("signup"); }}>Crea un account</Button>}
               {account && notice && <p role="status" className="text-sm text-muted-foreground">{notice}</p>}
