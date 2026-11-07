@@ -284,12 +284,20 @@ export function AccountSectorLock({ kind, account, email }: { kind: ProKind; acc
     dropProIdOnDevice();
     leaveAccount();
   };
+  // "Indietro" leaves this account too (kept on the phone, not ended) and goes back to the sector choice.
+  const back = async () => {
+    setBusy(true);
+    await keepProIdInAccount();
+    dropProIdOnDevice();
+    rememberWantedSector(null);
+    leaveAccount({ openPanel: false, to: "/benvenuto" });
+  };
   // Its own full-screen page over the form (and the sector page), so it is seen at once; "Indietro" goes back.
   const page = (
     <div role="dialog" aria-modal="true" aria-labelledby="sector-lock-title" className="dark fixed inset-0 z-[1000000000] isolate overflow-y-auto overscroll-contain bg-background px-6 text-foreground [color-scheme:dark] sm:px-12">
       <Suspense fallback={null}><Backdrop /></Suspense>
       <div className="relative mx-auto flex min-h-full max-w-lg flex-col py-10">
-        <button type="button" onClick={() => window.history.back()} className="inline-flex h-11 items-center gap-2 self-start rounded-full pr-3 text-[15px] font-semibold text-foreground/80 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+        <button type="button" disabled={busy} onClick={() => void back()} className="inline-flex h-11 items-center gap-2 self-start rounded-full pr-3 text-[15px] font-semibold text-foreground/80 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
           <ArrowLeft className="size-5" aria-hidden="true" />Indietro
         </button>
         <div className="my-auto space-y-5 py-10">
