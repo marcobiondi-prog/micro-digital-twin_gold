@@ -522,6 +522,20 @@ function RootComponent() {
       window.removeEventListener("wheel", pinchWheel);
     };
   }, []);
+  // Entering an account or a profile moves the app in place (lib/app-nav goInApp), never with a reload: the lists are
+  // read again for the account, and the simulation opens on its map.
+  useEffect(() => {
+    const go = (e: Event) => {
+      const href = (e as CustomEvent<string>).detail;
+      if (typeof href !== "string") return;
+      void queryClient.invalidateQueries();
+      if (href.startsWith("/vigneto")) openSimTab("vineyard", "mappa");
+      else if (href.startsWith("/urbano")) openSimTab("urban", "mappa");
+      void navigate({ href, replace: true });
+    };
+    window.addEventListener("mdt-go", go);
+    return () => window.removeEventListener("mdt-go", go);
+  }, [navigate, queryClient]);
   useEffect(() => {
     const landed = window as typeof window & { __mdtLanded?: boolean };
     if (landed.__mdtLanded) return;
@@ -538,12 +552,16 @@ function RootComponent() {
         if (code) {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) toast.error(`Accesso non riuscito: ${error.message}`);
+          // Signed in: once the account's profile is read, straight into its simulation (no sector page between).
+          else await Promise.race([openingSettled, new Promise((r) => setTimeout(r, 6000))]);
         } else {
           toast.error(`Accesso non riuscito: ${authError}`);
         }
         const back = sessionStorage.getItem("mdt-auth-return");
         sessionStorage.removeItem("mdt-auth-return");
-        void navigate({ href: back ?? window.location.pathname, replace: true });
+        const pro = getProId();
+        if (pro) openSimTab(pro.kind === "agronomo" ? "vineyard" : "urban", "mappa");
+        void navigate({ href: pro ? (pro.kind === "agronomo" ? "/vigneto" : "/urbano") : back ?? window.location.pathname, replace: true });
       })();
       return;
     }

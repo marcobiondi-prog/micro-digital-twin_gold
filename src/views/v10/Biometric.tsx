@@ -1,4 +1,4 @@
-import { preloadNext } from "@/lib/preloader";
+import { goInApp } from "@/lib/app-nav";
 import { useEffect, useState } from "react";
 import { Fingerprint, ScanFace, UserRound } from "lucide-react";
 import { toast } from "sonner";
@@ -143,7 +143,7 @@ export async function enterWithProfile(k: KnownProId, opts: { recognised?: boole
   rememberWantedSector(k.kind);
   await saveProId(k);
   toast.success(`Bentornato, ${k.name}`, { description: `Sei entrato con ${email}.` });
-  preloadNext(); window.location.assign(k.kind === "funzionario" ? "/urbano" : "/vigneto");
+  goInApp(k.kind === "funzionario" ? "/urbano" : "/vigneto");
   return true;
 }
 

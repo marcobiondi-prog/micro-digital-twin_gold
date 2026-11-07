@@ -1,4 +1,4 @@
-import { preloadNext } from "@/lib/preloader";
+import { goInApp } from "@/lib/app-nav";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSwipeBack } from "@/lib/use-swipe-back";
 import { createPortal } from "react-dom";
@@ -101,7 +101,7 @@ export function KnownProfiles({ kind, onPicked }: { kind: ProKind; onPicked?: ()
         await saveProId(k);
         toast.success(`Bentornato, ${k.name}`, { description: `Sei entrato anche con il tuo account ${target}.` });
         // A clean start on that account's simulation: every list and cache read again for it.
-        preloadNext(); window.location.assign(k.kind === "funzionario" ? "/urbano" : "/vigneto");
+        goInApp(k.kind === "funzionario" ? "/urbano" : "/vigneto");
         return;
       }
       // Its account is not kept on this phone: the profile goes in use and its account's sign-in starts by itself
