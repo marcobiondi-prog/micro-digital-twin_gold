@@ -201,8 +201,14 @@ export function Panels<T extends string>({ value, panels, peek = null, peekSide 
   // tab changed later by a tap gets an entrance. A swipe already slides the panel in with the finger (useTabSwipe).
   const ready = useRef(false);
   useEffect(() => { const t = window.setTimeout(() => { ready.current = true; }, 600); return () => window.clearTimeout(t); }, []);
-  const dir = !ready.current || index === last.current || justSwiped() || quiet() ? 0 : index > last.current ? 1 : -1;
-  useEffect(() => { last.current = index; }, [index]);
+  // The entrance is decided once, when the tab changes, and kept until the next change: recomputed on the next
+  // render it fell to none and the class came off one frame into the animation.
+  const enter = useRef<{ id: T; dir: number }>({ id: value, dir: 0 });
+  if (index !== last.current) {
+    enter.current = { id: value, dir: !ready.current || justSwiped() || quiet() ? 0 : index > last.current ? 1 : -1 };
+    last.current = index;
+  }
+  const dir = enter.current.id === value ? enter.current.dir : 0;
   return (
     <>
       {panels.map((p) => {
@@ -210,7 +216,7 @@ export function Panels<T extends string>({ value, panels, peek = null, peekSide 
         const peeking = p.id === peek && p.id !== value;
         return (p.always || seen.has(p.id) || p.id === value || peeking) && (
           <div key={p.id} role="tabpanel" hidden={p.id !== value && !peeking} aria-hidden={peeking || undefined} style={peeking ? peekStyle(peekSide, peekTop) : undefined}
-            className={cn(p.id === value && dir !== 0 && "animate-in fade-in-0 duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:animate-none", p.id === value && dir > 0 && "slide-in-from-right-4", p.id === value && dir < 0 && "slide-in-from-left-4")}>{p.content}</div>
+            className={cn(p.id === value && dir !== 0 && "animate-in fade-in-0 duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:animate-none", p.id === value && dir > 0 && "slide-in-from-right-12", p.id === value && dir < 0 && "slide-in-from-left-12")}>{p.content}</div>
         );
       })}
     </>
