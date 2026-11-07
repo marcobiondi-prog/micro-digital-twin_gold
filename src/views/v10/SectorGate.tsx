@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Building2, Grape, LogIn, Mail, Pencil, Plus, Trash2, UserPlus, UserRound, X } from "lucide-react";
 import { openAccount } from "@/lib/camera-dock";
-import { leaveAccount, signInAs, switchToAccount } from "@/lib/account-sessions";
+import { addGoogleAccount, leaveAccount, signInAs, switchToAccount } from "@/lib/account-sessions";
 import { BioIcon, checkProfileBiometric, ProfileBioButton, proBioKey } from "@/views/v10/Biometric";
 import { useBiometricOn } from "@/lib/biometric";
 import { supabase } from "@/integrations/supabase/client";
@@ -120,8 +120,8 @@ export function KnownProfiles({ kind, onPicked }: { kind: ProKind; onPicked?: ()
   // "Aggiungi account": another personal account signs in here (the current one stays kept on the phone).
   const addAccount = async () => {
     rememberWantedSector(kind);
-    if (accEmail) { await keepProIdInAccount(); dropProIdOnDevice(); leaveAccount(); return; }
-    openAccount();
+    if (accEmail) await keepProIdInAccount();
+    if (!(await addGoogleAccount())) openAccount();
   };
   // No profile of this sector on the phone yet (often the vineyard, the first time): the quick "Aggiungi account"
   // still shows, on its own, so another personal account can sign in here and bring its profile.
@@ -291,7 +291,7 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
             className="relative flex h-full flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-brand-turquoise/40 bg-[oklch(0.24_0.016_258/0.7)] p-5 text-center will-change-transform data-[active]:border-brand-turquoise/70">
             <span className="grid size-16 place-items-center rounded-full bg-brand-turquoise/15 text-brand-turquoise ring-2 ring-brand-turquoise/50" aria-hidden="true"><UserPlus className="size-7" /></span>
             <p className="text-xl font-semibold">Aggiungi account</p>
-            <p className="text-xs text-foreground/65">Entra con un altro account Google o email: il suo profilo si aggiunge qui.</p>
+            <p className="text-xs text-foreground/65">Scegli un altro account Google: il suo profilo si aggiunge qui.</p>
             <button type="button" onClick={() => (known.length === active ? onAdd() : go(known.length))}
               className="mt-auto inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
               <Plus className="size-4" aria-hidden="true" />Aggiungi account

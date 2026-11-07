@@ -459,8 +459,9 @@ export function useSyncProId() {
       const legacy = ownOf(meta) === null;
       // What the account really worked on (its own history, owner-only): the projects with interventions in it.
       const worked = await legacyOwn();
-      const owned0 = ownOf(meta) ?? worked;
-      if (owned0 === null) { adopted = ""; return; } // history not readable now: decide at the next sign-in or opening
+      // History not readable now (and no saved kinds): the profiles this phone tied to the account still count, so a
+      // sign-in never ends on the sector choice because a read failed.
+      const owned0 = ownOf(meta) ?? worked ?? [];
       // A kind the account worked on is its own, whatever its saved data say.
       const owned1 = [...new Set([...owned0, ...(worked ?? [])])];
       const prev0 = (meta as Meta)?.pro_last ?? {};
@@ -508,6 +509,7 @@ export function useSyncProId() {
       const sector: ProKind | null = wanted ?? onlyWorked ?? savedSector;
       if (email) for (const k of worked ?? []) { const p = prev[k]; if (isProId(p)) retieKnown(p, email); }
       const own = sector ? ownedClean.filter((k) => k === sector) : ownedClean;
+      const entering = gateAsk.kind ?? wantedSector();
       rememberWantedSector(null);
       // The account's own registered profiles come to this device too ("Continua come …" on its form).
       for (const k of own) { const p = prev[k]; if (isProId(p) && p.kind === k) { if (!lastSnap()[k]) keepLast(p); else keepKnown(p); } }
@@ -536,7 +538,8 @@ export function useSyncProId() {
       // page asks to choose the sector and identify, or to enter as a guest.
       set(null);
       if (dirty) void supabase.auth.updateUser({ data: clean }).catch(() => undefined);
-      if (!left && !guestSnap()) openSectorGate(null);
+      // The sector the person was entering opens on its form (a new account adds its profile there), not the choice.
+      if (!left && !guestSnap()) openSectorGate(entering ?? null);
       if (saved != null && !mine(saved)) toast("Questo account non ha ancora un profilo professionale", { description: "Scegli il settore e identificati, oppure entra come ospite." });
     };
     // Back from Google's sign-in (?code=): the session comes a moment later, through SIGNED_IN.

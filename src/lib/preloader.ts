@@ -7,6 +7,8 @@
 const CSS = `
 #mdt-preloader{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:oklch(0.155 0.012 265);color:#f4f6f8;color-scheme:dark;transition:opacity .5s cubic-bezier(.22,1,.36,1),visibility .5s;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 #mdt-preloader.out{opacity:0;visibility:hidden}
+#mdt-preloader.plain .glow,#mdt-preloader.plain .box{display:none}
+#mdt-preloader.plain{transition-duration:.25s}
 #mdt-preloader .glow{position:absolute;inset:0;background:radial-gradient(50% 32% at 50% 44%,oklch(0.72 0.15 190/.16),transparent 70%)}
 #mdt-preloader .box{position:relative;display:flex;flex-direction:column;align-items:center}
 #mdt-preloader svg{width:260px;max-width:72vw;overflow:visible}
@@ -60,10 +62,10 @@ var flag=false;try{flag=sessionStorage.getItem("mdt-preload")==="1";sessionStora
 var idx=location.pathname==="/";
 if(!idx&&!flag&&!/[?&]code=|[?&#]error_description=|#access_token=/.test(location.search+location.hash))return;
 var el=document.createElement("div");el.id="mdt-preloader";el.innerHTML=${JSON.stringify(HTML)};
-document.documentElement.appendChild(el);
+if(!idx)el.className="plain";document.documentElement.appendChild(el);
 var t0=Date.now(),gone=false;
-window.__mdtPreloaderDone=function(){if(gone)return;gone=true;var wait=Math.max(0,(idx?1800:500)-(Date.now()-t0));
-setTimeout(function(){el.classList.add("out");setTimeout(function(){el.remove()},600)},wait)};
+window.__mdtPreloaderDone=function(){if(gone)return;gone=true;var wait=idx?Math.max(0,1800-(Date.now()-t0)):0;
+setTimeout(function(){el.classList.add("out");setTimeout(function(){el.remove()},idx?600:300)},wait)};
 setTimeout(window.__mdtPreloaderDone,8000);
 }catch(e){}})();`;
 

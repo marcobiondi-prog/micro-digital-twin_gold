@@ -104,3 +104,14 @@ export async function signInAs(email: string, opts: { provider?: string | undefi
   }
   window.dispatchEvent(new CustomEvent("mdt-open-account", { detail: { email } }));
 }
+
+/**
+ * "Aggiungi account": straight to Google's account chooser, with no page in between and no reload first — the account
+ * signed in now stays kept on this phone (its session is already saved here) and the one chosen takes its place.
+ */
+export async function addGoogleAccount(): Promise<boolean> {
+  const back = window.location.pathname + window.location.search;
+  try { sessionStorage.setItem("mdt-auth-return", back); } catch { /* none */ }
+  const r = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin + window.location.pathname, queryParams: { prompt: "select_account" } } });
+  return !r.error;
+}
