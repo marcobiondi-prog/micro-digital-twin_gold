@@ -71,8 +71,8 @@ export function ProfileBioRow({ id }: { id: ProId }) {
         </div>
         <button type="button" role="switch" aria-checked={on} aria-label={`Accesso con ${name} per questo profilo`} disabled={busy}
           onClick={async () => { setBusy(true); setMsg(await toggle(id, on)); setBusy(false); }}
-          className={`relative h-7 w-12 shrink-0 rounded-full outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 ${on ? "bg-brand-turquoise" : "bg-foreground/20"}`}>
-          <span className={`absolute top-0.5 size-6 rounded-full bg-white shadow transition-transform ${on ? "translate-x-[1.375rem]" : "translate-x-0.5"}`} />
+          className={`relative h-7 w-12 shrink-0 rounded-full p-0 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 ${on ? "bg-brand-turquoise" : "bg-foreground/20"}`}>
+          <span className={`absolute left-0.5 top-0.5 size-6 rounded-full bg-white shadow transition-transform ${on ? "translate-x-5" : "translate-x-0"}`} />
         </button>
       </div>
       {msg && <p role="status" className="mt-2 text-xs text-muted-foreground">{msg}</p>}
@@ -98,8 +98,8 @@ export function ProfileBioSwitch({ id }: { id: ProId }) {
         </div>
         <button type="button" role="switch" aria-checked={on} aria-label={`Accesso con ${name}`} disabled={busy}
           onClick={async () => { setBusy(true); setMsg(await toggle(id, on)); setBusy(false); }}
-          className={`relative h-7 w-12 shrink-0 rounded-full outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 ${on ? "bg-brand-turquoise" : "bg-foreground/20"}`}>
-          <span className={`absolute top-0.5 size-6 rounded-full bg-white shadow transition-transform ${on ? "translate-x-[1.375rem]" : "translate-x-0.5"}`} />
+          className={`relative h-7 w-12 shrink-0 rounded-full p-0 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 ${on ? "bg-brand-turquoise" : "bg-foreground/20"}`}>
+          <span className={`absolute left-0.5 top-0.5 size-6 rounded-full bg-white shadow transition-transform ${on ? "translate-x-5" : "translate-x-0"}`} />
         </button>
       </div>
       {msg && <p role="status" className="mt-2 text-xs text-muted-foreground">{msg}</p>}
