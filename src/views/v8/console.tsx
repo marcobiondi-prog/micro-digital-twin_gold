@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -56,7 +56,7 @@ export function startOnMap(kind: SimKind) {
   listeners.forEach((l) => l());
 }
 export function useSimTab(kind: SimKind): SimTab {
-  return useSyncExternalStore((l) => { listeners.add(l); return () => { listeners.delete(l); }; }, () => tabs[kind], () => "simula");
+  return useSyncExternalStore((l) => { listeners.add(l); return () => { listeners.delete(l); }; }, () => tabs[kind], () => tabs[kind]);
 }
 
 /** The page that last set the light, so a page leaving does not switch it off while the next one is already setting its own. */
@@ -170,15 +170,38 @@ export function TabRow<T extends string>({ items, value, onChange, label, fill }
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     r.scrollTo({ left: a.offsetLeft - (r.clientWidth - a.offsetWidth) / 2, behavior: reduce || quiet() ? "auto" : "smooth" });
   }, [value]);
+  // The slate pill is one element under the tabs that glides from the old tab to the new one (left and width), on
+  // the tutorial's curve; on the first layout, a resize or a quiet switch it is simply put there, never animated.
+  const pill = useRef<HTMLSpanElement>(null);
+  const placed = useRef(false);
+  useLayoutEffect(() => {
+    const put = (animate: boolean) => {
+      const el = pill.current, a = active.current;
+      if (!el || !a) return;
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      el.style.transition = animate && placed.current && !reduce && !quiet() ? "transform 320ms cubic-bezier(0.22,1,0.36,1), width 320ms cubic-bezier(0.22,1,0.36,1)" : "none";
+      el.style.width = `${a.offsetWidth}px`;
+      el.style.transform = `translate3d(${a.offsetLeft}px,0,0)`;
+      el.style.opacity = "1";
+      placed.current = true;
+    };
+    put(true);
+    // ResizeObserver reports once as soon as it observes: that first report is not a resize (it would cut the glide).
+    let first = true;
+    const ro = new ResizeObserver(() => { if (first) { first = false; return; } put(false); });
+    if (row.current) ro.observe(row.current);
+    return () => ro.disconnect();
+  }, [value, items.length]);
   return (
     <div ref={row} role="tablist" aria-label={label} className={cn("no-scrollbar relative flex gap-1.5", fill ? "w-full" : "-mx-4 snap-x overflow-x-auto px-4 touch-pan-x")}>
+      <span ref={pill} aria-hidden="true" className="pointer-events-none absolute left-0 top-0 h-11 rounded-full bg-secondary opacity-0 shadow-[inset_0_1px_0_rgb(255_255_255/0.12)] will-change-transform" />
       {items.map(({ id, label: l, icon: Icon }) => {
         const on = id === value;
         return (
           <button key={id} ref={on ? active : undefined} type="button" role="tab" aria-selected={on} onClick={() => onChange(id)}
             className={cn("inline-flex h-11 snap-center items-center gap-2 whitespace-nowrap rounded-full px-5 text-[15px] font-semibold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
               fill ? "min-w-0 flex-1 justify-center" : "shrink-0",
-              on ? "bg-secondary text-secondary-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]" : "text-foreground/85 hover:bg-foreground/[0.06]")}>
+              "relative", on ? "text-secondary-foreground" : "text-foreground/85 hover:bg-foreground/[0.06]")}>
             {Icon && <Icon className="size-4" aria-hidden="true" />}{l}
           </button>
         );
@@ -197,8 +220,11 @@ export function Panels<T extends string>({ value, panels, peek = null, peekSide 
   // The panel slides in from the side of its tab: a later tab comes from the right, an earlier one from the left.
   const index = panels.findIndex((p) => p.id === value);
   const last = useRef(index);
-  // A swipe already slides the panel in with the finger (useTabSwipe): no second entrance then.
-  const dir = index === last.current || justSwiped() || quiet() ? 0 : index > last.current ? 1 : -1;
+  // Nothing slides while the page opens (the first tab, or one set by the page's own start, simply shows): only a
+  // tab changed later by a tap gets an entrance. A swipe already slides the panel in with the finger (useTabSwipe).
+  const ready = useRef(false);
+  useEffect(() => { const t = window.setTimeout(() => { ready.current = true; }, 600); return () => window.clearTimeout(t); }, []);
+  const dir = !ready.current || index === last.current || justSwiped() || quiet() ? 0 : index > last.current ? 1 : -1;
   useEffect(() => { last.current = index; }, [index]);
   return (
     <>
@@ -207,7 +233,7 @@ export function Panels<T extends string>({ value, panels, peek = null, peekSide 
         const peeking = p.id === peek && p.id !== value;
         return (p.always || seen.has(p.id) || p.id === value || peeking) && (
           <div key={p.id} role="tabpanel" hidden={p.id !== value && !peeking} aria-hidden={peeking || undefined} style={peeking ? peekStyle(peekSide, peekTop) : undefined}
-            className={cn(p.id === value && dir !== 0 && "animate-in fade-in-0 duration-300 motion-reduce:animate-none", p.id === value && dir > 0 && "slide-in-from-right-10", p.id === value && dir < 0 && "slide-in-from-left-10")}>{p.content}</div>
+            className={cn(p.id === value && dir !== 0 && "animate-in fade-in-0 duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:animate-none", p.id === value && dir > 0 && "slide-in-from-right-4", p.id === value && dir < 0 && "slide-in-from-left-4")}>{p.content}</div>
         );
       })}
     </>
