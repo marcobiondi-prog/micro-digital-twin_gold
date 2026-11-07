@@ -98,7 +98,7 @@ export async function signInAs(email: string, opts: { provider?: string | undefi
   const google = opts.provider !== "email";
   if (google) {
     const back = opts.back ?? window.location.pathname + window.location.search;
-    try { sessionStorage.setItem("mdt-auth-return", back); } catch { /* none */ }
+    try { localStorage.setItem("mdt-auth-return", back); } catch { /* none */ }
     const r = await googleOAuth(window.location.origin + back.split("?")[0], { login_hint: email });
     if (!r.error) return;
   }
@@ -111,7 +111,7 @@ export async function signInAs(email: string, opts: { provider?: string | undefi
  */
 export async function addGoogleAccount(): Promise<boolean> {
   const back = window.location.pathname + window.location.search;
-  try { sessionStorage.setItem("mdt-auth-return", back); } catch { /* none */ }
+  try { localStorage.setItem("mdt-auth-return", back); } catch { /* none */ }
   const r = await googleOAuth(window.location.origin + window.location.pathname, { prompt: "select_account" });
   return !r.error;
 }

@@ -435,21 +435,21 @@ const WANTED_KEY = "mdt-sector-wanted";
 const ADDING_KEY = "mdt-adding-account";
 /** "Aggiungi account" from a sector's form: the account signed in next is added to that sector (10 minutes at most). */
 export function rememberAddingSector(kind: ProKind) {
-  try { sessionStorage.setItem(ADDING_KEY, JSON.stringify({ kind, at: Date.now() })); } catch { /* none */ }
+  try { localStorage.setItem(ADDING_KEY, JSON.stringify({ kind, at: Date.now() })); } catch { /* none */ }
 }
 function takeAddingSector(): ProKind | null {
   try {
-    const v = JSON.parse(sessionStorage.getItem(ADDING_KEY) ?? "null") as { kind?: unknown; at?: number } | null;
-    sessionStorage.removeItem(ADDING_KEY);
+    const v = JSON.parse(localStorage.getItem(ADDING_KEY) ?? "null") as { kind?: unknown; at?: number } | null;
+    localStorage.removeItem(ADDING_KEY);
     return v && (v.kind === "agronomo" || v.kind === "funzionario") && Date.now() - (v.at ?? 0) < 10 * 60_000 ? v.kind : null;
   } catch { return null; }
 }
 export function rememberWantedSector(kind: ProKind | null) {
-  try { if (kind) sessionStorage.setItem(WANTED_KEY, JSON.stringify({ kind, at: Date.now() })); else sessionStorage.removeItem(WANTED_KEY); } catch { /* none */ }
+  try { if (kind) localStorage.setItem(WANTED_KEY, JSON.stringify({ kind, at: Date.now() })); else localStorage.removeItem(WANTED_KEY); } catch { /* none */ }
 }
 function wantedSector(): ProKind | null {
   try {
-    const v = JSON.parse(sessionStorage.getItem(WANTED_KEY) ?? "null") as { kind?: unknown; at?: number } | null;
+    const v = JSON.parse(localStorage.getItem(WANTED_KEY) ?? "null") as { kind?: unknown; at?: number } | null;
     return v && (v.kind === "agronomo" || v.kind === "funzionario") && Date.now() - (v.at ?? 0) < 15 * 60_000 ? v.kind : null;
   } catch { return null; }
 }

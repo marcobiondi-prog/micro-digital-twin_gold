@@ -557,8 +557,8 @@ function RootComponent() {
         } else {
           toast.error(`Accesso non riuscito: ${authError}`);
         }
-        const back = sessionStorage.getItem("mdt-auth-return");
-        sessionStorage.removeItem("mdt-auth-return");
+        const back = localStorage.getItem("mdt-auth-return");
+        localStorage.removeItem("mdt-auth-return");
         const pro = getProId();
         if (pro) openSimTab(pro.kind === "agronomo" ? "vineyard" : "urban", "mappa");
         const target = pro ? (pro.kind === "agronomo" ? "/vigneto" : "/urbano") : back ?? window.location.pathname;
@@ -578,12 +578,12 @@ function RootComponent() {
     // pulls a match out of the router mid-render and the router throws on a
     // missing routeId.
     // Returning from sign-in keeps the user in the section they left.
-    const back = sessionStorage.getItem("mdt-auth-return");
+    const back = localStorage.getItem("mdt-auth-return");
     if (back) {
-      sessionStorage.removeItem("mdt-auth-return");
+      localStorage.removeItem("mdt-auth-return");
       if (back !== location.pathname + location.searchStr) {
         const id = setTimeout(() => void navigate({ href: back, replace: true }), 250);
-        return () => { clearTimeout(id); landed.__mdtLanded = false; sessionStorage.setItem("mdt-auth-return", back); };
+        return () => { clearTimeout(id); landed.__mdtLanded = false; localStorage.setItem("mdt-auth-return", back); };
       }
       return;
     }
