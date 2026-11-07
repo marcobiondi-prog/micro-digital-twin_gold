@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Check, Copy, KeyRound, Pencil, Plus, Radio, Trash2 } from "lucide-react";
+import { Check, Copy, Download, KeyRound, Pencil, Plus, Radio, Trash2 } from "lucide-react";
 import { Card } from "@/views/health";
 import { Button } from "@/components/ui/button";
 import { addManualReading, addMySensor, removeMySensor, renewSensorKey } from "@/controllers/sensors.functions";
@@ -11,29 +11,63 @@ import { useLab } from "@/models/lab-store";
 import { drawnAreaFor } from "@/models/drawn-area";
 import { ringCentroid } from "@/models/place-area";
 import { cn } from "@/lib/utils";
+import { CODE_FILE, curlCode, esp32Code, pythonCode, type CodeKind } from "@/models/sensor-code";
 
 const ENDPOINT_PATH = "/api/public/sensor-readings";
 
-/** The key shown once, with how a device sends its readings. */
+/**
+ * The key shown once, with the code a device needs already written with the app's address and this key: a test
+ * command, an ESP32 sketch (the Wi-Fi name and password typed here go into it, never saved) and a Python script for a
+ * Raspberry Pi — each to copy or download straight from the app.
+ */
 function KeyBox({ token, kind, onDone }: { token: string; kind: SensorKind; onDone: () => void }) {
   const url = typeof location !== "undefined" ? `${location.origin}${ENDPOINT_PATH}` : ENDPOINT_PATH;
-  const example = `curl -X POST ${url} \\\n  -H "Authorization: Bearer ${token}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"value": ${kind === "umidita_suolo" || kind === "umidita_aria" ? 32 : kind === "vento" ? 12 : 27.5}}'`;
+  const [tab, setTab] = useState<CodeKind>("esp32");
+  const [wifi, setWifi] = useState({ name: "", password: "" });
+  const code = tab === "curl" ? curlCode(url, token, kind) : tab === "esp32" ? esp32Code(url, token, kind, wifi) : pythonCode(url, token, kind);
   const [copied, setCopied] = useState<string | null>(null);
   const copy = (what: string, text: string) => { void navigator.clipboard?.writeText(text).then(() => { setCopied(what); setTimeout(() => setCopied(null), 1500); }); };
+  const download = () => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([code], { type: "text/plain;charset=utf-8" }));
+    a.download = CODE_FILE[tab];
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    toast.success(`${CODE_FILE[tab]} salvato in Download`);
+  };
+  const TABS: Array<[CodeKind, string]> = [["esp32", "ESP32"], ["python", "Raspberry Pi"], ["curl", "Prova veloce"]];
   return (
-    <div className="space-y-2 rounded-xl border border-primary/40 bg-primary/5 p-3 text-xs">
+    <div className="space-y-2.5 rounded-xl border border-primary/40 bg-primary/5 p-3 text-xs">
       <p className="font-semibold text-foreground">Chiave del sensore · si vede solo ora</p>
       <div className="flex items-center gap-2">
         <code className="min-w-0 flex-1 break-all rounded-lg bg-background/60 px-2 py-1.5 font-mono text-[11px]">{token}</code>
         <Button size="sm" variant="secondary" className="shrink-0 rounded-full" onClick={() => copy("key", token)}>{copied === "key" ? <Check className="size-4" /> : <Copy className="size-4" />}<span className="sr-only">Copia la chiave</span></Button>
       </div>
-      <p className="text-muted-foreground">Il sensore manda le letture a questo indirizzo con la chiave. Esempio:</p>
-      <pre className="overflow-x-auto whitespace-pre rounded-lg bg-background/60 p-2 font-mono text-[10.5px] leading-snug" data-map-gestures>{example}</pre>
-      <p className="text-muted-foreground">Va bene anche più valori insieme, per esempio {"{"}"temperature": 27.5, "humidity": 40{"}"}, o un elenco "readings" con l’ora di ogni misura.</p>
-      <div className="flex gap-2">
-        <Button size="sm" variant="secondary" className="rounded-full" onClick={() => copy("ex", example)}>{copied === "ex" ? "Copiato" : "Copia l’esempio"}</Button>
+      <p className="font-semibold text-foreground">Il codice per il tuo sensore, già pronto</p>
+      <p className="text-muted-foreground">Indirizzo dell’app e chiave sono già scritti dentro: scegli il dispositivo, poi copialo o scaricalo.</p>
+      <div role="radiogroup" aria-label="Dispositivo" className="flex gap-1.5 overflow-x-auto" data-map-gestures>
+        {TABS.map(([k, label]) => (
+          <button key={k} type="button" role="radio" aria-checked={tab === k} onClick={() => setTab(k)}
+            className={cn("shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", tab === k ? "bg-foreground text-background" : "bg-foreground/[0.08] text-foreground")}>{label}</button>
+        ))}
+      </div>
+      {tab === "esp32" && (
+        <div className="grid gap-2 sm:grid-cols-2">
+          <label className="space-y-1"><span className="text-muted-foreground">Nome della rete Wi-Fi</span>
+            <input value={wifi.name} onChange={(e) => setWifi((w) => ({ ...w, name: e.target.value }))} autoComplete="off" className="h-9 w-full rounded-lg border bg-background/60 px-2 text-xs" /></label>
+          <label className="space-y-1"><span className="text-muted-foreground">Password del Wi-Fi</span>
+            <input value={wifi.password} onChange={(e) => setWifi((w) => ({ ...w, password: e.target.value }))} type="password" autoComplete="off" className="h-9 w-full rounded-lg border bg-background/60 px-2 text-xs" /></label>
+          <p className="text-muted-foreground sm:col-span-2">Servono solo a scriverle nel codice: l’app non le salva.</p>
+        </div>
+      )}
+      <pre className="max-h-64 overflow-auto whitespace-pre rounded-lg bg-background/60 p-2 font-mono text-[10.5px] leading-snug" data-map-gestures>{code}</pre>
+      <p className="text-muted-foreground">{tab === "esp32" ? "Apri Arduino IDE, incolla il codice (o apri il file scaricato), collega l’ESP32 e premi Carica. Nel Monitor seriale a 115200 vedi le letture inviate." : tab === "python" ? "Copia il file sul Raspberry (o su un computer, per la prova) e lancialo con python3: le istruzioni sono in cima al file." : "Incolla il comando nel Terminale del computer: se risponde \"ok\": true, il sensore nell’app diventa verde."}</p>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="secondary" className="rounded-full" onClick={() => copy("code", code)}>{copied === "code" ? <><Check className="size-4" /> Copiato</> : <><Copy className="size-4" /> Copia il codice</>}</Button>
+        <Button size="sm" variant="secondary" className="rounded-full" onClick={download}><Download className="size-4" /> Scarica</Button>
         <Button size="sm" className="rounded-full" onClick={onDone}>Fatto</Button>
       </div>
+      <p className="text-muted-foreground">Dopo Fatto la chiave non si rivede: se serve di nuovo, tocca «Nuova chiave» sul sensore.</p>
     </div>
   );
 }
