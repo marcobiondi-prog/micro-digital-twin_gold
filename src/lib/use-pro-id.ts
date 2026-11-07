@@ -540,13 +540,16 @@ export function useSyncProId() {
       if (dirty) void supabase.auth.updateUser({ data: clean }).catch(() => undefined);
       // The sector the person was entering opens on its form (a new account adds its profile there), not the choice.
       if (!left && !guestSnap()) openSectorGate(entering ?? null);
+      // An account just added from a sector's form: it is in, its profile of that sector is the next step.
+      if (entering && email) toast.success(`Sei entrato con ${email}`, { description: `Registra qui il suo profilo ${entering === "funzionario" ? "della piazza" : "del vigneto"}: da ora lo trovi tra i profili riconosciuti.` });
       if (saved != null && !mine(saved)) toast("Questo account non ha ancora un profilo professionale", { description: "Scegli il settore e identificati, oppure entra come ospite." });
     };
-    // Back from Google's sign-in (?code=): the session comes a moment later, through SIGNED_IN.
+    // Back from Google's sign-in (?code=): the session comes a moment later, through SIGNED_IN — the account signed in
+    // before (when one was added with "Aggiungi account") is not read meanwhile, it is about to be replaced.
     const fromSignIn = /[?&]code=/.test(window.location.search);
     const publish = (user: { email?: string | null; user_metadata?: unknown } | null | undefined) =>
       setAccountSector(user ? { kind: sectorOf(user.user_metadata), email: user.email ?? null, name: nameOf(user.user_metadata) } : null);
-    void supabase.auth.getSession().then(({ data }) => { publish(data.session?.user); if (data.session) void adopt(data.session.user.id, data.session.user.user_metadata).finally(() => settleOpening()); else if (!fromSignIn) settleOpening(); }).catch(() => settleOpening());
+    void supabase.auth.getSession().then(({ data }) => { publish(data.session?.user); if (data.session && !fromSignIn) void adopt(data.session.user.id, data.session.user.user_metadata).finally(() => settleOpening()); else if (!fromSignIn) settleOpening(); }).catch(() => settleOpening());
     // Signing out of the personal account signs out of the professional profile too (it stays saved in the account
     // and comes back with the next sign-in).
     const { data } = supabase.auth.onAuthStateChange((event, s) => {
