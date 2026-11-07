@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { disableBiometric, verifyBiometric } from "@/lib/biometric";
 
 /**
  * The personal accounts used on this phone, so that picking a recognised professional profile signs in its personal
@@ -38,17 +39,26 @@ export function installAccountSessions() {
       write({ ...read(), [email]: { userId: s.user.id, email, access_token: s.access_token, refresh_token: s.refresh_token, at: Date.now() } });
     } else if (event === "SIGNED_OUT" && current && !leaving) {
       // Signed out on purpose (or ended elsewhere): that session no longer works.
-      const all = read(); delete all[current]; write(all); current = null;
+      const all = read(); delete all[current]; write(all); disableBiometric(current); current = null;
     }
   });
   // The panel asked to open after leaving an account without ending it (see leaveAccount).
   try { if (sessionStorage.getItem(OPEN_AFTER)) { sessionStorage.removeItem(OPEN_AFTER); setTimeout(() => window.dispatchEvent(new Event("mdt-open-account")), 600); } } catch { /* none */ }
 }
 
-/** Enters the kept account with this email; false when it is not kept here or its session no longer works. */
-export async function switchToAccount(email: string): Promise<boolean> {
+/** The kept accounts' emails, newest first. */
+export function keptAccounts(): string[] {
+  return Object.values(read()).sort((a, b) => b.at - a.at).map((s) => s.email);
+}
+
+/**
+ * Enters the kept account with this email; false when it is not kept here, its session no longer works or, with the
+ * biometric sign-in on for it, the phone did not recognise the person.
+ */
+export async function switchToAccount(email: string): Promise<boolean | "refused"> {
   const s = read()[norm(email)];
   if (!s) return false;
+  if (!(await verifyBiometric(email)).ok) return "refused";
   const { data, error } = await supabase.auth.setSession({ access_token: s.access_token, refresh_token: s.refresh_token });
   if (error || !data.session) {
     const all = read(); delete all[norm(email)]; write(all);
@@ -61,13 +71,13 @@ export async function switchToAccount(email: string): Promise<boolean> {
  * Leaves the signed-in account without ending its session (it stays kept here for the way back) and reloads the page
  * signed out, with the account panel open to sign in with another one.
  */
-export function leaveAccount() {
+export function leaveAccount(opts: { openPanel?: boolean } = {}) {
   leaving = true;
   try {
     supabase.auth.stopAutoRefresh();
     const key = (supabase.auth as unknown as { storageKey?: string }).storageKey;
     if (key) { window.localStorage.removeItem(key); window.localStorage.removeItem(`${key}-code-verifier`); window.localStorage.removeItem(`${key}-user`); }
-    sessionStorage.setItem(OPEN_AFTER, "1");
+    if (opts.openPanel !== false) sessionStorage.setItem(OPEN_AFTER, "1");
   } catch { /* none */ }
   window.location.reload();
 }

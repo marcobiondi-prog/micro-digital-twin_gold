@@ -86,7 +86,9 @@ export function KnownProfiles({ kind }: { kind: ProKind }) {
     if (target && target !== accEmail) {
       rememberWantedSector(kind);
       if (accEmail) await keepProIdInAccount();
-      if (await switchToAccount(target)) {
+      const entered = await switchToAccount(target);
+      if (entered === "refused") { toast.error("Non ti ho riconosciuto", { description: `Per entrare con ${target} serve il riconoscimento del telefono. Riprova.` }); return; }
+      if (entered) {
         // Its account goes to this profile's sector (the person chose it), then the profile is put in use.
         const { data } = await supabase.auth.getSession();
         const sec = sectorOf(data.session?.user.user_metadata);
