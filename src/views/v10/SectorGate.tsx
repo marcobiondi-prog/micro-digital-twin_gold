@@ -2,14 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSwipeBack } from "@/lib/use-swipe-back";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, Building2, Grape, LogIn, Mail, Pencil, Trash2, UserRound, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, Grape, LogIn, Mail, Pencil, Plus, Trash2, UserPlus, UserRound, X } from "lucide-react";
 import { openAccount } from "@/lib/camera-dock";
 import { leaveAccount, switchToAccount } from "@/lib/account-sessions";
 import { BioIcon, checkProfileBiometric, ProfileBioButton, proBioKey } from "@/views/v10/Biometric";
 import { useBiometricOn } from "@/lib/biometric";
 import { supabase } from "@/integrations/supabase/client";
 import { introSeen } from "@/lib/intro-seen";
-import { clearSectorGate, enterAsGuest, forgetKnownProId, dropProIdOnDevice, keepProIdInAccount, rememberWantedSector, renameKnownProId, sectorOf, switchAccountSector, type KnownProId, saveProId, useAccountSector, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
+import { clearSectorGate, enterAsGuest, forgetKnownProId, dropProIdOnDevice, keepProIdInAccount, setProIdOnDevice, rememberWantedSector, renameKnownProId, sectorOf, switchAccountSector, type KnownProId, saveProId, useAccountSector, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
 import { proSummary } from "@/models/professional-id";
 import { toast } from "sonner";
 import { useSignedIn } from "@/lib/use-signed-in";
@@ -103,26 +103,34 @@ export function KnownProfiles({ kind }: { kind: ProKind }) {
         window.location.assign(k.kind === "funzionario" ? "/urbano" : "/vigneto");
         return;
       }
+      // Its account is not kept on this phone: the profile opens anyway, straight away, with no sign-in in between;
+      // its account can be entered later from the account panel to save in the cloud.
+      const to = k.kind === "funzionario" ? "/urbano" : "/vigneto";
       if (accEmail) {
-        // Signed in to another account: left (kept on the phone for the way back), then the sign-in opens.
-        toast(`Accedi con ${target}`, { description: `Il profilo di ${k.name} è legato a quell'account.` });
-        dropProIdOnDevice();
-        leaveAccount();
+        // Signed in to another account: left (kept on the phone for the way back), the profile put in use.
+        setProIdOnDevice(k);
+        toast.success(`Bentornato, ${k.name}`, { description: `Per salvare nel cloud entra con ${target} dal pannello account.` });
+        leaveAccount({ openPanel: false, to });
         return;
       }
       if (!(await saveProId(k))) return;
-      toast(`Bentornato, ${k.name} · Accedi con ${target}`, { description: "Collega il tuo account personale: da qui in poi entrerà da solo con il profilo." });
-      openAccount();
+      toast.success(`Bentornato, ${k.name}`, { description: `Per salvare nel cloud entra con ${target} dal pannello account.` });
       return;
     }
     if (!(await saveProId(k))) return;
     toast.success(`Bentornato, ${k.name}`, { description: `Ritrovi la cronologia ${flow}.` });
   };
+  // "Aggiungi account": another personal account signs in here (the current one stays kept on the phone).
+  const addAccount = async () => {
+    rememberWantedSector(kind);
+    if (accEmail) { await keepProIdInAccount(); dropProIdOnDevice(); leaveAccount(); return; }
+    openAccount();
+  };
   if (!known.length) return null;
   if (known.length > 0) return (
     <div className="space-y-2">
       {known.length > 1 && <p className="px-1 text-sm text-foreground/70">Su questo telefono ci sono {known.length} profili {kind === "funzionario" ? "del settore urbano" : "del settore agricolo"}: scorri e scegli chi sei.</p>}
-      <ProfileCarousel known={known} foreign={foreign} onPick={(k) => void pick(k)} />
+      <ProfileCarousel known={known} foreign={foreign} onPick={(k) => void pick(k)} onAdd={() => void addAccount()} />
     </div>
   );
   return (
@@ -149,7 +157,7 @@ export function KnownProfiles({ kind }: { kind: ProKind }) {
                 ) : (
                   <>
                     <p className="text-sm text-foreground/70">Su questo telefono si sono registrati {known.length} profili {kind === "funzionario" ? "del settore urbano" : "del settore agricolo"}: scegli chi sei e ritrovi la tua cronologia.</p>
-                    <ProfileCarousel known={known} foreign={foreign} onPick={(k) => void pick(k)} />
+                    <ProfileCarousel known={known} foreign={foreign} onPick={(k) => void pick(k)} onAdd={() => void addAccount()} />
                   </>
                 )}
               </div>
@@ -163,7 +171,7 @@ export function KnownProfiles({ kind }: { kind: ProKind }) {
  * initials), the name, the profile, the account's email, a white "Continua come …" and a bin that asks in place before
  * taking the profile off the phone. Flat with reduced motion.
  */
-function ProfileCarousel({ known, foreign, onPick }: { known: KnownProId[]; foreign: (k: KnownProId) => boolean; onPick: (k: KnownProId) => void }) {
+function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[]; foreign: (k: KnownProId) => boolean; onPick: (k: KnownProId) => void; onAdd: () => void }) {
   const row = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
   const [asking, setAsking] = useState<string | null>(null);
@@ -276,10 +284,23 @@ function ProfileCarousel({ known, foreign, onPick }: { known: KnownProId[]; fore
             </div>
           </div>
         ))}
+        {/* The last slide: add another personal account, quickly. */}
+        <div role="listitem" className="w-[78%] shrink-0 snap-center">
+          <div data-active={known.length === active || undefined}
+            className="relative flex h-full flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-brand-turquoise/40 bg-[oklch(0.24_0.016_258/0.7)] p-5 text-center will-change-transform data-[active]:border-brand-turquoise/70">
+            <span className="grid size-16 place-items-center rounded-full bg-brand-turquoise/15 text-brand-turquoise ring-2 ring-brand-turquoise/50" aria-hidden="true"><UserPlus className="size-7" /></span>
+            <p className="text-xl font-semibold">Aggiungi account</p>
+            <p className="text-xs text-foreground/65">Entra con un altro account Google o email: il suo profilo si aggiunge qui.</p>
+            <button type="button" onClick={() => (known.length === active ? onAdd() : go(known.length))}
+              className="mt-auto inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+              <Plus className="size-4" aria-hidden="true" />Aggiungi account
+            </button>
+          </div>
+        </div>
       </div>
-      {known.length > 1 && <div className="flex justify-center gap-1.5" aria-hidden="true">
-        {known.map((k, i) => <button key={keyOf(k)} type="button" tabIndex={-1} onClick={() => go(i)} className={`h-1.5 rounded-full transition-all ${i === active ? "w-5 bg-brand-turquoise" : "w-1.5 bg-white/30"}`} />)}
-      </div>}
+      <div className="flex justify-center gap-1.5" aria-hidden="true">
+        {[...known.map(keyOf), "add"].map((key, i) => <button key={key} type="button" tabIndex={-1} onClick={() => go(i)} className={`h-1.5 rounded-full transition-all ${i === active ? "w-5 bg-brand-turquoise" : "w-1.5 bg-white/30"}`} />)}
+      </div>
     </div>
   );
 }

@@ -244,6 +244,8 @@ export function useGuest(): boolean {
 
 /** Drops the profile in use from this device only (the account keeps it), when leaving the account for another. */
 export function dropProIdOnDevice() { set(null); }
+/** Puts a profile in use on this device only (no account write), before leaving the account for it. */
+export function setProIdOnDevice(id: ProId) { pickedAt = Date.now(); set(id); }
 const set = (id: ProId | null) => {
   if (id) { keepLast(id); if (guestSnap()) { guest = false; try { window.localStorage.removeItem(GUEST_KEY); } catch { /* memory only */ } } }
   current = id;

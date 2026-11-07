@@ -71,7 +71,7 @@ export async function switchToAccount(email: string): Promise<boolean | "refused
  * Leaves the signed-in account without ending its session (it stays kept here for the way back) and reloads the page
  * signed out, with the account panel open to sign in with another one.
  */
-export function leaveAccount(opts: { openPanel?: boolean } = {}) {
+export function leaveAccount(opts: { openPanel?: boolean; to?: string } = {}) {
   leaving = true;
   try {
     supabase.auth.stopAutoRefresh();
@@ -81,5 +81,5 @@ export function leaveAccount(opts: { openPanel?: boolean } = {}) {
     // Left on purpose: the recognition is not asked again by itself on the reload that follows.
     sessionStorage.setItem("mdt-bio-skip", "1");
   } catch { /* none */ }
-  window.location.reload();
+  if (opts.to) window.location.assign(opts.to); else window.location.reload();
 }
