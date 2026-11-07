@@ -2,11 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSwipeBack } from "@/lib/use-swipe-back";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, Building2, Grape, LogIn, Mail, Trash2, UserRound, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, Grape, LogIn, Mail, Pencil, Trash2, UserRound, X } from "lucide-react";
 import { openAccount } from "@/lib/camera-dock";
 import { supabase } from "@/integrations/supabase/client";
 import { introSeen } from "@/lib/intro-seen";
-import { clearSectorGate, enterAsGuest, forgetKnownProId, keepProIdInAccount, rememberWantedSector, type KnownProId, saveProId, useAccountSector, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
+import { clearSectorGate, enterAsGuest, forgetKnownProId, keepProIdInAccount, rememberWantedSector, renameKnownProId, type KnownProId, saveProId, useAccountSector, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
 import { proSummary } from "@/models/professional-id";
 import { toast } from "sonner";
 import { useSignedIn } from "@/lib/use-signed-in";
@@ -140,6 +140,16 @@ function ProfileCarousel({ known, foreign, onPick }: { known: KnownProId[]; fore
   const row = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
   const [asking, setAsking] = useState<string | null>(null);
+  // The card whose name is being changed, and the name typed.
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const rename = async (k: KnownProId) => {
+    const name = draft.trim();
+    if (name.length < 2) { toast.error("Scrivi un nome di almeno 2 lettere"); return; }
+    setEditing(null);
+    if (name === k.name) return;
+    if (await renameKnownProId(k, name)) toast.success("Nome cambiato", { description: `Il profilo ora si chiama ${name}.` });
+  };
   const keyOf = (k: KnownProId) => `${k.kind}-${k.name}-${k.at}`;
   useEffect(() => {
     const el = row.current;
@@ -183,22 +193,38 @@ function ProfileCarousel({ known, foreign, onPick }: { known: KnownProId[]; fore
               className="relative flex h-full flex-col gap-3 rounded-3xl bg-[oklch(0.24_0.016_258/0.96)] p-4 ring-1 ring-brand-turquoise/25 shadow-[0_18px_40px_-16px_rgb(0_0_0/0.75)] transition-[box-shadow] duration-300 will-change-transform data-[active]:ring-brand-turquoise/55 data-[active]:shadow-[0_18px_40px_-16px_rgb(0_0_0/0.75),0_0_28px_-8px_rgb(45_212_191/0.4)]">
               <div className="flex items-center justify-between gap-2">
                 <p className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-turquoise">Ti abbiamo riconosciuto</p>
-                <button type="button" onClick={() => setAsking(asking === keyOf(k) ? null : keyOf(k))} aria-label={`Elimina ${k.name} da questo telefono`} title="Elimina da questo telefono"
-                  className="-mr-1.5 -mt-1.5 grid size-9 shrink-0 place-items-center rounded-full text-foreground/50 outline-none transition-colors hover:bg-red-500/20 hover:text-red-300 focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+                <div className="-mr-1.5 -mt-1.5 flex shrink-0">
+                <button type="button" onClick={() => { setAsking(null); if (editing === keyOf(k)) setEditing(null); else { setEditing(keyOf(k)); setDraft(k.name); } }} aria-label={`Cambia il nome di ${k.name}`} title="Cambia nome"
+                  className="grid size-9 place-items-center rounded-full text-foreground/50 outline-none transition-colors hover:bg-foreground/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+                  <Pencil className="size-4" aria-hidden="true" />
+                </button>
+                <button type="button" onClick={() => { setEditing(null); setAsking(asking === keyOf(k) ? null : keyOf(k)); }} aria-label={`Elimina ${k.name} da questo telefono`} title="Elimina da questo telefono"
+                  className="grid size-9 shrink-0 place-items-center rounded-full text-foreground/50 outline-none transition-colors hover:bg-red-500/20 hover:text-red-300 focus-visible:ring-2 focus-visible:ring-brand-turquoise">
                   <Trash2 className="size-4" aria-hidden="true" />
                 </button>
+                </div>
               </div>
               <div className="flex items-center gap-3.5">
                 <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-full bg-brand-turquoise/15 text-lg font-semibold text-brand-turquoise ring-2 ring-brand-turquoise/50" aria-hidden="true">
                   {k.acct?.pic ? <img src={k.acct.pic} alt="" referrerPolicy="no-referrer" className="size-full object-cover" /> : initials(k.name)}
                 </span>
                 <div className="min-w-0">
-                  <p className="truncate text-xl font-semibold">{k.name}</p>
+                  <p className="text-xl font-semibold leading-tight [overflow-wrap:anywhere]">{k.name}</p>
                   <p className="text-sm text-foreground/70">{proSummary(k)}</p>
                   {k.acct?.email && <p className="text-xs text-foreground/55 [overflow-wrap:anywhere]">{k.acct.email}</p>}
                 </div>
               </div>
-              {asking === keyOf(k) ? (
+              {editing === keyOf(k) ? (
+                <form className="mt-auto space-y-2" onSubmit={(e) => { e.preventDefault(); void rename(k); }}>
+                  <label className="block text-xs text-foreground/70" htmlFor={`nome-${keyOf(k)}`}>Che nome vuoi dare a questo profilo?</label>
+                  <input id={`nome-${keyOf(k)}`} value={draft} onChange={(e) => setDraft(e.target.value)} autoFocus maxLength={60} autoComplete="off"
+                    className="h-11 w-full rounded-xl bg-foreground/[0.08] px-3 text-[15px] outline-none ring-1 ring-foreground/15 focus:ring-2 focus:ring-brand-turquoise" />
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setEditing(null)} className="h-11 flex-1 rounded-full bg-foreground/[0.1] text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">Annulla</button>
+                    <button type="submit" className="h-11 flex-1 rounded-full bg-white text-sm font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">Salva</button>
+                  </div>
+                </form>
+              ) : asking === keyOf(k) ? (
                 <div role="alertdialog" aria-label={`Eliminare ${k.name}?`} className="mt-auto space-y-2">
                   <p className="text-xs text-foreground/70">Eliminare questo profilo dal telefono? Resta nel suo account.</p>
                   <div className="flex gap-2">

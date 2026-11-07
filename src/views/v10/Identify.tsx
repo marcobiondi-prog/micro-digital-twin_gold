@@ -55,9 +55,7 @@ const PAGE: Record<ProKind, { title: string; section: "urban" | "vineyard"; open
 
 function AgronomoForm({ onDone }: { onDone: () => void }) {
   const [v, setV] = useState<AgronomoInput>({ name: "", licenceType: "", licence: "", region: "", expires: "", declared: false });
-  // Signed in, the name comes from the personal account (it can still be changed).
-  const acc = useAccountSector();
-  useEffect(() => { if (acc?.name) setV((x) => (x.name ? x : { ...x, name: acc.name! })); }, [acc?.name]);
+  // The name is the person's own choice: never filled from the account (accounts often carry the same name).
   const [errors, setErrors] = useState<Errors<keyof AgronomoInput>>({});
   // Changing a field clears its message: the rest stay until the next try.
   const up = <K extends keyof AgronomoInput>(k: K, val: AgronomoInput[K]) => {
@@ -176,12 +174,11 @@ function RegionField(props: { id: string; describedBy: string | undefined; inval
 
 function FunzionarioForm({ onDone }: { onDone: () => void }) {
   const [v, setV] = useState<FunzionarioInput>({ name: "", comune: "", office: "", otherOffice: "", role: "", email: "", badge: "", declared: false });
-  // Signed in, the name and the email come from the personal account (they can still be changed).
+  // Signed in, the email comes from the personal account (it can still be changed); the name is the person's choice.
   const acc = useAccountSector();
   useEffect(() => {
-    if (!acc) return;
-    setV((x) => ({ ...x, ...(acc.name && !x.name ? { name: acc.name } : {}), ...(acc.email && !x.email ? { email: acc.email } : {}) }));
-  }, [acc?.name, acc?.email]);
+    if (acc?.email) setV((x) => (x.email ? x : { ...x, email: acc.email! }));
+  }, [acc?.email]);
   // The town picked from the list: the email example follows it.
   const [town, setTown] = useState<string | null>(null);
   const [errors, setErrors] = useState<Errors<keyof FunzionarioInput>>({});

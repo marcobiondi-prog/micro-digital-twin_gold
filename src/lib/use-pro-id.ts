@@ -157,6 +157,28 @@ export function forgetKnownProId(id: ProId) {
   }
   subs.forEach((f) => f());
 }
+/**
+ * Gives a profile kept on this phone the name the person chooses (accounts often carry the same Google name): the
+ * known list and the last profile of its kind are rewritten, and when it is the profile in use it is saved again
+ * (in the account too, when signed in). Returns the renamed profile.
+ */
+export async function renameKnownProId(id: ProId, name: string): Promise<KnownProId | null> {
+  const clean = name.trim().replace(/\s+/g, " ");
+  if (clean.length < 2) return null;
+  const k = knownSnap();
+  let renamed: KnownProId | null = null;
+  known = { ...k, [id.kind]: (k[id.kind] as KnownProId[]).map((p) => (sameProfile(p, id) ? (renamed = { ...p, name: clean }) : p)) };
+  saveKnown();
+  const l = lastSnap();
+  if (l[id.kind] && sameProfile(l[id.kind]!, id)) {
+    last = { ...l, [id.kind]: { ...l[id.kind]!, name: clean } };
+    try { window.localStorage.setItem(LAST_KEY, JSON.stringify(last)); } catch { /* memory only */ }
+  }
+  const cur = snapshot();
+  if (cur && sameProfile(cur, id)) await saveProId({ ...cur, name: clean });
+  subs.forEach((f) => f());
+  return renamed;
+}
 const keepLast = (id: ProId) => {
   last = { ...lastSnap(), [id.kind]: id };
   try { window.localStorage.setItem(LAST_KEY, JSON.stringify(last)); } catch { /* memory only */ }
@@ -332,7 +354,7 @@ export async function saveProId(id: ProId | null): Promise<boolean> {
   // Another personal account's profile (tied on this phone to another email) cannot be taken by this account.
   const email = data.session?.user.email;
   if (id && email && (knownSnap()[id.kind] as KnownProId[]).some((q) => sameProfile(q, id) && !!q.acct?.email && q.acct.email !== email)) {
-    toast.error("Questo profilo è di un altro account", { description: "Identificati con i tuoi dati: il modulo è già compilato con il nome e l'email del tuo account." });
+    toast.error("Questo profilo è di un altro account", { description: "Identificati con i tuoi dati, oppure accedi con l'account di quel profilo." });
     return false;
   }
   // Signed in to an account of the other sector: refused (the form shows why and how to use another account).
