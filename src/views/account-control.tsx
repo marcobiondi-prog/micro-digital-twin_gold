@@ -2,7 +2,7 @@ import { keepProIdInAccount, openSectorGate, saveProId, useProId } from "@/lib/u
 import { DeviceCacheCard } from "@/views/v10/DeviceCache";
 import { AccountDevices } from "@/views/v10/AccountDevices";
 import { biometricOn } from "@/lib/biometric";
-import { proBioKey } from "@/views/v10/Biometric";
+import { BiometricSignIn, ProfileBioSwitch, proBioKey } from "@/views/v10/Biometric";
 import { getKnownProIds } from "@/lib/use-pro-id";
 import { leaveAccount } from "@/lib/account-sessions";
 import { dropProIdOnDevice } from "@/lib/use-pro-id";
@@ -507,6 +507,7 @@ export function AccountControl() {
                 </div>
               </div>
             ) : <p className="pb-2 text-sm text-muted-foreground">Nessun profilo: piazza e vigneto sono bloccati.</p>}
+            {proId && <ProfileBioSwitch id={proId} />}
             {/* Identified, the card shows only that profile: the ways to identify appear when there is none. */}
             {!proId && <ul>
               {/* Straight to that profile's registration form (the sector page, over everything), past the profile page. */}
@@ -555,6 +556,7 @@ export function AccountControl() {
             </section>
           ) : (
             <section className="space-y-4">
+              <BiometricSignIn onDone={() => setOpen(false)} />
               <div className="flex gap-1 border-b" aria-label="Modalità account">
                 <Button variant="ghost" className={`rounded-none border-b-2 px-3 ${mode === "signin" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"}`} onClick={() => changeMode("signin")}>Accedi</Button>
                 <Button variant="ghost" className={`rounded-none border-b-2 px-3 ${mode === "signup" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"}`} onClick={() => changeMode("signup")}>Registrati</Button>
