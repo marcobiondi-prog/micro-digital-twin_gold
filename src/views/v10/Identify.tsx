@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useSwipeBack } from "@/lib/use-swipe-back";
 import { useNavigate } from "@tanstack/react-router";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, BadgeCheck, Building2, Grape, LogOut, ShieldCheck } from "lucide-react";
 import { dropProIdOnDevice, keepProIdInAccount, rememberWantedSector, saveProId, useAccountSector, useProId, openSectorGate } from "@/lib/use-pro-id";
@@ -10,6 +11,8 @@ import { leaveAccount } from "@/lib/account-sessions";
 import { leaveProfile, ProfileBioRow } from "@/views/v10/Biometric";
 // The recognised profiles' carousel, as on the sector page (lazy: the sector page imports this file).
 const KnownProfiles = lazy(() => import("@/views/v10/SectorGate").then((m) => ({ default: m.KnownProfiles })));
+// The entrance's aurora, for the sector lock's own page (lazy: the entrance imports this file).
+const Backdrop = lazy(() => import("@/views/v10/intro").then((m) => ({ default: m.Backdrop })));
 import { loadComuni } from "@/lib/comuni";
 import { findComune, searchComuni, townDomain, type Comune } from "@/models/comuni";
 import { findRegion, officeOf, searchOffices, searchRegions } from "@/models/professional-id";
@@ -248,6 +251,7 @@ export function IdentifyForm({ kind, onDone }: { kind: ProKind; onDone: () => vo
 
 const SECTOR_NAME: Record<ProKind, string> = { funzionario: "urbano", agronomo: "agricolo" };
 const SECTOR_PLACE: Record<ProKind, string> = { funzionario: "la piazza", agronomo: "il vigneto" };
+const SECTOR_TO: Record<ProKind, string> = { funzionario: "alla piazza", agronomo: "al vigneto" };
 /** "Entra come <own profile>" on the lock: off for now (only the notice and "Esci e usa un altro account"); true restores it. */
 const LOCK_ENTER_OWN = false;
 /**
@@ -280,28 +284,39 @@ export function AccountSectorLock({ kind, account, email }: { kind: ProKind; acc
     dropProIdOnDevice();
     leaveAccount();
   };
-  return (
-    <div className="space-y-3 rounded-3xl bg-foreground/[0.07] p-5 ring-1 ring-amber-400/40">
-      <p className="flex items-center gap-2 text-[15px] font-semibold"><ShieldCheck className="size-5 shrink-0 text-amber-300" aria-hidden="true" />Questo account è del settore {SECTOR_NAME[account]}</p>
-      <p className="text-sm leading-relaxed text-foreground/70">
-        {email ? <>L’account <span className="font-semibold text-foreground [overflow-wrap:anywhere]">{email}</span></> : "Il tuo account"} è legato a {SECTOR_PLACE[account]}: ogni account personale vale per un solo settore. Per il settore {SECTOR_NAME[kind]} accedi con un altro account, o creane uno nuovo.
-      </p>
-      {own && (
-        <button type="button" disabled={busy} onClick={() => void enterOwn()}
-          className="flex w-full items-center gap-3 rounded-2xl bg-white p-3 pl-4 text-left text-black outline-none disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-brand-turquoise">
-          <span className="min-w-0 flex-1">
-            <span className="block text-[15px] font-semibold">Entra come {own.name}</span>
-            <span className="block text-xs text-black/60 [overflow-wrap:anywhere]">{proSummary(own)} · apre {SECTOR_PLACE[account]}</span>
-          </span>
-          <ArrowRight className="size-4 shrink-0" aria-hidden="true" />
+  // Its own full-screen page over the form (and the sector page), so it is seen at once; "Indietro" goes back.
+  const page = (
+    <div role="dialog" aria-modal="true" aria-labelledby="sector-lock-title" className="dark fixed inset-0 z-[1000000000] isolate overflow-y-auto overscroll-contain bg-background px-6 text-foreground [color-scheme:dark] sm:px-12">
+      <Suspense fallback={null}><Backdrop /></Suspense>
+      <div className="relative mx-auto flex min-h-full max-w-lg flex-col py-10">
+        <button type="button" onClick={() => window.history.back()} className="inline-flex h-11 items-center gap-2 self-start rounded-full pr-3 text-[15px] font-semibold text-foreground/80 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+          <ArrowLeft className="size-5" aria-hidden="true" />Indietro
         </button>
-      )}
-      <button type="button" disabled={busy} onClick={() => void other()}
-        className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-full text-sm font-semibold outline-none disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-ring ${own ? "bg-foreground/[0.08]" : "bg-white text-black"}`}>
-        <LogOut className="size-4" aria-hidden="true" />Esci e usa un altro account
-      </button>
+        <div className="my-auto space-y-5 py-10">
+          <span className="grid size-16 place-items-center rounded-full bg-amber-400/15 ring-1 ring-amber-400/40"><ShieldCheck className="size-8 text-amber-300" aria-hidden="true" /></span>
+          <h1 id="sector-lock-title" className="font-display text-[2.4rem] font-extralight leading-[1.05] tracking-tight sm:text-6xl">Questo account è del settore {SECTOR_NAME[account]}</h1>
+          <p className="text-[17px] leading-relaxed text-foreground/75">
+            {email ? <>L’account <span className="font-semibold text-foreground [overflow-wrap:anywhere]">{email}</span></> : "Il tuo account"} è legato {SECTOR_TO[account]}: ogni account personale vale per un solo settore. Per il settore {SECTOR_NAME[kind]} accedi con un altro account, o creane uno nuovo.
+          </p>
+          {LOCK_ENTER_OWN && own && (
+            <button type="button" disabled={busy} onClick={() => void enterOwn()}
+              className="flex w-full items-center gap-3 rounded-2xl bg-white p-3 pl-4 text-left text-black outline-none disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold">Entra come {own.name}</span>
+                <span className="block text-xs text-black/60 [overflow-wrap:anywhere]">{proSummary(own)} · apre {SECTOR_PLACE[account]}</span>
+              </span>
+              <ArrowRight className="size-4 shrink-0" aria-hidden="true" />
+            </button>
+          )}
+          <button type="button" disabled={busy} onClick={() => void other()}
+            className={`inline-flex h-12 w-full items-center justify-center gap-2 rounded-full text-[15px] font-semibold outline-none disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-ring ${LOCK_ENTER_OWN && own ? "bg-foreground/[0.08]" : "bg-white text-black"}`}>
+            <LogOut className="size-5" aria-hidden="true" />Esci e usa un altro account
+          </button>
+        </div>
+      </div>
     </div>
   );
+  return typeof document === "undefined" ? null : createPortal(page, document.body);
 }
 
 /** What the profile opens and locks, in one line. */
