@@ -5,6 +5,7 @@ import { biometricOn } from "@/lib/biometric";
 import { BiometricSignIn, ProfileBioSwitch, proBioKey } from "@/views/v10/Biometric";
 import { getKnownProIds } from "@/lib/use-pro-id";
 import { leaveAccount } from "@/lib/account-sessions";
+import { keepLink, keptLink, LINK_TTL_S } from "@/lib/signed-links";
 import { dropProIdOnDevice } from "@/lib/use-pro-id";
 import { getMedia, removeMedia, useLabMedia } from "@/models/lab-media-store";
 import { CLOUD_QUOTA, bytesText, usageTone, useCloudUsage } from "@/lib/use-cloud-usage";
@@ -256,8 +257,9 @@ export function AccountControl() {
       await supabase.storage.from(bucket).remove([previous.avatar_path]);
     }
     if (path) {
-      const { data, error: urlError } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
+      const { data, error: urlError } = await supabase.storage.from(bucket).createSignedUrl(path, LINK_TTL_S);
       if (urlError) throw urlError;
+      keepLink(bucket, path, data.signedUrl);
       setAvatarUrl(data.signedUrl);
     } else setAvatarUrl(null);
     setChoice(selected);
@@ -334,8 +336,11 @@ export function AccountControl() {
       if (profile?.avatar_choice) setChoice(profile.avatar_choice as Choice);
       else setChoice(null);
       if (profile?.avatar_path) {
-        const { data } = await supabase.storage.from(bucket).createSignedUrl(profile.avatar_path, 3600);
-        if (active) setAvatarUrl(data?.signedUrl ?? null);
+        // The same link for days (kept on the device), so the picture comes from the browser's cache, not downloaded again.
+        const kept = keptLink(bucket, profile.avatar_path);
+        const url = kept ?? (await supabase.storage.from(bucket).createSignedUrl(profile.avatar_path, LINK_TTL_S)).data?.signedUrl ?? null;
+        if (url && !kept) keepLink(bucket, profile.avatar_path, url);
+        if (active) setAvatarUrl(url);
       } else setAvatarUrl(null);
       const pending = sessionStorage.getItem(pendingAvatarKey);
       const selected = draftFileRef.current ? "upload" : (pending && suggestions.some((item) => item.id === pending) ? pending as Choice : null);

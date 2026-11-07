@@ -23,19 +23,24 @@ export function VideoPlayer({ src, autoPlay = false }: { src: string; autoPlay?:
   const [loop, setLoop] = useState(false);
   const [shown, setShown] = useState(true);
   const hide = useRef<number | undefined>(undefined);
+  // The frame strip is drawn only once the person touches the player: drawing it means reading the video at eight
+  // points, which costs traffic for a video only glanced at.
+  const [wantStrip, setWantStrip] = useState(false);
   const poke = () => {
+    setWantStrip(true);
     setShown(true);
     window.clearTimeout(hide.current);
     hide.current = window.setTimeout(() => { if (v.current && !v.current.paused) setShown(false); }, 3000);
   };
   useEffect(() => () => window.clearTimeout(hide.current), []);
   useEffect(() => { if (v.current) v.current.playbackRate = rate; }, [rate]);
-  // The strip's frames, drawn from a hidden copy of the video once its length is known.
+  // The strip's frames, drawn from a hidden copy of the video once its length is known and the player was touched;
+  // the copy reads only what each frame needs (preload metadata), never the whole file.
   useEffect(() => {
-    if (!d) return;
+    if (!d || !wantStrip) return;
     let live = true;
     const probe = document.createElement("video");
-    probe.muted = true; probe.preload = "auto"; probe.playsInline = true; probe.src = src;
+    probe.muted = true; probe.preload = "metadata"; probe.playsInline = true; probe.src = src;
     void (async () => {
       for (let k = 0; k < FRAMES && live; k++) {
         await new Promise<void>((done) => {
@@ -51,7 +56,7 @@ export function VideoPlayer({ src, autoPlay = false }: { src: string; autoPlay?:
       }
     })();
     return () => { live = false; probe.removeAttribute("src"); probe.load(); };
-  }, [src, d]);
+  }, [src, d, wantStrip]);
   const toggle = () => { const el = v.current; if (!el) return; if (el.paused) void el.play().catch(() => {}); else el.pause(); poke(); };
   const seekAt = (clientX: number) => {
     const el = v.current, box = strip.current?.getBoundingClientRect();

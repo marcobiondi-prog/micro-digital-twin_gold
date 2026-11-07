@@ -9,7 +9,9 @@ const RELOAD_KEY = "chunk-reload-at";
  * itself unregistered (the app registers a fresh one once loaded). On a slow network the old worker could serve a
  * page of an earlier version together with files of the new one, which breaks the app ("reading 'component'"). */
 export async function reloadFresh() {
-  try { if ("caches" in window) await Promise.all((await caches.keys()).map((k) => caches.delete(k))); } catch { /* cache unavailable */ }
+  // The thumbnails of photos and videos (mdt-thumbs-*) stay: they belong to no version, and making them again meant
+  // downloading every original once more (the traffic Supabase counts).
+  try { if ("caches" in window) await Promise.all((await caches.keys()).filter((k) => !k.startsWith("mdt-thumbs")).map((k) => caches.delete(k))); } catch { /* cache unavailable */ }
   try { if ("serviceWorker" in navigator) await Promise.all((await navigator.serviceWorker.getRegistrations()).map((r) => r.unregister())); } catch { /* no worker */ }
   window.location.reload();
 }

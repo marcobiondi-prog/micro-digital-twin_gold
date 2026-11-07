@@ -1,6 +1,7 @@
 import { getGoogleUsage } from "./google-usage";
 import { useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { keepLink, keptLink, LINK_TTL_S } from "@/lib/signed-links";
 
 export type MediaKind = "urban" | "vineyard";
 export type MediaItem = { id: string; name: string; size: number; url: string; kind: "image" | "video"; path?: string | undefined };
@@ -10,7 +11,6 @@ export const MEDIA_BUCKET = "lab-media";
 const state: Record<MediaKind, MediaItem[]> = { urban: [], vineyard: [] };
 const loadedFor: Record<MediaKind, string | null> = { urban: null, vineyard: null };
 /** The account files' signed links and when they were made (they last an hour). */
-const signedAt = new Map<string, { url: string; at: number }>();
 const subs = new Set<() => void>();
 const emit = () => subs.forEach((f) => f());
 /** Why the account's files could not be read last time (null when they were): shown in the history with a retry. */
@@ -148,19 +148,20 @@ export async function ensureMedia(k: MediaKind, userId: string | null) {
   let account: MediaItem[] = [];
   if (files.length) {
     const paths = files.map((f) => `${folder}/${f.name}`);
-    // A link signed less than 50 minutes ago is kept, so a refresh does not reload pictures or restart a playing video.
+    // A link kept on this device (signed for 7 days, reused for 6) keeps the same address, so the browser serves the
+    // file from its own cache instead of downloading it again (lib/signed-links).
     const now = Date.now();
-    const fresh = (p: string) => { const l = signedAt.get(p); return l && now - l.at < 50 * 60_000 ? l.url : null; };
+    const fresh = (p: string) => keptLink(MEDIA_BUCKET, p, now);
     const stale = paths.filter((p) => !fresh(p));
     for (let i = 0; i < stale.length; i += 100) {
       const part = stale.slice(i, i + 100);
-      const { data: signed, error: signError } = await supabase.storage.from(MEDIA_BUCKET).createSignedUrls(part, 3600);
+      const { data: signed, error: signError } = await supabase.storage.from(MEDIA_BUCKET).createSignedUrls(part, LINK_TTL_S);
       if (signError) console.warn("Lab media: signing links failed", signError);
-      (signed ?? []).forEach((x) => { if (x.signedUrl && x.path) signedAt.set(x.path, { url: x.signedUrl, at: now }); });
+      (signed ?? []).forEach((x) => { if (x.signedUrl && x.path) keepLink(MEDIA_BUCKET, x.path, x.signedUrl, now); });
       // A batch refused as a whole: each file is signed on its own, so one odd file never hides the others.
       for (const p of part.filter((q) => !fresh(q))) {
-        const one = await supabase.storage.from(MEDIA_BUCKET).createSignedUrl(p, 3600);
-        if (one.data?.signedUrl) signedAt.set(p, { url: one.data.signedUrl, at: now });
+        const one = await supabase.storage.from(MEDIA_BUCKET).createSignedUrl(p, LINK_TTL_S);
+        if (one.data?.signedUrl) keepLink(MEDIA_BUCKET, p, one.data.signedUrl, now);
       }
     }
     // A file whose link could not be signed now stays listed with the link it had (or none, shown as a dark tile) and

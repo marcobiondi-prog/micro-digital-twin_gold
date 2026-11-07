@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { keepLink, LINK_TTL_S } from "@/lib/signed-links";
 import {
   MEDIA_BUCKET,
   cloudUsed,
@@ -145,8 +146,9 @@ async function runQueue(
         else mark(up.id, "error");
         return;
       }
-      const { data } = await supabase.storage.from(MEDIA_BUCKET).createSignedUrl(path, 3600);
+      const { data } = await supabase.storage.from(MEDIA_BUCKET).createSignedUrl(path, LINK_TTL_S);
       if (data) {
+        keepLink(MEDIA_BUCKET, path, data.signedUrl);
         setMedia(kind, (p) => [
           { id: path, path, name: safe, size: file.size, url: data.signedUrl, kind: up.kind },
           ...p,
