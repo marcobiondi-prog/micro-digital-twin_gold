@@ -71,11 +71,11 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, medi
   // Entering the page always starts on Mappa (unless a tab was asked for on the way in).
   useLayoutEffect(() => startOnMap(kind), [kind]);
   const go = (t: SimTab) => openSimTab(kind, t);
-  // The title is the place chosen (its name, the rest of its address in the small line above with the section);
-  // a position from the GPS reads its street or town instead of "La mia posizione".
+  // The place's name in the small line above the title (Piazza / Vigneto); a position from the GPS reads its street or
+  // town instead of "La mia posizione".
   const parts = place.split(" · ").map((x) => x.trim()).filter(Boolean);
   const own = parts[0]?.startsWith("La mia posizione") && parts.length > 1 ? parts.slice(1) : parts;
-  const title = own[0] ?? place, kicker = [kind === "urban" ? "Piazza" : "Vigneto", ...own.slice(1)].join(" · ");
+  const title = own[0] ?? place;
   const barRef = useRef<HTMLDivElement>(null), rootRef = useRef<HTMLDivElement>(null);
   useHideOnScroll(barRef, rootRef);
   // The place is shown and changed in the Mappa tab.
@@ -86,7 +86,7 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, medi
   return (
     <div ref={rootRef} className="space-y-4">
       <Ambient tone={TONE[kind]} />
-      <PageHero small kicker={kicker} kickerIcon={MapPin} onKicker={toMap} title={title}
+      <PageHero kicker={title} kickerIcon={MapPin} onKicker={toMap} title={kind === "urban" ? "Piazza" : "Vigneto"}
         actions={<>
           {onCompare && <HeroButton icon={Scale} label="Confronta" onClick={onCompare} showLabel />}
           <DropdownMenu>
