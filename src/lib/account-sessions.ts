@@ -86,12 +86,14 @@ export function leaveAccount(opts: { openPanel?: boolean; to?: string } = {}) {
 
 /**
  * Signs in a personal account that is not kept on this phone, with as little as possible in between: a Google account
- * (signed in with Google before, or a Gmail address) goes straight to Google's sign-in for that very address
+ * (any account not known to use email and password) goes straight to Google's sign-in for that very address
  * (login_hint), coming back to `back`; any other opens the account panel with its email already written, asking only
  * the password. From then on the account is kept here and entered by itself.
  */
 export async function signInAs(email: string, opts: { provider?: string | undefined; back?: string } = {}) {
-  const google = opts.provider === "google" || (!opts.provider && /@(gmail|googlemail)\.com$/i.test(email));
+  // Google unless the account is known to use email and password: school and work addresses (Google Workspace, e.g.
+  // …@studenti.itsdemos.it) sign in with Google too, and Google's own page offers that address.
+  const google = opts.provider !== "email";
   if (google) {
     const back = opts.back ?? window.location.pathname + window.location.search;
     try { sessionStorage.setItem("mdt-auth-return", back); } catch { /* none */ }
