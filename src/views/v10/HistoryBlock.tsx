@@ -879,7 +879,7 @@ function EntryRow({ e }: { e: SourcedEntry }) {
         <p className="break-words text-[15px] leading-snug">{e.text}</p>
         <WhenLine e={e} />
         <p className="mt-0.5 truncate text-xs text-muted-foreground">{e.flow === "piazza" ? "Piazza" : "Vigneto"}{e.place ? ` · ${e.place}` : ""}</p>
-        {by && <p className="mt-0.5 truncate text-xs text-muted-foreground">{by.office}{by.role ? ` · ${by.role}` : ""} · Comune di {by.comune}</p>}
+        {by && <p className="mt-0.5 text-xs text-muted-foreground [overflow-wrap:anywhere]">{by.office}{by.role ? ` · ${by.role}` : ""} · Comune di {by.comune}</p>}
         <SourceChip source={e.source} />
       </div>
       <Link to="/cronologia/$id" params={{ id: e.id }} aria-label={`Apri: ${e.text}`}
@@ -1300,7 +1300,7 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
       <div ref={area} className="space-y-3">
       {!compact && !flow && <TabRow label="Luogo" items={FILTERS} value={filter} onChange={(v) => setFilter(v as Filter)} />}
       {/* A municipal officer: the interventions of the office in use, or of every office of the account. */}
-      {proId?.kind === "funzionario" && flow !== "vigneto" && (otherOffices > 0 || officeScope === "all") && <OfficeScopePills value={officeScope} office={proId.office} others={otherOffices} />}
+      {proId?.kind === "funzionario" && flow !== "vigneto" && <OfficeScopePills value={officeScope} office={proId.office} others={otherOffices} />}
       {/* Tutti · Piazza · Vigneto turn with a sideways swipe on the list, like the tutorial's screens. */}
       <div ref={swipe.ref} style={swipe.style} className="relative space-y-3">
       {failed && <DashCard><p className="text-sm text-muted-foreground">Non riesco a leggere la cronologia del tuo account. Vedi solo quella di questo dispositivo.</p></DashCard>}
