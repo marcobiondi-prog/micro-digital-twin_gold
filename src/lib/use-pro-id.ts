@@ -186,7 +186,10 @@ const accountLast = (meta: unknown, id: ProId | null, own: ProKind[]): Record<st
 const withKind = (own: ProKind[], id: ProId | null) => (id && !own.includes(id.kind) ? [...own, id.kind] : own);
 
 /** Saves the profile (null removes it) on this device and, signed in, in the account, as the account's own. */
+/** When a profile was last chosen on this device (identified, picked again or left): a sign-in being read meanwhile does not override it. */
+let pickedAt = 0;
 export async function saveProId(id: ProId | null): Promise<void> {
+  pickedAt = Date.now();
   set(id);
   const { data } = await supabase.auth.getSession();
   if (!data.session) return;
@@ -228,6 +231,7 @@ export function useSyncProId() {
     const adopt = async (userId: string, meta: unknown) => {
       if (adopted === userId) return;
       adopted = userId;
+      const startedAt = Date.now();
       const legacy = ownOf(meta) === null;
       const own = ownOf(meta) ?? (await legacyOwn());
       if (own === null) { adopted = ""; return; } // history not readable now: decide at the next sign-in or opening
@@ -238,6 +242,9 @@ export function useSyncProId() {
       const mine = (p: unknown): p is ProId => isProId(p) && own.includes(p.kind);
       const left = (meta as Meta)?.pro_left === true;
       const back = mine(saved) ? saved : left ? null : own.map((k) => prev[k]).filter(mine).sort((x, y) => (y.at > x.at ? 1 : -1))[0] ?? null;
+      // A profile chosen on this device while the account was being read (the history check takes a moment) wins: the
+      // account's older one would replace it — a farmer just picked on the vineyard's page turned back into an officer.
+      if (pickedAt >= startedAt) return;
       const clean = { pro_id: back, pro_last: accountLast(meta, back, own), pro_own: own };
       const dirty = legacy || (saved != null && !mine(saved)) || KINDS.some((k) => prev[k] != null && !own.includes(k));
       if (back) {

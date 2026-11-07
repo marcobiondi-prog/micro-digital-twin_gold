@@ -59,6 +59,65 @@ export function SectorGate() {
   return createPortal(<SectorPage key={ask.at} start={ask.kind} />, document.body);
 }
 
+
+/**
+ * "Ti abbiamo riconosciuto": the profiles of this kind registered before on this phone (or brought by the account), to
+ * continue as one of them — one as a card, more as a list to choose from, each with an ✕ to take it off the phone.
+ * Shown on the sector page's form and on a locked section's page.
+ */
+export function KnownProfiles({ kind }: { kind: ProKind }) {
+  const known = useKnownProIds(kind);
+  const avatar = useAccountAvatar();
+  const pick = (k: ProId) => { void saveProId(k); toast.success(`Bentornato, ${k.name}`, { description: `Ritrovi la cronologia ${k.kind === "funzionario" ? "della piazza" : "del vigneto"}.` }); };
+  if (!known.length) return null;
+  return (
+              <div className="space-y-3 rounded-3xl bg-foreground/[0.08] p-5 ring-1 ring-brand-turquoise/40">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-turquoise">Ti abbiamo riconosciuto</p>
+                {known.length === 1 ? (
+                  <>
+                    <div className="flex items-center gap-3.5">
+                      <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-full bg-foreground/10 ring-2 ring-brand-turquoise/50">
+                        {avatar ? <img src={avatar} alt="Immagine del tuo account" referrerPolicy="no-referrer" className="size-full object-cover" /> : <UserRound className="size-7 text-foreground/60" aria-hidden="true" />}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-xl font-semibold">{known[0]!.name}</p>
+                        <p className="text-sm text-foreground/70">{proSummary(known[0]!)}</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-foreground/60">Ti eri già registrato con questo profilo: continua e ritrovi la cronologia {kind === "funzionario" ? "della piazza" : "del vigneto"}.</p>
+                    <button type="button" onClick={() => pick(known[0]!)}
+                      className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white text-[15px] font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+                      Continua come {known[0]!.name}<ArrowRight className="size-4" aria-hidden="true" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-foreground/70">Su questo telefono si sono registrati {known.length} profili {kind === "funzionario" ? "del settore urbano" : "del settore agricolo"}: scegli chi sei e ritrovi la tua cronologia.</p>
+                    <ul className="space-y-2" aria-label="Profili registrati">
+                      {known.map((k) => (
+                        <li key={`${k.name}-${k.at}`} className="flex items-center gap-2 rounded-2xl bg-foreground/[0.06] ring-1 ring-foreground/10">
+                          <button type="button" onClick={() => pick(k)} aria-label={`Continua come ${k.name}, ${proSummary(k)}`}
+                            className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl p-3 text-left outline-none transition-colors hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+                            <span className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-turquoise/15 text-base font-semibold text-brand-turquoise ring-1 ring-brand-turquoise/40" aria-hidden="true">{initials(k.name)}</span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-[15px] font-semibold">{k.name}</span>
+                              <span className="block text-xs leading-snug text-foreground/65 [overflow-wrap:anywhere]">{proSummary(k)}</span>
+                            </span>
+                            <ArrowRight className="size-4 shrink-0 text-foreground/60" aria-hidden="true" />
+                          </button>
+                          <button type="button" onClick={() => forgetKnownProId(k)} aria-label={`Togli ${k.name} da questo telefono`} title="Togli da questo telefono"
+                            className="mr-1.5 grid size-9 shrink-0 place-items-center rounded-full text-foreground/50 outline-none hover:bg-foreground/[0.08] hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+                            <X className="size-4" aria-hidden="true" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </div>
+  );
+}
+
 /** Two letters for a profile's round badge in the list ("Marco Biondi" → "MB"). */
 const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || "?";
 
@@ -87,8 +146,6 @@ function SectorPage({ start }: { start: ProKind | null }) {
   // The profile of this kind registered before (on this device or in the account): recognised, one tap brings it back
   // with its project's history.
   const known = useKnownProIds(kind);
-  const pick = (k: ProId) => { void saveProId(k); toast.success(`Bentornato, ${k.name}`, { description: `Ritrovi la cronologia ${k.kind === "funzionario" ? "della piazza" : "del vigneto"}.` }); };
-  const avatar = useAccountAvatar();
   // The page behind does not scroll while this one is up.
   useEffect(() => {
     const html = document.documentElement, before = html.style.overflow;
@@ -116,52 +173,7 @@ function SectorPage({ start }: { start: ProKind | null }) {
             </button>
             <h1 className="font-display text-[2.6rem] font-extralight leading-[1] tracking-tight">{sector.name}</h1>
             <p className="text-[15px] leading-relaxed text-foreground/60">{profileIntro(sector.kind)}</p>
-            {known.length > 0 && (
-              <div className="space-y-3 rounded-3xl bg-foreground/[0.08] p-5 ring-1 ring-brand-turquoise/40">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-turquoise">Ti abbiamo riconosciuto</p>
-                {known.length === 1 ? (
-                  <>
-                    <div className="flex items-center gap-3.5">
-                      <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-full bg-foreground/10 ring-2 ring-brand-turquoise/50">
-                        {avatar ? <img src={avatar} alt="Immagine del tuo account" referrerPolicy="no-referrer" className="size-full object-cover" /> : <UserRound className="size-7 text-foreground/60" aria-hidden="true" />}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-xl font-semibold">{known[0]!.name}</p>
-                        <p className="text-sm text-foreground/70">{proSummary(known[0]!)}</p>
-                      </div>
-                    </div>
-                    <p className="text-xs text-foreground/60">Ti eri già registrato con questo profilo: continua e ritrovi la cronologia {sector.kind === "funzionario" ? "della piazza" : "del vigneto"}.</p>
-                    <button type="button" onClick={() => pick(known[0]!)}
-                      className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white text-[15px] font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
-                      Continua come {known[0]!.name}<ArrowRight className="size-4" aria-hidden="true" />
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm text-foreground/70">Su questo telefono si sono registrati {known.length} profili {sector.kind === "funzionario" ? "del settore urbano" : "del settore agricolo"}: scegli chi sei e ritrovi la tua cronologia.</p>
-                    <ul className="space-y-2" aria-label="Profili registrati">
-                      {known.map((k) => (
-                        <li key={`${k.name}-${k.at}`} className="flex items-center gap-2 rounded-2xl bg-foreground/[0.06] ring-1 ring-foreground/10">
-                          <button type="button" onClick={() => pick(k)} aria-label={`Continua come ${k.name}, ${proSummary(k)}`}
-                            className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl p-3 text-left outline-none transition-colors hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-brand-turquoise">
-                            <span className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-turquoise/15 text-base font-semibold text-brand-turquoise ring-1 ring-brand-turquoise/40" aria-hidden="true">{initials(k.name)}</span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-[15px] font-semibold">{k.name}</span>
-                              <span className="block text-xs leading-snug text-foreground/65 [overflow-wrap:anywhere]">{proSummary(k)}</span>
-                            </span>
-                            <ArrowRight className="size-4 shrink-0 text-foreground/60" aria-hidden="true" />
-                          </button>
-                          <button type="button" onClick={() => forgetKnownProId(k)} aria-label={`Togli ${k.name} da questo telefono`} title="Togli da questo telefono"
-                            className="mr-1.5 grid size-9 shrink-0 place-items-center rounded-full text-foreground/50 outline-none hover:bg-foreground/[0.08] hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand-turquoise">
-                            <X className="size-4" aria-hidden="true" />
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-              </div>
-            )}
+            <KnownProfiles kind={sector.kind} />
             {signIn}
             {known.length > 0 && <p className="px-1 pt-2 text-sm font-semibold text-foreground/70">Oppure registra un altro profilo</p>}
             <IdentifyForm kind={sector.kind} onDone={done} />
