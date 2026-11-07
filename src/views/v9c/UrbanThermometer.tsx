@@ -366,7 +366,7 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
       </div>
 
       {/* The simulation stays the focus: once the gauge scrolls away, its reading rides under the tabs. */}
-      <div aria-hidden={gaugeSeen} className={cn("pointer-events-none sticky top-[calc(var(--nav-h)+var(--sim-tabs-gap,3.75rem))] z-[999999996] -mb-5 flex h-0 justify-center transition-[opacity,top] duration-200 motion-reduce:transition-none", gaugeSeen ? "opacity-0" : "opacity-100")}>
+      <div aria-hidden={gaugeSeen} className={cn("pointer-events-none sticky top-[calc(var(--nav-h)+3.75rem)] z-[999999996] -mb-5 flex h-0 translate-y-[var(--sim-tabs-shift,0rem)] justify-center transition-[opacity,transform] duration-300 motion-reduce:transition-none", gaugeSeen ? "opacity-0" : "opacity-100")}>
         <button type="button" tabIndex={gaugeSeen ? -1 : 0} onClick={() => gaugeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
           className="mt-1 flex h-11 items-center gap-2 rounded-full bg-card/95 px-4 shadow-lg ring-1 ring-foreground/10 backdrop-blur" style={{ pointerEvents: gaugeSeen ? "none" : "auto" }}>
           <span className={cn("size-2.5 rounded-full", feel.bg ?? GAIN_BG[feel.step])} aria-hidden="true" />
