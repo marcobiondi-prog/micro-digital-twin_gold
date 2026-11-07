@@ -7,6 +7,8 @@ const EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
 export const SLIDE_EASE = `transform 380ms ${EASE}`;
 /** Space between the open panel and the next one sliding in beside it. */
 export const PEEK_GAP = 16;
+/** Sideways swipe between tabs: off for now (tabs change only with a tap); true turns it back on everywhere. */
+export const TAB_SWIPE_ON = false;
 /** A flick: this fast (px per ms) turns the tab even when it has moved less than 50 px (MIN_SWIPE), from this far. */
 const FLICK_SPEED = 0.45, FLICK_MIN = 16;
 
@@ -91,7 +93,7 @@ export function useTabSwipe<T extends string>(ids: ReadonlyArray<T>, value: T, o
   useEffect(() => {
     // Sub-tabs listen on their own element, the page's tabs on the document (same events, typed as an element's).
     const host = (scope ? scope.current : document) as HTMLElement | null;
-    if (!host) return;
+    if (!host || !TAB_SWIPE_ON) return;
     let frame = 0, dragged = 0, top = 0, nextX = 0;
     // The last few positions with their time, for the flick's speed.
     let trail: Array<[number, number]> = [];

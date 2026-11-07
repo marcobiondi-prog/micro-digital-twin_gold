@@ -1,7 +1,7 @@
 declare const __BUILD_TIME__: string | undefined;
 
 /**
- * This version's build number, shown in the account panel as "Build 446408": the minutes from 1 January 2026 (UTC) to
+ * This version's build number, shown in the account panel as a code like a console model's, "MDTW-9KK8" (the number in base 36): the minutes from 1 January 2026 (UTC) to
  * the build, so every build has its own number and a newer one is always higher, with no date nor time on screen.
  */
 export const BUILD_TIME = typeof __BUILD_TIME__ === "string" ? __BUILD_TIME__ : null;
@@ -13,7 +13,7 @@ export function buildNumber(iso: string | null = BUILD_TIME): number | null {
 }
 export function buildLabel(iso: string | null = BUILD_TIME): string {
   const n = buildNumber(iso);
-  return n === null ? "sviluppo" : `Build ${n}`;
+  return n === null ? "sviluppo" : `MDTW-${n.toString(36).toUpperCase()}`;
 }
 
 /** The version online now (its build time, from /version.json), or null without a connection. */
