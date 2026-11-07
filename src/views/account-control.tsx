@@ -11,7 +11,7 @@ import { getMedia, removeMedia, useLabMedia } from "@/models/lab-media-store";
 import { CLOUD_QUOTA, bytesText, usageTone, useCloudUsage } from "@/lib/use-cloud-usage";
 import { ProfileIcon } from "@/views/ProfileIcon";
 import { proSummary } from "@/models/professional-id";
-import { useCallback, useContext, useEffect, useRef, useState, type ChangeEvent, type ComponentType, type FormEvent } from "react";
+import { lazy, Suspense, useCallback, useContext, useEffect, useRef, useState, type ChangeEvent, type ComponentType, type FormEvent } from "react";
 import { LogOut, UserRound, Mail, LockKeyhole, Camera, ShieldCheck, ChevronRight, LoaderCircle, Trash2, RefreshCw } from "lucide-react";
 import { useUpdateProgress } from "@/lib/update-progress";
 import { buildLabel, checkForUpdate } from "@/lib/app-version";
@@ -20,7 +20,6 @@ import { InfoNav, InfoPage, type InfoPath } from "@/views/v10/InfoPage";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { pushBackGuard } from "@/hooks/use-back-close";
 import { PermissionsPage } from "@/views/v10/Permissions";
-import { AboutPage, ContactsPage, CookiePage, FaqPage, LicensesPage, PlansPage, PrivacyPage, PrivacyPrefsPage, TermsPage } from "@/views/v10/legal-pages";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { getMyAdminStatus } from "@/controllers/admin.functions";
@@ -79,7 +78,13 @@ function authMessage(error: { code?: string | undefined; message: string }) {
 }
 
 
-/** The account panel's plans, help, privacy and legal pages, shown inside the panel. */
+/** The account panel's plans, help, privacy and legal pages, shown inside the panel; their code is loaded only when
+ * one is opened (it was part of every page's first load). */
+const legal = (name: "AboutPage" | "ContactsPage" | "CookiePage" | "FaqPage" | "LicensesPage" | "PlansPage" | "PrivacyPage" | "PrivacyPrefsPage" | "TermsPage") =>
+  lazy(() => import("@/views/v10/legal-pages").then((m) => ({ default: m[name] })));
+const PlansPage = legal("PlansPage"), AboutPage = legal("AboutPage"), FaqPage = legal("FaqPage"), ContactsPage = legal("ContactsPage"),
+  CookiePage = legal("CookiePage"), PrivacyPage = legal("PrivacyPage"), PrivacyPrefsPage = legal("PrivacyPrefsPage"),
+  LicensesPage = legal("LicensesPage"), TermsPage = legal("TermsPage");
 const PAGES: Record<InfoPath, ComponentType> = {
   "/piani": PlansPage, "/chi-siamo": AboutPage, "/faq": FaqPage, "/contatti": ContactsPage, "/privacy/cookie": CookiePage, "/privacy/informativa": PrivacyPage,
   "/privacy/preferenze": PrivacyPrefsPage, "/privacy/autorizzazioni": PermissionsPage, "/legale/licenze": LicensesPage, "/legale/termini": TermsPage,
@@ -488,7 +493,7 @@ export function AccountControl() {
               onTouchEnd={(e) => { const t = e.changedTouches[0], s0 = swipe.current; swipe.current = null; setDragX(0); if (t && s0 && t.clientX - s0.x > 70) closePage(); }}
               onTouchCancel={() => { swipe.current = null; setDragX(0); }}>
               <DialogTitle className="sr-only">Account</DialogTitle>
-              <InfoNav.Provider value={{ back: closePage, open: openPage }}><Page /></InfoNav.Provider>
+              <InfoNav.Provider value={{ back: closePage, open: openPage }}><Suspense fallback={<div className="flex justify-center py-10"><LoaderCircle className="size-6 animate-spin text-muted-foreground" aria-label="Carico" /></div>}><Page /></Suspense></InfoNav.Provider>
             </div>
           );
         })() : (<>

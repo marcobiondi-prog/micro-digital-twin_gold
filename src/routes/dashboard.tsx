@@ -273,7 +273,9 @@ function UrbanRecords() {
   useEffect(() => {
     if (!uid || !loaded) return;
     let alive = true;
+    // Every 2 minutes while the page is in front (it was every 15 s), and at once on coming back to the app.
     const check = async () => {
+      if (document.hidden) return;
       const { data } = await (supabase as any).from("external_approval_requests").select("id, entity, status").eq("user_id", uid).eq("applied", false).neq("status", "attesa");
       if (!alive || !data?.length) return;
       const today = new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" });
@@ -286,9 +288,11 @@ function UrbanRecords() {
       await (supabase as any).from("external_approval_requests").update({ applied: true }).in("id", data.map((r: { id: string }) => r.id));
     };
     void check();
-    const iv = setInterval(check, 15000);
+    const iv = setInterval(check, 2 * 60_000);
+    const back = () => { if (!document.hidden) void check(); };
     window.addEventListener("focus", check);
-    return () => { alive = false; clearInterval(iv); window.removeEventListener("focus", check); };
+    document.addEventListener("visibilitychange", back);
+    return () => { alive = false; clearInterval(iv); window.removeEventListener("focus", check); document.removeEventListener("visibilitychange", back); };
   }, [uid, loaded]);
   return (
     <div className="space-y-8">

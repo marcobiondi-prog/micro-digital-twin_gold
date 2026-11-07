@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowRight, Building2, Grape, Lock, UserRound } from "lucide-react";
 import { openSectorGate, useGuest, useProId } from "@/lib/use-pro-id";
@@ -6,7 +6,8 @@ import { KIND_LABEL, KIND_SECTION, SECTION_KIND, SECTION_LABEL, proSummary, unlo
 import { toast } from "sonner";
 import { Ambient, PageHero, TabRow, openSimTab } from "@/views/v8/console";
 import { IdentifyForm, profileIntro } from "@/views/v10/Identify";
-import { KnownProfiles } from "@/views/v10/SectorGate";
+// The recognised profiles' carousel lives with the sector page: loaded only when a locked section shows it.
+const KnownProfiles = lazy(() => import("@/views/v10/SectorGate").then((m) => ({ default: m.KnownProfiles })));
 import { cn } from "@/lib/utils";
 
 export const SECTION_TONE: Record<Section, string> = { urban: "rgb(28 112 210 / 0.42)", vineyard: "rgb(150 36 110 / 0.42)" };
@@ -120,7 +121,7 @@ export function SectionGate({ section, children }: { section: Section; children:
         <p className="text-[15px] leading-relaxed text-muted-foreground">{profileIntro(need)}</p>
         {id && <p className="rounded-2xl bg-foreground/[0.06] px-4 py-3 text-sm text-muted-foreground">Ora sei identificato come <span className="font-semibold text-foreground">{proSummary(id)}</span>: identificandoti qui, quel profilo viene sostituito e {section === "urban" ? "il vigneto" : "la piazza"} si blocca.</p>}
         {/* Who identified as this profile on this phone before continues with one tap (a list when there are more). */}
-        <KnownProfiles kind={need} />
+        <Suspense fallback={null}><KnownProfiles kind={need} /></Suspense>
         <IdentifyForm kind={need} onDone={done} />
         <p className="px-1 text-xs text-muted-foreground">I dati restano su questo dispositivo e, se hai fatto l’accesso, nel tuo account. Puoi uscire dal profilo quando vuoi, da Profilo nella barra in basso.</p>
       </div>

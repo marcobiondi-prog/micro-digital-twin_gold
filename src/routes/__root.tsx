@@ -2,7 +2,7 @@ import { historyHome } from "@/lib/back-to";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { UpdatePill } from "@/views/UpdatePill";
 import { Outlet, Link, createRootRouteWithContext, useLocation, useNavigate, useRouter, HeadContent, Scripts, type ErrorComponentProps } from "@tanstack/react-router";
-import { useEffect, useLayoutEffect, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
@@ -14,7 +14,8 @@ import { THEME_DARK, ThemeToggle, themeBootScript } from "@/views/theme-toggle";
 import { AccountControl } from "@/views/account-control";
 import { CameraDockButton, CameraSheet } from "@/views/CameraDock";
 import { PermissionsSheet } from "@/views/v10/Permissions";
-import { SectorGate } from "@/views/v10/SectorGate";
+// The sector page is loaded after the first paint (it covers the app only with no profile, or when asked).
+const SectorGate = lazy(() => import("@/views/v10/SectorGate").then((m) => ({ default: m.SectorGate })));
 import { syncAppOrientation } from "@/lib/ar-orientation";
 import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
 import { installUiClicks } from "@/lib/ui-sounds";
@@ -629,7 +630,7 @@ function RootComponent() {
       {!intro && <BottomNav />}
       <CameraSheet />
       <PermissionsSheet />
-      <SectorGate />
+      <Suspense fallback={null}><SectorGate /></Suspense>
     </QueryClientProvider>
   );
 }
