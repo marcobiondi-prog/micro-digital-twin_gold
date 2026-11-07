@@ -39,15 +39,19 @@ function useHideOnScroll(bar: RefObject<HTMLDivElement | null>, root: RefObject<
       lastY = y;
       const el = bar.current;
       if (!el) return;
-      const h = el.offsetHeight + (parseFloat(getComputedStyle(el).top) || 0) + 8;
-      if (dy < 0) {
+      const stickyTop = parseFloat(getComputedStyle(el).top) || 0, h = el.offsetHeight + stickyTop + 8;
+      // Where the bar would be without its own shift: it moves only once it is stuck at the top of the screen; before
+      // that (the page near its top, the bar still in the flow under the title) it stays where it is, never over the
+      // title nor leaving a gap under it.
+      const r = el.getBoundingClientRect(), naturalTop = r.top + off, stuck = naturalTop <= stickyTop + 1;
+      let next = off;
+      if (!stuck || y <= 0) next = 0;
+      else if (dy < 0) {
         // The bar stays until half the map (or the map preview) has gone up past it.
-        const map = [...document.querySelectorAll("[data-sim-map-box]")].map((e) => e.getBoundingClientRect()).find((r) => r.height > 0);
-        const barBottom = el.getBoundingClientRect().bottom + off;
-        const pastHalf = map ? map.top + map.height / 2 < barBottom : y > 160;
-        if (!pastHalf) return;
-      }
-      const next = Math.max(0, Math.min(h, y <= 0 ? 0 : off - dy));
+        const map = [...document.querySelectorAll("[data-sim-map-box]")].map((e) => e.getBoundingClientRect()).find((b) => b.height > 0);
+        const pastHalf = map ? map.top + map.height / 2 < r.bottom + off : y > 160;
+        if (pastHalf) next = Math.min(h, off - dy);
+      } else next = Math.max(0, off - dy);
       if (next === off) return;
       off = next;
       if (!frame) frame = requestAnimationFrame(apply);
