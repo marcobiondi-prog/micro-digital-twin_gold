@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useSwipeBack } from "@/lib/use-swipe-back";
 import { useBackClose } from "@/hooks/use-back-close";
 import { openSimTab } from "@/views/v8/console";
@@ -14,7 +14,9 @@ import { TwinMascot } from "@/views/TwinMascot";
 import { NavigationArrows } from "@/views/navigation-arrows";
 import { THEME_DARK, THEME_META } from "@/views/theme-toggle";
 import { introSeen, markIntroSeen } from "@/lib/intro-seen";
-import { enterAsGuest, getProId, useProId } from "@/lib/use-pro-id";
+import { enterAsGuest, getProId, rememberWantedSector, useProId } from "@/lib/use-pro-id";
+// The recognised profiles' carousel, the same on both sectors' forms everywhere (loaded with the sector page's code).
+const KnownProfiles = lazy(() => import("@/views/v10/SectorGate").then((m) => ({ default: m.KnownProfiles })));
 import { proSummary, type ProKind } from "@/models/professional-id";
 import { IdentifyForm, profileIntro } from "@/views/v10/Identify";
 
@@ -304,6 +306,8 @@ export function Choice() {
   const proId = useProId();
   const { signedIn } = useSignedIn();
   const [identify, setIdentify] = useState<ProKind | null>(null);
+  // The sector being entered is remembered across a sign-in with Google, as on the sector page.
+  useEffect(() => { if (identify) rememberWantedSector(identify); }, [identify]);
   // On the form a swipe to the right goes back to the choice, like "Indietro".
   const formRef = useRef<HTMLDivElement>(null);
   const backToChoice = useCallback(() => setIdentify(null), []);
@@ -329,6 +333,7 @@ export function Choice() {
           <h1 className="font-display text-[2.6rem] font-extralight leading-[1] tracking-tight">{it.name}</h1>
           <p className="text-[15px] leading-relaxed text-foreground/60">{profileIntro(identify)}</p>
           {proId && <p className="rounded-2xl bg-foreground/[0.06] px-4 py-3 text-sm text-foreground/70">Ora sei identificato come <span className="font-semibold text-foreground">{proSummary(proId)}</span>: identificandoti qui, quel profilo viene sostituito.</p>}
+          <Suspense fallback={null}><KnownProfiles kind={identify} onPicked={() => go(it)} /></Suspense>
           <IdentifyForm kind={identify} onDone={() => go(it)} />
           <p className="px-1 text-xs text-foreground/50">I dati restano su questo dispositivo e, se hai fatto l’accesso, nel tuo account. Puoi uscire dal profilo quando vuoi, dal pannello account.</p>
         </section>

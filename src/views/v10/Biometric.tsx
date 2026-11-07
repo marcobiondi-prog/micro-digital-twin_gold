@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { Fingerprint, ScanFace } from "lucide-react";
+import { Fingerprint, ScanFace, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { openAccount } from "@/lib/camera-dock";
 import { biometricAvailable, biometricName, biometricOn, disableBiometric, enableBiometric, useBiometricAccounts, useBiometricOn, verifyBiometric } from "@/lib/biometric";
-import { hasAccountSession, switchToAccount } from "@/lib/account-sessions";
+import { hasAccountSession, leaveAccount, signInAs, switchToAccount } from "@/lib/account-sessions";
 import { supabase } from "@/integrations/supabase/client";
-import { getKnownProIds, getProId, type KnownProId, rememberWantedSector, saveProId, sectorOf, switchAccountSector, useKnownProIds } from "@/lib/use-pro-id";
+import { dropProIdOnDevice, getKnownProIds, getProId, keepProIdInAccount, openSectorGate, type KnownProId, rememberWantedSector, saveProId, sectorOf, switchAccountSector, useKnownProIds } from "@/lib/use-pro-id";
 import { type ProId } from "@/models/professional-id";
 
 /**
@@ -172,35 +172,91 @@ export function useBiometricAutoEnter() {
 }
 
 /**
- * The account panel signed out: one button per professional profile with the recognition on whose personal account
- * is kept on this phone — "Entra con Face ID · name · email": the recognition, then that account and that profile,
- * with no password nor Google.
+ * The account panel signed out, divided by sector: "Settore urbano" and "Settore agricolo" (the one being used first —
+ * the page open, else the profile in use, else the sector being entered), each listing the accounts of its
+ * professional profiles kept on this phone: with Face ID / fingerprint on and the account kept, "Entra con …" (the
+ * recognition, then the account and the profile); kept without recognition, "Entra" at once; not kept, "Accedi" to
+ * that account (Google straight for its address, else the panel with the email written). Nothing for a sector with
+ * no profile tied to an account.
  */
 export function BiometricSignIn({ onDone }: { onDone?: () => void }) {
   const available = useBiometricAvailable();
-  const all = [...useKnownProIds("funzionario"), ...useKnownProIds("agronomo")];
+  const urban = useKnownProIds("funzionario"), farm = useKnownProIds("agronomo");
   useBiometricAccounts(); // re-render when a profile's recognition is turned on or off
   const [busy, setBusy] = useState<string | null>(null);
-  const list = all.filter((k) => biometricOn(proBioKey(k)) && !!k.acct?.email && hasAccountSession(k.acct.email));
-  if (!available || list.length === 0) return null;
+  const path = typeof window === "undefined" ? "" : window.location.pathname;
+  const cur = getProId();
+  const first: ProId["kind"] = path.startsWith("/vigneto") ? "agronomo" : path.startsWith("/urbano") ? "funzionario" : cur?.kind ?? "funzionario";
+  const withAcct = (l: KnownProId[]) => l.filter((k) => !!k.acct?.email);
+  const groups = ([["funzionario", "Settore urbano", withAcct(urban)], ["agronomo", "Settore agricolo", withAcct(farm)]] as const)
+    .filter(([, , l]) => l.length > 0)
+    .sort((a) => (a[0] === first ? -1 : 1));
+  if (!groups.length) return null;
   const name = biometricName();
   const enter = async (k: KnownProId) => {
     setBusy(proBioKey(k));
-    try { if (await enterWithProfile(k)) onDone?.(); } finally { setBusy(null); }
+    try {
+      const email = k.acct!.email!;
+      const bio = available && biometricOn(proBioKey(k));
+      if (hasAccountSession(email)) {
+        if (await enterWithProfile(k, bio ? {} : { recognised: true })) onDone?.();
+        return;
+      }
+      // Not kept on this phone: the profile in use and its account's sign-in, Google straight for that address.
+      rememberWantedSector(k.kind);
+      if (!(await saveProId(k))) return;
+      onDone?.();
+      await signInAs(email, { provider: k.acct?.provider, back: k.kind === "funzionario" ? "/urbano" : "/vigneto" });
+    } finally { setBusy(null); }
   };
   return (
-    <div className="space-y-2">
-      {list.map((k) => (
-        <button key={proBioKey(k)} type="button" disabled={busy !== null} onClick={() => void enter(k)}
-          className="flex w-full items-center gap-3 rounded-2xl bg-brand-turquoise/15 px-4 py-3 text-left ring-1 ring-brand-turquoise/40 outline-none transition-colors hover:bg-brand-turquoise/25 focus-visible:ring-2 focus-visible:ring-brand-turquoise disabled:opacity-60">
-          <BioIcon className="size-7 shrink-0 text-brand-turquoise" />
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold">{busy === proBioKey(k) ? "Ti riconosco…" : `Entra con ${name}`}</span>
-            <span className="block text-xs text-muted-foreground [overflow-wrap:anywhere]">{k.name} · {k.kind === "funzionario" ? "piazza" : "vigneto"} · {k.acct!.email}</span>
-          </span>
-        </button>
+    <div className="space-y-4">
+      {groups.map(([kind, title, list]) => (
+        <section key={kind} aria-label={`Account del ${title.toLowerCase()}`} className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{title}</p>
+          {list.map((k) => {
+            const email = k.acct!.email!, kept = hasAccountSession(email), bio = available && biometricOn(proBioKey(k)) && kept;
+            const label = busy === proBioKey(k) ? (bio ? "Ti riconosco…" : "Entro…") : bio ? `Entra con ${name}` : kept ? `Entra come ${k.name.trim().split(/\s+/)[0]}` : `Accedi come ${k.name.trim().split(/\s+/)[0]}`;
+            return (
+              <button key={proBioKey(k)} type="button" disabled={busy !== null} onClick={() => void enter(k)}
+                className="flex w-full items-center gap-3 rounded-2xl bg-brand-turquoise/15 px-4 py-3 text-left ring-1 ring-brand-turquoise/40 outline-none transition-colors hover:bg-brand-turquoise/25 focus-visible:ring-2 focus-visible:ring-brand-turquoise disabled:opacity-60">
+                {bio ? <BioIcon className="size-7 shrink-0 text-brand-turquoise" />
+                  : k.acct?.pic ? <img src={k.acct.pic} alt="" referrerPolicy="no-referrer" className="size-8 shrink-0 rounded-full object-cover" />
+                  : <UserRound className="size-7 shrink-0 text-brand-turquoise" aria-hidden="true" />}
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold">{label}</span>
+                  <span className="block text-xs text-muted-foreground [overflow-wrap:anywhere]">{k.name} · {email}</span>
+                </span>
+              </button>
+            );
+          })}
+        </section>
       ))}
       <div className="flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />oppure<span className="h-px flex-1 bg-border" /></div>
     </div>
   );
+}
+
+/**
+ * "Esci dal profilo": leaving the professional profile signs out of its personal account too (Google or email). The
+ * profile stays saved in the account, so the next sign-in brings it back; with Face ID / fingerprint on for one of
+ * the account's profiles the account is only left on this phone (kept, not ended), to come back with the recognition.
+ * Signed out (a profile without account), only the profile is left. Either way the sector page opens on that sector.
+ */
+export async function leaveProfile(kind: ProId["kind"]) {
+  const { data } = await supabase.auth.getSession();
+  const email = data.session?.user.email?.toLowerCase();
+  if (!data.session) {
+    await saveProId(null);
+    openSectorGate(kind);
+    toast("Sei uscito dal profilo", { description: "Scegli il settore e identificati di nuovo quando vuoi." });
+    return;
+  }
+  await keepProIdInAccount();
+  const bio = getKnownProIds().some((k) => k.acct?.email?.toLowerCase() === email && biometricOn(proBioKey(k)));
+  dropProIdOnDevice();
+  rememberWantedSector(kind);
+  if (bio) { leaveAccount({ openPanel: false }); return; }
+  await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+  openSectorGate(kind);
 }

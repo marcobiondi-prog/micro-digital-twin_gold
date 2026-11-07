@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useSwipeBack } from "@/lib/use-swipe-back";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, BadgeCheck, Building2, Grape, LogOut, ShieldCheck } from "lucide-react";
-import { dropProIdOnDevice, keepProIdInAccount, saveProId, switchAccountSector, useAccountSector, useProId, openSectorGate } from "@/lib/use-pro-id";
+import { dropProIdOnDevice, keepProIdInAccount, rememberWantedSector, saveProId, switchAccountSector, useAccountSector, useProId, openSectorGate } from "@/lib/use-pro-id";
 import { supabase } from "@/integrations/supabase/client";
 import { openAccount } from "@/lib/camera-dock";
 import { leaveAccount } from "@/lib/account-sessions";
-import { ProfileBioRow } from "@/views/v10/Biometric";
+import { leaveProfile, ProfileBioRow } from "@/views/v10/Biometric";
+// The recognised profiles' carousel, as on the sector page (lazy: the sector page imports this file).
+const KnownProfiles = lazy(() => import("@/views/v10/SectorGate").then((m) => ({ default: m.KnownProfiles })));
 import { loadComuni } from "@/lib/comuni";
 import { findComune, searchComuni, townDomain, type Comune } from "@/models/comuni";
 import { findRegion, officeOf, searchOffices, searchRegions } from "@/models/professional-id";
@@ -337,12 +339,8 @@ export function ProfileCard({ kind, go }: { kind: ProKind; go?: () => void }) {
   const town = mine?.kind === "funzionario" ? mine : null;
   const officeMail = useOfficeEmail(town?.comune ?? "", town?.office ?? "", town?.istat);
   if (!mine) return null;
-  const leave = async () => {
-    await saveProId(null);
-    // Straight back to this profile's form, which recognises it ("Continua come …").
-    openSectorGate(kind);
-    toast("Profilo rimosso", { description: "Piazza e vigneto sono bloccati finché non ti identifichi." });
-  };
+  // Leaving the profile signs out of its personal account too; back to this profile's form, which recognises it.
+  const leave = () => leaveProfile(kind);
   return (
     <div className="fuse-canvas space-y-4 rounded-3xl px-5 py-6">
       <div className="flex items-start justify-between gap-3">
@@ -385,6 +383,7 @@ function profileRows(id: ProId, office?: { mail: string; official: boolean }, ac
  */
 export function IdentifyPage({ kind }: { kind: ProKind }) {
   const navigate = useNavigate();
+  useEffect(() => { rememberWantedSector(kind); }, [kind]);
   const id = useProId();
   const p = PAGE[kind];
   const back = useCallback(() => {
@@ -412,6 +411,7 @@ export function IdentifyPage({ kind }: { kind: ProKind }) {
         <>
           <p className="text-[15px] leading-relaxed text-muted-foreground">{p.intro}</p>
           {id && <p className="rounded-2xl bg-foreground/[0.06] px-4 py-3 text-sm text-muted-foreground">Ora sei identificato come <span className="font-semibold text-foreground">{proSummary(id)}</span>: identificandoti qui, quel profilo viene sostituito e {p.locks} si blocca.</p>}
+          <Suspense fallback={null}><KnownProfiles kind={kind} onPicked={done} /></Suspense>
           <IdentifyForm kind={kind} onDone={done} />
           <p className="px-1 text-xs text-muted-foreground">I dati restano su questo dispositivo e, se hai fatto l’accesso, nel tuo account. Puoi uscire dal profilo quando vuoi.</p>
         </>

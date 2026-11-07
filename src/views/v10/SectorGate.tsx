@@ -69,7 +69,7 @@ export function SectorGate() {
  * continue as one of them — one as a card, more as a list to choose from, each with an ✕ to take it off the phone.
  * Shown on the sector page's form and on a locked section's page.
  */
-export function KnownProfiles({ kind }: { kind: ProKind }) {
+export function KnownProfiles({ kind, onPicked }: { kind: ProKind; onPicked?: () => void }) {
   const all = useKnownProIds(kind);
   const accEmail = useAccountSector()?.email ?? null;
   const acc = useAccountSector();
@@ -114,6 +114,7 @@ export function KnownProfiles({ kind }: { kind: ProKind }) {
     }
     if (!(await saveProId(k))) return;
     toast.success(`Bentornato, ${k.name}`, { description: `Ritrovi la cronologia ${flow}.` });
+    onPicked?.();
   };
   // "Aggiungi account": another personal account signs in here (the current one stays kept on the phone).
   const addAccount = async () => {

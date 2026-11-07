@@ -2,7 +2,7 @@ import { keepProIdInAccount, openSectorGate, saveProId, useProId } from "@/lib/u
 import { DeviceCacheCard } from "@/views/v10/DeviceCache";
 import { AccountDevices } from "@/views/v10/AccountDevices";
 import { biometricOn } from "@/lib/biometric";
-import { BiometricSignIn, ProfileBioSwitch, proBioKey } from "@/views/v10/Biometric";
+import { BiometricSignIn, leaveProfile, ProfileBioSwitch, proBioKey } from "@/views/v10/Biometric";
 import { getKnownProIds } from "@/lib/use-pro-id";
 import { leaveAccount } from "@/lib/account-sessions";
 import { keepLink, keptLink, LINK_TTL_S } from "@/lib/signed-links";
@@ -232,13 +232,14 @@ export function AccountControl() {
   const draftFileRef = useRef<File | null>(null);
   const [savingAvatar, setSavingAvatar] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [googleEnabled, setGoogleEnabled] = useState(false);
-  // Only offer Google when the provider is enabled in Supabase; otherwise it opens a raw error page.
+  // "Accedi con Google" is always offered; it hides only when Supabase says plainly that Google is switched off (a
+  // settings read that failed or was slow used to hide it, so the button vanished from the panel).
+  const [googleEnabled, setGoogleEnabled] = useState(true);
   useEffect(() => {
     fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_PUBLISHABLE_KEY } })
       .then((r) => (r.ok ? r.json() : null))
-      .then((s: { external?: { google?: boolean } } | null) => setGoogleEnabled(Boolean(s?.external?.google)))
-      .catch(() => setGoogleEnabled(false));
+      .then((s: { external?: { google?: boolean } } | null) => { if (s?.external && s.external.google === false) setGoogleEnabled(false); })
+      .catch(() => undefined);
   }, []);
   const fileRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
@@ -514,7 +515,7 @@ export function AccountControl() {
                 <div className="min-w-0 flex-1">
                   <p className="text-[15px] font-semibold">{proId.name}</p>
                   <p className="text-sm text-muted-foreground">{proSummary(proId)}</p>
-                  <button type="button" onClick={() => { const was = proId.kind; void saveProId(null); setOpen(false); openSectorGate(was); }} className="mt-1 inline-flex min-h-10 items-center gap-1.5 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"><LogOut className="size-4" aria-hidden="true" />Esci dal profilo</button>
+                  <button type="button" onClick={() => { const was = proId.kind; setOpen(false); void leaveProfile(was); }} className="mt-1 inline-flex min-h-10 items-center gap-1.5 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"><LogOut className="size-4" aria-hidden="true" />Esci dal profilo</button>
                 </div>
               </div>
             ) : <p className="pb-2 text-sm text-muted-foreground">Nessun profilo: piazza e vigneto sono bloccati.</p>}
