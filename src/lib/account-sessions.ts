@@ -123,6 +123,11 @@ export async function addGoogleAccount(): Promise<boolean> {
 export async function googleOAuth(redirectTo: string, queryParams?: Record<string, string>): Promise<{ error: Error | null }> {
   const r = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo, skipBrowserRedirect: true, ...(queryParams ? { queryParams } : {}) } });
   if (r.error || !r.data?.url) return { error: r.error ?? new Error("Accesso Google non disponibile") };
+  // Google's pages then stand in the history after this one: back in the app, the root steps back past them to the
+  // page before this one and opens the app from there, so the phone's Back never lands on Google's account chooser.
+  // With nothing before this page (an app just opened) a copy of it is kept first, to step back to.
+  if (window.history.length < 2) window.history.pushState(window.history.state, "");
+  try { localStorage.setItem("mdt-auth-hist", JSON.stringify({ n: window.history.length, at: Date.now() })); } catch { /* none */ }
   window.location.replace(r.data.url);
   return { error: null };
 }

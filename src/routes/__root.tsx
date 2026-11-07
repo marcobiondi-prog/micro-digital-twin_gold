@@ -22,8 +22,8 @@ import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
 import { installUiClicks } from "@/lib/ui-sounds";
 import { isChunkError, reloadFresh } from "@/router";
 import { History, Building2, Grape, Info, LayoutDashboard, Lock, UserRound } from "lucide-react";
-import { getProId, openingSettled, useGuest, useProId, useSyncProId } from "@/lib/use-pro-id";
-import { installAccountSessions } from "@/lib/account-sessions";
+import { clearLockAsk, dropProIdOnDevice, getProId, openingSettled, readLockAsk, rememberWantedSector, useGuest, useProId, useSyncProId } from "@/lib/use-pro-id";
+import { installAccountSessions, leaveAccount } from "@/lib/account-sessions";
 import { useBiometricAutoEnter } from "@/views/v10/Biometric";
 import { useSyncMediaArchive } from "@/models/media-archive";
 import { useSyncHistoryArchive } from "@/models/history-archive";
@@ -33,7 +33,7 @@ import { useMediaSync } from "@/lib/use-media-sync";
 import { useDstNotice } from "@/lib/dst-notice";
 import { installAppPermissionGuards, usePermissions } from "@/lib/app-permissions";
 import { installGoogleUsageSync } from "@/lib/google-usage-sync";
-import { hidePreloader, preloaderScript } from "@/lib/preloader";
+import { hidePreloader, preloadNext, preloaderScript } from "@/lib/preloader";
 import { unlocks, type ProId } from "@/models/professional-id";
 import { AgronomoIcon, FunzionarioIcon } from "@/views/ProfileIcon";
 import { AmbientLayer, openSimTab } from "@/views/v8/console";
@@ -562,6 +562,19 @@ function RootComponent() {
         const pro = getProId();
         if (pro) openSimTab(pro.kind === "agronomo" ? "vineyard" : "urban", "mappa");
         const target = pro ? (pro.kind === "agronomo" ? "/vigneto" : "/urbano") : back ?? window.location.pathname;
+        // Google's pages stand in the history behind this one: step back past them to the page before the sign-in and
+        // open the app from there (the push drops them), so the phone's Back never lands on Google's account chooser.
+        let hist: { n?: number; at?: number } | null = null;
+        try { hist = JSON.parse(localStorage.getItem("mdt-auth-hist") ?? "null"); localStorage.removeItem("mdt-auth-hist"); } catch { /* none */ }
+        const delta = hist?.n && Date.now() - (hist.at ?? 0) < 15 * 60_000 ? (hist.n - 2) - (window.history.length - 1) : 0;
+        if (hist?.n && hist.n >= 2 && delta < 0 && delta >= -25) {
+          try { localStorage.setItem("mdt-after-google", JSON.stringify({ href: target, at: Date.now() })); } catch { /* none */ }
+          preloadNext();
+          // A beat later: a traversal asked while the router is still moving is dropped by it.
+          // The entries this page pushed meanwhile (the sector page's steps) count too: measured when it goes.
+          setTimeout(() => { window.history.go((hist!.n! - 2) - (window.history.length - 1)); }, 300);
+          return;
+        }
         // Back from the simulation returns to the page that was open before Google's account chooser (not to the
         // chooser itself): that page takes this entry's place and the simulation is pushed after it.
         if (back && back !== target) {
@@ -569,6 +582,31 @@ function RootComponent() {
           void navigate({ href: target });
         } else void navigate({ href: target, replace: true });
       })();
+      return;
+    }
+    // Stepped back past Google's pages (above): the app opens where the sign-in was going, pushed, so the pages
+    // ahead (Google's) are dropped.
+    let after: { href?: string; at?: number } | null = null;
+    try { after = JSON.parse(localStorage.getItem("mdt-after-google") ?? "null"); localStorage.removeItem("mdt-after-google"); } catch { /* none */ }
+    if (after?.href && Date.now() - (after.at ?? 0) < 60_000) {
+      const href = after.href;
+      if (href.startsWith("/vigneto")) openSimTab("vineyard", "mappa");
+      else if (href.startsWith("/urbano")) openSimTab("urban", "mappa");
+      const id = setTimeout(() => void navigate({ href }), 150);
+      return () => { clearTimeout(id); landed.__mdtLanded = false; localStorage.setItem("mdt-after-google", JSON.stringify(after)); };
+    }
+    // The sector lock page was up for this account and this opening is not its own: the phone's Back went past it.
+    // That Back does what the lock's "Indietro" does — leave the account (kept on the phone) for the sector choice.
+    const lock = readLockAsk();
+    if (lock) {
+      void supabase.auth.getSession().then(({ data }) => {
+        if (data.session?.user.id !== lock.user) { clearLockAsk(); return; }
+        clearLockAsk();
+        dropProIdOnDevice();
+        rememberWantedSector(null);
+        try { sessionStorage.setItem("mdt-gate-guard", "1"); } catch { /* none */ }
+        leaveAccount({ openPanel: false, to: "/benvenuto", replace: true });
+      });
       return;
     }
     // A fresh open of the app lands on the entrance (/) the first time, then on the map. This effect

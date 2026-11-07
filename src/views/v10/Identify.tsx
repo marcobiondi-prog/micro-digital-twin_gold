@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, BadgeCheck, Building2, Check, Grape, Lock, LogOut, Mail, ShieldCheck, UserRound } from "lucide-react";
 import { useAccountAvatar } from "@/lib/account-avatar";
-import { dropProIdOnDevice, keepProIdInAccount, rememberWantedSector, saveProId, useAccountSector, useProId, openSectorGate } from "@/lib/use-pro-id";
+import { clearLockAsk, dropProIdOnDevice, keepProIdInAccount, rememberWantedSector, saveProId, useAccountSector, useProId, openSectorGate } from "@/lib/use-pro-id";
 import { supabase } from "@/integrations/supabase/client";
 import { openAccount } from "@/lib/camera-dock";
 import { leaveAccount } from "@/lib/account-sessions";
@@ -292,6 +292,7 @@ export function AccountSectorLock({ kind, account, email }: { kind: ProKind; acc
     dropProIdOnDevice();
     // Back to the sector choice, never the account panel: from there "Hai già un account? Accedi" or a sector's form.
     rememberWantedSector(null);
+    clearLockAsk();
     try { sessionStorage.setItem("mdt-gate-guard", "1"); } catch { /* none */ }
     leaveAccount({ openPanel: false, to: "/benvenuto", replace: true });
   };
@@ -306,6 +307,7 @@ export function AccountSectorLock({ kind, account, email }: { kind: ProKind; acc
     await keepProIdInAccount();
     dropProIdOnDevice();
     rememberWantedSector(null);
+    clearLockAsk();
     try { sessionStorage.setItem("mdt-gate-guard", "1"); } catch { /* none */ }
     leaveAccount({ openPanel: false, to: "/benvenuto", replace: true });
   }, []);

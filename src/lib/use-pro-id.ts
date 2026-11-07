@@ -446,6 +446,22 @@ function takeAddingSector(): ProKind | null {
     return v && (v.kind === "agronomo" || v.kind === "funzionario") && Date.now() - (v.at ?? 0) < 10 * 60_000 ? v.kind : null;
   } catch { return null; }
 }
+/**
+ * The sector lock page shown for an account (signed in from the other sector's form): kept until it is left, so a
+ * later opening of the same account shows it again, and an opening that is not the lock's own (the phone's Back past
+ * it) leaves the account instead (the root's landing). 30 minutes at most.
+ */
+const LOCK_KEY = "mdt-lock-ask";
+export function rememberLockAsk(kind: ProKind, user: string) {
+  try { localStorage.setItem(LOCK_KEY, JSON.stringify({ kind, user, at: Date.now() })); } catch { /* none */ }
+}
+export function readLockAsk(): { kind: ProKind; user: string } | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(LOCK_KEY) ?? "null") as { kind?: unknown; user?: unknown; at?: number } | null;
+    return v && (v.kind === "agronomo" || v.kind === "funzionario") && typeof v.user === "string" && Date.now() - (v.at ?? 0) < 30 * 60_000 ? { kind: v.kind, user: v.user } : null;
+  } catch { return null; }
+}
+export function clearLockAsk() { try { localStorage.removeItem(LOCK_KEY); } catch { /* none */ } }
 export function rememberWantedSector(kind: ProKind | null) {
   try { if (kind) localStorage.setItem(WANTED_KEY, JSON.stringify({ kind, at: Date.now() })); else localStorage.removeItem(WANTED_KEY); } catch { /* none */ }
 }
@@ -546,8 +562,12 @@ export function useSyncProId() {
       // Signing in just now from the other sector's form (its "Aggiungi account", or the sector page open on it) with an
       // account already of a sector: nothing enters — no profile is put in use — and that form opens, where the lock page
       // says the account is of the other sector, with "Esci e usa un altro account".
-      const target = signIn ? adding0 ?? entering : null;
+      // A lock still pending for this account (shown before Google's pages were dropped from the history, see
+      // lockAsk) shows again on the next opening.
+      const pending = readLockAsk();
+      const target = signIn ? adding0 ?? entering : pending?.user === userId ? pending.kind : null;
       if (savedHolds && target && target !== savedSector) {
+        rememberLockAsk(target, userId);
         rememberWantedSector(null);
         setAccountSector({ kind: savedSector, email, name: nameOf(meta) });
         if (pickedAt >= startedAt) return;
@@ -603,7 +623,7 @@ export function useSyncProId() {
       if (event !== "SIGNED_OUT" && s) publish(s.user);
       if (event === "SIGNED_OUT") publish(null);
       if (event === "SIGNED_IN" && s) void adopt(s.user.id, s.user.user_metadata, true).finally(() => settleOpening());
-      if (event === "SIGNED_OUT") adopted = "";
+      if (event === "SIGNED_OUT") { adopted = ""; clearLockAsk(); }
       if (event === "SIGNED_OUT" && snapshot()) {
         const was = snapshot()!.kind;
         set(null);
