@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useSwipeBack } from "@/lib/use-swipe-back";
 import { ArrowLeft, ArrowRight, Building2, Grape, ScanLine, X } from "lucide-react";
 import { openAccount, setCameraSheetOpen } from "@/lib/camera-dock";
 import { AI_STANDBY } from "@/lib/ai-standby";
@@ -290,6 +291,10 @@ export function Choice() {
   const proId = useProId();
   const { signedIn } = useSignedIn();
   const [identify, setIdentify] = useState<ProKind | null>(null);
+  // On the form a swipe to the right goes back to the choice, like "Indietro".
+  const formRef = useRef<HTMLDivElement>(null);
+  const backToChoice = useCallback(() => setIdentify(null), []);
+  useSwipeBack(formRef, identify ? backToChoice : null);
   const go = (it: Item) => void navigate({ to: it.id === "urban" ? "/urbano" : "/vigneto" });
   const open = (it: Item) => {
     if (it.id === "camera") { setCameraSheetOpen(true); return; }
@@ -302,8 +307,8 @@ export function Choice() {
     return (
       <div className="dark relative isolate min-h-dvh bg-background px-6 text-foreground [color-scheme:dark] sm:px-12">
         <Backdrop />
-        <section aria-label={it.name} className="mx-auto max-w-xl space-y-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(1.5rem+env(safe-area-inset-top))]">
-          <button type="button" onClick={() => setIdentify(null)} className="-ml-1 inline-flex h-10 items-center gap-1.5 rounded-full pr-3 text-sm font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+        <section ref={formRef} aria-label={it.name} className="mx-auto max-w-xl space-y-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(1.5rem+env(safe-area-inset-top))]">
+          <button type="button" onClick={backToChoice} className="-ml-1 inline-flex h-10 items-center gap-1.5 rounded-full pr-3 text-sm font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
             <ArrowLeft className="size-5" aria-hidden="true" />Indietro
           </button>
           <h1 className="font-display text-[2.6rem] font-extralight leading-[1] tracking-tight">{it.name}</h1>

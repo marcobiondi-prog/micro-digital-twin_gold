@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSwipeBack } from "@/lib/use-swipe-back";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Building2, Grape, LogIn, UserRound } from "lucide-react";
@@ -62,6 +63,10 @@ function SectorPage({ start }: { start: ProKind | null }) {
   useDarkChrome();
   const { signedIn } = useSignedIn();
   const [kind, setKind] = useState<ProKind | null>(start);
+  // On a sector's form a swipe to the right goes back to the two sectors, like "Indietro".
+  const formRef = useRef<HTMLElement>(null);
+  const backToSectors = useCallback(() => setKind(null), []);
+  useSwipeBack(formRef, kind ? backToSectors : null);
   // The profile of this kind registered before (on this device or in the account): recognised, one tap brings it back
   // with its project's history.
   const previous = useLastProId(kind);
@@ -85,10 +90,10 @@ function SectorPage({ start }: { start: ProKind | null }) {
   return (
     <div role="dialog" aria-modal="true" aria-label="Da dove vuoi usarmi?" className="dark fixed inset-0 z-[999999999] isolate overflow-y-auto overscroll-contain bg-background px-6 text-foreground [color-scheme:dark] sm:px-12">
       <Backdrop />
-      <section className="mx-auto flex min-h-full max-w-xl flex-col gap-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(3rem+env(safe-area-inset-top))]">
+      <section ref={formRef} className="mx-auto flex min-h-full max-w-xl flex-col gap-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(3rem+env(safe-area-inset-top))]">
         {sector ? (
           <>
-            <button type="button" onClick={() => setKind(null)} className="-ml-1 inline-flex h-10 w-fit items-center gap-1.5 rounded-full pr-3 text-sm font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+            <button type="button" onClick={backToSectors} className="-ml-1 inline-flex h-10 w-fit items-center gap-1.5 rounded-full pr-3 text-sm font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
               <ArrowLeft className="size-5" aria-hidden="true" />Indietro
             </button>
             <h1 className="font-display text-[2.6rem] font-extralight leading-[1] tracking-tight">{sector.name}</h1>

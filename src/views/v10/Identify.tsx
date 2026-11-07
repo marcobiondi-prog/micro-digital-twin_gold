@@ -1,4 +1,5 @@
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useSwipeBack } from "@/lib/use-swipe-back";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, BadgeCheck, Building2, Grape, LogOut, ShieldCheck } from "lucide-react";
@@ -291,17 +292,20 @@ export function IdentifyPage({ kind }: { kind: ProKind }) {
   const navigate = useNavigate();
   const id = useProId();
   const p = PAGE[kind];
-  const back = () => {
+  const back = useCallback(() => {
     if ((window.history.state?.__TSR_index ?? 0) > 0) window.history.back();
     else void navigate({ to: "/benvenuto", replace: true });
-  };
+  }, [navigate]);
   const done = () => {
     toast.success(`Identificato come ${KIND_LABEL[kind].toLowerCase()}`, { description: `Si apre ${p.opens}; ${p.locks} è bloccat${kind === "agronomo" ? "a" : "o"}.` });
     void navigate({ to: p.go, replace: true });
   };
   const mine = id?.kind === kind ? id : null;
+  // A swipe to the right goes back, like "Indietro".
+  const pageRef = useRef<HTMLDivElement>(null);
+  useSwipeBack(pageRef, back);
   return (
-    <div className="mx-auto max-w-xl space-y-6">
+    <div ref={pageRef} className="mx-auto max-w-xl space-y-6">
       <Ambient tone={SECTION_TONE[p.section]} />
       <button type="button" onClick={back} className="-mb-2 inline-flex h-10 items-center gap-1.5 rounded-full pr-3 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
         <ArrowLeft className="size-5" aria-hidden="true" />Indietro
