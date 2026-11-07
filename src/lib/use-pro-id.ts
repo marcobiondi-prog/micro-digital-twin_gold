@@ -251,7 +251,33 @@ const setAccountSector = (next: AccountSector | null) => {
 };
 /** The signed-in personal account's sector and email (null signed out, or while not read yet). */
 export function useAccountSector(): AccountSector | null {
+  // Read again from the session on mount, so a form opened before the root published it (or after a change that sent
+  // no event) never shows a sector's form the account cannot use.
+  useEffect(() => {
+    void supabase.auth.getSession().then(({ data }) => {
+      const user = data.session?.user;
+      setAccountSector(user ? { kind: sectorOf(user.user_metadata), email: user.email ?? null } : null);
+    });
+  }, []);
   return useSyncExternalStore((f) => { sectorSubs.add(f); return () => { sectorSubs.delete(f); }; }, () => accountSector, () => null);
+}
+/**
+ * Moves the signed-in account to the other sector ("Usa questo account per il settore …" on the lock): the account's
+ * sector becomes that kind; its profile of that kind, if it registered one, comes back in use, else the form asks for
+ * it. The other sector's profile stays saved in the account, unused while the account is of this sector.
+ */
+export async function switchAccountSector(kind: ProKind): Promise<boolean> {
+  const { data } = await supabase.auth.getSession();
+  const user = data.session?.user;
+  if (!user) return false;
+  const meta = user.user_metadata as Meta;
+  const back = meta?.pro_last?.[kind];
+  const id = isProId(back) && back.kind === kind && (ownOf(meta) ?? []).includes(kind) ? back : null;
+  pickedAt = Date.now();
+  set(id);
+  setAccountSector({ kind, email: user.email ?? null });
+  const { error } = await supabase.auth.updateUser({ data: { pro_sector: kind, pro_id: id, pro_left: false } });
+  return !error;
 }
 /** Whether the signed-in account may use a profile of this kind (always, signed out or with no sector yet). */
 export const accountAllows = (kind: ProKind): boolean => !accountSector?.kind || accountSector.kind === kind;
@@ -271,7 +297,8 @@ export async function saveProId(id: ProId | null): Promise<boolean> {
   pickedAt = Date.now();
   set(id);
   if (!data.session) return true;
-  const own = withKind((ownOf(meta) ?? []).filter((k) => !sector || k === sector), id);
+  // Every kind the account registered stays owned (a sector switched back finds its profile again).
+  const own = withKind(ownOf(meta) ?? [], id);
   const proSector = sector ?? id?.kind ?? null;
   if (proSector) setAccountSector({ kind: proSector, email: data.session.user.email ?? null });
   // pro_left: the profile was left on purpose ("Esci dal profilo"), so the next sign-in does not bring it back by itself.
@@ -287,7 +314,8 @@ export async function keepProIdInAccount(): Promise<void> {
   const meta = data.session.user.user_metadata;
   const sector = sectorOf(meta);
   if (sector && sector !== id.kind) return;
-  const own = withKind((ownOf(meta) ?? []).filter((k) => !sector || k === sector), id);
+  // Every kind the account registered stays owned (a sector switched back finds its profile again).
+  const own = withKind(ownOf(meta) ?? [], id);
   await supabase.auth.updateUser({ data: { pro_id: id, pro_last: accountLast(meta, id, own), pro_own: own } }).catch(() => undefined);
 }
 
@@ -333,8 +361,10 @@ export function useSyncProId() {
       // A profile chosen on this device while the account was being read (the history check takes a moment) wins: the
       // account's older one would replace it — a farmer just picked on the vineyard's page turned back into an officer.
       if (pickedAt >= startedAt) return;
-      const clean = { pro_id: back, pro_last: accountLast(meta, back, own), pro_own: own, ...(sector ? { pro_sector: sector } : {}) };
-      const dirty = legacy || (saved != null && !mine(saved)) || KINDS.some((k) => prev[k] != null && !own.includes(k)) || (sector != null && (meta as { pro_sector?: unknown } | null)?.pro_sector !== sector) || owned.length !== own.length;
+      // The other sector's registered profile stays saved in the account (pro_own and pro_last keep every kind owned),
+      // only unused while the account is of this sector.
+      const clean = { pro_id: back, pro_last: accountLast(meta, back, owned), pro_own: owned, ...(sector ? { pro_sector: sector } : {}) };
+      const dirty = legacy || (saved != null && !mine(saved)) || KINDS.some((k) => prev[k] != null && !owned.includes(k)) || (sector != null && (meta as { pro_sector?: unknown } | null)?.pro_sector !== sector);
       if (back) {
         set(back);
         if (dirty || !mine(saved)) void supabase.auth.updateUser({ data: clean }).catch(() => undefined);

@@ -3,7 +3,7 @@ import { useSwipeBack } from "@/lib/use-swipe-back";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, BadgeCheck, Building2, Grape, LogOut, ShieldCheck } from "lucide-react";
-import { keepProIdInAccount, saveProId, useAccountSector, useProId, openSectorGate } from "@/lib/use-pro-id";
+import { keepProIdInAccount, saveProId, switchAccountSector, useAccountSector, useProId, openSectorGate } from "@/lib/use-pro-id";
 import { supabase } from "@/integrations/supabase/client";
 import { openAccount } from "@/lib/camera-dock";
 import { loadComuni } from "@/lib/comuni";
@@ -244,6 +244,16 @@ const SECTOR_PLACE: Record<ProKind, string> = { funzionario: "la piazza", agrono
  */
 export function AccountSectorLock({ kind, account, email }: { kind: ProKind; account: ProKind; email: string | null }) {
   const [busy, setBusy] = useState(false);
+  const [asking, setAsking] = useState(false);
+  // Moves this account to the sector of the form: its profile of that kind comes back (or the form asks for it).
+  const switchHere = async () => {
+    setBusy(true);
+    const ok = await switchAccountSector(kind);
+    setBusy(false);
+    setAsking(false);
+    if (ok) toast.success(`Ora questo account è del settore ${SECTOR_NAME[kind]}`, { description: `Il profilo ${account === "agronomo" ? "agricolo" : "urbano"} resta salvato nell'account.` });
+    else toast.error("Non sono riuscito a cambiare settore", { description: "Controlla la connessione e riprova." });
+  };
   const other = async () => {
     setBusy(true);
     await keepProIdInAccount();
@@ -255,11 +265,25 @@ export function AccountSectorLock({ kind, account, email }: { kind: ProKind; acc
     <div className="space-y-3 rounded-3xl bg-foreground/[0.07] p-5 ring-1 ring-amber-400/40">
       <p className="flex items-center gap-2 text-[15px] font-semibold"><ShieldCheck className="size-5 shrink-0 text-amber-300" aria-hidden="true" />Questo account è del settore {SECTOR_NAME[account]}</p>
       <p className="text-sm leading-relaxed text-foreground/70">
-        {email ? <>L'account <span className="font-semibold text-foreground [overflow-wrap:anywhere]">{email}</span></> : "Il tuo account"} è legato a {SECTOR_PLACE[account]}: ogni account personale vale per un solo settore. Per il settore {SECTOR_NAME[kind]} accedi con un altro account, o creane uno nuovo.
+        {email ? <>L'account <span className="font-semibold text-foreground [overflow-wrap:anywhere]">{email}</span></> : "Il tuo account"} è legato a {SECTOR_PLACE[account]}: ogni account personale vale per un solo settore. Per il settore {SECTOR_NAME[kind]} puoi spostare qui questo account, oppure accedere con un altro.
       </p>
+      {asking ? (
+        <div role="alertdialog" aria-label="Cambiare settore all'account?" className="space-y-3 rounded-2xl bg-foreground/[0.06] p-4">
+          <p className="text-sm leading-relaxed">Usare questo account per il settore {SECTOR_NAME[kind]}? Il profilo {account === "agronomo" ? "agricolo" : "urbano"} resta salvato nell'account, ma finché l'account è del settore {SECTOR_NAME[kind]} non apre {SECTOR_PLACE[account]}.</p>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setAsking(false)} className="h-11 flex-1 rounded-full bg-foreground/[0.08] text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">Annulla</button>
+            <button type="button" disabled={busy} onClick={() => void switchHere()} className="h-11 flex-1 rounded-full bg-white text-sm font-semibold text-black outline-none disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-brand-turquoise">{busy ? "Cambio…" : "Cambia settore"}</button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" disabled={busy} onClick={() => setAsking(true)}
+          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white px-4 text-[15px] font-semibold text-black outline-none disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+          {kind === "agronomo" ? <Grape className="size-4" aria-hidden="true" /> : <Building2 className="size-4" aria-hidden="true" />}Usa questo account per il settore {SECTOR_NAME[kind]}
+        </button>
+      )}
       <button type="button" disabled={busy} onClick={() => void other()}
-        className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white text-[15px] font-semibold text-black outline-none disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-brand-turquoise">
-        <LogOut className="size-4" aria-hidden="true" />{busy ? "Esco…" : "Esci e usa un altro account"}
+        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-foreground/[0.08] text-sm font-semibold outline-none disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-ring">
+        <LogOut className="size-4" aria-hidden="true" />Esci e usa un altro account
       </button>
     </div>
   );
