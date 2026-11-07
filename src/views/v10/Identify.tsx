@@ -250,6 +250,8 @@ export function IdentifyForm({ kind, onDone }: { kind: ProKind; onDone: () => vo
   return kind === "agronomo" ? <AgronomoForm onDone={onDone} /> : <FunzionarioForm onDone={onDone} />;
 }
 
+/** While the sector lock page is up it takes the phone's Back itself (the sector page's form step leaves it alone). */
+export const lockShown = { on: false };
 const SECTOR_NAME: Record<ProKind, string> = { funzionario: "urbano", agronomo: "agricolo" };
 const SECTOR_PLACE: Record<ProKind, string> = { funzionario: "la piazza", agronomo: "il vigneto" };
 const SECTOR_TO: Record<ProKind, string> = { funzionario: "alla piazza", agronomo: "al vigneto" };
@@ -290,16 +292,30 @@ export function AccountSectorLock({ kind, account, email }: { kind: ProKind; acc
     dropProIdOnDevice();
     // Back to the sector choice, never the account panel: from there "Hai già un account? Accedi" or a sector's form.
     rememberWantedSector(null);
-    leaveAccount({ openPanel: false, to: "/benvenuto" });
+    try { sessionStorage.setItem("mdt-gate-guard", "1"); } catch { /* none */ }
+    leaveAccount({ openPanel: false, to: "/benvenuto", replace: true });
   };
-  // "Indietro" leaves this account too (kept on the phone, not ended) and goes back to the sector choice.
-  const back = async () => {
+  // "Indietro" — and the phone's Back, Android's edge swipe included — leaves this account too (kept on the phone,
+  // not ended) and goes back to the sector choice, in place of this page (replace): Back no longer leads to Google's
+  // account chooser and from there to this page again. The sector choice then holds the phone's Back (mdt-gate-guard).
+  const leaving = useRef(false);
+  const back = useCallback(async () => {
+    if (leaving.current) return;
+    leaving.current = true;
     setBusy(true);
     await keepProIdInAccount();
     dropProIdOnDevice();
     rememberWantedSector(null);
-    leaveAccount({ openPanel: false, to: "/benvenuto" });
-  };
+    try { sessionStorage.setItem("mdt-gate-guard", "1"); } catch { /* none */ }
+    leaveAccount({ openPanel: false, to: "/benvenuto", replace: true });
+  }, []);
+  useEffect(() => {
+    lockShown.on = true;
+    window.history.pushState({ ...(window.history.state ?? {}), __sectorLock: true }, "");
+    const onPop = () => { void back(); };
+    window.addEventListener("popstate", onPop);
+    return () => { lockShown.on = false; window.removeEventListener("popstate", onPop); };
+  }, [back]);
   // Its own full-screen page over the form (and the sector page), so it is seen at once; "Indietro" goes back.
   const pic = useAccountAvatar();
   const tone = SECTOR_TONE_UI[account];

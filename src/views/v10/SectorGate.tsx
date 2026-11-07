@@ -18,7 +18,7 @@ import { useAccountAvatar } from "@/lib/account-avatar";
 import { hapticTick } from "@/lib/haptics";
 import { type ProId, type ProKind } from "@/models/professional-id";
 import { openSimTab } from "@/views/v8/console";
-import { IdentifyForm, profileIntro } from "@/views/v10/Identify";
+import { IdentifyForm, lockShown, profileIntro } from "@/views/v10/Identify";
 import { Backdrop, useDarkChrome } from "@/views/v10/intro";
 
 /**
@@ -342,10 +342,21 @@ function SectorPage({ start }: { start: ProKind | null }) {
       return;
     }
     if (!formStep.current) { window.history.pushState({ ...(window.history.state ?? {}), __sectorForm: true }, ""); formStep.current = true; }
-    const onPop = () => { formStep.current = false; setKind(null); };
+    const onPop = () => { if (lockShown.on) return; formStep.current = false; setKind(null); };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, [kind]);
+  // Just left an account from the sector lock page: the sector choice holds the phone's Back, which would lead to
+  // Google's account chooser and from there back to the lock page.
+  useEffect(() => {
+    let on = false;
+    try { on = sessionStorage.getItem("mdt-gate-guard") === "1"; } catch { /* none */ }
+    if (!on) return;
+    const guard = () => { if (!window.history.state?.__gateGuard && !window.history.state?.__sectorForm) window.history.pushState({ ...(window.history.state ?? {}), __gateGuard: true }, ""); };
+    guard();
+    window.addEventListener("popstate", guard);
+    return () => window.removeEventListener("popstate", guard);
+  }, []);
   // The profile of this kind registered before (on this device or in the account): recognised, one tap brings it back
   // with its project's history.
   const known = useKnownProIds(kind);
