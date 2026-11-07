@@ -446,6 +446,9 @@ function wantedSector(): ProKind | null {
  * Mounted once: on sign-in the account's profile comes to this device, or this device's goes to an account without one;
  * on sign-out the profile leaves this device (kept in the account for the next sign-in).
  */
+/** Settles once the opening's session read (and, signed in, the account's profile) is done: the preloader waits for it. */
+let settleOpening: () => void = () => {};
+export const openingSettled: Promise<void> = typeof window === "undefined" ? Promise.resolve() : new Promise((r) => { settleOpening = r; });
 export function useSyncProId() {
   useEffect(() => {
     let adopted = "";
@@ -534,7 +537,7 @@ export function useSyncProId() {
     };
     const publish = (user: { email?: string | null; user_metadata?: unknown } | null | undefined) =>
       setAccountSector(user ? { kind: sectorOf(user.user_metadata), email: user.email ?? null, name: nameOf(user.user_metadata) } : null);
-    void supabase.auth.getSession().then(({ data }) => { publish(data.session?.user); if (data.session) void adopt(data.session.user.id, data.session.user.user_metadata); });
+    void supabase.auth.getSession().then(({ data }) => { publish(data.session?.user); if (data.session) void adopt(data.session.user.id, data.session.user.user_metadata).finally(() => settleOpening()); else settleOpening(); }).catch(() => settleOpening());
     // Signing out of the personal account signs out of the professional profile too (it stays saved in the account
     // and comes back with the next sign-in).
     const { data } = supabase.auth.onAuthStateChange((event, s) => {

@@ -13,9 +13,11 @@ const SAVED = "Salvato su questo dispositivo (in modalità ospite non va nel clo
 export function LabSyncIndicator({ className }: { className?: string }) {
   const { savedAt } = useLab();
   const [phase, setPhase] = useState<"idle" | "saving" | "saved">("idle");
-  const first = useRef(true);
+  // The saves made while the page opens (the stored state read back, the place set) are not the person's own:
+  // nothing shows for them, so no notice flashes on opening.
+  const openedAt = useRef(Date.now());
   useEffect(() => {
-    if (first.current) { first.current = false; return; }
+    if (Date.now() - openedAt.current < 3000) return;
     setPhase("saving");
     const saved = window.setTimeout(() => setPhase("saved"), 700);
     const idle = window.setTimeout(() => setPhase("idle"), 1900);

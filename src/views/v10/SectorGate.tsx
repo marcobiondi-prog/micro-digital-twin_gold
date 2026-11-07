@@ -221,7 +221,7 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
   return (
     <div className="space-y-3">
       <div ref={row} role="list" aria-label="Profili registrati" data-map-gestures=""
-        className={`no-scrollbar -mx-6 flex snap-x snap-mandatory gap-3 overflow-x-auto px-[11%] py-4 touch-pan-x [scrollbar-width:none] sm:-mx-0 ${known.length ? "" : "justify-center"}`}>
+        className={`no-scrollbar -mx-6 flex snap-x snap-mandatory gap-3 overflow-x-auto px-[11%] py-4 touch-pan-x [scrollbar-width:none] sm:-mx-0`}>
         {known.map((k, i) => (
           <div key={keyOf(k)} role="listitem" className="w-[78%] shrink-0 snap-center">
             <div data-active={i === active || undefined}
@@ -374,7 +374,7 @@ function SectorPage({ start }: { start: ProKind | null }) {
             <p className="text-[15px] leading-relaxed text-foreground/60">{profileIntro(sector.kind)}</p>
             <KnownProfiles kind={sector.kind} />
             {signIn}
-            {known.length > 0 && !(acct?.kind && acct.kind !== sector.kind) && <p className="px-1 pt-2 text-sm font-semibold text-foreground/70">Oppure registra un altro profilo</p>}
+            {!(acct?.kind && acct.kind !== sector.kind) && <p className="px-1 pt-2 text-sm font-semibold text-foreground/70">Oppure registra un altro profilo</p>}
             <IdentifyForm kind={sector.kind} onDone={done} />
           </>
         ) : (

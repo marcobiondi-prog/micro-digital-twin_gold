@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useHomeFocus } from "@/lib/home-focus";
 import { introSeen } from "@/lib/intro-seen";
+import { PREVIEW_BUILD } from "@/lib/demo-login";
 import { THEME_DARK, ThemeToggle, themeBootScript } from "@/views/theme-toggle";
 import { AccountControl } from "@/views/account-control";
 import { CameraDockButton, CameraSheet } from "@/views/CameraDock";
@@ -21,7 +22,7 @@ import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
 import { installUiClicks } from "@/lib/ui-sounds";
 import { isChunkError, reloadFresh } from "@/router";
 import { History, Building2, Grape, Info, LayoutDashboard, Lock, UserRound } from "lucide-react";
-import { getProId, useGuest, useProId, useSyncProId } from "@/lib/use-pro-id";
+import { getProId, openingSettled, useGuest, useProId, useSyncProId } from "@/lib/use-pro-id";
 import { installAccountSessions } from "@/lib/account-sessions";
 import { useBiometricAutoEnter } from "@/views/v10/Biometric";
 import { useSyncMediaArchive } from "@/models/media-archive";
@@ -457,7 +458,21 @@ function RootComponent() {
   // The index's preloader goes once the app has started and its fonts are in.
   useEffect(() => {
     const fonts = (document as Document & { fonts?: { ready: Promise<unknown> } }).fonts?.ready ?? Promise.resolve();
-    void Promise.race([fonts, new Promise((r) => setTimeout(r, 1500))]).then(() => requestAnimationFrame(hidePreloader));
+    // It also waits for the app to land on its page (from "/" to the profile's simulation) and for the account's
+    // profile to be read, so no in-between screen (the empty "/", another page, the sector page) shows for a moment.
+    // At most 4 s in all, then it goes anyway.
+    const landed = new Promise<void>((resolve) => {
+      const start = Date.now();
+      const check = () => {
+        const onIndex = window.location.pathname === "/";
+        const tutorial = onIndex && (!introSeen() || PREVIEW_BUILD || /[?&](rivedi|scenario)=/.test(window.location.search));
+        if (!onIndex || tutorial || Date.now() - start > 3000) resolve(); else setTimeout(check, 60);
+      };
+      check();
+    });
+    const settled = Promise.all([Promise.race([fonts, new Promise((r) => setTimeout(r, 1500))]), landed, openingSettled])
+      .then(() => new Promise((r) => setTimeout(r, 250)));
+    void Promise.race([settled, new Promise((r) => setTimeout(r, 4000))]).then(() => requestAnimationFrame(hidePreloader));
   }, []);
   // The other pages' code is fetched once the app is idle, so moving between them never waits for the network
   // (on a first open, before the offline worker has cached anything, a page appeared in jumps while its file came in).
