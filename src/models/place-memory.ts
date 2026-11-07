@@ -15,9 +15,10 @@ export const samePlace = (a: { lat: number; lng: number }, b: { lat: number; lng
  * Leaving `from` for `to`: `from`'s snapshot replaces any earlier one of that place, and `to`'s snapshot (if any) is
  * returned to be put back. The list keeps the 30 most recent places.
  */
-export function movePlace<T>(places: PlaceSnap<T>[] | undefined, from: { lat: number; lng: number; label?: string }, snap: T, to: { lat: number; lng: number }): { places: PlaceSnap<T>[]; back: T | null } {
+export function movePlace<T>(places: PlaceSnap<T>[] | undefined, from: { lat: number; lng: number; label?: string; pending?: boolean }, snap: T, to: { lat: number; lng: number }): { places: PlaceSnap<T>[]; back: T | null } {
   const rest = (places ?? []).filter((p) => !samePlace(p, from));
-  const kept = [{ lat: from.lat, lng: from.lng, ...(from.label ? { label: from.label } : {}), snap }, ...rest].slice(0, MAX_PLACES);
+  // No place chosen yet: nothing to keep for it.
+  const kept = from.pending ? rest : [{ lat: from.lat, lng: from.lng, ...(from.label ? { label: from.label } : {}), snap }, ...rest].slice(0, MAX_PLACES);
   const found = kept.find((p) => samePlace(p, to) && !samePlace(p, from)) ?? null;
   return { places: kept, back: found ? found.snap : null };
 }

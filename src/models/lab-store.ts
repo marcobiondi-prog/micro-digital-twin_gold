@@ -6,7 +6,8 @@ import { piazzaEstimate, vineZones } from "./scenarios";
 import type { DrawnArea } from "./drawn-area";
 import { movePlace, samePlace, type PlaceSnap } from "./place-memory";
 
-export type Loc = { label: string; lat: number; lng: number };
+/** A place; pending while none has been chosen yet (no default place: the GPS or a search sets the first one). */
+export type Loc = { label: string; lat: number; lng: number; pending?: boolean };
 export type VineZoneState = { temperature: number; moisture: number; wind: number; rain: boolean; irrigation?: number; shade?: number; windbreak?: number };
 export type LabState = {
   savedAt?: number | null;
@@ -25,8 +26,8 @@ const KEY = "micro-digital-twin-lab";
 /** The place's real weather imported into the piazza (besides the air temperature, kept as realTemp): when, humidity %, wind km/h, ground temperature °C, sun kWh/m² a day and rain mm over the last week. */
 export type RealWeather = { at: string; humidity: number | null; wind: number | null; groundTemp: number | null; sun: number | null; rainWeek: number | null };
 const defaults = (): LabState => ({
-  urban: { trees: 6, permeable: 20, shade: 15, location: { label: "Piazza Vittorio Emanuele II · Campobasso · Molise", lat: 41.55837, lng: 14.659698 }, treeCells: null, permeableCells: null, shadeCells: null },
-  vineyard: { zones: vineZones.map((z) => ({ temperature: z.temp, moisture: z.moist, wind: z.wind, rain: false })), phase: "Invaiatura" as Pheno, selected: 2, allZones: false, location: { label: "Colline del Molise", lat: 41.83, lng: 14.98 } },
+  urban: { trees: 6, permeable: 20, shade: 15, location: { label: "Nessun luogo scelto", lat: 41.55837, lng: 14.659698, pending: true }, treeCells: null, permeableCells: null, shadeCells: null },
+  vineyard: { zones: vineZones.map((z) => ({ temperature: z.temp, moisture: z.moist, wind: z.wind, rain: false })), phase: "Invaiatura" as Pheno, selected: 2, allZones: false, location: { label: "Nessun luogo scelto", lat: 41.83, lng: 14.98, pending: true } },
 });
 
 const serverState = defaults();
@@ -41,12 +42,20 @@ export function upgradeUrbanLocation(location: Loc | undefined, fallback: Loc): 
   return oldDefault ? fallback : location;
 }
 
+/** The old default places (the Campobasso piazza, the Molise hills) saved on devices without an area drawn there become "no place yet". */
+const OLD_DEFAULTS = [{ lat: 41.55837, lng: 14.659698 }, { lat: 41.83, lng: 14.98 }];
+function dropDefault(location: Loc, none: Loc, area: DrawnArea | null | undefined): Loc {
+  if (location.pending) return none;
+  const old = OLD_DEFAULTS.some((o) => Math.abs(location.lat - o.lat) < 1e-5 && Math.abs(location.lng - o.lng) < 1e-5);
+  return old && !area ? none : location;
+}
+
 function load() {
   if (loaded || typeof window === "undefined") return;
   loaded = true;
   try {
     const raw = window.localStorage.getItem(KEY);
-    if (raw) { const d = defaults(), p = JSON.parse(raw) as Partial<LabState>; state = { ...state, urban: { ...d.urban, ...p.urban, location: upgradeUrbanLocation(p.urban?.location, d.urban.location) }, vineyard: { ...d.vineyard, ...p.vineyard }, syncedAt: p.syncedAt ?? null, syncedTargets: p.syncedTargets ?? null }; }
+    if (raw) { const d = defaults(), p = JSON.parse(raw) as Partial<LabState>; state = { ...state, urban: { ...d.urban, ...p.urban, location: dropDefault(upgradeUrbanLocation(p.urban?.location, d.urban.location), d.urban.location, p.urban?.area) }, vineyard: { ...d.vineyard, ...p.vineyard, location: dropDefault(p.vineyard?.location ?? d.vineyard.location, d.vineyard.location, p.vineyard?.area) }, syncedAt: p.syncedAt ?? null, syncedTargets: p.syncedTargets ?? null }; }
   } catch { /* ignore */ }
   window.addEventListener("storage", (e) => { if (e.key === KEY && e.newValue) { try { state = JSON.parse(e.newValue); listeners.forEach((l) => l()); } catch { /* ignore */ } } });
 }

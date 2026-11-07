@@ -10,7 +10,7 @@ type GoogleGeocodeResult = {
   geometry?: { location?: { lat?: number; lng?: number } };
 };
 
-export type SearchedLocation = { label: string; lat: number; lng: number };
+export type SearchedLocation = { label: string; lat: number; lng: number; pending?: boolean };
 
 type AddressPart = { longText: string; types: string[] };
 

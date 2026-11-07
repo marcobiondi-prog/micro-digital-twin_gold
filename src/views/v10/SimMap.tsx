@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { toast } from "sonner";
-import { Check, Hand, Lock, Map as MapIcon, MapPin, Moon, PenLine, RotateCcw, Sun, Sunrise, Sunset, Trash2, Undo2, X } from "lucide-react";
+import { Check, Hand, Lock, Map as MapIcon, MapPin, Moon, Navigation, PenLine, RotateCcw, Sun, Sunrise, Sunset, Trash2, Undo2, X } from "lucide-react";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { openAccount } from "@/lib/camera-dock";
 import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn } from "@/lib/demo-login";
@@ -200,6 +200,23 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
     if (m.part === "tree") { const trees = [...(e.trees ?? [])]; trees[m.index] = m.at; setEdits({ ...e, trees }); }
     else setEdits({ ...e, [m.part === "lawn" ? "lawnAt" : m.part === "shade" ? "shadeAt" : "windAt"]: m.at });
   };
+  // No place chosen yet: no map of a default place, only how to choose one (the GPS starts by itself on the Mappa tab).
+  if (loc.pending) return preview ? (
+    <button type="button" onClick={() => openSimTab(kind, "mappa")} className="flex h-40 w-full flex-col items-center justify-center gap-2 rounded-3xl bg-foreground/[0.06] px-6 text-center outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <Navigation className="size-6 text-brand-turquoise" aria-hidden="true" />
+      <span className="text-[15px] font-semibold">Nessun luogo ancora</span>
+      <span className="text-sm text-muted-foreground">Apri la mappa: il GPS trova dove sei, oppure cerca un luogo.</span>
+    </button>
+  ) : (
+    <div className="space-y-4">
+      <PlaceSearch kind={kind} />
+      <div role="status" className="flex h-[40vh] min-h-64 flex-col items-center justify-center gap-3 rounded-3xl bg-foreground/[0.06] px-6 text-center">
+        <Navigation className="size-8 text-brand-turquoise" aria-hidden="true" />
+        <p className="text-lg font-semibold">Nessun luogo ancora</p>
+        <p className="max-w-xs text-sm text-muted-foreground">Tocca il GPS per usare la tua posizione, oppure cerca {kind === "urban" ? "la piazza" : "il vigneto"} qui sopra. La mappa si apre lì.</p>
+      </div>
+    </div>
+  );
   if (preview) return (
     // The whole preview opens the Mappa tab; in the vineyard the zone pills over it choose the simulation's scope.
     <div onClick={() => openSimTab(kind, "mappa")}
