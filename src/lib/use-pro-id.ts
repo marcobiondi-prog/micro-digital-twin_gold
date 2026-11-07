@@ -104,7 +104,9 @@ async function attachAccount(id: ProId) {
   const pic = await smallPicture(getAccountAvatar());
   if (pic) acct.pic = pic;
   const k = knownSnap();
-  if (!k[id.kind].some((p) => sameProfile(p, id))) return;
+  const entry = (k[id.kind] as KnownProId[]).find((p) => sameProfile(p, id));
+  // A profile already tied to another personal account stays that account's.
+  if (!entry || (entry.acct?.email && entry.acct.email !== acct.email)) return;
   known = { ...k, [id.kind]: k[id.kind].map((p) => (sameProfile(p, id) ? { ...p, acct } : p)) };
   saveKnown();
   subs.forEach((f) => f());
@@ -273,11 +275,17 @@ export function sectorOf(meta: unknown): ProKind | null {
   }
   return null;
 }
-export type AccountSector = { kind: ProKind | null; email: string | null };
+export type AccountSector = { kind: ProKind | null; email: string | null; name?: string | null };
 let accountSector: AccountSector | null = null;
 const sectorSubs = new Set<() => void>();
+/** The account's own name, as the sign-in gave it (Google's full name), else none. */
+const nameOf = (meta: unknown): string | null => {
+  const m = meta as { full_name?: unknown; name?: unknown } | null;
+  const n = typeof m?.full_name === "string" ? m.full_name : typeof m?.name === "string" ? m.name : "";
+  return n.trim() || null;
+};
 const setAccountSector = (next: AccountSector | null) => {
-  if (next?.kind === accountSector?.kind && next?.email === accountSector?.email && !next === !accountSector) return;
+  if (next?.kind === accountSector?.kind && next?.email === accountSector?.email && next?.name === accountSector?.name && !next === !accountSector) return;
   accountSector = next;
   sectorSubs.forEach((f) => f());
 };
@@ -288,7 +296,7 @@ export function useAccountSector(): AccountSector | null {
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
       const user = data.session?.user;
-      setAccountSector(user ? { kind: sectorOf(user.user_metadata), email: user.email ?? null } : null);
+      setAccountSector(user ? { kind: sectorOf(user.user_metadata), email: user.email ?? null, name: nameOf(user.user_metadata) } : null);
     });
   }, []);
   return useSyncExternalStore((f) => { sectorSubs.add(f); return () => { sectorSubs.delete(f); }; }, () => accountSector, () => null);
@@ -307,7 +315,7 @@ export async function switchAccountSector(kind: ProKind): Promise<boolean> {
   const id = isProId(back) && back.kind === kind && (ownOf(meta) ?? []).includes(kind) ? back : null;
   pickedAt = Date.now();
   set(id);
-  setAccountSector({ kind, email: user.email ?? null });
+  setAccountSector({ kind, email: user.email ?? null, name: nameOf(user.user_metadata) });
   const { error } = await supabase.auth.updateUser({ data: { pro_sector: kind, pro_id: id, pro_left: false } });
   return !error;
 }
@@ -321,6 +329,12 @@ export async function saveProId(id: ProId | null): Promise<boolean> {
   const { data } = await supabase.auth.getSession();
   const meta = data.session?.user.user_metadata;
   const sector = data.session ? sectorOf(meta) : null;
+  // Another personal account's profile (tied on this phone to another email) cannot be taken by this account.
+  const email = data.session?.user.email;
+  if (id && email && (knownSnap()[id.kind] as KnownProId[]).some((q) => sameProfile(q, id) && !!q.acct?.email && q.acct.email !== email)) {
+    toast.error("Questo profilo è di un altro account", { description: "Identificati con i tuoi dati: il modulo è già compilato con il nome e l'email del tuo account." });
+    return false;
+  }
   // Signed in to an account of the other sector: refused (the form shows why and how to use another account).
   if (id && sector && sector !== id.kind) {
     toast.error(`Questo account è del settore ${sector === "funzionario" ? "urbano" : "agricolo"}`, { description: "Per l'altro settore accedi con un altro account personale." });
@@ -332,7 +346,7 @@ export async function saveProId(id: ProId | null): Promise<boolean> {
   // Every kind the account registered stays owned (a sector switched back finds its profile again).
   const own = withKind(ownOf(meta) ?? [], id);
   const proSector = sector ?? id?.kind ?? null;
-  if (proSector) setAccountSector({ kind: proSector, email: data.session.user.email ?? null });
+  if (proSector) setAccountSector({ kind: proSector, email: data.session.user.email ?? null, name: nameOf(meta) });
   // pro_left: the profile was left on purpose ("Esci dal profilo"), so the next sign-in does not bring it back by itself.
   await supabase.auth.updateUser({ data: { pro_id: id, pro_last: accountLast(meta, id, own), pro_own: own, pro_left: id === null, ...(proSector ? { pro_sector: proSector } : {}) } }).catch(() => undefined);
   return true;
@@ -365,6 +379,11 @@ async function legacyOwn(): Promise<ProKind[] | null> {
   return out;
 }
 
+async function accountEmail(userId: string): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.user.id === userId ? data.session.user.email ?? null : null;
+}
+
 /**
  * Mounted once: on sign-in the account's profile comes to this device, or this device's goes to an account without one;
  * on sign-out the profile leaves this device (kept in the account for the next sign-in).
@@ -387,7 +406,11 @@ export function useSyncProId() {
       // The account's own registered profiles come to this device too ("Continua come …" on its form).
       for (const k of own) { const p = prev[k]; if (isProId(p) && p.kind === k) { if (!lastSnap()[k]) keepLast(p); else keepKnown(p); } }
       const saved = (meta as Meta)?.pro_id;
-      const mine = (p: unknown): p is ProId => isProId(p) && own.includes(p.kind);
+      // A profile this phone knows as another personal account's (tied to another email: picked here while signed in
+      // to this account by mistake) is not this account's own, even if it reached its data.
+      const email = await accountEmail(userId);
+      const foreign = (p: unknown) => isProId(p) && !!email && KNOWN_KINDS.some((k) => (knownSnap()[k] as KnownProId[]).some((q) => sameProfile(q, p) && !!q.acct?.email && q.acct.email !== email));
+      const mine = (p: unknown): p is ProId => isProId(p) && own.includes(p.kind) && !foreign(p);
       const left = (meta as Meta)?.pro_left === true;
       const back = mine(saved) ? saved : left ? null : own.map((k) => prev[k]).filter(mine).sort((x, y) => (y.at > x.at ? 1 : -1))[0] ?? null;
       // A profile chosen on this device while the account was being read (the history check takes a moment) wins: the
@@ -395,8 +418,12 @@ export function useSyncProId() {
       if (pickedAt >= startedAt) return;
       // The other sector's registered profile stays saved in the account (pro_own and pro_last keep every kind owned),
       // only unused while the account is of this sector.
-      const clean = { pro_id: back, pro_last: accountLast(meta, back, owned), pro_own: owned, ...(sector ? { pro_sector: sector } : {}) };
-      const dirty = legacy || (saved != null && !mine(saved)) || KINDS.some((k) => prev[k] != null && !owned.includes(k)) || (sector != null && (meta as { pro_sector?: unknown } | null)?.pro_sector !== sector);
+      // Another account's profile that reached this one is dropped from it (and with it the sector it gave).
+      const ownedClean = owned.filter((k) => !foreign(prev[k]) && !(isProId(saved) && saved.kind === k && foreign(saved)));
+      const sectorClean = sector && ownedClean.includes(sector) ? sector : null;
+      const clean = { pro_id: back, pro_last: accountLast(meta, back, ownedClean), pro_own: ownedClean, pro_sector: sectorClean };
+      if (!sectorClean && accountSector?.kind) setAccountSector({ ...accountSector, kind: null });
+      const dirty = ownedClean.length !== owned.length || legacy || (saved != null && !mine(saved)) || KINDS.some((k) => prev[k] != null && !owned.includes(k)) || (sector != null && (meta as { pro_sector?: unknown } | null)?.pro_sector !== sector);
       if (back) {
         set(back);
         if (dirty || !mine(saved)) void supabase.auth.updateUser({ data: clean }).catch(() => undefined);
@@ -411,7 +438,7 @@ export function useSyncProId() {
       if (saved != null && !mine(saved)) toast("Questo account non ha ancora un profilo professionale", { description: "Scegli il settore e identificati, oppure entra come ospite." });
     };
     const publish = (user: { email?: string | null; user_metadata?: unknown } | null | undefined) =>
-      setAccountSector(user ? { kind: sectorOf(user.user_metadata), email: user.email ?? null } : null);
+      setAccountSector(user ? { kind: sectorOf(user.user_metadata), email: user.email ?? null, name: nameOf(user.user_metadata) } : null);
     void supabase.auth.getSession().then(({ data }) => { publish(data.session?.user); if (data.session) void adopt(data.session.user.id, data.session.user.user_metadata); });
     // Signing out of the personal account signs out of the professional profile too (it stays saved in the account
     // and comes back with the next sign-in).

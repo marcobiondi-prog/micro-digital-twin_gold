@@ -66,7 +66,10 @@ export function SectorGate() {
  * Shown on the sector page's form and on a locked section's page.
  */
 export function KnownProfiles({ kind }: { kind: ProKind }) {
-  const known = useKnownProIds(kind);
+  const all = useKnownProIds(kind);
+  const accEmail = useAccountSector()?.email ?? null;
+  // Signed in, only this account's profiles (and those not tied to any account yet): another account's never shows.
+  const known = accEmail ? all.filter((k) => !k.acct?.email || k.acct.email === accEmail) : all;
   const avatar = useAccountAvatar();
   const acc = useAccountSector();
   const pick = async (k: ProId) => { if (!(await saveProId(k))) return; toast.success(`Bentornato, ${k.name}`, { description: `Ritrovi la cronologia ${k.kind === "funzionario" ? "della piazza" : "del vigneto"}.` }); };

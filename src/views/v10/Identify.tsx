@@ -55,6 +55,9 @@ const PAGE: Record<ProKind, { title: string; section: "urban" | "vineyard"; open
 
 function AgronomoForm({ onDone }: { onDone: () => void }) {
   const [v, setV] = useState<AgronomoInput>({ name: "", licenceType: "", licence: "", region: "", expires: "", declared: false });
+  // Signed in, the name comes from the personal account (it can still be changed).
+  const acc = useAccountSector();
+  useEffect(() => { if (acc?.name) setV((x) => (x.name ? x : { ...x, name: acc.name! })); }, [acc?.name]);
   const [errors, setErrors] = useState<Errors<keyof AgronomoInput>>({});
   // Changing a field clears its message: the rest stay until the next try.
   const up = <K extends keyof AgronomoInput>(k: K, val: AgronomoInput[K]) => {
@@ -173,6 +176,12 @@ function RegionField(props: { id: string; describedBy: string | undefined; inval
 
 function FunzionarioForm({ onDone }: { onDone: () => void }) {
   const [v, setV] = useState<FunzionarioInput>({ name: "", comune: "", office: "", otherOffice: "", role: "", email: "", badge: "", declared: false });
+  // Signed in, the name and the email come from the personal account (they can still be changed).
+  const acc = useAccountSector();
+  useEffect(() => {
+    if (!acc) return;
+    setV((x) => ({ ...x, ...(acc.name && !x.name ? { name: acc.name } : {}), ...(acc.email && !x.email ? { email: acc.email } : {}) }));
+  }, [acc?.name, acc?.email]);
   // The town picked from the list: the email example follows it.
   const [town, setTown] = useState<string | null>(null);
   const [errors, setErrors] = useState<Errors<keyof FunzionarioInput>>({});
@@ -321,6 +330,8 @@ export const profileIntro = (kind: ProKind) => PAGE[kind].intro;
 /** The profile in use, with "Esci dal profilo" (and, on the identification page, the way into its section). */
 export function ProfileCard({ kind, go }: { kind: ProKind; go?: () => void }) {
   const id = useProId();
+  // Signed in, the personal email shown is the account's (the one signed in now).
+  const accountEmail = useAccountSector()?.email ?? null;
   const mine = id?.kind === kind ? id : null;
   const Icon = kind === "agronomo" ? Grape : Building2;
   // The office's official email (from the public administrations' register), else the usual pattern, marked indicative.
@@ -340,7 +351,7 @@ export function ProfileCard({ kind, go }: { kind: ProKind; go?: () => void }) {
         {mine.kind === "funzionario" ? <TownCrest name={mine.comune} istat={mine.istat} size={52} label /> : <TownCrest name={mine.region} region size={52} label />}
       </div>
       <dl className="divide-y divide-foreground/10 rounded-2xl bg-foreground/[0.05] px-4">
-        {profileRows(mine, town ? officeMail : undefined).map(([k, v]) => {
+        {profileRows(mine, town ? officeMail : undefined, accountEmail).map(([k, v]) => {
           const val = v;
           // A long value (the email) goes on its own line under its label, whole, instead of breaking mid-word beside it.
           return v.length > 24
@@ -361,11 +372,11 @@ export function ProfileCard({ kind, go }: { kind: ProKind; go?: () => void }) {
 }
 
 /** The profile's data as label · value rows. */
-function profileRows(id: ProId, office?: { mail: string; official: boolean }): Array<[string, string]> {
+function profileRows(id: ProId, office?: { mail: string; official: boolean }, account?: string | null): Array<[string, string]> {
   const since = new Date(id.at).toLocaleDateString("it-IT");
   return id.kind === "agronomo"
-    ? [["Nome", id.name], ...(id.licence ? [["Patentino", `${id.licenceType === "consulente" ? "Consulente" : "Utilizzatore"} · ${id.licence}`], ["Regione", id.region], ["Scadenza", new Date(`${id.expires}T12:00:00`).toLocaleDateString("it-IT")]] as Array<[string, string]> : [["Patentino", "Non indicato"], ["Regione", id.region]] as Array<[string, string]>), ["Identificato il", since]]
-    : [["Nome", id.name], ["Comune", id.comune], ["Ufficio", id.office], ["Ruolo", id.role], ...(office ? [[office.official ? "Email dell'ufficio" : "Email dell'ufficio (indicativa)", office.mail] as [string, string]] : []), ...(id.email && id.email !== office?.mail ? [["Email personale", id.email] as [string, string]] : []), ...(id.badge ? [["Matricola", id.badge] as [string, string]] : []), ["Identificato il", since]];
+    ? [["Nome", id.name], ...(id.licence ? [["Patentino", `${id.licenceType === "consulente" ? "Consulente" : "Utilizzatore"} · ${id.licence}`], ["Regione", id.region], ["Scadenza", new Date(`${id.expires}T12:00:00`).toLocaleDateString("it-IT")]] as Array<[string, string]> : [["Patentino", "Non indicato"], ["Regione", id.region]] as Array<[string, string]>), ...(account ? [["Email", account] as [string, string]] : []), ["Identificato il", since]]
+    : [["Nome", id.name], ["Comune", id.comune], ["Ufficio", id.office], ["Ruolo", id.role], ...(office ? [[office.official ? "Email dell'ufficio" : "Email dell'ufficio (indicativa)", office.mail] as [string, string]] : []), ...((account ?? id.email) && (account ?? id.email) !== office?.mail ? [["Email personale", (account ?? id.email)!] as [string, string]] : []), ...(id.badge ? [["Matricola", id.badge] as [string, string]] : []), ["Identificato il", since]];
 }
 
 /**
