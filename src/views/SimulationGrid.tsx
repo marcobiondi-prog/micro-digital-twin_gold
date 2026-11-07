@@ -79,8 +79,9 @@ const osmCache = new Map<string, OsmSuggestion[]>();
 /** Below this the phone has not really moved: the place stays as it is. */
 const GPS_STEP_M = 100;
 const GPS_KEY = "mdt-gps-v1";
-function readGps() { try { return typeof localStorage !== "undefined" && localStorage.getItem(GPS_KEY) === "on"; } catch { return false; } }
-function saveGps(on: boolean) { try { if (on) localStorage.setItem(GPS_KEY, "on"); else localStorage.removeItem(GPS_KEY); } catch { /* storage unavailable */ } }
+// On by default: the map finds the phone's position as soon as it opens; "off" only once turned off (or refused).
+function readGps() { try { return typeof localStorage !== "undefined" && localStorage.getItem(GPS_KEY) !== "off"; } catch { return false; } }
+function saveGps(on: boolean) { try { localStorage.setItem(GPS_KEY, on ? "on" : "off"); } catch { /* storage unavailable */ } }
 /** A place chosen by hand while the GPS is on pauses the following (kept across openings) until "Seguimi di nuovo". */
 const GPS_PAUSE_KEY = "mdt-gps-paused-v1";
 function readGpsPaused() { try { return typeof localStorage !== "undefined" && localStorage.getItem(GPS_PAUSE_KEY) === "1"; } catch { return false; } }
@@ -153,7 +154,8 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null }: { 
   const pauseFollow = () => { if (gpsRef.current) { setPaused(true); saveGpsPaused(true); } };
   const gpsRef = useRef(false); gpsRef.current = gps;
   // Read after mounting, so the server's page and the first render agree.
-  useEffect(() => { if (readGps() && appAllowed("posizione")) { setLocating(!readGpsPaused()); setGps(true); setPaused(readGpsPaused()); } }, []);
+  // Every opening follows the phone again: a place chosen by hand pauses the GPS only until the map is opened anew.
+  useEffect(() => { if (readGps() && appAllowed("posizione")) { saveGpsPaused(false); setLocating(true); setGps(true); setPaused(false); } }, []);
   // Position revoked inside the app (Account → Autorizzazioni): the GPS goes off at once.
   const positionAllowed = useAppAllowed("posizione");
   useEffect(() => { if (!positionAllowed) { setGps(false); setLocating(false); } }, [positionAllowed]);
