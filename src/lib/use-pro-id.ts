@@ -179,6 +179,20 @@ export async function renameKnownProId(id: ProId, name: string): Promise<KnownPr
   subs.forEach((f) => f());
   return renamed;
 }
+/** Ties a profile kept on this phone to the account it really belongs to (its email), replacing a wrong tie. */
+function retieKnown(id: ProId, email: string) {
+  const k = knownSnap();
+  let changed = false;
+  const list = (k[id.kind] as KnownProId[]).map((p) => {
+    if (!sameProfile(p, id) || p.acct?.email === email) return p;
+    changed = true;
+    return { ...p, acct: { email, ...(p.acct?.email === email ? { pic: p.acct?.pic } : {}) } };
+  });
+  if (!changed) return;
+  known = { ...k, [id.kind]: list };
+  saveKnown();
+  subs.forEach((f) => f());
+}
 const keepLast = (id: ProId) => {
   last = { ...lastSnap(), [id.kind]: id };
   try { window.localStorage.setItem(LAST_KEY, JSON.stringify(last)); } catch { /* memory only */ }
@@ -433,15 +447,21 @@ export function useSyncProId() {
       adopted = userId;
       const startedAt = Date.now();
       const legacy = ownOf(meta) === null;
-      const owned = ownOf(meta) ?? (await legacyOwn());
-      if (owned === null) { adopted = ""; return; } // history not readable now: decide at the next sign-in or opening
+      // What the account really worked on (its own history, owner-only): the projects with interventions in it.
+      const worked = await legacyOwn();
+      const owned0 = ownOf(meta) ?? worked;
+      if (owned0 === null) { adopted = ""; return; } // history not readable now: decide at the next sign-in or opening
+      // A kind the account worked on is its own, whatever its saved data say.
+      const owned = [...new Set([...owned0, ...(worked ?? [])])];
       const prev = (meta as Meta)?.pro_last ?? {};
       const saved = (meta as Meta)?.pro_id;
       // A profile this phone knows as another personal account's (tied to another email: picked here while signed in
       // to this account by mistake) is not this account's own, even if it reached its data: dropped from it, with the
       // sector it gave, before the account's sector is read.
       const email = await accountEmail(userId);
-      const foreign = (p: unknown) => isProId(p) && !!email && KNOWN_KINDS.some((k) => (knownSnap()[k] as KnownProId[]).some((q) => sameProfile(q, p) && !!q.acct?.email && q.acct.email !== email));
+      // A profile of a kind the account has interventions of is the account's own even if this phone tied it to
+      // another email (a tie made by mistake): the account's history wins, and the phone's tie is put right.
+      const foreign = (p: unknown) => isProId(p) && !!email && !(worked ?? []).includes(p.kind) && KNOWN_KINDS.some((k) => (knownSnap()[k] as KnownProId[]).some((q) => sameProfile(q, p) && !!q.acct?.email && q.acct.email !== email));
       const ownedClean = owned.filter((k) => !foreign(prev[k]) && !(isProId(saved) && saved.kind === k && foreign(saved)));
       const rawSector = (meta as { pro_sector?: unknown } | null)?.pro_sector;
       // One account, one sector: only the account's own sector counts (an older account owning both keeps the one in
@@ -458,7 +478,11 @@ export function useSyncProId() {
       const path = typeof window === "undefined" ? "" : window.location.pathname;
       const wanted: ProKind | null = gateAsk.kind ?? wantedSector() ?? (path.startsWith("/urbano") ? "funzionario" : path.startsWith("/vigneto") ? "agronomo" : null);
       const wantedProfile = wanted ? prev[wanted] : null;
-      const sector: ProKind | null = wanted && ownedClean.includes(wanted) && isProId(wantedProfile) && !foreign(wantedProfile) ? wanted : savedSector;
+      // An account that only ever worked on one project is of that project's sector (a saved sector of the other one,
+      // written by mistake, is put right), unless the person is entering the other sector with its own profile.
+      const onlyWorked: ProKind | null = worked && worked.length === 1 ? worked[0]! : null;
+      const sector: ProKind | null = wanted && ownedClean.includes(wanted) && isProId(wantedProfile) && !foreign(wantedProfile) ? wanted : onlyWorked ?? savedSector;
+      if (email) for (const k of worked ?? []) { const p = prev[k]; if (isProId(p)) retieKnown(p, email); }
       const own = sector ? ownedClean.filter((k) => k === sector) : ownedClean;
       rememberWantedSector(null);
       // The account's own registered profiles come to this device too ("Continua come …" on its form).
