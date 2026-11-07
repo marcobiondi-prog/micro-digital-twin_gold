@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Fingerprint, ScanFace } from "lucide-react";
 import { toast } from "sonner";
+import { openAccount } from "@/lib/camera-dock";
 import { biometricAvailable, biometricName, biometricOn, disableBiometric, enableBiometric, useBiometricAccounts, useBiometricOn, verifyBiometric } from "@/lib/biometric";
 import { hasAccountSession, switchToAccount } from "@/lib/account-sessions";
 import { supabase } from "@/integrations/supabase/client";
-import { type KnownProId, rememberWantedSector, saveProId, sectorOf, switchAccountSector, useKnownProIds } from "@/lib/use-pro-id";
+import { getKnownProIds, getProId, type KnownProId, rememberWantedSector, saveProId, sectorOf, switchAccountSector, useKnownProIds } from "@/lib/use-pro-id";
 import { type ProId } from "@/models/professional-id";
 
 /**
@@ -34,6 +35,12 @@ async function toggle(id: ProId, on: boolean): Promise<string> {
   const n = biometricName(), name = n[0]!.toUpperCase() + n.slice(1);
   if (on) { disableBiometric(proBioKey(id)); return `${name} spento per ${id.name}.`; }
   const r = await enableBiometric(proBioKey(id), id.name);
+  if (r.ok) {
+    // Turned on while signed out: the profile's account is entered at once (just recognised).
+    const { data } = await supabase.auth.getSession();
+    const k = knownOf(id);
+    if (!data.session && k) { if (await enterWithProfile(k, { recognised: true })) return `${name} attivo: entro come ${id.name}…`; }
+  }
   return r.ok ? `${name} attivo: per riprendere ${id.name} su questo telefono ti chiedo il riconoscimento.` : r.reason ?? "Non è stato possibile attivarlo.";
 }
 
@@ -107,6 +114,63 @@ export function ProfileBioSwitch({ id }: { id: ProId }) {
   );
 }
 
+/** The profile on this phone matching one (same kind and registration time), with the account it is tied to. */
+export function knownOf(id: ProId): KnownProId | null {
+  return getKnownProIds().find((k) => proBioKey(k) === proBioKey(id)) ?? null;
+}
+
+/**
+ * Enters a profile and its personal account at once: the phone's recognition (unless just asked), then the account
+ * kept on this phone, its sector moved to the profile's if needed, the profile in use and a clean load of its
+ * simulation. False when it could not (not recognised, or the account is not kept here / must be signed in again).
+ */
+export async function enterWithProfile(k: KnownProId, opts: { recognised?: boolean; quiet?: boolean } = {}): Promise<boolean> {
+  const email = k.acct?.email;
+  if (!email || !hasAccountSession(email)) {
+    if (!opts.quiet) toast("Accedi una volta con il tuo account", { description: `Poi ${biometricName()} ti farà entrare da solo in ${k.name} e nel suo account.` });
+    return false;
+  }
+  if (!opts.recognised && !(await checkProfileBiometric(k))) return false;
+  const r = await switchToAccount(email);
+  if (r !== true) {
+    if (!opts.quiet) toast.error("Questo account va riconnesso", { description: "Entra una volta con la password o con Google: poi il riconoscimento torna a farti entrare." });
+    return false;
+  }
+  const { data } = await supabase.auth.getSession();
+  const sec = sectorOf(data.session?.user.user_metadata);
+  if (sec && sec !== k.kind) await switchAccountSector(k.kind);
+  rememberWantedSector(k.kind);
+  await saveProId(k);
+  toast.success(`Bentornato, ${k.name}`, { description: `Sei entrato con ${email}.` });
+  window.location.assign(k.kind === "funzionario" ? "/urbano" : "/vigneto");
+  return true;
+}
+
+/**
+ * Opening the app signed out with a profile on this phone that has the recognition on and its account kept here: the
+ * phone's recognition is asked at once and, recognised, the profile and its account open by themselves. Once per
+ * load; where the browser wants a tap first, the account panel opens with its "Entra con …" button.
+ */
+export function useBiometricAutoEnter() {
+  useEffect(() => {
+    let done = false;
+    const t = window.setTimeout(async () => {
+      if (done) return;
+      try { if (sessionStorage.getItem("mdt-bio-skip")) { sessionStorage.removeItem("mdt-bio-skip"); return; } } catch { /* none */ }
+      const { data } = await supabase.auth.getSession();
+      if (data.session || !(await biometricAvailable())) return;
+      const cur = getProId();
+      const all = getKnownProIds().filter((k) => biometricOn(proBioKey(k)) && !!k.acct?.email && hasAccountSession(k.acct.email));
+      const k = (cur && all.find((x) => proBioKey(x) === proBioKey(cur))) ?? all.sort((a, b) => (b.at > a.at ? 1 : -1))[0];
+      if (!k) return;
+      const r = await verifyBiometric(proBioKey(k));
+      if (r.ok) { await enterWithProfile(k, { recognised: true }); return; }
+      openAccount();
+    }, 900);
+    return () => { done = true; window.clearTimeout(t); };
+  }, []);
+}
+
 /**
  * The account panel signed out: one button per professional profile with the recognition on whose personal account
  * is kept on this phone — "Entra con Face ID · name · email": the recognition, then that account and that profile,
@@ -121,21 +185,8 @@ export function BiometricSignIn({ onDone }: { onDone?: () => void }) {
   if (!available || list.length === 0) return null;
   const name = biometricName();
   const enter = async (k: KnownProId) => {
-    const key = proBioKey(k);
-    setBusy(key);
-    try {
-      if (!(await checkProfileBiometric(k))) return;
-      const r = await switchToAccount(k.acct!.email!);
-      if (r !== true) { toast.error("Questo account va riconnesso", { description: "Entra una volta con la password o con Google: poi il riconoscimento torna a farti entrare." }); return; }
-      const { data } = await supabase.auth.getSession();
-      const sec = sectorOf(data.session?.user.user_metadata);
-      if (sec && sec !== k.kind) await switchAccountSector(k.kind);
-      rememberWantedSector(k.kind);
-      await saveProId(k);
-      toast.success(`Bentornato, ${k.name}`, { description: `Sei entrato con ${k.acct!.email}.` });
-      onDone?.();
-      window.location.assign(k.kind === "funzionario" ? "/urbano" : "/vigneto");
-    } finally { setBusy(null); }
+    setBusy(proBioKey(k));
+    try { if (await enterWithProfile(k)) onDone?.(); } finally { setBusy(null); }
   };
   return (
     <div className="space-y-2">

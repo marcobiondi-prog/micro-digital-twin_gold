@@ -78,6 +78,8 @@ export function leaveAccount(opts: { openPanel?: boolean } = {}) {
     const key = (supabase.auth as unknown as { storageKey?: string }).storageKey;
     if (key) { window.localStorage.removeItem(key); window.localStorage.removeItem(`${key}-code-verifier`); window.localStorage.removeItem(`${key}-user`); }
     if (opts.openPanel !== false) sessionStorage.setItem(OPEN_AFTER, "1");
+    // Left on purpose: the recognition is not asked again by itself on the reload that follows.
+    sessionStorage.setItem("mdt-bio-skip", "1");
   } catch { /* none */ }
   window.location.reload();
 }

@@ -371,7 +371,7 @@ export function AccountControl() {
         leaveAccount({ openPanel: false });
         return;
       }
-      const { error } = await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut({ scope: "local" });
       if (error) { setNotice(error.message); setPending(false); return; }
     }
     sessionStorage.removeItem(guestKey);
