@@ -12,6 +12,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       className="toaster group app-toaster"
       position="top-center"
+      // Every alert goes away with a swipe sideways (left or right) or up, not only up as by default at the top centre.
+      swipeDirections={["left", "right", "top"]}
       offset="calc(env(safe-area-inset-top) + 0.75rem)"
       mobileOffset={{ top: "calc(env(safe-area-inset-top) + 0.75rem)", left: "1rem", right: "1rem" }}
       toastOptions={{

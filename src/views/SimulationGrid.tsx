@@ -167,7 +167,7 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
   useEffect(() => {
     if (positionAllowed) return;
     setGps((on) => {
-      if (on) toast("GPS spento", { description: "Hai revocato la posizione nell'app: la mappa non segue più dove sei." });
+      if (on) toast("GPS spento", { description: "Hai revocato la posizione nell'app: la mappa non segue più dove sei.", id: "gps-state" });
       return false;
     });
     setLocating(false);
@@ -181,7 +181,7 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
     const id = navigator.geolocation.watchPosition(async ({ coords }) => {
       const here = { lat: coords.latitude, lng: coords.longitude };
       // The first fix of each switch-on is said once: the GPS is on and following.
-      if (!lastFix.current) toast.success("GPS attivo", { description: pausedRef.current ? "Hai scelto tu la zona: il GPS resta acceso ma non la sposta." : "La mappa segue la tua posizione." });
+      if (!lastFix.current) toast.success("GPS attivo", { description: pausedRef.current ? "Hai scelto tu la zona: il GPS resta acceso ma non la sposta." : "La mappa segue la tua posizione.", id: "gps-state" });
       lastFix.current = here;
       setLocating(false);
       // With no place chosen yet the first fix sets it, however near.
@@ -215,7 +215,7 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
     if (gps && paused) { resume(); return; }
     if (gps) {
       setGps(false); saveGps(false); setPaused(false); saveGpsPaused(false); setLocating(false);
-      toast("GPS spento", { description: "La mappa non segue più la tua posizione. Toccalo di nuovo per riaccenderlo." });
+      toast("GPS spento", { description: "La mappa non segue più la tua posizione. Toccalo di nuovo per riaccenderlo.", id: "gps-state" });
       return;
     }
     if (!guardUse("posizione")) return;
