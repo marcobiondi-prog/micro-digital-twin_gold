@@ -50,13 +50,19 @@ const HTML = `<style>${CSS}</style><div class="glow"></div><div class="box" role
   + `<div class="name">Micro Digital <b>Twin</b></div><div class="sub">Creo il gemello digitale del luogo…</div>`
   + `<span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Caricamento…</span></div>`;
 
-/** Runs in the page as it is parsed: draws the preloader on "/" and gives the app a way to take it away. */
+/**
+ * Runs in the page as it is parsed: draws the preloader on "/", on a return from Google's sign-in (?code=) and on a
+ * reload the app asked for itself (preloadNext: entering an account or a profile), so the screens in between — the
+ * sector page, another profile's page — never show; and gives the app a way to take it away.
+ */
 export const preloaderScript = `(function(){try{
-if(location.pathname!=="/")return;
+var flag=false;try{flag=sessionStorage.getItem("mdt-preload")==="1";sessionStorage.removeItem("mdt-preload")}catch(e){}
+var idx=location.pathname==="/";
+if(!idx&&!flag&&!/[?&]code=|[?&#]error_description=|#access_token=/.test(location.search+location.hash))return;
 var el=document.createElement("div");el.id="mdt-preloader";el.innerHTML=${JSON.stringify(HTML)};
 document.documentElement.appendChild(el);
 var t0=Date.now(),gone=false;
-window.__mdtPreloaderDone=function(){if(gone)return;gone=true;var wait=Math.max(0,1800-(Date.now()-t0));
+window.__mdtPreloaderDone=function(){if(gone)return;gone=true;var wait=Math.max(0,(idx?1800:500)-(Date.now()-t0));
 setTimeout(function(){el.classList.add("out");setTimeout(function(){el.remove()},600)},wait)};
 setTimeout(window.__mdtPreloaderDone,8000);
 }catch(e){}})();`;
@@ -64,4 +70,9 @@ setTimeout(window.__mdtPreloaderDone,8000);
 /** Once the app has started: fades the preloader out (nothing on pages without it). */
 export function hidePreloader() {
   (window as unknown as { __mdtPreloaderDone?: () => void }).__mdtPreloaderDone?.();
+}
+
+/** The next page load (a reload or a move the app makes itself) shows the preloader until the app has settled. */
+export function preloadNext() {
+  try { sessionStorage.setItem("mdt-preload", "1"); } catch { /* none */ }
 }

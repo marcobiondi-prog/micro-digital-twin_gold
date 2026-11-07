@@ -496,12 +496,16 @@ export function useSyncProId() {
       // account that registered that sector's profile: the account goes to that sector — the person asked for it — even
       // if its saved sector was the other one.
       const path = typeof window === "undefined" ? "" : window.location.pathname;
-      const wanted: ProKind | null = gateAsk.kind ?? wantedSector() ?? (path.startsWith("/urbano") ? "funzionario" : path.startsWith("/vigneto") ? "agronomo" : null);
-      const wantedProfile = wanted ? prev[wanted] : null;
+      // The sector page's form (or the profile card picked) says it first; then the profile this phone tied to the
+      // account's email (signing in with Google from the panel enters that account's own profile, whatever page is
+      // open); only then the page open.
+      const tiedKinds = KNOWN_KINDS.filter((k) => !!tied[k]);
+      const usable = (k: ProKind | null | undefined): k is ProKind => !!k && ownedClean.includes(k) && isProId(prev[k]) && !foreign(prev[k]);
+      const wanted: ProKind | null = [gateAsk.kind, wantedSector(), tiedKinds.length === 1 ? tiedKinds[0] : null, path.startsWith("/urbano") ? "funzionario" as const : path.startsWith("/vigneto") ? "agronomo" as const : null].find(usable) ?? null;
       // An account that only ever worked on one project is of that project's sector (a saved sector of the other one,
       // written by mistake, is put right), unless the person is entering the other sector with its own profile.
       const onlyWorked: ProKind | null = worked && worked.length === 1 ? worked[0]! : null;
-      const sector: ProKind | null = wanted && ownedClean.includes(wanted) && isProId(wantedProfile) && !foreign(wantedProfile) ? wanted : onlyWorked ?? savedSector;
+      const sector: ProKind | null = wanted ?? onlyWorked ?? savedSector;
       if (email) for (const k of worked ?? []) { const p = prev[k]; if (isProId(p)) retieKnown(p, email); }
       const own = sector ? ownedClean.filter((k) => k === sector) : ownedClean;
       rememberWantedSector(null);
@@ -535,15 +539,17 @@ export function useSyncProId() {
       if (!left && !guestSnap()) openSectorGate(null);
       if (saved != null && !mine(saved)) toast("Questo account non ha ancora un profilo professionale", { description: "Scegli il settore e identificati, oppure entra come ospite." });
     };
+    // Back from Google's sign-in (?code=): the session comes a moment later, through SIGNED_IN.
+    const fromSignIn = /[?&]code=/.test(window.location.search);
     const publish = (user: { email?: string | null; user_metadata?: unknown } | null | undefined) =>
       setAccountSector(user ? { kind: sectorOf(user.user_metadata), email: user.email ?? null, name: nameOf(user.user_metadata) } : null);
-    void supabase.auth.getSession().then(({ data }) => { publish(data.session?.user); if (data.session) void adopt(data.session.user.id, data.session.user.user_metadata).finally(() => settleOpening()); else settleOpening(); }).catch(() => settleOpening());
+    void supabase.auth.getSession().then(({ data }) => { publish(data.session?.user); if (data.session) void adopt(data.session.user.id, data.session.user.user_metadata).finally(() => settleOpening()); else if (!fromSignIn) settleOpening(); }).catch(() => settleOpening());
     // Signing out of the personal account signs out of the professional profile too (it stays saved in the account
     // and comes back with the next sign-in).
     const { data } = supabase.auth.onAuthStateChange((event, s) => {
       if (event !== "SIGNED_OUT" && s) publish(s.user);
       if (event === "SIGNED_OUT") publish(null);
-      if (event === "SIGNED_IN" && s) void adopt(s.user.id, s.user.user_metadata);
+      if (event === "SIGNED_IN" && s) void adopt(s.user.id, s.user.user_metadata).finally(() => settleOpening());
       if (event === "SIGNED_OUT") adopted = "";
       if (event === "SIGNED_OUT" && snapshot()) {
         const was = snapshot()!.kind;

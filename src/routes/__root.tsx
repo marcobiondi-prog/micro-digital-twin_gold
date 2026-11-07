@@ -472,7 +472,7 @@ function RootComponent() {
     });
     const settled = Promise.all([Promise.race([fonts, new Promise((r) => setTimeout(r, 1500))]), landed, openingSettled])
       .then(() => new Promise((r) => setTimeout(r, 250)));
-    void Promise.race([settled, new Promise((r) => setTimeout(r, 4000))]).then(() => requestAnimationFrame(hidePreloader));
+    void Promise.race([settled, new Promise((r) => setTimeout(r, /[?&]code=/.test(window.location.search) ? 7000 : 4000))]).then(() => requestAnimationFrame(hidePreloader));
   }, []);
   // The other pages' code is fetched once the app is idle, so moving between them never waits for the network
   // (on a first open, before the offline worker has cached anything, a page appeared in jumps while its file came in).

@@ -1,3 +1,4 @@
+import { preloadNext } from "@/lib/preloader";
 import { supabase } from "@/integrations/supabase/client";
 import { disableBiometric, verifyBiometric } from "@/lib/biometric";
 
@@ -81,6 +82,7 @@ export function leaveAccount(opts: { openPanel?: boolean; to?: string } = {}) {
     // Left on purpose: the recognition is not asked again by itself on the reload that follows.
     sessionStorage.setItem("mdt-bio-skip", "1");
   } catch { /* none */ }
+  preloadNext();
   if (opts.to) window.location.assign(opts.to); else window.location.reload();
 }
 
