@@ -42,11 +42,62 @@ const readLast = (): Last => {
   } catch { return {}; }
 };
 const lastSnap = () => (last === undefined ? (last = readLast()) : last);
+/**
+ * Every profile registered on this device, per kind, newest first (localStorage mdt-pro-id-known-v1, at most
+ * KNOWN_MAX each): when more people identified on the same phone — two officers of different offices, two farmers —
+ * the form's "Ti abbiamo riconosciuto" lets one choose who is using it. The same person identified again (same name
+ * and the same licence or town and office) replaces their older entry.
+ */
+const KNOWN_KEY = "mdt-pro-id-known-v1";
+const KNOWN_MAX = 8;
+const KNOWN_KINDS = ["agronomo", "funzionario"] as const;
+type Known = Record<ProKind, ProId[]>;
+let known: Known | undefined;
+const sameProfile = (a: ProId, b: ProId) => a.kind === b.kind && a.name.trim().toLowerCase() === b.name.trim().toLowerCase()
+  && (a.kind === "agronomo" && b.kind === "agronomo" ? a.licence === b.licence && a.region === b.region
+    : a.kind === "funzionario" && b.kind === "funzionario" ? a.comune === b.comune && a.office === b.office : false);
+const knownSnap = (): Known => {
+  if (known) return known;
+  const out: Known = { agronomo: [], funzionario: [] };
+  try {
+    const v = JSON.parse(window.localStorage.getItem(KNOWN_KEY) ?? "{}") as Record<string, unknown>;
+    for (const k of KNOWN_KINDS) { const list = v[k]; if (Array.isArray(list)) out[k] = list.filter((p): p is ProId => isProId(p) && p.kind === k).slice(0, KNOWN_MAX); }
+  } catch { /* none */ }
+  // The last profile of each kind, kept before this list existed, counts too.
+  for (const k of KNOWN_KINDS) { const p = lastSnap()[k]; if (p && !out[k].some((q) => sameProfile(q, p))) out[k] = [...out[k], p]; }
+  return (known = out);
+};
+const keepKnown = (id: ProId) => {
+  const k = knownSnap();
+  known = { ...k, [id.kind]: [id, ...k[id.kind].filter((p) => !sameProfile(p, id))].slice(0, KNOWN_MAX) };
+  try { window.localStorage.setItem(KNOWN_KEY, JSON.stringify(known)); } catch { /* memory only */ }
+};
+/** Takes a profile off this device's list of profiles registered before (it stays in the account it was saved to). */
+export function forgetKnownProId(id: ProId) {
+  const k = knownSnap();
+  known = { ...k, [id.kind]: k[id.kind].filter((p) => !sameProfile(p, id)) };
+  try { window.localStorage.setItem(KNOWN_KEY, JSON.stringify(known)); } catch { /* memory only */ }
+  const l = lastSnap();
+  if (l[id.kind] && sameProfile(l[id.kind]!, id)) {
+    const rest = { ...l }; const next = known[id.kind][0];
+    if (next) rest[id.kind] = next; else delete rest[id.kind];
+    last = rest;
+    try { window.localStorage.setItem(LAST_KEY, JSON.stringify(last)); } catch { /* memory only */ }
+  }
+  subs.forEach((f) => f());
+}
 const keepLast = (id: ProId) => {
   last = { ...lastSnap(), [id.kind]: id };
   try { window.localStorage.setItem(LAST_KEY, JSON.stringify(last)); } catch { /* memory only */ }
+  keepKnown(id);
   subs.forEach((f) => f());
 };
+const EMPTY_KNOWN: Known = { agronomo: [], funzionario: [] };
+/** Every profile of that kind registered before on this device (or brought by the account), newest first. */
+export function useKnownProIds(kind: ProKind | null): ProId[] {
+  const all = useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, knownSnap, () => EMPTY_KNOWN);
+  return kind ? all[kind] : [];
+}
 /** The profile of that kind registered before on this device or account, if any. */
 export function useLastProId(kind: ProKind | null): ProId | null {
   const all = useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, lastSnap, () => ({}) as Last);
@@ -182,7 +233,7 @@ export function useSyncProId() {
       if (own === null) { adopted = ""; return; } // history not readable now: decide at the next sign-in or opening
       const prev = (meta as Meta)?.pro_last ?? {};
       // The account's own registered profiles come to this device too ("Continua come …" on its form).
-      for (const k of own) { const p = prev[k]; if (isProId(p) && p.kind === k && !lastSnap()[k]) keepLast(p); }
+      for (const k of own) { const p = prev[k]; if (isProId(p) && p.kind === k) { if (!lastSnap()[k]) keepLast(p); else keepKnown(p); } }
       const saved = (meta as Meta)?.pro_id;
       const mine = (p: unknown): p is ProId => isProId(p) && own.includes(p.kind);
       const left = (meta as Meta)?.pro_left === true;
