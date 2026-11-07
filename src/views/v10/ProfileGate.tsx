@@ -1,8 +1,8 @@
-import type { ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
+import { useEffect, type ReactNode } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowRight, Building2, Grape, Lock, UserRound } from "lucide-react";
 import { openSectorGate, useGuest, useProId } from "@/lib/use-pro-id";
-import { KIND_LABEL, SECTION_KIND, SECTION_LABEL, proSummary, unlocks, type ProKind, type Section } from "@/models/professional-id";
+import { KIND_LABEL, KIND_SECTION, SECTION_KIND, SECTION_LABEL, proSummary, unlocks, type ProKind, type Section } from "@/models/professional-id";
 import { toast } from "sonner";
 import { Ambient, PageHero, TabRow, openSimTab } from "@/views/v8/console";
 import { IdentifyForm, profileIntro } from "@/views/v10/Identify";
@@ -88,7 +88,17 @@ export function SectionLockCard({ section, className }: { section: Section; clas
 export function SectionGate({ section, children }: { section: Section; children: ReactNode }) {
   const id = useProId();
   const guest = useGuest();
-  if (id === undefined) return <div className="min-h-[60vh]" />;
+  const navigate = useNavigate();
+  // Identified with the other sector's profile: the page goes to that profile's own simulation (the farmer to the
+  // vineyard, the officer to the piazza) instead of showing this section locked.
+  const elsewhere = id ? KIND_SECTION[id.kind] : null;
+  const redirect = !!id && elsewhere !== section;
+  useEffect(() => {
+    if (!redirect || !elsewhere) return;
+    openSimTab(elsewhere, "mappa");
+    void navigate({ to: elsewhere === "urban" ? "/urbano" : "/vigneto", replace: true });
+  }, [redirect, elsewhere, navigate]);
+  if (id === undefined || redirect) return <div className="min-h-[60vh]" />;
   // A guest (no profile) tries both simulations.
   if (unlocks(id, section) || (guest && !id)) return <>{children}</>;
   const Icon = section === "urban" ? Building2 : Grape;
