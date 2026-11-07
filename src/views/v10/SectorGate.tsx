@@ -72,9 +72,9 @@ export function KnownProfiles({ kind }: { kind: ProKind }) {
   const pick = async (k: ProId) => { if (!(await saveProId(k))) return; toast.success(`Bentornato, ${k.name}`, { description: `Ritrovi la cronologia ${k.kind === "funzionario" ? "della piazza" : "del vigneto"}.` }); };
   // Signed in to an account of the other sector, these profiles cannot be used (the form below says why).
   if (!known.length || (acc?.kind && acc.kind !== kind)) return null;
-  if (known.length > 1) return (
+  if (known.length > 0) return (
     <div className="space-y-2">
-      <p className="px-1 text-sm text-foreground/70">Su questo telefono ci sono {known.length} profili {kind === "funzionario" ? "del settore urbano" : "del settore agricolo"}: scorri e scegli chi sei.</p>
+      {known.length > 1 && <p className="px-1 text-sm text-foreground/70">Su questo telefono ci sono {known.length} profili {kind === "funzionario" ? "del settore urbano" : "del settore agricolo"}: scorri e scegli chi sei.</p>}
       <ProfileCarousel known={known} onPick={(k) => void pick(k)} />
     </div>
   );
@@ -124,7 +124,6 @@ function ProfileCarousel({ known, onPick }: { known: KnownProId[]; onPick: (k: K
   useEffect(() => {
     const el = row.current;
     if (!el) return;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let frame = 0;
     const paint = () => {
       frame = 0;
@@ -134,11 +133,11 @@ function ProfileCarousel({ known, onPick }: { known: KnownProId[]; onPick: (k: K
         const card = c as HTMLElement;
         const d = (card.offsetLeft + card.offsetWidth / 2 - mid) / card.offsetWidth; // −1 … 1 for the neighbours
         if (Math.abs(d) < bestD) { bestD = Math.abs(d); best = i; }
-        if (reduce) return;
         const t = Math.max(-1.5, Math.min(1.5, d));
         const inner = card.firstElementChild as HTMLElement | null;
         if (inner) {
-          inner.style.transform = `perspective(1000px) translateZ(${-Math.abs(t) * 70}px) rotateY(${-t * 24}deg)`;
+          inner.style.transformOrigin = t > 0 ? "left center" : "right center";
+          inner.style.transform = `perspective(800px) translateZ(${-Math.abs(t) * 90}px) rotateY(${-t * 42}deg)`;
           inner.style.opacity = String(1 - Math.min(0.5, Math.abs(t) * 0.4));
         }
       });
@@ -157,14 +156,13 @@ function ProfileCarousel({ known, onPick }: { known: KnownProId[]; onPick: (k: K
   return (
     <div className="space-y-3">
       <div ref={row} role="list" aria-label="Profili registrati" data-map-gestures=""
-        className="no-scrollbar -mx-6 flex snap-x snap-mandatory gap-3 overflow-x-auto px-[7%] py-3 touch-pan-x [scrollbar-width:none] sm:-mx-0">
+        className="no-scrollbar -mx-6 flex snap-x snap-mandatory gap-3 overflow-x-auto px-[11%] py-4 touch-pan-x [scrollbar-width:none] sm:-mx-0">
         {known.map((k, i) => (
-          <div key={keyOf(k)} role="listitem" className="w-[86%] shrink-0 snap-center">
+          <div key={keyOf(k)} role="listitem" className="w-[78%] shrink-0 snap-center">
             <div data-active={i === active || undefined}
-              className="relative flex h-full flex-col gap-3 rounded-3xl bg-[oklch(0.24_0.016_258/0.96)] p-5 ring-1 ring-brand-turquoise/25 shadow-[0_18px_40px_-16px_rgb(0_0_0/0.75)] transition-[box-shadow] duration-300 will-change-transform data-[active]:ring-brand-turquoise/55 data-[active]:shadow-[0_18px_40px_-16px_rgb(0_0_0/0.75),0_0_28px_-8px_rgb(45_212_191/0.4)]">
+              className="relative flex h-full flex-col gap-3 rounded-3xl bg-[oklch(0.24_0.016_258/0.96)] p-4 ring-1 ring-brand-turquoise/25 shadow-[0_18px_40px_-16px_rgb(0_0_0/0.75)] transition-[box-shadow] duration-300 will-change-transform data-[active]:ring-brand-turquoise/55 data-[active]:shadow-[0_18px_40px_-16px_rgb(0_0_0/0.75),0_0_28px_-8px_rgb(45_212_191/0.4)]">
               <div className="flex items-center justify-between gap-2">
                 <p className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-turquoise">Ti abbiamo riconosciuto</p>
-                <span className="ml-auto shrink-0 text-xs font-semibold tabular-nums text-foreground/45">{i + 1} / {known.length}</span>
                 <button type="button" onClick={() => setAsking(asking === keyOf(k) ? null : keyOf(k))} aria-label={`Elimina ${k.name} da questo telefono`} title="Elimina da questo telefono"
                   className="-mr-1.5 -mt-1.5 grid size-9 shrink-0 place-items-center rounded-full text-foreground/50 outline-none transition-colors hover:bg-red-500/20 hover:text-red-300 focus-visible:ring-2 focus-visible:ring-brand-turquoise">
                   <Trash2 className="size-4" aria-hidden="true" />
@@ -192,8 +190,8 @@ function ProfileCarousel({ known, onPick }: { known: KnownProId[]; onPick: (k: K
                 <>
                   <p className="text-xs text-foreground/60">Ti eri già registrato con questo profilo: continua e ritrovi la cronologia {k.kind === "funzionario" ? "della piazza" : "del vigneto"}.</p>
                   <button type="button" onClick={() => (i === active ? onPick(k) : go(i))} aria-label={`Continua come ${k.name}`}
-                    className="mt-auto inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white px-4 text-[15px] font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
-                    <span className="truncate">Continua come {k.name}</span><ArrowRight className="size-4 shrink-0" aria-hidden="true" />
+                    className="mt-auto inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+                    <span className="truncate">Continua come {k.name.trim().split(/\s+/)[0]}</span><ArrowRight className="size-4 shrink-0" aria-hidden="true" />
                   </button>
                 </>
               )}
@@ -201,9 +199,9 @@ function ProfileCarousel({ known, onPick }: { known: KnownProId[]; onPick: (k: K
           </div>
         ))}
       </div>
-      <div className="flex justify-center gap-1.5" aria-hidden="true">
+      {known.length > 1 && <div className="flex justify-center gap-1.5" aria-hidden="true">
         {known.map((k, i) => <button key={keyOf(k)} type="button" tabIndex={-1} onClick={() => go(i)} className={`h-1.5 rounded-full transition-all ${i === active ? "w-5 bg-brand-turquoise" : "w-1.5 bg-white/30"}`} />)}
-      </div>
+      </div>}
     </div>
   );
 }
