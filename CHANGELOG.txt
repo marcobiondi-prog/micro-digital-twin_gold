@@ -1,6 +1,158 @@
 MICRO DIGITAL TWIN — CHANGELOG
-Modifiche dal 1 al 5 novembre 2026
+Modifiche dal 1 al 7 novembre 2026
 ==================================================
+
+
+7 NOVEMBRE 2026
+--------------------------------------------------
+
+App più leggera e meno consumi su Supabase   (13c885a, cacee2f)
+- Link di foto, video e immagine dell'account stabili per 7 giorni e
+  ricordati sul telefono: un file già visto non si riscarica più.
+- Le miniature di foto e video restano sul telefono anche dopo un
+  aggiornamento dell'app (si tolgono solo con "Svuota cache").
+- Lettore video: la striscia dei fotogrammi si disegna solo quando tocchi
+  il video e non scarica più il video intero una seconda volta.
+- Riletture automatiche più rade: foto, video e cronologia dell'account
+  ogni 5 minuti (prima ogni minuto), risposte degli enti nella Dashboard
+  ogni 2 minuti (prima ogni 15 secondi); subito al ritorno nell'app.
+- Pagine Piani, Aiuto, Privacy e Licenze, pagina dei settori e carosello
+  dei profili caricati solo quando servono.
+- Tolti 46 file di codice mai usati (vecchie schermate e componenti).
+
+Accesso, account e profili professionali
+- Un account personale vale per un solo settore (urbano o agricolo);
+  il blocco dice a quale settore appartiene e offre "Entra come …",
+  "Usa questo account per il settore …" ed "Esci e usa un altro account".
+- Il settore dell'account si capisce dalla sua cronologia: un account che
+  ha lavorato solo sul vigneto è agricolo, solo sulla piazza è urbano.
+- L'accesso segue il settore che stai aprendo, anche dopo il giro su Google.
+- L'agricoltore va sempre al vigneto, il funzionario sempre alla piazza.
+- "Ti abbiamo riconosciuto": tutti i profili del settore salvati sul
+  telefono in un carosello 3D, ognuno con l'immagine e l'email del suo
+  account personale, la matita per cambiare il nome e il cestino; in
+  fondo la scheda "Aggiungi account".
+- Scegliendo un profilo si entra subito: se il suo account è ricordato sul
+  telefono si entra anche nell'account, altrimenti parte da solo l'accesso
+  Google per quell'indirizzo (anche per indirizzi scolastici e di lavoro).
+- Entrando con l'account personale si attiva da solo il suo profilo.
+- Il nome del profilo lo sceglie la persona: i moduli non lo prendono più
+  dall'account Google.
+- "Esci" chiude l'account solo su questo telefono; "Esci da tutti i
+  dispositivi" li chiude tutti.
+- Pannello account: "Dispositivi collegati" (ogni telefono una volta sola,
+  ultimo uso, togli dall'elenco, esci da tutti); "Piani e informazioni" in
+  una pagina sua.
+- Pagina "Scegli": "Hai già un account? Accedi"; swipe verso destra e
+  tasto Indietro per tornare dai moduli, senza schermata nera.
+
+Face ID, Touch ID e impronta   (570d42e, 77779de, f2d47b7, 76812df)
+- Il riconoscimento del telefono si attiva per ogni profilo professionale:
+  pulsante con l'impronta sulle schede del carosello, interruttore nella
+  scheda "Profilo professionale" del pannello account e nella pagina
+  del profilo.
+- Con il riconoscimento attivo: "Continua come …" lo chiede prima di
+  entrare; aprendo l'app senza account lo chiede da solo; nel pannello
+  account compare "Entra con impronta / Face ID".
+- Impronta e volto restano sul telefono; descritto in Licenze.
+
+Funzionario comunale e cronologia della piazza
+- Uffici: Urbanistica, Ufficio tecnico, Lavori pubblici, Edilizia privata,
+  Ambiente e verde pubblico (altri si scrivono a mano).
+- Email: si può usare qualsiasi email; la scheda mostra l'email
+  dell'ufficio presa dal registro ufficiale della Pubblica
+  Amministrazione (IPA), altrimenti quella indicativa.
+- Ogni intervento della piazza ricorda Comune, ufficio e ruolo; la
+  cronologia filtra per ufficio (il mio, tutti o uno a scelta, con i
+  conteggi). Richiede la migrazione 20261107000000_intervention_history_by.
+
+Testi dalla tabella modifiche   (2587661)
+- Piazza: classe di comfort calcolata ("Nessun disagio da caldo", "Caldo
+  moderato", …), "Temperatura percepita" con spiegazione, "Temperatura
+  dell'aria ora", "Minimo raggiungibile", "−n° rispetto a senza
+  interventi", leve "Superfici verdi e permeabili" e "Coperture
+  ombreggianti", nota sui nebulizzatori, "Modifica gli interventi".
+- "Cosa ottieni": "CO₂ assorbita all'anno", "Acqua piovana trattenuta
+  (m³/anno)", "Posti all'ombra (capienza teorica, 2 m² a persona)".
+- Livelli: "Interventi leggeri", "Interventi medi", "Progetto completo".
+- Tutorial, mappa, Sensori AI, salvataggi e cronologia con le frasi
+  nuove; etichette per i lettori di schermo in italiano; apostrofi
+  tipografici in tutta l'app.
+
+Sensori dell'utente   (3185881, 22cc01f)
+- Dopo "Aggiungi sensore" l'app dà il codice già pronto per ESP32,
+  Raspberry Pi o una prova veloce, con indirizzo e chiave già scritti (e
+  il Wi-Fi per l'ESP32): da copiare o scaricare.
+- Le scelte di "Cosa misura" vanno a capo e restano dentro la scheda.
+
+Vigneto
+- Zone da disegnare: Irrigazione, Teli d'ombra e Frangivento, con il loro
+  disegno sulla mappa; "Solo quello disegnato" e "Posizione migliore"
+  come nella piazza.
+
+Mappa e GPS
+- Il GPS è acceso all'apertura e segue il telefono; non sposta un luogo
+  in cui hai già disegnato l'area. Icona satellite e avvisi quando si
+  accende e si spegne (gli avvisi si scorrono di lato).
+- Nessun luogo predefinito: il primo luogo lo danno il GPS o la ricerca.
+- Mappa 2D: le immagini aperte restano finché la mappa Google non è
+  pronta, così non resta mai vuota.
+- La pillola della temperatura sopra la mappa resta sempre al centro.
+
+Aspetto e movimento
+- Le pagine entrano da destra; le schede entrano dal lato giusto; niente
+  più swipe tra le schede; la dashboard si apre dall'inizio.
+- Le schede in alto delle simulazioni seguono lo scorrimento della pagina.
+- Arco della piazza: il punto bianco si trascina in modo più fluido.
+- Versione dell'app come codice di build (per esempio "Build MDTW-9KO1").
+
+
+6 NOVEMBRE 2026
+--------------------------------------------------
+
+Vigneto
+- Tornano Irrigazione, Teli d'ombra e Frangivento; tolti i parassiti
+  (leve, indice, mappa, dashboard, report).   (7d0f786)
+- L'arco legge il "Bisogno di intervento" (nessuno / consigliato /
+  urgente) in verde, giallo e rosso, zona per zona.
+- Al posto della stima dei costi: "Cosa fare adesso", "Acqua necessaria"
+  e "Prossimi 7 giorni", in un accordion.   (d122dc2, c530749)
+- La scelta delle zone sta sulla mini mappa; il tubo principale
+  dell'irrigazione segue il bordo delle zone.
+- Il profilo del vigneto si chiama "Agricoltore"; il patentino
+  fitosanitario è facoltativo.
+
+Ospite
+- Si entra anche senza profilo: piazza, vigneto, mappa, foto e dashboard
+  aperti; cronologia, Sensori AI ed esportazione bloccati; badge "Ospite"
+  e pagina Profilo che spiega cosa si può fare.   (a2031bd, 3637426)
+
+Simulazioni e mappe
+- Schede in ordine Mappa · Simula · Sensori AI.
+- Simula: piccola anteprima della mappa sopra l'arco, con parallasse e
+  sfumatura; un tocco apre la scheda Mappa.
+- Mappa 2D: all'apertura inquadra l'area disegnata; zoom più vicino;
+  alberi, nebulizzatori e motivi della stessa misura a ogni zoom.
+- Aiuole: strisce d'erba e vialetti di ciottoli che seguono il tracciato
+  della zona, uguali in 2D e in 3D.
+- Zone disegnate a mano spostabili, una o tutte insieme; nuova zona
+  Nebulizzatori; nebulizzatori numerati sulle mappe.
+- Piazza: gli interventi evitano alberi, fontane, edifici e monumenti già
+  presenti nell'area.   (020c94d)
+- Mappa 3D: giorno e notte anche sulla vista fotografica, ombre sopra le
+  aiuole, "Regola posizione" del disegno a mano, avviso quando la vista
+  fotografica non è disponibile; 3D semplificato con three.js (viti
+  pianta per pianta, alberi, pergolati, luce del sole).
+- Piazza: "Importa dal meteo reale" porta anche umidità, vento,
+  temperatura del suolo, sole e pioggia della settimana.
+
+Altro
+- Barra in basso: un tocco su uno spazio vuoto la abbassa, un altro la
+  rialza.
+- Trasparenze sfocate anche su iPhone.
+- Spazio nel cloud: conta anche lo spazio usato nell'account Google (il
+  permesso aggiuntivo di Google per ora è spento: bloccava l'accesso).
+- Tolta la frase "Un profilo alla volta".
 
 
 5 NOVEMBRE 2026
