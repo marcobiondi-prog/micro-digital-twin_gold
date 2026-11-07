@@ -3,7 +3,8 @@ import { useSwipeBack } from "@/lib/use-swipe-back";
 import { useNavigate } from "@tanstack/react-router";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, BadgeCheck, Building2, Grape, LogOut, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, BadgeCheck, Building2, Check, Grape, Lock, LogOut, Mail, ShieldCheck, UserRound } from "lucide-react";
+import { useAccountAvatar } from "@/lib/account-avatar";
 import { dropProIdOnDevice, keepProIdInAccount, rememberWantedSector, saveProId, useAccountSector, useProId, openSectorGate } from "@/lib/use-pro-id";
 import { supabase } from "@/integrations/supabase/client";
 import { openAccount } from "@/lib/camera-dock";
@@ -252,6 +253,11 @@ export function IdentifyForm({ kind, onDone }: { kind: ProKind; onDone: () => vo
 const SECTOR_NAME: Record<ProKind, string> = { funzionario: "urbano", agronomo: "agricolo" };
 const SECTOR_PLACE: Record<ProKind, string> = { funzionario: "la piazza", agronomo: "il vigneto" };
 const SECTOR_TO: Record<ProKind, string> = { funzionario: "alla piazza", agronomo: "al vigneto" };
+/** Each sector's colours on the lock page: blue for the piazza, green for the vineyard. */
+const SECTOR_TONE_UI: Record<ProKind, { text: string; ring: string; glow: string; solid: string; chip: string; card: string }> = {
+  funzionario: { text: "text-sky-300", ring: "ring-sky-300/70", glow: "bg-sky-500/40", solid: "bg-sky-300", chip: "bg-sky-400/20 text-sky-200", card: "bg-gradient-to-br from-sky-500/20 to-sky-500/[0.04]" },
+  agronomo: { text: "text-emerald-300", ring: "ring-emerald-300/70", glow: "bg-emerald-500/40", solid: "bg-emerald-300", chip: "bg-emerald-400/20 text-emerald-200", card: "bg-gradient-to-br from-emerald-500/20 to-emerald-500/[0.04]" },
+};
 /** "Entra come <own profile>" on the lock: off for now (only the notice and "Esci e usa un altro account"); true restores it. */
 const LOCK_ENTER_OWN = false;
 /**
@@ -295,19 +301,56 @@ export function AccountSectorLock({ kind, account, email }: { kind: ProKind; acc
     leaveAccount({ openPanel: false, to: "/benvenuto" });
   };
   // Its own full-screen page over the form (and the sector page), so it is seen at once; "Indietro" goes back.
+  const pic = useAccountAvatar();
+  const tone = SECTOR_TONE_UI[account];
+  const OwnIcon = account === "agronomo" ? Grape : Building2;
+  const fade = "animate-in fade-in slide-in-from-bottom-3 fill-mode-both duration-500 motion-reduce:animate-none";
+  const sectors = (["funzionario", "agronomo"] as const).map((k) => {
+    const mine = k === account;
+    const Icon = k === "agronomo" ? Grape : Building2;
+    return (
+      <div key={k} className={cn("relative flex flex-1 flex-col items-start gap-2 rounded-2xl p-3.5 ring-1", mine ? `${SECTOR_TONE_UI[k].card} ring-white/15` : "bg-white/[0.03] ring-white/[0.06]")}>
+        <span className={cn("grid size-9 place-items-center rounded-xl", mine ? SECTOR_TONE_UI[k].chip : "bg-white/[0.05] text-foreground/35")}><Icon className="size-[18px]" aria-hidden="true" /></span>
+        <span className={cn("text-[15px] font-semibold leading-tight", !mine && "text-foreground/40")}>Settore {SECTOR_NAME[k]}</span>
+        <span className={cn("inline-flex items-center gap-1 text-xs font-semibold", mine ? SECTOR_TONE_UI[k].text : "text-foreground/40")}>
+          {mine ? <><Check className="size-3.5" aria-hidden="true" />Il suo settore</> : <><Lock className="size-3.5" aria-hidden="true" />Bloccato</>}
+        </span>
+      </div>
+    );
+  });
   const page = (
     <div role="dialog" aria-modal="true" aria-labelledby="sector-lock-title" className="dark fixed inset-0 z-[1000000000] isolate overflow-y-auto overscroll-contain bg-background px-6 text-foreground [color-scheme:dark] sm:px-12">
       <Suspense fallback={null}><Backdrop /></Suspense>
-      <div className="relative mx-auto flex min-h-full max-w-lg flex-col py-10">
-        <button type="button" disabled={busy} onClick={() => void back()} className="inline-flex h-11 items-center gap-2 self-start rounded-full pr-3 text-[15px] font-semibold text-foreground/80 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+      <div className="relative mx-auto flex min-h-full max-w-md flex-col pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]">
+        <button type="button" disabled={busy} onClick={() => void back()} className="inline-flex h-11 items-center gap-2 self-start rounded-full bg-white/[0.06] pl-3 pr-4 text-[15px] font-semibold text-foreground/90 ring-1 ring-white/10 backdrop-blur-md outline-none hover:bg-white/[0.1] focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">
           <ArrowLeft className="size-5" aria-hidden="true" />Indietro
         </button>
-        <div className="my-auto space-y-5 py-10">
-          <span className="grid size-16 place-items-center rounded-full bg-amber-400/15 ring-1 ring-amber-400/40"><ShieldCheck className="size-8 text-amber-300" aria-hidden="true" /></span>
-          <h1 id="sector-lock-title" className="font-display text-[2.4rem] font-extralight leading-[1.05] tracking-tight sm:text-6xl">Questo account è del settore {SECTOR_NAME[account]}</h1>
-          <p className="text-[17px] leading-relaxed text-foreground/75">
-            {email ? <>L’account <span className="font-semibold text-foreground [overflow-wrap:anywhere]">{email}</span></> : "Il tuo account"} è legato {SECTOR_TO[account]}: ogni account personale vale per un solo settore. Per il settore {SECTOR_NAME[kind]} accedi con un altro account, o creane uno nuovo.
+        <div className="my-auto flex flex-col items-center py-8 text-center">
+          {/* The account, with the badge of the sector it belongs to. */}
+          <div className={cn("relative", fade)}>
+            <span aria-hidden="true" className={cn("absolute -inset-6 rounded-full opacity-60 blur-2xl", tone.glow)} />
+            <span className={cn("relative grid size-24 place-items-center overflow-hidden rounded-full bg-white/[0.06] p-[3px] ring-2", tone.ring)}>
+              {pic ? <img src={pic} alt="" referrerPolicy="no-referrer" className="size-full rounded-full object-cover" /> : <UserRound className="size-10 text-foreground/70" aria-hidden="true" />}
+            </span>
+            <span className={cn("absolute -bottom-1 -right-1 grid size-9 place-items-center rounded-full ring-4 ring-background", tone.solid)}><OwnIcon className="size-[18px] text-black" aria-hidden="true" /></span>
+          </div>
+          <p className={cn("mt-7 inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-300", fade, "delay-75")}>
+            <ShieldCheck className="size-3.5" aria-hidden="true" />Un account, un settore
           </p>
+          <h1 id="sector-lock-title" className={cn("mt-3 font-display text-[2.15rem] font-extralight leading-[1.08] tracking-tight sm:text-5xl", fade, "delay-100")}>
+            Questo account è del settore <span className={cn("font-light", tone.text)}>{SECTOR_NAME[account]}</span>
+          </h1>
+          {email && (
+            <p className={cn("mt-5 inline-flex max-w-full items-center gap-2 rounded-full bg-white/[0.06] px-4 py-2 text-sm font-medium ring-1 ring-white/10 backdrop-blur-md", fade, "delay-150")}>
+              <Mail className="size-4 shrink-0 text-foreground/60" aria-hidden="true" /><span className="min-w-0 [overflow-wrap:anywhere]">{email}</span>
+            </p>
+          )}
+          <div className={cn("mt-7 flex w-full gap-3 text-left", fade, "delay-200")}>{sectors}</div>
+          <p className={cn("mt-6 text-[15px] leading-relaxed text-foreground/70", fade, "delay-300")}>
+            È legato {SECTOR_TO[account]}: ogni account personale vale per un solo settore. Per il settore {SECTOR_NAME[kind]} accedi con un altro account, o creane uno nuovo.
+          </p>
+        </div>
+        <div className={cn("space-y-3", fade, "delay-300")}>
           {LOCK_ENTER_OWN && own && (
             <button type="button" disabled={busy} onClick={() => void enterOwn()}
               className="flex w-full items-center gap-3 rounded-2xl bg-white p-3 pl-4 text-left text-black outline-none disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-brand-turquoise">
@@ -319,9 +362,10 @@ export function AccountSectorLock({ kind, account, email }: { kind: ProKind; acc
             </button>
           )}
           <button type="button" disabled={busy} onClick={() => void other()}
-            className={`inline-flex h-12 w-full items-center justify-center gap-2 rounded-full text-[15px] font-semibold outline-none disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-ring ${LOCK_ENTER_OWN && own ? "bg-foreground/[0.08]" : "bg-white text-black"}`}>
+            className={`inline-flex h-14 w-full items-center justify-center gap-2 rounded-full text-base font-semibold shadow-[0_10px_40px_-10px_rgba(255,255,255,0.35)] outline-none transition-transform active:scale-[0.98] disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-ring ${LOCK_ENTER_OWN && own ? "bg-foreground/[0.08]" : "bg-white text-black"}`}>
             <LogOut className="size-5" aria-hidden="true" />Esci e usa un altro account
           </button>
+          <p className="text-center text-xs text-foreground/50">Il profilo di questo account resta salvato: lo ritrovi quando rientri.</p>
         </div>
       </div>
     </div>
