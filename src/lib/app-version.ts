@@ -13,7 +13,7 @@ export function buildNumber(iso: string | null = BUILD_TIME): number | null {
 }
 export function buildLabel(iso: string | null = BUILD_TIME): string {
   const n = buildNumber(iso);
-  return n === null ? "sviluppo" : `MDTW-${n.toString(36).toUpperCase()}`;
+  return n === null ? "sviluppo" : `Build MDTW-${n.toString(36).toUpperCase()}`;
 }
 
 /** The version online now (its build time, from /version.json), or null without a connection. */
