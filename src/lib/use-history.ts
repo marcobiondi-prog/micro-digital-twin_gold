@@ -4,11 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSignedIn } from "@/lib/use-signed-in";
 import {
   addLocalHistory, clearLocalHistory, removeLocalHistory, isHistoryEntry, localHistory, mergeHistory, newEntry, serverLocalHistory, subscribeLocalHistory,
-  type HistoryEntry, type HistoryFlow, type SourcedEntry, type HistoryMix, type HistoryWhen,
+  ofOffice, type HistoryBy, type HistoryEntry, type HistoryFlow, type SourcedEntry, type HistoryMix, type HistoryWhen,
 } from "@/models/intervention-history";
 import { requestSimWhen } from "@/models/sim-when";
 import { setUrban, setVineyard } from "@/models/lab-store";
-import { getProId, isGuest } from "@/lib/use-pro-id";
+import { getProId, isGuest, useProId } from "@/lib/use-pro-id";
 
 // The table comes from supabase/migrations (not in the generated types), like the other late tables.
 const table = () => (supabase as any).from("intervention_history");
@@ -21,7 +21,10 @@ export async function addHistory(flow: HistoryFlow, text: string, place: string,
   if (!text.trim()) return;
   // A guest (no professional profile) simulates but saves nothing.
   if (isGuest() && !getProId()) return;
-  const entry = newEntry(flow, text, place, new Date(), mix, when);
+  // A piazza entry keeps who recorded it: the municipal officer's town, office and role.
+  const pro = getProId();
+  const by: HistoryBy | null = flow === "piazza" && pro?.kind === "funzionario" ? { comune: pro.comune, office: pro.office, role: pro.role } : null;
+  const entry = newEntry(flow, text, place, new Date(), mix, when, by);
   const { data } = await supabase.auth.getSession();
   if (!data.session) { addLocalHistory(entry); return; }
   // Signed in without a connection: kept on the phone, and sent to the account as soon as the connection is back.
@@ -39,7 +42,8 @@ async function saveRows(entries: HistoryEntry[]): Promise<unknown> {
   const rows = entries.map((e) => ({ id: e.id, at: e.at, flow: e.flow, place: e.place, text: e.text }));
   const full = entries.map((e, i) => ({ ...rows[i], mix: e.mix ?? null, season: e.season ?? null, hour: e.hour ?? null }));
   const opts = { onConflict: "id", ignoreDuplicates: true };
-  let { error } = await table().upsert(full, opts);
+  let { error } = await table().upsert(entries.map((e, i) => ({ ...full[i], by: e.by ?? null })), opts);
+  if (error) ({ error } = await table().upsert(full, opts));
   // An account table without the newer columns yet (their migrations not applied): save what it can hold.
   if (error) ({ error } = await table().upsert(entries.map((e, i) => ({ ...rows[i], mix: e.mix ?? null })), opts));
   if (error) ({ error } = await table().upsert(rows, opts));
@@ -127,8 +131,31 @@ export function reopenHistory(mix: HistoryMix, when: HistoryWhen | null = null) 
   }));
 }
 
+/**
+ * Which piazza interventions the municipal officer sees: only those of the office in use ("mine", the default; entries
+ * recorded before the office was kept count as its own) or every office's ("all"). Kept on this device (mdt-history-office-v1).
+ */
+export type OfficeScope = "mine" | "all";
+const SCOPE_KEY = "mdt-history-office-v1";
+let scope: OfficeScope | undefined;
+const scopeSubs = new Set<() => void>();
+const scopeSnap = (): OfficeScope => {
+  if (scope === undefined) { try { scope = localStorage.getItem(SCOPE_KEY) === "all" ? "all" : "mine"; } catch { scope = "mine"; } }
+  return scope;
+};
+export function setOfficeScope(next: OfficeScope) {
+  scope = next;
+  try { localStorage.setItem(SCOPE_KEY, next); } catch { /* this visit only */ }
+  scopeSubs.forEach((f) => f());
+}
+export function useOfficeScope(): OfficeScope {
+  return useSyncExternalStore((f) => { scopeSubs.add(f); return () => { scopeSubs.delete(f); }; }, scopeSnap, () => "mine");
+}
+
 /** The history to show: the account's for signed-in users (plus what a failed save left here), this device's for the others. */
-export function useHistory(): { entries: SourcedEntry[]; where: "account" | "device"; loading: boolean; failed: boolean; reload: () => void } {
+export function useHistory(opts: { allOffices?: boolean } = {}): { entries: SourcedEntry[]; otherOffices: number; where: "account" | "device"; loading: boolean; failed: boolean; reload: () => void } {
+  const officeScope = useOfficeScope();
+  const pro = useProId();
   const { signedIn, demo } = useSignedIn();
   const account = signedIn && !demo;
   const device = useSyncExternalStore(subscribeLocalHistory, localHistory, serverLocalHistory);
@@ -139,7 +166,7 @@ export function useHistory(): { entries: SourcedEntry[]; where: "account" | "dev
     setLoading(true);
     // Without the newer columns yet the entries still show, only without season and hour, or without "Riapri".
     let data: unknown, error: unknown;
-    for (const columns of ["id, at, flow, place, text, mix, season, hour", "id, at, flow, place, text, mix", "id, at, flow, place, text"]) {
+    for (const columns of ["id, at, flow, place, text, mix, season, hour, by", "id, at, flow, place, text, mix, season, hour", "id, at, flow, place, text, mix", "id, at, flow, place, text"]) {
       ({ data, error } = await table().select(columns).order("at", { ascending: false }).limit(500));
       if (!error) break;
     }
@@ -160,7 +187,12 @@ export function useHistory(): { entries: SourcedEntry[]; where: "account" | "dev
     const fromAccount = new Set(cloud.map((e) => e.id));
     return (account ? mergeHistory(cloud, device) : device).map((e) => ({ ...e, source: fromAccount.has(e.id) ? "account" : "device" }));
   }, [account, cloud, device]);
+  // A municipal officer sees the piazza interventions of the office in use, unless every office is asked for.
+  const office = pro?.kind === "funzionario" ? { comune: pro.comune, office: pro.office } : null;
+  const otherOffices = office ? entries.filter((e) => e.flow === "piazza" && !ofOffice(e, office)).length : 0;
+  const shown = useMemo(() => (office && officeScope === "mine" && !opts.allOffices ? entries.filter((e) => e.flow !== "piazza" || ofOffice(e, office)) : entries),
+    [entries, office?.comune, office?.office, officeScope, opts.allOffices]); // eslint-disable-line react-hooks/exhaustive-deps
   return account
-    ? { entries, where: "account", loading, failed, reload: () => void load() }
-    : { entries, where: "device", loading: false, failed: false, reload: () => undefined };
+    ? { entries: shown, otherOffices, where: "account", loading, failed, reload: () => void load() }
+    : { entries: shown, otherOffices, where: "device", loading: false, failed: false, reload: () => undefined };
 }

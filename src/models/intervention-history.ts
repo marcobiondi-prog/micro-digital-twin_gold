@@ -13,10 +13,14 @@ export type HistoryMix = (
 ) & {
   /** A copy of the simulated season and hour, for an account table that lacks their own columns. */
   when?: { season: string; hour: number; minute?: number; dst?: string } | null;
+  /** A copy of who recorded it (the municipal officer's town, office and role), for an account table without its column. */
+  by?: HistoryBy | null;
 };
+/** Who recorded a piazza entry: the municipal officer's town, office and role at that moment. */
+export type HistoryBy = { comune: string; office: string; role: string };
 /** The season and hour the simulation was set to when the intervention was made (older entries have none). */
 export type HistoryWhen = { season: Season; hour: number; minute?: number; dst?: "solare" | "legale" };
-export type HistoryEntry = { id: string; at: string; flow: HistoryFlow; place: string; text: string; mix?: HistoryMix | null; season?: Season | null; hour?: number | null; minute?: number | null; dst?: "solare" | "legale" | null };
+export type HistoryEntry = { id: string; at: string; flow: HistoryFlow; place: string; text: string; mix?: HistoryMix | null; season?: Season | null; hour?: number | null; minute?: number | null; dst?: "solare" | "legale" | null; by?: HistoryBy | null };
 /** Where an entry is kept: in the account (recorded signed in) or on this device (recorded without signing in). Not saved, worked out when read. */
 export type HistorySource = "account" | "device";
 export type SourcedEntry = HistoryEntry & { source: HistorySource };
@@ -33,9 +37,23 @@ function uuid(): string {
   return `${hex(8)}-${hex(4)}-4${hex(3)}-${"89ab"[Math.floor(Math.random() * 4)]}${hex(3)}-${hex(12)}`;
 }
 
-export function newEntry(flow: HistoryFlow, text: string, place: string, now: Date = new Date(), mix: HistoryMix | null = null, when: HistoryWhen | null = null): HistoryEntry {
-  return { id: uuid(), at: now.toISOString(), flow, place: place.trim(), text: text.trim().slice(0, MAX_TEXT), mix: mix && when ? { ...mix, when } : mix, season: when?.season ?? null, hour: when?.hour ?? null, minute: when?.minute ?? null, dst: when?.dst ?? null };
+export function newEntry(flow: HistoryFlow, text: string, place: string, now: Date = new Date(), mix: HistoryMix | null = null, when: HistoryWhen | null = null, by: HistoryBy | null = null): HistoryEntry {
+  const m = mix ? { ...mix, ...(when ? { when } : {}), ...(by ? { by } : {}) } : null;
+  return { id: uuid(), at: now.toISOString(), flow, place: place.trim(), text: text.trim().slice(0, MAX_TEXT), mix: m, season: when?.season ?? null, hour: when?.hour ?? null, minute: when?.minute ?? null, dst: when?.dst ?? null, by };
 }
+
+const isBy = (v: unknown): v is HistoryBy => {
+  const b = v as Partial<HistoryBy> | null;
+  return !!b && typeof b.comune === "string" && typeof b.office === "string" && typeof b.role === "string";
+};
+/** Who recorded the entry (its own field, else the copy kept in the mix); null for older entries and the vineyard. */
+export const byOf = (e: HistoryEntry): HistoryBy | null => (isBy(e.by) ? e.by : isBy(e.mix?.by) ? e.mix!.by! : null);
+const same = (a: string, b: string) => a.trim().toLocaleLowerCase("it") === b.trim().toLocaleLowerCase("it");
+/** Whether an entry belongs to this office of this town: entries recorded before the office was kept count as its own. */
+export const ofOffice = (e: HistoryEntry, office: { comune: string; office: string }): boolean => {
+  const b = byOf(e);
+  return !b || (same(b.comune, office.comune) && same(b.office, office.office));
+};
 
 const isSeason = (v: unknown): v is Season => typeof v === "string" && (SEASONS as readonly string[]).includes(v);
 const isHour = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 23;
@@ -86,7 +104,8 @@ export const isHistoryEntry = (v: unknown): v is HistoryEntry => {
     && (e.season === undefined || e.season === null || isSeason(e.season))
     && (e.hour === undefined || e.hour === null || isHour(e.hour))
     && (e.minute === undefined || e.minute === null || isMinute(e.minute))
-    && (e.dst === undefined || e.dst === null || isDst(e.dst));
+    && (e.dst === undefined || e.dst === null || isDst(e.dst))
+    && (e.by === undefined || e.by === null || isBy(e.by));
 };
 
 /** Entries grouped by day on this device's calendar, newest first, each headed "29/10/2026". */

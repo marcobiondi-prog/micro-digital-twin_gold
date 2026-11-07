@@ -5,7 +5,7 @@ import { SEASON_LABEL } from "@/models/season-climate";
 import { Ambient, PageHero, openSimTab } from "@/views/v8/console";
 import { DashCard, DashSection } from "@/views/v10/Dashboard";
 import { reopenHistory, useHistory } from "@/lib/use-history";
-import { mixRows, whenClock, whenOf, type HistoryEntry, type SourcedEntry } from "@/models/intervention-history";
+import { byOf, mixRows, whenClock, whenOf, type HistoryEntry, type SourcedEntry } from "@/models/intervention-history";
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -18,7 +18,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 /** One recorded intervention to read: when it was saved, the season and hour simulated, and what was set. */
 export function HistoryDetail({ id }: { id: string }) {
-  const { entries, loading } = useHistory();
+  const { entries, loading } = useHistory({ allOffices: true });
   const navigate = useNavigate();
   const e: SourcedEntry | undefined = entries.find((x) => x.id === id);
   const back = () => {
@@ -34,6 +34,7 @@ export function HistoryDetail({ id }: { id: string }) {
     void navigate({ to: entry.flow === "piazza" ? "/urbano" : "/vigneto" });
   };
   const w = e ? whenOf(e) : null;
+  const by = e ? byOf(e) : null;
   const d = e ? new Date(e.at) : null;
   return (
     <div className="space-y-6">
@@ -54,6 +55,7 @@ export function HistoryDetail({ id }: { id: string }) {
                 <Row label="Stagione simulata" value={w ? SEASON_LABEL[w.season] : "Non registrata"} />
                 <Row label="Ora simulata" value={w ? `ore ${whenClock(w)}` : "Non registrata"} />
                 <Row label="Salvato" value={e.source === "account" ? "Con accesso, nel tuo account" : "Senza accesso, su questo dispositivo"} />
+                {by && <Row label="Registrato da" value={`${by.office}${by.role ? ` · ${by.role}` : ""} · Comune di ${by.comune}`} />}
               </dl>
             </DashCard>
           </DashSection>
