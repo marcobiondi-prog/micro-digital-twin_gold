@@ -10,7 +10,7 @@ import { BioIcon, checkProfileBiometric, ProfileBioButton, proBioKey } from "@/v
 import { useBiometricOn } from "@/lib/biometric";
 import { supabase } from "@/integrations/supabase/client";
 import { introSeen } from "@/lib/intro-seen";
-import { clearSectorGate, enterAsGuest, forgetKnownProId, dropProIdOnDevice, keepProIdInAccount, setProIdOnDevice, rememberWantedSector, renameKnownProId, sectorOf, switchAccountSector, type KnownProId, saveProId, useAccountSector, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
+import { clearSectorGate, enterAsGuest, forgetKnownProId, dropProIdOnDevice, keepProIdInAccount, setProIdOnDevice, rememberAddingSector, rememberWantedSector, renameKnownProId, sectorOf, switchAccountSector, type KnownProId, saveProId, useAccountSector, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
 import { proSummary } from "@/models/professional-id";
 import { toast } from "sonner";
 import { useSignedIn } from "@/lib/use-signed-in";
@@ -120,6 +120,7 @@ export function KnownProfiles({ kind, onPicked }: { kind: ProKind; onPicked?: ()
   // "Aggiungi account": another personal account signs in here (the current one stays kept on the phone).
   const addAccount = async () => {
     rememberWantedSector(kind);
+    rememberAddingSector(kind);
     if (accEmail) await keepProIdInAccount();
     if (!(await addGoogleAccount())) openAccount();
   };

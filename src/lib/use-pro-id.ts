@@ -432,6 +432,18 @@ async function accountEmail(userId: string): Promise<string | null> {
  * leaves the page and comes back — still knows which sector the person was entering.
  */
 const WANTED_KEY = "mdt-sector-wanted";
+const ADDING_KEY = "mdt-adding-account";
+/** "Aggiungi account" from a sector's form: the account signed in next is added to that sector (10 minutes at most). */
+export function rememberAddingSector(kind: ProKind) {
+  try { sessionStorage.setItem(ADDING_KEY, JSON.stringify({ kind, at: Date.now() })); } catch { /* none */ }
+}
+function takeAddingSector(): ProKind | null {
+  try {
+    const v = JSON.parse(sessionStorage.getItem(ADDING_KEY) ?? "null") as { kind?: unknown; at?: number } | null;
+    sessionStorage.removeItem(ADDING_KEY);
+    return v && (v.kind === "agronomo" || v.kind === "funzionario") && Date.now() - (v.at ?? 0) < 10 * 60_000 ? v.kind : null;
+  } catch { return null; }
+}
 export function rememberWantedSector(kind: ProKind | null) {
   try { if (kind) sessionStorage.setItem(WANTED_KEY, JSON.stringify({ kind, at: Date.now() })); else sessionStorage.removeItem(WANTED_KEY); } catch { /* none */ }
 }
@@ -506,7 +518,10 @@ export function useSyncProId() {
       // An account that only ever worked on one project is of that project's sector (a saved sector of the other one,
       // written by mistake, is put right), unless the person is entering the other sector with its own profile.
       const onlyWorked: ProKind | null = worked && worked.length === 1 ? worked[0]! : null;
-      const sector: ProKind | null = wanted ?? onlyWorked ?? savedSector;
+      // Added on purpose with "Aggiungi account" from a sector's form: the account goes to that sector, whatever it
+      // was before (its other profile stays saved in it), so any account can be added to either sector.
+      const adding = fromSignIn ? takeAddingSector() : null;
+      const sector: ProKind | null = adding ?? wanted ?? onlyWorked ?? savedSector;
       if (email) for (const k of worked ?? []) { const p = prev[k]; if (isProId(p)) retieKnown(p, email); }
       const own = sector ? ownedClean.filter((k) => k === sector) : ownedClean;
       const entering = gateAsk.kind ?? wantedSector();
