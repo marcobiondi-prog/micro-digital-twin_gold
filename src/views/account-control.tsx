@@ -208,7 +208,8 @@ export function AccountControl() {
   const proId = useProId();
   // The locked AI option of the camera sheet opens this dialog to sign in.
   useEffect(() => {
-    const show = () => setOpen(true);
+    // An email given with the request (a recognised profile's account) is written in the sign-in for it.
+    const show = (e: Event) => { const em = (e as CustomEvent<{ email?: string } | undefined>).detail?.email; if (em) { setEmail(em); setMode("signin"); } setOpen(true); };
     window.addEventListener(OPEN_ACCOUNT_EVENT, show);
     return () => window.removeEventListener(OPEN_ACCOUNT_EVENT, show);
   }, []);

@@ -70,7 +70,7 @@ const knownSnap = (): Known => {
 };
 /** The personal account a profile was registered with: its email and a small copy of its picture (a data URL, so a
  * signed link that expires never leaves the list without a face). */
-export type KnownAccount = { email?: string; pic?: string };
+export type KnownAccount = { email?: string; pic?: string; provider?: string };
 export type KnownProId = ProId & { acct?: KnownAccount };
 const saveKnown = () => { try { window.localStorage.setItem(KNOWN_KEY, JSON.stringify(known)); } catch { /* memory only */ } };
 const keepKnown = (id: ProId, acct?: KnownAccount) => {
@@ -100,7 +100,7 @@ async function attachAccount(id: ProId) {
   const { data } = await supabase.auth.getSession();
   const user = data.session?.user;
   if (!user) return;
-  const acct: KnownAccount = { ...(user.email ? { email: user.email } : {}) };
+  const acct: KnownAccount = { ...(user.email ? { email: user.email } : {}), ...(user.app_metadata?.provider ? { provider: String(user.app_metadata.provider) } : {}) };
   const pic = await smallPicture(getAccountAvatar());
   if (pic) acct.pic = pic;
   const k = knownSnap();
@@ -132,8 +132,9 @@ export async function syncKnownAccounts(): Promise<void> {
       const saved = lastOf[kind];
       const mine = p.acct?.email === email || (isProId(saved) && sameProfile(p, saved)) || (!p.acct && inUse != null && sameProfile(p, inUse));
       if (!mine) return p;
-      const acct: KnownAccount = { email, ...((pic ?? p.acct?.pic) ? { pic: pic ?? p.acct!.pic! } : {}) };
-      if (p.acct?.email === acct.email && p.acct?.pic === acct.pic) return p;
+      const provider = user.app_metadata?.provider ? String(user.app_metadata.provider) : p.acct?.provider;
+      const acct: KnownAccount = { email, ...((pic ?? p.acct?.pic) ? { pic: pic ?? p.acct!.pic! } : {}), ...(provider ? { provider } : {}) };
+      if (p.acct?.email === acct.email && p.acct?.pic === acct.pic && p.acct?.provider === acct.provider) return p;
       changed = true;
       return { ...p, acct };
     });

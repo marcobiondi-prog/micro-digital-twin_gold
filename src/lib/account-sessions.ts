@@ -83,3 +83,20 @@ export function leaveAccount(opts: { openPanel?: boolean; to?: string } = {}) {
   } catch { /* none */ }
   if (opts.to) window.location.assign(opts.to); else window.location.reload();
 }
+
+/**
+ * Signs in a personal account that is not kept on this phone, with as little as possible in between: a Google account
+ * (signed in with Google before, or a Gmail address) goes straight to Google's sign-in for that very address
+ * (login_hint), coming back to `back`; any other opens the account panel with its email already written, asking only
+ * the password. From then on the account is kept here and entered by itself.
+ */
+export async function signInAs(email: string, opts: { provider?: string | undefined; back?: string } = {}) {
+  const google = opts.provider === "google" || (!opts.provider && /@(gmail|googlemail)\.com$/i.test(email));
+  if (google) {
+    const back = opts.back ?? window.location.pathname + window.location.search;
+    try { sessionStorage.setItem("mdt-auth-return", back); } catch { /* none */ }
+    const r = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin + back.split("?")[0], queryParams: { login_hint: email } } });
+    if (!r.error) return;
+  }
+  window.dispatchEvent(new CustomEvent("mdt-open-account", { detail: { email } }));
+}

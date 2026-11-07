@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Building2, Grape, LogIn, Mail, Pencil, Plus, Trash2, UserPlus, UserRound, X } from "lucide-react";
 import { openAccount } from "@/lib/camera-dock";
-import { leaveAccount, switchToAccount } from "@/lib/account-sessions";
+import { leaveAccount, signInAs, switchToAccount } from "@/lib/account-sessions";
 import { BioIcon, checkProfileBiometric, ProfileBioButton, proBioKey } from "@/views/v10/Biometric";
 import { useBiometricOn } from "@/lib/biometric";
 import { supabase } from "@/integrations/supabase/client";
@@ -103,18 +103,13 @@ export function KnownProfiles({ kind }: { kind: ProKind }) {
         window.location.assign(k.kind === "funzionario" ? "/urbano" : "/vigneto");
         return;
       }
-      // Its account is not kept on this phone: the profile opens anyway, straight away, with no sign-in in between;
-      // its account can be entered later from the account panel to save in the cloud.
+      // Its account is not kept on this phone: the profile goes in use and its account's sign-in starts by itself
+      // (Google straight for that address, else the panel with the email written); signed in, the account and the
+      // profile come together (the adopt counts the profile tied to the email) and from then on it is kept here.
       const to = k.kind === "funzionario" ? "/urbano" : "/vigneto";
-      if (accEmail) {
-        // Signed in to another account: left (kept on the phone for the way back), the profile put in use.
-        setProIdOnDevice(k);
-        toast.success(`Bentornato, ${k.name}`, { description: `Per salvare nel cloud entra con ${target} dal pannello account.` });
-        leaveAccount({ openPanel: false, to });
-        return;
-      }
-      if (!(await saveProId(k))) return;
-      toast.success(`Bentornato, ${k.name}`, { description: `Per salvare nel cloud entra con ${target} dal pannello account.` });
+      if (accEmail) setProIdOnDevice(k); else if (!(await saveProId(k))) return;
+      toast(`Accedo con ${target}`, { description: `Collego il tuo account personale a ${k.name}.` });
+      await signInAs(target, { provider: k.acct?.provider, back: to });
       return;
     }
     if (!(await saveProId(k))) return;
