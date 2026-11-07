@@ -6,7 +6,7 @@ import { openAccount } from "@/lib/camera-dock";
 import { biometricAvailable, biometricName, biometricOn, disableBiometric, enableBiometric, useBiometricAccounts, useBiometricOn, verifyBiometric } from "@/lib/biometric";
 import { hasAccountSession, leaveAccount, signInAs, switchToAccount } from "@/lib/account-sessions";
 import { supabase } from "@/integrations/supabase/client";
-import { dropProIdOnDevice, getKnownProIds, getProId, keepProIdInAccount, openSectorGate, type KnownProId, rememberWantedSector, saveProId, sectorOf, switchAccountSector, useKnownProIds } from "@/lib/use-pro-id";
+import { dropProIdOnDevice, getKnownProIds, getProId, keepProIdInAccount, openSectorGate, type KnownProId, rememberWantedSector, saveProId, sectorOf, useKnownProIds } from "@/lib/use-pro-id";
 import { type ProId } from "@/models/professional-id";
 
 /**
@@ -137,11 +137,9 @@ export async function enterWithProfile(k: KnownProId, opts: { recognised?: boole
     if (!opts.quiet) toast.error("Questo account va riconnesso", { description: "Entra una volta con la password o con Google: poi il riconoscimento torna a farti entrare." });
     return false;
   }
-  const { data } = await supabase.auth.getSession();
-  const sec = sectorOf(data.session?.user.user_metadata);
-  if (sec && sec !== k.kind) await switchAccountSector(k.kind);
+  // One account, one sector: an account of the other sector is not moved (saveProId refuses and says so).
   rememberWantedSector(k.kind);
-  await saveProId(k);
+  if (!(await saveProId(k))) return false;
   toast.success(`Bentornato, ${k.name}`, { description: `Sei entrato con ${email}.` });
   goInApp(k.kind === "funzionario" ? "/urbano" : "/vigneto");
   return true;

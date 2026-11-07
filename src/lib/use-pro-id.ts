@@ -522,7 +522,11 @@ export function useSyncProId() {
       // to that sector. One account, one sector: an account already of the other sector keeps it.
       const adding0 = fromSignIn ? takeAddingSector() : null;
       const adding = adding0 && !savedSector && !onlyWorked ? adding0 : null;
-      const sector: ProKind | null = adding ?? wanted ?? onlyWorked ?? savedSector;
+      // One account, one sector: an account whose saved sector has its own profile stays there, whatever form or page
+      // it signs in from; only an account with no sector yet (or whose saved sector has no profile of its own, a wrong
+      // mark) takes the sector being added to, entered, or the one its history shows.
+      const savedHolds = !!savedSector && isProId(prev[savedSector]) && !foreign(prev[savedSector]);
+      const sector: ProKind | null = savedHolds ? savedSector : adding ?? wanted ?? onlyWorked ?? savedSector;
       if (email) for (const k of worked ?? []) { const p = prev[k]; if (isProId(p)) retieKnown(p, email); }
       // A new account added from a sector's form gets its profile of that sector made at once from the Google account
       // (its name, its email; the other details empty, to fill in later from the profile), with no form to fill.

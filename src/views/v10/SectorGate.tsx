@@ -10,7 +10,7 @@ import { BioIcon, checkProfileBiometric, ProfileBioButton, proBioKey } from "@/v
 import { useBiometricOn } from "@/lib/biometric";
 import { supabase } from "@/integrations/supabase/client";
 import { introSeen } from "@/lib/intro-seen";
-import { clearSectorGate, enterAsGuest, forgetKnownProId, dropProIdOnDevice, keepProIdInAccount, setProIdOnDevice, rememberAddingSector, rememberWantedSector, renameKnownProId, sectorOf, switchAccountSector, type KnownProId, saveProId, useAccountSector, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
+import { clearSectorGate, enterAsGuest, forgetKnownProId, dropProIdOnDevice, keepProIdInAccount, setProIdOnDevice, rememberAddingSector, rememberWantedSector, renameKnownProId, sectorOf, type KnownProId, saveProId, useAccountSector, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
 import { proSummary } from "@/models/professional-id";
 import { toast } from "sonner";
 import { useSignedIn } from "@/lib/use-signed-in";
@@ -95,10 +95,8 @@ export function KnownProfiles({ kind, onPicked }: { kind: ProKind; onPicked?: ()
       if (entered === "refused") { toast.error("Non ti ho riconosciuto", { description: `Per entrare con ${target} serve il riconoscimento del telefono. Riprova.` }); return; }
       if (entered) {
         // Its account goes to this profile's sector (the person chose it), then the profile is put in use.
-        const { data } = await supabase.auth.getSession();
-        const sec = sectorOf(data.session?.user.user_metadata);
-        if (sec && sec !== k.kind) await switchAccountSector(k.kind);
-        await saveProId(k);
+        // One account, one sector: an account of the other sector is not moved (saveProId refuses and says so).
+        if (!(await saveProId(k))) return;
         toast.success(`Bentornato, ${k.name}`, { description: `Sei entrato anche con il tuo account ${target}.` });
         // A clean start on that account's simulation: every list and cache read again for it.
         goInApp(k.kind === "funzionario" ? "/urbano" : "/vigneto");
