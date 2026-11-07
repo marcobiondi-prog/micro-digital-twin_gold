@@ -81,7 +81,7 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, medi
             </DropdownMenuContent>
           </DropdownMenu>
         </>} />
-      <div data-sim-tabs="" data-hidden={tabsHidden || undefined} className={`sticky top-[var(--nav-h)] z-[999999997] -mx-4 bg-transparent px-4 py-2 backdrop-blur-xl transition-[top,transform,opacity] duration-300 motion-reduce:transition-none ${tabsHidden ? "pointer-events-none -translate-y-[calc(100%+var(--nav-h,0px)+0.5rem)] opacity-0" : ""}`}>
+      <div data-sim-tabs="" data-hidden={tabsHidden || undefined} className={`sticky top-[var(--nav-h)] z-[999999997] -mx-4 bg-transparent px-4 py-2 backdrop-blur-xl transition-[top,transform] duration-300 motion-reduce:transition-none ${tabsHidden ? "pointer-events-none -translate-y-[calc(100%+var(--nav-h,0px)+0.5rem)]" : "translate-y-0"}`}>
         <TabRow label="Sezioni" items={TABS} value={tab} onChange={go} />
       </div>
       {/* The open tab follows the finger and the next slides in once it turns; nothing peeks beside it. */}
