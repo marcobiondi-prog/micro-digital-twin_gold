@@ -12,3 +12,23 @@ export function deviceLabel(ua: string, opts: { standalone?: boolean; model?: st
   const parts = [opts.model?.trim(), os, opts.standalone ? "app installata" : browser].filter((p): p is string => !!p);
   return parts.join(" · ").slice(0, 120);
 }
+
+/**
+ * One entry per device: rows with the same label are the same phone or computer registered again (its own id lost
+ * with the app's data — a reinstall, cleared site data). Of each group the row of this device is kept (else the one
+ * used last), carrying the group's first sign-in and last use; the others are returned to be removed.
+ */
+export function mergeSameDevices<T extends { id: string; device_id: string; label: string; first_seen: string; last_seen: string }>(rows: T[], me: string): { keep: T[]; drop: T[] } {
+  const groups = new Map<string, T[]>();
+  for (const r of rows) groups.set(r.label, [...(groups.get(r.label) ?? []), r]);
+  const keep: T[] = [], drop: T[] = [];
+  for (const g of groups.values()) {
+    const byUse = [...g].sort((a, b) => b.last_seen.localeCompare(a.last_seen));
+    const head = g.find((r) => r.device_id === me) ?? byUse[0]!;
+    const first = g.map((r) => r.first_seen).sort()[0]!;
+    keep.push({ ...head, first_seen: first, last_seen: byUse[0]!.last_seen });
+    drop.push(...g.filter((r) => r !== head));
+  }
+  keep.sort((a, b) => b.last_seen.localeCompare(a.last_seen));
+  return { keep, drop };
+}

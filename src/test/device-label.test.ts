@@ -9,3 +9,20 @@ describe("device label", () => {
     expect(deviceLabel("Mozilla/5.0 (Linux; Android 14; K) Chrome/130.0 Mobile Safari/537.36", { model: "SM-S918B" })).toBe("SM-S918B · Android · Chrome");
   });
 });
+
+import { mergeSameDevices } from "@/models/device-label";
+describe("same device merged", () => {
+  const row = (id: string, device_id: string, label: string, first: string, last: string) => ({ id, device_id, label, first_seen: first, last_seen: last });
+  it("keeps one row per label, this device's own when it is there", () => {
+    const rows = [
+      row("a", "me", "XQ-FE72 · Android · app installata", "2026-11-07T05:00", "2026-11-07T06:00"),
+      row("b", "old1", "XQ-FE72 · Android · app installata", "2026-11-07T03:00", "2026-11-07T05:30"),
+      row("c", "old2", "XQ-FE72 · Android · app installata", "2026-11-07T04:00", "2026-11-07T04:28"),
+      row("d", "pc", "Windows · Chrome", "2026-11-01T10:00", "2026-11-06T10:00"),
+    ];
+    const { keep, drop } = mergeSameDevices(rows, "me");
+    expect(keep.map((r) => r.id)).toEqual(["a", "d"]);
+    expect(keep[0]!.first_seen).toBe("2026-11-07T03:00");
+    expect(drop.map((r) => r.id).sort()).toEqual(["b", "c"]);
+  });
+});

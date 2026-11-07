@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { deviceLabel } from "@/models/device-label";
+import { deviceLabel, mergeSameDevices } from "@/models/device-label";
 
 /**
  * The devices signed in to the account (table account_devices, owner-only, from
@@ -62,7 +62,18 @@ export function useAccountDevices(): { devices: AccountDevice[]; ready: boolean;
     await registerDevice();
     const { data, error } = await table().select("id, device_id, label, first_seen, last_seen").order("last_seen", { ascending: false }).limit(50);
     setReady(!error);
-    setDevices(error || !Array.isArray(data) ? [] : (data as AccountDevice[]));
+    const rows = error || !Array.isArray(data) ? [] : (data as AccountDevice[]);
+    // The same phone registered again (its id lost with the app's data) shows once: the extra rows are removed
+    // from the account and the kept one carries the earliest first sign-in.
+    const { keep, drop } = mergeSameDevices(rows, thisDeviceId());
+    setDevices(keep);
+    if (drop.length) {
+      void table().delete().in("id", drop.map((d) => d.id)).then(() => undefined, () => undefined);
+      for (const k of keep) {
+        const was = rows.find((r) => r.id === k.id);
+        if (was && was.first_seen !== k.first_seen) void table().update({ first_seen: k.first_seen }).eq("id", k.id).then(() => undefined, () => undefined);
+      }
+    }
     setLoading(false);
   }, []);
   useEffect(() => { void load(); }, [load]);
