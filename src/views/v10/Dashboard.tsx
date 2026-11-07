@@ -187,7 +187,7 @@ export type Locked = { icon: LucideIcon; title: string; line: string };
 export function SendProject({ flow }: { flow: "piazza" | "vigneto" }) {
   const piazza = flow === "piazza";
   const guest = useGuestOnly();
-  if (guest) return <GuestLock title="Invia il progetto" line="Il report, la tabella, i dati per la mappa e le foto si mandano dopo esserti identificato." />;
+  if (guest) return <GuestLock kind={piazza ? "funzionario" : "agronomo"} title="Invia il progetto" line="Il report, la tabella, i dati per la mappa e le foto si mandano dopo esserti identificato." />;
   return (
     <section className="space-y-3" aria-label="Invia il progetto">
       <div className="flex items-center gap-2 px-1">

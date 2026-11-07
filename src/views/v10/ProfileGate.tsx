@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Building2, Grape, Lock, UserRound } from "lucide-react";
 import { openSectorGate, useGuest, useProId } from "@/lib/use-pro-id";
-import { KIND_LABEL, SECTION_KIND, SECTION_LABEL, proSummary, unlocks, type Section } from "@/models/professional-id";
+import { KIND_LABEL, SECTION_KIND, SECTION_LABEL, proSummary, unlocks, type ProKind, type Section } from "@/models/professional-id";
 import { toast } from "sonner";
 import { Ambient, PageHero, TabRow, openSimTab } from "@/views/v8/console";
 import { IdentifyForm, profileIntro } from "@/views/v10/Identify";
@@ -25,7 +25,9 @@ export function useGuestOnly(): boolean {
  * What a guest cannot use (the history saved, Sensori AI, Esporta report, Invia il progetto): a lock, what it is and
  * the way to identify — the sector page, straight on its form.
  */
-export function GuestLock({ title, line, className }: { title: string; line: string; className?: string }) {
+export function GuestLock({ title, line, className, kind }: { title: string; line: string; className?: string; kind?: ProKind }) {
+  // In a section (the piazza or the vineyard) only the profile that opens it is offered; with no section, both.
+  const both = !kind;
   return (
     <div className={cn("space-y-3 rounded-3xl bg-foreground/[0.05] p-5", className)}>
       <div className="flex items-start gap-3">
@@ -36,8 +38,8 @@ export function GuestLock({ title, line, className }: { title: string; line: str
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => openSectorGate("funzionario")} className="inline-flex h-10 items-center gap-2 rounded-full bg-foreground px-4 text-sm font-semibold text-background outline-none focus-visible:ring-2 focus-visible:ring-ring"><Building2 className="size-4" aria-hidden="true" />Identificati come funzionario</button>
-        <button type="button" onClick={() => openSectorGate("agronomo")} className="inline-flex h-10 items-center gap-2 rounded-full bg-foreground/[0.08] px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"><Grape className="size-4" aria-hidden="true" />Come agricoltore</button>
+        {(both || kind === "funzionario") && <button type="button" onClick={() => openSectorGate("funzionario")} className="inline-flex h-10 items-center gap-2 rounded-full bg-foreground px-4 text-sm font-semibold text-background outline-none focus-visible:ring-2 focus-visible:ring-ring"><Building2 className="size-4" aria-hidden="true" />Identificati come funzionario</button>}
+        {(both || kind === "agronomo") && <button type="button" onClick={() => openSectorGate("agronomo")} className={cn("inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", both ? "bg-foreground/[0.08]" : "bg-foreground text-background")}><Grape className="size-4" aria-hidden="true" />{both ? "Come agricoltore" : "Identificati come agricoltore"}</button>}
       </div>
     </div>
   );

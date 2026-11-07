@@ -87,6 +87,6 @@ export function VineyardFlow() {
 /** Sensori AI: the suggestions and the user's own sensors; a guest sees the lock. */
 function GuestSensors({ kind }: { kind: "urban" | "vineyard" }) {
   const guest = useGuestOnly();
-  if (guest) return <GuestLock title="Sensori AI" line="Dove mettere i sensori e i tuoi sensori si usano dopo esserti identificato." />;
+  if (guest) return <GuestLock kind={kind === "urban" ? "funzionario" : "agronomo"} title="Sensori AI" line="Dove mettere i sensori e i tuoi sensori si usano dopo esserti identificato." />;
   return <div className="space-y-4"><SensorAdvisor embedded kind={kind} /><MySensors kind={kind} /></div>;
 }
