@@ -518,20 +518,17 @@ export function AccountControl() {
                   <button type="button" onClick={() => { const was = proId.kind; setOpen(false); void leaveProfile(was); }} className="mt-1 inline-flex min-h-10 items-center gap-1.5 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"><LogOut className="size-4" aria-hidden="true" />Esci dal profilo</button>
                 </div>
               </div>
-            ) : <p className="pb-2 text-sm text-muted-foreground">Nessun profilo: piazza e vigneto sono bloccati.</p>}
+            ) : <p className="pb-2 text-sm text-muted-foreground">Nessun profilo attivo: scegli il settore per entrare nella piazza o nel vigneto.</p>}
             {proId && <ProfileBioSwitch id={proId} />}
             {/* Identified, the card shows only that profile: the ways to identify appear when there is none. */}
-            {!proId && <ul>
-              {/* Straight to that profile's registration form (the sector page, over everything), past the profile page. */}
-              {([["Agricoltore · apre il vigneto", "agronomo"], ["Funzionario comunale · apre la piazza", "funzionario"]] as const).map(([label, kind]) => (
-                <li key={kind}>
-                  <button type="button" onClick={() => { setOpen(false); openSectorGate(kind); }} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl text-left text-[15px] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
-                    <span className="min-w-0 flex-1">{label}</span>
-                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                  </button>
-                </li>
-              ))}
-            </ul>}
+            {/* No profile: one way, to the sector choice ("Da dove vuoi usarmi?"), where the two sectors, the recognised
+                profiles and the forms are. */}
+            {!proId && (
+              <button type="button" onClick={() => { setOpen(false); openSectorGate(null); }}
+                className="mt-1 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground text-[15px] font-semibold text-background outline-none focus-visible:ring-4 focus-visible:ring-ring/50">
+                Scegli il settore<ChevronRight className="size-4" aria-hidden="true" />
+              </button>
+            )}
           </section>
           {mode !== "reset" && <section className="space-y-3" aria-label="Immagine account">
             <div className="flex items-center gap-3">

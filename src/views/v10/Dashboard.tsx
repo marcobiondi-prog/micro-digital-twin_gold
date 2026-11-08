@@ -187,12 +187,14 @@ export type Locked = { icon: LucideIcon; title: string; line: string };
 export function SendProject({ flow }: { flow: "piazza" | "vigneto" }) {
   const piazza = flow === "piazza";
   const guest = useGuestOnly();
+  // Signed in the account is Premium: the free plan's "gratis" mark is not shown.
+  const { signedIn } = useSignedIn();
   if (guest) return <GuestLock kind={piazza ? "funzionario" : "agronomo"} title="Invia il progetto" line="Il report, la tabella, i dati per la mappa e le foto si mandano dopo esserti identificato." />;
   return (
     <section className="space-y-3" aria-label="Invia il progetto">
       <div className="flex items-center gap-2 px-1">
         <h2 className="text-lg font-semibold tracking-tight">Invia il progetto</h2>
-        <span className="rounded-full bg-ok/15 px-2.5 py-0.5 text-[11px] font-semibold text-ok">gratis</span>
+        {!signedIn && <span className="rounded-full bg-ok/15 px-2.5 py-0.5 text-[11px] font-semibold text-ok">gratis</span>}
       </div>
       <div className="rounded-3xl bg-foreground/[0.05] p-4 sm:p-5">
         <div className="flex items-start gap-3">
