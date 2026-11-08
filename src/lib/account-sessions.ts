@@ -1,4 +1,3 @@
-import { toast } from "sonner";
 import { preloadNext } from "@/lib/preloader";
 import { googleInApp } from "@/lib/google-one-tap";
 import { getProId, getSectorGateKind, nextAdoptDone } from "@/lib/use-pro-id";
@@ -124,10 +123,10 @@ export async function addGoogleAccount(): Promise<boolean> {
  * Google's sign-in, opened in place of the page (location.replace): the page left is not kept twice in the history,
  * and back from the app after the sign-in returns to it rather than to Google's account chooser.
  */
-export async function googleOAuth(redirectTo: string, queryParams?: Record<string, string>, opts: { forcePage?: boolean } = {}): Promise<{ error: Error | null }> {
+export async function googleOAuth(redirectTo: string, queryParams?: Record<string, string>): Promise<{ error: Error | null }> {
   // First Google's chooser inside the app (no window of Google's left behind the app); its pages only when it cannot show.
   const hint = queryParams?.["login_hint"];
-  const inApp = opts.forcePage ? "unavailable" : await googleInApp(hint ? { loginHint: hint } : {});
+  const inApp = await googleInApp(hint ? { loginHint: hint } : {});
   if (inApp !== "unavailable") {
     try { localStorage.removeItem("mdt-auth-return"); } catch { /* none */ }
     if (inApp === "signed") {
@@ -136,15 +135,6 @@ export async function googleOAuth(redirectTo: string, queryParams?: Record<strin
       const pro = getProId();
       if (pro && !getSectorGateKind()) goInApp(pro.kind === "agronomo" ? "/vigneto" : "/urbano");
     }
-    return { error: null };
-  }
-  // Google's own pages are no longer opened by themselves: only when the person asks for them from the notice.
-  if (!opts.forcePage) {
-    toast("Scelta dell'account Google non disponibile ora", {
-      description: "Riprova tra poco, oppure apri la pagina di Google.",
-      action: { label: "Apri Google", onClick: () => { void googleOAuth(redirectTo, queryParams, { forcePage: true }); } },
-      duration: 10_000,
-    });
     return { error: null };
   }
   const r = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo, skipBrowserRedirect: true, ...(queryParams ? { queryParams } : {}) } });
