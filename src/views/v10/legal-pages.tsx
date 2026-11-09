@@ -1,7 +1,5 @@
 import { useContext, useEffect, useState, type ReactNode } from "react";
 import { comparison, nextPhase, prototypeChoice } from "@/models/scenarios";
-import { UNIT_COST, grouped } from "@/models/intervention-cost";
-import { VINE_UNIT_COST } from "@/models/vine-interventions";
 import { introSeen } from "@/lib/intro-seen";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { Check, Mail, MapPin, Phone, type LucideIcon } from "lucide-react";
@@ -14,7 +12,6 @@ import { LIBRARIES, SERVICES } from "@/models/credit-logos";
 import { LogoTiles } from "./LogoTiles";
 import { DeviceCacheCard } from "./DeviceCache";
 
-const eur = (n: number) => `${grouped(n)} €`;
 const level = (id: string) => comparison.find((l) => l.id === id)!;
 
 /** Domande frequenti: the old "Costi e tempi" table, opened up into plain questions and answers. */
@@ -24,7 +21,7 @@ export function FaqPage() {
     <InfoPage title="Domande frequenti" intro="Costi, tempi e cosa si impara con i tre livelli di intervento, in poche risposte.">
       <div className="space-y-2">
         <Faq q="Che cosa simula l’app?">
-          <p>Due luoghi: una piazza, dove alberi, aiuole e ombra tolgono gradi al calore percepito, e un vigneto, dove irrigazione, teli d’ombra e frangivento tolgono sete alle viti. Muovi il punto bianco sull’arco o i comandi sotto e vedi subito l’effetto e quanto costa.</p>
+          <p>Due luoghi: una piazza, dove alberi, aiuole e ombra tolgono gradi al calore percepito, e un vigneto, dove irrigazione, teli d’ombra e frangivento tolgono sete alle viti. Muovi il punto bianco sull’arco o i comandi sotto e vedi subito l’effetto.</p>
         </Faq>
         <Faq q="Cosa vogliono dire i tre livelli?">
           <ul>
@@ -38,11 +35,6 @@ export function FaqPage() {
             <li><b>{zero.s}</b>: {zero.cost}, si usano i dati che ci sono già.</li>
             <li><b>{mvp.s}</b>: una spesa contenuta per pochi sensori nei punti giusti.</li>
             <li><b>{full.s}</b>: un budget importante e continuo (misure, droni, modello 3D).</li>
-          </ul>
-          <p>Gli interventi hanno poi il loro costo, stimato nelle simulazioni (IVA esclusa, solo come ordine di grandezza):</p>
-          <ul>
-            <li>Piazza: albero {grouped(UNIT_COST.tree.lo)}–{eur(UNIT_COST.tree.hi)} l’uno, aiuole e ciottoli {UNIT_COST.lawnM2.lo}–{UNIT_COST.lawnM2.hi} €/m², ombra {UNIT_COST.shadeM2.lo}–{UNIT_COST.shadeM2.hi} €/m².</li>
-            <li>Vigneto, all’ettaro: irrigazione a goccia {grouped(VINE_UNIT_COST.irrigation.lo)}–{eur(VINE_UNIT_COST.irrigation.hi)}, teli d’ombra {grouped(VINE_UNIT_COST.shade.lo)}–{eur(VINE_UNIT_COST.shade.hi)}, frangivento {grouped(VINE_UNIT_COST.windbreak.lo)}–{eur(VINE_UNIT_COST.windbreak.hi)}.</li>
           </ul>
         </Faq>
         <Faq q="Quanto tempo serve?">
@@ -234,7 +226,7 @@ export function TermsPage() {
         <p>Micro Digital Twin è uno strumento dimostrativo per simulare interventi di adattamento al clima in una piazza e in un vigneto. È offerto da [titolare] così com’è, senza garanzie di disponibilità continua.</p>
       </InfoCard>
       <InfoCard title="I risultati">
-        <p>Temperature, sete delle viti, costi e superfici sono stime indicative: non sostituiscono rilievi, progetti o il parere di un tecnico o di un agronomo. Le decisioni prese a partire dall’app restano di chi le prende.</p>
+        <p>Temperature, sete delle viti e superfici sono stime indicative: non sostituiscono rilievi, progetti o il parere di un tecnico o di un agronomo. Le decisioni prese a partire dall’app restano di chi le prende.</p>
       </InfoCard>
       <InfoCard title="Il tuo account e i tuoi contenuti">
         <p>Sei responsabile delle credenziali e dei contenuti che carichi (foto, video, note): devi averne i diritti e non devono ritrarre persone senza il loro consenso. Puoi cancellarli in qualsiasi momento.</p>
@@ -251,7 +243,7 @@ export function TermsPage() {
 
 /** The two plans in a few plain lines: what Free gives, and what Premium adds on top. */
 const FREE_FEATURES = [
-  "Simulazione della piazza e del vigneto, con costi e benefici",
+  "Simulazione della piazza e del vigneto, con i benefici",
   "Stagioni e ore con il clima reale del luogo",
   "Mappa 2D e ricerca del luogo",
   "Foto e video, registro interventi e quaderno di campagna",
@@ -365,7 +357,7 @@ export function AboutPage() {
     <InfoPage title="Chi siamo" intro="Micro Digital Twin è un gemello digitale del microclima: una copia al computer di un luogo vero, dove provare gli interventi prima di farli.">
       <InfoCard title="Perché esiste">
         <p>Le estati sono sempre più calde. Nelle piazze il caldo si sente sulla pelle, nei vigneti lo sentono le viti. Spesso però si decide senza poter vedere prima cosa cambia davvero.</p>
-        <p>Con l’app chi amministra un comune, chi coltiva o chi studia può provare alberi, aiuole, ombra, irrigazione o frangivento e vedere subito quanto si guadagna e quanto costa.</p>
+        <p>Con l’app chi amministra un comune, chi coltiva o chi studia può provare alberi, aiuole, ombra, irrigazione o frangivento e vedere subito quanto si guadagna.</p>
       </InfoCard>
       <InfoCard title="Cosa facciamo">
         <ul>

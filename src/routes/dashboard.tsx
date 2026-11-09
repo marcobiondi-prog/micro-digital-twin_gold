@@ -35,7 +35,7 @@ import { getPiazzaReading } from "@/models/sim-reading";
 import { useQueryClient } from "@tanstack/react-query";
 import { heatStep, heatWords, piazzaMix, piazzaSummary, thirstStep, thirstWords, vineMixRows, vineSummary } from "@/models/project-summary";
 import { SEASON_LABEL, type Season } from "@/models/season-climate";
-import { euroRange, grouped } from "@/models/intervention-cost";
+import { grouped } from "@/models/intervention-cost";
 import { zoneSummaryRows } from "@/models/drawn-area";
 import climateTwinLogo from "@/assets/climate-twin-logo-final.png";
 import climateTwinLogoCompact from "@/assets/climate-twin-logo-compact.png";
@@ -476,19 +476,17 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
       ["Quando", `${pd.sim ? "Come nella simulazione" : pd.fromSim ? "Alla stessa ora della simulazione" : "Ora più calda"} · ${pd.when.toLowerCase()}${ps.estimated ? " (stima indicativa)" : ""}`],
       ["Calore percepito", `da ${f1(ps.before)} °C a ${f1(ps.after)} °C (−${f1(ps.before - ps.after)} °C) · ${heatWords(ps.after)}`],
       ["Livello", ps.level ?? "Nessun intervento"],
-      ["Costo indicativo", ps.empty ? "Nessun intervento" : euroRange(ps.cost)],
       ["Superficie", `${grouped(ps.m2)} m² ${ps.drawn ? "disegnati sulla mappa" : ps.measured ? "della piazza" : "di riferimento"}`],
-      // The zones drawn inside the area: free ones, zones for one intervention, lots with their share of the cost.
-      ...zoneSummaryRows(u.area, u.location, ps.cost, ps.empty, euroRange),
+      // The zones drawn inside the area: free ones, zones for one intervention, lots with their surface.
+      ...zoneSummaryRows(u.area, u.location),
     ]
     : [
       ["Luogo", v.location.label],
       ["Fase della vite", v.phase],
       ["Bisogno di intervento", `da ${Math.round(vs.before)} a ${Math.round(vs.after)} su 100 · ${thirstWords(vs.after)}`],
       ["Livello", vs.level ?? "Nessun intervento"],
-      ["Costo indicativo", vs.empty ? "Nessun intervento" : euroRange(vs.cost)],
       ["Superficie", vs.drawn ? `${grouped(vs.m2)} m² disegnati sulla mappa` : vs.measured ? `${grouped(vs.m2)} m² del vigneto` : "1 ettaro di riferimento"],
-      ...zoneSummaryRows(v.area, v.location, vs.cost, vs.empty, euroRange),
+      ...zoneSummaryRows(v.area, v.location),
     ];
   const benefits: Array<[string, string]> = ctx === "Urbano"
     ? [[`${ps.co2} kg`, "CO2 assorbita all’anno"], [`${grouped(ps.water)} m³`, "Acqua piovana trattenuta (m³/anno)"], [`${grouped(ps.shadeM2)} m²`, "All’ombra"]]
@@ -497,7 +495,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   const noteRows: [string, string][] = ctx === "Urbano" ? [] : notes.slice(0, 8).map((n): [string, string] => [n.d, n.t]);
   const reportRows: [string, string][] = [
     ...resultRows,
-    ...mixRows.map((r): [string, string] => [r.label, `${r.value} · ${r.cost}`]),
+    ...mixRows.map((r): [string, string] => [r.label, `${r.value} · ${r.detail}`]),
     ...benefits.map(([x, l]): [string, string] => [l, x]),
     ...zoneRows,
     ...noteRows.map(([d, t]): [string, string] => [`Quaderno ${d}`, t]),
@@ -628,7 +626,6 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
     const stepIx = urban ? heatStep(after) : thirstStep(after);
     const words = urban ? heatWords(after) : thirstWords(after);
     const level = (urban ? ps.level : vs.level) ?? "Nessun intervento";
-    const cost = (urban ? ps.empty : vs.empty) ? "0 €" : euroRange(urban ? ps.cost : vs.cost);
     card(M, y, CW, 92);
     doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...C.muted);
     doc.text(clean(urban ? `${pd.sim ? "Come nella simulazione" : pd.fromSim ? "Alla stessa ora della simulazione" : "Nell’ora più calda"} · ${pd.when.toLowerCase()}` : "Bisogno di intervento · media delle tre zone"), W / 2, y + 10, { align: "center" });
@@ -637,7 +634,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
     pill(words, W / 2, cy - 25, STEP[stepIx]!);
     doc.setFont("helvetica", "normal"); doc.setFontSize(34); doc.setTextColor(...C.ink);
     doc.text(urban ? `${f1(after)}°` : `${Math.round(after)}`, W / 2, cy - 6, { align: "center" });
-    doc.setFontSize(8.5); doc.setTextColor(...C.muted); doc.text(clean(`${level} · ${cost}`), W / 2, cy + 1, { align: "center" });
+    doc.setFontSize(8.5); doc.setTextColor(...C.muted); doc.text(clean(level), W / 2, cy + 1, { align: "center" });
     doc.setFontSize(10); doc.setTextColor(...C.ink);
     const gain = before - after;
     doc.text(clean(urban
@@ -698,8 +695,8 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
     y += 34;
 
     await step("Compilazione delle tabelle…", 30);
-    rows([...mixRows.map((r): [string, string] => [`${r.label}  ${r.value}`, r.cost]), ["Totale indicativo", (urban ? ps.empty : vs.empty) ? "Nessun intervento" : euroRange(urban ? ps.cost : vs.cost)]],
-      { strongLast: true, head: ["Cosa hai messo", urban ? `${grouped(ps.m2)} m² ${ps.drawn ? "disegnati" : ps.measured ? "della piazza" : "di riferimento"}` : vs.drawn ? `${grouped(vs.m2)} m² disegnati` : vs.measured ? `${grouped(vs.m2)} m² del vigneto` : "1 ettaro di riferimento"] });
+    rows(mixRows.map((r): [string, string] => [`${r.label}  ${r.value}`, r.detail]),
+      { head: ["Cosa hai messo", urban ? `${grouped(ps.m2)} m² ${ps.drawn ? "disegnati" : ps.measured ? "della piazza" : "di riferimento"}` : vs.drawn ? `${grouped(vs.m2)} m² disegnati` : vs.measured ? `${grouped(vs.m2)} m² del vigneto` : "1 ettaro di riferimento"] });
     if (noteRows.length) rows(noteRows, { head: ["Quaderno di campagna"] });
     // AI camera scans: each one stays in the report even without a photo (indicative estimates).
     if (scanRows.length) rows(scanRows, { head: ["Scansioni della Fotocamera AI"] });
@@ -744,7 +741,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
     for (let p = 1; p <= pages; p++) {
       doc.setPage(p); doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...C.muted);
       doc.setDrawColor(...C.line); doc.setLineWidth(0.2); doc.line(M, 284, W - M, 284);
-      doc.text("Valori indicativi, da validare con un tecnico. Costi IVA esclusa.", M, 290);
+      doc.text("Valori indicativi, da validare con un tecnico.", M, 290);
       doc.text(`${p} / ${pages}`, W - M, 290, { align: "right" });
     }
     return doc;

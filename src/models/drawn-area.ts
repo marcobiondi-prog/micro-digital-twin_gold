@@ -74,20 +74,20 @@ export function surfaceSource(drawn: number | null, measured: number | null): Su
 }
 
 /**
- * The inner zones in words, for the dashboard and the report: the surface left free and each lot with its surface and
- * its share of the cost ("Lotto A" · "1.200 m² · 25–60 mila €"); nothing without zones.
+ * The inner zones in words, for the dashboard and the report: the surface left free and each lot with its surface
+ * ("Lotto A" · "1.200 m²"); nothing without zones.
  */
-export function zoneSummaryRows(area: DrawnArea | null | undefined, place: { lat: number; lng: number }, cost: { lo: number; hi: number }, empty: boolean, money: (c: { lo: number; hi: number }) => string): Array<[string, string]> {
+export function zoneSummaryRows(area: DrawnArea | null | undefined, place: { lat: number; lng: number }): Array<[string, string]> {
   const a = drawnAreaFor(area, place);
   if (!a) return [];
   const rows: Array<[string, string]> = [];
   const free = freeM2(a), nFree = zonesOf(a).filter((z) => z.kind === "libera").length;
-  if (free > 0) rows.push(["Zone libere", `${nFree} · ${surfaceText(free)} esclusi dai costi`]);
+  if (free > 0) rows.push(["Zone libere", `${nFree} · ${surfaceText(free)} lasciati liberi`]);
   for (const kind of ["alberi", "prato", "ombra"] as const) {
     const zs = zonesOf(a).filter((z) => z.kind === kind);
     if (zs.length) rows.push([`Zone ${ZONE_LABEL[kind].toLowerCase()}`, `${zs.length} · ${surfaceText(zs.reduce((t, z) => t + pinsM2(z.ring), 0))}`]);
   }
-  for (const l of lotsOf(a)) rows.push([l.name, `${surfaceText(l.m2)}${empty ? "" : ` · ${money({ lo: cost.lo * l.share, hi: cost.hi * l.share })}`}`]);
+  for (const l of lotsOf(a)) rows.push([l.name, surfaceText(l.m2)]);
   return rows;
 }
 

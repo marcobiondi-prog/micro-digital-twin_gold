@@ -392,8 +392,8 @@ export function ExportSheet({ open, onOpenChange, flow, place, author, media, pr
                 <>
                   {head(`1 di ${bars.length} · Cosa allegare`, "Quali file vuoi?", "Accendi quelli da mandare: partono insieme.")}
                   <Box>
-                    <ToggleRow icon={<FileText />} title="Report" sub="PDF con risultato, giornata e costi" size={reportSize !== null ? sizeText(reportSize) : "…"} on={on.report} onChange={() => toggle("report")} />
-                    <ToggleRow icon={<Table2 />} title="Tabella" sub="Valori e costi, da aprire in Excel" size={sizeText(sizes.table)} on={on.table} onChange={() => toggle("table")} />
+                    <ToggleRow icon={<FileText />} title="Report" sub="PDF con risultato, giornata e interventi" size={reportSize !== null ? sizeText(reportSize) : "…"} on={on.report} onChange={() => toggle("report")} />
+                    <ToggleRow icon={<Table2 />} title="Tabella" sub="Valori e interventi, da aprire in Excel" size={sizeText(sizes.table)} on={on.table} onChange={() => toggle("table")} />
                     <ToggleRow icon={<MapIcon />} title="Dati per la mappa" sub="Area e zone disegnate, per i GIS" size={sizeText(sizes.map)} on={on.map} onChange={() => toggle("map")} />
                     <ToggleRow icon={<Images />} title="Foto e video" disabled={!media.length}
                       sub={media.length ? countText(chosen) : "Nessuna foto o video nella simulazione"}

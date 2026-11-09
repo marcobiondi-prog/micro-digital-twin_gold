@@ -9,7 +9,7 @@ import { ArrowRight, CloudDrizzle, CloudRain, Sprout, Droplets, Leaf, Lock, Mail
 import { useLab, type LabState } from "@/models/lab-store";
 import { getPiazzaReading, usePiazzaReading, type PiazzaReading } from "@/models/sim-reading";
 import { heatStep, heatWords, piazzaMix, piazzaSummary, thirstStep, thirstWords, vineMixRows, vineSummary } from "@/models/project-summary";
-import { euroRange, grouped } from "@/models/intervention-cost";
+import { grouped } from "@/models/intervention-cost";
 import { SEASONS, SEASON_LABEL, coolingShare, type Season } from "@/models/season-climate";
 import { clockText } from "@/models/sim-when";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
@@ -78,7 +78,7 @@ export function DashCard({ children, className }: { children: ReactNode; classNa
  * The result of the project, read-only: the same half ring as the simulation, the faint ring where it starts, the white
  * dot where the interventions bring it, and inside the reading, its words and the level.
  */
-function ResultArc({ before, after, min, max, unit, value, words, step, bg, level, cost }: { before: number; after: number; min: number; max: number; unit: string; value: string; words: string; step: number; bg?: string | undefined; level: string | null; cost: string }) {
+function ResultArc({ before, after, min, max, unit, value, words, step, bg, level }: { before: number; after: number; min: number; max: number; unit: string; value: string; words: string; step: number; bg?: string | undefined; level: string | null }) {
   const R = 88, C = Math.PI * R;
   const share = (t: number) => Math.max(0, Math.min(1, (t - min) / (max - min)));
   const at = (t: number) => { const a = Math.PI * (1 - share(t)); return { x: 100 + Math.cos(a) * R, y: 100 - Math.sin(a) * R }; };
@@ -101,7 +101,7 @@ function ResultArc({ before, after, min, max, unit, value, words, step, bg, leve
       <div className="absolute inset-x-0 bottom-1 flex flex-col items-center text-center">
         <span className={cn("rounded-full px-3 py-1 text-xs font-semibold text-white", bg ?? GAIN_BG[step])}>{words}</span>
         <span className="mt-1 font-display text-5xl font-extralight leading-none tabular-nums">{value}</span>
-        <span className="mt-1 text-xs text-muted-foreground">{level ?? "Nessun intervento"} · {cost}</span>
+        <span className="mt-1 text-xs text-muted-foreground">{level ?? "Nessun intervento"}</span>
       </div>
     </div>
   );
@@ -139,21 +139,20 @@ function Facts({ items }: { items: Array<{ icon: LucideIcon; value: string; labe
   );
 }
 
-/** What was put in place, one row each, with its indicative cost. */
-function MixRows({ rows, total, note }: { rows: Array<{ icon: LucideIcon; label: string; value: string; cost: string }>; total: string; note: string }) {
+/** What was put in place, one row each, with what it is. */
+function MixRows({ rows, note }: { rows: Array<{ icon: LucideIcon; label: string; value: string; detail: string }>; note?: string | undefined }) {
   return (
     <DashCard className="p-0 sm:p-0">
       <ul className="divide-y divide-foreground/10">
         {rows.map((r) => (
           <li key={r.label} className="flex items-center gap-3 px-4 py-3 sm:px-5">
             <r.icon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{r.label}</span><span className="block text-xs text-muted-foreground">{r.cost}</span></span>
+            <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{r.label}</span><span className="block text-xs text-muted-foreground">{r.detail}</span></span>
             <span className="font-mono text-base font-semibold tabular-nums">{r.value}</span>
           </li>
         ))}
-        <li className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5"><span className="text-sm font-semibold">Totale indicativo</span><span className="text-right text-sm font-semibold">{total}</span></li>
       </ul>
-      <p className="px-4 pb-4 text-[11px] text-muted-foreground sm:px-5">{note}</p>
+      {note ? <p className="px-4 pb-4 text-[11px] text-muted-foreground sm:px-5">{note}</p> : null}
     </DashCard>
   );
 }
@@ -300,7 +299,7 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
         when={<SeasonPills value={season} onChange={setDashSeason} only={reading?.season} />}>
         <p className="text-center text-sm text-muted-foreground">{dash.sim ? "Come nella simulazione" : dash.fromSim ? "Alla stessa ora della simulazione" : "Nell’ora più calda"} · {dash.when.toLowerCase()}</p>
         <ResultArc before={before} after={after} min={dash.min} max={dash.max} unit="°"
-          value={`${fmt1(after)}°`} words={heatWords(after)} step={heatStep(after)} bg={after < 10 ? "bg-urban" : after < 18 ? "bg-water" : undefined} level={sum.level} cost={empty ? "0 €" : euroRange(sum.cost)} />
+          value={`${fmt1(after)}°`} words={heatWords(after)} step={heatStep(after)} bg={after < 10 ? "bg-urban" : after < 18 ? "bg-water" : undefined} level={sum.level} />
         <p className="text-center text-sm">
           {before - after >= 0.05 ? <>Da <b>{fmt1(before)}°</b> a <b className={GAIN_TEXT[heatStep(after)]}>{fmt1(after)}°</b> percepiti: <b>−{fmt1(before - after)}°</b></> : empty ? "Nessun intervento: apri la simulazione per provarne uno." : (dash.fromSim ? "A quest’ora gli interventi non cambiano il calore." : "In questa stagione gli interventi non cambiano il calore.")}
         </p>
@@ -339,11 +338,9 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
       </DashSection>
 
       <DashSection title="Cosa hai messo" hint={`${grouped(m2)} m² ${sum.drawn ? "disegnati" : sum.measured ? "della piazza" : "di riferimento"}`}>
-        <MixRows total={empty ? "Nessun intervento" : euroRange(sum.cost)}
-          note="Costi indicativi IVA esclusa, da verificare con un preventivo."
-          rows={piazzaMix(urban, sum).map((r, i) => ({ ...r, icon: [TreePine, Sprout, Umbrella, CloudDrizzle][i] ?? TreePine }))} />
+        <MixRows rows={piazzaMix(urban, sum).map((r, i) => ({ ...r, icon: [TreePine, Sprout, Umbrella, CloudDrizzle][i] ?? TreePine }))} />
       </DashSection>
-      <ZoneRows rows={zoneSummaryRows(urban.area, urban.location, sum.cost, empty, euroRange)} />
+      <ZoneRows rows={zoneSummaryRows(urban.area, urban.location)} />
 
       {records}
     </div>
@@ -369,7 +366,7 @@ export function VineDashboard({ records }: { records: ReactNode }) {
       <ResultCard kind="vineyard" place={place.name} when={<span className="text-xs text-muted-foreground">Media delle tre zone, come le hai lasciate nella simulazione</span>}>
         <p className="text-center text-sm text-muted-foreground">Bisogno di intervento</p>
         <ResultArc before={before} after={thirst} min={Math.max(0, Math.floor(Math.min(thirst, before) - 8))} max={Math.min(100, Math.ceil(before + 6))} unit=""
-          value={`${Math.round(thirst)}`} words={thirstWords(thirst)} step={thirstStep(thirst)} level={sum.level} cost={empty ? "0 €" : euroRange(sum.cost)} />
+          value={`${Math.round(thirst)}`} words={thirstWords(thirst)} step={thirstStep(thirst)} level={sum.level} />
         <p className="text-center text-sm">
           {before - thirst >= 0.5 ? <>Da <b>{Math.round(before)}</b> a <b className={GAIN_TEXT[thirstStep(thirst)]}>{Math.round(thirst)}</b> su 100: <b>−{Math.round(before - thirst)}</b></> : empty ? "Nessun intervento: apri la simulazione per provarne uno." : "Gli interventi qui cambiano poco."}
         </p>
@@ -397,11 +394,10 @@ export function VineDashboard({ records }: { records: ReactNode }) {
       </DashSection>
 
       <DashSection title="Cosa hai messo" hint={sum.drawn ? `${grouped(m2)} m² disegnati` : sum.measured ? `${grouped(m2)} m² del vigneto` : "1 ettaro di riferimento"}>
-        <MixRows total={empty ? "Nessun intervento" : euroRange(sum.cost)}
-          note={same ? "Costi indicativi IVA esclusa, da verificare con un preventivo." : "Media delle tre zone (ognuna ha il suo intervento). Costi indicativi IVA esclusa."}
+        <MixRows note={same ? undefined : "Media delle tre zone (ognuna ha il suo intervento)."}
           rows={vineMixRows(sum).map((r, i) => ({ ...r, icon: [Droplets, Umbrella, Wind][i] ?? Droplets }))} />
       </DashSection>
-      <ZoneRows rows={zoneSummaryRows(vine.area, vine.location, sum.cost, empty, euroRange)} />
+      <ZoneRows rows={zoneSummaryRows(vine.area, vine.location)} />
 
       {records}
     </div>

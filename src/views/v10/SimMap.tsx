@@ -105,7 +105,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   const finish = () => {
     if (draft.length < 3) { toast("Servono almeno 3 pin per chiudere l’area"); return; }
     save(draft); setDrawing(false);
-    toast.success("Area salvata", { description: `${surfaceText(pinsM2(draft))}: la usano i costi e i benefici.` });
+    toast.success("Area salvata", { description: `${surfaceText(pinsM2(draft))}: la usano i benefici.` });
   };
   const remove = () => { save(null); setDrawing(false); setDraft([]); toast("Area cancellata", { description: "Torna la superficie misurata o di riferimento." }); };
   // The simulation inside the saved area: automatic from the levers, plus what was moved by hand (kept with the area).
@@ -152,7 +152,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
     } else {
       const z: SubArea = { id: crypto.randomUUID?.() ?? String(Date.now()), kind: zoneKind, ring: zoneDraft, name: zoneName(saved, zoneKind) };
       setZones([...all, z]);
-      toast.success(`${z.name} aggiunta`, { description: `${surfaceText(pinsM2(zoneDraft))}${zoneKind === "libera" ? ": tolti dalla superficie dei costi." : "."}` });
+      toast.success(`${z.name} aggiunta`, { description: `${surfaceText(pinsM2(zoneDraft))}${zoneKind === "libera" ? ": tolti dalla superficie." : "."}` });
     }
     closeZone();
   };
@@ -350,7 +350,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
           const next = leversOfZones(saved);
           setUrban({ ...next, treeCells: null, permeableCells: null, shadeCells: null, area: { ...saved, edits: { onlyDrawn: true } } });
           setArranging(false);
-          toast.success("Solo quello disegnato da te", { description: `Alberi ${next.trees} · Aiuole ${next.permeable} % · Ombra ${next.shade} % · Nebulizzatori ${next.misters}: temperatura e costi contano solo le tue zone.` });
+          toast.success("Solo quello disegnato da te", { description: `Alberi ${next.trees} · Aiuole ${next.permeable} % · Ombra ${next.shade} % · Nebulizzatori ${next.misters}: la temperatura conta solo le tue zone.` });
         }}
         onArrange={() => { setView("2d"); setArranging((a) => !a); }} onAuto={() => { setEdits({}); toast("Disposizione automatica ripristinata"); }}
         onBest={() => {
@@ -510,7 +510,7 @@ function AreaBar({ drawing, pins, m2, saved, vineyard, onStart, onUndo, onCancel
       <div className="flex flex-wrap items-center gap-3 rounded-3xl bg-foreground/[0.05] p-4">
         <span className="min-w-0 flex-1">
           <span className="block text-[15px] font-semibold">Area disegnata · {surfaceText(m2)}</span>
-          <span className="block text-sm text-muted-foreground">La usano i costi e i benefici al posto della superficie misurata.</span>
+          <span className="block text-sm text-muted-foreground">La usano i benefici al posto della superficie misurata.</span>
         </span>
         <div className="flex gap-2">
           <button type="button" onClick={onStart} className={cn(barBtn, "bg-foreground/[0.08]")}><PenLine className="size-4" aria-hidden="true" />Modifica</button>
@@ -524,7 +524,7 @@ function AreaBar({ drawing, pins, m2, saved, vineyard, onStart, onUndo, onCancel
       <span className="grid size-11 shrink-0 place-items-center rounded-full bg-foreground text-background"><PenLine className="size-5" aria-hidden="true" /></span>
       <span className="min-w-0">
         <span className="block text-[15px] font-semibold">Disegna l’area</span>
-        <span className="block text-sm text-muted-foreground">Metti i pin sugli angoli: useremo la superficie per stimare i costi.</span>
+        <span className="block text-sm text-muted-foreground">Metti i pin sugli angoli: useremo la superficie per i benefici.</span>
       </span>
     </button>
   );
@@ -591,7 +591,7 @@ function SimBar({ sim, when, arranging, edited, best, only, canOnly, onArrange, 
 }
 
 const ZONE_HINT: Record<ZoneKind, string> = {
-  libera: "Resta vuota (una fontana, una strada, un parcheggio) e la sua superficie si toglie dai costi.",
+  libera: "Resta vuota (una fontana, una strada, un parcheggio) e la sua superficie si toglie dal totale.",
   alberi: "Gli alberi della simulazione vanno qui dentro.",
   prato: "Qui ci sono aiuole e ciottoli, poi il resto della percentuale dove c’è posto.",
   ombra: "Qui c’è un pergolato, poi il resto della percentuale dove c’è posto.",
@@ -653,7 +653,7 @@ function ZonesBar({ area, flow, onAdd, onEdit, onRemove }: { area: DrawnArea; fl
               <span className="size-3 shrink-0 rounded-[3px]" style={{ background: ZONE_COLORS[z.kind] }} aria-hidden="true" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[15px] font-medium">{z.kind === "lotto" ? z.name : ZONE_LABEL[z.kind]}</span>
-                <span className="block text-sm text-muted-foreground">{surfaceText(pinsM2(z.ring))}{z.kind === "lotto" && shareOf(z.id) !== undefined ? ` · ${Math.round(shareOf(z.id)! * 100)}% del costo` : z.kind === "libera" ? " · esclusa dai costi" : ""}</span>
+                <span className="block text-sm text-muted-foreground">{surfaceText(pinsM2(z.ring))}{z.kind === "lotto" && shareOf(z.id) !== undefined ? ` · ${Math.round(shareOf(z.id)! * 100)}% dell’area` : z.kind === "libera" ? " · lasciata libera" : ""}</span>
               </span>
               <button type="button" onClick={() => onEdit(z)} aria-label={`Modifica la zona ${z.name ?? ZONE_LABEL[z.kind]}`} className="grid size-10 shrink-0 place-items-center rounded-full bg-foreground/[0.08] outline-none focus-visible:ring-2 focus-visible:ring-ring"><PenLine className="size-4" aria-hidden="true" /></button>
               <button type="button" onClick={() => onRemove(z.id)} aria-label={`Cancella la zona ${z.name ?? ZONE_LABEL[z.kind]}`} className="grid size-10 shrink-0 place-items-center rounded-full bg-foreground/[0.08] outline-none focus-visible:ring-2 focus-visible:ring-ring"><Trash2 className="size-4" aria-hidden="true" /></button>

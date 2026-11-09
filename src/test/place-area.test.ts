@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { areaCandidates, placeArea, ringAreaM2, ringContains, type Ring } from "@/models/place-area";
-import { euroRange, euroShort, grouped, interventionCost } from "@/models/intervention-cost";
+import { grouped } from "@/models/intervention-cost";
 
 /** A square of `side` metres around a point, as lat/lng (1° lat ≈ 111 195 m). */
 const square = (lat: number, lng: number, side: number): Ring => {
@@ -32,13 +32,8 @@ describe("place area", () => {
   });
 });
 
-describe("intervention cost", () => {
-  it("adds trees, lawn and shade and divides by the surface", () => {
-    const c = interventionCost(1000, 2, 10, 10);
-    expect(c.total.lo).toBe(2 * 600 + 100 * 60 + 100 * 120);
-    expect(c.perM2.hi).toBeCloseTo(c.total.hi / 1000);
-    expect(euroShort(245_000)).toBe("245 mila €");
-    expect(euroRange({ lo: 124_000, hi: 331_000 })).toBe("124–331 mila €");
+describe("surface formatting", () => {
+  it("groups thousands with a dot", () => {
     expect(grouped(4000)).toBe("4.000");
   });
 });

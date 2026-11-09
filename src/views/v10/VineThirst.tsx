@@ -10,8 +10,8 @@ import { estimatedTemp, type Season } from "@/models/season-climate";
 import { useSeasonClock, WhenPicker } from "@/views/v10/when";
 import { comparison, type PrototypeId } from "@/models/scenarios";
 import { setVineyard, useLab, vineMetrics, vineThirstPartsOf } from "@/models/lab-store";
-import { NO_MIX, VINE_LEVELS, VINE_MAX, VINE_REFERENCE_M2, vineCost, vineMixAt, vineMixOf, zoneMixOf, type VineMix } from "@/models/vine-interventions";
-import { euroRange, grouped } from "@/models/intervention-cost";
+import { NO_MIX, VINE_LEVELS, VINE_MAX, VINE_REFERENCE_M2, vineMixAt, vineMixOf, zoneMixOf, type VineMix } from "@/models/vine-interventions";
+import { grouped } from "@/models/intervention-cost";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { GAIN_BG, GAIN_TEXT } from "@/views/v7/studio-ui";
 import { Gauge, Lever, type Stop } from "@/views/v9c/UrbanThermometer";
@@ -39,8 +39,8 @@ const fmt1 = (n: number) => n.toLocaleString("it-IT", { maximumFractionDigits: 1
 
 /**
  * v10 vineyard simulation, built like the piazza one: the half-ring arc of the vines' thirst is the one control (the three
- * levels sit on it as stops; drag the white dot or touch a level), inside it the verdict, the thirst and the cost; under it the
- * three zones, the phase of the vine and the rain; then three levers (irrigation, shade cloth, windbreak) and the cost per hectare.
+ * levels sit on it as stops; drag the white dot or touch a level), inside it the verdict and the thirst; under it the
+ * three zones, the phase of the vine and the rain; then three levers (irrigation, shade cloth, windbreak).
  */
 /**
  * The scope — the whole vineyard or one zone, each with its need of intervention after the interventions — as small
@@ -127,9 +127,6 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
   const drawn = drawnM2(vine.area, vine.location);
   const measured = area.data?.m2 ?? null;
   const m2 = drawn ?? measured ?? VINE_REFERENCE_M2;
-  // Each zone is a third of the vineyard: the cost shown is the one of the scope.
-  const zoneCost = (i: number) => vineCost(m2 / Math.max(1, vine.zones.length), mixes[i] ?? NO_MIX).total;
-  const cost = { total: targets.reduce((t, i) => ({ lo: t.lo + zoneCost(i).lo, hi: t.hi + zoneCost(i).hi }), { lo: 0, hi: 0 }), perHa: vineCost(m2, mix).perHa };
 
   // Every zone keeps its own mix written down, so the scope can change without the others moving.
   // With "Solo quello disegnato" on the map, a lever moved by hand goes back to the automatic layout (said once).

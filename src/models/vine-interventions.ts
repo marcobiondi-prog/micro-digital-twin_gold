@@ -39,21 +39,8 @@ export const zoneMixOf = (z: Partial<VineMix>, fallback: VineMix = NO_MIX): Vine
 /** Reads a stored vineyard (older saves have no mix). */
 export const vineMixOf = (v: Partial<VineMix>): VineMix => ({ irrigation: v.irrigation ?? 0, shade: v.shade ?? 0, windbreak: v.windbreak ?? 0 });
 
-/**
- * Indicative costs per hectare (works and materials, VAT excluded), full extent of each item; the mix pays its share.
- * Drip line for emergency watering 3.000–6.000 €/ha, shade cloth on the rows 4.000–8.000 €/ha,
- * hedge or windbreak net along the edge 6.000–12.000 €/ha.
- */
-export const VINE_UNIT_COST = { irrigation: { lo: 3000, hi: 6000 }, shade: { lo: 4000, hi: 8000 }, windbreak: { lo: 6000, hi: 12000 } } as const;
 /** Reference surface when the vineyard has no mapped shape: one hectare. */
 export const VINE_REFERENCE_M2 = 10_000;
-
-export function vineCost(m2: number, m: VineMix): { total: { lo: number; hi: number }; perHa: { lo: number; hi: number } } {
-  const share = { irrigation: m.irrigation / VINE_MAX.irrigation, shade: m.shade / VINE_MAX.shade, windbreak: m.windbreak / VINE_MAX.windbreak };
-  const perHa = (k: "lo" | "hi") => share.irrigation * VINE_UNIT_COST.irrigation[k] + share.shade * VINE_UNIT_COST.shade[k] + share.windbreak * VINE_UNIT_COST.windbreak[k];
-  const ha = m2 / 10_000;
-  return { perHa: { lo: perHa("lo"), hi: perHa("hi") }, total: { lo: perHa("lo") * ha, hi: perHa("hi") * ha } };
-}
 
 /** The mix halfway along the path no mix → Subito, gratis → Pochi sensori → Progetto completo (u from 0 to 3). */
 export function vineMixAt(u: number): VineMix {

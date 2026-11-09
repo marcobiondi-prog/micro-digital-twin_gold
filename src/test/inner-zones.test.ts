@@ -12,21 +12,21 @@ const ring = rect(0, 0, 80, 60), west = rect(5, 20, 25, 40), east = rect(55, 20,
 const area = (zones: SubArea[]): DrawnArea => ({ lat, lng, ring, zones });
 
 describe("zones inside the area", () => {
-  it("takes the free zones off the surface used for costs", () => {
+  it("takes the free zones off the usable surface", () => {
     const a = area([{ id: "f", kind: "libera", ring: west }]);
     expect(freeM2(a)).toBeGreaterThan(390);
     expect(usableM2(a)).toBe(pinsM2(ring) - freeM2(a));
     expect(drawnM2(a, { lat, lng })).toBe(usableM2(a));
   });
-  it("gives each lot its surface and share of the cost, named in order", () => {
+  it("gives each lot its surface and share, named in order", () => {
     const a = area([{ id: "a", kind: "lotto", ring: west, name: "Lotto A" }, { id: "b", kind: "lotto", ring: east, name: "Lotto B" }]);
     const lots = lotsOf(a);
     expect(lots.map((l) => l.name)).toEqual(["Lotto A", "Lotto B"]);
     expect(lots[0]!.share).toBeCloseTo(400 / 4800, 2);
     expect(zoneName(a, "lotto")).toBe("Lotto C");
-    const rows = zoneSummaryRows(a, { lat, lng }, { lo: 48_000, hi: 96_000 }, false, (c) => `${Math.round(c.lo)}-${Math.round(c.hi)}`);
+    const rows = zoneSummaryRows(a, { lat, lng });
     expect(rows[0]![0]).toBe("Lotto A");
-    expect(rows[0]![1]).toMatch(/^400 m² · 4\d{3}-\d+$/);
+    expect(rows[0]![1]).toBe("400 m²");
   });
   it("lays nothing in a free zone, the lawn in its zone and the trees in theirs", () => {
     const free = piazzaLayout(ring, 10, 30, 0, {}, [{ kind: "libera", ring: west }])!;
