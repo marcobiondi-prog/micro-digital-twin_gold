@@ -350,8 +350,8 @@ function LevelSummary({ level, title, compact = false }: { level: PrototypeId; t
           <span>{info.s}</span>
         </span>
       </div>
-      <dl className={cn("mt-2 grid grid-cols-3 gap-x-2 sm:block sm:space-y-1", compact && "sm:mt-1.5 sm:flex sm:flex-wrap sm:items-baseline sm:gap-x-4 sm:gap-y-1 sm:space-y-0")}>
-        {([["Costo", info.cost], ["Precisione", info.prec], ["Tempi", info.time]] as const).map(([k, v]) => (
+      <dl className={cn("mt-2 grid grid-cols-2 gap-x-2 sm:block sm:space-y-1", compact && "sm:mt-1.5 sm:flex sm:flex-wrap sm:items-baseline sm:gap-x-4 sm:gap-y-1 sm:space-y-0")}>
+        {([["Precisione", info.prec], ["Tempi", info.time]] as const).map(([k, v]) => (
           <div key={k} className={cn("flex min-w-0 flex-col gap-0.5 border-b border-current/10 pb-1 last:border-0 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2", compact && "sm:justify-start sm:gap-1.5 sm:border-0 sm:pb-0")}>
             <dt className={cn("shrink-0 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[10px]", compact && "sm:leading-4")}>{k}</dt>
             <dd className={cn("min-w-0 break-words font-mono text-[11px] font-bold sm:text-right sm:text-xs", compact && "sm:leading-4", tone.value)}>{v}</dd>

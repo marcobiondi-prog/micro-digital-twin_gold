@@ -30,13 +30,6 @@ export function FaqPage() {
             <li><b>{full.s}</b>: {full.def}</li>
           </ul>
         </Faq>
-        <Faq q="Quanto costa ogni livello?">
-          <ul>
-            <li><b>{zero.s}</b>: {zero.cost}, si usano i dati che ci sono già.</li>
-            <li><b>{mvp.s}</b>: una spesa contenuta per pochi sensori nei punti giusti.</li>
-            <li><b>{full.s}</b>: un budget importante e continuo (misure, droni, modello 3D).</li>
-          </ul>
-        </Faq>
         <Faq q="Quanto tempo serve?">
           <ul>
             <li><b>{zero.s}</b>: {zero.time.toLowerCase()}.</li>

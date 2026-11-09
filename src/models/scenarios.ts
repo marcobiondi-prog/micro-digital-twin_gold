@@ -41,7 +41,6 @@ export type PrototypeLevel = {
   s: string;
   dt: string;
   def: string;
-  cost: string;
   prec: string;
   time: string;
   test: { urban: string; vineyard: string };
@@ -53,7 +52,7 @@ export const comparison: PrototypeLevel[] = [
   {
     id: "zero", s: "Interventi leggeri", dt: "Con i dati che ci sono già",
     def: "Dati aperti, meteo e osservazioni a mano: si capisce subito se l’idea serve, prima di comprare strumenti.",
-    cost: "0 €", prec: "Bassa (±3 °C)", time: "Subito",
+    prec: "Bassa (±3 °C)", time: "Subito",
     test: {
       urban: "L’informazione è davvero utile al tecnico comunale per scegliere dove intervenire?",
       vineyard: "L’agricoltore capisce e usa l’allerta per decidere quale zona irrigare?",
@@ -62,7 +61,7 @@ export const comparison: PrototypeLevel[] = [
   {
     id: "mvp", s: "Interventi medi", dt: "Una prova sul posto", chosen: true,
     def: "Pochi sensori messi nei punti giusti: si impara molto spendendo poco, in poche settimane.",
-    cost: "€€", prec: "Media (±1 °C)", time: "Settimane",
+    prec: "Media (±1 °C)", time: "Settimane",
     test: {
       urban: "Alberi, suolo permeabile e ombra riducono davvero di −2/−4 °C la piazza misurata?",
       vineyard: "Umidità e temperatura per zona anticipano lo stress delle viti in invaiatura?",
@@ -71,7 +70,7 @@ export const comparison: PrototypeLevel[] = [
   {
     id: "roadmap", s: "Progetto completo", dt: "Su tutta la città o il territorio",
     def: "Misure continue, droni e modello 3D: da fare solo dopo che la prova con pochi sensori ha funzionato.",
-    cost: "€€€€", prec: "Alta (±0,3 °C)", time: "Mesi / anni",
+    prec: "Alta (±0,3 °C)", time: "Mesi / anni",
     test: {
       urban: "Il modello validato regge su più luoghi della città e nella gestione continua?",
       vineyard: "Il modello si estende a più vigneti e cooperative del territorio?",
