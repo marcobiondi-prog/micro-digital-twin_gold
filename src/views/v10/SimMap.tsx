@@ -599,7 +599,7 @@ const ZONE_HINT: Record<ZoneKind, string> = {
   irrigazione: "Qui le viti hanno l’irrigazione a goccia su ogni filare, con il tubo principale lungo il bordo.",
   teli: "Qui le viti stanno sotto i teli d’ombra.",
   frangivento: "Qui va la siepe frangivento, lungo il lato più lungo della zona.",
-  lotto: "Una parte del progetto, con la sua superficie e la sua quota di costo.",
+  lotto: "Una parte del progetto, con la sua superficie e la sua quota dell’area.",
 };
 
 /**
