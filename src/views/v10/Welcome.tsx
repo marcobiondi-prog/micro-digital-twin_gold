@@ -48,7 +48,7 @@ export function Welcome() {
   return (
     <div className="space-y-6">
       <Ambient tone={TONE} />
-      <PageHero kicker="Micro Digital Twin" title="Benvenuto" />
+      <PageHero kicker={<><span>Micro Digital Twin</span><span className="rounded-full border border-brand-turquoise/40 bg-brand-turquoise/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-turquoise">Beta</span></>} title="Benvenuto" />
       <p className="text-[15px] leading-relaxed text-muted-foreground">Scegli da dove partire. Qui sotto trovi gli ultimi interventi che hai registrato.</p>
       <div className="flex gap-3">
         {/* Identified, the section the profile locks gives its place to the round profile button (the agronomist's where Piazza was, the officer's where Vigneto was). */}

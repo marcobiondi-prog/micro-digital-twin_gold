@@ -22,7 +22,7 @@ export function HistoryPage() {
       <button type="button" onClick={back} className="-mb-2 inline-flex h-10 items-center gap-1.5 rounded-full pr-3 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
         <ArrowLeft className="size-5" aria-hidden="true" />{label}
       </button>
-      <PageHero kicker="Micro Digital Twin" title="Cronologia" />
+      <PageHero kicker={<><span>Micro Digital Twin</span><span className="rounded-full border border-brand-turquoise/40 bg-brand-turquoise/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-turquoise">Beta</span></>} title="Cronologia" />
       <HistoryBlock />
     </div>
   );

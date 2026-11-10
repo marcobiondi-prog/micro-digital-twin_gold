@@ -9,7 +9,7 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 function page(title: string, body: string, status = 200) {
   const html = `<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${esc(title)} · Micro Digital Twin</title>
 <style>body{font-family:system-ui,sans-serif;background:#f4f7f8;color:#10222a;margin:0;display:grid;place-items:center;min-height:100vh;padding:16px}main{background:#fff;border-radius:20px;padding:28px;max-width:420px;width:100%;box-shadow:0 10px 30px #0001}h1{font-size:20px;margin:0 0 8px}p{color:#4a5d66;line-height:1.5}.brand{font-size:12px;font-weight:700;letter-spacing:.08em;color:#4a5d66}.brand b{color:#14b8a6}form{display:flex;gap:8px;margin-top:20px}button{flex:1;height:44px;border-radius:999px;border:0;font-weight:700;font-size:15px;cursor:pointer}.ok{background:#16a34a;color:#fff}.no{background:#fee2e2;color:#b91c1c}</style></head>
-<body><main><div class="brand">MICRO DIGITAL <b>TWIN</b></div>${body}</main></body></html>`;
+<body><main><div class="brand">MICRO DIGITAL <b>TWIN</b> <span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.08em;color:#4cc9bd;background:rgba(76,201,189,.15);border:1px solid rgba(76,201,189,.4)">BETA</span></div>${body}</main></body></html>`;
   return new Response(html, { status, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
 }
 

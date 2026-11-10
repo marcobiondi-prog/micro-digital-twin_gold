@@ -19,6 +19,7 @@ const CSS = `
 #mdt-preloader .scan{stroke:oklch(0.72 0.15 190);stroke-width:2;filter:drop-shadow(0 0 6px oklch(0.72 0.15 190));animation:mdtp-scan 3s ease-in-out infinite}
 #mdt-preloader .name{margin-top:22px;font-size:13px;font-weight:600;letter-spacing:.32em;text-transform:uppercase;padding-left:.32em}
 #mdt-preloader .name b{color:oklch(0.72 0.15 190);font-weight:600}
+#mdt-preloader .beta{display:inline-block;margin-left:8px;padding:2px 6px;border-radius:999px;font-size:9px;font-weight:700;letter-spacing:.12em;color:oklch(0.72 0.15 190);background:oklch(0.72 0.15 190/.15);border:1px solid oklch(0.72 0.15 190/.4);vertical-align:middle}
 #mdt-preloader .sub{margin-top:8px;font-size:12px;color:rgb(255 255 255/.55);letter-spacing:.04em}
 @keyframes mdtp-draw{0%{stroke-dashoffset:900}50%,100%{stroke-dashoffset:0}}
 @keyframes mdtp-pt{0%,30%{opacity:0;transform:translate(var(--dx),var(--dy))}60%,100%{opacity:1;transform:none}}
@@ -49,7 +50,7 @@ const HTML = `<style>${CSS}</style><div class="glow"></div><div class="box" role
   + `<path class="real" d="M 65 170 L 65 120 M 65 140 L 50 125 M 65 132 L 82 118 M 65 120 C 25 120 20 80 40 66 C 30 40 60 22 72 34 C 90 18 112 40 104 62 C 122 78 108 120 65 120"/>`
   + `${treePoints()}<line class="scan" x1="130" y1="20" x2="130" y2="175"/>`
   + `<text class="lbl" x="65" y="188">REALE</text><text class="lbl" x="195" y="188">DIGITALE</text></svg>`
-  + `<div class="name">Micro Digital <b>Twin</b></div><div class="sub">Creo il gemello digitale del luogo…</div>`
+  + `<div class="name">Micro Digital <b>Twin</b><span class="beta">BETA</span></div><div class="sub">Creo il gemello digitale del luogo…</div>`
   + `<span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Caricamento…</span></div>`;
 
 /**

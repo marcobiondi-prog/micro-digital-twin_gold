@@ -129,10 +129,10 @@ export function AmbientPools({ className }: { className?: string }) {
   );
 }
 
-export function PageHero({ kicker, kickerIcon: KIcon, onKicker, title, actions, small = false }: { kicker?: string; kickerIcon?: LucideIcon; onKicker?: () => void; title: string; actions?: ReactNode; small?: boolean }) {
+export function PageHero({ kicker, kickerIcon: KIcon, onKicker, title, actions, small = false }: { kicker?: ReactNode; kickerIcon?: LucideIcon; onKicker?: () => void; title: string; actions?: ReactNode; small?: boolean }) {
   const k = kicker && (
     <span className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
-      {KIcon && <KIcon className="size-4 shrink-0" aria-hidden="true" />}<span className="truncate">{kicker}</span>
+      {KIcon && <KIcon className="size-4 shrink-0" aria-hidden="true" />}<span className="inline-flex items-center gap-1.5 truncate">{kicker}</span>
     </span>
   );
   return (
