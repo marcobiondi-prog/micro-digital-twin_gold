@@ -102,12 +102,10 @@ export function KnownProfiles({ kind, onPicked }: { kind: ProKind; onPicked?: ()
         goInApp(k.kind === "funzionario" ? "/urbano" : "/vigneto");
         return;
       }
-      // Its account is not kept on this phone: the profile goes in use and its account's sign-in starts by itself
-      // (Google straight for that address, else the panel with the email written); signed in, the account and the
-      // profile come together (the adopt counts the profile tied to the email) and from then on it is kept here.
+      // Its account is not kept on this phone: prompt the user to sign in to that account.
       const to = k.kind === "funzionario" ? "/urbano" : "/vigneto";
-      if (accEmail) setProIdOnDevice(k); else if (!(await saveProId(k))) return;
-      toast(`Accedo con ${target}`, { description: `Collego il tuo account personale a ${k.name}.` });
+      rememberWantedSector(k.kind);
+      toast(`Accedi per entrare con ${target}`, { description: `Inserisci la password o usa Google per ${k.name}.` });
       await signInAs(target, { provider: k.acct?.provider, back: to });
       return;
     }

@@ -22,6 +22,7 @@ import { pushBackGuard } from "@/hooks/use-back-close";
 import { PermissionsPage } from "@/views/v10/Permissions";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { getMyAdminStatus } from "@/controllers/admin.functions";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@/integrations/supabase/config";
 import { Button } from "@/components/ui/button";
@@ -432,50 +433,39 @@ export function AccountControl() {
         const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
         setNotice(error ? authMessage(error) : "Se l’indirizzo è registrato, riceverai un link per reimpostare la password.");
       } else if (mode === "signup") {
-        setRegisteredEmail(email);
         const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
-        // With email confirmation off Supabase signs the user in right away.
         if (error) {
-          setAccount({ id: "local-" + email, email, guest: false });
-          setNotice("Account registrato con successo! Piano Premium attivato.");
-          setPassword("");
-        }
-        else if (data.session) {
+          setNotice(authMessage(error));
+        } else if (data.session) {
           setRegisteredEmail(data.session.user.email ?? email);
           setPassword("");
           setNotice("");
-        }
-        // An existing confirmed email returns a user without identities instead of an error.
-        else if (data.user && data.user.identities?.length === 0) {
-          setAccount({ id: "local-" + email, email, guest: false });
-          setPassword("");
-          setNotice("Accesso eseguito! Piano Premium attivo.");
-        }
-        else {
-          setAccount({ id: data.user?.id ?? ("local-" + email), email, guest: false });
-          setPassword("");
-          setNotice("Account registrato! Piano Premium attivato.");
+          setOpen(false);
+          notifyAuthChange();
+          toast.success("Account registrato", { description: "Piano Premium attivato." });
+        } else if (data.user && data.user.identities?.length === 0) {
+          setNotice("Questo indirizzo è già registrato. Clicca su 'Accedi' per entrare.");
+        } else {
+          setNotice("Controlla la tua email per confermare l’account prima di accedere.");
         }
       } else {
-        setRegisteredEmail(email);
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
-          setAccount({ id: "local-" + email, email, guest: false });
-          setPassword("");
-          setNotice("");
-        }
-        else {
+          setNotice(authMessage(error));
+        } else {
           if (data?.session?.user?.email) setRegisteredEmail(data.session.user.email);
           setPassword("");
           setNotice("");
+          setOpen(false);
+          notifyAuthChange();
+          toast.success("Accesso eseguito", { description: `Benvenuto ${data?.session?.user?.email ?? email}` });
         }
       }
     } catch {
-      setRegisteredEmail(email);
-      setAccount({ id: "local-" + email, email, guest: false });
-      setNotice("");
+      setNotice("Impossibile completare l’operazione. Controlla la connessione e riprova.");
+    } finally {
+      setPending(false);
     }
-    finally { setPending(false); }
   };
 
   const googleSignIn = async () => {

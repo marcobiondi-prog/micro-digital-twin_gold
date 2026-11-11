@@ -262,14 +262,16 @@ export function BiometricSignIn({ onDone }: { onDone?: () => void }) {
  * and completely disconnects from the account and signs out cleanly.
  */
 export async function leaveProfile(_kind?: ProId["kind"]) {
-  // Pre-set the gate immediately to null so it opens directly on the main gate ("Da dove vuoi usarmi?")
+  // 1. Immediately drop the profile and clear active state synchronously
+  dropProIdOnDevice();
+  setRegisteredEmail(null);
   openSectorGate(null);
   rememberWantedSector(null);
+  sessionStorage.removeItem("mdt-guest");
+  sessionStorage.setItem("mdt-bio-skip", "1");
+  notifyAuthChange();
 
-  await keepProIdInAccount();
-  dropProIdOnDevice();
-  await saveProId(null);
-
+  // 2. Clear Supabase auth storage
   try {
     supabase.auth.stopAutoRefresh();
     const key = (supabase.auth as unknown as { storageKey?: string }).storageKey;
@@ -278,12 +280,13 @@ export async function leaveProfile(_kind?: ProId["kind"]) {
       window.localStorage.removeItem(`${key}-code-verifier`);
       window.localStorage.removeItem(`${key}-user`);
     }
-    sessionStorage.setItem("mdt-bio-skip", "1");
   } catch {}
 
-  setRegisteredEmail(null);
-  sessionStorage.removeItem("mdt-guest");
-  await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
-  notifyAuthChange();
+  // 3. Complete remote sign out in background
+  void supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+  void saveProId(null).catch(() => undefined);
+
+  // 4. Navigate back to the gate
+  goInApp("/benvenuto");
   toast("Sei uscito dal profilo", { description: "Scegli il settore e identificati di nuovo quando vuoi." });
 }

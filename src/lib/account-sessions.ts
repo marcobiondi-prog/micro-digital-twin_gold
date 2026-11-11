@@ -96,16 +96,14 @@ export function leaveAccount(opts: { openPanel?: boolean; to?: string; replace?:
  * the password. From then on the account is kept here and entered by itself.
  */
 export async function signInAs(email: string, opts: { provider?: string | undefined; back?: string } = {}) {
-  // Google unless the account is known to use email and password: school and work addresses (Google Workspace, e.g.
-  // …@studenti.itsdemos.it) sign in with Google too, and Google's own page offers that address.
-  const google = opts.provider !== "email";
+  const google = opts.provider === "google";
   if (google) {
     const back = opts.back ?? window.location.pathname + window.location.search;
     try { localStorage.setItem("mdt-auth-return", back); } catch { /* none */ }
     const r = await googleOAuth(window.location.origin + back.split("?")[0], { login_hint: email });
     if (!r.error) return;
   }
-  window.dispatchEvent(new CustomEvent("mdt-open-account", { detail: { email } }));
+  window.dispatchEvent(new CustomEvent("mdt-open-account", { detail: { email, mode: "signin" } }));
 }
 
 /**
