@@ -17,7 +17,7 @@ import { useUpdateProgress } from "@/lib/update-progress";
 import { buildLabel, checkForUpdate } from "@/lib/app-version";
 import { Link } from "@tanstack/react-router";
 import { InfoNav, InfoPage, type InfoPath } from "@/views/v10/InfoPage";
-import { useSignedIn, getRegisteredEmail, setRegisteredEmail } from "@/lib/use-signed-in";
+import { useSignedIn, getRegisteredEmail, setRegisteredEmail, notifyAuthChange } from "@/lib/use-signed-in";
 import { pushBackGuard } from "@/hooks/use-back-close";
 import { PermissionsPage } from "@/views/v10/Permissions";
 import { useQueryClient } from "@tanstack/react-query";
@@ -214,10 +214,21 @@ export function AccountControl() {
   const proId = useProId();
   // The locked AI option of the camera sheet opens this dialog to sign in.
   useEffect(() => {
-    // An email given with the request (a recognised profile's account) is written in the sign-in for it.
-    const show = (e: Event) => { const em = (e as CustomEvent<{ email?: string } | undefined>).detail?.email; if (em) { setEmail(em); setMode("signin"); } setOpen(true); };
+    // An email or mode given with the request is set in the form.
+    const show = (e: Event) => {
+      const detail = (e as CustomEvent<{ email?: string; mode?: "signin" | "signup" | "reset" } | undefined>).detail;
+      const em = detail?.email;
+      if (em) { setEmail(em); }
+      setMode(detail?.mode ?? "signin");
+      setOpen(true);
+    };
+    const close = () => setOpen(false);
     window.addEventListener(OPEN_ACCOUNT_EVENT, show);
-    return () => window.removeEventListener(OPEN_ACCOUNT_EVENT, show);
+    window.addEventListener("mdt-close-account", close);
+    return () => {
+      window.removeEventListener(OPEN_ACCOUNT_EVENT, show);
+      window.removeEventListener("mdt-close-account", close);
+    };
   }, []);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [account, setAccount] = useState<Account>(null);
@@ -383,27 +394,33 @@ export function AccountControl() {
     queryClient.clear();
     if (!account?.guest) {
       await keepProIdInAccount();
-      // A professional profile of this account with Face ID / fingerprint on: "Esci" keeps the account on this phone
-      // (not ended), so taking that profile up again with a glance or a touch enters the account too; the profile
-      // leaves the device as with any sign-out.
-      if (account?.email && getKnownProIds().some((k) => k.acct?.email?.toLowerCase() === account.email.toLowerCase() && biometricOn(proBioKey(k)))) {
-        dropProIdOnDevice();
-        leaveAccount({ openPanel: false });
-        return;
-      }
-      const { error } = await supabase.auth.signOut({ scope: "local" });
-      if (error) { setNotice(error.message); setPending(false); return; }
+      dropProIdOnDevice();
+      await saveProId(null);
+      try {
+        supabase.auth.stopAutoRefresh();
+        const key = (supabase.auth as unknown as { storageKey?: string }).storageKey;
+        if (key) {
+          window.localStorage.removeItem(key);
+          window.localStorage.removeItem(`${key}-code-verifier`);
+          window.localStorage.removeItem(`${key}-user`);
+        }
+      } catch {}
+      await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
     }
     setRegisteredEmail(null);
     sessionStorage.removeItem(guestKey);
     sessionStorage.removeItem(pendingAvatarKey);
     setAccount(null);
+    setMode("signin");
+    setEmail("");
+    setPassword("");
     setChoice(null);
     setAvatarUrl(null);
     draftFileRef.current = null;
     setDraftPreview(null);
     setOpen(false);
     setPending(false);
+    notifyAuthChange();
   };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {

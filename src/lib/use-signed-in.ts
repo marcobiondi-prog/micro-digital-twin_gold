@@ -11,45 +11,12 @@ export function notifyAuthChange() {
   });
 }
 
-/** Returns the registered email if any profile or registration on this device has one. */
+/** Returns the registered email if the user is currently registered or signed in on this device. */
 export function getRegisteredEmail(): string | null {
   if (typeof window === "undefined") return null;
   try {
     const direct = window.localStorage.getItem(REGISTERED_EMAIL_KEY);
     if (direct && direct.includes("@")) return direct.trim();
-
-    // Check last active profile
-    const lastPro = window.localStorage.getItem("mdt-pro-id-v1");
-    if (lastPro) {
-      const parsed = JSON.parse(lastPro);
-      if (parsed?.email && String(parsed.email).includes("@")) return String(parsed.email).trim();
-      if (parsed?.acct?.email && String(parsed.acct.email).includes("@")) return String(parsed.acct.email).trim();
-    }
-
-    // Check last profiles by sector
-    const lastBySector = window.localStorage.getItem("mdt-last-pro-v1");
-    if (lastBySector) {
-      const parsed = JSON.parse(lastBySector);
-      for (const k of ["agronomo", "funzionario"]) {
-        const item = parsed?.[k];
-        if (item?.email && String(item.email).includes("@")) return String(item.email).trim();
-        if (item?.acct?.email && String(item.acct.email).includes("@")) return String(item.acct.email).trim();
-      }
-    }
-
-    // Check known profiles
-    const known = window.localStorage.getItem("mdt-known-pro-ids-v1");
-    if (known) {
-      const parsed = JSON.parse(known);
-      for (const list of [parsed?.agronomo, parsed?.funzionario]) {
-        if (Array.isArray(list)) {
-          for (const item of list) {
-            if (item?.email && String(item.email).includes("@")) return String(item.email).trim();
-            if (item?.acct?.email && String(item.acct.email).includes("@")) return String(item.acct.email).trim();
-          }
-        }
-      }
-    }
   } catch {
     // memory only fallback
   }

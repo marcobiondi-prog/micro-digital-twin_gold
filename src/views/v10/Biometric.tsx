@@ -5,8 +5,8 @@ import { toast } from "sonner";
 import { biometricAvailable, biometricName, markUnlocked, biometricOn, disableBiometric, enableBiometric, useBiometricAccounts, useBiometricOn, verifyBiometric } from "@/lib/biometric";
 import { hasAccountSession, leaveAccount, signInAs, switchToAccount } from "@/lib/account-sessions";
 import { supabase } from "@/integrations/supabase/client";
-import { dropProIdOnDevice, getKnownProIds, getProId, getSectorGateKind, keepProIdInAccount, openSectorGate, type KnownProId, rememberWantedSector, saveProId, sectorOf, useKnownProIds } from "@/lib/use-pro-id";
 import { type ProId } from "@/models/professional-id";
+import { setRegisteredEmail, notifyAuthChange } from "@/lib/use-signed-in";
 
 /**
  * Face ID / fingerprint on each professional profile: turned on for a profile, taking it up again on this phone
@@ -259,35 +259,31 @@ export function BiometricSignIn({ onDone }: { onDone?: () => void }) {
 
 /**
  * "Esci dal profilo": leaving the professional profile returns to the main gate ("Da dove vuoi usarmi?"),
- * signing out cleanly without page reload or stutter.
+ * and completely disconnects from the account and signs out cleanly.
  */
 export async function leaveProfile(_kind?: ProId["kind"]) {
   // Pre-set the gate immediately to null so it opens directly on the main gate ("Da dove vuoi usarmi?")
   openSectorGate(null);
   rememberWantedSector(null);
 
-  const { data } = await supabase.auth.getSession();
-  const email = data.session?.user.email?.toLowerCase();
-  if (!data.session) {
-    await saveProId(null);
-    toast("Sei uscito dal profilo", { description: "Scegli il settore e identificati di nuovo quando vuoi." });
-    return;
-  }
   await keepProIdInAccount();
-  const bio = getKnownProIds().some((k) => k.acct?.email?.toLowerCase() === email && biometricOn(proBioKey(k)));
   dropProIdOnDevice();
-  if (bio) {
-    try {
-      supabase.auth.stopAutoRefresh();
-      const key = (supabase.auth as unknown as { storageKey?: string }).storageKey;
-      if (key) {
-        window.localStorage.removeItem(key);
-        window.localStorage.removeItem(`${key}-code-verifier`);
-        window.localStorage.removeItem(`${key}-user`);
-      }
-      sessionStorage.setItem("mdt-bio-skip", "1");
-    } catch {}
-    return;
-  }
+  await saveProId(null);
+
+  try {
+    supabase.auth.stopAutoRefresh();
+    const key = (supabase.auth as unknown as { storageKey?: string }).storageKey;
+    if (key) {
+      window.localStorage.removeItem(key);
+      window.localStorage.removeItem(`${key}-code-verifier`);
+      window.localStorage.removeItem(`${key}-user`);
+    }
+    sessionStorage.setItem("mdt-bio-skip", "1");
+  } catch {}
+
+  setRegisteredEmail(null);
+  sessionStorage.removeItem("mdt-guest");
   await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+  notifyAuthChange();
+  toast("Sei uscito dal profilo", { description: "Scegli il settore e identificati di nuovo quando vuoi." });
 }
