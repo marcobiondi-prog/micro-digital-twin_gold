@@ -13,22 +13,26 @@ export function pushBackGuard(guard: () => boolean) {
  * leaving the page: a same-URL history entry is pushed on open and consumed
  * on close.
  */
+let backCloseCounter = 0;
+
 export function useBackClose(open: boolean, close: () => void) {
   const closeRef = useRef(close);
   closeRef.current = close;
   useEffect(() => {
     if (!open) return;
     let popped = false;
-    window.history.pushState({ ...(window.history.state ?? {}), __panel: true }, "");
+    const key = `__panel_${++backCloseCounter}`;
+    window.history.pushState({ ...(window.history.state ?? {}), [key]: true, __panel: true }, "");
     const onPop = () => {
       if (guards.length && guards[guards.length - 1]!()) return;
+      if (window.history.state?.[key]) return;
       popped = true;
       closeRef.current();
     };
     window.addEventListener("popstate", onPop);
     return () => {
       window.removeEventListener("popstate", onPop);
-      if (!popped && window.history.state?.__panel) window.history.back();
+      if (!popped && window.history.state?.[key]) window.history.back();
     };
   }, [open]);
 }

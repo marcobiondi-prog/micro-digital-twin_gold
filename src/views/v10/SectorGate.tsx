@@ -345,7 +345,12 @@ function SectorPage({ start }: { start: ProKind | null }) {
       return;
     }
     if (!formStep.current) { window.history.pushState({ ...(window.history.state ?? {}), __sectorForm: true }, ""); formStep.current = true; }
-    const onPop = () => { if (lockShown.on) return; formStep.current = false; setKind(null); };
+    const onPop = () => {
+      if (lockShown.on) return;
+      if (window.history.state?.__sectorForm) return;
+      formStep.current = false;
+      setKind(null);
+    };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, [kind]);
@@ -416,7 +421,6 @@ function SectorPage({ start }: { start: ProKind | null }) {
               ))}
             </div>
             <div className="mt-auto space-y-3 pt-4">
-              {signIn}
               <button type="button" onClick={() => { hapticTick(); enterAsGuest(); toast("Sei entrato come ospite", { description: "Prova la piazza e il vigneto. Quando vuoi, identificati dal tuo account." }); }}
                 className="flex w-full items-center gap-3 rounded-3xl px-5 py-4 text-left outline-none ring-1 ring-foreground/15 transition-colors hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-ring">
                 <UserRound className="size-5 shrink-0 text-foreground/70" aria-hidden="true" />
