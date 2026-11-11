@@ -62,7 +62,7 @@ const PAGE: Record<ProKind, { title: string; section: "urban" | "vineyard"; open
 };
 
 function AgronomoForm({ onDone }: { onDone: () => void }) {
-  const [v, setV] = useState<AgronomoInput>({ name: "", licenceType: "", licence: "", region: "", expires: "", declared: false });
+  const [v, setV] = useState<AgronomoInput>({ name: "", email: "", licenceType: "", licence: "", region: "", expires: "", declared: false });
   // The name is the person's own choice: never filled from the account (accounts often carry the same name).
   const [errors, setErrors] = useState<Errors<keyof AgronomoInput>>({});
   // Changing a field clears its message: the rest stay until the next try.
@@ -81,6 +81,7 @@ function AgronomoForm({ onDone }: { onDone: () => void }) {
   return (
     <form noValidate onSubmit={(e) => { e.preventDefault(); void submit(); }} className="space-y-4">
       <Field label="Nome e cognome" error={errors.name}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!errors.name} autoComplete="name" value={v.name} onChange={(e) => up("name", e.target.value)} className={fieldCls} />}</Field>
+      <Field label="La tua email" hint="Anche personale (es. avatar8@hotmail.it). Ti dà accesso completo a tutti i servizi Premium e alla cronologia." error={errors.email}>{(id, d) => <input id={id} type="email" inputMode="email" autoComplete="email" aria-describedby={d} aria-invalid={!!errors.email} value={v.email ?? ""} onChange={(e) => up("email", e.target.value)} className={fieldCls} />}</Field>
       <Field label="Regione" hint="Dove si trova il vigneto o dove è stato rilasciato il patentino: scrivi le prime lettere e scegli dall’elenco." error={errors.region}>{(id, d) => <RegionField id={id} describedBy={d} invalid={!!errors.region} value={v.region} onChange={(x) => up("region", x)} />}</Field>
       {/* The licence is optional: its type and expiry are asked only once a number is written. */}
       <Field label="Numero del patentino fitosanitario (facoltativo)" hint="Se ce l’hai, come è scritto sul patentino, per esempio MOL/CB/01234. Puoi lasciarlo vuoto." error={errors.licence}>{(id, d) => <input id={id} aria-describedby={d} aria-invalid={!!errors.licence} autoCapitalize="characters" value={v.licence} onChange={(e) => up("licence", e.target.value)} className={fieldCls} />}</Field>
@@ -219,7 +220,7 @@ function FunzionarioForm({ onDone }: { onDone: () => void }) {
         <select id={id} aria-describedby={d} aria-invalid={!!errors.role} value={v.role} onChange={(e) => up("role", e.target.value)} className={fieldCls}>
           <option value="" className={optionCls}>Scegli il ruolo</option>{ROLES.map((r) => <option key={r} value={r} className={optionCls}>{r}</option>)}
         </select>)}</Field>
-      <Field label="La tua email" hint="Anche personale. Nella scheda compare l’email ufficiale dell’ufficio scelto, presa dall’elenco delle pubbliche amministrazioni." error={errors.email}>{(id, d) => <input id={id} type="email" inputMode="email" autoComplete="email" aria-describedby={d} aria-invalid={!!errors.email} value={v.email} onChange={(e) => up("email", e.target.value)} className={fieldCls} />}</Field>
+      <Field label="La tua email" hint="Anche personale (es. avatar8@hotmail.it). Ti dà accesso completo a tutti i servizi Premium e alla cronologia." error={errors.email}>{(id, d) => <input id={id} type="email" inputMode="email" autoComplete="email" aria-describedby={d} aria-invalid={!!errors.email} value={v.email} onChange={(e) => up("email", e.target.value)} className={fieldCls} />}</Field>
       <Field label="Matricola (facoltativa)" hint="Il numero del tuo badge o della matricola, se vuoi aggiungerlo." error={errors.badge}>{(id, d) => <input id={id} aria-describedby={d} value={v.badge} onChange={(e) => up("badge", e.target.value)} className={fieldCls} />}</Field>
       {/* At the end, the picked town with its coat of arms. */}
       {town && (

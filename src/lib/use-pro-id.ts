@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { isProId, type ProId, type ProKind } from "@/models/professional-id";
 import { getAccountAvatar } from "@/lib/account-avatar";
+import { setRegisteredEmail } from "@/lib/use-signed-in";
 
 /**
  * The professional profile in use: kept on this device (localStorage) and, signed in, in the account's user data too,
@@ -387,6 +388,7 @@ export async function saveProId(id: ProId | null): Promise<boolean> {
   }
   pickedAt = Date.now();
   set(id);
+  if (id && (id as any).email) setRegisteredEmail((id as any).email);
   if (!data.session) return true;
   // Every kind the account registered stays owned (a sector switched back finds its profile again).
   const own = withKind(ownOf(meta) ?? [], id);

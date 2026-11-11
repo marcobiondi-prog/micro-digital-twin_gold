@@ -10,7 +10,7 @@ export type Section = "urban" | "vineyard";
 export type ProKind = "agronomo" | "funzionario";
 
 export type AgronomoId = {
-  kind: "agronomo"; name: string; licenceType: "consulente" | "utilizzatore"; licence: string; region: string; expires: string; at: string;
+  kind: "agronomo"; name: string; licenceType: "consulente" | "utilizzatore"; licence: string; region: string; expires: string; at: string; email?: string;
 };
 export type FunzionarioId = {
   kind: "funzionario"; name: string; comune: string; office: string; role: string; email: string; badge: string; at: string;
@@ -96,10 +96,11 @@ export function officeEmail(office: string, comune: string): string {
 }
 export const isTownEmail = (s: string) => /^[^@\s]+@(?:[a-z0-9-]+\.)*[a-z0-9-]*comune[a-z0-9-]*(?:\.[a-z0-9-]+)*\.it$/i.test(s.trim());
 
-export type AgronomoInput = { name: string; licenceType: string; licence: string; region: string; expires: string; declared: boolean };
+export type AgronomoInput = { name: string; email?: string; licenceType: string; licence: string; region: string; expires: string; declared: boolean };
 export function checkAgronomo(v: AgronomoInput, today: Date = new Date()): { id: AgronomoId | null; errors: Errors<keyof AgronomoInput> } {
   const errors: Errors<keyof AgronomoInput> = {};
   if (clean(v.name).split(" ").length < 2) errors.name = "Scrivi nome e cognome.";
+  if (v.email && v.email.trim() !== "" && !isEmail(v.email)) errors.email = "Scrivi un’email valida, per esempio avatar8@hotmail.it.";
   // The licence number is optional: without it, its type and expiry are not asked either; given, it must read right
   // and come with its type and a valid expiry.
   const hasLicence = v.licence.trim() !== "";
@@ -111,7 +112,7 @@ export function checkAgronomo(v: AgronomoInput, today: Date = new Date()): { id:
   else if (hasLicence && exp && exp < today) errors.expires = "Il patentino è scaduto: serve un patentino valido, oppure lascia vuoto il numero.";
   if (!v.declared) errors.declared = "Conferma che i dati sono tuoi e veri.";
   if (Object.keys(errors).length) return { id: null, errors };
-  return { id: { kind: "agronomo", name: clean(v.name), licenceType: (hasLicence ? v.licenceType : "utilizzatore") as AgronomoId["licenceType"], licence: v.licence.trim().toUpperCase(), region: v.region, expires: hasLicence ? v.expires : "", at: today.toISOString() }, errors };
+  return { id: { kind: "agronomo", name: clean(v.name), email: v.email?.trim() || undefined, licenceType: (hasLicence ? v.licenceType : "utilizzatore") as AgronomoId["licenceType"], licence: v.licence.trim().toUpperCase(), region: v.region, expires: hasLicence ? v.expires : "", at: today.toISOString() }, errors };
 }
 
 export type FunzionarioInput = { name: string; comune: string; office: string; otherOffice: string; role: string; email: string; badge: string; declared: boolean };

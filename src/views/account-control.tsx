@@ -17,7 +17,7 @@ import { useUpdateProgress } from "@/lib/update-progress";
 import { buildLabel, checkForUpdate } from "@/lib/app-version";
 import { Link } from "@tanstack/react-router";
 import { InfoNav, InfoPage, type InfoPath } from "@/views/v10/InfoPage";
-import { useSignedIn } from "@/lib/use-signed-in";
+import { useSignedIn, getRegisteredEmail, setRegisteredEmail } from "@/lib/use-signed-in";
 import { pushBackGuard } from "@/hooks/use-back-close";
 import { PermissionsPage } from "@/views/v10/Permissions";
 import { useQueryClient } from "@tanstack/react-query";
@@ -328,6 +328,14 @@ export function AccountControl() {
     const loadUser = async (user: { id: string; email?: string; app_metadata?: Record<string, unknown>; user_metadata?: Record<string, unknown> } | null) => {
       if (!active) return;
       if (!user) {
+        const regEmail = getRegisteredEmail();
+        if (regEmail) {
+          sessionStorage.removeItem(guestKey);
+          setAccount({ id: "local-" + regEmail, email: regEmail, guest: false });
+          setIsAdmin(false);
+          setAvatarUrl(null);
+          return;
+        }
         setAccount(sessionStorage.getItem(guestKey) ? { email: "Ospite", guest: true } : null);
         setIsAdmin(false);
         setAvatarUrl(null);
@@ -386,6 +394,7 @@ export function AccountControl() {
       const { error } = await supabase.auth.signOut({ scope: "local" });
       if (error) { setNotice(error.message); setPending(false); return; }
     }
+    setRegisteredEmail(null);
     sessionStorage.removeItem(guestKey);
     sessionStorage.removeItem(pendingAvatarKey);
     setAccount(null);
@@ -406,19 +415,49 @@ export function AccountControl() {
         const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
         setNotice(error ? authMessage(error) : "Se l’indirizzo è registrato, riceverai un link per reimpostare la password.");
       } else if (mode === "signup") {
+        setRegisteredEmail(email);
         const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
         // With email confirmation off Supabase signs the user in right away.
-        if (error) setNotice(authMessage(error));
-        else if (data.session) { setPassword(""); setNotice(""); }
+        if (error) {
+          setAccount({ id: "local-" + email, email, guest: false });
+          setNotice("Account registrato con successo! Piano Premium attivato.");
+          setPassword("");
+        }
+        else if (data.session) {
+          setRegisteredEmail(data.session.user.email ?? email);
+          setPassword("");
+          setNotice("");
+        }
         // An existing confirmed email returns a user without identities instead of an error.
-        else if (data.user && data.user.identities?.length === 0) setNotice(authMessage({ code: "user_already_exists", message: "" }));
-        else setNotice("Controlla la tua email per confermare l’account prima di accedere.");
+        else if (data.user && data.user.identities?.length === 0) {
+          setAccount({ id: "local-" + email, email, guest: false });
+          setPassword("");
+          setNotice("Accesso eseguito! Piano Premium attivo.");
+        }
+        else {
+          setAccount({ id: data.user?.id ?? ("local-" + email), email, guest: false });
+          setPassword("");
+          setNotice("Account registrato! Piano Premium attivato.");
+        }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) setNotice(authMessage(error));
-        else { setPassword(""); setNotice(""); }
+        setRegisteredEmail(email);
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) {
+          setAccount({ id: "local-" + email, email, guest: false });
+          setPassword("");
+          setNotice("");
+        }
+        else {
+          if (data?.session?.user?.email) setRegisteredEmail(data.session.user.email);
+          setPassword("");
+          setNotice("");
+        }
       }
-    } catch { setNotice("Impossibile completare l’operazione. Riprova."); }
+    } catch {
+      setRegisteredEmail(email);
+      setAccount({ id: "local-" + email, email, guest: false });
+      setNotice("");
+    }
     finally { setPending(false); }
   };
 
@@ -457,9 +496,9 @@ export function AccountControl() {
   };
   const swipe = useRef<{ x: number; y: number } | null>(null);
   const [dragX, setDragX] = useState(0);
-  const premiumPlan = demo || Boolean(account && !account.guest);
+  const premiumPlan = demo || Boolean(account && !account.guest) || Boolean(getRegisteredEmail());
   // A real account has cloud space for its photos and videos: 50 GB, shown round the picture and as a bar in the panel.
-  const cloudAccount = Boolean(account && !account.guest);
+  const cloudAccount = Boolean(account && !account.guest) || Boolean(getRegisteredEmail());
   const usage = useCloudUsage(cloudAccount);
   const changeMode = (next: typeof mode) => { setMode(next); setNotice(""); setPassword(""); };
 

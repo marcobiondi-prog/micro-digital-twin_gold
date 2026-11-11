@@ -164,6 +164,12 @@ export function useHistory(opts: { allOffices?: boolean } = {}): { entries: Sour
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const load = useCallback(async () => {
+    const { data: authData } = await supabase.auth.getSession();
+    if (!authData?.session) {
+      setLoading(false);
+      setFailed(false);
+      return;
+    }
     setLoading(true);
     // Without the newer columns yet the entries still show, only without season and hour, or without "Riapri".
     let data: unknown, error: unknown;
@@ -186,7 +192,7 @@ export function useHistory(opts: { allOffices?: boolean } = {}): { entries: Sour
   // Each entry says where it is kept: signed in, the account's come first and this device's (recorded without signing in) follow.
   const entries = useMemo<SourcedEntry[]>(() => {
     const fromAccount = new Set(cloud.map((e) => e.id));
-    return (account ? mergeHistory(cloud, device) : device).map((e) => ({ ...e, source: fromAccount.has(e.id) ? "account" : "device" }));
+    return (account ? mergeHistory(cloud, device) : device).map((e) => ({ ...e, source: (fromAccount.has(e.id) || account) ? "account" : "device" }));
   }, [account, cloud, device]);
   // A municipal officer sees the piazza interventions of the office in use, unless every office is asked for.
   const office = pro?.kind === "funzionario" ? { comune: pro.comune, office: pro.office } : null;
