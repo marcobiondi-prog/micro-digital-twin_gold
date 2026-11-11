@@ -18,3 +18,6 @@ Object.defineProperty(window, "matchMedia", {
     dispatchEvent: () => {},
   }),
 });
+
+// jsdom has no Element.scrollTo (TabRow centres its open pill by scrolling its own row).
+if (!Element.prototype.scrollTo) Element.prototype.scrollTo = function () {};

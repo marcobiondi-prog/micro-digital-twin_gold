@@ -13,7 +13,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "start": "node .output/server/index.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:touch": "playwright test -c playwright.touch.config.ts"
   },
   "overrides": {
     "rolldown": "1.2.1"
