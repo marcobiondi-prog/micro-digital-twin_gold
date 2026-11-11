@@ -395,7 +395,7 @@ function SectorPage({ start }: { start: ProKind | null }) {
           </>
         ) : (
           <>
-            <p className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.35em] text-foreground/60"><span>Micro Digital <span className="text-brand-turquoise">Twin</span></span><span className="rounded-full border border-brand-turquoise/40 bg-brand-turquoise/15 px-2 py-0.5 text-[10px] font-bold tracking-[0.12em] text-brand-turquoise">BETA</span></p>
+            <p className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.35em] text-foreground/60"><span className="whitespace-nowrap">Micro Digital</span><span className="inline-flex items-center gap-1.5 whitespace-nowrap"><span className="text-brand-turquoise">Twin</span><span className="rounded-full border border-brand-turquoise/40 bg-brand-turquoise/15 px-2 py-0.5 text-[10px] font-bold tracking-[0.12em] text-brand-turquoise">BETA</span></span></p>
             <h1 className="font-display text-[3.2rem] font-extralight leading-[0.95] tracking-tight sm:text-7xl">Da dove<br />vuoi usarmi?</h1>
             <p className="max-w-xs text-[15px] leading-relaxed text-foreground/60">Scegli il tuo settore e identificati: si apre la tua simulazione.</p>
             <div role="radiogroup" aria-label="Settore" className="mt-4 space-y-3">
