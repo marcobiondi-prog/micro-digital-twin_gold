@@ -403,7 +403,7 @@ function SectorPage({ start }: { start: ProKind | null }) {
                 </button>
               ))}
             </div>
-            <div className="mt-auto space-y-3 pb-8 pt-4 sm:pb-10">
+            <div className="mt-auto space-y-3 pt-6">
               {signIn}
               <button type="button" onClick={() => { hapticTick(); enterAsGuest(); toast("Sei entrato come ospite", { description: "Prova la piazza e il vigneto. Quando vuoi, identificati dal tuo account." }); }}
                 className="flex w-full items-center gap-3 rounded-3xl px-5 py-4 text-left outline-none ring-1 ring-foreground/15 transition-colors hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-ring">
