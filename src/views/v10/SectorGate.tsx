@@ -373,7 +373,7 @@ function SectorPage({ start }: { start: ProKind | null }) {
   const sector = SECTORS.find((s) => s.kind === kind) ?? null;
   // Once identified the page goes away by itself and SectorGate opens the simulation.
   const done = () => undefined;
-  const signIn = !signedIn && (
+  const signIn = (
     <button type="button" onClick={openAccount} className="flex w-full items-center gap-3 rounded-3xl bg-foreground/[0.06] px-5 py-4 text-left outline-none transition-colors hover:bg-foreground/[0.1] focus-visible:ring-2 focus-visible:ring-ring">
       <LogIn className="size-5 shrink-0 text-brand-turquoise" aria-hidden="true" />
       <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Hai già un account? Accedi</span><span className="block text-xs text-foreground/60">Il profilo che avevi salvato torna da solo.</span></span>

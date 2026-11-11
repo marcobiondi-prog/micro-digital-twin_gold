@@ -400,11 +400,9 @@ export function Choice() {
             </Link>
           )}
           {/* Who already has an account signs in here: the account's own profile comes back and its simulation opens. */}
-          {!signedIn && (
-            <button type="button" onClick={openAccount} className="inline-flex h-12 items-center justify-center gap-1.5 rounded-full text-sm font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
-              Hai già un account?<span className="text-foreground">Accedi</span>
-            </button>
-          )}
+          <button type="button" onClick={openAccount} className="inline-flex h-12 items-center justify-center gap-1.5 rounded-full text-sm font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+            Hai già un account?<span className="text-foreground">Accedi</span>
+          </button>
         </div>
       </section>
     </div>
