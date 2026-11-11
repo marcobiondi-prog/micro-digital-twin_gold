@@ -1,6 +1,7 @@
 import { goInApp } from "@/lib/app-nav";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSwipeBack } from "@/lib/use-swipe-back";
+import { useBackClose } from "@/hooks/use-back-close";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Building2, Grape, LogIn, Mail, Pencil, Plus, Trash2, UserPlus, UserRound, X } from "lucide-react";
@@ -40,7 +41,7 @@ export function SectorGate() {
   const id = useProId();
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const [seen, setSeen] = useState(false);
+  const [seen, setSeen] = useState(() => (typeof window !== "undefined" ? introSeen() : false));
   useEffect(() => setSeen(introSeen()), [pathname]);
   // Asked for by name (leaving a profile or the account, the account panel's rows): shown on any page, on that form.
   const ask = useSectorGateAsk();
@@ -333,32 +334,16 @@ function SectorPage({ start }: { start: ProKind | null }) {
   // The sector being entered, remembered across a sign-in with Google (which leaves the page and comes back).
   useEffect(() => { if (kind) rememberWantedSector(kind); }, [kind]);
   useSwipeBack(formRef, kind ? backToSectors : null);
-  // The phone's Back closes the form and shows the two sectors again: a same-page history step while a form is open,
-  // taken back when the form is closed by hand — but not when the whole page goes away because a profile is in (the
-  // gate then moves to the simulation, and a Back here would undo that move).
-  const formStep = useRef(false);
-  useEffect(() => {
-    if (!kind) {
-      if (formStep.current) { formStep.current = false; if (window.history.state?.__sectorForm) window.history.back(); }
-      return;
-    }
-    if (!formStep.current) { window.history.pushState({ ...(window.history.state ?? {}), __sectorForm: true }, ""); formStep.current = true; }
-    const onPop = () => {
-      if (lockShown.on) return;
-      if (window.history.state?.__sectorForm) return;
-      formStep.current = false;
-      setKind(null);
-    };
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, [kind]);
+  // The phone's Back closes the form and shows the two sectors again.
+  useBackClose(kind !== null, backToSectors);
   // Just left an account from the sector lock page: the sector choice holds the phone's Back, which would lead to
   // Google's account chooser and from there back to the lock page.
   useEffect(() => {
     let on = false;
     try { on = sessionStorage.getItem("mdt-gate-guard") === "1"; } catch { /* none */ }
     if (!on) return;
-    const guard = () => { if (!window.history.state?.__gateGuard && !window.history.state?.__sectorForm) window.history.pushState({ ...(window.history.state ?? {}), __gateGuard: true }, ""); };
+    try { sessionStorage.removeItem("mdt-gate-guard"); } catch { /* none */ }
+    const guard = () => { if (!window.history.state?.__gateGuard) window.history.pushState({ ...(window.history.state ?? {}), __gateGuard: true }, ""); };
     guard();
     window.addEventListener("popstate", guard);
     return () => window.removeEventListener("popstate", guard);

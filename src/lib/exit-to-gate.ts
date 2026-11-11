@@ -19,6 +19,7 @@ export async function exitToGate(opts: { global?: boolean } = {}): Promise<void>
 
   try {
     sessionStorage.removeItem("mdt-guest");
+    sessionStorage.removeItem("mdt-gate-guard");
     sessionStorage.removeItem("mdt-pending-avatar");
     sessionStorage.setItem("mdt-bio-skip", "1");
   } catch {}

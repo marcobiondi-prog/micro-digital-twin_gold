@@ -7,6 +7,7 @@ import {
   PERMS, STATE_LABEL, askPermission, changeMessage, howToChange, markPermsAsked, permsAsked, setAppAllowed, useAppAllowed, usePermissions,
   type AppKind, type PermKind, type PermState,
 } from "@/lib/app-permissions";
+import { useGuest, useProId } from "@/lib/use-pro-id";
 import { InfoCard, InfoPage, PageLink } from "./InfoPage";
 
 const ICON: Record<PermKind, LucideIcon> = { posizione: MapPin, fotocamera: Camera, notifiche: Bell };
@@ -85,13 +86,15 @@ export function PermissionsSheet() {
   const [open, setOpen] = useState(false);
   const { states, busy, notes, ask } = usePermRows();
   const [all, setAll] = useState(false);
+  const id = useProId();
+  const guest = useGuest();
   useEffect(() => {
-    if (open || pathname === "/" || pathname === "/scegli" || permsAsked() || !states) return;
+    if (open || (!id && !guest) || pathname === "/" || pathname === "/scegli" || permsAsked() || !states) return;
     if (PERMS.every((p) => states[p.kind] !== "prompt")) { markPermsAsked(); return; }
     // A beat after the page shows, so the sheet does not land on top of the page change.
     const t = window.setTimeout(() => { markPermsAsked(); setOpen(true); }, 1200);
     return () => window.clearTimeout(t);
-  }, [pathname, states, open]);
+  }, [pathname, states, open, id, guest]);
   const askAll = async () => {
     setAll(true);
     // One after the other: the phone shows one question at a time.

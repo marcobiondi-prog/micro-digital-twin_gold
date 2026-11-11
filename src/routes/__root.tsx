@@ -578,9 +578,9 @@ function RootComponent() {
         // Back from the simulation returns to the page that was open before Google's account chooser (not to the
         // chooser itself): that page takes this entry's place and the simulation is pushed after it.
         if (back && back !== target) {
-          await navigate({ href: back, replace: true });
-          void navigate({ href: target });
-        } else void navigate({ href: target, replace: true });
+          await navigate({ to: back as any, replace: true });
+          void navigate({ to: target as any });
+        } else void navigate({ to: target as any, replace: true });
       })();
       return;
     }
@@ -592,7 +592,7 @@ function RootComponent() {
       const href = after.href;
       if (href.startsWith("/vigneto")) openSimTab("vineyard", "mappa");
       else if (href.startsWith("/urbano")) openSimTab("urban", "mappa");
-      const id = setTimeout(() => void navigate({ href }), 150);
+      const id = setTimeout(() => void navigate({ to: href as any }), 150);
       return () => { clearTimeout(id); landed.__mdtLanded = false; localStorage.setItem("mdt-after-google", JSON.stringify(after)); };
     }
     // The sector lock page was up for this account and this opening is not its own: the phone's Back went past it.
@@ -620,22 +620,21 @@ function RootComponent() {
     if (back) {
       localStorage.removeItem("mdt-auth-return");
       if (back !== location.pathname + location.searchStr) {
-        const id = setTimeout(() => void navigate({ href: back, replace: true }), 250);
+        const id = setTimeout(() => void navigate({ to: back as any, replace: true }), 250);
         return () => { clearTimeout(id); landed.__mdtLanded = false; localStorage.setItem("mdt-auth-return", back); };
       }
       return;
     }
     if (location.pathname === "/reset-password") return;
-    // The entrance shows once, at the first access: afterwards a fresh open lands on the urban simulation (a shared
-    // scenario link or the "i" still open the tutorial).
+    if (location.pathname !== "/" && location.pathname !== "/index") return;
     const params = new URLSearchParams(location.searchStr);
-    if (location.pathname === "/" && (params.has("scenario") || params.has("rivedi"))) return;
+    if (params.has("scenario") || params.has("rivedi")) return;
     // After the tutorial a fresh open lands on the Mappa tab of the profile's simulation (the agronomist's vineyard,
     // otherwise the piazza).
     const seen = introSeen(), vine = getProId()?.kind === "agronomo";
     const home = seen ? (vine ? "/vigneto" : "/urbano") : "/";
     if (seen) openSimTab(vine ? "vineyard" : "urban", "mappa");
-    if (location.pathname === home || (home === "/" && location.pathname === "/index")) return;
+    if (location.pathname === home) return;
     const id = setTimeout(() => void navigate({ to: home, replace: true }), 250);
     // Unmounted before the move (StrictMode's double mount): let the next mount try again.
     return () => { clearTimeout(id); landed.__mdtLanded = false; };
@@ -689,7 +688,7 @@ function RootComponent() {
           <div className="flex min-w-0 items-center"><AccountControl /></div>
           <div className="flex shrink-0 items-center gap-2">
             {/* "i" shows the tutorial again (only the tutorial: it ends by coming back here). */}
-            <button type="button" onClick={() => void navigate({ href: "/?rivedi=1" })} aria-label="Come funziona" title="Come funziona"
+            <button type="button" onClick={() => void navigate({ to: "/?rivedi=1" as any })} aria-label="Come funziona" title="Come funziona"
               className="grid size-9 shrink-0 place-items-center rounded-full border border-foreground/15 bg-foreground/[0.06] text-foreground outline-none transition-colors hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring sm:size-10">
               <Info className="size-4 sm:size-[1.15rem]" aria-hidden="true" />
             </button>
