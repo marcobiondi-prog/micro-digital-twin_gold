@@ -393,7 +393,7 @@ export function Choice() {
             );
           })}
         </div>
-        <div className="mt-auto flex flex-col items-stretch gap-1 pt-10">
+        <div className="mt-auto flex flex-col items-stretch gap-1 pb-8 pt-10 sm:pb-10">
           {!proId && (
             <Link to="/benvenuto" onClick={() => enterAsGuest()} className="inline-flex h-12 items-center justify-center gap-2 rounded-full text-[15px] font-semibold text-foreground outline-none ring-1 ring-foreground/20 hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-ring">
               Entra come ospite<ArrowRight className="size-4" aria-hidden="true" />

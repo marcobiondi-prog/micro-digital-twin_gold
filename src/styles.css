@@ -812,28 +812,30 @@
   .account-panel[data-state="open"] > * {
     animation: account-content-in 230ms ease-out 150ms both;
   }
-  /* Closing smoothly fades and scales out without circular clip pops */
+  /* Closing replays the reveal backwards: the sheet folds back into the button. */
   .account-panel[data-state="closed"] {
-    animation: account-close-mobile 180ms ease-out both !important;
-  }
-  .account-panel[data-state="closed"] > * {
-    animation: account-content-out 150ms ease-out both !important;
+    animation: account-fold-mobile 380ms cubic-bezier(0.39, 0.575, 0.565, 1) both !important;
   }
   .account-overlay[data-state="closed"] {
-    animation: account-overlay-out 180ms ease-out both !important;
+    animation: account-overlay-out 380ms ease-out both !important;
   }
 }
 .account-panel[data-state="closed"],
 .account-overlay[data-state="closed"] {
-  animation: account-overlay-out 180ms ease-out both !important;
+  animation: account-overlay-out 200ms ease-out both !important;
 }
-@keyframes account-close-mobile {
-  from { opacity: 1; transform: scale(1); }
-  to { opacity: 0; transform: scale(0.97); }
-}
-@keyframes account-content-out {
-  from { opacity: 1; }
-  to { opacity: 0; }
+@keyframes account-fold-mobile {
+  0% {
+    clip-path: circle(150vmax at var(--account-x, 90%) var(--account-y, 40px));
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    clip-path: circle(0px at var(--account-x, 90%) var(--account-y, 40px));
+    opacity: 0;
+  }
 }
 @keyframes account-overlay-out {
   from { opacity: 1; }
