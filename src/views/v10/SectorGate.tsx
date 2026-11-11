@@ -11,7 +11,7 @@ import { BioIcon, checkProfileBiometric, ProfileBioButton, proBioKey } from "@/v
 import { useBiometricOn } from "@/lib/biometric";
 import { supabase } from "@/integrations/supabase/client";
 import { introSeen } from "@/lib/intro-seen";
-import { clearSectorGate, enterAsGuest, forgetKnownProId, dropProIdOnDevice, keepProIdInAccount, setProIdOnDevice, rememberAddingSector, rememberWantedSector, renameKnownProId, sectorOf, type KnownProId, saveProId, useAccountSector, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
+import { clearAddingSector, clearSectorGate, enterAsGuest, forgetKnownProId, dropProIdOnDevice, keepProIdInAccount, setProIdOnDevice, rememberAddingSector, rememberWantedSector, renameKnownProId, sectorOf, type KnownProId, saveProId, useAccountSector, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
 import { proSummary } from "@/models/professional-id";
 import { toast } from "sonner";
 import { useSignedIn, setRegisteredEmail, notifyAuthChange } from "@/lib/use-signed-in";
@@ -352,14 +352,23 @@ function SectorPage({ start }: { start: ProKind | null }) {
   }, [start]);
   // On a sector's form a swipe to the right goes back to the two sectors, like "Indietro".
   const formRef = useRef<HTMLElement>(null);
-  const backToSectors = useCallback(() => setKind(null), []);
+  const backToSectors = useCallback(() => {
+    setKind(null);
+    rememberWantedSector(null);
+    clearAddingSector();
+  }, []);
   // The sector being entered, remembered across a sign-in with Google (which leaves the page and comes back).
-  useEffect(() => { if (kind) rememberWantedSector(kind); }, [kind]);
+  useEffect(() => {
+    if (kind) {
+      rememberWantedSector(kind);
+      rememberAddingSector(kind);
+    }
+  }, [kind]);
   useSwipeBack(formRef, kind ? backToSectors : null);
   // The phone's Back closes the form and shows the two sectors again.
   // While the "Un account, un settore" page is up it takes the Back itself (it leaves the account and returns here): the
   // form step must not also close, or the two sectors show for a moment between the lock page and the gate.
-  const closeForm = useCallback(() => { if (!lockShown.on) setKind(null); }, []);
+  const closeForm = useCallback(() => { if (!lockShown.on) backToSectors(); }, [backToSectors]);
   useBackClose(kind !== null, closeForm);
   // Just left an account from the sector lock page: the sector choice holds the phone's Back, which would lead to
   // Google's account chooser and from there back to the lock page.
@@ -386,8 +395,15 @@ function SectorPage({ start }: { start: ProKind | null }) {
   const sector = SECTORS.find((s) => s.kind === kind) ?? null;
   // Once identified the page goes away by itself and SectorGate opens the simulation.
   const done = () => undefined;
+  const openAccountFromSector = () => {
+    if (kind) {
+      rememberWantedSector(kind);
+      rememberAddingSector(kind);
+    }
+    openAccount();
+  };
   const signIn = (
-    <button type="button" onClick={openAccount} className="flex w-full items-center gap-3 rounded-3xl bg-foreground/[0.06] px-5 py-4 text-left outline-none transition-colors hover:bg-foreground/[0.1] focus-visible:ring-2 focus-visible:ring-ring">
+    <button type="button" onClick={openAccountFromSector} className="flex w-full items-center gap-3 rounded-3xl bg-foreground/[0.06] px-5 py-4 text-left outline-none transition-colors hover:bg-foreground/[0.1] focus-visible:ring-2 focus-visible:ring-ring">
       <LogIn className="size-5 shrink-0 text-brand-turquoise" aria-hidden="true" />
       <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Hai già un account? Accedi</span><span className="block text-xs text-foreground/60">Il profilo che avevi salvato torna da solo.</span></span>
       <ArrowRight className="size-4 shrink-0 text-foreground/60" aria-hidden="true" />
@@ -416,7 +432,7 @@ function SectorPage({ start }: { start: ProKind | null }) {
             <p className="max-w-xs text-[15px] leading-relaxed text-foreground/60">Scegli il tuo settore e identificati: si apre la tua simulazione.</p>
             <div role="radiogroup" aria-label="Settore" className="mt-4 space-y-3">
               {SECTORS.map((s) => (
-                <button key={s.kind} type="button" role="radio" aria-checked={false} onClick={() => { hapticTick(); setKind(s.kind); document.querySelector('[aria-label="Scegli il settore"]')?.scrollTo({ top: 0 }); }}
+                <button key={s.kind} type="button" role="radio" aria-checked={false} onClick={() => { hapticTick(); setKind(s.kind); rememberWantedSector(s.kind); rememberAddingSector(s.kind); document.querySelector('[aria-label="Scegli il settore"]')?.scrollTo({ top: 0 }); }}
                   className="flex w-full items-center gap-4 rounded-3xl bg-foreground/[0.07] p-5 text-left outline-none ring-1 ring-foreground/10 transition-colors hover:bg-foreground/[0.11] focus-visible:ring-2 focus-visible:ring-foreground">
                   <s.Icon className="size-8 shrink-0 text-brand-turquoise" strokeWidth={1.5} aria-hidden="true" />
                   <span className="min-w-0 flex-1">

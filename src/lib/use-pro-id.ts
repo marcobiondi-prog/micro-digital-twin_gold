@@ -268,7 +268,7 @@ const gateSubs = new Set<() => void>();
 export function openSectorGate(kind: ProKind | null) { gateAsk = { kind, at: Date.now() }; gateSubs.forEach((f) => f()); }
 /** The sector the sector page is open on, read outside React. */
 export const getSectorGateKind = (): ProKind | null => (gateAsk.at ? gateAsk.kind : null);
-export function clearSectorGate() { if (gateAsk.at) { gateAsk = { kind: null, at: 0 }; gateSubs.forEach((f) => f()); } }
+export function clearSectorGate() { if (gateAsk.at) { gateAsk = { kind: null, at: 0 }; gateSubs.forEach((f) => f()); } clearAddingSector(); }
 export function useSectorGateAsk(): GateAsk {
   return useSyncExternalStore((f) => { gateSubs.add(f); return () => { gateSubs.delete(f); }; }, () => gateAsk, () => gateAsk);
 }
@@ -441,12 +441,14 @@ const ADDING_KEY = "mdt-adding-account";
 export function rememberAddingSector(kind: ProKind) {
   try { localStorage.setItem(ADDING_KEY, JSON.stringify({ kind, at: Date.now() })); } catch { /* none */ }
 }
-function takeAddingSector(): ProKind | null {
+export function readAddingSector(): ProKind | null {
   try {
     const v = JSON.parse(localStorage.getItem(ADDING_KEY) ?? "null") as { kind?: unknown; at?: number } | null;
-    localStorage.removeItem(ADDING_KEY);
     return v && (v.kind === "agronomo" || v.kind === "funzionario") && Date.now() - (v.at ?? 0) < 10 * 60_000 ? v.kind : null;
   } catch { return null; }
+}
+export function clearAddingSector() {
+  try { localStorage.removeItem(ADDING_KEY); } catch { /* none */ }
 }
 /**
  * The sector lock page shown for an account (signed in from the other sector's form): kept until it is left, so a
@@ -546,37 +548,39 @@ export function useSyncProId() {
       const onlyWorked: ProKind | null = worked && worked.length === 1 ? worked[0]! : null;
       // Added with "Aggiungi account" from a sector's form: an account with no sector yet (never used in the app) goes
       // to that sector. One account, one sector: an account already of the other sector keeps it.
-      const adding0 = fromSignIn || signIn ? takeAddingSector() : null;
+      const adding0 = readAddingSector();
+      const entering = gateAsk.kind ?? wantedSector() ?? adding0;
       const adding = adding0 && !savedSector && !onlyWorked ? adding0 : null;
+      const makeFor = adding ?? (!savedSector && !onlyWorked && entering ? entering : null);
       // One account, one sector: an account whose saved sector has its own profile stays there, whatever form or page
       // it signs in from; only an account with no sector yet (or whose saved sector has no profile of its own, a wrong
       // mark) takes the sector being added to, entered, or the one its history shows.
       const savedHolds = !!savedSector && isProId(prev[savedSector]) && !foreign(prev[savedSector]);
-      const sector: ProKind | null = savedHolds ? savedSector : adding ?? wanted ?? onlyWorked ?? savedSector;
+      const sector: ProKind | null = savedHolds ? savedSector : makeFor ?? wanted ?? onlyWorked ?? savedSector;
       if (email) for (const k of worked ?? []) { const p = prev[k]; if (isProId(p)) retieKnown(p, email); }
       // A new account added from a sector's form gets its profile of that sector made at once from the Google account
       // (its name, its email; the other details empty, to fill in later from the profile), with no form to fill.
       let autoMade: ProId | null = null;
-      if (adding && !isProId(prev[adding])) {
+      if (makeFor && !isProId(prev[makeFor])) {
         const name = nameOf(meta) ?? (email ? email.split("@")[0]! : "Nuovo profilo");
         const at = new Date().toISOString();
-        autoMade = adding === "agronomo"
+        autoMade = makeFor === "agronomo"
           ? { kind: "agronomo", name, licenceType: "utilizzatore", licence: "", region: "", expires: "", at }
           : { kind: "funzionario", name, comune: "", office: "", role: "", email: email ?? "", badge: "", at };
-        prev[adding] = autoMade;
-        if (!ownedClean.includes(adding)) ownedClean.push(adding);
+        prev[makeFor] = autoMade;
+        if (!ownedClean.includes(makeFor)) ownedClean.push(makeFor);
       }
-      const entering = gateAsk.kind ?? wantedSector();
       // Signing in just now from the other sector's form (its "Aggiungi account", or the sector page open on it) with an
       // account already of a sector: nothing enters — no profile is put in use — and that form opens, where the lock page
       // says the account is of the other sector, with "Esci e usa un altro account".
       // A lock still pending for this account (shown before Google's pages were dropped from the history, see
       // lockAsk) shows again on the next opening.
       const pending = readLockAsk();
-      const target = signIn ? adding0 ?? entering : pending?.user === userId ? pending.kind : null;
+      const target = (adding0 ?? entering) ?? (pending?.user === userId ? pending.kind : null);
       if (savedHolds && target && target !== savedSector) {
         rememberLockAsk(target, userId);
         rememberWantedSector(null);
+        clearAddingSector();
         setAccountSector({ kind: savedSector, email, name: nameOf(meta) });
         if (pickedAt >= startedAt) return;
         set(null);
@@ -603,8 +607,10 @@ export function useSyncProId() {
       const clean = { pro_id: back, pro_last: accountLast({ ...(meta as object), pro_last: prev }, back, ownedClean), pro_own: ownedClean, pro_sector: sector, pro_left: false };
       const dirty = ownedClean.length !== owned.length || legacy || KNOWN_KINDS.some((k) => !!tied[k] && !isProId(prev0[k])) || (saved != null && !mine(saved)) || KINDS.some((k) => prev[k] != null && !owned.includes(k)) || rawSector !== sector || staleLeft || !!autoMade;
       if (back) {
+        clearAddingSector();
+        rememberWantedSector(null);
         set(back);
-        if (dirty || !mine(saved)) void supabase.auth.updateUser({ data: clean }).catch(() => undefined);
+        if (dirty || !mine(saved)) await supabase.auth.updateUser({ data: clean }).catch(() => undefined);
         if (autoMade) toast.success(`Account aggiunto: ${email ?? back.name}`, { description: `Ho creato il suo profilo ${back.kind === "agronomo" ? "da agricoltore" : "da funzionario"}: lo trovi tra i profili. I dettagli li completi quando vuoi dal profilo.` });
         else if (!mine(saved)) toast(`Bentornato, ${back.name}`, { description: "Sei entrato con il tuo profilo professionale." });
         return;
@@ -612,7 +618,7 @@ export function useSyncProId() {
       // The account never registered a profile of its own: none is given to it (not even this device's); the sector
       // page asks to choose the sector and identify, or to enter as a guest.
       set(null);
-      if (dirty) void supabase.auth.updateUser({ data: clean }).catch(() => undefined);
+      if (dirty) await supabase.auth.updateUser({ data: clean }).catch(() => undefined);
       // The sector the person was entering opens on its form (a new account adds its profile there), not the choice.
       if (!left && !guestSnap()) openSectorGate(entering ?? null);
       // An account just added from a sector's form: it is in, its profile of that sector is the next step.

@@ -484,7 +484,7 @@ export function AccountControl() {
     try {
       // Remember the current section so the post-login reload stays here.
       localStorage.setItem("mdt-auth-return", window.location.pathname + window.location.search);
-      const result = await googleOAuth(window.location.origin + window.location.pathname);
+      const result = await googleOAuth(window.location.origin + window.location.pathname, { prompt: "select_account" });
       if (result.error) setNotice(result.error.message);
     } catch { setNotice("Accesso Google non disponibile. Riprova."); }
     finally { setPending(false); }
