@@ -61,7 +61,8 @@ const HTML = `<style>${CSS}</style><div class="glow"></div><div class="box" role
 export const preloaderScript = `(function(){try{
 var flag=false;try{flag=sessionStorage.getItem("mdt-preload")==="1";sessionStorage.removeItem("mdt-preload")}catch(e){}
 var idx=location.pathname==="/";
-if(!idx&&!flag&&!/[?&]code=|[?&#]error_description=|#access_token=/.test(location.search+location.hash))return;
+var inner=false;try{var pn=location.pathname;inner=pn!=="/"&&localStorage.getItem("mdt-intro-seen")==="1"&&!/^\\/(scegli|identificazione|privacy|legale|faq|chi-siamo|contatti|piani|reset-password|admin)(\\/|$)/.test(pn)}catch(e){}
+if(!idx&&!flag&&!inner&&!/[?&]code=|[?&#]error_description=|#access_token=/.test(location.search+location.hash))return;
 var el=document.createElement("div");el.id="mdt-preloader";el.innerHTML=${JSON.stringify(HTML)};
 if(!idx)el.className="plain";document.documentElement.appendChild(el);
 var t0=Date.now(),gone=false;
