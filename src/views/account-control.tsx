@@ -62,6 +62,21 @@ function GoogleLogo() {
 
 const guestKey = "micro-digital-twin-guest";
 const pendingAvatarKey = "micro-digital-twin-pending-avatar";
+// The picture chosen by each registered account is also kept on this phone (by email), so entering the account again —
+// even before its data is read, or with no live session — shows the same picture at once.
+const LOCAL_AVATAR_KEY = "mdt-account-avatar-v1";
+const readLocalAvatar = (email: string): string | null => {
+  try { const m = JSON.parse(localStorage.getItem(LOCAL_AVATAR_KEY) ?? "{}") as Record<string, string>; return m[email.toLowerCase()] ?? null; } catch { return null; }
+};
+const writeLocalAvatar = (email: string, choice: string | null) => {
+  try {
+    const m = JSON.parse(localStorage.getItem(LOCAL_AVATAR_KEY) ?? "{}") as Record<string, string>;
+    if (choice) m[email.toLowerCase()] = choice; else delete m[email.toLowerCase()];
+    localStorage.setItem(LOCAL_AVATAR_KEY, JSON.stringify(m));
+  } catch { /* none */ }
+};
+const knownPicOf = (email: string): string | null =>
+  getKnownProIds().find((k) => k.acct?.email?.toLowerCase() === email.toLowerCase() && k.acct?.pic)?.acct?.pic ?? null;
 const bucket = "account-avatars";
 
 // Supabase Auth messages are English and terse; explain the common ones.
@@ -241,6 +256,8 @@ export function AccountControl() {
   const [notice, setNotice] = useState("");
   const [choice, setChoice] = useState<Choice | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  // The picture kept on this phone for the account entered with no live session.
+  const [localPic, setLocalPic] = useState<string | null>(null);
   const [draftPreview, setDraftPreview] = useState<string | null>(null);
   const draftFileRef = useRef<File | null>(null);
   const [savingAvatar, setSavingAvatar] = useState(false);
@@ -347,21 +364,31 @@ export function AccountControl() {
           setAccount({ id: "local-" + regEmail, email: regEmail, guest: false });
           setIsAdmin(false);
           setAvatarUrl(null);
+          const kept = readLocalAvatar(regEmail);
+          setChoice(kept && (kept === "upload" || suggestions.some((i) => i.id === kept)) ? kept as Choice : null);
+          setLocalPic(knownPicOf(regEmail));
           return;
         }
         setAccount(sessionStorage.getItem(guestKey) ? { email: "Ospite", guest: true } : null);
         setIsAdmin(false);
         setAvatarUrl(null);
+        setLocalPic(null);
         return;
       }
       sessionStorage.removeItem(guestKey);
       const googleAvatar = typeof user.user_metadata?.['avatar_url'] === "string" ? user.user_metadata['avatar_url'] : typeof user.user_metadata?.['picture'] === "string" ? user.user_metadata['picture'] : undefined;
       setAccount({ id: user.id, email: user.email ?? "Account", guest: false, ...(user.app_metadata?.['provider'] === "google" && googleAvatar ? { googleAvatar } : {}) });
+      // The picture this phone kept for the account shows at once, before the account's data arrive.
+      if (user.email) {
+        const kept = readLocalAvatar(user.email);
+        if (kept && (kept === "upload" || suggestions.some((i) => i.id === kept))) setChoice(kept as Choice);
+        setLocalPic(knownPicOf(user.email));
+      }
       void getMyAdminStatus().then((r) => { if (active) setIsAdmin(r.isAdmin); }, () => { if (active) setIsAdmin(false); });
       const { data: profile } = await supabase.from("profiles").select("avatar_choice, avatar_path").eq("user_id", user.id).maybeSingle();
       if (!active) return;
-      if (profile?.avatar_choice) setChoice(profile.avatar_choice as Choice);
-      else setChoice(null);
+      if (profile?.avatar_choice) { setChoice(profile.avatar_choice as Choice); if (user.email) writeLocalAvatar(user.email, profile.avatar_choice); }
+      else if (!(user.email && readLocalAvatar(user.email))) setChoice(null);
       if (profile?.avatar_path) {
         // The same link for days (kept on the device), so the picture comes from the browser's cache, not downloaded again.
         const kept = keptLink(bucket, profile.avatar_path);
@@ -492,8 +519,11 @@ export function AccountControl() {
   const usage = useCloudUsage(cloudAccount);
   const changeMode = (next: typeof mode) => { setMode(next); setNotice(""); setPassword(""); };
 
-  const displayedAvatar = (choice === "upload" ? draftPreview ?? avatarUrl : suggestions.find((item) => item.id === choice)?.src ?? account?.googleAvatar) ?? undefined;
+  const displayedAvatar = (choice === "upload" ? draftPreview ?? avatarUrl ?? localPic : suggestions.find((item) => item.id === choice)?.src ?? account?.googleAvatar ?? (account && !account.guest ? localPic : null)) ?? undefined;
   const signedAvatar = account && !account.guest ? displayedAvatar ?? null : null;
+  useEffect(() => {
+    if (choice && account && !account.guest && account.id && !account.id.startsWith("local-")) writeLocalAvatar(account.email, choice);
+  }, [choice, account]);
   useEffect(() => {
     setAccountAvatar(signedAvatar);
     // The profiles on this phone that are this account's get its picture and email ("Ti abbiamo riconosciuto").
