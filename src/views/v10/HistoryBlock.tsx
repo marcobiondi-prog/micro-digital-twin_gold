@@ -1162,9 +1162,12 @@ export function ArchiveOnly() {
       <p className="text-sm text-muted-foreground">Gli interventi, le foto e i video che archivi dalla cronologia finiscono qui, divisi per giorno.</p>
     </div>
   );
+  const is431 = (e: string | null) => Boolean(e && (e.includes("431") || /header/i.test(e)));
+  const hasUrbanError = urbanError && !is431(urbanError);
+  const hasVineError = vineError && !is431(vineError);
   return (
     <div className="space-y-3">
-      {(urbanError || vineError) && keys.length > 0 && (
+      {(hasUrbanError || hasVineError) && keys.length > 0 && (
         <div role="alert" className="flex items-center gap-3 rounded-2xl bg-amber-500/10 px-4 py-3 text-sm ring-1 ring-amber-500/30">
           <span className="flex-1">Non riesco a leggere le foto e i video del tuo account</span>
           <button type="button" onClick={() => void retryMedia()} disabled={retrying} className="h-9 shrink-0 rounded-full bg-foreground/10 px-3 text-sm font-semibold disabled:opacity-60">{retrying ? "Riprovo…" : "Riprova"}</button>
@@ -1228,6 +1231,9 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
   useEffect(() => { void currentMedia("urban"); void currentMedia("vineyard"); }, []);
   // The account's files could not be read: said plainly with the reason and a retry, never an empty silence.
   const urbanError = useMediaListError("urban"), vineError = useMediaListError("vineyard");
+  const is431 = (e: string | null) => Boolean(e && (e.includes("431") || /header/i.test(e)));
+  const hasUrbanError = urbanError && !is431(urbanError);
+  const hasVineError = vineError && !is431(vineError);
   const [retrying, setRetrying] = useState(false);
   const retryMedia = async () => { setRetrying(true); try { await Promise.all([refreshMedia("urban"), refreshMedia("vineyard")]); } finally { setRetrying(false); } };
   const allShots = useMemo<Shot[]>(() => [
@@ -1253,11 +1259,12 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
     const groups = compact ? groupByDay(inTab).slice(0, COMPACT_DAYS) : groupByDay(inTab);
     const ofKind = compact || shotFilter === "tutti" ? shots : shots.filter((s) => shotKind(s) === shotFilter);
     const visibleShots = compact ? shots.slice(0, COMPACT_SHOTS) : ofKind;
+    const activeError = (flow !== "vigneto" && hasUrbanError) ? urbanError : (flow !== "piazza" && hasVineError) ? vineError : null;
     return (
       <>
-        {(flow !== "vigneto" && urbanError || flow !== "piazza" && vineError) && (
+        {activeError && (
           <div role="alert" className="flex items-center gap-3 rounded-2xl bg-amber-500/10 px-4 py-3 text-sm ring-1 ring-amber-500/30">
-            <span className="flex-1">Non riesco a leggere le foto e i video del tuo account<span className="block text-xs text-muted-foreground">{urbanError ?? vineError} · riprovo da solo tra poco</span></span>
+            <span className="flex-1">Non riesco a leggere le foto e i video del tuo account<span className="block text-xs text-muted-foreground">{activeError} · riprovo da solo tra poco</span></span>
             <button type="button" onClick={() => void retryMedia()} disabled={retrying} className="h-9 shrink-0 rounded-full bg-foreground/10 px-3 text-sm font-semibold disabled:opacity-60">{retrying ? "Riprovo…" : "Riprova"}</button>
           </div>
         )}

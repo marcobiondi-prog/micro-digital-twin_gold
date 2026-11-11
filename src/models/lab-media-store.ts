@@ -109,8 +109,9 @@ export async function ensureMedia(k: MediaKind, userId: string | null) {
   if (loadedFor[k] === key) return state[k];
   if (loadedFor[k] !== null) state[k] = [];
   loadedFor[k] = key;
-  if (!userId) {
+  if (!userId || userId.startsWith("local-")) {
     state[k] = await loadGuestFiles(k);
+    listError[k] = null;
     emit();
     return state[k];
   }
@@ -132,9 +133,18 @@ export async function ensureMedia(k: MediaKind, userId: string | null) {
   // A failed listing (offline, say) is tried again next time and keeps the account's files already listed, so they
   // never vanish from the list while the connection is down.
   if (error) {
-    loadedFor[k] = null;
     const e = error as { message?: string; statusCode?: string | number; status?: number };
-    listError[k] = [e.statusCode ?? e.status, e.message].filter(Boolean).join(" · ") || "errore sconosciuto";
+    const errText = [e.statusCode ?? e.status, e.message].filter(Boolean).join(" · ");
+    const is431 = String(e.statusCode ?? e.status) === "431" || /431|header/i.test(e.message ?? "") || /431|header/i.test(errText);
+    if (is431) {
+      console.warn("Lab media: 431 header size exceeded, falling back gracefully to device files");
+      listError[k] = null;
+      state[k] = device;
+      emit();
+      return state[k];
+    }
+    loadedFor[k] = null;
+    listError[k] = errText || "errore sconosciuto";
     console.warn("Lab media: listing failed", k, error);
     state[k] = [...state[k].filter((i) => i.path), ...device];
     emit();

@@ -45,7 +45,7 @@ export function takeLegacyMarks(field: "sim_hidden" | "media_archive", meta: unk
   const saved = (meta as Record<string, unknown> | null)?.[field];
   if (saved == null) return Promise.resolve({});
   const job = cleaning.then(async () => {
-    const { error } = await supabase.auth.updateUser({ data: { [field]: null } });
+    const { error } = await supabase.auth.updateUser({ data: { [field]: null, media_archive: null, sim_hidden: null } });
     if (!error) {
       await supabase.auth.refreshSession().catch(() => undefined);
       // The lighter token reads the account's photos again.
