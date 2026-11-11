@@ -192,6 +192,7 @@ export function KnownProfiles({ kind, onPicked }: { kind: ProKind; onPicked?: ()
  * taking the profile off the phone. Flat with reduced motion.
  */
 function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[]; foreign: (k: KnownProId) => boolean; onPick: (k: KnownProId) => void; onAdd: () => void }) {
+  const avatar = useAccountAvatar();
   const row = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
   const [asking, setAsking] = useState<string | null>(null);
@@ -242,7 +243,9 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
     <div className="space-y-3">
       <div ref={row} role="list" aria-label="Profili registrati" data-map-gestures=""
         className={`no-scrollbar -mx-6 flex snap-x snap-mandatory gap-3 overflow-x-auto px-[11%] py-4 touch-pan-x [scrollbar-width:none] sm:-mx-0`}>
-        {known.map((k, i) => (
+        {known.map((k, i) => {
+          const pic = resolveProfilePic(k, avatar);
+          return (
           <div key={keyOf(k)} role="listitem" className="w-[78%] shrink-0 snap-center">
             <div data-active={i === active || undefined}
               className="relative flex h-full flex-col gap-3 rounded-3xl bg-[oklch(0.24_0.016_258/0.96)] p-4 ring-1 ring-brand-turquoise/25 shadow-[0_18px_40px_-16px_rgb(0_0_0/0.75)] transition-[box-shadow] duration-300 will-change-transform data-[active]:ring-brand-turquoise/55 data-[active]:shadow-[0_18px_40px_-16px_rgb(0_0_0/0.75),0_0_28px_-8px_rgb(45_212_191/0.4)]">
@@ -262,7 +265,7 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
               </div>
               <div className="flex items-center gap-3.5">
                 <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-full bg-brand-turquoise/15 text-lg font-semibold text-brand-turquoise ring-2 ring-brand-turquoise/50" aria-hidden="true">
-                  {resolveProfilePic(k, avatar) ? <img src={resolveProfilePic(k, avatar)!} alt="" referrerPolicy="no-referrer" className="size-full object-cover" /> : initials(k.name)}
+                  {pic ? <img src={pic} alt="" referrerPolicy="no-referrer" className="size-full object-cover" /> : initials(k.name)}
                 </span>
                 <div className="min-w-0">
                   <p className="text-xl font-semibold leading-tight [overflow-wrap:anywhere]">{k.name}</p>
@@ -303,7 +306,7 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
               )}
             </div>
           </div>
-        ))}
+        )})}
         {/* The last slide: add another personal account, quickly. */}
         <div role="listitem" className="w-[78%] shrink-0 snap-center">
           <div data-active={known.length === active || undefined}
