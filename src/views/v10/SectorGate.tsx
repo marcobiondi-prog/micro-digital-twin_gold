@@ -136,7 +136,7 @@ export function KnownProfiles({ kind, onPicked }: { kind: ProKind; onPicked?: ()
     rememberWantedSector(kind);
     rememberAddingSector(kind);
     if (accEmail) await keepProIdInAccount();
-    if (!(await addGoogleAccount())) openAccount();
+    if (!(await addGoogleAccount())) openAccount({ mode: "signin" });
   };
   // No profile of this sector on the phone yet (often the vineyard, the first time): the quick "Aggiungi account"
   // still shows, on its own, so another personal account can sign in here and bring its profile.
@@ -400,7 +400,7 @@ function SectorPage({ start }: { start: ProKind | null }) {
       rememberWantedSector(kind);
       rememberAddingSector(kind);
     }
-    openAccount();
+    openAccount({ mode: "signin" });
   };
   const signIn = (
     <button type="button" onClick={openAccountFromSector} className="flex w-full items-center gap-3 rounded-3xl bg-foreground/[0.06] px-5 py-4 text-left outline-none transition-colors hover:bg-foreground/[0.1] focus-visible:ring-2 focus-visible:ring-ring">

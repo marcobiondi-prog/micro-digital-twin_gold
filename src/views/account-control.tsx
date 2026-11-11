@@ -341,14 +341,11 @@ export function AccountControl() {
     return () => window.removeEventListener("pointerdown", note, { capture: true });
   }, []);
   const placePanel = useCallback((element: HTMLDivElement | null) => {
-    if (!element || !triggerRef.current || !window.matchMedia("(max-width: 639px)").matches) return;
-    const trigger = triggerRef.current.getBoundingClientRect();
+    if (!element || !window.matchMedia("(max-width: 639px)").matches) return;
+    const trigger = triggerRef.current?.getBoundingClientRect();
     const panel = element.getBoundingClientRect();
-    // The sheet unfolds from the account button; opened from further down the page (the dashboard's "Accedi per
-    // sbloccare", a locked tool), the button has scrolled out of sight and a circle grown from there never covered the
-    // screen — the panel stayed invisible behind its dark veil. Then it unfolds from the tap that opened it.
-    const onScreen = trigger.bottom > 0 && trigger.top < window.innerHeight;
-    const at = onScreen ? { x: trigger.left + trigger.width / 2, y: trigger.top + trigger.height / 2 } : lastTap.current ?? { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    const onScreen = trigger ? trigger.bottom > 0 && trigger.top < window.innerHeight : false;
+    const at = onScreen && trigger ? { x: trigger.left + trigger.width / 2, y: trigger.top + trigger.height / 2 } : lastTap.current ?? { x: window.innerWidth / 2, y: window.innerHeight / 2 };
     element.style.setProperty("--account-x", `${at.x - panel.left}px`);
     element.style.setProperty("--account-y", `${at.y - panel.top}px`);
   }, []);
@@ -541,7 +538,7 @@ export function AccountControl() {
           {/* Signed in, a ring round the picture fills with the cloud space in use, out of 50 GB. */}
           {cloudAccount && <StorageRing share={usage.share} />}
         </span>
-      <DialogContent ref={placePanel} overlayClassName="account-overlay" className="account-panel flex max-h-[min(680px,90dvh)] w-[min(420px,calc(100vw-2rem))] flex-col gap-0 overflow-y-auto rounded-lg border bg-popover p-0 text-popover-foreground shadow-xl sm:rounded-lg">
+      <DialogContent ref={placePanel} overlayClassName="account-overlay !z-[1000000020]" className="account-panel !z-[1000000021] flex max-h-[min(680px,90dvh)] w-[min(420px,calc(100vw-2rem))] flex-col gap-0 overflow-y-auto rounded-lg border bg-popover p-0 text-popover-foreground shadow-xl sm:rounded-lg">
         {page ? (() => {
           const Page = page === "menu" ? InfoMenu : PAGES[page];
           return (
@@ -611,7 +608,7 @@ export function AccountControl() {
               </div>
               <Button variant="ghost" className="w-full justify-start" onClick={() => { setDemoSignedIn(false); setOpen(false); }}><LogOut />Esci dalla simulazione</Button>
             </section>
-          ) : account ? (
+          ) : account && !account.id.startsWith("local-") && mode !== "signin" ? (
             <section className="space-y-4">
               <div className="rounded-md border bg-muted/40 p-4">
                 <p className="text-sm font-semibold">{account.guest ? "Sessione ospite" : account.email}</p>

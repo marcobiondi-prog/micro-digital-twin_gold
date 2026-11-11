@@ -29,7 +29,9 @@ export function useCameraSheetOpen(): boolean {
 
 /** Opens the account dialog from anywhere (e.g. the locked AI option). */
 export const OPEN_ACCOUNT_EVENT = "mdt-open-account";
-export function openAccount() { window.dispatchEvent(new Event(OPEN_ACCOUNT_EVENT)); }
+export function openAccount(detail?: { email?: string; mode?: "signin" | "signup" | "reset" }) {
+  window.dispatchEvent(detail ? new CustomEvent(OPEN_ACCOUNT_EVENT, { detail }) : new Event(OPEN_ACCOUNT_EVENT));
+}
 
 /**
  * Files picked from the camera sheet itself (Video or Galleria tapped off the project's page): the phone's camera or

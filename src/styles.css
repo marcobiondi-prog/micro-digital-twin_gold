@@ -785,6 +785,17 @@
 /* Only the phone sheet reveals from the account button; larger dialogs appear instantly. */
 .account-panel,
 .account-overlay { animation: none !important; }
+.account-overlay {
+  z-index: 1000000020 !important;
+}
+.account-panel {
+  z-index: 1000000021 !important;
+}
+.account-overlay[data-state="closed"],
+.account-panel[data-state="closed"] {
+  z-index: 1000000000 !important;
+  pointer-events: none !important;
+}
 @keyframes account-content-in {
   from { opacity: 0; }
   to { opacity: 1; }
