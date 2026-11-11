@@ -74,7 +74,7 @@ function GuestCard() {
         <p className="px-1 text-sm font-semibold text-muted-foreground">Identificati per avere tutto</p>
         <GuestWay kind="funzionario" /><GuestWay kind="agronomo" />
       </div>
-      <button type="button" onClick={() => { leaveGuest(); openSectorGate(null); }} className="mx-auto flex h-11 items-center gap-2 rounded-full px-4 text-[15px] font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+      <button type="button" onClick={() => { openSectorGate(null); leaveGuest(); }} className="mx-auto flex h-11 items-center gap-2 rounded-full px-4 text-[15px] font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
         <LogOut className="size-4" aria-hidden="true" />Esci da ospite
       </button>
     </div>

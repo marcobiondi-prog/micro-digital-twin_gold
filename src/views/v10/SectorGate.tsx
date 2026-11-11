@@ -61,7 +61,7 @@ export function SectorGate() {
   }, [shown, id, navigate]);
   if (!shown) return null;
   // Over everything (menus and bottom bar too), under the account dialog, which opens above it to sign in.
-  return createPortal(<SectorPage key={ask.at} start={ask.kind} />, document.body);
+  return createPortal(<SectorPage key={ask.kind ?? "default"} start={ask.kind} />, document.body);
 }
 
 
@@ -214,7 +214,7 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
       setActive(best);
     };
     const onScroll = () => { if (!frame) frame = requestAnimationFrame(paint); };
-    paint();
+    frame = requestAnimationFrame(paint);
     el.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
     return () => { el.removeEventListener("scroll", onScroll); window.removeEventListener("resize", onScroll); if (frame) cancelAnimationFrame(frame); };
@@ -326,6 +326,9 @@ function SectorPage({ start }: { start: ProKind | null }) {
   useDarkChrome();
   const { signedIn } = useSignedIn();
   const [kind, setKind] = useState<ProKind | null>(start);
+  useEffect(() => {
+    if (start !== undefined && start !== null) setKind(start);
+  }, [start]);
   // On a sector's form a swipe to the right goes back to the two sectors, like "Indietro".
   const formRef = useRef<HTMLElement>(null);
   const backToSectors = useCallback(() => setKind(null), []);
@@ -378,7 +381,7 @@ function SectorPage({ start }: { start: ProKind | null }) {
     </button>
   );
   return (
-    <div role="dialog" aria-modal="true" aria-label="Scegli il settore" className="dark fixed inset-0 z-[999999999] isolate overflow-y-auto overscroll-contain bg-background px-6 text-foreground [color-scheme:dark] sm:px-12">
+    <div role="dialog" aria-modal="true" aria-label="Scegli il settore" className="dark fixed inset-0 z-[999999999] isolate overflow-y-auto overscroll-contain bg-background px-6 text-foreground [color-scheme:dark] sm:px-12 animate-in fade-in-0 duration-200">
       <Backdrop />
       <section ref={formRef} className="mx-auto flex min-h-full max-w-xl flex-col gap-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(3rem+env(safe-area-inset-top))]">
         {sector ? (

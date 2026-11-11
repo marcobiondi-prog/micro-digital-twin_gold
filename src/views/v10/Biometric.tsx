@@ -264,19 +264,32 @@ export function BiometricSignIn({ onDone }: { onDone?: () => void }) {
  * Signed out (a profile without account), only the profile is left. Either way the sector page opens on that sector.
  */
 export async function leaveProfile(kind: ProId["kind"]) {
+  // Pre-set the gate immediately so the sector page mounts directly on this sector without flash or stutter
+  openSectorGate(kind);
+  rememberWantedSector(kind);
+
   const { data } = await supabase.auth.getSession();
   const email = data.session?.user.email?.toLowerCase();
   if (!data.session) {
     await saveProId(null);
-    openSectorGate(kind);
     toast("Sei uscito dal profilo", { description: "Scegli il settore e identificati di nuovo quando vuoi." });
     return;
   }
   await keepProIdInAccount();
   const bio = getKnownProIds().some((k) => k.acct?.email?.toLowerCase() === email && biometricOn(proBioKey(k)));
   dropProIdOnDevice();
-  rememberWantedSector(kind);
-  if (bio) { leaveAccount({ openPanel: false }); return; }
+  if (bio) {
+    try {
+      supabase.auth.stopAutoRefresh();
+      const key = (supabase.auth as unknown as { storageKey?: string }).storageKey;
+      if (key) {
+        window.localStorage.removeItem(key);
+        window.localStorage.removeItem(`${key}-code-verifier`);
+        window.localStorage.removeItem(`${key}-user`);
+      }
+      sessionStorage.setItem("mdt-bio-skip", "1");
+    } catch {}
+    return;
+  }
   await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
-  openSectorGate(kind);
 }
