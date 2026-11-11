@@ -258,15 +258,13 @@ export function BiometricSignIn({ onDone }: { onDone?: () => void }) {
 }
 
 /**
- * "Esci dal profilo": leaving the professional profile signs out of its personal account too (Google or email). The
- * profile stays saved in the account, so the next sign-in brings it back; with Face ID / fingerprint on for one of
- * the account's profiles the account is only left on this phone (kept, not ended), to come back with the recognition.
- * Signed out (a profile without account), only the profile is left. Either way the sector page opens on that sector.
+ * "Esci dal profilo": leaving the professional profile returns to the main gate ("Da dove vuoi usarmi?"),
+ * signing out cleanly without page reload or stutter.
  */
-export async function leaveProfile(kind: ProId["kind"]) {
-  // Pre-set the gate immediately so the sector page mounts directly on this sector without flash or stutter
-  openSectorGate(kind);
-  rememberWantedSector(kind);
+export async function leaveProfile(_kind?: ProId["kind"]) {
+  // Pre-set the gate immediately to null so it opens directly on the main gate ("Da dove vuoi usarmi?")
+  openSectorGate(null);
+  rememberWantedSector(null);
 
   const { data } = await supabase.auth.getSession();
   const email = data.session?.user.email?.toLowerCase();

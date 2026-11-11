@@ -327,7 +327,7 @@ function SectorPage({ start }: { start: ProKind | null }) {
   const { signedIn } = useSignedIn();
   const [kind, setKind] = useState<ProKind | null>(start);
   useEffect(() => {
-    if (start !== undefined && start !== null) setKind(start);
+    if (start !== undefined) setKind(start);
   }, [start]);
   // On a sector's form a swipe to the right goes back to the two sectors, like "Indietro".
   const formRef = useRef<HTMLElement>(null);

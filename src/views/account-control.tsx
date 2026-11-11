@@ -554,7 +554,7 @@ export function AccountControl() {
                 <div className="min-w-0 flex-1">
                   <p className="text-[15px] font-semibold">{proId.name}</p>
                   <p className="text-sm text-muted-foreground">{proSummary(proId)}</p>
-                  <button type="button" onClick={() => { const was = proId.kind; setOpen(false); void leaveProfile(was); }} className="mt-1 inline-flex min-h-10 items-center gap-1.5 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"><LogOut className="size-4" aria-hidden="true" />Esci dal profilo</button>
+                  <button type="button" onClick={() => { setOpen(false); void leaveProfile(); }} className="mt-1 inline-flex min-h-10 items-center gap-1.5 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"><LogOut className="size-4" aria-hidden="true" />Esci dal profilo</button>
                 </div>
               </div>
             ) : <p className="pb-2 text-sm text-muted-foreground">Nessun profilo: piazza e vigneto sono bloccati.</p>}

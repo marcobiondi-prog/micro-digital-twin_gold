@@ -406,8 +406,8 @@ export function ProfileCard({ kind, go }: { kind: ProKind; go?: () => void }) {
   const town = mine?.kind === "funzionario" ? mine : null;
   const officeMail = useOfficeEmail(town?.comune ?? "", town?.office ?? "", town?.istat);
   if (!mine) return null;
-  // Leaving the profile signs out of its personal account too; back to this profile's form, which recognises it.
-  const leave = () => leaveProfile(kind);
+  // Leaving the profile signs out of its personal account too and returns to the gate.
+  const leave = () => leaveProfile();
   return (
     <div className="fuse-canvas space-y-4 rounded-3xl px-5 py-6">
       <div className="flex items-start justify-between gap-3">
