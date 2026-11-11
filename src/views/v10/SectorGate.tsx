@@ -352,7 +352,10 @@ function SectorPage({ start }: { start: ProKind | null }) {
   useEffect(() => { if (kind) rememberWantedSector(kind); }, [kind]);
   useSwipeBack(formRef, kind ? backToSectors : null);
   // The phone's Back closes the form and shows the two sectors again.
-  useBackClose(kind !== null, backToSectors);
+  // While the "Un account, un settore" page is up it takes the Back itself (it leaves the account and returns here): the
+  // form step must not also close, or the two sectors show for a moment between the lock page and the gate.
+  const closeForm = useCallback(() => { if (!lockShown.on) setKind(null); }, []);
+  useBackClose(kind !== null, closeForm);
   // Just left an account from the sector lock page: the sector choice holds the phone's Back, which would lead to
   // Google's account chooser and from there back to the lock page.
   useEffect(() => {
