@@ -2,8 +2,9 @@ import { goInApp } from "@/lib/app-nav";
 import { useEffect, useState } from "react";
 import { Fingerprint, ScanFace, UserRound } from "lucide-react";
 import { toast } from "sonner";
-import { biometricAvailable, biometricName, markUnlocked, biometricOn, disableBiometric, enableBiometric, useBiometricAccounts, useBiometricOn, verifyBiometric } from "@/lib/biometric";
+import { biometricAccounts, biometricAvailable, biometricName, markUnlocked, biometricOn, disableBiometric, enableBiometric, useBiometricAccounts, useBiometricOn, verifyBiometric } from "@/lib/biometric";
 import { hasAccountSession, leaveAccount, signInAs, switchToAccount } from "@/lib/account-sessions";
+import { resolveProfilePic } from "@/lib/account-avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { type ProId } from "@/models/professional-id";
 import { setRegisteredEmail, notifyAuthChange } from "@/lib/use-signed-in";
@@ -29,7 +30,17 @@ export function useBiometricAvailable() {
 
 /** Asks the recognition for a profile that has it on; true when there is none or the person is recognised. */
 export async function checkProfileBiometric(id: ProId): Promise<boolean> {
-  const r = await verifyBiometric(proBioKey(id));
+  const k = id as KnownProId;
+  const pKey = proBioKey(id);
+  const emailKey = k.acct?.email ? k.acct.email.trim().toLowerCase() : null;
+  const targetKey = biometricOn(pKey)
+    ? pKey
+    : (emailKey && biometricOn(emailKey))
+    ? emailKey
+    : (biometricAccounts().length > 0 ? biometricAccounts()[0] : null);
+
+  if (!targetKey || !biometricOn(targetKey)) return true;
+  const r = await verifyBiometric(targetKey);
   if (!r.ok) toast.error("Non ti ho riconosciuto", { description: `Per continuare come ${id.name} serve il riconoscimento del telefono. Riprova.` });
   return r.ok;
 }
@@ -133,7 +144,7 @@ export async function enterWithProfile(k: KnownProId, opts: { recognised?: boole
   const section = k.kind === "funzionario" ? "urban" : "vineyard";
   if (!opts.recognised && !(await checkProfileBiometric(k))) return false;
   if (email && hasAccountSession(email)) {
-    const r = await switchToAccount(email);
+    const r = await switchToAccount(email, { skipBio: true });
     if (r === "refused") {
       if (!opts.quiet) toast.error("Non ti ho riconosciuto", { description: `Per entrare con ${email} serve il riconoscimento del telefono. Riprova.` });
       return false;
@@ -175,20 +186,21 @@ export function useBiometricAutoEnter() {
       try { if (sessionStorage.getItem("mdt-bio-skip")) { sessionStorage.removeItem("mdt-bio-skip"); return; } } catch { /* none */ }
       const { data } = await supabase.auth.getSession();
       if (data.session || !(await biometricAvailable())) return;
+      const bioKeys = biometricAccounts();
+      if (!bioKeys.length) return;
       const cur = getProId();
-      const all = getKnownProIds().filter((k) => biometricOn(proBioKey(k)) && !!k.acct?.email && hasAccountSession(k.acct.email));
+      const all = getKnownProIds().filter((k) => biometricOn(proBioKey(k)) || (k.acct?.email && biometricOn(k.acct.email)));
       const k = (cur && all.find((x) => proBioKey(x) === proBioKey(cur))) ?? all.sort((a, b) => (b.at > a.at ? 1 : -1))[0];
-      if (!k) return;
-      // The recognition only unlocks the app: it stays on the sector page (the two sectors), where the person picks the
-      // sector and the profile — asked no second time for a few minutes. Nothing is entered by itself.
-      const r = await verifyBiometric(proBioKey(k));
+      const targetKey = k ? (biometricOn(proBioKey(k)) ? proBioKey(k) : (k.acct?.email && biometricOn(k.acct.email) ? k.acct.email : bioKeys[0])) : bioKeys[0];
+      if (!targetKey) return;
+      // Prompt 1: The recognition unlocks the app at entrance; then user chooses their sector & profile.
+      const r = await verifyBiometric(targetKey);
       if (r.ok) {
-        markUnlocked();
-        toast.success("App sbloccata", { description: "Scegli il settore: il tuo profilo ti aspetta lì." });
+        toast.success("App sbloccata", { description: "Scegli il settore e il tuo account per entrare." });
         return;
       }
-      toast("Sblocco non riuscito", { description: "Scegli il settore e il tuo profilo: il riconoscimento ti verrà chiesto lì." });
-    }, 900);
+      toast("Sblocco annullato", { description: "Scegli il settore e il tuo profilo per accedere con il riconoscimento." });
+    }, 800);
     return () => { done = true; window.clearTimeout(t); };
   }, []);
 }
@@ -218,7 +230,7 @@ export function BiometricSignIn({ onDone }: { onDone?: () => void }) {
   const enter = async (k: KnownProId) => {
     setBusy(proBioKey(k));
     try {
-      const bio = available && biometricOn(proBioKey(k));
+      const bio = available && (biometricOn(proBioKey(k)) || (k.acct?.email && biometricOn(k.acct.email)));
       if (await enterWithProfile(k, bio ? {} : { recognised: true })) {
         onDone?.();
       }
@@ -232,11 +244,12 @@ export function BiometricSignIn({ onDone }: { onDone?: () => void }) {
           {list.map((k) => {
             const email = k.acct!.email!, bio = available && biometricOn(proBioKey(k));
             const label = busy === proBioKey(k) ? (bio ? "Ti riconosco…" : "Entro…") : bio ? `Entra con ${name}` : `Entra come ${k.name.trim().split(/\s+/)[0]}`;
+            const pic = resolveProfilePic(k);
             return (
               <button key={proBioKey(k)} type="button" disabled={busy !== null} onClick={() => void enter(k)}
                 className="flex w-full items-center gap-3 rounded-2xl bg-brand-turquoise/15 px-4 py-3 text-left ring-1 ring-brand-turquoise/40 outline-none transition-colors hover:bg-brand-turquoise/25 focus-visible:ring-2 focus-visible:ring-brand-turquoise disabled:opacity-60">
                 {bio ? <BioIcon className="size-7 shrink-0 text-brand-turquoise" />
-                  : k.acct?.pic ? <img src={k.acct.pic} alt="" referrerPolicy="no-referrer" className="size-8 shrink-0 rounded-full object-cover" />
+                  : pic ? <img src={pic} alt="" referrerPolicy="no-referrer" className="size-8 shrink-0 rounded-full object-cover" />
                   : <UserRound className="size-7 shrink-0 text-brand-turquoise" aria-hidden="true" />}
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-semibold">{label}</span>

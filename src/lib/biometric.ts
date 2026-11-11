@@ -85,17 +85,10 @@ export function disableBiometric(email: string) {
   const all = { ...read() }; delete all[norm(email)]; write(all);
 }
 
-/** Asks the phone's biometrics for this account; true when the person is recognised. */
-/**
- * The app unlocked by the phone's recognition at its opening: for a few minutes after it the recognition is not asked
- * again (picking a profile on the sector page right after unlocking does not ask twice).
- */
-let unlockedUntil = 0;
-export function markUnlocked(ms = 5 * 60_000) { unlockedUntil = Date.now() + ms; }
+export function markUnlocked(_ms?: number) { /* no-op: app unlock and account selection both require biometric check */ }
 export async function verifyBiometric(email: string): Promise<{ ok: boolean; reason?: string }> {
   const e = read()[norm(email)];
   if (!e) return { ok: true };
-  if (Date.now() < unlockedUntil) return { ok: true };
   try {
     const got = await navigator.credentials.get({
       publicKey: {

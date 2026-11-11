@@ -2,7 +2,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { isProId, type ProId, type ProKind } from "@/models/professional-id";
-import { getAccountAvatar } from "@/lib/account-avatar";
+import { getAccountAvatar, readLocalAvatar } from "@/lib/account-avatar";
 import { setRegisteredEmail } from "@/lib/use-signed-in";
 
 /**
@@ -67,6 +67,15 @@ const knownSnap = (): Known => {
   } catch { /* none */ }
   // The last profile of each kind, kept before this list existed, counts too.
   for (const k of KNOWN_KINDS) { const p = lastSnap()[k]; if (p && !out[k].some((q) => sameProfile(q, p))) out[k] = [...out[k], p]; }
+  for (const k of KNOWN_KINDS) {
+    out[k] = (out[k] as KnownProId[]).map((p) => {
+      if (p.acct?.email && !p.acct.pic) {
+        const pic = readLocalAvatar(p.acct.email);
+        if (pic) return { ...p, acct: { ...p.acct, pic } };
+      }
+      return p;
+    });
+  }
   return (known = out);
 };
 /** The personal account a profile was registered with: its email and a small copy of its picture (a data URL, so a
@@ -77,7 +86,9 @@ const saveKnown = () => { try { window.localStorage.setItem(KNOWN_KEY, JSON.stri
 const keepKnown = (id: ProId, acct?: KnownAccount) => {
   const k = knownSnap();
   const old = k[id.kind].find((p) => sameProfile(p, id)) as KnownProId | undefined;
-  const keep = acct ?? old?.acct;
+  const email = acct?.email ?? old?.acct?.email;
+  const pic = acct?.pic ?? old?.acct?.pic ?? (email ? readLocalAvatar(email) ?? undefined : undefined);
+  const keep = (acct || old?.acct || email || pic) ? { ...(old?.acct ?? {}), ...(acct ?? {}), ...(email ? { email } : {}), ...(pic ? { pic } : {}) } : undefined;
   const entry: KnownProId = keep ? { ...id, acct: keep } : { ...id };
   known = { ...k, [id.kind]: [entry, ...k[id.kind].filter((p) => !sameProfile(p, id))].slice(0, KNOWN_MAX) };
   saveKnown();
@@ -102,7 +113,7 @@ async function attachAccount(id: ProId) {
   const user = data.session?.user;
   if (!user) return;
   const acct: KnownAccount = { ...(user.email ? { email: user.email } : {}), ...(user.app_metadata?.provider ? { provider: String(user.app_metadata.provider) } : {}) };
-  const pic = await smallPicture(getAccountAvatar());
+  const pic = (await smallPicture(getAccountAvatar())) ?? (user.email ? readLocalAvatar(user.email) ?? undefined : undefined);
   if (pic) acct.pic = pic;
   const k = knownSnap();
   const entry = (k[id.kind] as KnownProId[]).find((p) => sameProfile(p, id));

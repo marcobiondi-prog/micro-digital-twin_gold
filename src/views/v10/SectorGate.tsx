@@ -12,12 +12,11 @@ import { useBiometricOn } from "@/lib/biometric";
 import { supabase } from "@/integrations/supabase/client";
 import { introSeen } from "@/lib/intro-seen";
 import { clearAddingSector, clearSectorGate, enterAsGuest, forgetKnownProId, dropProIdOnDevice, keepProIdInAccount, setProIdOnDevice, rememberAddingSector, rememberWantedSector, renameKnownProId, sectorOf, type KnownProId, saveProId, useAccountSector, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
-import { proSummary } from "@/models/professional-id";
 import { toast } from "sonner";
 import { useSignedIn, setRegisteredEmail, notifyAuthChange } from "@/lib/use-signed-in";
-import { useAccountAvatar } from "@/lib/account-avatar";
+import { useAccountAvatar, resolveProfilePic, readLocalAvatar } from "@/lib/account-avatar";
 import { hapticTick } from "@/lib/haptics";
-import { type ProId, type ProKind } from "@/models/professional-id";
+import { proSummary, type ProId, type ProKind } from "@/models/professional-id";
 import { openSimTab } from "@/views/v8/console";
 import { IdentifyForm, lockShown, profileIntro } from "@/views/v10/Identify";
 import { Backdrop, useDarkChrome } from "@/views/v10/intro";
@@ -95,7 +94,7 @@ export function KnownProfiles({ kind, onPicked }: { kind: ProKind; onPicked?: ()
     if (target && target !== accEmail) {
       rememberWantedSector(kind);
       if (accEmail) await keepProIdInAccount();
-      const entered = await switchToAccount(target);
+      const entered = await switchToAccount(target, { skipBio: true });
       if (entered === "refused") {
         toast.error("Non ti ho riconosciuto", { description: `Per entrare con ${target} serve il riconoscimento del telefono. Riprova.` });
         return;
@@ -161,7 +160,7 @@ export function KnownProfiles({ kind, onPicked }: { kind: ProKind; onPicked?: ()
                   <>
                     <div className="flex items-center gap-3.5">
                       <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-full bg-foreground/10 ring-2 ring-brand-turquoise/50">
-                        {(known[0]!.acct?.pic ?? avatar) ? <img src={known[0]!.acct?.pic ?? avatar!} alt="Immagine dell’account" referrerPolicy="no-referrer" className="size-full object-cover" /> : <UserRound className="size-7 text-foreground/60" aria-hidden="true" />}
+                        {resolveProfilePic(known[0], avatar) ? <img src={resolveProfilePic(known[0], avatar)!} alt="Immagine dell’account" referrerPolicy="no-referrer" className="size-full object-cover" /> : <UserRound className="size-7 text-foreground/60" aria-hidden="true" />}
                       </span>
                       <div className="min-w-0">
                         <p className="text-xl font-semibold">{known[0]!.name}</p>
@@ -263,7 +262,7 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
               </div>
               <div className="flex items-center gap-3.5">
                 <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-full bg-brand-turquoise/15 text-lg font-semibold text-brand-turquoise ring-2 ring-brand-turquoise/50" aria-hidden="true">
-                  {k.acct?.pic ? <img src={k.acct.pic} alt="" referrerPolicy="no-referrer" className="size-full object-cover" /> : initials(k.name)}
+                  {resolveProfilePic(k, avatar) ? <img src={resolveProfilePic(k, avatar)!} alt="" referrerPolicy="no-referrer" className="size-full object-cover" /> : initials(k.name)}
                 </span>
                 <div className="min-w-0">
                   <p className="text-xl font-semibold leading-tight [overflow-wrap:anywhere]">{k.name}</p>
@@ -467,10 +466,11 @@ function NewAccountCard({ email, pic, kind }: { email: string; pic: string | nul
     field?.scrollIntoView({ behavior: "smooth", block: "center" });
     window.setTimeout(() => field?.focus({ preventScroll: true }), 350);
   };
+  const resolvedPic = pic ?? readLocalAvatar(email);
   return (
     <div className="flex items-center gap-3.5 rounded-3xl bg-brand-turquoise/[0.12] p-4 ring-2 ring-brand-turquoise/60 shadow-[0_0_28px_-8px_oklch(0.72_0.15_190/0.7)]">
       <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-full bg-foreground/10 ring-2 ring-brand-turquoise/60">
-        {pic ? <img src={pic} alt="Immagine dell’account" referrerPolicy="no-referrer" className="size-full object-cover" /> : <UserRound className="size-7 text-foreground/60" aria-hidden="true" />}
+        {resolvedPic ? <img src={resolvedPic} alt="Immagine dell’account" referrerPolicy="no-referrer" className="size-full object-cover" /> : <UserRound className="size-7 text-foreground/60" aria-hidden="true" />}
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-turquoise">Account aggiunto</p>

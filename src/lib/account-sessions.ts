@@ -59,10 +59,10 @@ export function keptAccounts(): string[] {
  * Enters the kept account with this email; false when it is not kept here, its session no longer works or, with the
  * biometric sign-in on for it, the phone did not recognise the person.
  */
-export async function switchToAccount(email: string): Promise<boolean | "refused"> {
+export async function switchToAccount(email: string, opts: { skipBio?: boolean } = {}): Promise<boolean | "refused"> {
   const s = read()[norm(email)];
   if (!s) return false;
-  if (!(await verifyBiometric(email)).ok) return "refused";
+  if (!opts.skipBio && !(await verifyBiometric(email)).ok) return "refused";
   const { data, error } = await supabase.auth.setSession({ access_token: s.access_token, refresh_token: s.refresh_token });
   if (error || !data.session) {
     const all = read(); delete all[norm(email)]; write(all);
