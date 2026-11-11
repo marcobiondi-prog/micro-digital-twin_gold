@@ -179,30 +179,8 @@ export async function enterWithProfile(k: KnownProId, opts: { recognised?: boole
  * load; where the browser wants a tap first, the account panel opens with its "Entra con …" button.
  */
 export function useBiometricAutoEnter() {
-  useEffect(() => {
-    let done = false;
-    const t = window.setTimeout(async () => {
-      if (done) return;
-      try { if (sessionStorage.getItem("mdt-bio-skip")) { sessionStorage.removeItem("mdt-bio-skip"); return; } } catch { /* none */ }
-      const { data } = await supabase.auth.getSession();
-      if (data.session || !(await biometricAvailable())) return;
-      const bioKeys = biometricAccounts();
-      if (!bioKeys.length) return;
-      const cur = getProId();
-      const all = getKnownProIds().filter((k) => biometricOn(proBioKey(k)) || (k.acct?.email && biometricOn(k.acct.email)));
-      const k = (cur && all.find((x) => proBioKey(x) === proBioKey(cur))) ?? all.sort((a, b) => (b.at > a.at ? 1 : -1))[0];
-      const targetKey = k ? (biometricOn(proBioKey(k)) ? proBioKey(k) : (k.acct?.email && biometricOn(k.acct.email) ? k.acct.email : bioKeys[0])) : bioKeys[0];
-      if (!targetKey) return;
-      // Prompt 1: The recognition unlocks the app at entrance; then user chooses their sector & profile.
-      const r = await verifyBiometric(targetKey);
-      if (r.ok) {
-        toast.success("App sbloccata", { description: "Scegli il settore e il tuo account per entrare." });
-        return;
-      }
-      toast("Sblocco annullato", { description: "Scegli il settore e il tuo profilo per accedere con il riconoscimento." });
-    }, 800);
-    return () => { done = true; window.clearTimeout(t); };
-  }, []);
+  // Riconoscimento biometrico allo sblocco dell'app rimosso:
+  // Viene richiesto esclusivamente alla selezione del profilo/account.
 }
 
 /**
