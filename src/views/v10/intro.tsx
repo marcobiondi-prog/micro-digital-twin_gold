@@ -225,6 +225,7 @@ export function Tutorial() {
     if (s0 && Math.abs(x - s0.x) > 50) go(page + (x < s0.x ? 1 : -1));
   };
   const finish = () => {
+    hapticTick();
     markIntroSeen();
     if (again && window.history.length > 1) window.history.back();
     else void navigate({ to: again ? "/benvenuto" : "/scegli" });
@@ -306,7 +307,10 @@ export function Tutorial() {
  */
 export function Choice() {
   useDarkChrome();
-  useEffect(() => { markIntroSeen(); }, []);
+  useEffect(() => {
+    markIntroSeen();
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, []);
   const navigate = useNavigate();
   const ai = useAiReadyHome();
   const proId = useProId();
@@ -330,7 +334,7 @@ export function Choice() {
   if (identify) {
     const it = items.find((x) => x.id !== "camera" && KIND_OF[x.id] === identify)!;
     return (
-      <div className="dark relative isolate min-h-dvh bg-background px-6 text-foreground [color-scheme:dark] sm:px-12">
+      <div className="dark relative isolate min-h-dvh bg-background px-6 text-foreground [color-scheme:dark] sm:px-12 animate-in fade-in-0 duration-200">
         <Backdrop />
         <section ref={formRef} aria-label={it.name} className="mx-auto max-w-xl space-y-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(1.5rem+env(safe-area-inset-top))]">
           <button type="button" onClick={backToChoice} className="-ml-1 inline-flex h-10 items-center gap-1.5 rounded-full pr-3 text-sm font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
@@ -347,15 +351,15 @@ export function Choice() {
     );
   }
   return (
-    <div className="dark relative isolate min-h-dvh bg-background px-6 text-foreground [color-scheme:dark] sm:px-12">
+    <div className="dark relative isolate min-h-dvh bg-background px-6 text-foreground [color-scheme:dark] sm:px-12 animate-in fade-in-0 duration-200">
       <Backdrop />
       <section aria-label="Scelta" className="mx-auto flex min-h-dvh max-w-xl flex-col pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-[calc(3rem+env(safe-area-inset-top))]">
         <h1 className="sr-only">Da dove vuoi iniziare</h1>
-        <Reveal>
+        <div>
           <p className="mb-3 inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.35em] text-foreground/60"><span className="whitespace-nowrap">Micro Digital</span><span className="inline-flex items-center gap-1.5 whitespace-nowrap"><span className="text-brand-turquoise">Twin</span><span className="rounded-full border border-brand-turquoise/40 bg-brand-turquoise/15 px-2 py-0.5 text-[10px] font-bold tracking-[0.12em] text-brand-turquoise">BETA</span></span></p>
           <h2 aria-hidden="true" className="font-display text-[3.4rem] font-extralight leading-[0.95] tracking-tight text-foreground sm:text-7xl">Da dove<br />vuoi iniziare?</h2>
           <p className="mt-5 max-w-xs text-[15px] leading-relaxed text-foreground/60">Dicci chi sei: ti identifichi qui e si apre la tua simulazione.</p>
-        </Reveal>
+        </div>
         <div role="list" aria-label="Da dove vuoi iniziare" className="mt-10 space-y-3">
           {items.map((it) => {
             const off = it.id === "camera" && AI_STANDBY;
