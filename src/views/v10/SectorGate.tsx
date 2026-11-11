@@ -342,6 +342,11 @@ function SectorPage({ start }: { start: ProKind | null }) {
   useDarkChrome();
   const { signedIn } = useSignedIn();
   const [kind, setKind] = useState<ProKind | null>(start);
+  // Just shown (back from another page, a swipe's release): the finger can still be down on a button that appears under
+  // it ("Entra come ospite" in the screenshot: the guest entered by itself and the page behind showed). Taps are ignored
+  // for a moment.
+  const [armed, setArmed] = useState(false);
+  useEffect(() => { const t = window.setTimeout(() => setArmed(true), 450); return () => window.clearTimeout(t); }, []);
   useEffect(() => {
     if (start !== undefined) setKind(start);
   }, [start]);
@@ -389,9 +394,9 @@ function SectorPage({ start }: { start: ProKind | null }) {
     </button>
   );
   return (
-    <div role="dialog" aria-modal="true" aria-label="Scegli il settore" className="dark fixed inset-0 z-[999999999] isolate overflow-y-auto overscroll-contain bg-background px-6 text-foreground [color-scheme:dark] sm:px-12">
+    <div role="dialog" aria-modal="true" aria-label="Scegli il settore" className={`dark fixed inset-0 z-[999999999] isolate overflow-y-auto overscroll-contain bg-background px-6 text-foreground [color-scheme:dark] sm:px-12`}>
       <Backdrop />
-      <section ref={formRef} className="mx-auto flex min-h-full max-w-xl flex-col gap-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(3rem+env(safe-area-inset-top))]">
+      <section ref={formRef} className={`mx-auto flex min-h-full max-w-xl flex-col gap-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(3rem+env(safe-area-inset-top))]${armed ? "" : " pointer-events-none"}`}>
         {sector ? (
           <>
             <button type="button" onClick={backToSectors} className="-ml-1 inline-flex h-10 w-fit items-center gap-1.5 rounded-full pr-3 text-sm font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
