@@ -399,6 +399,9 @@ export function Choice() {
               Entra come ospite<ArrowRight className="size-4" aria-hidden="true" />
             </Link>
           )}
+          <button type="button" onClick={openAccount} className="inline-flex h-12 items-center justify-center gap-1.5 rounded-full text-sm font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+            Hai già un account?<span className="text-foreground">Accedi</span>
+          </button>
         </div>
       </section>
     </div>
