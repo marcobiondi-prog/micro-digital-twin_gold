@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Welcome } from "@/views/v10/Welcome";
+import { useProId, useGuest } from "@/lib/use-pro-id";
 
 export const Route = createFileRoute("/benvenuto")({
   head: () => ({
@@ -9,5 +10,16 @@ export const Route = createFileRoute("/benvenuto")({
       { property: "og:type", content: "website" },
     ],
   }),
-  component: Welcome,
+  component: BenvenutoRoute,
 });
+
+function BenvenutoRoute() {
+  const id = useProId();
+  const guest = useGuest();
+  // Se non c'è un profilo identificato e non si è in modalità ospite, copri Benvenuto con una schermata nera
+  // così sotto il SectorGate ("Da dove vuoi usarmi?") non traspare né si intravede mai Benvenuto.
+  if (id === null && !guest) {
+    return <div className="fixed inset-0 z-[999999998] bg-black [color-scheme:dark]" aria-hidden="true" />;
+  }
+  return <Welcome />;
+}

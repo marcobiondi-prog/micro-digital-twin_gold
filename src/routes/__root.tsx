@@ -22,7 +22,7 @@ import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
 import { installUiClicks } from "@/lib/ui-sounds";
 import { isChunkError, reloadFresh } from "@/router";
 import { History, Building2, Grape, Info, LayoutDashboard, Lock, UserRound } from "lucide-react";
-import { clearLockAsk, dropProIdOnDevice, getProId, openingSettled, readLockAsk, rememberWantedSector, useGuest, useProId, useSyncProId } from "@/lib/use-pro-id";
+import { clearLockAsk, dropProIdOnDevice, getProId, isGuest, openingSettled, readLockAsk, rememberWantedSector, useGuest, useProId, useSyncProId } from "@/lib/use-pro-id";
 import { installAccountSessions, leaveAccount } from "@/lib/account-sessions";
 import { useBiometricAutoEnter } from "@/views/v10/Biometric";
 import { useSyncMediaArchive } from "@/models/media-archive";
@@ -466,7 +466,13 @@ function RootComponent() {
       const check = () => {
         const onIndex = window.location.pathname === "/";
         const tutorial = onIndex && (!introSeen() || PREVIEW_BUILD || /[?&](rivedi|scenario)=/.test(window.location.search));
-        if (!onIndex || tutorial || Date.now() - start > 3000) resolve(); else setTimeout(check, 60);
+        if (!onIndex || tutorial || Date.now() - start > 3000) {
+          // Not before the sector page is up when nobody is identified: the page behind (Benvenuto…) never shows.
+          const free = /^\/(scegli|identificazione|privacy|legale|faq|chi-siamo|contatti|piani|reset-password|admin)(\/|$)/.test(window.location.pathname);
+          const needGate = !onIndex && introSeen() && !free && !getProId() && !isGuest();
+          if (needGate && !document.querySelector('[aria-label="Scegli il settore"]') && Date.now() - start < 3000) { setTimeout(check, 40); return; }
+          resolve();
+        } else setTimeout(check, 60);
       };
       check();
     });
@@ -701,10 +707,10 @@ function RootComponent() {
       </>}
 
       <main id="main-content" tabIndex={-1} className={intro ? "focus:outline-none" : "app-main mx-auto max-w-7xl px-4 pb-8 pt-6 focus:outline-none sm:pt-8"}><Outlet /></main><Toaster /><UpdatePill />
-      {!intro && <footer className="mx-auto max-w-7xl px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] text-sm leading-relaxed text-muted-foreground sm:pb-10 sm:text-[15px]">
+      {!intro && !(introSeen() && !getProId() && !useGuest()) && <footer className="mx-auto max-w-7xl px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] text-sm leading-relaxed text-muted-foreground sm:pb-10 sm:text-[15px]">
         I risultati del simulatore sono indicativi e non sostituiscono modelli fisici calibrati.
       </footer>}
-      {!intro && <BottomNav />}
+      {!intro && !(introSeen() && !getProId() && !useGuest()) && <BottomNav />}
       <CameraSheet />
       <PermissionsSheet />
       <Suspense fallback={null}><SectorGate /></Suspense>
