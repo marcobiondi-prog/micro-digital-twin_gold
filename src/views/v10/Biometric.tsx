@@ -7,6 +7,7 @@ import { hasAccountSession, leaveAccount, signInAs, switchToAccount } from "@/li
 import { supabase } from "@/integrations/supabase/client";
 import { type ProId } from "@/models/professional-id";
 import { setRegisteredEmail, notifyAuthChange } from "@/lib/use-signed-in";
+import { dropProIdOnDevice, getKnownProIds, getProId, getSectorGateKind, keepProIdInAccount, openSectorGate, type KnownProId, rememberWantedSector, saveProId, sectorOf, useKnownProIds } from "@/lib/use-pro-id";
 import { exitToGate } from "@/lib/exit-to-gate";
 
 /**
