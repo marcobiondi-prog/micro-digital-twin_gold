@@ -24,7 +24,7 @@ import {
   checkAgronomo, checkFunzionario, isProId, KIND_LABEL, ROLES, proSummary,
   type AgronomoInput, type Errors, type FunzionarioInput, type ProId, type ProKind,
 } from "@/models/professional-id";
-import { Ambient, PageHero } from "@/views/v8/console";
+import { Ambient, PageHero, openSimTab } from "@/views/v8/console";
 import { SECTION_TONE } from "@/views/v10/ProfileGate";
 
 const fieldCls = "h-12 w-full rounded-2xl border border-foreground/10 bg-foreground/[0.05] px-4 text-[15px] outline-none focus-visible:ring-2 focus-visible:ring-ring aria-[invalid=true]:border-danger dark:[color-scheme:dark]";
@@ -459,6 +459,7 @@ export function IdentifyPage({ kind }: { kind: ProKind }) {
   }, [navigate]);
   const done = () => {
     toast.success(`Identificato come ${KIND_LABEL[kind].toLowerCase()}`, { description: `Si apre ${p.opens}; ${p.locks} è bloccat${kind === "agronomo" ? "a" : "o"}.` });
+    openSimTab(p.section, "mappa");
     void navigate({ to: p.go, replace: true });
   };
   const mine = id?.kind === kind ? id : null;
@@ -473,12 +474,12 @@ export function IdentifyPage({ kind }: { kind: ProKind }) {
       </button>
       <PageHero kicker="Identificazione" kickerIcon={ShieldCheck} title={p.title} />
       {mine ? (
-        <ProfileCard kind={kind} go={() => void navigate({ to: p.go })} />
+        <ProfileCard kind={kind} go={() => { openSimTab(p.section, "mappa"); void navigate({ to: p.go }); }} />
       ) : (
         <>
           <p className="text-[15px] leading-relaxed text-muted-foreground">{p.intro}</p>
           {id && <p className="rounded-2xl bg-foreground/[0.06] px-4 py-3 text-sm text-muted-foreground">Ora sei identificato come <span className="font-semibold text-foreground">{proSummary(id)}</span>: identificandoti qui, quel profilo viene sostituito e {p.locks} si blocca.</p>}
-          <Suspense fallback={null}><KnownProfiles kind={kind} onPicked={done} /></Suspense>
+          <Suspense fallback={null}><KnownProfiles kind={kind} /></Suspense>
           <IdentifyForm kind={kind} onDone={done} />
           <p className="px-1 text-xs text-muted-foreground">I dati restano su questo dispositivo e, se hai fatto l’accesso, nel tuo account. Puoi uscire dal profilo quando vuoi.</p>
         </>

@@ -41,9 +41,11 @@ export async function exitToGate(opts: { global?: boolean } = {}): Promise<void>
     }
   } catch {}
 
-  try {
-    window.localStorage.removeItem("mdt-account-sessions-v1");
-  } catch {}
+  if (opts.global) {
+    try {
+      window.localStorage.removeItem("mdt-account-sessions-v1");
+    } catch {}
+  }
 
   // 3. Notify auth changes across components and close account modal
   notifyAuthChange();

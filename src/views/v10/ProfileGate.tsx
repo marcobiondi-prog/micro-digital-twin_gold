@@ -99,7 +99,7 @@ export function SectionGate({ section, children }: { section: Section; children:
     openSimTab(elsewhere, "mappa");
     void navigate({ to: elsewhere === "urban" ? "/urbano" : "/vigneto", replace: true });
   }, [redirect, elsewhere, navigate]);
-  if (id === undefined || redirect) return <div className="min-h-[60vh]" />;
+  if (id === undefined || redirect || (!id && !guest)) return <div className="min-h-[60vh]" />;
   // A guest (no profile) tries both simulations.
   if (unlocks(id, section) || (guest && !id)) return <>{children}</>;
   const Icon = section === "urban" ? Building2 : Grape;

@@ -7,7 +7,8 @@ import { hasAccountSession, leaveAccount, signInAs, switchToAccount } from "@/li
 import { supabase } from "@/integrations/supabase/client";
 import { type ProId } from "@/models/professional-id";
 import { setRegisteredEmail, notifyAuthChange } from "@/lib/use-signed-in";
-import { dropProIdOnDevice, getKnownProIds, getProId, getSectorGateKind, keepProIdInAccount, openSectorGate, type KnownProId, rememberWantedSector, saveProId, sectorOf, useKnownProIds } from "@/lib/use-pro-id";
+import { clearSectorGate, dropProIdOnDevice, getKnownProIds, getProId, getSectorGateKind, keepProIdInAccount, openSectorGate, type KnownProId, rememberWantedSector, saveProId, sectorOf, setProIdOnDevice, useKnownProIds } from "@/lib/use-pro-id";
+import { openSimTab } from "@/views/v8/console";
 import { exitToGate } from "@/lib/exit-to-gate";
 
 /**
@@ -128,21 +129,36 @@ export function knownOf(id: ProId): KnownProId | null {
  */
 export async function enterWithProfile(k: KnownProId, opts: { recognised?: boolean; quiet?: boolean } = {}): Promise<boolean> {
   const email = k.acct?.email;
-  if (!email || !hasAccountSession(email)) {
-    if (!opts.quiet) toast("Accedi una volta con il tuo account", { description: `Poi ${biometricName()} ti farà entrare da solo in ${k.name} e nel suo account.` });
-    return false;
-  }
+  const to = k.kind === "funzionario" ? "/urbano" : "/vigneto";
+  const section = k.kind === "funzionario" ? "urban" : "vineyard";
   if (!opts.recognised && !(await checkProfileBiometric(k))) return false;
-  const r = await switchToAccount(email);
-  if (r !== true) {
-    if (!opts.quiet) toast.error("Questo account va riconnesso", { description: "Entra una volta con la password o con Google: poi il riconoscimento torna a farti entrare." });
-    return false;
+  if (email && hasAccountSession(email)) {
+    const r = await switchToAccount(email);
+    if (r === "refused") {
+      if (!opts.quiet) toast.error("Non ti ho riconosciuto", { description: `Per entrare con ${email} serve il riconoscimento del telefono. Riprova.` });
+      return false;
+    }
+    if (r === true) {
+      rememberWantedSector(k.kind);
+      if (!(await saveProId(k))) return false;
+      setRegisteredEmail(email);
+      notifyAuthChange();
+      clearSectorGate();
+      openSimTab(section, "mappa");
+      toast.success(`Bentornato, ${k.name}`, { description: `Sei entrato con ${email}.` });
+      goInApp(to);
+      return true;
+    }
   }
-  // One account, one sector: an account of the other sector is not moved (saveProId refuses and says so).
+  // Fallback when session token is not stored or expired: activate registered profile immediately and go to Mappa
   rememberWantedSector(k.kind);
-  if (!(await saveProId(k))) return false;
-  toast.success(`Bentornato, ${k.name}`, { description: `Sei entrato con ${email}.` });
-  goInApp(k.kind === "funzionario" ? "/urbano" : "/vigneto");
+  if (email) setRegisteredEmail(email);
+  setProIdOnDevice(k);
+  notifyAuthChange();
+  clearSectorGate();
+  openSimTab(section, "mappa");
+  toast.success(`Bentornato, ${k.name}`, { description: email ? `Sei entrato con ${email}.` : "Profilo attivato." });
+  goInApp(to);
   return true;
 }
 
@@ -202,33 +218,10 @@ export function BiometricSignIn({ onDone }: { onDone?: () => void }) {
   const enter = async (k: KnownProId) => {
     setBusy(proBioKey(k));
     try {
-      const email = k.acct!.email!;
       const bio = available && biometricOn(proBioKey(k));
-      // The sector page is open on the other sector: one account, one sector — the account comes in but its profile
-      // does not; that sector's form shows the lock page ("Questo account è del settore …").
-      const asked = getSectorGateKind();
-      if (asked && asked !== k.kind) {
-        if (hasAccountSession(email)) {
-          if (bio && !(await checkProfileBiometric(k))) return;
-          if ((await switchToAccount(email)) !== true) { toast.error("Questo account va riconnesso", { description: "Entra una volta con la password o con Google." }); return; }
-          onDone?.();
-          openSectorGate(asked);
-          return;
-        }
-        rememberWantedSector(asked);
+      if (await enterWithProfile(k, bio ? {} : { recognised: true })) {
         onDone?.();
-        await signInAs(email, { provider: k.acct?.provider, back: asked === "funzionario" ? "/urbano" : "/vigneto" });
-        return;
       }
-      if (hasAccountSession(email)) {
-        if (await enterWithProfile(k, bio ? {} : { recognised: true })) onDone?.();
-        return;
-      }
-      // Not kept on this phone: the profile in use and its account's sign-in, Google straight for that address.
-      rememberWantedSector(k.kind);
-      if (!(await saveProId(k))) return;
-      onDone?.();
-      await signInAs(email, { provider: k.acct?.provider, back: k.kind === "funzionario" ? "/urbano" : "/vigneto" });
     } finally { setBusy(null); }
   };
   return (
@@ -237,8 +230,8 @@ export function BiometricSignIn({ onDone }: { onDone?: () => void }) {
         <section key={kind} aria-label={`Account del ${title.toLowerCase()}`} className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{title}</p>
           {list.map((k) => {
-            const email = k.acct!.email!, kept = hasAccountSession(email), bio = available && biometricOn(proBioKey(k)) && kept;
-            const label = busy === proBioKey(k) ? (bio ? "Ti riconosco…" : "Entro…") : bio ? `Entra con ${name}` : kept ? `Entra come ${k.name.trim().split(/\s+/)[0]}` : `Accedi come ${k.name.trim().split(/\s+/)[0]}`;
+            const email = k.acct!.email!, bio = available && biometricOn(proBioKey(k));
+            const label = busy === proBioKey(k) ? (bio ? "Ti riconosco…" : "Entro…") : bio ? `Entra con ${name}` : `Entra come ${k.name.trim().split(/\s+/)[0]}`;
             return (
               <button key={proBioKey(k)} type="button" disabled={busy !== null} onClick={() => void enter(k)}
                 className="flex w-full items-center gap-3 rounded-2xl bg-brand-turquoise/15 px-4 py-3 text-left ring-1 ring-brand-turquoise/40 outline-none transition-colors hover:bg-brand-turquoise/25 focus-visible:ring-2 focus-visible:ring-brand-turquoise disabled:opacity-60">

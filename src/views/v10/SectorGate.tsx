@@ -14,7 +14,7 @@ import { introSeen } from "@/lib/intro-seen";
 import { clearSectorGate, enterAsGuest, forgetKnownProId, dropProIdOnDevice, keepProIdInAccount, setProIdOnDevice, rememberAddingSector, rememberWantedSector, renameKnownProId, sectorOf, type KnownProId, saveProId, useAccountSector, useGuest, useKnownProIds, useProId, useSectorGateAsk } from "@/lib/use-pro-id";
 import { proSummary } from "@/models/professional-id";
 import { toast } from "sonner";
-import { useSignedIn } from "@/lib/use-signed-in";
+import { useSignedIn, setRegisteredEmail, notifyAuthChange } from "@/lib/use-signed-in";
 import { useAccountAvatar } from "@/lib/account-avatar";
 import { hapticTick } from "@/lib/haptics";
 import { type ProId, type ProKind } from "@/models/professional-id";
@@ -56,10 +56,11 @@ export function SectorGate() {
     if (wasShown.current && id) {
       wasShown.current = false;
       const section = id.kind === "agronomo" ? "vineyard" : "urban";
+      const target = section === "urban" ? "/urbano" : "/vigneto";
       openSimTab(section, "mappa");
-      void navigate({ to: section === "urban" ? "/urbano" : "/vigneto", replace: true });
+      if (pathname !== target) goInApp(target);
     }
-  }, [shown, id, navigate]);
+  }, [shown, id, pathname]);
   if (!shown) return null;
   // Over everything (menus and bottom bar too), under the account dialog, which opens above it to sign in.
   return createPortal(<SectorPage key={ask.kind ?? "default"} start={ask.kind} />, document.body);
@@ -87,31 +88,47 @@ export function KnownProfiles({ kind, onPicked }: { kind: ProKind; onPicked?: ()
     if (!(await checkProfileBiometric(k))) return;
     const target = k.acct?.email ?? null;
     const flow = k.kind === "funzionario" ? "della piazza" : "del vigneto";
-    // The profile's personal account is entered with it: at once when it is kept on this phone (no password, no
-    // Google), else the sign-in opens for it.
+    const to = k.kind === "funzionario" ? "/urbano" : "/vigneto";
+    const section = k.kind === "funzionario" ? "urban" : "vineyard";
+
+    // Switch to the kept account session if available
     if (target && target !== accEmail) {
       rememberWantedSector(kind);
       if (accEmail) await keepProIdInAccount();
       const entered = await switchToAccount(target);
-      if (entered === "refused") { toast.error("Non ti ho riconosciuto", { description: `Per entrare con ${target} serve il riconoscimento del telefono. Riprova.` }); return; }
-      if (entered) {
-        // Its account goes to this profile's sector (the person chose it), then the profile is put in use.
-        // One account, one sector: an account of the other sector is not moved (saveProId refuses and says so).
-        if (!(await saveProId(k))) return;
-        toast.success(`Bentornato, ${k.name}`, { description: `Sei entrato anche con il tuo account ${target}.` });
-        // A clean start on that account's simulation: every list and cache read again for it.
-        goInApp(k.kind === "funzionario" ? "/urbano" : "/vigneto");
+      if (entered === "refused") {
+        toast.error("Non ti ho riconosciuto", { description: `Per entrare con ${target} serve il riconoscimento del telefono. Riprova.` });
         return;
       }
-      // Its account is not kept on this phone: prompt the user to sign in to that account.
-      const to = k.kind === "funzionario" ? "/urbano" : "/vigneto";
-      rememberWantedSector(k.kind);
-      toast(`Accedi per entrare con ${target}`, { description: `Inserisci la password o usa Google per ${k.name}.` });
-      await signInAs(target, { provider: k.acct?.provider, back: to });
+      if (entered) {
+        if (!(await saveProId(k))) return;
+        setRegisteredEmail(target);
+        notifyAuthChange();
+        clearSectorGate();
+        openSimTab(section, "mappa");
+        toast.success(`Bentornato, ${k.name}`, { description: `Sei entrato anche con il tuo account ${target}.` });
+        goInApp(to);
+        onPicked?.();
+        return;
+      }
+      // Even if the remote session token expired, activate the registered profile immediately and go to Mappa
+      setRegisteredEmail(target);
+      setProIdOnDevice(k);
+      notifyAuthChange();
+      clearSectorGate();
+      openSimTab(section, "mappa");
+      toast.success(`Bentornato, ${k.name}`, { description: `Ritrovi la cronologia ${flow}.` });
+      goInApp(to);
+      onPicked?.();
       return;
     }
     if (!(await saveProId(k))) return;
+    if (target) setRegisteredEmail(target);
+    notifyAuthChange();
+    clearSectorGate();
+    openSimTab(section, "mappa");
     toast.success(`Bentornato, ${k.name}`, { description: `Ritrovi la cronologia ${flow}.` });
+    goInApp(to);
     onPicked?.();
   };
   // "Aggiungi account": another personal account signs in here (the current one stays kept on the phone).

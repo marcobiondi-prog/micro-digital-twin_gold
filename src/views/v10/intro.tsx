@@ -324,7 +324,11 @@ export function Choice() {
   useSwipeBack(formRef, identify ? backToChoice : null);
   // The phone's Back (and its edge-swipe gesture) closes the form too, instead of leaving the page for the tutorial.
   useBackClose(identify !== null, backToChoice);
-  const go = (it: Item) => void navigate({ to: it.id === "urban" ? "/urbano" : "/vigneto" });
+  const go = (it: Item) => {
+    const section = it.id === "urban" ? "urban" : "vineyard";
+    openSimTab(section, "mappa");
+    void navigate({ to: it.id === "urban" ? "/urbano" : "/vigneto", replace: true });
+  };
   const open = (it: Item) => {
     if (it.id === "camera") { setCameraSheetOpen(true); return; }
     // Already this profile: straight in. Otherwise its form shows here.

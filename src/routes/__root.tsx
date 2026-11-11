@@ -531,6 +531,7 @@ function RootComponent() {
       void queryClient.invalidateQueries();
       if (href.startsWith("/vigneto")) openSimTab("vineyard", "mappa");
       else if (href.startsWith("/urbano")) openSimTab("urban", "mappa");
+      slidePath.current = href.split("?")[0] ?? href;
       void navigate({ to: href as any, replace: true });
     };
     window.addEventListener("mdt-go", go);
