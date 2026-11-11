@@ -381,7 +381,7 @@ function SectorPage({ start }: { start: ProKind | null }) {
     </button>
   );
   return (
-    <div role="dialog" aria-modal="true" aria-label="Scegli il settore" className="dark fixed inset-0 z-[999999999] isolate overflow-y-auto overscroll-contain bg-background px-6 text-foreground [color-scheme:dark] sm:px-12 animate-in fade-in-0 duration-200">
+    <div role="dialog" aria-modal="true" aria-label="Scegli il settore" className="dark fixed inset-0 z-[999999999] isolate overflow-y-auto overscroll-contain bg-background px-6 text-foreground [color-scheme:dark] sm:px-12">
       <Backdrop />
       <section ref={formRef} className="mx-auto flex min-h-full max-w-xl flex-col gap-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(3rem+env(safe-area-inset-top))]">
         {sector ? (

@@ -334,7 +334,7 @@ export function Choice() {
   if (identify) {
     const it = items.find((x) => x.id !== "camera" && KIND_OF[x.id] === identify)!;
     return (
-      <div className="dark relative isolate min-h-dvh bg-background px-6 text-foreground [color-scheme:dark] sm:px-12 animate-in fade-in-0 duration-200">
+      <div className="dark relative isolate min-h-dvh bg-background px-6 text-foreground [color-scheme:dark] sm:px-12">
         <Backdrop />
         <section ref={formRef} aria-label={it.name} className="mx-auto max-w-xl space-y-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(1.5rem+env(safe-area-inset-top))]">
           <button type="button" onClick={backToChoice} className="-ml-1 inline-flex h-10 items-center gap-1.5 rounded-full pr-3 text-sm font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
@@ -351,7 +351,7 @@ export function Choice() {
     );
   }
   return (
-    <div className="dark relative isolate min-h-dvh bg-background px-6 text-foreground [color-scheme:dark] sm:px-12 animate-in fade-in-0 duration-200">
+    <div className="dark relative isolate min-h-dvh bg-background px-6 text-foreground [color-scheme:dark] sm:px-12">
       <Backdrop />
       <section aria-label="Scelta" className="mx-auto flex min-h-dvh max-w-xl flex-col pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-[calc(3rem+env(safe-area-inset-top))]">
         <h1 className="sr-only">Da dove vuoi iniziare</h1>
