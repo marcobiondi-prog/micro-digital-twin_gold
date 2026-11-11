@@ -812,12 +812,12 @@
   .account-panel[data-state="open"] > * {
     animation: account-content-in 230ms ease-out 150ms both;
   }
-  /* Closing replays the reveal backwards: slower cinematic fold (980ms) */
+  /* Closing replays the reveal backwards: slower cinematic fold (1200ms) */
   .account-panel[data-state="closed"] {
-    animation: account-fold-mobile 980ms cubic-bezier(0.39, 0.575, 0.565, 1) both !important;
+    animation: account-fold-mobile 1200ms cubic-bezier(0.39, 0.575, 0.565, 1) both !important;
   }
   .account-overlay[data-state="closed"] {
-    animation: account-overlay-out 980ms ease-out both !important;
+    animation: account-overlay-out 1200ms ease-out both !important;
   }
 }
 .account-panel[data-state="closed"],
