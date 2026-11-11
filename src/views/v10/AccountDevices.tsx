@@ -2,6 +2,7 @@ import { useState } from "react";
 import { LogOut, Monitor, Smartphone, Tablet, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { keepProIdInAccount } from "@/lib/use-pro-id";
+import { exitToGate } from "@/lib/exit-to-gate";
 import { thisDeviceId, useAccountDevices, type AccountDevice } from "@/lib/account-devices";
 
 /** "adesso", "12 min fa", "oggi 14:32", "ieri 09:10", "03/11/2026". */
@@ -31,10 +32,9 @@ export function AccountDevices() {
   const me = thisDeviceId();
   const outAll = async () => {
     setBusy(true);
-    await keepProIdInAccount();
-    const { error } = await supabase.auth.signOut({ scope: "global" });
-    setBusy(false); setAsk(false);
-    if (error) setMsg("Non sono riuscito a far uscire gli altri dispositivi: controlla la connessione e riprova.");
+    setAsk(false);
+    await exitToGate({ global: true });
+    setBusy(false);
   };
   const drop = async (d: AccountDevice) => {
     const ok = await remove(d.id);

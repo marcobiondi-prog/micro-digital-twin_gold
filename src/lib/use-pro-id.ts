@@ -631,13 +631,11 @@ export function useSyncProId() {
       if (event !== "SIGNED_OUT" && s) publish(s.user);
       if (event === "SIGNED_OUT") publish(null);
       if (event === "SIGNED_IN" && s) void adopt(s.user.id, s.user.user_metadata, true).finally(() => { settleOpening(); flushAdopt(); });
-      if (event === "SIGNED_OUT") { adopted = ""; clearLockAsk(); }
-      if (event === "SIGNED_OUT" && snapshot()) {
-        const was = snapshot()!.kind;
+      if (event === "SIGNED_OUT") {
+        adopted = "";
+        clearLockAsk();
         set(null);
-        // The sector page opens straight on that profile's form, which recognises it.
-        openSectorGate(was);
-        toast("Sei uscito anche dal profilo professionale", { description: "Accedi di nuovo e torna da solo." });
+        openSectorGate(null);
       }
     });
     return () => data.subscription.unsubscribe();

@@ -7,6 +7,7 @@ import { hasAccountSession, leaveAccount, signInAs, switchToAccount } from "@/li
 import { supabase } from "@/integrations/supabase/client";
 import { type ProId } from "@/models/professional-id";
 import { setRegisteredEmail, notifyAuthChange } from "@/lib/use-signed-in";
+import { exitToGate } from "@/lib/exit-to-gate";
 
 /**
  * Face ID / fingerprint on each professional profile: turned on for a profile, taking it up again on this phone
@@ -259,34 +260,6 @@ export function BiometricSignIn({ onDone }: { onDone?: () => void }) {
 
 /**
  * "Esci dal profilo": leaving the professional profile returns to the main gate ("Da dove vuoi usarmi?"),
- * and completely disconnects from the account and signs out cleanly.
+ * and completely disconnects from both personal and professional accounts.
  */
-export async function leaveProfile(_kind?: ProId["kind"]) {
-  // 1. Immediately drop the profile and clear active state synchronously
-  dropProIdOnDevice();
-  setRegisteredEmail(null);
-  openSectorGate(null);
-  rememberWantedSector(null);
-  sessionStorage.removeItem("mdt-guest");
-  sessionStorage.setItem("mdt-bio-skip", "1");
-  notifyAuthChange();
-
-  // 2. Clear Supabase auth storage
-  try {
-    supabase.auth.stopAutoRefresh();
-    const key = (supabase.auth as unknown as { storageKey?: string }).storageKey;
-    if (key) {
-      window.localStorage.removeItem(key);
-      window.localStorage.removeItem(`${key}-code-verifier`);
-      window.localStorage.removeItem(`${key}-user`);
-    }
-  } catch {}
-
-  // 3. Complete remote sign out in background
-  void supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
-  void saveProId(null).catch(() => undefined);
-
-  // 4. Navigate back to the gate
-  goInApp("/benvenuto");
-  toast("Sei uscito dal profilo", { description: "Scegli il settore e identificati di nuovo quando vuoi." });
-}
+export const leaveProfile = (_kind?: ProId["kind"]) => exitToGate();

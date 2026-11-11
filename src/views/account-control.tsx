@@ -7,6 +7,7 @@ import { getKnownProIds } from "@/lib/use-pro-id";
 import { googleOAuth, leaveAccount } from "@/lib/account-sessions";
 import { keepLink, keptLink, LINK_TTL_S } from "@/lib/signed-links";
 import { dropProIdOnDevice } from "@/lib/use-pro-id";
+import { exitToGate } from "@/lib/exit-to-gate";
 import { getMedia, removeMedia, useLabMedia } from "@/models/lab-media-store";
 import { CLOUD_QUOTA, bytesText, usageTone, useCloudUsage } from "@/lib/use-cloud-usage";
 import { ProfileIcon } from "@/views/ProfileIcon";
@@ -393,24 +394,6 @@ export function AccountControl() {
     setPending(true);
     await queryClient.cancelQueries();
     queryClient.clear();
-    if (!account?.guest) {
-      await keepProIdInAccount();
-      dropProIdOnDevice();
-      await saveProId(null);
-      try {
-        supabase.auth.stopAutoRefresh();
-        const key = (supabase.auth as unknown as { storageKey?: string }).storageKey;
-        if (key) {
-          window.localStorage.removeItem(key);
-          window.localStorage.removeItem(`${key}-code-verifier`);
-          window.localStorage.removeItem(`${key}-user`);
-        }
-      } catch {}
-      await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
-    }
-    setRegisteredEmail(null);
-    sessionStorage.removeItem(guestKey);
-    sessionStorage.removeItem(pendingAvatarKey);
     setAccount(null);
     setMode("signin");
     setEmail("");
@@ -421,7 +404,7 @@ export function AccountControl() {
     setDraftPreview(null);
     setOpen(false);
     setPending(false);
-    notifyAuthChange();
+    await exitToGate();
   };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {

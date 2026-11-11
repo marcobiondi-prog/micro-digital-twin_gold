@@ -531,7 +531,7 @@ function RootComponent() {
       void queryClient.invalidateQueries();
       if (href.startsWith("/vigneto")) openSimTab("vineyard", "mappa");
       else if (href.startsWith("/urbano")) openSimTab("urban", "mappa");
-      void navigate({ href, replace: true });
+      void navigate({ to: href as any, replace: true });
     };
     window.addEventListener("mdt-go", go);
     return () => window.removeEventListener("mdt-go", go);
