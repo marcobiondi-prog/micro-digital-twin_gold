@@ -7,6 +7,7 @@ import { detectArObject, getReferencePhoto, type Detection, type Soil } from "@/
 import { gbifPhotoSearchUrl, pickGbifPhoto, type ReferencePhoto } from "@/models/ar-reference-photo";
 import { findSubject, frameUsable, SEARCH_BOX, smoothBox, type SubjectBox } from "@/lib/ar-subject-tracker";
 import { extractPlantPhoto } from "@/views/ar-plant-photo";
+import { useBurstDock } from "@/lib/use-burst-dock";
 
 type D = NonNullable<Detection>;
 const BIN_EMPTY_MS = 1100;
@@ -157,49 +158,15 @@ export function ArCamera({
     });
   };
 
-  const carouselRef = useRef<HTMLDivElement>(null);
+  const { carouselRef, updateDockEffect } = useBurstDock(burst, burstShots.length);
 
-  // Effetto ingrandimento Mac Dock (Genius/Fisheye) allo scorrimento del carosello: centrato sulla mezzeria dello schermo
-  const updateDockEffect = useCallback(() => {
-    const container = carouselRef.current;
-    if (!container) return;
-    const screenCenterX = window.innerWidth / 2;
-    const items = container.querySelectorAll<HTMLElement>("[data-burst-item]");
-    const maxRadius = 140;
-    items.forEach((item) => {
-      const itemRect = item.getBoundingClientRect();
-      const itemCenterX = itemRect.left + itemRect.width / 2;
-      const dist = Math.abs(screenCenterX - itemCenterX);
-      if (dist < maxRadius) {
-        const factor = (1 + Math.cos((dist / maxRadius) * Math.PI)) / 2;
-        const scale = 0.88 + 0.44 * factor;
-        const lift = -14 * factor;
-        item.style.transform = `scale(${scale.toFixed(3)}) translateY(${lift.toFixed(1)}px)`;
-        item.style.zIndex = factor > 0.25 ? "25" : "10";
-      } else {
-        item.style.transform = "scale(0.88) translateY(0px)";
-        item.style.zIndex = "1";
-      }
-    });
-  }, []);
-
+  // Scorrimento fluido alla nuova foto scattata
   useEffect(() => {
     if (burst && burstShots.length > 0) {
-      const id = requestAnimationFrame(updateDockEffect);
-      return () => cancelAnimationFrame(id);
+      const el = carouselRef.current;
+      if (el) el.scrollTo({ left: el.scrollWidth, behavior: "smooth" });
     }
-  }, [burst, burstShots.length, updateDockEffect]);
-
-  useEffect(() => {
-    if (!burst || burstShots.length === 0) return;
-    const onResize = () => updateDockEffect();
-    window.addEventListener("resize", onResize);
-    window.addEventListener("orientationchange", onResize);
-    return () => {
-      window.removeEventListener("resize", onResize);
-      window.removeEventListener("orientationchange", onResize);
-    };
-  }, [burst, burstShots.length, updateDockEffect]);
+  }, [burst, burstShots.length]);
 
   const pickBestShot = (id: number, el?: HTMLElement | null) => {
     setBestShotId(id);
@@ -1512,6 +1479,7 @@ export function ArCamera({
                             <div
                               key={s.id}
                               data-burst-item
+                              data-burst-id={s.id}
                               role="button"
                               tabIndex={0}
                               onClick={(e) => pickBestShot(s.id, e.currentTarget)}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Check, Trash2, X, Zap, ZapOff } from "lucide-react";
+import { Camera, Check, Star, Trash2, X, Zap, ZapOff } from "lucide-react";
 import { setCameraTorch, supportsCameraTorch } from "@/lib/camera-torch";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -12,6 +12,7 @@ import { hapticTick } from "@/lib/haptics";
 import { useHoldBurst } from "@/lib/hold-burst";
 import { createTrackZoomer, pinchZoom, splitZoom, trackZoomRange, zoomHaptic, ZOOM_MAX, ZOOM_MIN } from "@/lib/camera-zoom";
 import { ZoomDial } from "@/views/ZoomDial";
+import { useBurstDock } from "@/lib/use-burst-dock";
 
 /**
  * Live capture for hosts without native HTML capture, such as Windows tablets, and for the multiple shot ("burst"):
@@ -28,23 +29,42 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
   const [shots, setShots] = useState<Shot[]>([]);
   const shotsRef = useRef(shots);
   shotsRef.current = shots;
+  const [bestShotId, setBestShotId] = useState<number | null>(null);
+  const bestShotIdRef = useRef(bestShotId);
+  bestShotIdRef.current = bestShotId;
   const [flash, setFlash] = useState(0);
   const [pending, setPending] = useState(0);
   const [asking, setAsking] = useState(false);
-  const stripRef = useRef<HTMLDivElement>(null);
   // The photo camera turns into the multiple shot without closing: the Singolo | Multiplo switch, or holding the shutter.
   const [multi, setMulti] = useState(mode === "burst");
   useEffect(() => { setMulti(mode === "burst"); }, [mode]);
   const burst = mode !== "video" && mode !== null && multi;
+
+  const { carouselRef, updateDockEffect } = useBurstDock(Boolean(burst), shots.length);
+
+  useEffect(() => {
+    if (burst && shots.length > 0) {
+      const el = carouselRef.current;
+      if (el) el.scrollTo({ left: el.scrollWidth, behavior: "smooth" });
+    }
+  }, [burst, shots.length, carouselRef]);
+
   const finish = useCallback((keep: boolean) => {
     const taken = shotsRef.current;
     // Shots still encoding are waited for, then handed over together: nothing shot is lost.
-    if (taken.length && keep) void Promise.all(taken.map((s) => s.file)).then((files) => {
-      const ready = files.filter((f): f is File => !!f);
-      if (ready.length) onCapture(ready);
-    });
+    if (taken.length && keep) {
+      const bestId = bestShotIdRef.current;
+      const ordered = bestId
+        ? [...taken.filter((s) => s.id === bestId), ...taken.filter((s) => s.id !== bestId)]
+        : taken;
+      void Promise.all(ordered.map((s) => s.file)).then((files) => {
+        const ready = files.filter((f): f is File => !!f);
+        if (ready.length) onCapture(ready);
+      });
+    }
     shotsRef.current = [];
     setShots([]);
+    setBestShotId(null);
     setAsking(false);
     close();
   }, [close, onCapture]);
@@ -55,14 +75,34 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
   const backToSingle = () => {
     const taken = shotsRef.current;
     if (taken.length) {
-      void Promise.all(taken.map((s) => s.file)).then((files) => { const ready = files.filter((f): f is File => !!f); if (ready.length) onCapture(ready); });
+      const bestId = bestShotIdRef.current;
+      const ordered = bestId
+        ? [...taken.filter((s) => s.id === bestId), ...taken.filter((s) => s.id !== bestId)]
+        : taken;
+      void Promise.all(ordered.map((s) => s.file)).then((files) => { const ready = files.filter((f): f is File => !!f); if (ready.length) onCapture(ready); });
       shotsRef.current = [];
       setShots([]);
+      setBestShotId(null);
     }
     setMulti(false);
   };
-  const dropShot = (id: number) => setShots((p) => p.filter((s) => s.id !== id));
-  useEffect(() => { const el = stripRef.current; if (el) el.scrollTo({ left: el.scrollWidth, behavior: "smooth" }); }, [shots.length]);
+  const dropShot = (id: number) => {
+    setShots((p) => {
+      const next = p.filter((s) => s.id !== id);
+      if (bestShotIdRef.current === id) {
+        setBestShotId(next.length > 0 ? next[next.length - 1].id : null);
+      }
+      return next;
+    });
+  };
+  const pickBestShot = (id: number, el?: HTMLElement | null) => {
+    setBestShotId(id);
+    hapticTick(25);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+      setTimeout(updateDockEffect, 200);
+    }
+  };
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -222,6 +262,7 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
           resolve(blob ? new File([blob], `multiplo-${Math.floor(id)}.jpg`, { type: "image/jpeg" }) : null);
         }, "image/jpeg", 0.9));
         setShots((p) => [...p, { id, file, thumb }]);
+        setBestShotId((prev) => prev ?? id);
         return;
       }
       // A single photo: the camera's own full-resolution photo where the phone offers it, else the frame.
@@ -315,20 +356,71 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
           </div>
         )}
         <div className="camera-bottom">
-          {burst && (
+          {burst && shots.length === 0 && (
             <p className="mb-2 text-center text-xs text-white/85 [text-shadow:0_1px_3px_rgb(0_0_0/0.7)]" role="status" aria-live="polite">
-              {shots.length ? `${shots.length} ${shots.length === 1 ? "foto scattata" : "foto scattate"} · il cestino ne toglie una` : "Tocca per una foto o tieni premuto per scattarne di fila, poi Fine"}
+              Tocca per una foto o tieni premuto per scattarne di fila, poi Fine
             </p>
           )}
           {burst && shots.length > 0 && (
-            <div ref={stripRef} data-map-gestures className="mx-auto mb-3 flex max-w-md touch-pan-x snap-x gap-2 overflow-x-auto px-1 pt-2 [scrollbar-width:none]">
-              {shots.map((s, i) => (
-                <span key={s.id} className="relative shrink-0 snap-end">
-                  <img src={s.thumb} alt={`Foto ${i + 1}`} className="size-14 rounded-lg object-cover ring-1 ring-white/50" />
-                  <span className="absolute bottom-0.5 left-1 text-[10px] font-semibold text-white [text-shadow:0_1px_2px_black]">{i + 1}</span>
-                  <button type="button" onClick={() => dropShot(s.id)} aria-label={`Togli la foto ${i + 1}`} className="absolute -right-1.5 -top-1.5 grid size-6 place-items-center rounded-full bg-black/80 text-white ring-1 ring-white/40"><Trash2 className="size-3" aria-hidden="true" /></button>
+            <div className="flex w-full flex-col items-center gap-1 mb-2">
+              <div className="flex w-full max-w-[min(26rem,92vw)] items-center justify-between px-2 text-[10.5px] font-semibold text-white/90 [text-shadow:0_1px_2px_black]">
+                <span>{shots.length} {shots.length === 1 ? "foto scattata" : "foto scattate"}</span>
+                <span className="flex items-center gap-1 font-bold text-[#00d296]">
+                  <Star className="size-2.5 fill-current" /> Tocca per scegliere la migliore
                 </span>
-              ))}
+              </div>
+              <div
+                ref={carouselRef}
+                onScroll={updateDockEffect}
+                data-map-gestures
+                className="ar-burst-carousel w-full max-w-full"
+              >
+                {shots.map((s, i) => {
+                  const isBest = s.id === (bestShotId ?? shots[0]?.id);
+                  return (
+                    <div
+                      key={s.id}
+                      data-burst-item
+                      data-burst-id={s.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => pickBestShot(s.id, e.currentTarget)}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickBestShot(s.id, e.currentTarget as HTMLElement); } }}
+                      aria-label={`Foto ${i + 1}${isBest ? " (Scatto migliore selezionato)" : " (Tocca per scegliere come migliore)"}`}
+                      className={`relative shrink-0 snap-center rounded-lg p-0.5 cursor-pointer ${
+                        isBest
+                          ? "ring-2 ring-[#00d296] shadow-[0_0_14px_rgba(0,210,150,0.85)]"
+                          : "ring-1 ring-white/40 hover:ring-white/80 opacity-80 hover:opacity-100"
+                      }`}
+                    >
+                      <img
+                        src={s.thumb}
+                        alt={`Foto ${i + 1}`}
+                        className="size-12 rounded-md object-cover"
+                      />
+                      <span className="absolute bottom-1 left-1.5 rounded-full bg-black/75 px-1 text-[8.5px] font-bold text-white [text-shadow:0_1px_2px_black]">
+                        {i + 1}
+                      </span>
+                      {isBest && (
+                        <span className="absolute -top-2 left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded-full bg-[#00d296] px-1.5 py-0.2 text-[8.5px] font-extrabold text-[#042017] shadow-sm whitespace-nowrap">
+                          <Star className="size-2 fill-current" /> Migliore
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          dropShot(s.id);
+                        }}
+                        aria-label={`Togli la foto ${i + 1}`}
+                        className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-black/85 text-white ring-1 ring-white/40 hover:bg-destructive hover:scale-110 transition-transform"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
           {canZoom && ready && <ZoomDial className="mb-2" zoom={zoom} max={mode === "video" && zoomRangeRef.current ? zoomRangeRef.current.max / zoomRangeRef.current.min : ZOOM_MAX} onZoom={setZoom} />}
