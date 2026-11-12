@@ -41,6 +41,7 @@ import { Button } from "@/components/ui/button";
 import { drawCameraVideo, freezeCameraFrame, paintArFrame } from "@/lib/ar-frame";
 import { startArFrameLoop } from "@/lib/ar-frame-loop";
 import { captureSummaryLines } from "@/models/ar-capture-summary";
+import { isArCoreSupported, createArCoreManager, type ArCoreManager } from "@/lib/arcore";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cameraViewport, groundTilt, setArOrientationActive, shortestRotationDelta } from "@/lib/ar-orientation";
 import { CameraCloseGestures } from "@/views/CameraCloseGestures";
@@ -214,7 +215,28 @@ export function ArCamera({
   // Only the scanned photographic cutout can be placed; no geometric tree templates.
 
   const last = useRef<Parameters<ArScene["place"]> | null>(null);
-  // Nessuna schermata di posizionamento: la fotocamera AI resta l'unica vista.
+  // Integrazione ARCore / WebXR per tracciamento superfici reali
+  const [arCoreActive, setArCoreActive] = useState(false);
+  const arCoreRef = useRef<ArCoreManager | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void isArCoreSupported().then((supported) => {
+      if (supported && active) {
+        setArCoreActive(true);
+        arCoreRef.current = createArCoreManager();
+        if (sceneRef.current) {
+          sceneRef.current.setArCoreManager?.(arCoreRef.current);
+        }
+      }
+    });
+    return () => {
+      active = false;
+      void arCoreRef.current?.stopSession();
+      arCoreRef.current = null;
+    };
+  }, []);
+
   const xrActive = false;
   // Eye tracking del soggetto: il mirino cerca e segue la pianta dal primo fotogramma.
   const [subject, setSubject] = useState<SubjectBox>(SEARCH_BOX);
@@ -448,7 +470,11 @@ export function ArCamera({
     setToolsOpen(false); setActiveTool(null);
     setLayers(new Set(["objects"]));
     void import("@/views/ar-scene").then((m) => {
-      if (!cancelled) sceneRef.current = m.createArScene();
+      if (!cancelled) {
+        const scene = m.createArScene();
+        if (arCoreRef.current) scene.setArCoreManager?.(arCoreRef.current);
+        sceneRef.current = scene;
+      }
     }).catch(() => {
       if (!cancelled) setError("Anteprima AR non disponibile su questo dispositivo.");
     });
@@ -1320,6 +1346,16 @@ export function ArCamera({
                   {AR_FOCUS[kind].map(o => <Button variant="ghost" size="sm" key={o.id} type="button" role="radio" aria-label={o.label} title={o.label} aria-checked={arFocusOption(kind, target).id === o.id} className="camera-tool ar-focus-pill" onClick={() => selectTarget(o.id)}>{FOCUS_LABELS[o.id]}</Button>)}
                 </div>
                 </div>
+                {arCoreActive && (
+                  <span
+                    className="inline-flex items-center self-center rounded-full border border-brand-turquoise/40 bg-brand-turquoise/15 px-2 py-0.5 text-[10px] font-bold tracking-wider text-brand-turquoise"
+                    title="ARCore attivo: tracciamento continuo delle superfici reali"
+                    role="status"
+                    aria-label="ARCore attivo"
+                  >
+                    ARCore
+                  </span>
+                )}
                 {(found || species || viewedRecord) && !scanning && <Button variant="ghost" size="sm" aria-label="Mostra esito analisi" title="Mostra esito analisi" className="camera-tool ar-esito-chip" onClick={() => { setToolsOpen(true); setActiveTool("analysis"); setPanelOpen(true); }}><Activity className="size-4 shrink-0" />Esito</Button>}
                 <Button variant="ghost" size="icon" className="camera-tool size-11" aria-label="Guida inquadratura" title="Guida inquadratura" aria-pressed={guideOpen} onClick={() => setGuideOpen(v => !v)}><Info className="size-4" /></Button>
                 {torchSupported && <Button variant="ghost" size="icon" className="camera-tool size-11" disabled={torchBusy || scanning} aria-pressed={torchOn} aria-label={torchOn ? "Disattiva flash" : "Attiva flash"} title={torchOn ? "Disattiva flash" : "Attiva flash"} onClick={() => void toggleTorch()}>{torchOn ? <Zap className="size-4" /> : <ZapOff className="size-4" />}</Button>}

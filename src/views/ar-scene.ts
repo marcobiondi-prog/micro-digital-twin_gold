@@ -1,7 +1,8 @@
-// Browser-only photographed plant placement on a virtual ground plane.
+// Browser-only photographed plant placement on a virtual ground plane or ARCore real surfaces.
 import * as THREE from "three";
 import { isGroundPoint } from "@/lib/ar-orientation";
 import { compactPlantHeight, nextPlantHeight } from "@/models/ar-placement";
+import type { ArCoreHitPoint, ArCoreManager } from "@/lib/arcore";
 
 type Options = { image: HTMLCanvasElement };
 export type ArScene = {
@@ -20,6 +21,10 @@ export type ArScene = {
   clear: () => void;
   render: (w: number, h: number, showGrid: boolean) => void;
   dispose: () => void;
+  /** Integrazione ARCore: impostazione del manager di sessione o dell'hit reale */
+  setRealSurfaceHit?: (hit: ArCoreHitPoint | null) => void;
+  setArCoreManager?: (manager: ArCoreManager | null) => void;
+  isArCoreTracking?: () => boolean;
 };
 
 /** Resolve CSS semantic colours through the browser before giving them to Three.js. */
@@ -63,7 +68,19 @@ export function createArScene(): ArScene {
   const ray = new THREE.Raycaster();
   const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   const plants: THREE.Group[] = [];
+  let arCoreManager: ArCoreManager | null = null;
+  let realSurfaceHit: ArCoreHitPoint | null = null;
+
   const snap = (nx: number, ny: number) => {
+    // 1. Priorità ad ARCore: superficie reale tracciata da WebXR
+    if (realSurfaceHit?.isRealSurface) {
+      return new THREE.Vector3(realSurfaceHit.x, realSurfaceHit.y, realSurfaceHit.z);
+    }
+    if (arCoreManager?.isActive()) {
+      const hit = arCoreManager.performHitTest(nx, ny);
+      if (hit) return new THREE.Vector3(hit.x, hit.y, hit.z);
+    }
+    // 2. Fallback su piano matematico orizzontale
     if (!isGroundPoint(ny)) return null;
     ray.setFromCamera(new THREE.Vector2(nx * 2 - 1, 1 - ny * 2), camera);
     const hit = ray.ray.intersectPlane(ground, new THREE.Vector3());
@@ -159,5 +176,8 @@ export function createArScene(): ArScene {
       renderer.autoClear = true;
     },
     dispose: () => { plants.splice(0).forEach(release); release(grid); release(target); renderer.dispose(); },
+    setRealSurfaceHit: (hit) => { realSurfaceHit = hit; },
+    setArCoreManager: (m) => { arCoreManager = m; },
+    isArCoreTracking: () => Boolean(realSurfaceHit || arCoreManager?.isActive()),
   };
 }
