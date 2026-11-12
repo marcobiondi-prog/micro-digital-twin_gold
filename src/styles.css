@@ -2168,7 +2168,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   position: absolute;
   left: 0;
   right: 0;
-  bottom: calc(16.75rem + env(safe-area-inset-bottom));
+  bottom: calc(11.75rem + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2187,7 +2187,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   pointer-events: none !important;
 }
 .ar-burst-shelf.is-tools-open {
-  bottom: calc(22.5rem + env(safe-area-inset-bottom));
+  bottom: calc(17.5rem + env(safe-area-inset-bottom));
 }
 .ar-burst-shelf .ar-burst-carousel {
   padding-inline: calc(50vw - 28px);
@@ -2257,9 +2257,9 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .ar-burst-bar > * { pointer-events: auto; }
 .ar-burst-bar > .burst-flash { pointer-events: none !important; }
 .ar-camera-surface[data-landscape=true] .ar-burst-bar { margin-bottom: 0; }
-.ar-burst-carousel { display: flex; align-items: flex-end; gap: .75rem; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; touch-action: pan-x; scrollbar-width: none; min-height: 7.25rem; padding-top: 2.5rem; padding-bottom: .875rem; padding-inline: calc(50% - 28px); }
+.ar-burst-carousel { display: flex; align-items: flex-end; gap: .75rem; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scroll-padding-inline: calc(50% - 28px); -webkit-overflow-scrolling: touch; touch-action: pan-x; scrollbar-width: none; min-height: 7.25rem; padding-top: 2.5rem; padding-bottom: .875rem; padding-inline: calc(50% - 28px); }
 .ar-burst-carousel::-webkit-scrollbar { display: none; }
-[data-burst-item] { transform-origin: bottom center; transition: transform 70ms ease-out; will-change: transform; }
+[data-burst-item] { transform-origin: bottom center; transition: transform 70ms ease-out; will-change: transform; scroll-snap-align: center; scroll-snap-stop: always; }
 @media (max-width: 767.98px) {
   /* Su mobile mantieni le pillole Singolo/Multiplo e il counter abbassati a ridosso dello zoom */
   .ar-burst-bar { margin-bottom: 0; }

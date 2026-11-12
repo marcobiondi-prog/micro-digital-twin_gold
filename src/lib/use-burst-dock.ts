@@ -6,11 +6,17 @@ import { hapticTick } from "@/lib/haptics";
  * on photo burst carousels (both AI camera ArCamera and standard camera SystemCamera).
  * Magnification is centered on the horizontal center of the viewport (window.innerWidth / 2).
  */
-export function useBurstDock(active: boolean, count: number) {
+export function useBurstDock(
+  active: boolean,
+  count: number,
+  onCenteredChange?: (id: number) => void
+) {
   const carouselRef = useRef<HTMLDivElement>(null);
   const lastCenteredIdRef = useRef<number | null>(null);
   const lastScrollTimeRef = useRef(0);
   const lastScrollLeftRef = useRef(0);
+  const onCenteredChangeRef = useRef(onCenteredChange);
+  onCenteredChangeRef.current = onCenteredChange;
 
   const updateDockEffect = useCallback(() => {
     const container = carouselRef.current;
@@ -57,6 +63,7 @@ export function useBurstDock(active: boolean, count: number) {
     // passa esattamente al centro dello schermo. L'impulso si adatta alla velocità dello scorrimento.
     if (closestId !== null && minDistance < 36 && closestId !== lastCenteredIdRef.current) {
       lastCenteredIdRef.current = closestId;
+      onCenteredChangeRef.current?.(closestId);
       const now = performance.now();
       const dt = Math.max(1, now - lastScrollTimeRef.current);
       const dx = Math.abs(container.scrollLeft - lastScrollLeftRef.current);

@@ -40,12 +40,17 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
   useEffect(() => { setMulti(mode === "burst"); }, [mode]);
   const burst = mode !== "video" && mode !== null && multi;
 
-  const { carouselRef, updateDockEffect } = useBurstDock(Boolean(burst), shots.length);
+  const { carouselRef, updateDockEffect } = useBurstDock(Boolean(burst), shots.length, setBestShotId);
 
   useEffect(() => {
     if (burst && shots.length > 0) {
       const el = carouselRef.current;
-      if (el) el.scrollTo({ left: el.scrollWidth, behavior: "smooth" });
+      if (el) {
+        const lastItem = el.querySelector<HTMLElement>("[data-burst-item]:last-child");
+        if (lastItem) {
+          lastItem.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+        }
+      }
     }
   }, [burst, shots.length, carouselRef]);
 
@@ -262,7 +267,7 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
           resolve(blob ? new File([blob], `multiplo-${Math.floor(id)}.jpg`, { type: "image/jpeg" }) : null);
         }, "image/jpeg", 0.9));
         setShots((p) => [...p, { id, file, thumb }]);
-        setBestShotId((prev) => prev ?? id);
+        setBestShotId(id);
         return;
       }
       // A single photo: the camera's own full-resolution photo where the phone offers it, else the frame.
@@ -376,7 +381,7 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
               className="ar-burst-carousel w-full max-w-full"
             >
               {shots.map((s, i) => {
-                const isBest = s.id === (bestShotId ?? shots[0]?.id);
+                const isBest = s.id === (bestShotId ?? shots[shots.length - 1]?.id);
                 return (
                   <div
                     key={s.id}
@@ -387,10 +392,10 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
                     onClick={(e) => pickBestShot(s.id, e.currentTarget)}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickBestShot(s.id, e.currentTarget as HTMLElement); } }}
                     aria-label={`Foto ${i + 1}${isBest ? " (Scatto migliore selezionato)" : " (Tocca per scegliere come migliore)"}`}
-                    className={`relative shrink-0 snap-center rounded-lg p-0.5 cursor-pointer ${
+                    className={`relative shrink-0 snap-center rounded-lg p-0.5 cursor-pointer transition-opacity duration-150 ${
                       isBest
-                        ? "ring-2 ring-[#00d296] shadow-[0_0_14px_rgba(0,210,150,0.85)]"
-                        : "ring-1 ring-white/40 hover:ring-white/80 opacity-80 hover:opacity-100"
+                        ? "ring-2 ring-[#00d296] shadow-[0_0_16px_rgba(0,210,150,0.85)] opacity-100"
+                        : "ring-1 ring-white/35 hover:ring-white/70 opacity-65 hover:opacity-95"
                     }`}
                   >
                     <img

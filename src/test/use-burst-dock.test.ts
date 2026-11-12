@@ -251,4 +251,63 @@ describe("useBurstDock", () => {
     // Item 2 (dist 50px > 38px) is strictly at base scale 0.88
     expect(item2.style.transform).toBe("scale(0.88) translateY(0px)");
   });
+
+  it("calls onCenteredChange with the centered item ID", () => {
+    const onCenteredChange = vi.fn();
+    const { result } = renderHook(() => useBurstDock(true, 2, onCenteredChange));
+    const container = document.createElement("div");
+    vi.spyOn(container, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      right: 800,
+      width: 800,
+      height: 100,
+      top: 0,
+      bottom: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => {},
+    });
+
+    const item1 = document.createElement("div");
+    item1.setAttribute("data-burst-item", "true");
+    item1.setAttribute("data-burst-id", "42");
+    vi.spyOn(item1, "getBoundingClientRect").mockReturnValue({
+      left: 375,
+      right: 425,
+      width: 50,
+      height: 50,
+      top: 0,
+      bottom: 50,
+      x: 375,
+      y: 0,
+      toJSON: () => {},
+    });
+
+    const item2 = document.createElement("div");
+    item2.setAttribute("data-burst-item", "true");
+    item2.setAttribute("data-burst-id", "43");
+    vi.spyOn(item2, "getBoundingClientRect").mockReturnValue({
+      left: 600,
+      right: 650,
+      width: 50,
+      height: 50,
+      top: 0,
+      bottom: 50,
+      x: 600,
+      y: 0,
+      toJSON: () => {},
+    });
+
+    container.appendChild(item1);
+    container.appendChild(item2);
+
+    // @ts-expect-error ref assignment for testing
+    result.current.carouselRef.current = container;
+
+    act(() => {
+      result.current.updateDockEffect();
+    });
+
+    expect(onCenteredChange).toHaveBeenCalledWith(42);
+  });
 });

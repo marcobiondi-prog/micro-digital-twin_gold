@@ -158,15 +158,20 @@ export function ArCamera({
     });
   };
 
-  const { carouselRef, updateDockEffect } = useBurstDock(burst, burstShots.length);
+  const { carouselRef, updateDockEffect } = useBurstDock(burst, burstShots.length, setBestShotId);
 
-  // Scorrimento fluido alla nuova foto scattata
+  // Scorrimento fluido alla nuova foto scattata portandola al centro fisso tipo Netflix
   useEffect(() => {
     if (burst && burstShots.length > 0) {
       const el = carouselRef.current;
-      if (el) el.scrollTo({ left: el.scrollWidth, behavior: "smooth" });
+      if (el) {
+        const lastItem = el.querySelector<HTMLElement>("[data-burst-item]:last-child");
+        if (lastItem) {
+          lastItem.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+        }
+      }
     }
-  }, [burst, burstShots.length]);
+  }, [burst, burstShots.length, carouselRef]);
 
   const pickBestShot = (id: number, el?: HTMLElement | null) => {
     setBestShotId(id);
@@ -1281,7 +1286,7 @@ export function ArCamera({
         if (!b) return;
         const file = new File([b], `foto-ar${tag}-multiplo-${id}.jpg`, { type: "image/jpeg" });
         setBurstShots((p) => [...p, { id, file, thumb }]);
-        setBestShotId((prev) => prev ?? id);
+        setBestShotId(id);
       }, "image/jpeg", 0.88);
       return;
     }
@@ -1473,7 +1478,7 @@ export function ArCamera({
                   className="ar-burst-carousel w-full max-w-full"
                 >
                   {burstShots.map((s, i) => {
-                    const isBest = s.id === (bestShotId ?? burstShots[0]?.id);
+                    const isBest = s.id === (bestShotId ?? burstShots[burstShots.length - 1]?.id);
                     return (
                       <div
                         key={s.id}
@@ -1484,10 +1489,10 @@ export function ArCamera({
                         onClick={(e) => pickBestShot(s.id, e.currentTarget)}
                         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickBestShot(s.id, e.currentTarget as HTMLElement); } }}
                         aria-label={`Foto ${i + 1}${isBest ? " (Scatto migliore selezionato)" : " (Tocca per scegliere come migliore)"}`}
-                        className={`relative shrink-0 snap-center rounded-lg p-0.5 cursor-pointer ${
+                        className={`relative shrink-0 snap-center rounded-lg p-0.5 cursor-pointer transition-opacity duration-150 ${
                           isBest
-                            ? "ring-2 ring-[#00d296] shadow-[0_0_14px_rgba(0,210,150,0.85)]"
-                            : "ring-1 ring-white/40 hover:ring-white/80 opacity-80 hover:opacity-100"
+                            ? "ring-2 ring-[#00d296] shadow-[0_0_16px_rgba(0,210,150,0.85)] opacity-100"
+                            : "ring-1 ring-white/35 hover:ring-white/70 opacity-65 hover:opacity-95"
                         }`}
                       >
                         <img
