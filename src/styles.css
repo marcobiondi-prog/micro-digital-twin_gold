@@ -2168,7 +2168,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   position: absolute;
   left: 0;
   right: 0;
-  bottom: calc(11.75rem + env(safe-area-inset-bottom));
+  bottom: calc(13.5rem + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2187,7 +2187,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   pointer-events: none !important;
 }
 .ar-burst-shelf.is-tools-open {
-  bottom: calc(17.5rem + env(safe-area-inset-bottom));
+  bottom: calc(19.25rem + env(safe-area-inset-bottom));
 }
 .ar-burst-shelf .ar-burst-carousel {
   padding-inline: calc(50vw - 28px);
