@@ -7,13 +7,13 @@ vi.mock("three", async (importOriginal) => {
   return {
     ...actual,
     WebGLRenderer: vi.fn().mockImplementation(function (this: Record<string, unknown>) {
-      this.setClearAlpha = vi.fn();
-      this.setSize = vi.fn();
-      this.clear = vi.fn();
-      this.setScissor = vi.fn();
-      this.setScissorTest = vi.fn();
-      this.render = vi.fn();
-      this.dispose = vi.fn();
+      this["setClearAlpha"] = vi.fn();
+      this["setSize"] = vi.fn();
+      this["clear"] = vi.fn();
+      this["setScissor"] = vi.fn();
+      this["setScissorTest"] = vi.fn();
+      this["render"] = vi.fn();
+      this["dispose"] = vi.fn();
     }),
   };
 });
@@ -86,6 +86,28 @@ describe("ARCore WebXR Integration", () => {
       await manager.isSupported();
       expect(statuses).toContain("supported");
       unsub();
+    });
+
+    it("starts and stops an immersive-ar session successfully", async () => {
+      const mockSession = {
+        requestReferenceSpace: vi.fn().mockResolvedValue({}),
+        requestHitTestSource: vi.fn().mockResolvedValue({}),
+        requestAnimationFrame: vi.fn(),
+        addEventListener: vi.fn(),
+        end: vi.fn().mockResolvedValue(undefined),
+      };
+      (navigator as unknown as { xr: { requestSession: () => Promise<unknown> } }).xr = {
+        requestSession: vi.fn().mockResolvedValue(mockSession),
+      };
+
+      const manager = createArCoreManager();
+      const started = await manager.startSession();
+      expect(started).toBe(true);
+      expect(manager.isActive()).toBe(true);
+
+      await manager.stopSession();
+      expect(manager.isActive()).toBe(false);
+      expect(mockSession.end).toHaveBeenCalled();
     });
   });
 

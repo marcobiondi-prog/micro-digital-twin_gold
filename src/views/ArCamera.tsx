@@ -216,6 +216,7 @@ export function ArCamera({
 
   const last = useRef<Parameters<ArScene["place"]> | null>(null);
   // Integrazione ARCore / WebXR per tracciamento superfici reali
+  const [arCoreSupported, setArCoreSupported] = useState(false);
   const [arCoreActive, setArCoreActive] = useState(false);
   const arCoreRef = useRef<ArCoreManager | null>(null);
 
@@ -223,10 +224,14 @@ export function ArCamera({
     let active = true;
     void isArCoreSupported().then((supported) => {
       if (supported && active) {
-        setArCoreActive(true);
-        arCoreRef.current = createArCoreManager();
+        setArCoreSupported(true);
+        const mgr = createArCoreManager();
+        arCoreRef.current = mgr;
+        mgr.subscribeStatus((st) => {
+          if (active) setArCoreActive(st === "active");
+        });
         if (sceneRef.current) {
-          sceneRef.current.setArCoreManager?.(arCoreRef.current);
+          sceneRef.current.setArCoreManager?.(mgr);
         }
       }
     });
@@ -236,6 +241,15 @@ export function ArCamera({
       arCoreRef.current = null;
     };
   }, []);
+
+  const toggleArCore = async () => {
+    if (!arCoreRef.current) return;
+    if (arCoreActive) {
+      await arCoreRef.current.stopSession();
+    } else {
+      await arCoreRef.current.startSession();
+    }
+  };
 
   const xrActive = false;
   // Eye tracking del soggetto: il mirino cerca e segue la pianta dal primo fotogramma.
@@ -1346,15 +1360,23 @@ export function ArCamera({
                   {AR_FOCUS[kind].map(o => <Button variant="ghost" size="sm" key={o.id} type="button" role="radio" aria-label={o.label} title={o.label} aria-checked={arFocusOption(kind, target).id === o.id} className="camera-tool ar-focus-pill" onClick={() => selectTarget(o.id)}>{FOCUS_LABELS[o.id]}</Button>)}
                 </div>
                 </div>
-                {arCoreActive && (
-                  <span
-                    className="inline-flex items-center self-center rounded-full border border-brand-turquoise/40 bg-brand-turquoise/15 px-2 py-0.5 text-[10px] font-bold tracking-wider text-brand-turquoise"
-                    title="ARCore attivo: tracciamento continuo delle superfici reali"
-                    role="status"
-                    aria-label="ARCore attivo"
+                {arCoreSupported && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    type="button"
+                    onClick={() => void toggleArCore()}
+                    className={`camera-tool self-center rounded-full border px-2.5 py-0.5 text-[11px] font-bold tracking-wider transition-colors ${
+                      arCoreActive
+                        ? "border-brand-turquoise bg-brand-turquoise text-white shadow-[0_0_10px_rgba(45,212,191,0.5)]"
+                        : "border-brand-turquoise/50 bg-brand-turquoise/10 text-brand-turquoise hover:bg-brand-turquoise/20"
+                    }`}
+                    title={arCoreActive ? "ARCore attivo su superfici reali (tocca per disattivare)" : "Attiva tracciamento superfici reali con Google ARCore"}
+                    aria-pressed={arCoreActive}
+                    aria-label={arCoreActive ? "Disattiva ARCore" : "Attiva ARCore"}
                   >
-                    ARCore
-                  </span>
+                    {arCoreActive ? "● ARCore attivo" : "⛶ Avvia ARCore"}
+                  </Button>
                 )}
                 {(found || species || viewedRecord) && !scanning && <Button variant="ghost" size="sm" aria-label="Mostra esito analisi" title="Mostra esito analisi" className="camera-tool ar-esito-chip" onClick={() => { setToolsOpen(true); setActiveTool("analysis"); setPanelOpen(true); }}><Activity className="size-4 shrink-0" />Esito</Button>}
                 <Button variant="ghost" size="icon" className="camera-tool size-11" aria-label="Guida inquadratura" title="Guida inquadratura" aria-pressed={guideOpen} onClick={() => setGuideOpen(v => !v)}><Info className="size-4" /></Button>

@@ -119,8 +119,31 @@ export function createArCoreManager(): ArCoreManager {
       const viewerSpace = await session.requestReferenceSpace("viewer");
 
       if (session.requestHitTestSource) {
-        hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
+        hitTestSource = (await session.requestHitTestSource({ space: viewerSpace })) ?? null;
       }
+
+      const onXRFrame: XRFrameRequestCallback = (_time, frame) => {
+        if (!session) return;
+        if (hitTestSource && refSpace) {
+          const hitTestResults = frame.getHitTestResults(hitTestSource);
+          if (hitTestResults.length > 0) {
+            const hit = hitTestResults[0];
+            const pose = hit ? hit.getPose(refSpace) : null;
+            if (pose) {
+              const pos = pose.transform.position;
+              lastHit = {
+                x: pos.x,
+                y: pos.y,
+                z: pos.z,
+                distance: Math.sqrt(pos.x * pos.x + pos.y * pos.y + pos.z * pos.z),
+                isRealSurface: true,
+              };
+            }
+          }
+        }
+        session.requestAnimationFrame(onXRFrame);
+      };
+      session.requestAnimationFrame(onXRFrame);
 
       session.addEventListener("end", () => {
         session = null;
