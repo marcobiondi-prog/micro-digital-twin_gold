@@ -1515,7 +1515,7 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .ar-xr-overlay[hidden] { display: none; }
 .ar-xr-overlay [data-camera-controls] { pointer-events: auto; }
 .ar-xr-overlay .ar-thermal-summary { pointer-events: auto; }
-@media (orientation: landscape) { .ar-thermal-summary { width: min(28vw, 18rem); max-width: calc(50vw - 6rem); } }
+@media (orientation: landscape) { .ar-thermal-summary { width: min(34vw, 21rem); max-width: calc(50vw - 4.5rem); } }
 /* Landscape: stima termica più leggibile (valori e testo ingranditi solo qui) */
 @media (orientation: landscape) {
   .ar-thermal-summary:not(.ar-thermal-summary-min) .ar-thermal-heading { font-size: .8125rem; }
@@ -1720,7 +1720,7 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .ar-pill-hud .ar-thermal-summary:not(.ar-thermal-summary-min) { max-height: calc(100dvh - max(1rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 20rem); overflow-y: auto; overscroll-behavior: contain; }
 .ar-flash-error { position: absolute; top: calc(max(1rem, env(safe-area-inset-top)) + 3rem); right: 1rem; max-width: min(80%, 20rem); padding: .5rem; border-radius: 6px; background: var(--camera-glass); font-size: .75rem; color: var(--camera-ink); }
 @media (orientation: landscape) {
-  .ar-pill-hud .ar-thermal-summary { width: min(28vw, 18rem); max-width: calc(50vw - 6rem); }
+  .ar-pill-hud .ar-thermal-summary { width: min(34vw, 21rem); max-width: calc(50vw - 4.5rem); }
   .ar-pill-hud .ar-thermal-summary:not(.ar-thermal-summary-min) { max-height: calc(100dvh - max(1rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 5.5rem); }
   .ar-pill-hud .camera-bottom { left: max(44%, env(safe-area-inset-left)); right: max(1rem, env(safe-area-inset-right)); }
   .ar-pill-hud .ar-tools-panel [data-camera-scroll] { max-height: 28dvh; }
@@ -1728,7 +1728,7 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 }
 @media (prefers-reduced-motion: reduce) { .ar-framing-hint { transition: none; } .ar-viewfinder.is-locked:not(.is-locking) .ar-viewfinder-corner { animation: none; } }
 
-.ar-camera-surface[data-landscape=true] .ar-thermal-summary { width: min(28vw, 18rem); max-width: calc(50vw - 6rem); }
+.ar-camera-surface[data-landscape=true] .ar-thermal-summary { width: min(34vw, 21rem); max-width: calc(50vw - 4.5rem); }
 .ar-camera-surface[data-landscape=true] .ar-thermal-summary:not(.ar-thermal-summary-min) { max-height: calc(var(--ar-camera-height) - max(1rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 5.5rem); }
 /* Landscape: the compact top bar and the goal selectors sit higher so the view keeps its height. */
 .ar-camera-surface[data-landscape=true] .ar-camera-topbar { top: max(.375rem, env(safe-area-inset-top)); }
