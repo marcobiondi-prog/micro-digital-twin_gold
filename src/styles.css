@@ -2198,10 +2198,10 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 /* Landscape: containment shelf above the Scansiona pill, closer to zoom buttons with proper spacing */
 .ar-camera-surface[data-landscape=true] .ar-burst-shelf {
   left: auto;
-  right: calc(50% + 4.25rem);
-  bottom: calc(5.25rem + env(safe-area-inset-bottom));
+  right: calc(50% + 3.75rem);
+  bottom: calc(4.85rem + env(safe-area-inset-bottom));
   width: min(24vw, 10rem);
-  max-width: calc(50vw - 4.5rem);
+  max-width: calc(50vw - 4.25rem);
   background: transparent;
   border: none;
   border-radius: 0;
@@ -2226,10 +2226,10 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 @media (orientation: landscape) and (max-height: 520px) {
   .camera-hud .ar-burst-shelf {
     left: auto;
-    right: calc(50% + 4.25rem);
-    bottom: calc(5.25rem + env(safe-area-inset-bottom));
+    right: calc(50% + 3.75rem);
+    bottom: calc(4.85rem + env(safe-area-inset-bottom));
     width: min(24vw, 10rem);
-    max-width: calc(50vw - 4.5rem);
+    max-width: calc(50vw - 4.25rem);
     background: transparent;
     border: none;
     border-radius: 0;
