@@ -27,7 +27,10 @@ export function utcOffsetText(ms: number, tz: string): string {
   const name = new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "shortOffset" }).formatToParts(new Date(ms)).find((p) => p.type === "timeZoneName")?.value ?? "GMT";
   const m = /GMT([+-])(\d{1,2})(?::(\d{2}))?/.exec(name);
   if (!m) return "UTC";
-  return `UTC${m[1] === "-" ? "−" : "+"}${Number(m[2])}${m[3] && m[3] !== "00" ? `:${m[3]}` : ""}`;
+  const hours = Number(m[2]);
+  const mins = m[3] && m[3] !== "00" ? `:${m[3]}` : "";
+  if (hours === 0 && !mins) return "UTC";
+  return `UTC${m[1] === "-" ? "−" : "+"}${hours}${mins}`;
 }
 
 /** The zone's name in plain Italian ("Ora dell'Europa centrale"), else its city ("Tokyo"). */

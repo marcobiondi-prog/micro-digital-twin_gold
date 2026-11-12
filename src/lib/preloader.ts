@@ -6,7 +6,7 @@
  */
 const CSS = `
 #mdt-preloader{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:oklch(0.155 0.012 265);color:#f4f6f8;color-scheme:dark;transition:opacity .5s cubic-bezier(.22,1,.36,1),visibility .5s;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-#mdt-preloader.out{opacity:0;visibility:hidden}
+#mdt-preloader.out{opacity:0;visibility:hidden;pointer-events:none}
 #mdt-preloader.plain .glow,#mdt-preloader.plain .box{display:none}
 #mdt-preloader.plain{transition-duration:.25s}
 #mdt-preloader .glow{position:absolute;inset:0;background:radial-gradient(50% 32% at 50% 44%,oklch(0.72 0.15 190/.16),transparent 70%)}
@@ -67,7 +67,8 @@ var el=document.createElement("div");el.id="mdt-preloader";el.innerHTML=${JSON.s
 if(!idx)el.className="plain";document.documentElement.appendChild(el);
 var t0=Date.now(),gone=false;
 window.__mdtPreloaderDone=function(){if(gone)return;gone=true;var wait=idx?Math.max(0,1800-(Date.now()-t0)):0;
-setTimeout(function(){el.classList.add("out");setTimeout(function(){el.remove()},idx?600:300)},wait)};
+var finish=function(){el.classList.add("out");setTimeout(function(){el.remove()},idx?600:300)};
+if(wait>0)setTimeout(finish,wait);else finish();};
 setTimeout(window.__mdtPreloaderDone,8000);
 }catch(e){}})();`;
 

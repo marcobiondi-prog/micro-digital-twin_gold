@@ -19,7 +19,7 @@ function BenvenutoRoute() {
   // Se non c'è un profilo identificato e non si è in modalità ospite, copri Benvenuto con una schermata nera
   // così sotto il SectorGate ("Da dove vuoi usarmi?") non traspare né si intravede mai Benvenuto.
   if (id === null && !guest) {
-    return <div className="fixed inset-0 z-[999999998] bg-black [color-scheme:dark]" aria-hidden="true" />;
+    return <div className="fixed inset-0 z-[1000000000] bg-black [color-scheme:dark]" aria-hidden="true" />;
   }
   return <Welcome />;
 }

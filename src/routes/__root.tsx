@@ -476,8 +476,9 @@ function RootComponent() {
       };
       check();
     });
+    const onIndex = typeof window !== "undefined" && window.location.pathname === "/";
     const settled = Promise.all([Promise.race([fonts, new Promise((r) => setTimeout(r, 1500))]), landed, openingSettled])
-      .then(() => new Promise((r) => setTimeout(r, 250)));
+      .then(() => (onIndex ? new Promise((r) => setTimeout(r, 250)) : Promise.resolve()));
     void Promise.race([settled, new Promise((r) => setTimeout(r, /[?&]code=/.test(window.location.search) ? 7000 : 4000))]).then(() => requestAnimationFrame(hidePreloader));
   }, []);
   // The other pages' code is fetched once the app is idle, so moving between them never waits for the network
@@ -707,10 +708,10 @@ function RootComponent() {
       </>}
 
       <main id="main-content" tabIndex={-1} className={intro ? "focus:outline-none" : "app-main mx-auto max-w-7xl px-4 pb-8 pt-6 focus:outline-none sm:pt-8"}><Outlet /></main><Toaster /><UpdatePill />
-      {!intro && !(introSeen() && !getProId() && !useGuest()) && <footer className="mx-auto max-w-7xl px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] text-sm leading-relaxed text-muted-foreground sm:pb-10 sm:text-[15px]">
+      {!intro && <footer className="mx-auto max-w-7xl px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] text-sm leading-relaxed text-muted-foreground sm:pb-10 sm:text-[15px]">
         I risultati del simulatore sono indicativi e non sostituiscono modelli fisici calibrati.
       </footer>}
-      {!intro && !(introSeen() && !getProId() && !useGuest()) && <BottomNav />}
+      {!intro && <BottomNav />}
       <CameraSheet />
       <PermissionsSheet />
       <Suspense fallback={null}><SectorGate /></Suspense>

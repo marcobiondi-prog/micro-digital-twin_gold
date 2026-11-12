@@ -347,7 +347,7 @@ function SectorPage({ start }: { start: ProKind | null }) {
   // Just shown (back from another page, a swipe's release): the finger can still be down on a button that appears under
   // it ("Entra come ospite" in the screenshot: the guest entered by itself and the page behind showed). Taps are ignored
   // for a moment.
-  const [armed, setArmed] = useState(false);
+  const [armed, setArmed] = useState(true);
   useEffect(() => { const t = window.setTimeout(() => setArmed(true), 450); return () => window.clearTimeout(t); }, []);
   useEffect(() => {
     if (start !== undefined) setKind(start);
