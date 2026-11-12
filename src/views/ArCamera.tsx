@@ -157,9 +157,47 @@ export function ArCamera({
     });
   };
 
-  const pickBestShot = (id: number) => {
+  const carouselRef = useRef<HTMLDivElement>(null);
+
+  // Effetto ingrandimento Mac Dock (Genius/Fisheye) allo scorrimento del carosello
+  const updateDockEffect = useCallback(() => {
+    const container = carouselRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const items = container.querySelectorAll<HTMLElement>("[data-burst-item]");
+    const maxRadius = 120;
+    items.forEach((item) => {
+      const itemRect = item.getBoundingClientRect();
+      const itemCenterX = itemRect.left + itemRect.width / 2;
+      const dist = Math.abs(centerX - itemCenterX);
+      if (dist < maxRadius) {
+        const factor = (1 + Math.cos((dist / maxRadius) * Math.PI)) / 2;
+        const scale = 0.9 + 0.38 * factor;
+        const lift = -10 * factor;
+        item.style.transform = `scale(${scale.toFixed(3)}) translateY(${lift.toFixed(1)}px)`;
+        item.style.zIndex = factor > 0.3 ? "15" : "5";
+      } else {
+        item.style.transform = "scale(0.9) translateY(0px)";
+        item.style.zIndex = "1";
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (burst && burstShots.length > 0) {
+      const id = requestAnimationFrame(updateDockEffect);
+      return () => cancelAnimationFrame(id);
+    }
+  }, [burst, burstShots.length, updateDockEffect]);
+
+  const pickBestShot = (id: number, el?: HTMLElement | null) => {
     setBestShotId(id);
     hapticTick(25);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+      setTimeout(updateDockEffect, 200);
+    }
   };
   // Copernicus area context (signed-in camera): read once per place, shared with the Lab panel.
   const lab = useLab();
@@ -1407,22 +1445,25 @@ export function ArCamera({
                         </span>
                       </div>
                       <div
+                        ref={carouselRef}
+                        onScroll={updateDockEffect}
                         data-map-gestures
-                        className="ar-burst-carousel max-w-[min(20rem,88vw)] px-1 py-1.5"
+                        className="ar-burst-carousel max-w-[min(20rem,88vw)]"
                       >
                         {burstShots.map((s, i) => {
                           const isBest = s.id === (bestShotId ?? burstShots[0]?.id);
                           return (
                             <div
                               key={s.id}
+                              data-burst-item
                               role="button"
                               tabIndex={0}
-                              onClick={() => pickBestShot(s.id)}
-                              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickBestShot(s.id); } }}
+                              onClick={(e) => pickBestShot(s.id, e.currentTarget)}
+                              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickBestShot(s.id, e.currentTarget as HTMLElement); } }}
                               aria-label={`Foto ${i + 1}${isBest ? " (Scatto migliore selezionato)" : " (Tocca per scegliere come migliore)"}`}
-                              className={`relative shrink-0 snap-center rounded-lg p-0.5 transition-all cursor-pointer ${
+                              className={`relative shrink-0 snap-center rounded-lg p-0.5 cursor-pointer ${
                                 isBest
-                                  ? "ring-2 ring-[#00d296] shadow-[0_0_12px_rgba(0,210,150,0.85)] scale-105"
+                                  ? "ring-2 ring-[#00d296] shadow-[0_0_14px_rgba(0,210,150,0.85)]"
                                   : "ring-1 ring-white/40 hover:ring-white/80 opacity-80 hover:opacity-100"
                               }`}
                             >
