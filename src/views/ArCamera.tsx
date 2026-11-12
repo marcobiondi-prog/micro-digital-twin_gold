@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { flushSync } from "react-dom";
 import { toast } from "sonner";
-import { Activity, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grid2X2, Minus, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
+import { Activity, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grid2X2, Minus, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Star, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
 import { supportsCameraTorch, setCameraTorch } from "@/lib/camera-torch";
 import { detectArObject, getReferencePhoto, type Detection, type Soil } from "@/controllers/ar-detect.functions";
 import { gbifPhotoSearchUrl, pickGbifPhoto, type ReferencePhoto } from "@/models/ar-reference-photo";
@@ -106,23 +106,61 @@ export function ArCamera({
   // Multiple shot (Multiplo): the AI camera stays open, each shutter tap keeps one more captioned photo, and "Fine"
   // (or closing, Back included) adds them all at once — nothing shot is lost.
   const [burst, setBurst] = useState(false);
-  const [burstShots, setBurstShots] = useState<Array<{ id: number; file: File; url: string }>>([]);
+  const [burstShots, setBurstShots] = useState<Array<{ id: number; file: File; thumb: string }>>([]);
+  const [bestShotId, setBestShotId] = useState<number | null>(null);
   const burstRef = useRef(burstShots);
   burstRef.current = burstShots;
+  const bestShotIdRef = useRef(bestShotId);
+  bestShotIdRef.current = bestShotId;
   const [burstFlash, setBurstFlash] = useState(0);
-  const onClose = useCallback(() => {
+
+  const getOrderedShots = () => {
     const taken = burstRef.current;
-    if (taken.length) { onCapture(taken.map((s) => s.file)); taken.forEach((s) => URL.revokeObjectURL(s.url)); burstRef.current = []; setBurstShots([]); }
+    if (!taken.length) return [];
+    const currentBest = bestShotIdRef.current;
+    const best = taken.find((s) => s.id === currentBest);
+    const others = taken.filter((s) => s.id !== currentBest);
+    return best ? [best, ...others] : taken;
+  };
+
+  const onClose = useCallback(() => {
+    const ordered = getOrderedShots();
+    if (ordered.length) {
+      onCapture(ordered.map((s) => s.file));
+      burstRef.current = [];
+      setBurstShots([]);
+      setBestShotId(null);
+    }
     setBurst(false);
     closeCamera();
   }, [closeCamera, onCapture]);
-  // Back to Singolo at any time: the multiple shot's photos go to the simulation at once and the camera stays open.
+
+  // Torna a Singolo: consegna gli scatti (con il migliore in testa) e mantiene aperta la fotocamera.
   const backToSingle = () => {
-    const taken = burstRef.current;
-    if (taken.length) { onCapture(taken.map((s) => s.file)); taken.forEach((s) => URL.revokeObjectURL(s.url)); burstRef.current = []; setBurstShots([]); }
+    const ordered = getOrderedShots();
+    if (ordered.length) {
+      onCapture(ordered.map((s) => s.file));
+      burstRef.current = [];
+      setBurstShots([]);
+      setBestShotId(null);
+    }
     setBurst(false);
   };
-  const dropBurstShot = (id: number) => setBurstShots((p) => { const gone = p.find((s) => s.id === id); if (gone) URL.revokeObjectURL(gone.url); return p.filter((s) => s.id !== id); });
+
+  const dropBurstShot = (id: number) => {
+    setBurstShots((p) => {
+      const next = p.filter((s) => s.id !== id);
+      if (bestShotIdRef.current === id) {
+        setBestShotId(next.length > 0 ? next[next.length - 1].id : null);
+      }
+      return next;
+    });
+  };
+
+  const pickBestShot = (id: number) => {
+    setBestShotId(id);
+    hapticTick(25);
+  };
   // Copernicus area context (signed-in camera): read once per place, shared with the Lab panel.
   const lab = useLab();
   const place = kind === "urban" ? lab.urban.location : lab.vineyard.location;
@@ -328,7 +366,8 @@ export function ArCamera({
     const g = sample.getContext("2d", { willReadFrequently: true });
     if (!g) return;
     let box = SEARCH_BOX;
-    let hits = 0, misses = 0, locked = false;
+    let prevBox = SEARCH_BOX;
+    let hits = 0, misses = 0, locked = false, prevLocked = false;
     let greenHits = 0, greenMisses = 0;
     greenLockRef.current = false;
     const tick = () => {
@@ -348,11 +387,17 @@ export function ArCamera({
       if (!locked && hits >= 2) locked = true;
       if (locked && misses >= 4) locked = false;
       box = smoothBox(box, found && (locked || hits > 0) ? found : locked ? box : SEARCH_BOX, locked ? 0.45 : 0.3);
-      setSubject(box);
-      setSubjectLocked(locked);
+      if (Math.hypot(box.x - prevBox.x, box.y - prevBox.y, box.w - prevBox.w, box.h - prevBox.h) > 0.015) {
+        prevBox = box;
+        setSubject(box);
+      }
+      if (locked !== prevLocked) {
+        prevLocked = locked;
+        setSubjectLocked(locked);
+      }
     };
     tick();
-    const id = window.setInterval(tick, 110);
+    const id = window.setInterval(tick, 200);
     return () => { window.clearInterval(id); setSubject(SEARCH_BOX); setSubjectLocked(false); greenLockRef.current = false; };
   }, [mode, ready]);
   const surfaceRef = useRef<HTMLDivElement>(null);
@@ -808,7 +853,9 @@ export function ArCamera({
       if (version === scanVersion.current) playCameraSound("scan-fail", 1.8);
       if (version === scanVersion.current) setFound(/Unauthorized/.test(message) ? "Sessione scaduta: esci e accedi di nuovo prima di una nuova analisi." : `Analisi interrotta${detail ? ` (${detail})` : ""}. Controlla la connessione prima di una nuova analisi.`);
     } finally {
-      if (version === scanVersion.current) { scanBusy.current = false; scanningRef.current = false; setScanning(false); }
+      scanBusy.current = false;
+      scanningRef.current = false;
+      setScanning(false);
     }
   };
 
@@ -1162,10 +1209,18 @@ export function ArCamera({
       const id = Date.now();
       setBurstFlash((n) => n + 1);
       hapticTick(30);
+      const thumbCanvas = document.createElement("canvas");
+      const scale = 160 / Math.max(saved.width, saved.height);
+      thumbCanvas.width = Math.max(1, Math.round(saved.width * scale));
+      thumbCanvas.height = Math.max(1, Math.round(saved.height * scale));
+      thumbCanvas.getContext("2d")?.drawImage(saved, 0, 0, thumbCanvas.width, thumbCanvas.height);
+      const thumb = thumbCanvas.toDataURL("image/jpeg", 0.7);
+
       saved.toBlob((b) => {
         if (!b) return;
         const file = new File([b], `foto-ar${tag}-multiplo-${id}.jpg`, { type: "image/jpeg" });
-        setBurstShots((p) => [...p, { id, file, url: URL.createObjectURL(file) }]);
+        setBurstShots((p) => [...p, { id, file, thumb }]);
+        setBestShotId((prev) => prev ?? id);
       }, "image/jpeg", 0.88);
       return;
     }
@@ -1342,23 +1397,69 @@ export function ArCamera({
                   data-camera-controls
                   aria-hidden={Boolean(thermalInfoOpen || confirmClear || guideOpen)}
                 >
-                  {burstFlash > 0 && <div key={burstFlash} className="burst-flash pointer-events-none fixed inset-0 bg-white" aria-hidden="true" />}
+                  {burstFlash > 0 && <div key={burstFlash} onAnimationEnd={() => setBurstFlash(0)} className="burst-flash pointer-events-none fixed inset-0 bg-white" aria-hidden="true" />}
                   {burst && burstShots.length > 0 && (
-                    <div data-map-gestures className="flex max-w-[min(22rem,90vw)] touch-pan-x gap-1.5 overflow-x-auto px-1 pt-2 [scrollbar-width:none]">
-                      {burstShots.map((s, i) => (
-                        <span key={s.id} className="relative shrink-0">
-                          <img src={s.url} alt={`Foto ${i + 1}`} className="size-11 rounded-md object-cover ring-1 ring-white/50" />
-                          <button type="button" onClick={() => dropBurstShot(s.id)} aria-label={`Togli la foto ${i + 1}`} className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-black/80 text-white ring-1 ring-white/40"><X className="size-3" aria-hidden="true" /></button>
+                    <div className="flex w-full flex-col items-center gap-1.5">
+                      <div className="flex w-full max-w-[min(20rem,88vw)] items-center justify-between px-1 text-[10.5px] font-semibold text-white/90 [text-shadow:0_1px_2px_black]">
+                        <span>{burstShots.length} {burstShots.length === 1 ? "foto scattata" : "foto scattate"}</span>
+                        <span className="flex items-center gap-1 font-bold text-[#00d296]">
+                          <Star className="size-2.5 fill-current" /> Tocca per scegliere la migliore
                         </span>
-                      ))}
+                      </div>
+                      <div
+                        data-map-gestures
+                        className="ar-burst-carousel max-w-[min(20rem,88vw)] px-1 py-1.5"
+                      >
+                        {burstShots.map((s, i) => {
+                          const isBest = s.id === (bestShotId ?? burstShots[0]?.id);
+                          return (
+                            <div
+                              key={s.id}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => pickBestShot(s.id)}
+                              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickBestShot(s.id); } }}
+                              aria-label={`Foto ${i + 1}${isBest ? " (Scatto migliore selezionato)" : " (Tocca per scegliere come migliore)"}`}
+                              className={`relative shrink-0 snap-center rounded-lg p-0.5 transition-all cursor-pointer ${
+                                isBest
+                                  ? "ring-2 ring-[#00d296] shadow-[0_0_12px_rgba(0,210,150,0.85)] scale-105"
+                                  : "ring-1 ring-white/40 hover:ring-white/80 opacity-80 hover:opacity-100"
+                              }`}
+                            >
+                              <img
+                                src={s.thumb}
+                                alt={`Foto ${i + 1}`}
+                                className="size-12 rounded-md object-cover"
+                              />
+                              <span className="absolute bottom-1 left-1.5 rounded-full bg-black/75 px-1 text-[8.5px] font-bold text-white [text-shadow:0_1px_2px_black]">
+                                {i + 1}
+                              </span>
+                              {isBest && (
+                                <span className="absolute -top-2 left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded-full bg-[#00d296] px-1.5 py-0.2 text-[8.5px] font-extrabold text-[#042017] shadow-sm whitespace-nowrap">
+                                  <Star className="size-2 fill-current" /> Migliore
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  dropBurstShot(s.id);
+                                }}
+                                aria-label={`Togli la foto ${i + 1}`}
+                                className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-black/85 text-white ring-1 ring-white/40 hover:bg-destructive hover:scale-110 transition-transform"
+                              >
+                                <X className="size-3" aria-hidden="true" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                   <div className="flex items-center gap-2">
                     <div role="radiogroup" aria-label="Tipo di scatto" className="flex rounded-full bg-black/55 p-0.5 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur">
                       <button type="button" role="radio" aria-checked={!burst} onClick={backToSingle}
-                        // Off once the multiple shot has photos (no switching by mistake mid-series): "Fine" hands them over first.
-                        disabled={burst && burstShots.length > 0} title={burst && burstShots.length > 0 ? "Prima tocca Fine per tenere gli scatti" : undefined}
-                        className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""} disabled:opacity-40`}>Singolo</button>
+                        className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""}`}>Singolo</button>
                       <button type="button" role="radio" aria-checked={burst} onClick={() => setBurst(true)} className={`h-8 rounded-full px-3 ${burst ? "bg-white text-black" : ""}`}>Multiplo</button>
                     </div>
                     {burst && burstShots.length > 0 && (
