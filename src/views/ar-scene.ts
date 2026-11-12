@@ -58,7 +58,7 @@ export function createArScene(): ArScene {
   grid.position.z = -40;
   const gm = grid.material as THREE.Material;
   gm.transparent = true;
-  gm.opacity = 0.45;
+  gm.opacity = 0.65;
   gm.depthWrite = false;
   scene.add(grid);
   const target = new THREE.Mesh(new THREE.RingGeometry(0.22, 0.25, 48), new THREE.MeshBasicMaterial({ color: ink, transparent: true, opacity: 0.9, side: THREE.DoubleSide }));

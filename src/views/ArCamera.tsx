@@ -245,26 +245,30 @@ export function ArCamera({
 
   const arTransitionRef = useRef(false);
 
-  const toggleArCore = async (e?: React.MouseEvent) => {
+  const toggleAr = async (e?: React.MouseEvent) => {
     e?.stopPropagation();
     e?.preventDefault();
-    if (!arCoreRef.current) return;
     arTransitionRef.current = true;
     try {
-      if (arCoreActive) {
-        await arCoreRef.current.stopSession();
-        toast.info("Tracciamento 3D standard attivo.");
-      } else {
-        const root = surfaceRef.current ?? document.body;
-        const ok = await arCoreRef.current.startSession({ domOverlay: root });
-        if (ok) {
-          toast.success("ARCore attivo: rilevamento superfici fisiche in corso.");
-        } else {
-          toast.info("ARCore non disponibile su questo dispositivo. Continua con il tracciamento standard.");
+      const willEnable = !layers.has("grid");
+      if (willEnable) {
+        setLayers((s) => new Set(s).add("grid").add("objects"));
+        toast.success("Realtà Aumentata attiva: griglia del terreno agganciata.");
+        if (arCoreRef.current && !arCoreActive) {
+          const root = surfaceRef.current ?? document.body;
+          void arCoreRef.current.startSession({ domOverlay: root }).catch(() => {});
         }
+      } else {
+        setLayers((s) => {
+          const n = new Set(s);
+          n.delete("grid");
+          return n;
+        });
+        if (arCoreRef.current && arCoreActive) {
+          void arCoreRef.current.stopSession().catch(() => {});
+        }
+        toast.info("Tracciamento griglia AR disattivato.");
       }
-    } catch {
-      toast.info("ARCore non disponibile su questo dispositivo. Continua con il tracciamento standard.");
     } finally {
       window.setTimeout(() => {
         arTransitionRef.current = false;
@@ -1414,35 +1418,33 @@ export function ArCamera({
               {toolsOpen && <div className="ar-tools-panel flex w-full flex-col items-center gap-2">
               <div className="ar-tool-options" data-camera-controls>
                 <Button variant="ghost" size="sm" className="camera-tool" title="Analisi" aria-label="Analisi" aria-pressed={activeTool === "analysis"} onClick={() => { setActiveTool(v => v === "analysis" ? null : "analysis"); setPanelOpen(true); }}><Info className="size-4" />Analisi</Button>
-                <Button variant="ghost" size="sm" className="camera-tool" title="Livelli AR" aria-label="Livelli AR" aria-pressed={activeTool === "manage"} onClick={() => { setActiveTool(v => v === "manage" ? null : "manage"); setLayers(s => new Set(s).add("grid")); }}><SlidersHorizontal className="size-4" />AR</Button>
-                {arCoreSupported && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    type="button"
-                    onClick={(e) => void toggleArCore(e)}
-                    className={`camera-tool flex items-center gap-1.5 transition-colors ${
-                      arCoreActive
-                        ? "border-brand-turquoise bg-brand-turquoise text-white shadow-[0_0_10px_rgba(45,212,191,0.5)]"
-                        : "border-brand-turquoise/50 bg-brand-turquoise/10 text-brand-turquoise hover:bg-brand-turquoise/20"
-                    }`}
-                    title={arCoreActive ? "ARCore attivo su superfici reali (tocca per disattivare)" : "Attiva tracciamento superfici reali con Google ARCore"}
-                    aria-pressed={arCoreActive}
-                    aria-label={arCoreActive ? "Disattiva ARCore" : "Attiva ARCore"}
-                  >
-                    {arCoreActive ? (
-                      <>
-                        <span className="size-1.5 rounded-full bg-white animate-pulse" />
-                        <span>ARCore attivo</span>
-                      </>
-                    ) : (
-                      <>
-                        <Scan className="size-3.5 shrink-0" />
-                        <span>Avvia ARCore</span>
-                      </>
-                    )}
-                  </Button>
-                )}
+                <Button variant="ghost" size="sm" className="camera-tool" title="Livelli" aria-label="Livelli" aria-pressed={activeTool === "manage"} onClick={() => { setActiveTool(v => v === "manage" ? null : "manage"); }}><SlidersHorizontal className="size-4" />Livelli</Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  onClick={(e) => void toggleAr(e)}
+                  className={`camera-tool flex items-center gap-1.5 transition-colors ${
+                    layers.has("grid") || arCoreActive
+                      ? "border-brand-turquoise bg-brand-turquoise text-white shadow-[0_0_10px_rgba(45,212,191,0.5)]"
+                      : "border-brand-turquoise/50 bg-brand-turquoise/10 text-brand-turquoise hover:bg-brand-turquoise/20"
+                  }`}
+                  title={layers.has("grid") || arCoreActive ? "AR attiva: griglia agganciata al terreno (tocca per disattivare)" : "Attiva la Realtà Aumentata con griglia di posizionamento"}
+                  aria-pressed={layers.has("grid") || arCoreActive}
+                  aria-label={layers.has("grid") || arCoreActive ? "Disattiva AR" : "Attiva AR"}
+                >
+                  {layers.has("grid") || arCoreActive ? (
+                    <>
+                      <span className="size-1.5 rounded-full bg-white animate-pulse" />
+                      <span>AR attivo</span>
+                    </>
+                  ) : (
+                    <>
+                      <Scan className="size-3.5 shrink-0" />
+                      <span>Attiva AR</span>
+                    </>
+                  )}
+                </Button>
               {activeTool === "manage" && <div className="flex items-center gap-2" data-camera-controls>
                 <Button variant="ghost" size="icon" className="camera-tool" aria-label="Mostra griglia" title="Griglia" aria-pressed={layers.has("grid")} onClick={() => toggle("grid")}><Grid2X2 className="size-4" /></Button>
                 <Button variant="ghost" size="icon" className="camera-tool" aria-label="Mappa termica simulata" title="Calore simulato" aria-pressed={layers.has("heat")} onClick={() => { if (!layers.has("heat")) setThermalInfoOpen(true); toggle("heat"); }}><Flame className="size-4" /></Button>
