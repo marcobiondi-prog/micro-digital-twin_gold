@@ -1070,7 +1070,7 @@ export function ArCamera({
   const goToPage = (page: number) => setBrowse(pageCount ? (page + pageCount) % pageCount : null);
   const summarySwipeProps = {
     onPointerDown: (event: React.PointerEvent<HTMLElement>) => {
-      if (!event.isPrimary || event.pointerType === "mouse" || pageCount < 2 || (event.target instanceof Element && event.target.closest("button"))) return;
+      if (!event.isPrimary || event.pointerType === "mouse" || pageCount < 2 || (event.target instanceof Element && event.target.closest("button, .ar-thermal-heading"))) return;
       summarySwipe.current = { id: event.pointerId, x: event.clientX, y: event.clientY, rotation: rotationRef.current };
     },
     onPointerUp: (event: React.PointerEvent<HTMLElement>) => {

@@ -1504,7 +1504,7 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .ar-pill-hud .ar-tools-panel [data-camera-scroll] { text-shadow: var(--camera-shadow); }
 .ar-pill-hud .ar-tools-panel > div { max-width: 100%; }
 .ar-pill-hud .ar-tools-panel [data-camera-scroll] { background: transparent; padding-left: 0; }
-.ar-thermal-summary { position: absolute; top: calc(max(1rem, env(safe-area-inset-top)) + 3.25rem); left: max(1rem, env(safe-area-inset-left)); width: min(calc(100% - 2rem), 22rem); padding: .625rem .75rem; border: 1px solid var(--camera-border); border-radius: 8px; color: var(--camera-ink); background: var(--camera-glass); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); pointer-events: none; }
+.ar-thermal-summary { position: absolute; top: calc(max(1rem, env(safe-area-inset-top)) + 3.25rem); left: max(1rem, env(safe-area-inset-left)); width: min(calc(100% - 2rem), 22rem); padding: .625rem .75rem; border: 1px solid var(--camera-border); border-radius: 8px; color: var(--camera-ink); background: var(--camera-glass); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); pointer-events: none; z-index: 22; }
 .ar-thermal-heading { display: flex; align-items: center; gap: .375rem; font-size: .75rem; font-weight: 600; cursor: pointer; user-select: none; }
 .ar-thermal-heading:hover { opacity: .94; }
 .ar-thermal-values { display: flex; gap: 1.5rem; margin-top: .375rem; font-variant-numeric: tabular-nums; }
@@ -1517,8 +1517,8 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .ar-xr-overlay [data-camera-controls] { pointer-events: auto; }
 .ar-xr-overlay .ar-thermal-summary { pointer-events: auto; }
 @media (orientation: landscape) {
-  .ar-thermal-summary:not(.ar-thermal-summary-min) { top: max(.375rem, env(safe-area-inset-top)) !important; width: min(34vw, 21rem); max-width: calc(50vw - 4.5rem); }
-  .ar-thermal-summary-min { top: max(.375rem, env(safe-area-inset-top)) !important; width: auto !important; max-width: min(85vw, 22rem) !important; }
+  .ar-thermal-summary:not(.ar-thermal-summary-min) { top: calc(max(.375rem, env(safe-area-inset-top)) + 2.75rem) !important; width: min(34vw, 21rem); max-width: calc(50vw - 4.5rem); z-index: 22; pointer-events: auto !important; }
+  .ar-thermal-summary-min { top: calc(max(.375rem, env(safe-area-inset-top)) + 2.75rem) !important; width: auto !important; max-width: min(85vw, 22rem) !important; z-index: 22; pointer-events: auto !important; }
 }
 /* Landscape: stima termica più leggibile (valori e testo ingranditi solo qui) */
 @media (orientation: landscape) {
@@ -1652,14 +1652,15 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .ar-analysis-min { display: flex; align-items: center; gap: .375rem; padding: .375rem .75rem; border: 1px solid var(--camera-border); border-radius: 999px; background: var(--camera-glass); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: var(--camera-ink); font-size: .75rem; font-weight: 600; }
 
 /* Stima termica minimizzata e bilancia trascinabile */
-.ar-thermal-summary-min { display: inline-flex; align-items: center; gap: .375rem; width: auto !important; height: 2.25rem; padding: .375rem .75rem; border-radius: 999px !important; font-size: .75rem; cursor: pointer; pointer-events: auto; white-space: nowrap; }
-.ar-thermal-summary:not(.ar-thermal-summary-min) { pointer-events: auto; }
+.ar-thermal-summary-min { display: inline-flex; align-items: center; gap: .375rem; width: auto !important; height: 2.25rem; padding: .375rem .75rem; border-radius: 999px !important; font-size: .75rem; cursor: pointer; pointer-events: auto; white-space: nowrap; z-index: 22; }
+.ar-thermal-summary:not(.ar-thermal-summary-min) { pointer-events: auto; z-index: 22; }
 .ar-thermal-balance-track.is-draggable { cursor: ew-resize; touch-action: none; height: 14px; }
 .ar-thermal-balance-value { position: absolute; top: 1.15rem; transform: translateX(-50%); font-size: .7rem; font-weight: 700; color: var(--camera-ink); font-variant-numeric: tabular-nums; white-space: nowrap; text-shadow: var(--camera-shadow); }
 @media (prefers-reduced-motion: reduce) { .ar-thermal-balance-value { transition: none; } }
 
 /* Field camera: compact one-handed controls, isolated from close gestures. */
-.ar-camera-topbar { position: absolute; inset-inline: max(1rem, env(safe-area-inset-left), env(safe-area-inset-right)); top: max(1rem, env(safe-area-inset-top)); display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: .5rem; }
+.ar-camera-topbar { position: absolute; inset-inline: max(1rem, env(safe-area-inset-left), env(safe-area-inset-right)); top: max(1rem, env(safe-area-inset-top)); display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: .5rem; pointer-events: none; }
+.ar-camera-topbar > * { pointer-events: auto; }
 .ar-framing-hint { position: absolute; top: calc(max(1rem, env(safe-area-inset-top)) + 3.5rem); left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 2rem); border-radius: 6px; padding: .5rem .75rem; background: var(--camera-glass); color: var(--camera-ink); font-size: .75rem; text-align: center; pointer-events: none; opacity: 0; transition: opacity 180ms ease; }
 .ar-framing-hint[data-visible=true] { opacity: 1; }
 .ar-framing-hint[data-camera-controls] { pointer-events: auto; z-index: 30; max-height: calc(100dvh - 12rem); overflow-y: auto; }
@@ -1725,22 +1726,22 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .ar-pill-hud .ar-thermal-summary:not(.ar-thermal-summary-min) { max-height: calc(100dvh - max(1rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 20rem); overflow-y: auto; overscroll-behavior: contain; }
 .ar-flash-error { position: absolute; top: calc(max(1rem, env(safe-area-inset-top)) + 3rem); right: 1rem; max-width: min(80%, 20rem); padding: .5rem; border-radius: 6px; background: var(--camera-glass); font-size: .75rem; color: var(--camera-ink); }
 @media (orientation: landscape) {
-  .ar-pill-hud .ar-thermal-summary:not(.ar-thermal-summary-min) { top: max(.375rem, env(safe-area-inset-top)) !important; width: min(34vw, 21rem); max-width: calc(50vw - 4.5rem); }
-  .ar-pill-hud .ar-thermal-summary-min { top: max(.375rem, env(safe-area-inset-top)) !important; width: auto !important; max-width: min(85vw, 22rem) !important; }
-  .ar-pill-hud .ar-thermal-summary:not(.ar-thermal-summary-min) { max-height: calc(100dvh - max(.375rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 7.5rem); }
+  .ar-pill-hud .ar-thermal-summary:not(.ar-thermal-summary-min) { top: calc(max(.375rem, env(safe-area-inset-top)) + 2.75rem) !important; width: min(34vw, 21rem); max-width: calc(50vw - 4.5rem); z-index: 22; pointer-events: auto !important; }
+  .ar-pill-hud .ar-thermal-summary-min { top: calc(max(.375rem, env(safe-area-inset-top)) + 2.75rem) !important; width: auto !important; max-width: min(85vw, 22rem) !important; z-index: 22; pointer-events: auto !important; }
+  .ar-pill-hud .ar-thermal-summary:not(.ar-thermal-summary-min) { max-height: calc(100dvh - max(.375rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 9.5rem); }
   .ar-pill-hud .camera-bottom { left: max(44%, env(safe-area-inset-left)); right: max(1rem, env(safe-area-inset-right)); }
   .ar-pill-hud .ar-tools-panel [data-camera-scroll] { max-height: 28dvh; }
   .ar-pill-hud .ar-tools-panel { max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 8rem); overflow-y: auto; overscroll-behavior: contain; }
 }
 @media (prefers-reduced-motion: reduce) { .ar-framing-hint { transition: none; } .ar-viewfinder.is-locked:not(.is-locking) .ar-viewfinder-corner { animation: none; } }
 
-.ar-camera-surface[data-landscape=true] .ar-thermal-summary:not(.ar-thermal-summary-min) { top: max(.375rem, env(safe-area-inset-top)) !important; width: min(34vw, 21rem); max-width: calc(50vw - 4.5rem); }
-.ar-camera-surface[data-landscape=true] .ar-thermal-summary-min { top: max(.375rem, env(safe-area-inset-top)) !important; width: auto !important; max-width: min(85vw, 22rem) !important; }
-.ar-camera-surface[data-landscape=true] .ar-thermal-summary:not(.ar-thermal-summary-min) { max-height: calc(var(--ar-camera-height) - max(.375rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 7.5rem); }
+.ar-camera-surface[data-landscape=true] .ar-thermal-summary:not(.ar-thermal-summary-min) { top: calc(max(.375rem, env(safe-area-inset-top)) + 2.75rem) !important; width: min(34vw, 21rem); max-width: calc(50vw - 4.5rem); z-index: 22; pointer-events: auto !important; }
+.ar-camera-surface[data-landscape=true] .ar-thermal-summary-min { top: calc(max(.375rem, env(safe-area-inset-top)) + 2.75rem) !important; width: auto !important; max-width: min(85vw, 22rem) !important; z-index: 22; pointer-events: auto !important; }
+.ar-camera-surface[data-landscape=true] .ar-thermal-summary:not(.ar-thermal-summary-min) { max-height: calc(var(--ar-camera-height, 100dvh) - max(.375rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 9.5rem); }
 /* Landscape: the compact top bar and the goal selectors sit higher so the view keeps its height. */
 .ar-camera-surface[data-landscape=true] .ar-camera-topbar { top: max(.375rem, env(safe-area-inset-top)); }
 .ar-camera-surface[data-landscape=true] .ar-camera-topbar .camera-tool.size-11 { width: 2.25rem; height: 2.25rem; }
-.ar-camera-surface[data-landscape=true] { --ar-header-bottom: max(.375rem, env(safe-area-inset-top)); }
+.ar-camera-surface[data-landscape=true] { --ar-header-bottom: calc(max(.375rem, env(safe-area-inset-top)) + 2.75rem); }
 .ar-camera-surface[data-landscape=true] .ar-camera-topbar .camera-tool.size-11 { min-height: 2.25rem; }
 .ar-camera-surface[data-landscape=true] .camera-bottom { left: max(1rem, env(safe-area-inset-left)); right: max(1rem, env(safe-area-inset-right)); bottom: calc(1rem + env(safe-area-inset-bottom)); }
 .ar-camera-surface[data-landscape=true] .camera-capture-row { grid-template-columns: 1fr 60px 1fr; }
@@ -1846,7 +1847,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .ar-camera-actions { grid-column: 1 / -1; grid-row: 1; justify-content: flex-end; align-items: center; }
 .ar-focus-options { display:flex; align-items:center; gap:.25rem; padding:.3125rem; border-radius:999px; background:var(--camera-glass); border:1px solid var(--camera-border); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow:0 2px 10px color-mix(in oklab, oklch(0 0 0) 35%, transparent); }
 .ar-camera-surface:not([data-landscape=true]) .ar-thermal-summary { top:var(--ar-header-bottom); }
-.ar-camera-surface[data-landscape=true] .ar-thermal-summary { top: max(.375rem, env(safe-area-inset-top)) !important; }
+.ar-camera-surface[data-landscape=true] .ar-thermal-summary { top: calc(max(.375rem, env(safe-area-inset-top)) + 2.75rem) !important; z-index: 22; pointer-events: auto !important; }
 /* Leaves room for the capture dock, but never squeezes the results below ~12rem while the screen has it. */
 .ar-camera-surface .ar-thermal-summary:not(.ar-thermal-summary-min) { max-height:max(min(12rem, calc(var(--ar-camera-height, 100dvh) - var(--ar-header-bottom) - 1rem)), calc(var(--ar-camera-height, 100dvh) - var(--ar-header-bottom) - env(safe-area-inset-bottom) - 12rem)); overflow-y:auto; }
 .ar-camera-surface .ar-tools-panel { max-height:max(3rem, calc(var(--ar-camera-height, 100dvh) - var(--ar-header-bottom) - env(safe-area-inset-bottom) - 9rem)); overflow-y:auto; overscroll-behavior:contain; }
