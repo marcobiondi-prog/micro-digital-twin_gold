@@ -23,6 +23,7 @@ import { galleryMultiple, openSystemCamera, prepareSystemCamera, supportsSystemC
 import { SystemCamera } from "@/views/SystemCamera";
 import { GalleryReview } from "@/views/GalleryReview";
 import { guardUse } from "@/lib/app-permissions";
+import { useRegisteredEmail } from "@/lib/use-signed-in";
 import { useLab } from "@/models/lab-store";
 import { ZONE_LABEL, drawnAreaFor } from "@/models/drawn-area";
 import { MEDIA_GROUP, uploadGroups } from "@/models/media-groups";
@@ -243,7 +244,8 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
   const installedApp = useInstalledApp();
   const demo = useDemoSignedIn();
   // AI_STANDBY: the AI camera is paused for now.
-  const aiReady = !AI_STANDBY && (Boolean(userId) || demo) && (installedApp || demo);
+  const registeredEmail = useRegisteredEmail();
+  const aiReady = !AI_STANDBY && (Boolean(userId) || Boolean(registeredEmail) || demo) && (installedApp || demo);
   // The central camera button of the menu starts captures here, inside the same tap.
   const captureRef = useRef<(action: "ai" | "photo" | "video" | "burst" | "gallery") => void>(() => undefined);
   captureRef.current = (action) => {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { flushSync } from "react-dom";
-import { Activity, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grid2X2, Minus, Plus, ScanSearch, SlidersHorizontal, Square, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
+import { Activity, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grid2X2, Minus, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
 import { supportsCameraTorch, setCameraTorch } from "@/lib/camera-torch";
 import { detectArObject, getReferencePhoto, type Detection, type Soil } from "@/controllers/ar-detect.functions";
 import { gbifPhotoSearchUrl, pickGbifPhoto, type ReferencePhoto } from "@/models/ar-reference-photo";
@@ -1366,7 +1366,7 @@ export function ArCamera({
                     size="sm"
                     type="button"
                     onClick={() => void toggleArCore()}
-                    className={`camera-tool self-center rounded-full border px-2.5 py-0.5 text-[11px] font-bold tracking-wider transition-colors ${
+                    className={`camera-tool self-center flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-bold tracking-wider transition-colors ${
                       arCoreActive
                         ? "border-brand-turquoise bg-brand-turquoise text-white shadow-[0_0_10px_rgba(45,212,191,0.5)]"
                         : "border-brand-turquoise/50 bg-brand-turquoise/10 text-brand-turquoise hover:bg-brand-turquoise/20"
@@ -1375,7 +1375,17 @@ export function ArCamera({
                     aria-pressed={arCoreActive}
                     aria-label={arCoreActive ? "Disattiva ARCore" : "Attiva ARCore"}
                   >
-                    {arCoreActive ? "● ARCore attivo" : "⛶ Avvia ARCore"}
+                    {arCoreActive ? (
+                      <>
+                        <span className="size-1.5 rounded-full bg-white animate-pulse" />
+                        <span>ARCore attivo</span>
+                      </>
+                    ) : (
+                      <>
+                        <Scan className="size-3.5 shrink-0" />
+                        <span>Avvia ARCore</span>
+                      </>
+                    )}
                   </Button>
                 )}
                 {(found || species || viewedRecord) && !scanning && <Button variant="ghost" size="sm" aria-label="Mostra esito analisi" title="Mostra esito analisi" className="camera-tool ar-esito-chip" onClick={() => { setToolsOpen(true); setActiveTool("analysis"); setPanelOpen(true); }}><Activity className="size-4 shrink-0" />Esito</Button>}
