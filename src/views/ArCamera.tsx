@@ -243,22 +243,32 @@ export function ArCamera({
     };
   }, []);
 
+  const arTransitionRef = useRef(false);
+
   const toggleArCore = async (e?: React.MouseEvent) => {
     e?.stopPropagation();
     e?.preventDefault();
     if (!arCoreRef.current) return;
+    arTransitionRef.current = true;
     try {
       if (arCoreActive) {
         await arCoreRef.current.stopSession();
+        toast.info("Tracciamento 3D standard attivo.");
       } else {
         const root = surfaceRef.current ?? document.body;
         const ok = await arCoreRef.current.startSession({ domOverlay: root });
-        if (!ok) {
-          toast.info("ARCore non avviabile su questo dispositivo. Continua con il tracciamento standard.");
+        if (ok) {
+          toast.success("ARCore attivo: rilevamento superfici fisiche in corso.");
+        } else {
+          toast.info("ARCore non disponibile su questo dispositivo. Continua con il tracciamento standard.");
         }
       }
     } catch {
-      toast.info("ARCore non avviabile su questo dispositivo. Continua con il tracciamento standard.");
+      toast.info("ARCore non disponibile su questo dispositivo. Continua con il tracciamento standard.");
+    } finally {
+      window.setTimeout(() => {
+        arTransitionRef.current = false;
+      }, 1500);
     }
   };
 
@@ -459,7 +469,9 @@ export function ArCamera({
     let wasFullscreen = Boolean(document.fullscreenElement);
     const onFullscreenChange = () => {
       const fullscreen = Boolean(document.fullscreenElement);
-      if (wasFullscreen && !fullscreen && fullscreenExitIsBack(performance.now())) onClose();
+      if (wasFullscreen && !fullscreen && fullscreenExitIsBack(performance.now())) {
+        if (!arTransitionRef.current) onClose();
+      }
       wasFullscreen = fullscreen;
     };
     document.addEventListener("fullscreenchange", onFullscreenChange);
@@ -1213,7 +1225,7 @@ export function ArCamera({
     <Dialog modal
       open={mode !== null}
       onOpenChange={(o) => {
-        if (!o) onClose();
+        if (!o && !arTransitionRef.current) onClose();
       }}
     >
       <DialogContent

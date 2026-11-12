@@ -103,8 +103,7 @@ export function createArCoreManager(): ArCoreManager {
     if (typeof window === "undefined" || !navigator.xr) return false;
     try {
       const sessionInit: XRSessionInit = {
-        requiredFeatures: ["hit-test"],
-        optionalFeatures: ["local-floor", "light-estimation", "plane-detection"],
+        optionalFeatures: ["hit-test", "local-floor", "light-estimation", "plane-detection"],
       };
 
       if (options?.domOverlay) {
@@ -114,7 +113,14 @@ export function createArCoreManager(): ArCoreManager {
         };
       }
 
-      session = await navigator.xr.requestSession("immersive-ar", sessionInit);
+      try {
+        session = await navigator.xr.requestSession("immersive-ar", sessionInit);
+      } catch (errFirst) {
+        session = await navigator.xr.requestSession("immersive-ar", {
+          optionalFeatures: ["local-floor"],
+        });
+      }
+
       refSpace = await session.requestReferenceSpace("local");
       const viewerSpace = await session.requestReferenceSpace("viewer");
 
