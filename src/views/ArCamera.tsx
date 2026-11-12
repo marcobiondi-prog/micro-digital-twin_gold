@@ -245,35 +245,25 @@ export function ArCamera({
 
   const arTransitionRef = useRef(false);
 
-  const toggleAr = async (e?: React.MouseEvent) => {
+  const toggleAr = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     e?.preventDefault();
     arTransitionRef.current = true;
-    try {
-      const willEnable = !layers.has("grid");
-      if (willEnable) {
-        setLayers((s) => new Set(s).add("grid").add("objects"));
-        toast.success("Realtà Aumentata attiva: griglia del terreno agganciata.");
-        if (arCoreRef.current && !arCoreActive) {
-          const root = surfaceRef.current ?? document.body;
-          void arCoreRef.current.startSession({ domOverlay: root }).catch(() => {});
-        }
-      } else {
-        setLayers((s) => {
-          const n = new Set(s);
-          n.delete("grid");
-          return n;
-        });
-        if (arCoreRef.current && arCoreActive) {
-          void arCoreRef.current.stopSession().catch(() => {});
-        }
-        toast.info("Tracciamento griglia AR disattivato.");
-      }
-    } finally {
-      window.setTimeout(() => {
-        arTransitionRef.current = false;
-      }, 1500);
+    const willEnable = !layers.has("grid");
+    if (willEnable) {
+      setLayers((s) => new Set(s).add("grid").add("objects"));
+      toast.success("AR Core attivo: griglia del terreno agganciata.");
+    } else {
+      setLayers((s) => {
+        const n = new Set(s);
+        n.delete("grid");
+        return n;
+      });
+      toast.info("AR Core disattivato.");
     }
+    window.setTimeout(() => {
+      arTransitionRef.current = false;
+    }, 500);
   };
 
   const xrActive = false;
@@ -1423,25 +1413,23 @@ export function ArCamera({
                   variant="ghost"
                   size="sm"
                   type="button"
-                  onClick={(e) => void toggleAr(e)}
-                  className={`camera-tool flex items-center gap-1.5 transition-colors ${
-                    layers.has("grid") || arCoreActive
-                      ? "border-brand-turquoise bg-brand-turquoise text-white shadow-[0_0_10px_rgba(45,212,191,0.5)]"
-                      : "border-brand-turquoise/50 bg-brand-turquoise/10 text-brand-turquoise hover:bg-brand-turquoise/20"
+                  onClick={(e) => toggleAr(e)}
+                  className={`camera-tool flex items-center gap-1.5 transition-all ${
+                    layers.has("grid") ? "ar-pill-active" : "ar-pill-inactive"
                   }`}
-                  title={layers.has("grid") || arCoreActive ? "AR attiva: griglia agganciata al terreno (tocca per disattivare)" : "Attiva la Realtà Aumentata con griglia di posizionamento"}
-                  aria-pressed={layers.has("grid") || arCoreActive}
-                  aria-label={layers.has("grid") || arCoreActive ? "Disattiva AR" : "Attiva AR"}
+                  title={layers.has("grid") ? "AR Core attivo sul terreno (tocca per disattivare)" : "Attiva la Realtà Aumentata AR Core"}
+                  aria-pressed={layers.has("grid")}
+                  aria-label={layers.has("grid") ? "Disattiva AR Core" : "Attiva AR Core"}
                 >
-                  {layers.has("grid") || arCoreActive ? (
+                  {layers.has("grid") ? (
                     <>
-                      <span className="size-1.5 rounded-full bg-white animate-pulse" />
-                      <span>AR attivo</span>
+                      <span className="size-2 rounded-full bg-[#042017] animate-pulse" />
+                      <span className="font-bold">AR Core attivo</span>
                     </>
                   ) : (
                     <>
                       <Scan className="size-3.5 shrink-0" />
-                      <span>Attiva AR</span>
+                      <span>AR Core</span>
                     </>
                   )}
                 </Button>

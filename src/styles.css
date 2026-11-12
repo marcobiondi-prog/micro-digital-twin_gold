@@ -1478,6 +1478,20 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .camera-viewfinder { filter: drop-shadow(var(--camera-shadow)); opacity: .85; }
 .ar-pill-hud .camera-tool { min-height: 40px; border-radius: 999px; color: var(--camera-ink); background: var(--camera-glass); border: 1px solid var(--camera-border); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
 .ar-pill-hud .camera-tool:hover, .ar-pill-hud .camera-tool[aria-pressed=true] { background: var(--camera-surface); border-color: var(--camera-ink); }
+.ar-pill-hud .camera-tool.ar-pill-active,
+.ar-pill-hud .camera-tool.ar-pill-active[aria-pressed=true],
+.ar-pill-hud .camera-tool.ar-pill-active:hover {
+  background: #00d296 !important;
+  color: #042017 !important;
+  border: 1.5px solid #6ee7b7 !important;
+  font-weight: 700 !important;
+  box-shadow: 0 0 16px rgba(0, 210, 150, 0.85), 0 0 4px #6ee7b7 !important;
+}
+.ar-pill-hud .camera-tool.ar-pill-inactive {
+  background: rgba(0, 210, 150, 0.12) !important;
+  color: #2dd4bf !important;
+  border: 1px solid rgba(45, 212, 191, 0.45) !important;
+}
 .ar-pill-hud .camera-labelled-tool .camera-tool { width: auto; min-width: 94px; gap: .375rem; padding-inline: .625rem; font-size: .6875rem; }
 .ar-scan-tools { display: flex; align-items: center; justify-content: center; gap: .375rem; }
 .ar-pill-hud .camera-labelled-tool .camera-tool.is-compact { width: 40px; min-width: 40px; padding-inline: 0; }
