@@ -1505,7 +1505,8 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .ar-pill-hud .ar-tools-panel > div { max-width: 100%; }
 .ar-pill-hud .ar-tools-panel [data-camera-scroll] { background: transparent; padding-left: 0; }
 .ar-thermal-summary { position: absolute; top: calc(max(1rem, env(safe-area-inset-top)) + 3.25rem); left: max(1rem, env(safe-area-inset-left)); width: min(calc(100% - 2rem), 22rem); padding: .625rem .75rem; border: 1px solid var(--camera-border); border-radius: 8px; color: var(--camera-ink); background: var(--camera-glass); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); pointer-events: none; }
-.ar-thermal-heading { display: flex; align-items: center; gap: .375rem; font-size: .75rem; font-weight: 600; }
+.ar-thermal-heading { display: flex; align-items: center; gap: .375rem; font-size: .75rem; font-weight: 600; cursor: pointer; user-select: none; }
+.ar-thermal-heading:hover { opacity: .94; }
 .ar-thermal-values { display: flex; gap: 1.5rem; margin-top: .375rem; font-variant-numeric: tabular-nums; }
 .ar-thermal-values dt, .ar-thermal-note { color: var(--camera-muted); font-size: .625rem; }
 .ar-thermal-values dd { font-size: 1.125rem; font-weight: 700; }
@@ -1515,7 +1516,10 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .ar-xr-overlay[hidden] { display: none; }
 .ar-xr-overlay [data-camera-controls] { pointer-events: auto; }
 .ar-xr-overlay .ar-thermal-summary { pointer-events: auto; }
-@media (orientation: landscape) { .ar-thermal-summary { top: max(.375rem, env(safe-area-inset-top)) !important; width: min(34vw, 21rem); max-width: calc(50vw - 4.5rem); } }
+@media (orientation: landscape) {
+  .ar-thermal-summary:not(.ar-thermal-summary-min) { top: max(.375rem, env(safe-area-inset-top)) !important; width: min(34vw, 21rem); max-width: calc(50vw - 4.5rem); }
+  .ar-thermal-summary-min { top: max(.375rem, env(safe-area-inset-top)) !important; width: auto !important; max-width: min(85vw, 22rem) !important; }
+}
 /* Landscape: stima termica più leggibile (valori e testo ingranditi solo qui) */
 @media (orientation: landscape) {
   .ar-thermal-summary:not(.ar-thermal-summary-min) .ar-thermal-heading { font-size: .8125rem; }
@@ -1648,7 +1652,7 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .ar-analysis-min { display: flex; align-items: center; gap: .375rem; padding: .375rem .75rem; border: 1px solid var(--camera-border); border-radius: 999px; background: var(--camera-glass); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: var(--camera-ink); font-size: .75rem; font-weight: 600; }
 
 /* Stima termica minimizzata e bilancia trascinabile */
-.ar-thermal-summary-min { display: flex; align-items: center; gap: .375rem; width: auto; padding: .375rem .625rem; font-size: .75rem; cursor: pointer; pointer-events: auto; }
+.ar-thermal-summary-min { display: inline-flex; align-items: center; gap: .375rem; width: auto !important; height: 2.25rem; padding: .375rem .75rem; border-radius: 999px !important; font-size: .75rem; cursor: pointer; pointer-events: auto; white-space: nowrap; }
 .ar-thermal-summary:not(.ar-thermal-summary-min) { pointer-events: auto; }
 .ar-thermal-balance-track.is-draggable { cursor: ew-resize; touch-action: none; height: 14px; }
 .ar-thermal-balance-value { position: absolute; top: 1.15rem; transform: translateX(-50%); font-size: .7rem; font-weight: 700; color: var(--camera-ink); font-variant-numeric: tabular-nums; white-space: nowrap; text-shadow: var(--camera-shadow); }
@@ -1712,15 +1716,17 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .ar-specimen-dock .ar-thermal-balance-track { height: 16px; }
 .ar-specimen-dock .ar-thermal-balance-marker { transition: none; }
 .ar-specimen-dock .ar-thermal-balance-value { width: 5rem; text-align: center; left: clamp(2rem, var(--balance-position, 50%), calc(100% - 2rem)); }
-.ar-thermal-heading { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; }
-.ar-thermal-heading > span, .ar-thermal-summary-min > span { min-width: 0; overflow-wrap: anywhere; }
-.ar-thermal-summary-min { max-width: calc(100% - 2rem); white-space: normal; height: auto; text-align: left; }
+.ar-thermal-heading { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; cursor: pointer; user-select: none; }
+.ar-thermal-heading > span { min-width: 0; overflow-wrap: anywhere; }
+.ar-thermal-summary-min > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: min(16rem, 50vw); }
+.ar-thermal-summary-min { max-width: min(calc(100% - 2rem), 22rem) !important; white-space: nowrap !important; height: 2.25rem !important; text-align: left; }
 .ar-thermal-values { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr)); gap: .5rem; }
 .ar-thermal-values > div { min-width: 0; overflow-wrap: anywhere; }
 .ar-pill-hud .ar-thermal-summary:not(.ar-thermal-summary-min) { max-height: calc(100dvh - max(1rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 20rem); overflow-y: auto; overscroll-behavior: contain; }
 .ar-flash-error { position: absolute; top: calc(max(1rem, env(safe-area-inset-top)) + 3rem); right: 1rem; max-width: min(80%, 20rem); padding: .5rem; border-radius: 6px; background: var(--camera-glass); font-size: .75rem; color: var(--camera-ink); }
 @media (orientation: landscape) {
-  .ar-pill-hud .ar-thermal-summary { top: max(.375rem, env(safe-area-inset-top)) !important; width: min(34vw, 21rem); max-width: calc(50vw - 4.5rem); }
+  .ar-pill-hud .ar-thermal-summary:not(.ar-thermal-summary-min) { top: max(.375rem, env(safe-area-inset-top)) !important; width: min(34vw, 21rem); max-width: calc(50vw - 4.5rem); }
+  .ar-pill-hud .ar-thermal-summary-min { top: max(.375rem, env(safe-area-inset-top)) !important; width: auto !important; max-width: min(85vw, 22rem) !important; }
   .ar-pill-hud .ar-thermal-summary:not(.ar-thermal-summary-min) { max-height: calc(100dvh - max(.375rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 7.5rem); }
   .ar-pill-hud .camera-bottom { left: max(44%, env(safe-area-inset-left)); right: max(1rem, env(safe-area-inset-right)); }
   .ar-pill-hud .ar-tools-panel [data-camera-scroll] { max-height: 28dvh; }
@@ -1728,7 +1734,8 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 }
 @media (prefers-reduced-motion: reduce) { .ar-framing-hint { transition: none; } .ar-viewfinder.is-locked:not(.is-locking) .ar-viewfinder-corner { animation: none; } }
 
-.ar-camera-surface[data-landscape=true] .ar-thermal-summary { top: max(.375rem, env(safe-area-inset-top)) !important; width: min(34vw, 21rem); max-width: calc(50vw - 4.5rem); }
+.ar-camera-surface[data-landscape=true] .ar-thermal-summary:not(.ar-thermal-summary-min) { top: max(.375rem, env(safe-area-inset-top)) !important; width: min(34vw, 21rem); max-width: calc(50vw - 4.5rem); }
+.ar-camera-surface[data-landscape=true] .ar-thermal-summary-min { top: max(.375rem, env(safe-area-inset-top)) !important; width: auto !important; max-width: min(85vw, 22rem) !important; }
 .ar-camera-surface[data-landscape=true] .ar-thermal-summary:not(.ar-thermal-summary-min) { max-height: calc(var(--ar-camera-height) - max(.375rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 7.5rem); }
 /* Landscape: the compact top bar and the goal selectors sit higher so the view keeps its height. */
 .ar-camera-surface[data-landscape=true] .ar-camera-topbar { top: max(.375rem, env(safe-area-inset-top)); }
@@ -2157,12 +2164,12 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 @media (prefers-reduced-motion: reduce) { .burst-flash { animation: none; } }
 
 /* AI camera: Singolo | Multiplo above the capture row, and the strip of the multiple shot's photos. */
-.ar-burst-bar { position: relative; z-index: 20; display: grid; justify-items: center; gap: .5rem; width: 100%; pointer-events: none; }
+.ar-burst-bar { position: relative; z-index: 20; display: grid; justify-items: center; gap: .25rem; width: 100%; pointer-events: none; overflow: visible; }
 .ar-burst-bar > * { pointer-events: auto; }
 .ar-burst-bar > .burst-flash { pointer-events: none !important; }
-.ar-burst-carousel { display: flex; align-items: flex-end; gap: .625rem; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; touch-action: pan-x; scrollbar-width: none; padding-block: 1.125rem .625rem; padding-inline: 1.5rem; }
+.ar-burst-carousel { display: flex; align-items: flex-end; gap: .75rem; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; touch-action: pan-x; scrollbar-width: none; min-height: 7.25rem; padding-top: 2.5rem; padding-bottom: .875rem; padding-inline: calc(50vw - 28px); }
 .ar-burst-carousel::-webkit-scrollbar { display: none; }
-[data-burst-item] { transform-origin: bottom center; transition: transform 90ms cubic-bezier(.2,.8,.2,1); will-change: transform; }
+[data-burst-item] { transform-origin: bottom center; transition: transform 70ms ease-out; will-change: transform; }
 @media (max-width: 767.98px) {
   /* Su mobile, quando gli strumenti sono chiusi, distanzia la pillola Singolo/Multiplo dallo zoom */
   .ar-burst-bar.is-tools-closed { margin-bottom: .75rem; }

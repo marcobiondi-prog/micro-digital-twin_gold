@@ -159,26 +159,25 @@ export function ArCamera({
 
   const carouselRef = useRef<HTMLDivElement>(null);
 
-  // Effetto ingrandimento Mac Dock (Genius/Fisheye) allo scorrimento del carosello
+  // Effetto ingrandimento Mac Dock (Genius/Fisheye) allo scorrimento del carosello: centrato sulla mezzeria dello schermo
   const updateDockEffect = useCallback(() => {
     const container = carouselRef.current;
     if (!container) return;
-    const rect = container.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
+    const screenCenterX = window.innerWidth / 2;
     const items = container.querySelectorAll<HTMLElement>("[data-burst-item]");
-    const maxRadius = 120;
+    const maxRadius = 140;
     items.forEach((item) => {
       const itemRect = item.getBoundingClientRect();
       const itemCenterX = itemRect.left + itemRect.width / 2;
-      const dist = Math.abs(centerX - itemCenterX);
+      const dist = Math.abs(screenCenterX - itemCenterX);
       if (dist < maxRadius) {
         const factor = (1 + Math.cos((dist / maxRadius) * Math.PI)) / 2;
-        const scale = 0.9 + 0.38 * factor;
-        const lift = -10 * factor;
+        const scale = 0.88 + 0.44 * factor;
+        const lift = -14 * factor;
         item.style.transform = `scale(${scale.toFixed(3)}) translateY(${lift.toFixed(1)}px)`;
-        item.style.zIndex = factor > 0.3 ? "15" : "5";
+        item.style.zIndex = factor > 0.25 ? "25" : "10";
       } else {
-        item.style.transform = "scale(0.9) translateY(0px)";
+        item.style.transform = "scale(0.88) translateY(0px)";
         item.style.zIndex = "1";
       }
     });
@@ -189,6 +188,17 @@ export function ArCamera({
       const id = requestAnimationFrame(updateDockEffect);
       return () => cancelAnimationFrame(id);
     }
+  }, [burst, burstShots.length, updateDockEffect]);
+
+  useEffect(() => {
+    if (!burst || burstShots.length === 0) return;
+    const onResize = () => updateDockEffect();
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+    };
   }, [burst, burstShots.length, updateDockEffect]);
 
   const pickBestShot = (id: number, el?: HTMLElement | null) => {
@@ -1107,12 +1117,37 @@ export function ArCamera({
       <button type="button" aria-label="Scansione successiva" onClick={() => goToPage(viewPage + 1)}><ChevronRight className="size-3.5" /></button>
     </div>
   );
-  const minimizeSummary = <Button type="button" variant="ghost" size="icon" onClick={() => setThermalMin(true)}
-    aria-label="Minimizza stima termica" title="Minimizza stima termica"
-    className="ml-auto grid size-7 shrink-0 place-items-center rounded-full"><ChevronDown className="size-3.5" /></Button>;
+  const minimizeSummary = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      onClick={(e) => {
+        e.stopPropagation();
+        setThermalMin(true);
+      }}
+      aria-label="Minimizza stima termica"
+      title="Minimizza stima termica"
+      className="ml-auto grid size-7 shrink-0 place-items-center rounded-full"
+    >
+      <ChevronDown className="size-3.5" />
+    </Button>
+  );
   const recordView = (r: ScanRecord) => (
     <>
-      <div className="ar-thermal-heading">
+      <div
+        className="ar-thermal-heading"
+        onClick={() => setThermalMin(true)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setThermalMin(true);
+          }
+        }}
+        title="Comprimi stima termica"
+      >
         <span className="ar-thermal-info-btn" aria-hidden="true"><Flame className="size-4 shrink-0" /></span>
         <span>{r.target}{r.species ? ` · ${r.species.commonName}` : r.soil ? ` · ${r.soil.label}` : ""}{r.count > 0 ? ` · ×${r.count}` : ""}</span>
         {minimizeSummary}
@@ -1172,11 +1207,32 @@ export function ArCamera({
     <section className={`ar-thermal-summary ${Math.abs(viewport.rotation) === 90 ? "touch-pan-x" : "touch-pan-y"}`} data-camera-controls aria-label="Risultati termici della scansione" aria-live="polite" {...summarySwipeProps}>
       <div className="ar-summary-slide" key={viewPage}>
       {viewedRecord ? recordView(viewedRecord) : <>
-      <div className="ar-thermal-heading">
-        <button type="button" className="ar-thermal-info-btn" onClick={() => setThermalInfoOpen(true)}
-          aria-label="Come leggere la stima termica" title="Come leggere la stima termica">
+      <div
+        className="ar-thermal-heading"
+        onClick={() => setThermalMin(true)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setThermalMin(true);
+          }
+        }}
+        title="Comprimi stima termica"
+      >
+        <button
+          type="button"
+          className="ar-thermal-info-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            setThermalInfoOpen(true);
+          }}
+          aria-label="Come leggere la stima termica"
+          title="Come leggere la stima termica"
+        >
           <Flame className="size-4 shrink-0" />
-        </button><span>{summaryText.title}{species ? ` · ${species.commonName}` : ""}{count > 0 ? ` · ×${count}` : ""}</span>
+        </button>
+        <span>{summaryText.title}{species ? ` · ${species.commonName}` : ""}{count > 0 ? ` · ×${count}` : ""}</span>
         {minimizeSummary}
       </div>
       {species && <dl className="ar-thermal-values">
@@ -1437,8 +1493,8 @@ export function ArCamera({
                 >
                   {burstFlash > 0 && <div key={burstFlash} onAnimationEnd={() => setBurstFlash(0)} className="burst-flash pointer-events-none fixed inset-0 bg-white" aria-hidden="true" />}
                   {burst && burstShots.length > 0 && (
-                    <div className="flex w-full flex-col items-center gap-1.5">
-                      <div className="flex w-full max-w-[min(20rem,88vw)] items-center justify-between px-1 text-[10.5px] font-semibold text-white/90 [text-shadow:0_1px_2px_black]">
+                    <div className="flex w-full flex-col items-center gap-1">
+                      <div className="flex w-full max-w-[min(26rem,92vw)] items-center justify-between px-2 text-[10.5px] font-semibold text-white/90 [text-shadow:0_1px_2px_black]">
                         <span>{burstShots.length} {burstShots.length === 1 ? "foto scattata" : "foto scattate"}</span>
                         <span className="flex items-center gap-1 font-bold text-[#00d296]">
                           <Star className="size-2.5 fill-current" /> Tocca per scegliere la migliore
@@ -1448,7 +1504,7 @@ export function ArCamera({
                         ref={carouselRef}
                         onScroll={updateDockEffect}
                         data-map-gestures
-                        className="ar-burst-carousel max-w-[min(20rem,88vw)]"
+                        className="ar-burst-carousel w-full max-w-full"
                       >
                         {burstShots.map((s, i) => {
                           const isBest = s.id === (bestShotId ?? burstShots[0]?.id);
