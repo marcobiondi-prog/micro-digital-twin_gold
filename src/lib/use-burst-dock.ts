@@ -15,9 +15,17 @@ export function useBurstDock(active: boolean, count: number) {
   const updateDockEffect = useCallback(() => {
     const container = carouselRef.current;
     if (!container) return;
+    const items = container.querySelectorAll<HTMLElement>("[data-burst-item]");
+    // Se c'è solo 1 foto non ingrandire
+    if (items.length <= 1) {
+      items.forEach((item) => {
+        item.style.transform = "scale(1) translateY(0px)";
+        item.style.zIndex = "1";
+      });
+      return;
+    }
     const rect = container.getBoundingClientRect();
     const targetCenterX = rect.left + rect.width / 2;
-    const items = container.querySelectorAll<HTMLElement>("[data-burst-item]");
     // L'ingrandimento Genius parte quando il cursore è in mezzo a 2 foto (metà passo ~38px), non prima
     const maxRadius = 38;
 

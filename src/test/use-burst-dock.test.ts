@@ -114,7 +114,24 @@ describe("useBurstDock", () => {
       toJSON: () => {},
     });
 
+    // Item 2: outside center radius
+    const item2 = document.createElement("div");
+    item2.setAttribute("data-burst-item", "true");
+    item2.setAttribute("data-burst-id", "2");
+    vi.spyOn(item2, "getBoundingClientRect").mockReturnValue({
+      left: 240,
+      right: 290,
+      width: 50,
+      height: 50,
+      top: 220,
+      bottom: 270,
+      x: 240,
+      y: 220,
+      toJSON: () => {},
+    });
+
     container.appendChild(item1);
+    container.appendChild(item2);
 
     // @ts-expect-error ref assignment for testing
     result.current.carouselRef.current = container;
@@ -125,6 +142,48 @@ describe("useBurstDock", () => {
 
     expect(item1.style.transform).toContain("scale(1.320)");
     expect(item1.style.transform).toContain("translateY(-14.0px)");
+  });
+
+  it("does not magnify if there is only 1 photo", () => {
+    const { result } = renderHook(() => useBurstDock(true, 1));
+    const container = document.createElement("div");
+    vi.spyOn(container, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      right: 800,
+      width: 800,
+      height: 100,
+      top: 0,
+      bottom: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => {},
+    });
+
+    const item1 = document.createElement("div");
+    item1.setAttribute("data-burst-item", "true");
+    item1.setAttribute("data-burst-id", "1");
+    vi.spyOn(item1, "getBoundingClientRect").mockReturnValue({
+      left: 375,
+      right: 425,
+      width: 50,
+      height: 50,
+      top: 0,
+      bottom: 50,
+      x: 375,
+      y: 0,
+      toJSON: () => {},
+    });
+
+    container.appendChild(item1);
+    // @ts-expect-error ref assignment for testing
+    result.current.carouselRef.current = container;
+
+    act(() => {
+      result.current.updateDockEffect();
+    });
+
+    expect(item1.style.transform).toBe("scale(1) translateY(0px)");
+    expect(item1.style.zIndex).toBe("1");
   });
 
   it("activates Genius magnification only when between 2 photos (dist <= 38px) and not before", () => {

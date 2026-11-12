@@ -426,7 +426,7 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
         <div className="camera-bottom">
           {canZoom && ready && <ZoomDial className="mb-2" zoom={zoom} max={mode === "video" && zoomRangeRef.current ? zoomRangeRef.current.max / zoomRangeRef.current.min : ZOOM_MAX} onZoom={setZoom} />}
           {mode !== "video" && (
-            <div className="relative mx-auto mb-5 flex items-center justify-center">
+            <div className="relative mx-auto mb-2 flex items-center justify-center">
               <div
                 className="flex w-fit rounded-full bg-black/55 p-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur"
                 role="radiogroup"

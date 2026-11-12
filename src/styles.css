@@ -2197,11 +2197,11 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 
 /* Landscape: containment shelf widened and moved to the left to give ample breathing space */
 .ar-camera-surface[data-landscape=true] .ar-burst-shelf {
-  left: auto;
-  right: calc(50% + 6.25rem);
+  left: max(0.75rem, env(safe-area-inset-left));
+  right: calc(50% + 5.5rem);
   bottom: calc(4.85rem + env(safe-area-inset-bottom));
-  width: min(30vw, 12.5rem);
-  max-width: calc(50vw - 5.5rem);
+  width: auto;
+  max-width: none;
   background: transparent;
   border: none;
   border-radius: 0;
@@ -2225,11 +2225,11 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 
 @media (orientation: landscape) and (max-height: 520px) {
   .camera-hud .ar-burst-shelf {
-    left: auto;
-    right: calc(50% + 6.25rem);
+    left: max(0.75rem, env(safe-area-inset-left));
+    right: calc(50% + 5.5rem);
     bottom: calc(4.85rem + env(safe-area-inset-bottom));
-    width: min(30vw, 12.5rem);
-    max-width: calc(50vw - 5.5rem);
+    width: auto;
+    max-width: none;
     background: transparent;
     border: none;
     border-radius: 0;
@@ -2256,14 +2256,14 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .ar-burst-bar { position: relative; z-index: 20; display: flex; justify-content: center; align-items: center; width: 100%; pointer-events: none; overflow: visible; margin-bottom: 1.5rem; }
 .ar-burst-bar > * { pointer-events: auto; }
 .ar-burst-bar > .burst-flash { pointer-events: none !important; }
-.ar-camera-surface[data-landscape=true] .ar-burst-bar { margin-bottom: 0.875rem; }
+.ar-camera-surface[data-landscape=true] .ar-burst-bar { margin-bottom: 0; }
 .ar-burst-carousel { display: flex; align-items: flex-end; gap: .75rem; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; touch-action: pan-x; scrollbar-width: none; min-height: 7.25rem; padding-top: 2.5rem; padding-bottom: .875rem; padding-inline: calc(50% - 28px); }
 .ar-burst-carousel::-webkit-scrollbar { display: none; }
 [data-burst-item] { transform-origin: bottom center; transition: transform 70ms ease-out; will-change: transform; }
 @media (max-width: 767.98px) {
   /* Su mobile distanzia con respiro la pillola Singolo/Multiplo dallo zoom */
   .ar-burst-bar { margin-bottom: 1.5rem; }
-  .ar-camera-surface[data-landscape=true] .ar-burst-bar { margin-bottom: 0.875rem; }
+  .ar-camera-surface[data-landscape=true] .ar-burst-bar { margin-bottom: 0; }
 }
 
 /* Xperia-style zoom ruler: shown while swiping on the lens chips, it slides under a fixed centre mark. */
