@@ -2253,7 +2253,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 }
 
 /* AI camera: Singolo | Multiplo above the capture row */
-.ar-burst-bar { position: relative; z-index: 20; display: flex; justify-content: center; align-items: center; width: 100%; pointer-events: none; overflow: visible; margin-bottom: 1.5rem; }
+.ar-burst-bar { position: relative; z-index: 20; display: flex; justify-content: center; align-items: center; width: 100%; pointer-events: none; overflow: visible; margin-bottom: 0; }
 .ar-burst-bar > * { pointer-events: auto; }
 .ar-burst-bar > .burst-flash { pointer-events: none !important; }
 .ar-camera-surface[data-landscape=true] .ar-burst-bar { margin-bottom: 0; }
@@ -2261,8 +2261,8 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .ar-burst-carousel::-webkit-scrollbar { display: none; }
 [data-burst-item] { transform-origin: bottom center; transition: transform 70ms ease-out; will-change: transform; }
 @media (max-width: 767.98px) {
-  /* Su mobile distanzia con respiro la pillola Singolo/Multiplo dallo zoom */
-  .ar-burst-bar { margin-bottom: 1.5rem; }
+  /* Su mobile mantieni le pillole Singolo/Multiplo e il counter abbassati a ridosso dello zoom */
+  .ar-burst-bar { margin-bottom: 0; }
   .ar-camera-surface[data-landscape=true] .ar-burst-bar { margin-bottom: 0; }
 }
 

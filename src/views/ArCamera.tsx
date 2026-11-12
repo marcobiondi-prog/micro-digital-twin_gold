@@ -1522,7 +1522,7 @@ export function ArCamera({
             )}
             <div
               data-camera-hud
-              className={`camera-bottom absolute z-20 flex flex-col items-center ${landscape ? "gap-1.5" : "gap-3"}`}
+              className={`camera-bottom absolute z-20 flex flex-col items-center ${landscape ? "gap-1.5" : "gap-2"}`}
             >
               {/* Singolo | Multiplo for photos, and while shooting the strip of the shots kept with "Fine · n". */}
               {!error && mode === "photo" && (
