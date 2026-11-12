@@ -2163,11 +2163,67 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 @keyframes burst-flash { from { opacity: 0.55; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .burst-flash { animation: none; } }
 
-/* AI camera: Singolo | Multiplo above the capture row, and the strip of the multiple shot's photos. */
-.ar-burst-bar { position: relative; z-index: 20; display: grid; justify-items: center; gap: .25rem; width: 100%; pointer-events: none; overflow: visible; }
+/* Multiple shot burst shelf containment div */
+.ar-burst-shelf {
+  position: absolute;
+  z-index: 25;
+  pointer-events: none;
+  overflow: visible;
+  transition: bottom .22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.ar-burst-shelf > * {
+  pointer-events: auto;
+}
+.ar-burst-shelf > .burst-flash {
+  pointer-events: none !important;
+}
+
+/* Portrait: anchored above the bottom capture controls */
+.ar-camera-surface:not([data-landscape=true]) .ar-burst-shelf {
+  left: 0;
+  right: 0;
+  bottom: calc(11.25rem + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.ar-camera-surface:not([data-landscape=true]) .ar-burst-shelf.is-tools-open {
+  bottom: calc(16.5rem + env(safe-area-inset-bottom));
+}
+.ar-camera-surface:not([data-landscape=true]) .ar-burst-shelf .ar-burst-carousel {
+  padding-inline: calc(50vw - 28px);
+}
+
+/* Landscape: containment card in the free space on the left */
+.ar-camera-surface[data-landscape=true] .ar-burst-shelf {
+  left: max(1rem, env(safe-area-inset-left));
+  right: auto;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  width: min(38vw, 22rem);
+  max-width: calc(50vw - 4.5rem);
+  background: var(--camera-glass);
+  border: 1px solid var(--camera-border);
+  border-radius: 1.25rem;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+  padding: .625rem .375rem .375rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.ar-camera-surface[data-landscape=true] .ar-burst-shelf .ar-burst-carousel {
+  padding-inline: calc(50% - 28px);
+  width: 100%;
+  min-height: 6.5rem;
+  padding-top: 2rem;
+}
+
+/* AI camera: Singolo | Multiplo above the capture row */
+.ar-burst-bar { position: relative; z-index: 20; display: flex; justify-content: center; align-items: center; width: 100%; pointer-events: none; overflow: visible; }
 .ar-burst-bar > * { pointer-events: auto; }
 .ar-burst-bar > .burst-flash { pointer-events: none !important; }
-.ar-burst-carousel { display: flex; align-items: flex-end; gap: .75rem; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; touch-action: pan-x; scrollbar-width: none; min-height: 7.25rem; padding-top: 2.5rem; padding-bottom: .875rem; padding-inline: calc(50vw - 28px); }
+.ar-burst-carousel { display: flex; align-items: flex-end; gap: .75rem; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; touch-action: pan-x; scrollbar-width: none; min-height: 7.25rem; padding-top: 2.5rem; padding-bottom: .875rem; padding-inline: calc(50% - 28px); }
 .ar-burst-carousel::-webkit-scrollbar { display: none; }
 [data-burst-item] { transform-origin: bottom center; transition: transform 70ms ease-out; will-change: transform; }
 @media (max-width: 767.98px) {

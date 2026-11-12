@@ -355,82 +355,107 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
             </div>
           </div>
         )}
-        <div className="camera-bottom">
-          {burst && shots.length === 0 && (
-            <p className="mb-2 text-center text-xs text-white/85 [text-shadow:0_1px_3px_rgb(0_0_0/0.7)]" role="status" aria-live="polite">
-              Tocca per una foto o tieni premuto per scattarne di fila, poi Fine
-            </p>
-          )}
-          {burst && shots.length > 0 && (
-            <div className="flex w-full flex-col items-center gap-1 mb-2">
-              <div className="flex w-full max-w-[min(26rem,92vw)] items-center justify-between px-2 text-[10.5px] font-semibold text-white/90 [text-shadow:0_1px_2px_black]">
-                <span>{shots.length} {shots.length === 1 ? "foto scattata" : "foto scattate"}</span>
-                <span className="flex items-center gap-1 font-bold text-[#00d296]">
-                  <Star className="size-2.5 fill-current" /> Tocca per scegliere la migliore
-                </span>
-              </div>
-              <div
-                ref={carouselRef}
-                onScroll={updateDockEffect}
-                data-map-gestures
-                className="ar-burst-carousel w-full max-w-full"
-              >
-                {shots.map((s, i) => {
-                  const isBest = s.id === (bestShotId ?? shots[0]?.id);
-                  return (
-                    <div
-                      key={s.id}
-                      data-burst-item
-                      data-burst-id={s.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={(e) => pickBestShot(s.id, e.currentTarget)}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickBestShot(s.id, e.currentTarget as HTMLElement); } }}
-                      aria-label={`Foto ${i + 1}${isBest ? " (Scatto migliore selezionato)" : " (Tocca per scegliere come migliore)"}`}
-                      className={`relative shrink-0 snap-center rounded-lg p-0.5 cursor-pointer ${
-                        isBest
-                          ? "ring-2 ring-[#00d296] shadow-[0_0_14px_rgba(0,210,150,0.85)]"
-                          : "ring-1 ring-white/40 hover:ring-white/80 opacity-80 hover:opacity-100"
-                      }`}
-                    >
-                      <img
-                        src={s.thumb}
-                        alt={`Foto ${i + 1}`}
-                        className="size-12 rounded-md object-cover"
-                      />
-                      <span className="absolute bottom-1 left-1.5 rounded-full bg-black/75 px-1 text-[8.5px] font-bold text-white [text-shadow:0_1px_2px_black]">
-                        {i + 1}
-                      </span>
-                      {isBest && (
-                        <span className="absolute -top-2 left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded-full bg-[#00d296] px-1.5 py-0.2 text-[8.5px] font-extrabold text-[#042017] shadow-sm whitespace-nowrap">
-                          <Star className="size-2 fill-current" /> Migliore
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          dropShot(s.id);
-                        }}
-                        aria-label={`Togli la foto ${i + 1}`}
-                        className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-black/85 text-white ring-1 ring-white/40 hover:bg-destructive hover:scale-110 transition-transform"
-                      >
-                        <X className="size-3" />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
+        {burst && shots.length > 0 && (
+          <aside className="ar-burst-shelf" data-camera-controls>
+            <div className="flex w-full max-w-[min(26rem,92vw)] items-center justify-between px-2 text-[10.5px] font-semibold text-white/90 [text-shadow:0_1px_2px_black]">
+              <span>{shots.length} {shots.length === 1 ? "foto scattata" : "foto scattate"}</span>
+              <span className="flex items-center gap-1 font-bold text-[#00d296]">
+                <Star className="size-2.5 fill-current" /> Tocca per scegliere la migliore
+              </span>
             </div>
-          )}
+            <div
+              ref={carouselRef}
+              onScroll={updateDockEffect}
+              data-map-gestures
+              className="ar-burst-carousel w-full max-w-full"
+            >
+              {shots.map((s, i) => {
+                const isBest = s.id === (bestShotId ?? shots[0]?.id);
+                return (
+                  <div
+                    key={s.id}
+                    data-burst-item
+                    data-burst-id={s.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => pickBestShot(s.id, e.currentTarget)}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickBestShot(s.id, e.currentTarget as HTMLElement); } }}
+                    aria-label={`Foto ${i + 1}${isBest ? " (Scatto migliore selezionato)" : " (Tocca per scegliere come migliore)"}`}
+                    className={`relative shrink-0 snap-center rounded-lg p-0.5 cursor-pointer ${
+                      isBest
+                        ? "ring-2 ring-[#00d296] shadow-[0_0_14px_rgba(0,210,150,0.85)]"
+                        : "ring-1 ring-white/40 hover:ring-white/80 opacity-80 hover:opacity-100"
+                    }`}
+                  >
+                    <img
+                      src={s.thumb}
+                      alt={`Foto ${i + 1}`}
+                      className="size-12 rounded-md object-cover"
+                    />
+                    <span className="absolute bottom-1 left-1.5 rounded-full bg-black/75 px-1 text-[8.5px] font-bold text-white [text-shadow:0_1px_2px_black]">
+                      {i + 1}
+                    </span>
+                    {isBest && (
+                      <span className="absolute -top-2 left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded-full bg-[#00d296] px-1.5 py-0.2 text-[8.5px] font-extrabold text-[#042017] shadow-sm whitespace-nowrap">
+                        <Star className="size-2 fill-current" /> Migliore
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        dropShot(s.id);
+                      }}
+                      aria-label={`Togli la foto ${i + 1}`}
+                      className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-black/85 text-white ring-1 ring-white/40 hover:bg-destructive hover:scale-110 transition-transform"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </aside>
+        )}
+        <div className="camera-bottom">
           {canZoom && ready && <ZoomDial className="mb-2" zoom={zoom} max={mode === "video" && zoomRangeRef.current ? zoomRangeRef.current.max / zoomRangeRef.current.min : ZOOM_MAX} onZoom={setZoom} />}
           {mode !== "video" && (
-            <div className="mx-auto mb-2 flex w-fit rounded-full bg-black/55 p-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur" role="radiogroup" aria-label="Tipo di scatto">
-              <button type="button" role="radio" aria-checked={!burst} onClick={backToSingle}
-                  // Off once the multiple shot has photos (no switching by mistake mid-series): "Fine" hands them over first.
-                  disabled={burst && shots.length > 0} title={burst && shots.length > 0 ? "Prima tocca Fine per tenere gli scatti" : undefined}
-                  className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""} disabled:opacity-40`}>Singolo</button>
-              <button type="button" role="radio" aria-checked={burst} onClick={() => setMulti(true)} className={`h-8 rounded-full px-3 ${burst ? "bg-white text-black" : ""}`}>Multiplo</button>
+            <div className="relative mx-auto mb-2 flex items-center justify-center">
+              <div
+                className="flex w-fit rounded-full bg-black/55 p-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur"
+                role="radiogroup"
+                aria-label="Tipo di scatto"
+              >
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={!burst}
+                  onClick={backToSingle}
+                  disabled={burst && shots.length > 0}
+                  title={burst && shots.length > 0 ? "Prima tocca Fine per tenere gli scatti" : undefined}
+                  className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""} disabled:opacity-40`}
+                >
+                  Singolo
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={burst}
+                  onClick={() => setMulti(true)}
+                  className={`h-8 rounded-full px-3 ${burst ? "bg-white text-black" : ""}`}
+                >
+                  Multiplo
+                </button>
+              </div>
+              {burst && shots.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => finish(true)}
+                  className="absolute left-[calc(100%+0.5rem)] top-1/2 -translate-y-1/2 inline-flex h-8 items-center gap-1 rounded-full bg-white px-3 text-xs font-semibold text-black shadow-md whitespace-nowrap"
+                >
+                  <Check className="size-3.5" aria-hidden="true" />Fine · {shots.length}
+                </button>
+              )}
             </div>
           )}
           <CameraCaptureControl mode={mode === "video" ? "video" : "photo"} recording={recording} disabled={!ready || !!error || (!burst && pending > 0)} onCapture={capture} {...(mode !== "video" ? { onHold } : {})} />

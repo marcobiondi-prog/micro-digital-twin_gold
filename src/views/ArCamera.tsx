@@ -1447,6 +1447,73 @@ export function ArCamera({
                 <span>Fresco</span>
               </div>
             )}
+            {burstFlash > 0 && <div key={burstFlash} onAnimationEnd={() => setBurstFlash(0)} className="burst-flash pointer-events-none fixed inset-0 bg-white" aria-hidden="true" />}
+            {burst && burstShots.length > 0 && (
+              <aside
+                className={`ar-burst-shelf ${toolsOpen ? "is-tools-open" : "is-tools-closed"}`}
+                data-camera-controls
+                aria-hidden={Boolean(thermalInfoOpen || confirmClear || guideOpen)}
+              >
+                <div className="flex w-full max-w-[min(26rem,92vw)] items-center justify-between px-2 text-[10.5px] font-semibold text-white/90 [text-shadow:0_1px_2px_black]">
+                  <span>{burstShots.length} {burstShots.length === 1 ? "foto scattata" : "foto scattate"}</span>
+                  <span className="flex items-center gap-1 font-bold text-[#00d296]">
+                    <Star className="size-2.5 fill-current" /> Tocca per scegliere la migliore
+                  </span>
+                </div>
+                <div
+                  ref={carouselRef}
+                  onScroll={updateDockEffect}
+                  data-map-gestures
+                  className="ar-burst-carousel w-full max-w-full"
+                >
+                  {burstShots.map((s, i) => {
+                    const isBest = s.id === (bestShotId ?? burstShots[0]?.id);
+                    return (
+                      <div
+                        key={s.id}
+                        data-burst-item
+                        data-burst-id={s.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => pickBestShot(s.id, e.currentTarget)}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickBestShot(s.id, e.currentTarget as HTMLElement); } }}
+                        aria-label={`Foto ${i + 1}${isBest ? " (Scatto migliore selezionato)" : " (Tocca per scegliere come migliore)"}`}
+                        className={`relative shrink-0 snap-center rounded-lg p-0.5 cursor-pointer ${
+                          isBest
+                            ? "ring-2 ring-[#00d296] shadow-[0_0_14px_rgba(0,210,150,0.85)]"
+                            : "ring-1 ring-white/40 hover:ring-white/80 opacity-80 hover:opacity-100"
+                        }`}
+                      >
+                        <img
+                          src={s.thumb}
+                          alt={`Foto ${i + 1}`}
+                          className="size-12 rounded-md object-cover"
+                        />
+                        <span className="absolute bottom-1 left-1.5 rounded-full bg-black/75 px-1 text-[8.5px] font-bold text-white [text-shadow:0_1px_2px_black]">
+                          {i + 1}
+                        </span>
+                        {isBest && (
+                          <span className="absolute -top-2 left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded-full bg-[#00d296] px-1.5 py-0.2 text-[8.5px] font-extrabold text-[#042017] shadow-sm whitespace-nowrap">
+                            <Star className="size-2 fill-current" /> Migliore
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            dropBurstShot(s.id);
+                          }}
+                          aria-label={`Togli la foto ${i + 1}`}
+                          className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-black/85 text-white ring-1 ring-white/40 hover:bg-destructive hover:scale-110 transition-transform"
+                        >
+                          <X className="size-3" aria-hidden="true" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </aside>
+            )}
             <div
               data-camera-hud
               className={`camera-bottom absolute z-20 flex flex-col items-center ${landscape ? "gap-1.5" : "gap-3"}`}
@@ -1458,77 +1525,18 @@ export function ArCamera({
                   data-camera-controls
                   aria-hidden={Boolean(thermalInfoOpen || confirmClear || guideOpen)}
                 >
-                  {burstFlash > 0 && <div key={burstFlash} onAnimationEnd={() => setBurstFlash(0)} className="burst-flash pointer-events-none fixed inset-0 bg-white" aria-hidden="true" />}
-                  {burst && burstShots.length > 0 && (
-                    <div className="flex w-full flex-col items-center gap-1">
-                      <div className="flex w-full max-w-[min(26rem,92vw)] items-center justify-between px-2 text-[10.5px] font-semibold text-white/90 [text-shadow:0_1px_2px_black]">
-                        <span>{burstShots.length} {burstShots.length === 1 ? "foto scattata" : "foto scattate"}</span>
-                        <span className="flex items-center gap-1 font-bold text-[#00d296]">
-                          <Star className="size-2.5 fill-current" /> Tocca per scegliere la migliore
-                        </span>
-                      </div>
-                      <div
-                        ref={carouselRef}
-                        onScroll={updateDockEffect}
-                        data-map-gestures
-                        className="ar-burst-carousel w-full max-w-full"
-                      >
-                        {burstShots.map((s, i) => {
-                          const isBest = s.id === (bestShotId ?? burstShots[0]?.id);
-                          return (
-                            <div
-                              key={s.id}
-                              data-burst-item
-                              data-burst-id={s.id}
-                              role="button"
-                              tabIndex={0}
-                              onClick={(e) => pickBestShot(s.id, e.currentTarget)}
-                              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickBestShot(s.id, e.currentTarget as HTMLElement); } }}
-                              aria-label={`Foto ${i + 1}${isBest ? " (Scatto migliore selezionato)" : " (Tocca per scegliere come migliore)"}`}
-                              className={`relative shrink-0 snap-center rounded-lg p-0.5 cursor-pointer ${
-                                isBest
-                                  ? "ring-2 ring-[#00d296] shadow-[0_0_14px_rgba(0,210,150,0.85)]"
-                                  : "ring-1 ring-white/40 hover:ring-white/80 opacity-80 hover:opacity-100"
-                              }`}
-                            >
-                              <img
-                                src={s.thumb}
-                                alt={`Foto ${i + 1}`}
-                                className="size-12 rounded-md object-cover"
-                              />
-                              <span className="absolute bottom-1 left-1.5 rounded-full bg-black/75 px-1 text-[8.5px] font-bold text-white [text-shadow:0_1px_2px_black]">
-                                {i + 1}
-                              </span>
-                              {isBest && (
-                                <span className="absolute -top-2 left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded-full bg-[#00d296] px-1.5 py-0.2 text-[8.5px] font-extrabold text-[#042017] shadow-sm whitespace-nowrap">
-                                  <Star className="size-2 fill-current" /> Migliore
-                                </span>
-                              )}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  dropBurstShot(s.id);
-                                }}
-                                aria-label={`Togli la foto ${i + 1}`}
-                                className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-black/85 text-white ring-1 ring-white/40 hover:bg-destructive hover:scale-110 transition-transform"
-                              >
-                                <X className="size-3" aria-hidden="true" />
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2">
+                  <div className="relative flex items-center justify-center">
                     <div role="radiogroup" aria-label="Tipo di scatto" className="flex rounded-full bg-black/55 p-0.5 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur">
                       <button type="button" role="radio" aria-checked={!burst} onClick={backToSingle}
                         className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""}`}>Singolo</button>
                       <button type="button" role="radio" aria-checked={burst} onClick={() => setBurst(true)} className={`h-8 rounded-full px-3 ${burst ? "bg-white text-black" : ""}`}>Multiplo</button>
                     </div>
                     {burst && burstShots.length > 0 && (
-                      <button type="button" onClick={onClose} className="inline-flex h-9 items-center gap-1 rounded-full bg-white px-3.5 text-xs font-semibold text-black">
+                      <button
+                        type="button"
+                        onClick={onClose}
+                        className="absolute left-[calc(100%+0.5rem)] top-1/2 -translate-y-1/2 inline-flex h-8 items-center gap-1 rounded-full bg-white px-3.5 text-xs font-semibold text-black shadow-md whitespace-nowrap"
+                      >
                         <Check className="size-3.5" aria-hidden="true" />Fine · {burstShots.length}
                       </button>
                     )}

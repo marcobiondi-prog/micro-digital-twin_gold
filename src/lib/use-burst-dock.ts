@@ -15,7 +15,10 @@ export function useBurstDock(active: boolean, count: number) {
   const updateDockEffect = useCallback(() => {
     const container = carouselRef.current;
     if (!container) return;
-    const screenCenterX = window.innerWidth / 2;
+    const rect = container.getBoundingClientRect();
+    const targetCenterX = rect.width >= window.innerWidth * 0.75
+      ? window.innerWidth / 2
+      : (rect.left + rect.width / 2);
     const items = container.querySelectorAll<HTMLElement>("[data-burst-item]");
     const maxRadius = 140;
 
@@ -25,7 +28,7 @@ export function useBurstDock(active: boolean, count: number) {
     items.forEach((item, index) => {
       const itemRect = item.getBoundingClientRect();
       const itemCenterX = itemRect.left + itemRect.width / 2;
-      const dist = Math.abs(screenCenterX - itemCenterX);
+      const dist = Math.abs(targetCenterX - itemCenterX);
       if (dist < minDistance) {
         minDistance = dist;
         const rawId = item.getAttribute("data-burst-id");
