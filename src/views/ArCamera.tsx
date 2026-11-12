@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { flushSync } from "react-dom";
+import { toast } from "sonner";
 import { Activity, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grid2X2, Minus, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
 import { supportsCameraTorch, setCameraTorch } from "@/lib/camera-torch";
 import { detectArObject, getReferencePhoto, type Detection, type Soil } from "@/controllers/ar-detect.functions";
@@ -242,12 +243,22 @@ export function ArCamera({
     };
   }, []);
 
-  const toggleArCore = async () => {
+  const toggleArCore = async (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    e?.preventDefault();
     if (!arCoreRef.current) return;
-    if (arCoreActive) {
-      await arCoreRef.current.stopSession();
-    } else {
-      await arCoreRef.current.startSession();
+    try {
+      if (arCoreActive) {
+        await arCoreRef.current.stopSession();
+      } else {
+        const root = surfaceRef.current ?? document.body;
+        const ok = await arCoreRef.current.startSession({ domOverlay: root });
+        if (!ok) {
+          toast.info("ARCore non avviabile su questo dispositivo. Continua con il tracciamento standard.");
+        }
+      }
+    } catch {
+      toast.info("ARCore non avviabile su questo dispositivo. Continua con il tracciamento standard.");
     }
   };
 
@@ -1360,34 +1371,6 @@ export function ArCamera({
                   {AR_FOCUS[kind].map(o => <Button variant="ghost" size="sm" key={o.id} type="button" role="radio" aria-label={o.label} title={o.label} aria-checked={arFocusOption(kind, target).id === o.id} className="camera-tool ar-focus-pill" onClick={() => selectTarget(o.id)}>{FOCUS_LABELS[o.id]}</Button>)}
                 </div>
                 </div>
-                {arCoreSupported && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    type="button"
-                    onClick={() => void toggleArCore()}
-                    className={`camera-tool self-center flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-bold tracking-wider transition-colors ${
-                      arCoreActive
-                        ? "border-brand-turquoise bg-brand-turquoise text-white shadow-[0_0_10px_rgba(45,212,191,0.5)]"
-                        : "border-brand-turquoise/50 bg-brand-turquoise/10 text-brand-turquoise hover:bg-brand-turquoise/20"
-                    }`}
-                    title={arCoreActive ? "ARCore attivo su superfici reali (tocca per disattivare)" : "Attiva tracciamento superfici reali con Google ARCore"}
-                    aria-pressed={arCoreActive}
-                    aria-label={arCoreActive ? "Disattiva ARCore" : "Attiva ARCore"}
-                  >
-                    {arCoreActive ? (
-                      <>
-                        <span className="size-1.5 rounded-full bg-white animate-pulse" />
-                        <span>ARCore attivo</span>
-                      </>
-                    ) : (
-                      <>
-                        <Scan className="size-3.5 shrink-0" />
-                        <span>Avvia ARCore</span>
-                      </>
-                    )}
-                  </Button>
-                )}
                 {(found || species || viewedRecord) && !scanning && <Button variant="ghost" size="sm" aria-label="Mostra esito analisi" title="Mostra esito analisi" className="camera-tool ar-esito-chip" onClick={() => { setToolsOpen(true); setActiveTool("analysis"); setPanelOpen(true); }}><Activity className="size-4 shrink-0" />Esito</Button>}
                 <Button variant="ghost" size="icon" className="camera-tool size-11" aria-label="Guida inquadratura" title="Guida inquadratura" aria-pressed={guideOpen} onClick={() => setGuideOpen(v => !v)}><Info className="size-4" /></Button>
                 {torchSupported && <Button variant="ghost" size="icon" className="camera-tool size-11" disabled={torchBusy || scanning} aria-pressed={torchOn} aria-label={torchOn ? "Disattiva flash" : "Attiva flash"} title={torchOn ? "Disattiva flash" : "Attiva flash"} onClick={() => void toggleTorch()}>{torchOn ? <Zap className="size-4" /> : <ZapOff className="size-4" />}</Button>}
@@ -1420,6 +1403,34 @@ export function ArCamera({
               <div className="ar-tool-options" data-camera-controls>
                 <Button variant="ghost" size="sm" className="camera-tool" title="Analisi" aria-label="Analisi" aria-pressed={activeTool === "analysis"} onClick={() => { setActiveTool(v => v === "analysis" ? null : "analysis"); setPanelOpen(true); }}><Info className="size-4" />Analisi</Button>
                 <Button variant="ghost" size="sm" className="camera-tool" title="Livelli AR" aria-label="Livelli AR" aria-pressed={activeTool === "manage"} onClick={() => { setActiveTool(v => v === "manage" ? null : "manage"); setLayers(s => new Set(s).add("grid")); }}><SlidersHorizontal className="size-4" />AR</Button>
+                {arCoreSupported && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    type="button"
+                    onClick={(e) => void toggleArCore(e)}
+                    className={`camera-tool flex items-center gap-1.5 transition-colors ${
+                      arCoreActive
+                        ? "border-brand-turquoise bg-brand-turquoise text-white shadow-[0_0_10px_rgba(45,212,191,0.5)]"
+                        : "border-brand-turquoise/50 bg-brand-turquoise/10 text-brand-turquoise hover:bg-brand-turquoise/20"
+                    }`}
+                    title={arCoreActive ? "ARCore attivo su superfici reali (tocca per disattivare)" : "Attiva tracciamento superfici reali con Google ARCore"}
+                    aria-pressed={arCoreActive}
+                    aria-label={arCoreActive ? "Disattiva ARCore" : "Attiva ARCore"}
+                  >
+                    {arCoreActive ? (
+                      <>
+                        <span className="size-1.5 rounded-full bg-white animate-pulse" />
+                        <span>ARCore attivo</span>
+                      </>
+                    ) : (
+                      <>
+                        <Scan className="size-3.5 shrink-0" />
+                        <span>Avvia ARCore</span>
+                      </>
+                    )}
+                  </Button>
+                )}
               {activeTool === "manage" && <div className="flex items-center gap-2" data-camera-controls>
                 <Button variant="ghost" size="icon" className="camera-tool" aria-label="Mostra griglia" title="Griglia" aria-pressed={layers.has("grid")} onClick={() => toggle("grid")}><Grid2X2 className="size-4" /></Button>
                 <Button variant="ghost" size="icon" className="camera-tool" aria-label="Mappa termica simulata" title="Calore simulato" aria-pressed={layers.has("heat")} onClick={() => { if (!layers.has("heat")) setThermalInfoOpen(true); toggle("heat"); }}><Flame className="size-4" /></Button>
