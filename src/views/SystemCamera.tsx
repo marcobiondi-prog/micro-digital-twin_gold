@@ -357,10 +357,16 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
         )}
         {burst && shots.length > 0 && (
           <aside className="ar-burst-shelf" data-camera-controls>
-            <div className="flex w-full max-w-[min(26rem,92vw)] items-center justify-between px-2 text-[10.5px] font-semibold text-white/90 [text-shadow:0_1px_2px_black]">
-              <span>{shots.length} {shots.length === 1 ? "foto scattata" : "foto scattate"}</span>
+            <div className="ar-burst-header flex w-full max-w-[min(26rem,92vw)] items-center justify-between px-2 text-[10.5px] font-semibold text-white/90 [text-shadow:0_1px_2px_black]">
+              <span>
+                {shots.length}{" "}
+                <span className="ar-burst-header-long">{shots.length === 1 ? "foto scattata" : "foto scattate"}</span>
+                <span className="ar-burst-header-short">foto</span>
+              </span>
               <span className="flex items-center gap-1 font-bold text-[#00d296]">
-                <Star className="size-2.5 fill-current" /> Tocca per scegliere la migliore
+                <Star className="size-2.5 fill-current" />
+                <span className="ar-burst-header-long">Tocca per scegliere la migliore</span>
+                <span className="ar-burst-header-short">Migliore</span>
               </span>
             </div>
             <div

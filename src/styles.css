@@ -2166,10 +2166,19 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 /* Multiple shot burst shelf containment div */
 .ar-burst-shelf {
   position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(11.25rem + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   z-index: 25;
   pointer-events: none;
   overflow: visible;
   transition: bottom .22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 .ar-burst-shelf > * {
   pointer-events: auto;
@@ -2177,37 +2186,29 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .ar-burst-shelf > .burst-flash {
   pointer-events: none !important;
 }
-
-/* Portrait: anchored above the bottom capture controls */
-.ar-camera-surface:not([data-landscape=true]) .ar-burst-shelf {
-  left: 0;
-  right: 0;
-  bottom: calc(11.25rem + env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.ar-camera-surface:not([data-landscape=true]) .ar-burst-shelf.is-tools-open {
+.ar-burst-shelf.is-tools-open {
   bottom: calc(16.5rem + env(safe-area-inset-bottom));
 }
-.ar-camera-surface:not([data-landscape=true]) .ar-burst-shelf .ar-burst-carousel {
+.ar-burst-shelf .ar-burst-carousel {
   padding-inline: calc(50vw - 28px);
 }
+.ar-burst-header-short { display: none; }
+.ar-burst-header-long { display: inline; }
 
-/* Landscape: containment card in the free space on the left */
+/* Landscape: containment shelf in the free space on the left, completely transparent and shorter */
 .ar-camera-surface[data-landscape=true] .ar-burst-shelf {
-  left: max(1rem, env(safe-area-inset-left));
+  left: max(0.75rem, env(safe-area-inset-left));
   right: auto;
-  bottom: calc(1rem + env(safe-area-inset-bottom));
-  width: min(38vw, 22rem);
-  max-width: calc(50vw - 4.5rem);
-  background: var(--camera-glass);
-  border: 1px solid var(--camera-border);
-  border-radius: 1.25rem;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
-  padding: .625rem .375rem .375rem;
+  bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  width: min(22vw, 10.5rem);
+  max-width: calc(50vw - 6rem);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  padding: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2215,8 +2216,40 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .ar-camera-surface[data-landscape=true] .ar-burst-shelf .ar-burst-carousel {
   padding-inline: calc(50% - 28px);
   width: 100%;
-  min-height: 6.5rem;
-  padding-top: 2rem;
+  min-height: 6rem;
+  padding-top: 1.75rem;
+  padding-bottom: 0.25rem;
+}
+.ar-camera-surface[data-landscape=true] .ar-burst-shelf .ar-burst-header-long { display: none; }
+.ar-camera-surface[data-landscape=true] .ar-burst-shelf .ar-burst-header-short { display: inline; }
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .camera-hud .ar-burst-shelf {
+    left: max(0.75rem, env(safe-area-inset-left));
+    right: auto;
+    bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    width: min(22vw, 10.5rem);
+    max-width: calc(50vw - 6rem);
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .camera-hud .ar-burst-shelf .ar-burst-carousel {
+    padding-inline: calc(50% - 28px);
+    width: 100%;
+    min-height: 6rem;
+    padding-top: 1.75rem;
+    padding-bottom: 0.25rem;
+  }
+  .camera-hud .ar-burst-shelf .ar-burst-header-long { display: none; }
+  .camera-hud .ar-burst-shelf .ar-burst-header-short { display: inline; }
 }
 
 /* AI camera: Singolo | Multiplo above the capture row */
