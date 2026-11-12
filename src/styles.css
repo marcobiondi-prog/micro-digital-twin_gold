@@ -2158,10 +2158,11 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 @media (prefers-reduced-motion: reduce) { .burst-flash { animation: none; } }
 
 /* AI camera: Singolo | Multiplo above the capture row, and the strip of the multiple shot's photos. */
-.ar-burst-bar { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom) + 10.5rem); z-index: 20; display: grid; justify-items: center; gap: .5rem; }
+.ar-burst-bar { position: relative; z-index: 20; display: grid; justify-items: center; gap: .5rem; width: 100%; pointer-events: none; }
+.ar-burst-bar > * { pointer-events: auto; }
 @media (max-width: 767.98px) {
-  /* Su mobile, alza la pillola Singolo/Multiplo sopra la pillola dello zoom per evitare sovrapposizioni */
-  .ar-burst-bar { bottom: calc(env(safe-area-inset-bottom) + 13rem); }
+  /* Su mobile, quando gli strumenti sono chiusi, distanzia la pillola Singolo/Multiplo dallo zoom */
+  .ar-burst-bar.is-tools-closed { margin-bottom: .75rem; }
 }
 
 /* Xperia-style zoom ruler: shown while swiping on the lens chips, it slides under a fixed centre mark. */

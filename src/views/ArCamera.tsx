@@ -1335,6 +1335,41 @@ export function ArCamera({
               data-camera-hud
               className={`camera-bottom absolute z-20 flex flex-col items-center ${landscape ? "gap-1.5" : "gap-3"}`}
             >
+              {/* Singolo | Multiplo for photos, and while shooting the strip of the shots kept with "Fine · n". */}
+              {!error && mode === "photo" && (
+                <div
+                  className={`ar-burst-bar ${toolsOpen ? "is-tools-open" : "is-tools-closed"}`}
+                  data-camera-controls
+                  aria-hidden={Boolean(thermalInfoOpen || confirmClear || guideOpen)}
+                >
+                  {burstFlash > 0 && <div key={burstFlash} className="burst-flash pointer-events-none fixed inset-0 bg-white" aria-hidden="true" />}
+                  {burst && burstShots.length > 0 && (
+                    <div data-map-gestures className="flex max-w-[min(22rem,90vw)] touch-pan-x gap-1.5 overflow-x-auto px-1 pt-2 [scrollbar-width:none]">
+                      {burstShots.map((s, i) => (
+                        <span key={s.id} className="relative shrink-0">
+                          <img src={s.url} alt={`Foto ${i + 1}`} className="size-11 rounded-md object-cover ring-1 ring-white/50" />
+                          <button type="button" onClick={() => dropBurstShot(s.id)} aria-label={`Togli la foto ${i + 1}`} className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-black/80 text-white ring-1 ring-white/40"><X className="size-3" aria-hidden="true" /></button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <div role="radiogroup" aria-label="Tipo di scatto" className="flex rounded-full bg-black/55 p-0.5 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur">
+                      <button type="button" role="radio" aria-checked={!burst} onClick={backToSingle}
+                        // Off once the multiple shot has photos (no switching by mistake mid-series): "Fine" hands them over first.
+                        disabled={burst && burstShots.length > 0} title={burst && burstShots.length > 0 ? "Prima tocca Fine per tenere gli scatti" : undefined}
+                        className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""} disabled:opacity-40`}>Singolo</button>
+                      <button type="button" role="radio" aria-checked={burst} onClick={() => setBurst(true)} className={`h-8 rounded-full px-3 ${burst ? "bg-white text-black" : ""}`}>Multiplo</button>
+                    </div>
+                    {burst && burstShots.length > 0 && (
+                      <button type="button" onClick={onClose} className="inline-flex h-9 items-center gap-1 rounded-full bg-white px-3.5 text-xs font-semibold text-black">
+                        <Check className="size-3.5" aria-hidden="true" />Fine · {burstShots.length}
+                      </button>
+                    )}
+                  </div>
+                  <span className="sr-only" role="status" aria-live="polite">{burst ? `${burstShots.length} foto scattate` : ""}</span>
+                </div>
+              )}
               <div id="ar-camera-tools" hidden={!toolsOpen} className="w-full">
               {toolsOpen && <div className="ar-tools-panel flex w-full flex-col items-center gap-2">
               <div className="ar-tool-options" data-camera-controls>
@@ -1506,37 +1541,6 @@ export function ArCamera({
                 Fai uno swipe dal basso verso l’alto per chiudere.
               </p>
             </div>
-            {/* Singolo | Multiplo for photos, and while shooting the strip of the shots kept with "Fine · n". */}
-            {mode === "photo" && (
-              <div className="ar-burst-bar" data-camera-controls aria-hidden={Boolean(thermalInfoOpen || confirmClear || guideOpen)}>
-                {burstFlash > 0 && <div key={burstFlash} className="burst-flash pointer-events-none fixed inset-0 bg-white" aria-hidden="true" />}
-                {burst && burstShots.length > 0 && (
-                  <div data-map-gestures className="flex max-w-[min(22rem,90vw)] touch-pan-x gap-1.5 overflow-x-auto px-1 pt-2 [scrollbar-width:none]">
-                    {burstShots.map((s, i) => (
-                      <span key={s.id} className="relative shrink-0">
-                        <img src={s.url} alt={`Foto ${i + 1}`} className="size-11 rounded-md object-cover ring-1 ring-white/50" />
-                        <button type="button" onClick={() => dropBurstShot(s.id)} aria-label={`Togli la foto ${i + 1}`} className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-black/80 text-white ring-1 ring-white/40"><X className="size-3" aria-hidden="true" /></button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <div className="flex items-center gap-2">
-                  <div role="radiogroup" aria-label="Tipo di scatto" className="flex rounded-full bg-black/55 p-0.5 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur">
-                    <button type="button" role="radio" aria-checked={!burst} onClick={backToSingle}
-                      // Off once the multiple shot has photos (no switching by mistake mid-series): "Fine" hands them over first.
-                      disabled={burst && burstShots.length > 0} title={burst && burstShots.length > 0 ? "Prima tocca Fine per tenere gli scatti" : undefined}
-                      className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""} disabled:opacity-40`}>Singolo</button>
-                    <button type="button" role="radio" aria-checked={burst} onClick={() => setBurst(true)} className={`h-8 rounded-full px-3 ${burst ? "bg-white text-black" : ""}`}>Multiplo</button>
-                  </div>
-                  {burst && burstShots.length > 0 && (
-                    <button type="button" onClick={onClose} className="inline-flex h-9 items-center gap-1 rounded-full bg-white px-3.5 text-xs font-semibold text-black">
-                      <Check className="size-3.5" aria-hidden="true" />Fine · {burstShots.length}
-                    </button>
-                  )}
-                </div>
-                <span className="sr-only" role="status" aria-live="polite">{burst ? `${burstShots.length} foto scattate` : ""}</span>
-              </div>
-            )}
             {/* Modal veils & alert dialogs: render over all camera controls and burst bar */}
             {guideOpen && <div className="ar-tutorial-veil" data-camera-controls aria-hidden="true" />}
             {confirmClear && <div className="ar-confirm-veil" data-camera-controls onClick={() => { if (!emptying) setConfirmClear(false); }}>
