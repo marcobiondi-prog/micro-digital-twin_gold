@@ -18,7 +18,8 @@ export function useBurstDock(active: boolean, count: number) {
     const rect = container.getBoundingClientRect();
     const targetCenterX = rect.left + rect.width / 2;
     const items = container.querySelectorAll<HTMLElement>("[data-burst-item]");
-    const maxRadius = Math.min(105, Math.max(75, rect.width * 0.28));
+    // L'ingrandimento Genius parte quando il cursore è in mezzo a 2 foto (metà passo ~38px), non prima
+    const maxRadius = 38;
 
     let closestId: number | null = null;
     let minDistance = Infinity;
