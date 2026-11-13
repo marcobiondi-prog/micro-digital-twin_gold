@@ -46,15 +46,15 @@ export function arColorToken(name: string) {
 
 export function createArScene(): ArScene {
   const canvas = document.createElement("canvas");
-  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: "high-performance" });
   renderer.setClearAlpha(0);
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(60, 9 / 16, 0.1, 120);
   camera.position.set(0, 1.5, 0);
   camera.rotation.x = -Math.PI / 6;
   const ink = arColorToken("--ar-outline");
-  // One wide grid reaching the horizon reads as an endless ground plane.
-  const grid = new THREE.GridHelper(160, 320, ink, ink);
+  // One wide grid reaching the horizon reads as an endless ground plane: 120 divisioni per leggerezza e fluidità.
+  const grid = new THREE.GridHelper(160, 120, ink, ink);
   grid.position.z = -40;
   const gm = grid.material as THREE.Material;
   gm.transparent = true;

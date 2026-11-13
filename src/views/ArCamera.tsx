@@ -12,7 +12,7 @@ import { useBurstDock } from "@/lib/use-burst-dock";
 type D = NonNullable<Detection>;
 const BIN_EMPTY_MS = 1100;
 /** Scan uploads: main frame, leaf close-up and the smaller retry frame (longest side, px). */
-const SCAN_IMAGE_PX = 1280, SCAN_DETAIL_PX = 768, SCAN_RETRY_PX = 960;
+const SCAN_IMAGE_PX = 1024, SCAN_DETAIL_PX = 640, SCAN_RETRY_PX = 800;
 /** Long side of the light scan photo stored with each report record (Esito on a swiped-back scan). */
 const SCAN_PHOTO_PX = 400;
 /** The server-fn client turns an HTTP error with an empty body into an Error with an empty message. */
@@ -426,7 +426,7 @@ export function ArCamera({
       }
     };
     tick();
-    const id = window.setInterval(tick, 300);
+    const id = window.setInterval(tick, 450);
     return () => {
       window.clearInterval(id);
       subjectRef.current = SEARCH_BOX;
@@ -632,7 +632,7 @@ export function ArCamera({
       setError("La fotocamera AR non è disponibile su questo dispositivo.");
     } else navigator.mediaDevices
       .getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1440 }, frameRate: { ideal: 30, max: 30 } },
+        video: { facingMode: "environment", width: { ideal: 1280, max: 1920 }, height: { ideal: 960, max: 1440 }, frameRate: { ideal: 30, max: 30 } },
         audio: mode === "video",
       })
       .then((stream) => {
@@ -785,8 +785,8 @@ export function ArCamera({
       // Recognition and frozen preview preserve the live crop and rotation.
       const small = freezeCameraFrame(c, video, -rotationRef.current, digitalZoomRef.current);
       if (!small) return;
-      // Lighter upload (≤1280 px, q0.85): large tablet frames could fail as an empty HTTP error.
-      const image = encodeFrame(small, SCAN_IMAGE_PX, 0.85);
+      // Lighter upload (≤1024 px, q0.82): fast and lightweight payload for AI analysis.
+      const image = encodeFrame(small, SCAN_IMAGE_PX, 0.82);
       playCameraSound("scan-start", 1.8);
       // Same frozen frame, with a second close-up preserving leaf edges and veins.
       const detail = document.createElement("canvas");
@@ -797,7 +797,7 @@ export function ArCamera({
       detail.width = Math.max(1, Math.round(w * small.width * scale));
       detail.height = Math.max(1, Math.round(h * small.height * scale));
       detail.getContext("2d")?.drawImage(small, x * small.width, y * small.height, w * small.width, h * small.height, 0, 0, detail.width, detail.height);
-      const detailImage = detail.toDataURL("image/jpeg", 0.85);
+      const detailImage = detail.toDataURL("image/jpeg", 0.82);
       const request = { kind, target: arFocusOption(kind, target).id, ...(subjectLocked ? { focus: subjectRef.current } : {}), ...(satellite ? { satellite } : {}) };
       let r: Awaited<ReturnType<typeof detectArObject>>;
       try {
@@ -805,7 +805,7 @@ export function ArCamera({
       } catch (first) {
         // An HTTP error with an empty body (oversized or too slow): one retry, smaller and without the close-up.
         if (version !== scanVersion.current || !isEmptyHttpError(first)) throw first;
-        r = await detectArObject({ data: { ...request, image: encodeFrame(small, SCAN_RETRY_PX, 0.8) } });
+        r = await detectArObject({ data: { ...request, image: encodeFrame(small, SCAN_RETRY_PX, 0.78) } });
       }
       if (version !== scanVersion.current) return;
       const d = r.detection;
@@ -1871,7 +1871,7 @@ let tmp: HTMLCanvasElement | null = null;
  * (superfici chiare/esposte = più calde, verde = più fresco); ogni albero piantato raffresca l'area attorno.
  */
 function thermal(g: CanvasRenderingContext2D, w: number, h: number, taps: { x: number; y: number }[], cooling: PlacementCooling[]) {
-  const W = 120, H = Math.round((120 * h) / w);
+  const W = 64, H = Math.round((64 * h) / w);
   tmp ??= document.createElement("canvas");
   if (tmp.width !== W || tmp.height !== H) { tmp.width = W; tmp.height = H; }
   const t = tmp.getContext("2d", { willReadFrequently: true });
