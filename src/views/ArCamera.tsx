@@ -311,9 +311,7 @@ export function ArCamera({
     const willEnable = !layers.has("grid");
     if (willEnable) {
       setLayers((s) => new Set(s).add("grid").add("objects"));
-      if (arCoreRef.current && arCoreSupported && !arCoreRef.current.isActive()) {
-        void arCoreRef.current.startSession();
-      }
+      setArCoreActive(true);
       toast.success("AR Core attivo: griglia del terreno agganciata.");
     } else {
       setLayers((s) => {
@@ -323,13 +321,12 @@ export function ArCamera({
         return n;
       });
       sceneRef.current?.hideTarget?.();
-      void arCoreRef.current?.stopSession();
       setArCoreActive(false);
       toast.info("AR Core disattivato.");
     }
     window.setTimeout(() => {
       arTransitionRef.current = false;
-    }, 500);
+    }, 300);
   };
 
   const xrActive = false;
@@ -1168,7 +1165,7 @@ export function ArCamera({
     track.addEventListener("lostpointercapture", up);
   };
   const specimenDock = !scanning && (viewedRecord ? dockRecord : species?.cooling) && (
-    <div className="ar-specimen-dock" data-camera-controls data-collapsed={balanceMin || undefined} aria-label="Esemplari e raffrescamento stimato">
+    <div className={`ar-specimen-dock${zoomRulerActive ? " is-zoom-active" : ""}`} data-camera-controls data-collapsed={balanceMin || undefined} aria-label="Esemplari e raffrescamento stimato">
       {/* Smartphones only (CSS hides it on tablets): fold the balance like an accordion, keeping a one-line summary;
           the header stays put at the bottom and the body unfolds from bottom to top. */}
       <button type="button" className="ar-dock-toggle" aria-expanded={!balanceMin} aria-controls="ar-balance-body" onClick={() => setBalanceMin((v) => !v)}>
