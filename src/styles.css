@@ -1461,7 +1461,7 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .camera-topbar { position: absolute; top: max(1rem, env(safe-area-inset-top)); left: max(1rem, env(safe-area-inset-left)); right: max(1rem, env(safe-area-inset-right)); display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
 .camera-title { display: inline-flex; align-items: center; gap: .5rem; border: 1px solid var(--camera-border); border-radius: 8px; background: var(--camera-glass); padding: .625rem .75rem; font-size: .75rem; font-weight: 600; -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
 .camera-tool { border-radius: 50%; color: var(--camera-ink); background: var(--camera-glass); border: 1px solid var(--camera-border); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
-.camera-bottom { position: absolute; inset-inline: max(1rem, env(safe-area-inset-left), env(safe-area-inset-right)); bottom: calc(2.5rem + env(safe-area-inset-bottom)); }
+.camera-bottom { position: absolute; inset-inline: max(0.5rem, env(safe-area-inset-left), env(safe-area-inset-right)); bottom: calc(2.5rem + env(safe-area-inset-bottom)); }
 .camera-capture-dock { width: min(100%, 22rem); margin-inline: auto; display: grid; justify-items: center; gap: .375rem; color: var(--camera-ink); text-shadow: var(--camera-shadow); }
 .camera-capture-status { display: flex; align-items: center; justify-content: center; gap: .375rem; min-height: 1.5rem; padding: .125rem .625rem; border-radius: 4px; background: var(--camera-glass); font-size: .6875rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .camera-capture-row { width: 100%; display: grid; grid-template-columns: 1fr 76px 1fr; align-items: center; gap: .75rem; }
@@ -1498,9 +1498,10 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .ar-pill-hud .camera-capture-status[hidden] { display: none; }
 .ar-pill-hud .camera-capture-status { border-radius: 999px; }
 .ar-pill-hud .ar-tools-panel { width: min(100%, 28rem); margin-inline: auto; padding: 0; background: transparent; border: 0; }
-.ar-tool-options { display: flex; align-items: center; gap: .375rem; width: 100%; overflow-x: auto; scrollbar-width: none; }
-.ar-tool-options > .camera-tool, .ar-tool-options > div { flex-shrink: 0; }
-.ar-tool-options > div { display: flex; gap: .375rem; }
+.ar-tool-options { display: flex; align-items: center; justify-content: center; gap: .35rem; width: 100%; max-width: 100%; overflow-x: auto; scrollbar-width: none; box-sizing: border-box; padding-inline: .25rem; }
+.ar-tool-options > .camera-tool { height: 36px; min-height: 36px; padding-inline: .65rem; font-size: .75rem; flex-shrink: 0; }
+.ar-tool-options > div { display: flex; align-items: center; gap: .35rem; flex-shrink: 0; }
+.ar-tool-options > div .camera-tool { width: 36px; min-width: 36px; height: 36px; min-height: 36px; padding: 0; }
 .ar-pill-hud .ar-tools-panel [data-camera-scroll] { text-shadow: var(--camera-shadow); }
 .ar-pill-hud .ar-tools-panel > div { max-width: 100%; }
 .ar-pill-hud .ar-tools-panel [data-camera-scroll] { background: transparent; padding-left: 0; }
@@ -1517,7 +1518,20 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .ar-xr-overlay [data-camera-controls] { pointer-events: auto; }
 .ar-xr-overlay .ar-thermal-summary { pointer-events: auto; }
 @media (orientation: landscape) {
-  .ar-thermal-summary:not(.ar-thermal-summary-min) { top: calc(max(.375rem, env(safe-area-inset-top)) + 2.75rem) !important; width: min(34vw, 21rem); max-width: calc(50vw - 4.5rem); z-index: 22; pointer-events: auto !important; }
+  .ar-thermal-summary:not(.ar-thermal-summary-min) {
+    top: calc(max(.375rem, env(safe-area-inset-top)) + 2.75rem) !important;
+    bottom: calc(max(.75rem, env(safe-area-inset-bottom))) !important;
+    max-height: calc(100% - max(.375rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 3.5rem) !important;
+    width: min(34vw, 21rem);
+    max-width: calc(50vw - 4.5rem);
+    z-index: 22;
+    pointer-events: auto !important;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: var(--camera-border) transparent;
+  }
   .ar-thermal-summary-min { top: calc(max(.375rem, env(safe-area-inset-top)) + 2.75rem) !important; width: auto !important; max-width: min(85vw, 22rem) !important; z-index: 22; pointer-events: auto !important; }
 }
 /* Landscape: stima termica più leggibile (valori e testo ingranditi solo qui) */
@@ -1528,26 +1542,15 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
   .ar-thermal-summary:not(.ar-thermal-summary-min) .ar-thermal-note { font-size: .6875rem; }
   .ar-thermal-summary:not(.ar-thermal-summary-min) .ar-thermal-exposure { font-size: .8125rem; }
 }
-/* Landscape: il testo lungo della stima termica scorre dentro il pannello */
-@media (orientation: landscape) {
-  .ar-thermal-summary:not(.ar-thermal-summary-min) {
-    max-height: calc(100% - max(1rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 15.25rem);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-    scrollbar-color: var(--camera-border) transparent;
-  }
-  .ar-thermal-summary:not(.ar-thermal-summary-min)::-webkit-scrollbar { width: 4px; }
-  .ar-thermal-summary:not(.ar-thermal-summary-min)::-webkit-scrollbar-track { background: transparent; }
-  .ar-thermal-summary:not(.ar-thermal-summary-min)::-webkit-scrollbar-thumb { border-radius: 999px; background: var(--camera-border); }
-}
 @media (orientation: landscape) and (max-height: 600px) {
   .camera-bottom { bottom: calc(1.5rem + env(safe-area-inset-bottom)); }
   .camera-capture-row { grid-template-columns: 1fr 60px 1fr; }
   .camera-shutter { width: 60px; height: 60px; }
   .camera-capture-dock { gap: .125rem; }
-  .ar-thermal-summary:not(.ar-thermal-summary-min) { max-height: calc(100% - max(1rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 12.5rem); }
+  .ar-thermal-summary:not(.ar-thermal-summary-min) {
+    bottom: calc(max(.75rem, env(safe-area-inset-bottom))) !important;
+    max-height: calc(100% - max(.375rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 3.5rem) !important;
+  }
 }
 @media (prefers-reduced-motion: reduce) { .camera-shutter { transition: none; } }
 
@@ -1893,9 +1896,10 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   .ar-camera-surface[data-landscape=true] #ar-camera-tools { pointer-events: none; }
   .ar-camera-surface[data-landscape=true] .camera-bottom > :not(#ar-camera-tools),
   .ar-camera-surface[data-landscape=true] .ar-tools-panel { pointer-events: auto; }
-  .ar-camera-surface[data-landscape=true] .ar-cooling-readout { margin-top: 1.4rem; }
-  .ar-camera-surface[data-landscape=true] .ar-thermal-summary:not(.ar-thermal-summary-min) { max-height: calc(var(--ar-camera-height) - var(--ar-header-bottom) - env(safe-area-inset-bottom) - 6.5rem); }
-}
+  .ar-camera-surface[data-landscape=true] .ar-thermal-summary:not(.ar-thermal-summary-min) {
+    bottom: calc(max(.75rem, env(safe-area-inset-bottom))) !important;
+    max-height: calc(100% - max(.375rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 3.5rem) !important;
+  }
 
 /* Smartphone portrait: the expanded summary stops above the bottom HUD (balance, zoom, capture) and scrolls,
    and the balance lines up with the summary's left edge. */
@@ -2294,14 +2298,18 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .ar-burst-bar { position: relative; z-index: 20; display: flex; justify-content: center; align-items: center; width: 100%; pointer-events: none; overflow: visible; margin-bottom: 2.5rem; }
 .ar-burst-bar > * { pointer-events: auto; }
 .ar-burst-bar > .burst-flash { pointer-events: none !important; }
+.ar-burst-bar.is-tools-open { margin-bottom: 0.5rem; }
 .ar-camera-surface[data-landscape=true] .ar-burst-bar { margin-bottom: 2.35rem; }
+.ar-camera-surface[data-landscape=true] .ar-burst-bar.is-tools-open { margin-bottom: 0.35rem; }
 .ar-burst-carousel { display: flex; align-items: flex-end; gap: .75rem; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scroll-padding-inline: calc(50% - 28px); -webkit-overflow-scrolling: touch; touch-action: pan-x; scrollbar-width: none; min-height: 7.25rem; padding-top: 2.5rem; padding-bottom: .875rem; padding-inline: calc(50% - 28px); }
 .ar-burst-carousel::-webkit-scrollbar { display: none; }
 [data-burst-item] { transform-origin: bottom center; transition: transform 70ms ease-out; will-change: transform; scroll-snap-align: center; scroll-snap-stop: always; }
 @media (max-width: 767.98px) {
   /* Su mobile mantieni le pillole Singolo/Multiplo posizionate sopra al righello dello zoom */
   .ar-burst-bar { margin-bottom: 2.5rem; }
+  .ar-burst-bar.is-tools-open { margin-bottom: 0.5rem; }
   .ar-camera-surface[data-landscape=true] .ar-burst-bar { margin-bottom: 2.35rem; }
+  .ar-camera-surface[data-landscape=true] .ar-burst-bar.is-tools-open { margin-bottom: 0.35rem; }
 }
 
 /* Xperia-style zoom ruler: shown while swiping on the lens chips, it slides under a fixed centre mark. */

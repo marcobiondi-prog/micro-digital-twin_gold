@@ -1620,7 +1620,7 @@ export function ArCamera({
                   {layers.has("grid") ? (
                     <>
                       <span className="size-2 rounded-full bg-[#042017] animate-pulse" />
-                      <span className="font-bold">AR Core attivo</span>
+                      <span className="font-semibold">AR Core</span>
                     </>
                   ) : (
                     <>
@@ -1629,7 +1629,7 @@ export function ArCamera({
                     </>
                   )}
                 </Button>
-              {activeTool === "manage" && <div className="flex items-center gap-2" data-camera-controls>
+              {activeTool === "manage" && <div className="flex items-center gap-1.5" data-camera-controls>
                 <Button variant="ghost" size="icon" className="camera-tool" aria-label="Mostra griglia" title="Griglia" aria-pressed={layers.has("grid")} onClick={() => toggle("grid")}><Grid2X2 className="size-4" /></Button>
                 <Button variant="ghost" size="icon" className="camera-tool" aria-label="Mappa termica simulata" title="Calore simulato" aria-pressed={layers.has("heat")} onClick={() => { if (!layers.has("heat")) setThermalInfoOpen(true); toggle("heat"); }}><Flame className="size-4" /></Button>
               </div>}
