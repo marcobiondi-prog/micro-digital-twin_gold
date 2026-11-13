@@ -388,6 +388,28 @@ export function ArcZoomDial({
           2x
         </span>
       </button>
+
+      {/* Etichette HTML ad altissima nitidezza (sovrapposizione bulletproof cross-device) */}
+      <span
+        className="absolute pointer-events-none select-none text-[12.5px] font-bold text-white tracking-tight"
+        style={{
+          left: `${stop1.dotX + 9}px`,
+          top: `${stop1.dotY - 8}px`,
+          textShadow: "0 1px 3px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.8)",
+        }}
+      >
+        1x
+      </span>
+      <span
+        className="absolute pointer-events-none select-none text-[12.5px] font-bold text-white tracking-tight"
+        style={{
+          left: `${stop2.dotX + 9}px`,
+          top: `${stop2.dotY - 8}px`,
+          textShadow: "0 1px 3px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.8)",
+        }}
+      >
+        2x
+      </span>
     </div>
   );
 }
