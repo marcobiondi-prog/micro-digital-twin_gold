@@ -1498,10 +1498,13 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .ar-pill-hud .camera-capture-status[hidden] { display: none; }
 .ar-pill-hud .camera-capture-status { border-radius: 999px; }
 .ar-pill-hud .ar-tools-panel { width: min(100%, 28rem); margin-inline: auto; padding: 0; background: transparent; border: 0; }
-.ar-tool-options { display: flex; align-items: center; justify-content: center; gap: .35rem; width: 100%; max-width: 100%; overflow-x: auto; scrollbar-width: none; box-sizing: border-box; padding-inline: .25rem; }
+.ar-tool-options { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .35rem; width: 100%; max-width: 100%; box-sizing: border-box; padding-inline: .25rem; }
 .ar-tool-options > .camera-tool { height: 36px; min-height: 36px; padding-inline: .65rem; font-size: .75rem; flex-shrink: 0; }
-.ar-tool-options > div { display: flex; align-items: center; gap: .35rem; flex-shrink: 0; }
-.ar-tool-options > div .camera-tool { width: 36px; min-width: 36px; height: 36px; min-height: 36px; padding: 0; }
+.ar-tool-options > div { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .35rem; flex-shrink: 0; }
+.ar-tool-options > div .camera-tool { height: 36px; min-height: 36px; font-size: .75rem; }
+.ar-tool-options > div .camera-tool:not(.ar-plant-button):not(.text-\[\#00f0ff\]) { width: 36px; min-width: 36px; padding: 0; }
+.ar-tool-options > div .camera-tool.ar-plant-button,
+.ar-tool-options > div .camera-tool.text-\[\#00f0ff\] { width: auto !important; min-width: auto !important; padding-inline: .75rem !important; }
 .ar-pill-hud .ar-tools-panel [data-camera-scroll] { text-shadow: var(--camera-shadow); }
 .ar-pill-hud .ar-tools-panel > div { max-width: 100%; }
 .ar-pill-hud .ar-tools-panel [data-camera-scroll] { background: transparent; padding-left: 0; }
@@ -1965,7 +1968,17 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 @media (max-width: 599px), (max-height: 599px) {
   .ar-camera-surface[data-landscape=true] .ar-specimen-dock { align-self: flex-end; width: min(52%, 22rem); }
   /* Esito / Analisi / AR tools take the same right-hand column as the balance, clear of the summary. */
-  .ar-camera-surface[data-landscape=true] .ar-tools-panel { width: min(100%, 22rem); margin-inline: auto 0; }
+  .ar-camera-surface[data-landscape=true] .ar-tools-panel {
+    width: min(100%, 25rem);
+    max-width: calc(100vw - env(safe-area-inset-right) - 1.5rem);
+    margin-inline: auto 0;
+    padding-right: max(.25rem, env(safe-area-inset-right));
+  }
+  .ar-camera-surface[data-landscape=true] .ar-tool-options {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: .35rem .5rem;
+  }
   /* The bottom HUD now reaches up the right column, so its empty left part (over the summary) must let taps
      through: only its controls catch them, and the minimized summary chip reopens. */
   .ar-camera-surface[data-landscape=true] .camera-bottom,

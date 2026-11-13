@@ -1784,11 +1784,11 @@ export function ArCamera({
                     </>
                   )}
                 </Button>
-              {activeTool === "manage" && <div className="flex items-center gap-1.5" data-camera-controls>
+              {activeTool === "manage" && <div className="flex flex-wrap items-center justify-center gap-1.5" data-camera-controls>
                 <Button variant="ghost" size="icon" className="camera-tool" aria-label="Mostra griglia" title="Griglia" aria-pressed={layers.has("grid")} onClick={() => toggle("grid")}><Grid2X2 className="size-4" /></Button>
                 <Button variant="ghost" size="icon" className="camera-tool" aria-label="Mappa termica simulata" title="Calore simulato" aria-pressed={layers.has("heat")} onClick={() => { if (!layers.has("heat")) setThermalInfoOpen(true); toggle("heat"); }}><Flame className="size-4" /></Button>
                 {layers.has("grid") && (
-                  <Button variant="ghost" size="sm" className="camera-tool text-[#00f0ff] font-bold" aria-label="Posiziona albero 3D" title="Posiziona albero 3D" onClick={() => handlePlace3DTree(0.5, 0.65)}>🌳 Pianta 3D</Button>
+                  <Button variant="ghost" size="sm" className="camera-tool ar-plant-button text-[#00f0ff] font-bold w-auto px-3 shrink-0 whitespace-nowrap" aria-label="Posiziona albero 3D" title="Posiziona albero 3D" onClick={() => handlePlace3DTree(0.5, 0.65)}>🌳 Pianta 3D</Button>
                 )}
               </div>}
               </div>
