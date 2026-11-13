@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Camera, Check, Star, Trash2, X, Zap, ZapOff } from "lucide-react";
 import { setCameraTorch, supportsCameraTorch } from "@/lib/camera-torch";
 import { Button } from "@/components/ui/button";
@@ -320,9 +320,57 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
     }
   }
 
+  const surfaceRef = useRef<HTMLDivElement>(null);
+  const [zoomRulerActive, setZoomRulerActive] = useState(false);
+  const [landscape, setLandscape] = useState(false);
+
+  useEffect(() => {
+    const update = () => setLandscape(window.innerWidth > window.innerHeight);
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("orientationchange", update);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("orientationchange", update);
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    const surface = surfaceRef.current;
+    if (!surface) return;
+    const measure = () => {
+      if (!landscape) {
+        const burstBar = surface.querySelector<HTMLElement>(".ar-burst-bar");
+        if (burstBar) {
+          const barRect = burstBar.getBoundingClientRect();
+          const surfaceRect = surface.getBoundingClientRect();
+          const bottomPx = Math.max(0, Math.round(surfaceRect.bottom - barRect.top + 6));
+          if (surface.style.getPropertyValue("--ar-burst-shelf-bottom") !== `${bottomPx}px`) {
+            surface.style.setProperty("--ar-burst-shelf-bottom", `${bottomPx}px`);
+          }
+        }
+      } else {
+        surface.style.removeProperty("--ar-burst-shelf-bottom");
+      }
+    };
+    measure();
+    const hud = surface.querySelector<HTMLElement>(".camera-bottom");
+    if (!hud || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(hud);
+    return () => ro.disconnect();
+  }, [burst, shots.length, zoomRulerActive, canZoom, ready, landscape]);
+
   return (
     <Dialog open={mode !== null} onOpenChange={(open) => { if (!open) onClose(); }} modal>
-      <DialogContent data-no-ui-click data-sys-camera-root className="camera-hud inset-0 left-0 top-0 block h-dvh w-screen max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 bg-camera-surface p-0 text-camera-ink shadow-none duration-0 data-[state=open]:animate-none data-[state=closed]:animate-none sm:max-h-none sm:overflow-hidden sm:rounded-none [&>button]:hidden" aria-describedby={undefined}>
+      <DialogContent
+        ref={surfaceRef}
+        data-landscape={landscape}
+        data-no-ui-click
+        data-sys-camera-root
+        className="camera-hud inset-0 left-0 top-0 block h-dvh w-screen max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 bg-camera-surface p-0 text-camera-ink shadow-none duration-0 data-[state=open]:animate-none data-[state=closed]:animate-none sm:max-h-none sm:overflow-hidden sm:rounded-none [&>button]:hidden"
+        aria-describedby={undefined}
+      >
         <DialogTitle className="sr-only">{mode === "video" ? "Registra video" : burst ? "Scatto multiplo" : "Scatta foto"}</DialogTitle>
         <CameraCloseGestures onClose={onClose} onPinch={canZoom ? onPinch : undefined}>
         <div className="absolute inset-0">
@@ -435,46 +483,59 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
             </div>
           </aside>
         )}
-        <div className="camera-bottom">
-          {canZoom && ready && <ZoomDial className="mb-2" zoom={zoom} max={mode === "video" && zoomRangeRef.current ? zoomRangeRef.current.max / zoomRangeRef.current.min : ZOOM_MAX} onZoom={setZoom} />}
-          {mode !== "video" && (
-            <div className="relative mx-auto mb-2 flex items-center justify-center">
-              <div
-                className="flex w-fit rounded-full bg-black/55 p-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur"
-                role="radiogroup"
-                aria-label="Tipo di scatto"
-              >
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={!burst}
-                  onClick={backToSingle}
-                  disabled={burst && shots.length > 0}
-                  title={burst && shots.length > 0 ? "Prima tocca Fine per tenere gli scatti" : undefined}
-                  className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""} disabled:opacity-40`}
+        <div className={`camera-bottom absolute z-20 flex flex-col items-center ${landscape ? "gap-1.5" : "gap-2"}`}>
+          {!error && mode !== "video" && (
+            <div
+              className={`ar-burst-bar${zoomRulerActive ? " is-zoom-active" : ""}`}
+              data-camera-controls
+            >
+              <div className="relative flex items-center justify-center">
+                <div
+                  role="radiogroup"
+                  aria-label="Tipo di scatto"
+                  className="flex rounded-full bg-black/55 p-0.5 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur"
                 >
-                  Singolo
-                </button>
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={burst}
-                  onClick={() => setMulti(true)}
-                  className={`h-8 rounded-full px-3 ${burst ? "bg-white text-black" : ""}`}
-                >
-                  Multiplo
-                </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={!burst}
+                    onClick={backToSingle}
+                    disabled={burst && shots.length > 0}
+                    title={burst && shots.length > 0 ? "Prima tocca Fine per tenere gli scatti" : undefined}
+                    className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""} disabled:opacity-40`}
+                  >
+                    Singolo
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={burst}
+                    onClick={() => setMulti(true)}
+                    className={`h-8 rounded-full px-3 ${burst ? "bg-white text-black" : ""}`}
+                  >
+                    Multiplo
+                  </button>
+                </div>
+                {burst && shots.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => finish(true)}
+                    className="absolute left-[calc(100%+0.5rem)] top-1/2 -translate-y-1/2 inline-flex h-8 items-center gap-1 rounded-full bg-white px-3.5 text-xs font-semibold text-black shadow-md whitespace-nowrap"
+                  >
+                    <Check className="size-3.5" aria-hidden="true" />Fine · {shots.length}
+                  </button>
+                )}
               </div>
-              {burst && shots.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => finish(true)}
-                  className="absolute left-[calc(100%+0.5rem)] top-1/2 -translate-y-1/2 inline-flex h-8 items-center gap-1 rounded-full bg-white px-3 text-xs font-semibold text-black shadow-md whitespace-nowrap"
-                >
-                  <Check className="size-3.5" aria-hidden="true" />Fine · {shots.length}
-                </button>
-              )}
+              <span className="sr-only" role="status" aria-live="polite">{burst ? `${shots.length} foto scattate` : ""}</span>
             </div>
+          )}
+          {canZoom && ready && (
+            <ZoomDial
+              zoom={zoom}
+              max={mode === "video" && zoomRangeRef.current ? zoomRangeRef.current.max / zoomRangeRef.current.min : ZOOM_MAX}
+              onZoom={setZoom}
+              onRulerChange={setZoomRulerActive}
+            />
           )}
           <CameraCaptureControl mode={mode === "video" ? "video" : "photo"} recording={recording} disabled={!ready || !!error || (!burst && pending > 0)} onCapture={capture} {...(mode !== "video" ? { onHold } : {})} />
         </div>
