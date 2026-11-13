@@ -174,5 +174,40 @@ describe("ARCore WebXR Integration", () => {
       scene.render(800, 600, true);
       scene.dispose();
     });
+
+    it("places and removes 3D tree with anchor reticle and thermal card", () => {
+      vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+        fillStyle: "",
+        fillRect: vi.fn(),
+        getImageData: vi.fn().mockReturnValue({ data: [0, 0, 0, 255] }),
+        clearRect: vi.fn(),
+        beginPath: vi.fn(),
+        moveTo: vi.fn(),
+        lineTo: vi.fn(),
+        quadraticCurveTo: vi.fn(),
+        closePath: vi.fn(),
+        fill: vi.fn(),
+        stroke: vi.fn(),
+        fillText: vi.fn(),
+        save: vi.fn(),
+        restore: vi.fn(),
+      } as unknown as CanvasRenderingContext2D);
+
+      const scene = createArScene();
+      const targeted = scene.target(0.5, 0.65);
+      expect(targeted).toBe(true);
+
+      const placed = scene.place3DTree?.(0.5, 0.65, {
+        speciesName: "Leccio",
+        scientificName: "Quercus ilex",
+        shadeM2: 18,
+        cooling: 0.4,
+      });
+      expect(placed).toBe(true);
+
+      scene.render(800, 600, true);
+      scene.removeLast();
+      scene.dispose();
+    });
   });
 });

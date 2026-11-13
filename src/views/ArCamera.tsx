@@ -45,7 +45,7 @@ import { startArFrameLoop } from "@/lib/ar-frame-loop";
 import { captureSummaryLines } from "@/models/ar-capture-summary";
 import { isArCoreSupported, createArCoreManager, type ArCoreManager } from "@/lib/arcore";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { cameraViewport, groundTilt, setArOrientationActive, shortestRotationDelta } from "@/lib/ar-orientation";
+import { cameraViewport, groundTilt, isGroundPoint, setArOrientationActive, shortestRotationDelta } from "@/lib/ar-orientation";
 import { CameraCloseGestures } from "@/views/CameraCloseGestures";
 import { tutorialSwipeStep } from "@/lib/ar-tutorial-swipe";
 import { CameraCenterCapture } from "@/views/CameraCenterCapture";
@@ -668,7 +668,12 @@ export function ArCamera({
         stopFrameLoop = startArFrameLoop(() => {
           // Same full-resolution composition, capped at 30 fps and paused while hidden.
           // Durante la scansione il fotogramma resta congelato: il video non viene ridipinto.
-          if (!scanningRef.current) paint(layersRef.current.has("grid"));
+          if (!scanningRef.current) {
+            if (layersRef.current.has("grid")) {
+              sceneRef.current?.target(0.5, 0.65);
+            }
+            paint(layersRef.current.has("grid"));
+          }
         }, {
           request: callback => requestAnimationFrame(callback),
           cancel: id => cancelAnimationFrame(id),
@@ -860,12 +865,21 @@ export function ArCamera({
         Math.max(0.15, d.box.h),
         cutout ? { image: cutout } : undefined,
       ];
-      // Nessun modello automatico: la specie riconosciuta viene usata solo ai tocchi sulla griglia.
+      // Posizionamento sulla griglia e calcolo termico
       last.current = cutout ? args : null;
-      // Nessun aggancio automatico: le copie compaiono solo con il pulsante +.
       setLayers((s) => new Set(s).add("objects"));
       const identified = d.species ? { ...d.species, cooling: d.cooling, identification: d.identification } : null;
       setSpecies(identified);
+      if (identified && sceneRef.current) {
+        sceneRef.current.place(type, d.box.x + d.box.w / 2, Math.min(0.98, d.box.y + d.box.h), Math.max(0.15, d.box.h), {
+          speciesName: identified.commonName,
+          scientificName: identified.scientificName,
+          shadeM2: identified.cooling?.shadeM2 ?? 18,
+          cooling: identified.cooling?.deltaT ?? 0.4,
+          is3D: true,
+          image: cutout ?? undefined,
+        });
+      }
       playCameraSound("scan-done", 1.8);
       const outcome = d.species
         ? `${d.species.commonName} · ${d.identification?.level === "genus" ? "genere probabile" : "specie probabile"}`
@@ -921,16 +935,80 @@ export function ArCamera({
 
   // All controls share one bounded count; no stage objects and no generic cooling.
   const changeGreen = (requested: number) => {
-    if (!ready || scanningRef.current || !species?.cooling) return;
+    if (!ready || scanningRef.current) return;
+    const coolingData = species?.cooling ?? { deltaT: 0.4, shadeM2: 18 };
     const next = scannedSpecimenCount(requested);
     countRef.current = next;
     taps.current = Array.from({length:next}, (_, i) => ({x:0.2 + (i % 3) * 0.3, y:0.65 + Math.floor(i / 3) * 0.1}));
-    plantedCooling.current = Array.from({length:next}, () => species.cooling);
+    plantedCooling.current = Array.from({length:next}, () => coolingData);
     setCount(next);
   };
   const addGreen = () => changeGreen(countRef.current + 1);
   const removeGreen = () => changeGreen(countRef.current - 1);
-  const removeLast = removeGreen;
+  const removeLast = () => {
+    sceneRef.current?.removeLast();
+    removeGreen();
+  };
+
+  /** Posiziona il modello 3D del Leccio (Quercus ilex) con ombra reale e card termica galleggiante sul terreno */
+  const handlePlace3DTree = (nx = 0.5, ny = 0.65) => {
+    if (!ready || scanningRef.current || !sceneRef.current) return;
+    const commonName = species?.commonName || "Leccio";
+    const scientificName = species?.scientificName || "Quercus ilex";
+    const shadeM2 = species?.cooling?.shadeM2 ?? 18;
+    const deltaT = species?.cooling?.deltaT ?? 0.4;
+
+    const placed = sceneRef.current.place3DTree?.(nx, ny, {
+      speciesName: commonName,
+      scientificName,
+      shadeM2,
+      cooling: deltaT,
+      is3D: true,
+    }) || sceneRef.current.add("tree", nx, ny, 1, {
+      speciesName: commonName,
+      scientificName,
+      shadeM2,
+      cooling: deltaT,
+      is3D: true,
+    });
+
+    if (placed) {
+      hapticTick([30]);
+      playCameraSound("scan-done", 1.8);
+
+      const effectiveSpecies: SpeciesInfo = species ?? {
+        commonName: "Leccio",
+        scientificName: "Quercus ilex",
+        family: "Fagaceae",
+        gbifKey: 2878688,
+        gbifUrl: "https://www.gbif.org/species/2878688",
+        colUrl: "https://www.catalogueoflife.org/data/taxon/4R5C9",
+        photo: null,
+        form: "tree",
+        heightM: 15,
+        crownM: 8,
+        evergreen: true,
+        density: 0.8,
+        cooling: { deltaT: 0.4, shadeM2: 18, note: "Stima per esemplare adulto di Leccio" },
+        identification: { level: "species", leafVisible: false, evidence: "Modello 3D ARCore posizionato sul terreno con calcolo ombra in tempo reale." },
+      };
+      if (!species) {
+        setSpecies(effectiveSpecies);
+        setFound("Leccio (Quercus ilex) · modello 3D posizionato");
+        logScan("Leccio (Quercus ilex) · modello 3D ARCore", effectiveSpecies, null, null);
+      }
+
+      const nextCount = Math.max(1, countRef.current + 1);
+      countRef.current = nextCount;
+      taps.current = Array.from({ length: nextCount }, (_, i) => ({
+        x: 0.2 + (i % 3) * 0.3,
+        y: 0.65 + Math.floor(i / 3) * 0.1,
+      }));
+      plantedCooling.current = Array.from({ length: nextCount }, () => effectiveSpecies.cooling);
+      setCount(nextCount);
+    }
+  };
+
   // "Elimina tutti" also empties this flow's scan records (report log and every section's result), after a confirm.
   const scanRecords = useArScans(kind);
   // The confirm lives inside the camera surface (not window.confirm), so it turns with the camera in landscape.
@@ -938,6 +1016,7 @@ export function ArCamera({
   // While the records are being deleted the big bin empties (files fly out, lid opens), then the confirm closes.
   const [emptying, setEmptying] = useState(false);
   const clearEverything = () => {
+    sceneRef.current?.clear();
     setConfirmClear(false); setEmptying(false);
     clearScans(kind);
     tabMemory.current.clear();
@@ -1448,8 +1527,18 @@ export function ArCamera({
           <div className="relative h-full w-full">
             <canvas
               ref={canvasRef}
-              className="absolute inset-0 h-full w-full touch-none bg-muted"
-              aria-label="Anteprima in realtà aumentata"
+              onClick={(e) => {
+                if (!ready || scanning) return;
+                const rect = e.currentTarget.getBoundingClientRect();
+                if (!rect.width || !rect.height) return;
+                const nx = (e.clientX - rect.left) / rect.width;
+                const ny = (e.clientY - rect.top) / rect.height;
+                if (isGroundPoint(ny)) {
+                  handlePlace3DTree(nx, ny);
+                }
+              }}
+              className="absolute inset-0 h-full w-full touch-none bg-muted cursor-pointer"
+              aria-label="Anteprima in realtà aumentata: tocca il terreno per posizionare l'albero 3D"
             />
             {ready && <div ref={viewfinderRef} className={`ar-viewfinder${subjectLocked ? " is-locked" : ""}${scanning ? " is-locking" : ""}`} aria-hidden="true"
               style={{ left: `${(subjectRef.current.x * 100).toFixed(2)}%`, top: `${(subjectRef.current.y * 100).toFixed(2)}%`, width: `${(subjectRef.current.w * 100).toFixed(2)}%`, height: `${(subjectRef.current.h * 100).toFixed(2)}%` }}>
@@ -1598,12 +1687,24 @@ export function ArCamera({
                   data-camera-controls
                   aria-hidden={Boolean(thermalInfoOpen || confirmClear || guideOpen)}
                 >
-                  <div className="relative flex items-center justify-center">
+                  <div className="relative flex items-center justify-center gap-2">
                     <div role="radiogroup" aria-label="Tipo di scatto" className="flex rounded-full bg-black/55 p-0.5 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur">
                       <button type="button" role="radio" aria-checked={!burst} onClick={backToSingle}
                         className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""}`}>Singolo</button>
                       <button type="button" role="radio" aria-checked={burst} onClick={() => setBurst(true)} className={`h-8 rounded-full px-3 ${burst ? "bg-white text-black" : ""}`}>Multiplo</button>
                     </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handlePlace3DTree(0.5, 0.65)}
+                      title="Posiziona il modello 3D del Leccio sul terreno tracciato da ARCore"
+                      aria-label="Posiziona albero 3D sul terreno"
+                      className="h-8 rounded-full bg-[#00f0ff]/20 text-[#00f0ff] ring-1 ring-[#00f0ff]/50 hover:bg-[#00f0ff]/30 backdrop-blur px-3 text-xs font-bold flex items-center gap-1.5 shadow-[0_0_12px_rgba(0,240,255,0.35)]"
+                    >
+                      <span className="size-2 rounded-full bg-[#00f0ff] animate-ping" />
+                      <span>Posiziona Albero 3D</span>
+                    </Button>
                     {burst && burstShots.length > 0 && (
                       <button
                         type="button"
@@ -1649,6 +1750,7 @@ export function ArCamera({
               {activeTool === "manage" && <div className="flex items-center gap-1.5" data-camera-controls>
                 <Button variant="ghost" size="icon" className="camera-tool" aria-label="Mostra griglia" title="Griglia" aria-pressed={layers.has("grid")} onClick={() => toggle("grid")}><Grid2X2 className="size-4" /></Button>
                 <Button variant="ghost" size="icon" className="camera-tool" aria-label="Mappa termica simulata" title="Calore simulato" aria-pressed={layers.has("heat")} onClick={() => { if (!layers.has("heat")) setThermalInfoOpen(true); toggle("heat"); }}><Flame className="size-4" /></Button>
+                <Button variant="ghost" size="sm" className="camera-tool text-[#00f0ff] font-bold" aria-label="Posiziona albero 3D" title="Posiziona albero 3D" onClick={() => handlePlace3DTree(0.5, 0.65)}>🌳 Pianta 3D</Button>
               </div>}
               </div>
               {!torchSupported && <p className="text-xs text-muted-foreground">Flash non supportato su questa fotocamera.</p>}
