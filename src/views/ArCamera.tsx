@@ -52,6 +52,7 @@ import { CameraCenterCapture } from "@/views/CameraCenterCapture";
 import { CameraCaptureControl } from "@/views/CameraCaptureControl";
 import { useHoldBurst } from "@/lib/hold-burst";
 import { ZoomDial } from "@/views/ZoomDial";
+import { ArcZoomDial } from "@/views/ArcZoomDial";
 import { playAiShutter, playCameraSound, preloadAiShutter, startScanLoop } from "@/lib/camera-sounds";
 import { useLab } from "@/models/lab-store";
 import { createTrackZoomer, pinchZoom, splitZoom, trackZoomRange, zoomHaptic, ZOOM_MAX, ZOOM_MIN } from "@/lib/camera-zoom";
@@ -272,6 +273,54 @@ export function ArCamera({
   const [torchOn, setTorchOn] = useState(false);
   const [torchBusy, setTorchBusy] = useState(false);
   const [torchError, setTorchError] = useState<string | null>(null);
+
+  // Info banner state: slide to dismiss & clear searches
+  const [infoBannerDismissed, setInfoBannerDismissed] = useState(false);
+  const [infoBannerDragY, setInfoBannerDragY] = useState(0);
+  const [infoBannerDragging, setInfoBannerDragging] = useState(false);
+  const infoBannerStartRef = useRef<{ id: number; y: number; x: number } | null>(null);
+
+  useEffect(() => {
+    if (species || soil || survey) {
+      setInfoBannerDismissed(false);
+    }
+  }, [species, soil, survey]);
+
+  const handleClearSearch = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    resetResults();
+    tabMemory.current.clear();
+    setInfoBannerDismissed(false);
+    toast("Ricerche cancellate", { description: "Tutte le scansioni ed esemplari attivi sono stati azzerati." });
+  };
+
+  const onBannerPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    infoBannerStartRef.current = { id: e.pointerId, y: e.clientY, x: e.clientX };
+    setInfoBannerDragging(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const onBannerPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!infoBannerStartRef.current || infoBannerStartRef.current.id !== e.pointerId) return;
+    const dy = e.clientY - infoBannerStartRef.current.y;
+    if (dy > 0) {
+      setInfoBannerDragY(dy);
+    } else {
+      setInfoBannerDragY(dy * 0.2);
+    }
+  };
+
+  const onBannerPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!infoBannerStartRef.current || infoBannerStartRef.current.id !== e.pointerId) return;
+    infoBannerStartRef.current = null;
+    setInfoBannerDragging(false);
+    if (infoBannerDragY > 35) {
+      setInfoBannerDismissed(true);
+      hapticTick();
+    }
+    setInfoBannerDragY(0);
+  };
   // Only the scanned photographic cutout can be placed; no geometric tree templates.
 
   const last = useRef<Parameters<ArScene["place"]> | null>(null);
@@ -534,9 +583,14 @@ export function ArCamera({
   useEffect(() => {
     if (!mode) return;
     setArOrientationActive(true);
+    document.documentElement.setAttribute("data-sys-camera", "");
     // No white system bars: fullscreen where allowed, else dark bars (lib/camera-chrome).
     void enterCameraChrome();
-    return () => { setArOrientationActive(false); exitCameraChrome(); };
+    return () => {
+      setArOrientationActive(false);
+      document.documentElement.removeAttribute("data-sys-camera");
+      exitCameraChrome();
+    };
   }, [mode]);
 
   useEffect(() => {
@@ -1582,9 +1636,9 @@ export function ArCamera({
       ) : (
         /* Portrait: Two balanced, centered rows */
         <div className="flex flex-col items-center gap-2.5 w-full px-4 pt-1" data-camera-controls>
-          {/* Row 1: Left [ ✕ ], Center [ ● ARCore ], Right [ ⓘ ] */}
-          <div className="flex w-full items-center justify-between">
-            <div className="flex items-center">
+          {/* Row 1: Left [ ✕ ], Center [ ● ARCore ], Right [ ⓘ, ⚡ ] */}
+          <div className="relative flex w-full items-center justify-between min-h-10">
+            <div className="flex items-center z-10">
               <Button
                 variant="ghost"
                 size="icon"
@@ -1598,7 +1652,7 @@ export function ArCamera({
               </Button>
             </div>
 
-            <div className="flex items-center justify-center">
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-auto">
               <Button
                 variant="ghost"
                 size="sm"
@@ -1616,7 +1670,7 @@ export function ArCamera({
               </Button>
             </div>
 
-            <div className="flex items-center gap-1.5 justify-end">
+            <div className="flex items-center gap-1.5 justify-end z-10">
               <Button
                 variant="ghost"
                 size="icon"
@@ -2025,6 +2079,7 @@ export function ArCamera({
       }}
     >
       <DialogContent
+        data-sys-camera-root
         style={{
           // Finestra sempre stabile a tutto schermo: nessuna rotazione CSS, così l'interfaccia
           // non si sposta né scompare quando il telefono ruota.
@@ -2121,13 +2176,64 @@ export function ArCamera({
               <div className="ar-landscape-layout" data-camera-controls>
                 {/* Colonna Sinistra: Informazioni e Analisi */}
                 <div className="ar-landscape-left">
-                  <div className="ar-landscape-specimen-card" data-camera-controls>
-                    <p className="text-xs font-bold text-white">Alberi e ombra · Leccio · x{dockCount || 1}</p>
-                    <div className="mt-1 space-y-0.5 text-[11px] text-white/80 font-variant-numeric tabular-nums">
-                      <p>Ombreggiatura ≈ {18 * (dockCount || 1)} m²</p>
-                      <p>Riduzione ≈ -{((0.4 * (dockCount || 1))).toFixed(1).replace(".", ",")} °C</p>
+                  {!infoBannerDismissed ? (
+                    <div
+                      className="ar-landscape-specimen-card"
+                      data-camera-controls
+                      style={
+                        infoBannerDragging
+                          ? { transform: `translateY(${infoBannerDragY}px)`, opacity: Math.max(0.2, 1 - Math.abs(infoBannerDragY) / 120), transition: "none" }
+                          : undefined
+                      }
+                      onPointerDown={onBannerPointerDown}
+                      onPointerMove={onBannerPointerMove}
+                      onPointerUp={onBannerPointerUp}
+                      onPointerCancel={onBannerPointerUp}
+                    >
+                      <div className="ar-specimen-handle" aria-hidden="true" title="Trascina verso il basso per togliere" />
+                      <div className="ar-specimen-header mb-1">
+                        <p className="text-xs font-bold text-white truncate">
+                          {species?.name ? `${species.name} · x${dockCount || 1}` : `Alberi e ombra · Leccio · x${dockCount || 1}`}
+                        </p>
+                        <div className="ar-specimen-actions">
+                          <button
+                            type="button"
+                            onClick={handleClearSearch}
+                            className="ar-specimen-btn ar-specimen-btn-danger"
+                            title="Cancella le ricerche e scansioni"
+                            aria-label="Cancella ricerche"
+                          >
+                            <Trash2 className="size-3" />
+                            <span>Cancella</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setInfoBannerDismissed(true); hapticTick(); }}
+                            className="ar-specimen-close-btn"
+                            title="Nascondi banner"
+                            aria-label="Nascondi banner"
+                          >
+                            <X className="size-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="space-y-0.5 text-[11px] text-white/80 font-variant-numeric tabular-nums">
+                        <p>Ombreggiatura ≈ {18 * (dockCount || 1)} m²</p>
+                        <p>Riduzione ≈ -{((0.4 * (dockCount || 1))).toFixed(1).replace(".", ",")} °C</p>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => { setInfoBannerDismissed(false); hapticTick(); }}
+                      className="ar-specimen-restore-btn w-fit"
+                      data-camera-controls
+                      title="Mostra informazioni specie e ombra"
+                    >
+                      <Info className="size-3.5 text-cyan-400" />
+                      <span>Mostra informazioni</span>
+                    </button>
+                  )}
                   <div className="ar-landscape-balance-card" data-camera-controls>
                     <p className="text-xs font-bold text-white mb-1.5">Bilancia termica</p>
                     <div className="ar-thermal-balance" data-camera-controls role="slider" tabIndex={0}
@@ -2144,7 +2250,12 @@ export function ArCamera({
                 {/* Colonna Destra: Controlli Fotocamera ed Ergonomia con il pollice */}
                 <div className="ar-landscape-right">
                   {toolsOpen && toolsPanelElement}
-                  {zoomDialElement}
+                  <ArcZoomDial
+                    zoom={zoom}
+                    max={ZOOM_MAX}
+                    onZoom={setZoom}
+                    disabled={!ready || scanning}
+                  />
                   {captureControlElement}
                 </div>
               </div>
@@ -2155,10 +2266,63 @@ export function ArCamera({
                   className="camera-bottom absolute z-20 flex flex-col items-center gap-2.5 w-full"
                 >
                   {/* Card informativo specie / raffrescamento */}
-                  <div className="ar-portrait-specimen-card" data-camera-controls>
-                    <p className="ar-portrait-specimen-title">{species?.name ? `${species.name} (${species.scientificName ?? "Quercus ilex"})` : (kind === "urban" ? "Leccio (Quercus ilex)" : "Vite (Vitis vinifera)")}</p>
-                    <p className="ar-portrait-specimen-desc">Ombra stimata ≈ {18 * (dockCount || 1)} m² · Raffrescamento ≈ -{((0.4 * (dockCount || 1))).toFixed(1).replace(".", ",")} °C</p>
-                  </div>
+                  {!infoBannerDismissed ? (
+                    <div
+                      className="ar-portrait-specimen-card"
+                      data-camera-controls
+                      style={
+                        infoBannerDragging
+                          ? { transform: `translateY(${infoBannerDragY}px)`, opacity: Math.max(0.2, 1 - infoBannerDragY / 120), transition: "none" }
+                          : undefined
+                      }
+                      onPointerDown={onBannerPointerDown}
+                      onPointerMove={onBannerPointerMove}
+                      onPointerUp={onBannerPointerUp}
+                      onPointerCancel={onBannerPointerUp}
+                    >
+                      <div className="ar-specimen-handle" aria-hidden="true" title="Trascina verso il basso per togliere" />
+                      <div className="ar-specimen-header">
+                        <p className="ar-portrait-specimen-title truncate">
+                          {species?.name ? `${species.name} (${species.scientificName ?? "Quercus ilex"})` : (kind === "urban" ? "Leccio (Quercus ilex)" : "Vite (Vitis vinifera)")}
+                        </p>
+                        <div className="ar-specimen-actions">
+                          <button
+                            type="button"
+                            onClick={handleClearSearch}
+                            className="ar-specimen-btn ar-specimen-btn-danger"
+                            title="Cancella le ricerche e scansioni"
+                            aria-label="Cancella ricerche"
+                          >
+                            <Trash2 className="size-3" />
+                            <span>Cancella</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setInfoBannerDismissed(true); hapticTick(); }}
+                            className="ar-specimen-close-btn"
+                            title="Nascondi banner"
+                            aria-label="Nascondi banner"
+                          >
+                            <X className="size-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <p className="ar-portrait-specimen-desc">
+                        Ombra stimata ≈ {18 * (dockCount || 1)} m² · Raffrescamento ≈ -{((0.4 * (dockCount || 1))).toFixed(1).replace(".", ",")} °C
+                      </p>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => { setInfoBannerDismissed(false); hapticTick(); }}
+                      className="ar-specimen-restore-btn"
+                      data-camera-controls
+                      title="Mostra informazioni specie e ombra"
+                    >
+                      <Info className="size-3.5 text-cyan-400" />
+                      <span>Mostra informazioni</span>
+                    </button>
+                  )}
                   {toolsOpen && toolsPanelElement}
                   {burst && burstShelfElement}
                   {zoomDialElement}
