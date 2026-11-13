@@ -1997,17 +1997,32 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .ar-dock-toggle { display: none; }
 @media (max-width: 599px), (max-height: 599px) {
   .ar-dock-toggle { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: .5rem; min-height: 2rem; padding: .125rem 0; font-size: .72rem; font-weight: 600; color: var(--camera-ink); text-align: left; font-variant-numeric: tabular-nums; }
-  /* The header sits at the bottom and the dock keeps its footprint, so the header never moves: collapsing
-     clips the dock down to the header row and opening reveals the body from bottom to top. The clipped part
-     is transparent and takes no touches. */
-  .ar-specimen-dock { display: flex; flex-direction: column-reverse; padding: .625rem .875rem .375rem; }
-  .ar-specimen-dock { clip-path: inset(0 0 0 0 round 8px); transition: clip-path .28s cubic-bezier(.2, .8, .2, 1), margin-bottom 200ms cubic-bezier(0.2, 0.8, 0.2, 1); }
-  .ar-specimen-dock[data-collapsed] { clip-path: inset(calc(100% - 2.75rem) 0 0 0 round 8px); }
-  .ar-specimen-dock { position: relative; }
-  .ar-specimen-dock::after { content: ""; position: absolute; inset: auto 0 calc(2.75rem - 1px); height: 1px; border-radius: 8px 8px 0 0; background: var(--camera-border); opacity: 0; transition: opacity .15s ease; pointer-events: none; }
-  .ar-specimen-dock[data-collapsed]::after { opacity: 1; }
-  .ar-dock-body { transition: opacity .2s ease; }
-  .ar-specimen-dock[data-collapsed] .ar-dock-body { opacity: 0; visibility: hidden; transition: opacity .15s ease, visibility 0s .28s; }
+  .ar-specimen-dock {
+    display: flex;
+    flex-direction: column-reverse;
+    padding: .5rem .875rem .375rem;
+    transition: margin-bottom 200ms cubic-bezier(0.2, 0.8, 0.2, 1), padding 200ms ease;
+  }
+  .ar-dock-body {
+    max-height: 18rem;
+    opacity: 1;
+    overflow: hidden;
+    transition: max-height 250ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 200ms ease;
+  }
+  .ar-specimen-dock[data-collapsed] {
+    padding-top: .3125rem;
+    padding-bottom: .3125rem;
+  }
+  .ar-specimen-dock[data-collapsed] .ar-dock-body {
+    max-height: 0;
+    opacity: 0;
+    margin: 0;
+    padding: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: max-height 250ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 150ms ease, visibility 0s 250ms;
+  }
+  .ar-specimen-dock::after { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .ar-specimen-dock, .ar-dock-body, .ar-specimen-dock[data-collapsed] .ar-dock-body { transition: none; } }
 
@@ -2401,6 +2416,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .ar-burst-bar.is-tools-open { margin-bottom: 0.5rem; }
 .ar-burst-bar.is-zoom-active,
 .ar-specimen-dock.is-zoom-active { margin-bottom: 2.5rem; }
+.camera-bottom:has(.ar-specimen-dock) .ar-burst-bar.is-zoom-active { margin-bottom: 0.35rem; }
 .ar-camera-surface[data-landscape=true] .ar-burst-bar,
 .camera-hud[data-landscape=true] .ar-burst-bar { margin-bottom: 0.2rem; }
 .ar-camera-surface[data-landscape=true] .ar-burst-bar.is-tools-open,
@@ -2417,6 +2433,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   .ar-burst-bar.is-tools-open { margin-bottom: 0.5rem; }
   .ar-burst-bar.is-zoom-active,
   .ar-specimen-dock.is-zoom-active { margin-bottom: 2.5rem; }
+  .camera-bottom:has(.ar-specimen-dock) .ar-burst-bar.is-zoom-active { margin-bottom: 0.35rem; }
   .ar-camera-surface[data-landscape=true] .ar-burst-bar,
   .camera-hud[data-landscape=true] .ar-burst-bar { margin-bottom: 0.2rem; }
   .ar-camera-surface[data-landscape=true] .ar-burst-bar.is-tools-open,

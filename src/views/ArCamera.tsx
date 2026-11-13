@@ -1093,6 +1093,28 @@ export function ArCamera({
     }
   });
   useEffect(() => () => hudObserver.current?.ro.disconnect(), []);
+  useEffect(() => {
+    const surface = surfaceRef.current?.querySelector<HTMLElement>(".ar-camera-surface");
+    const hud = surface?.querySelector<HTMLElement>(".camera-bottom");
+    if (!surface || !hud) return;
+    const measure = () => {
+      if (!landscape) {
+        const burstBar = hud.querySelector<HTMLElement>(".ar-burst-bar");
+        if (burstBar) {
+          const barRect = burstBar.getBoundingClientRect();
+          const surfaceRect = surface.getBoundingClientRect();
+          const bottomPx = Math.max(0, Math.round(surfaceRect.bottom - barRect.top + 6));
+          if (surface.style.getPropertyValue("--ar-burst-shelf-bottom") !== `${bottomPx}px`) {
+            surface.style.setProperty("--ar-burst-shelf-bottom", `${bottomPx}px`);
+          }
+        }
+      }
+    };
+    measure();
+    const t1 = setTimeout(measure, 100);
+    const t2 = setTimeout(measure, 260);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [balanceMin, landscape]);
   // Every specimen added or removed flashes, even when a small plant changes only hundredths of a degree.
   const lastStep = useRef({ count, cooling: coolingNow });
   useEffect(() => {
@@ -1164,7 +1186,8 @@ export function ArCamera({
     track.addEventListener("pointercancel", up);
     track.addEventListener("lostpointercapture", up);
   };
-  const specimenDock = !scanning && (viewedRecord ? dockRecord : species?.cooling) && (
+  const hasDock = Boolean(!scanning && (viewedRecord ? dockRecord : species?.cooling));
+  const specimenDock = hasDock && (
     <div className={`ar-specimen-dock${zoomRulerActive ? " is-zoom-active" : ""}`} data-camera-controls data-collapsed={balanceMin || undefined} aria-label="Esemplari e raffrescamento stimato">
       {/* Smartphones only (CSS hides it on tablets): fold the balance like an accordion, keeping a one-line summary;
           the header stays put at the bottom and the body unfolds from bottom to top. */}
@@ -1695,7 +1718,7 @@ export function ArCamera({
               {/* Singolo | Multiplo for photos, and while shooting the strip of the shots kept with "Fine · n". */}
               {!error && mode === "photo" && (
                 <div
-                  className={`ar-burst-bar ${burstShelfStateClass}${zoomRulerActive ? " is-zoom-active" : ""}`}
+                  className={`ar-burst-bar ${burstShelfStateClass}${zoomRulerActive && !hasDock ? " is-zoom-active" : ""}`}
                   data-camera-controls
                   aria-hidden={Boolean(thermalInfoOpen || confirmClear || guideOpen)}
                 >
