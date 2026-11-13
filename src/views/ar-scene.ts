@@ -26,8 +26,10 @@ export type ArScene = {
   moveLast: (nx: number, ny: number) => boolean;
   scaleLast: (factor: number) => boolean;
   clear: () => void;
-  render: (w: number, h: number, showGrid: boolean) => void;
+  render: (w: number, h: number, showGrid: boolean, showObjects?: boolean) => void;
   dispose: () => void;
+  /** Nasconde il reticolo di posizionamento quando ARCore è disattivato */
+  hideTarget?: () => void;
   /** Integrazione ARCore: impostazione del manager di sessione o dell'hit reale */
   setRealSurfaceHit?: (hit: ArCoreHitPoint | null) => void;
   setArCoreManager?: (manager: ArCoreManager | null) => void;
@@ -426,6 +428,9 @@ export function createArScene(): ArScene {
       if (hit) target.position.copy(hit).setY(hit.y + 0.015);
       return Boolean(hit);
     },
+    hideTarget: () => {
+      target.visible = false;
+    },
     // Inclinazione contenuta: la griglia resta sempre ancorata in basso, niente rotazioni ampie.
     setTilt: (beta, _gamma) => { camera.rotation.set(THREE.MathUtils.degToRad(Math.max(-40, Math.min(-15, beta - 90))), 0, 0, "YXZ"); },
     // Ancoraggio al movimento: la camera contro-ruota con il giroscopio (smorzata),
@@ -453,58 +458,63 @@ export function createArScene(): ArScene {
       return true;
     },
     clear: () => { plants.splice(0).forEach(release); target.visible = false; },
-    render: (w, h, showGrid) => {
+    render: (w, h, showGrid, showObjects = true) => {
       if (canvas.width !== w || canvas.height !== h) { renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
       renderer.clear();
-      const targetVisible = target.visible;
-      const hasPlants = plants.length > 0;
+      const targetVisible = showGrid && target.visible;
+      const hasPlants = showObjects && plants.length > 0;
 
       // Aggiornamento geometrie dei piani reali tracciati da ARCore
-      const detectedPlanes = arCoreManager?.getDetectedPlanes?.() ?? [];
-      const horizontalPlanes = detectedPlanes.filter((p) => p.orientation === "horizontal" && p.polygon.length >= 3);
-      if (horizontalPlanes.length > 0) {
-        clearPlanes();
-        horizontalPlanes.forEach((pl) => {
-          try {
-            const shape = new THREE.Shape();
-            pl.polygon.forEach((pt, i) => {
-              if (i === 0) shape.moveTo(pt.x, -pt.z);
-              else shape.lineTo(pt.x, -pt.z);
-            });
-            shape.closePath();
-            const geom = new THREE.ShapeGeometry(shape);
-            geom.rotateX(-Math.PI / 2);
-            const planeMesh = new THREE.Mesh(
-              geom,
-              new THREE.MeshBasicMaterial({
-                color: ink,
-                transparent: true,
-                opacity: 0.18,
-                depthWrite: false,
-                side: THREE.DoubleSide,
-              })
-            );
-            planeMesh.position.set(pl.center.x, pl.center.y + 0.005, pl.center.z);
-            planesGroup.add(planeMesh);
+      if (showGrid) {
+        const detectedPlanes = arCoreManager?.getDetectedPlanes?.() ?? [];
+        const horizontalPlanes = detectedPlanes.filter((p) => p.orientation === "horizontal" && p.polygon.length >= 3);
+        if (horizontalPlanes.length > 0) {
+          clearPlanes();
+          horizontalPlanes.forEach((pl) => {
+            try {
+              const shape = new THREE.Shape();
+              pl.polygon.forEach((pt, i) => {
+                if (i === 0) shape.moveTo(pt.x, -pt.z);
+                else shape.lineTo(pt.x, -pt.z);
+              });
+              shape.closePath();
+              const geom = new THREE.ShapeGeometry(shape);
+              geom.rotateX(-Math.PI / 2);
+              const planeMesh = new THREE.Mesh(
+                geom,
+                new THREE.MeshBasicMaterial({
+                  color: ink,
+                  transparent: true,
+                  opacity: 0.18,
+                  depthWrite: false,
+                  side: THREE.DoubleSide,
+                })
+              );
+              planeMesh.position.set(pl.center.x, pl.center.y + 0.005, pl.center.z);
+              planesGroup.add(planeMesh);
 
-            const borderPts = pl.polygon.map((pt) => new THREE.Vector3(pt.x, 0.008, pt.z));
-            if (borderPts.length > 0 && borderPts[0]) borderPts.push(borderPts[0].clone());
-            const lineGeom = new THREE.BufferGeometry().setFromPoints(borderPts);
-            const borderLine = new THREE.Line(
-              lineGeom,
-              new THREE.LineBasicMaterial({ color: ink, transparent: true, opacity: 0.75 })
-            );
-            borderLine.position.set(pl.center.x, pl.center.y, pl.center.z);
-            planesGroup.add(borderLine);
-          } catch {
-            // Geometria non valida o degenere, ignora
-          }
-        });
-      } else if (planesGroup.children.length > 0) {
-        clearPlanes();
+              const borderPts = pl.polygon.map((pt) => new THREE.Vector3(pt.x, 0.008, pt.z));
+              if (borderPts.length > 0 && borderPts[0]) borderPts.push(borderPts[0].clone());
+              const lineGeom = new THREE.BufferGeometry().setFromPoints(borderPts);
+              const borderLine = new THREE.Line(
+                lineGeom,
+                new THREE.LineBasicMaterial({ color: ink, transparent: true, opacity: 0.75 })
+              );
+              borderLine.position.set(pl.center.x, pl.center.y, pl.center.z);
+              planesGroup.add(borderLine);
+            } catch {
+              // Geometria non valida o degenere, ignora
+            }
+          });
+        } else if (planesGroup.children.length > 0) {
+          clearPlanes();
+        }
+      } else {
+        if (planesGroup.children.length > 0) clearPlanes();
+        target.visible = false;
       }
 
-      if (!showGrid && !hasPlants && !targetVisible && planesGroup.children.length === 0) {
+      if (!showGrid && !hasPlants && !targetVisible) {
         return;
       }
       if (showGrid) {
@@ -522,7 +532,7 @@ export function createArScene(): ArScene {
       if (hasPlants || targetVisible) {
         target.visible = targetVisible;
         plants.forEach((plant) => {
-          plant.visible = true;
+          plant.visible = showObjects;
           if (!plant.userData['is3D']) {
             const height = compactPlantHeight(
               camera.position.distanceTo(plant.position),

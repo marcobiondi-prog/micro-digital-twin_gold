@@ -209,5 +209,13 @@ describe("ARCore WebXR Integration", () => {
       scene.removeLast();
       scene.dispose();
     });
+
+    it("hides target reticle and does not render when AR is deactivated", () => {
+      const scene = createArScene();
+      scene.target(0.5, 0.65);
+      scene.hideTarget?.();
+      scene.render(800, 600, false);
+      scene.dispose();
+    });
   });
 });

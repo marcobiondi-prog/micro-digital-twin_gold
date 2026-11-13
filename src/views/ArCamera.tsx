@@ -311,13 +311,20 @@ export function ArCamera({
     const willEnable = !layers.has("grid");
     if (willEnable) {
       setLayers((s) => new Set(s).add("grid").add("objects"));
+      if (arCoreRef.current && arCoreSupported && !arCoreRef.current.isActive()) {
+        void arCoreRef.current.startSession();
+      }
       toast.success("AR Core attivo: griglia del terreno agganciata.");
     } else {
       setLayers((s) => {
         const n = new Set(s);
         n.delete("grid");
+        n.delete("objects");
         return n;
       });
+      sceneRef.current?.hideTarget?.();
+      void arCoreRef.current?.stopSession();
+      setArCoreActive(false);
       toast.info("AR Core disattivato.");
     }
     window.setTimeout(() => {
@@ -647,7 +654,7 @@ export function ArCamera({
         digitalZoomRef.current = 1; zoomRef.current = 1; setZoomState(1);
         v.srcObject = stream;
         void v.play().catch(() => {});
-        const paint = (showGrid: boolean) => {
+        const paint = (showGrid: boolean, showObjects = true) => {
           const c = canvasRef.current;
           if (!c) return false;
           const painted = paintArFrame(
@@ -658,21 +665,25 @@ export function ArCamera({
               zoom: digitalZoomRef.current,
               scene: sceneRef.current,
               heat: layersRef.current.has("heat") ? (g, w, h) => thermal(g, w, h, taps.current, plantedCooling.current) : undefined,
+              showObjects,
             },
             showGrid,
           );
           if (painted && !previewReady) { previewReady = true; setReady(true); }
           return painted;
         };
-        paintRef.current = paint;
+        paintRef.current = (showGrid: boolean) => paint(showGrid, layersRef.current.has("objects"));
         stopFrameLoop = startArFrameLoop(() => {
           // Same full-resolution composition, capped at 30 fps and paused while hidden.
           // Durante la scansione il fotogramma resta congelato: il video non viene ridipinto.
           if (!scanningRef.current) {
-            if (layersRef.current.has("grid")) {
+            const isArActive = layersRef.current.has("grid");
+            if (isArActive) {
               sceneRef.current?.target(0.5, 0.65);
+            } else {
+              sceneRef.current?.hideTarget?.();
             }
-            paint(layersRef.current.has("grid"));
+            paint(isArActive, layersRef.current.has("objects"));
           }
         }, {
           request: callback => requestAnimationFrame(callback),
@@ -706,8 +717,12 @@ export function ArCamera({
   const toggle = (l: Layer) =>
     setLayers((s) => {
       const n = new Set(s);
-      if (n.has(l)) n.delete(l);
-      else n.add(l);
+      if (n.has(l)) {
+        n.delete(l);
+        if (l === "grid") sceneRef.current?.hideTarget?.();
+      } else {
+        n.add(l);
+      }
       return n;
     });
 
@@ -952,7 +967,7 @@ export function ArCamera({
 
   /** Posiziona il modello 3D del Leccio (Quercus ilex) con ombra reale e card termica galleggiante sul terreno */
   const handlePlace3DTree = (nx = 0.5, ny = 0.65) => {
-    if (!ready || scanningRef.current || !sceneRef.current) return;
+    if (!ready || scanningRef.current || !sceneRef.current || !layersRef.current.has("grid")) return;
     const commonName = species?.commonName || "Leccio";
     const scientificName = species?.scientificName || "Quercus ilex";
     const shadeM2 = species?.cooling?.shadeM2 ?? 18;
@@ -1528,7 +1543,7 @@ export function ArCamera({
             <canvas
               ref={canvasRef}
               onClick={(e) => {
-                if (!ready || scanning) return;
+                if (!ready || scanning || !layers.has("grid")) return;
                 const rect = e.currentTarget.getBoundingClientRect();
                 if (!rect.width || !rect.height) return;
                 const nx = (e.clientX - rect.left) / rect.width;
@@ -1537,8 +1552,8 @@ export function ArCamera({
                   handlePlace3DTree(nx, ny);
                 }
               }}
-              className="absolute inset-0 h-full w-full touch-none bg-muted cursor-pointer"
-              aria-label="Anteprima in realtà aumentata: tocca il terreno per posizionare l'albero 3D"
+              className={`absolute inset-0 h-full w-full touch-none bg-muted ${layers.has("grid") ? "cursor-pointer" : ""}`}
+              aria-label={layers.has("grid") ? "Anteprima in realtà aumentata: tocca il terreno per posizionare l'albero 3D" : "Anteprima fotocamera"}
             />
             {ready && <div ref={viewfinderRef} className={`ar-viewfinder${subjectLocked ? " is-locked" : ""}${scanning ? " is-locking" : ""}`} aria-hidden="true"
               style={{ left: `${(subjectRef.current.x * 100).toFixed(2)}%`, top: `${(subjectRef.current.y * 100).toFixed(2)}%`, width: `${(subjectRef.current.w * 100).toFixed(2)}%`, height: `${(subjectRef.current.h * 100).toFixed(2)}%` }}>
@@ -1693,18 +1708,20 @@ export function ArCamera({
                         className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""}`}>Singolo</button>
                       <button type="button" role="radio" aria-checked={burst} onClick={() => setBurst(true)} className={`h-8 rounded-full px-3 ${burst ? "bg-white text-black" : ""}`}>Multiplo</button>
                     </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handlePlace3DTree(0.5, 0.65)}
-                      title="Posiziona il modello 3D del Leccio sul terreno tracciato da ARCore"
-                      aria-label="Posiziona albero 3D sul terreno"
-                      className="h-8 rounded-full bg-[#00f0ff]/20 text-[#00f0ff] ring-1 ring-[#00f0ff]/50 hover:bg-[#00f0ff]/30 backdrop-blur px-3 text-xs font-bold flex items-center gap-1.5 shadow-[0_0_12px_rgba(0,240,255,0.35)]"
-                    >
-                      <span className="size-2 rounded-full bg-[#00f0ff] animate-ping" />
-                      <span>Posiziona Albero 3D</span>
-                    </Button>
+                    {layers.has("grid") && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handlePlace3DTree(0.5, 0.65)}
+                        title="Posiziona il modello 3D del Leccio sul terreno tracciato da ARCore"
+                        aria-label="Posiziona albero 3D sul terreno"
+                        className="h-8 rounded-full bg-[#00f0ff]/20 text-[#00f0ff] ring-1 ring-[#00f0ff]/50 hover:bg-[#00f0ff]/30 backdrop-blur px-3 text-xs font-bold flex items-center gap-1.5 shadow-[0_0_12px_rgba(0,240,255,0.35)]"
+                      >
+                        <span className="size-2 rounded-full bg-[#00f0ff] animate-ping" />
+                        <span>Posiziona Albero 3D</span>
+                      </Button>
+                    )}
                     {burst && burstShots.length > 0 && (
                       <button
                         type="button"
@@ -1750,7 +1767,9 @@ export function ArCamera({
               {activeTool === "manage" && <div className="flex items-center gap-1.5" data-camera-controls>
                 <Button variant="ghost" size="icon" className="camera-tool" aria-label="Mostra griglia" title="Griglia" aria-pressed={layers.has("grid")} onClick={() => toggle("grid")}><Grid2X2 className="size-4" /></Button>
                 <Button variant="ghost" size="icon" className="camera-tool" aria-label="Mappa termica simulata" title="Calore simulato" aria-pressed={layers.has("heat")} onClick={() => { if (!layers.has("heat")) setThermalInfoOpen(true); toggle("heat"); }}><Flame className="size-4" /></Button>
-                <Button variant="ghost" size="sm" className="camera-tool text-[#00f0ff] font-bold" aria-label="Posiziona albero 3D" title="Posiziona albero 3D" onClick={() => handlePlace3DTree(0.5, 0.65)}>🌳 Pianta 3D</Button>
+                {layers.has("grid") && (
+                  <Button variant="ghost" size="sm" className="camera-tool text-[#00f0ff] font-bold" aria-label="Posiziona albero 3D" title="Posiziona albero 3D" onClick={() => handlePlace3DTree(0.5, 0.65)}>🌳 Pianta 3D</Button>
+                )}
               </div>}
               </div>
               {!torchSupported && <p className="text-xs text-muted-foreground">Flash non supportato su questa fotocamera.</p>}

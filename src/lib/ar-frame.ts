@@ -3,7 +3,7 @@
 
 export type ArFrameScene = {
   canvas: HTMLCanvasElement;
-  render: (w: number, h: number, showGrid: boolean) => void;
+  render: (w: number, h: number, showGrid: boolean, showObjects?: boolean) => void;
 };
 
 export type ArFrameSource = {
@@ -15,6 +15,8 @@ export type ArFrameSource = {
   rotation?: number;
   /** Digital zoom: centred crop factor (1 = none). */
   zoom?: number;
+  /** Mostra/nasconde gli oggetti virtuali 3D posizionati. */
+  showObjects?: boolean;
 };
 
 export function drawCameraVideo(g: CanvasRenderingContext2D, video: HTMLVideoElement, width: number, height: number, rotation = 0, zoom = 1) {
@@ -68,7 +70,11 @@ export function paintArFrame(canvas: HTMLCanvasElement, source: ArFrameSource, s
   heat?.(g, cw, ch);
   if (scene) {
     // La griglia segue l'inclinazione del telefono, ma solo dove viene mostrata a schermo.
-    scene.render(cw, ch, showGrid);
+    if (source.showObjects !== undefined) {
+      scene.render(cw, ch, showGrid, source.showObjects);
+    } else {
+      scene.render(cw, ch, showGrid);
+    }
     g.drawImage(scene.canvas, 0, 0, cw, ch);
   }
   return true;
