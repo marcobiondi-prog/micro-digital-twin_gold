@@ -1900,6 +1900,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
     bottom: calc(max(.75rem, env(safe-area-inset-bottom))) !important;
     max-height: calc(100% - max(.375rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 3.5rem) !important;
   }
+}
 
 /* Smartphone portrait: the expanded summary stops above the bottom HUD (balance, zoom, capture) and scrolls,
    and the balance lines up with the summary's left edge. */
