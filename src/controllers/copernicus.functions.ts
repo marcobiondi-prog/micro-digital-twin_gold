@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { optionalSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { latestValue, ndviRequest, surfaceTempRequest, type CopernicusReading } from "@/models/copernicus";
 
 const TOKEN_URL = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token";
@@ -36,7 +36,7 @@ async function statistics(bearer: string, request: unknown) {
 
 /** Premium (signed-in): Sentinel-2 NDVI and Sentinel-3 surface temperature around a place. */
 export const getCopernicusReading = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([optionalSupabaseAuth])
   .inputValidator((d) => z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).parse(d))
   .handler(async ({ data }): Promise<CopernicusReading & { configured: boolean }> => {
     const id = process.env["CDSE_CLIENT_ID"], secret = process.env["CDSE_CLIENT_SECRET"];

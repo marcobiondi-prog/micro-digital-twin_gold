@@ -901,7 +901,7 @@ export function ArCamera({
       // The host's own error text (e.g. FUNCTION_INVOCATION_TIMEOUT) names the real cause.
       const detail = message.replace(/<(style|script)[\s\S]*?<\/\1>|<[^>]*>/gi, " ").replace(/\s+/g, " ").trim().slice(0, 140) || (isEmptyHttpError(error) ? "risposta vuota dal server" : "");
       if (version === scanVersion.current) playCameraSound("scan-fail", 1.8);
-      if (version === scanVersion.current) setFound(/Unauthorized/.test(message) ? "Sessione scaduta: esci e accedi di nuovo prima di una nuova analisi." : `Analisi interrotta${detail ? ` (${detail})` : ""}. Controlla la connessione prima di una nuova analisi.`);
+      if (version === scanVersion.current) setFound(/Unauthorized/.test(message) ? "Sessione non sincronizzata: riprova la scansione." : `Analisi interrotta${detail ? ` (${detail})` : ""}. Controlla la connessione prima di una nuova analisi.`);
     } finally {
       scanBusy.current = false;
       scanningRef.current = false;

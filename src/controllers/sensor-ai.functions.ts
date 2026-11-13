@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { optionalSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { aiConfigured, aiResponses } from "@/lib/ai-responses";
 import { OVERPASS_URLS } from "@/models/place-area";
 import { cleanPicks, fallbackPicks, metres, readModelJson, type Poi, type Sensor } from "@/models/sensor-picks";
@@ -61,7 +61,7 @@ Da 3 a 5 sensori: colloca li vicino ai luoghi sensibili entro 1,5 km dal centro 
 Il campo "luogo" deve descrivere il punto in modo riconoscibile: nome della via o della piazza e tipo di luogo (es. "Via Mazzini, vicino alla scuola elementare", "Parcheggio del terminal bus", "Versante sud del vigneto").`;
 
 export const suggestHeatSensors = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([optionalSupabaseAuth])
   .inputValidator((d) => z.object({ kind: z.enum(["urban", "vineyard"]), label: z.string().max(300), lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).parse(d))
   .handler(async ({ data }) => {
     const [sensors, pois] = await Promise.all([fetchExistingSensors(data.lat, data.lng), fetchPois(data.lat, data.lng)]);

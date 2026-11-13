@@ -10,7 +10,7 @@ export const attachSupabaseAuth = createMiddleware({ type: 'function' }).client(
       const { data } = await supabase.auth.getSession();
       let session = data.session;
       const now = Math.floor(Date.now() / 1000);
-      if (!session || (session.expires_at && session.expires_at <= now + 60)) {
+      if (session && session.expires_at && session.expires_at <= now + 60) {
         const { data: refreshed, error } = await supabase.auth.refreshSession();
         if (!error && refreshed.session) {
           session = refreshed.session;

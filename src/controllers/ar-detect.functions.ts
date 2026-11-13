@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { arRecognitionSchema, canEstimateRecognizedPlant, estimateCooling, withPlantAlternatives, type GroundSurvey } from "@/models/ar-recognition";
 import { ArGatewayError, readArResponse } from "@/controllers/ar-response.server";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { optionalSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { aiConfigured, aiResponses } from "@/lib/ai-responses";
 import { plantPhotoBounds, type PlantOutline } from "@/models/ar-plant-photo";
 import { arFocusOption } from "@/models/ar-focus";
@@ -139,15 +139,15 @@ async function referencePhoto(name: string, gbifKey: number | null): Promise<Ref
 const detectInput = z.object({ image: z.string().regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/).max(3_000_000), detailImage: z.string().regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/).max(1_000_000).optional(), kind: z.enum(["urban", "vineyard"]).default("urban"), target: z.enum(["tree", "ground", "leaf", "canopy", "interrow"]).optional(), focus: z.object({x:z.number().min(0).max(1),y:z.number().min(0).max(1),w:z.number().min(0).max(1),h:z.number().min(0).max(1)}).optional(), satellite: z.object({ ndvi: z.number().min(-1).max(1).optional(), ndviDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), surfaceTemp: z.number().min(-60).max(80).optional(), tempDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }).optional() });
 type DetectResult = { detection: Detection; soil?: Soil; survey?: GroundSurvey | null; error?: string; status?: number };
 
-/** Foto di riferimento della specie riconosciuta, chiesta dalla fotocamera dopo la scansione (solo utenti registrati). */
+/** Foto di riferimento della specie riconosciuta, chiesta dalla fotocamera dopo la scansione. */
 export const getReferencePhoto = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([optionalSupabaseAuth])
   .inputValidator((d) => z.object({ name: z.string().trim().min(2).max(80), gbifKey: z.number().int().positive().nullable() }).parse(d))
   .handler(async ({ data }): Promise<ReferencePhoto | null> => referencePhoto(data.name, data.gbifKey));
 
-/** Riconosce oggetto e specie inquadrati dalla fotocamera AR (solo utenti registrati). */
+/** Riconosce oggetto e specie inquadrati dalla fotocamera AR. */
 export const detectArObject = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([optionalSupabaseAuth])
   .inputValidator((d) => detectInput.parse(d))
   .handler(async ({ data }): Promise<DetectResult> => {
     // Unexpected server failures come back as a readable error instead of a thrown request.

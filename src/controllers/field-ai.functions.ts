@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { optionalSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { aiConfigured, aiResponses } from "@/lib/ai-responses";
 
 export type Intervention = { priorita: "alta" | "media" | "bassa"; azione: string; motivazione: string; entro: string };
@@ -16,7 +16,7 @@ Rispondi SOLO con JSON valido, senza testo extra, nel formato:
 Massimo 5 interventi, ordinati per priorità decrescente. Testi brevi, in italiano. Se mancano dati, indicalo nella sintesi.`;
 
 export const planInterventions = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([optionalSupabaseAuth])
   .inputValidator((d) => z.object({ observation: z.string().trim().min(3).max(2000), phase: z.string().max(40).optional(), kind: z.enum(["urban", "vineyard"]).default("vineyard") }).parse(d))
   .handler(async ({ data }) => {
     if (!aiConfigured()) return { error: "Servizio AI non configurato." };
