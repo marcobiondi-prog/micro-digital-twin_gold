@@ -1518,20 +1518,7 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .ar-xr-overlay [data-camera-controls] { pointer-events: auto; }
 .ar-xr-overlay .ar-thermal-summary { pointer-events: auto; }
 @media (orientation: landscape) {
-  .ar-thermal-summary:not(.ar-thermal-summary-min) {
-    top: calc(max(.375rem, env(safe-area-inset-top)) + 2.75rem) !important;
-    bottom: calc(max(.75rem, env(safe-area-inset-bottom))) !important;
-    max-height: calc(100% - max(.375rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 3.5rem) !important;
-    width: min(34vw, 21rem);
-    max-width: calc(50vw - 4.5rem);
-    z-index: 22;
-    pointer-events: auto !important;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-    scrollbar-color: var(--camera-border) transparent;
-  }
+  .ar-thermal-summary:not(.ar-thermal-summary-min) { top: calc(max(.375rem, env(safe-area-inset-top)) + 2.75rem) !important; width: min(34vw, 21rem); max-width: calc(50vw - 4.5rem); z-index: 22; pointer-events: auto !important; }
   .ar-thermal-summary-min { top: calc(max(.375rem, env(safe-area-inset-top)) + 2.75rem) !important; width: auto !important; max-width: min(85vw, 22rem) !important; z-index: 22; pointer-events: auto !important; }
 }
 /* Landscape: stima termica più leggibile (valori e testo ingranditi solo qui) */
@@ -1542,15 +1529,26 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
   .ar-thermal-summary:not(.ar-thermal-summary-min) .ar-thermal-note { font-size: .6875rem; }
   .ar-thermal-summary:not(.ar-thermal-summary-min) .ar-thermal-exposure { font-size: .8125rem; }
 }
+/* Landscape: il testo lungo della stima termica scorre dentro il pannello */
+@media (orientation: landscape) {
+  .ar-thermal-summary:not(.ar-thermal-summary-min) {
+    max-height: calc(100% - max(1rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 15.25rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: var(--camera-border) transparent;
+  }
+  .ar-thermal-summary:not(.ar-thermal-summary-min)::-webkit-scrollbar { width: 4px; }
+  .ar-thermal-summary:not(.ar-thermal-summary-min)::-webkit-scrollbar-track { background: transparent; }
+  .ar-thermal-summary:not(.ar-thermal-summary-min)::-webkit-scrollbar-thumb { border-radius: 999px; background: var(--camera-border); }
+}
 @media (orientation: landscape) and (max-height: 600px) {
   .camera-bottom { bottom: calc(1.5rem + env(safe-area-inset-bottom)); }
   .camera-capture-row { grid-template-columns: 1fr 60px 1fr; }
   .camera-shutter { width: 60px; height: 60px; }
   .camera-capture-dock { gap: .125rem; }
-  .ar-thermal-summary:not(.ar-thermal-summary-min) {
-    bottom: calc(max(.75rem, env(safe-area-inset-bottom))) !important;
-    max-height: calc(100% - max(.375rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 3.5rem) !important;
-  }
+  .ar-thermal-summary:not(.ar-thermal-summary-min) { max-height: calc(100% - max(1rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 12.5rem); }
 }
 @media (prefers-reduced-motion: reduce) { .camera-shutter { transition: none; } }
 
@@ -1668,7 +1666,7 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .ar-framing-hint[data-visible=true] { opacity: 1; }
 .ar-framing-hint[data-camera-controls] { pointer-events: auto; z-index: 30; max-height: calc(100dvh - 12rem); overflow-y: auto; }
 .ar-tutorial-veil { position: absolute; z-index: 60; inset: 0; background: color-mix(in oklab, var(--camera-surface, var(--background)) 30%, transparent); -webkit-backdrop-filter: blur(10px) saturate(1.15); backdrop-filter: blur(10px) saturate(1.15); animation: ar-veil-in 260ms ease-out; }
-.ar-tutorial { position: absolute; z-index: 65; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(20rem, calc(100% - 2rem)); max-height: calc(100dvh - 8rem); overflow-y: auto; padding: 1.25rem 1.25rem 1rem; border-radius: 1.25rem; text-align: center; color: var(--camera-ink); background: color-mix(in oklab, var(--camera-surface, var(--background)) 55%, transparent); -webkit-backdrop-filter: blur(22px) saturate(1.4); backdrop-filter: blur(22px) saturate(1.4); border: 1px solid color-mix(in oklab, var(--camera-ink) 18%, transparent); box-shadow: 0 20px 50px -20px color-mix(in oklab, var(--foreground) 45%, transparent), inset 0 1px 0 color-mix(in oklab, var(--camera-ink) 15%, transparent); animation: ar-tutorial-in 240ms ease-out; }
+.ar-tutorial { position: absolute; z-index: 65; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(20rem, calc(100% - 2rem)); max-height: calc(100dvh - 8rem); overflow-y: auto; padding: 1.25rem 1.25rem 1rem; border-radius: 1.25rem; text-align: center; color: var(--camera-ink); background: color-mix(in oklab, var(--camera-surface, var(--background)) 55%, transparent); -webkit-backdrop-filter: blur(22px) saturate(1.4); backdrop-filter: blur(22px) saturate(1.4); border: 1px solid var(--camera-border); box-shadow: 0 20px 50px -20px color-mix(in oklab, var(--foreground) 45%, transparent), inset 0 1px 0 color-mix(in oklab, var(--camera-ink) 15%, transparent); animation: ar-tutorial-in 240ms ease-out; }
 .ar-tutorial-close { position: absolute; top: .6rem; right: .6rem; display: grid; place-items: center; width: 1.9rem; height: 1.9rem; border-radius: 999px; color: var(--camera-ink); opacity: .75; }
 .ar-tutorial-close:hover { opacity: 1; background: color-mix(in oklab, var(--camera-ink) 12%, transparent); }
 .ar-tutorial-icon { position: relative; margin: 0 auto .75rem; display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: 999px; color: var(--primary-foreground); background: linear-gradient(135deg, var(--primary), var(--brand-turquoise, var(--primary))); box-shadow: 0 6px 18px -6px var(--primary); }
@@ -1688,12 +1686,11 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 @keyframes ar-tutorial-in { from { opacity: 0; transform: translate(-50%, -46%) scale(.97); } to { opacity: 1; transform: translate(-50%, -50%); } }
 @keyframes ar-tutorial-step { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
-/* Stima termica: spiegazione dell'icona della fiamma, con contorno satinato. */
+/* Stima termica: spiegazione dell'icona della fiamma */
 .ar-thermal-info-btn { display: grid; place-items: center; border-radius: 999px; color: inherit; transition: background 160ms ease; }
 .ar-thermal-info-btn:hover, .ar-thermal-info-btn:focus-visible { background: color-mix(in oklab, var(--camera-ink) 14%, transparent); }
 .ar-thermal-info-veil { position: absolute; z-index: 60; inset: 0; background: color-mix(in oklab, var(--camera-surface, var(--background)) 30%, transparent); -webkit-backdrop-filter: blur(10px) saturate(1.15); backdrop-filter: blur(10px) saturate(1.15); animation: ar-veil-in 260ms ease-out; }
-.ar-thermal-info { position: absolute; z-index: 65; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(20rem, calc(100% - 2rem)); max-height: calc(100dvh - 8rem); overflow-y: auto; padding: 1.25rem 1.25rem 1rem; border-radius: 1.25rem; text-align: center; color: var(--camera-ink); background: color-mix(in oklab, var(--camera-surface, var(--background)) 55%, transparent); -webkit-backdrop-filter: blur(22px) saturate(1.4); backdrop-filter: blur(22px) saturate(1.4); box-shadow: 0 20px 50px -20px color-mix(in oklab, var(--foreground) 45%, transparent); animation: ar-tutorial-in 240ms ease-out; }
-.ar-thermal-info::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; background: linear-gradient(150deg, color-mix(in oklab, var(--camera-ink) 60%, transparent), color-mix(in oklab, var(--camera-ink) 8%, transparent) 32%, color-mix(in oklab, var(--camera-ink) 28%, transparent) 62%, color-mix(in oklab, var(--camera-ink) 60%, transparent)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude; pointer-events: none; box-shadow: inset 0 1px 0 color-mix(in oklab, var(--camera-ink) 28%, transparent), inset 0 -1px 0 color-mix(in oklab, var(--camera-ink) 12%, transparent); }
+.ar-thermal-info { position: absolute; z-index: 65; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(20rem, calc(100% - 2rem)); max-height: calc(100dvh - 8rem); overflow-y: auto; padding: 1.25rem 1.25rem 1rem; border-radius: 1.25rem; text-align: center; color: var(--camera-ink); background: color-mix(in oklab, var(--camera-surface, var(--background)) 55%, transparent); -webkit-backdrop-filter: blur(22px) saturate(1.4); backdrop-filter: blur(22px) saturate(1.4); border: 1px solid var(--camera-border); box-shadow: 0 20px 50px -20px color-mix(in oklab, var(--foreground) 45%, transparent), inset 0 1px 0 color-mix(in oklab, var(--camera-ink) 15%, transparent); animation: ar-tutorial-in 240ms ease-out; }
 .ar-thermal-info-icon { position: relative; margin: 0 auto .75rem; display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: 999px; color: var(--primary-foreground); background: linear-gradient(135deg, var(--primary), var(--brand-turquoise, var(--primary))); box-shadow: 0 6px 18px -6px var(--primary); }
 .ar-thermal-info-icon::after { content: ""; position: absolute; inset: -6px; border-radius: inherit; border: 1.5px solid color-mix(in oklab, var(--primary) 55%, transparent); animation: ar-icon-pulse 2.2s ease-out infinite; }
 .ar-thermal-info-text { margin-top: .5rem; font-size: .8rem; line-height: 1.5; opacity: .85; }
@@ -1750,8 +1747,84 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .ar-camera-surface[data-landscape=true] .camera-capture-row { grid-template-columns: 1fr 60px 1fr; }
 .ar-camera-surface[data-landscape=true] .camera-shutter { width: 60px; height: 60px; }
 .ar-camera-surface[data-landscape=true] .ar-tools-panel { max-height: calc(var(--ar-camera-height) - 8rem); overflow-y: auto; overscroll-behavior: contain; }
-.ar-camera-surface[data-landscape=true] .ar-tools-panel [data-camera-scroll] { max-height: calc(var(--ar-camera-height) * .28); }
-.ar-camera-surface .ar-tutorial { max-height: calc(var(--ar-camera-height, 100dvh) - 4rem); }
+.ar-camera-surface .ar-tutorial,
+.ar-camera-surface .ar-thermal-info {
+  max-height: calc(var(--ar-camera-height, 100dvh) - 4rem);
+}
+
+.ar-camera-surface[data-landscape=true] .ar-tutorial,
+.ar-camera-surface[data-landscape=true] .ar-thermal-info {
+  width: min(32rem, calc(100% - 2.5rem));
+  max-width: calc(100vw - 3rem);
+  max-height: calc(var(--ar-camera-height, 100dvh) - 1.5rem);
+  padding: .875rem 1.25rem;
+  border: 1px solid var(--camera-border) !important;
+  box-sizing: border-box;
+}
+.ar-camera-surface[data-landscape=true] .ar-tutorial-demo {
+  height: 64px;
+  width: 120px;
+  margin: 0 auto .4rem;
+}
+.ar-camera-surface[data-landscape=true] .ar-tutorial-icon,
+.ar-camera-surface[data-landscape=true] .ar-thermal-info-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  margin: 0 auto .35rem;
+}
+.ar-camera-surface[data-landscape=true] .ar-tutorial-dots {
+  margin: .4rem 0 .4rem;
+}
+.ar-camera-surface[data-landscape=true] .ar-tutorial-title {
+  font-size: .95rem;
+}
+.ar-camera-surface[data-landscape=true] .ar-tutorial-text,
+.ar-camera-surface[data-landscape=true] .ar-thermal-info-text {
+  font-size: .78rem;
+  line-height: 1.4;
+  margin-top: .3rem;
+}
+.ar-camera-surface[data-landscape=true] .ar-thermal-info-close {
+  margin-top: .6rem;
+}
+
+@media (orientation: landscape) and (max-height: 600px) {
+  .ar-tutorial,
+  .ar-thermal-info {
+    width: min(32rem, calc(100% - 2.5rem));
+    max-width: calc(100vw - 3rem);
+    max-height: calc(100dvh - 1.5rem);
+    padding: .875rem 1.25rem;
+    border: 1px solid var(--camera-border) !important;
+    box-sizing: border-box;
+  }
+  .ar-tutorial-demo {
+    height: 64px;
+    width: 120px;
+    margin: 0 auto .4rem;
+  }
+  .ar-tutorial-icon,
+  .ar-thermal-info-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+    margin: 0 auto .35rem;
+  }
+  .ar-tutorial-dots {
+    margin: .4rem 0 .4rem;
+  }
+  .ar-tutorial-title {
+    font-size: .95rem;
+  }
+  .ar-tutorial-text,
+  .ar-thermal-info-text {
+    font-size: .78rem;
+    line-height: 1.4;
+    margin-top: .3rem;
+  }
+  .ar-thermal-info-close {
+    margin-top: .6rem;
+  }
+}
 html[data-ar-camera], html[data-ar-camera] body { background: var(--camera-surface); overflow: hidden; overscroll-behavior: none; }
 .ar-tutorial-demo { position: relative; height: 96px; width: 160px; margin: 0 auto 1rem; overflow: hidden; color: var(--brand-turquoise); }
 .ar-demo-target { position: absolute; inset: 12px 40px; border: 2px solid currentColor; border-radius: 8px; animation: ar-demo-lock 2.4s ease-in-out infinite; }
@@ -1895,11 +1968,8 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   .ar-camera-surface[data-landscape=true] .camera-bottom,
   .ar-camera-surface[data-landscape=true] #ar-camera-tools { pointer-events: none; }
   .ar-camera-surface[data-landscape=true] .camera-bottom > :not(#ar-camera-tools),
-  .ar-camera-surface[data-landscape=true] .ar-tools-panel { pointer-events: auto; }
-  .ar-camera-surface[data-landscape=true] .ar-thermal-summary:not(.ar-thermal-summary-min) {
-    bottom: calc(max(.75rem, env(safe-area-inset-bottom))) !important;
-    max-height: calc(100% - max(.375rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 3.5rem) !important;
-  }
+  .ar-camera-surface[data-landscape=true] .ar-cooling-readout { margin-top: 1.4rem; }
+  .ar-camera-surface[data-landscape=true] .ar-thermal-summary:not(.ar-thermal-summary-min) { max-height: calc(var(--ar-camera-height) - var(--ar-header-bottom) - env(safe-area-inset-bottom) - 6.5rem); }
 }
 
 /* Smartphone portrait: the expanded summary stops above the bottom HUD (balance, zoom, capture) and scrolls,
