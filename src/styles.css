@@ -2736,7 +2736,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   flex-direction: column !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 22px !important;
+  gap: 28px !important;
   width: 100% !important;
   pointer-events: auto !important;
 }

@@ -49,10 +49,13 @@ export async function registerServiceWorker() {
   // A newer version online that the worker has not brought (yet): said all the same, on start and on every return.
   const compare = async () => {
     const online = await version.onlineBuild();
-    if (online && version.BUILD_TIME && online !== version.BUILD_TIME) tellReady();
+    if (online && version.BUILD_TIME && online !== version.BUILD_TIME) {
+      tellReady();
+      void version.applyUpdate(online);
+    }
   };
-  window.setTimeout(() => void compare(), 10_000);
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") window.setTimeout(() => void compare(), 10_000); });
+  void compare();
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") void compare(); });
   try {
     const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
     // A new version installing (an update, not the first install): its progress shows as a bar.

@@ -10,7 +10,7 @@ import { hapticTick } from "@/lib/haptics";
  * - Prominent, crisp 1x and 2x numbers and luminous dots
  * - Cyan connector and pill button [ 2x ] touching outer boundary
  * - Sliding 3D glass bead along the track
- * - High-contrast crisp ticks without fragile SVG filters so it renders identically across all devices
+ * - Pure SVG attributes (no buggy filters) for 100% cross-device rendering guarantee
  */
 export function ArcZoomDial({
   zoom,
@@ -97,50 +97,58 @@ export function ArcZoomDial({
     dragging.current = false;
   };
 
-  // Generate radial ticks between -30° and +30°
+  // Generate radial ticks between -33° and +33°
+  // Calibrated exactly to image_2.png: 8 subdivisions per octave (2.0625° step)
+  const step = degPerOctave / 8; // 2.0625°
   const ticks: Array<{ deg: number; x1: number; y1: number; x2: number; y2: number; isCyan?: boolean }> = [];
-  for (let d = -30; d <= 30; d += 1.8) {
-    if (Math.abs(d - (-16.5)) < 1.1 || Math.abs(d) < 1.1 || Math.abs(d - 16.5) < 1.1) continue;
+  for (let i = -15; i <= 15; i++) {
+    // Skip preset stop positions (rendered with custom prominent lines & dots below)
+    if (i === -8 || i === 0 || i === 8) continue;
+    const d = i * step;
     const rad = (d * Math.PI) / 180;
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
-    const isCyan = Math.abs(d - (-24)) < 1.0 || Math.abs(d - (-8)) < 1.0 || Math.abs(d - 8) < 1.0 || Math.abs(d - 24) < 1.0;
+    const isCyan = Math.abs(i) === 4 || Math.abs(i) === 12;
+    const tlen = isCyan ? 6.5 : 4.5;
     ticks.push({
       deg: d,
-      x1: cx - (R - (isCyan ? 5.5 : 3.5)) * cos,
-      y1: cy + (R - (isCyan ? 5.5 : 3.5)) * sin,
-      x2: cx - (R + (isCyan ? 5.5 : 3.5)) * cos,
-      y2: cy + (R + (isCyan ? 5.5 : 3.5)) * sin,
+      x1: cx - (R - tlen) * cos,
+      y1: cy + (R - tlen) * sin,
+      x2: cx - (R + tlen) * cos,
+      y2: cy + (R + tlen) * sin,
       isCyan,
     });
   }
 
-  // Preset stop coordinates
-  const rad1 = (-16.5 * Math.PI) / 180;
+  // Preset stop coordinates:
+  // Stop 1: 1x (-16.5°, i = -8)
+  const rad1 = (-degPerOctave * Math.PI) / 180;
   const stop1 = {
-    xIn: cx - (R - 7) * Math.cos(rad1),
-    yIn: cy + (R - 7) * Math.sin(rad1),
-    xOut: cx - (R + 7) * Math.cos(rad1),
-    yOut: cy + (R + 7) * Math.sin(rad1),
+    xIn: cx - (R - 8.5) * Math.cos(rad1),
+    yIn: cy + (R - 8.5) * Math.sin(rad1),
+    xOut: cx - (R + 8.5) * Math.cos(rad1),
+    yOut: cy + (R + 8.5) * Math.sin(rad1),
     dotX: cx - R * Math.cos(rad1),
     dotY: cy + R * Math.sin(rad1),
   };
 
+  // Stop 2: 2x (0°, i = 0)
   const stop2 = {
-    xIn: cx - (R - 7),
+    xIn: cx - (R - 8.5),
     yIn: cy,
-    xOut: cx - (R + 7),
+    xOut: cx - (R + 8.5),
     yOut: cy,
     dotX: cx - R,
     dotY: cy,
   };
 
-  const rad3 = (16.5 * Math.PI) / 180;
+  // Stop 3: Inferiore (+16.5°, i = +8)
+  const rad3 = (degPerOctave * Math.PI) / 180;
   const stop3 = {
-    xIn: cx - (R - 7) * Math.cos(rad3),
-    yIn: cy + (R - 7) * Math.sin(rad3),
-    xOut: cx - (R + 7) * Math.cos(rad3),
-    yOut: cy + (R + 7) * Math.sin(rad3),
+    xIn: cx - (R - 8.5) * Math.cos(rad3),
+    yIn: cy + (R - 8.5) * Math.sin(rad3),
+    xOut: cx - (R + 8.5) * Math.cos(rad3),
+    yOut: cy + (R + 8.5) * Math.sin(rad3),
     dotX: cx - R * Math.cos(rad3),
     dotY: cy + R * Math.sin(rad3),
   };
@@ -148,18 +156,18 @@ export function ArcZoomDial({
   // End ticks at -33° and +33°
   const radTop = (-33 * Math.PI) / 180;
   const endTop = {
-    x1: cx - (R - 8) * Math.cos(radTop),
-    y1: cy + (R - 8) * Math.sin(radTop),
-    x2: cx - (R + 8) * Math.cos(radTop),
-    y2: cy + (R + 8) * Math.sin(radTop),
+    x1: cx - (R - 9) * Math.cos(radTop),
+    y1: cy + (R - 9) * Math.sin(radTop),
+    x2: cx - (R + 9) * Math.cos(radTop),
+    y2: cy + (R + 9) * Math.sin(radTop),
   };
 
   const radBottom = (33 * Math.PI) / 180;
   const endBottom = {
-    x1: cx - (R - 8) * Math.cos(radBottom),
-    y1: cy + (R - 8) * Math.sin(radBottom),
-    x2: cx - (R + 8) * Math.cos(radBottom),
-    y2: cy + (R + 8) * Math.sin(radBottom),
+    x1: cx - (R - 9) * Math.cos(radBottom),
+    y1: cy + (R - 9) * Math.sin(radBottom),
+    x2: cx - (R + 9) * Math.cos(radBottom),
+    y2: cy + (R + 9) * Math.sin(radBottom),
   };
 
   // Active glowing bead coordinates
@@ -194,16 +202,16 @@ export function ArcZoomDial({
         {/* Corpo scuro semitrasparente e bordo della fascia sfocata */}
         <path
           d={fanPath}
-          fill="rgba(25, 32, 45, 0.22)"
-          stroke="rgba(255, 255, 255, 0.15)"
-          strokeWidth="1"
+          fill="rgba(25, 32, 45, 0.28)"
+          stroke="rgba(255, 255, 255, 0.18)"
+          strokeWidth="1.2"
         />
 
         {/* Traccia sottile guida dell'arco */}
         <path
           d={trackPath}
           fill="none"
-          stroke="rgba(255, 255, 255, 0.25)"
+          stroke="rgba(255, 255, 255, 0.35)"
           strokeWidth="1.5"
           strokeLinecap="round"
         />
@@ -216,10 +224,9 @@ export function ArcZoomDial({
             y1={t.y1}
             x2={t.x2}
             y2={t.y2}
-            stroke={t.isCyan ? "#00f0ff" : "rgba(255, 255, 255, 0.72)"}
-            strokeWidth={t.isCyan ? "1.8" : "1.2"}
+            stroke={t.isCyan ? "#00f0ff" : "rgba(255, 255, 255, 0.85)"}
+            strokeWidth={t.isCyan ? "2.2" : "1.4"}
             strokeLinecap="round"
-            style={t.isCyan ? { filter: "drop-shadow(0 0 3px #00e5ff)" } : undefined}
           />
         ))}
 
@@ -230,7 +237,7 @@ export function ArcZoomDial({
           x2={endTop.x2}
           y2={endTop.y2}
           stroke="#ffffff"
-          strokeWidth="2.5"
+          strokeWidth="2.8"
           strokeLinecap="round"
         />
         <line
@@ -239,7 +246,7 @@ export function ArcZoomDial({
           x2={endBottom.x2}
           y2={endBottom.y2}
           stroke="#ffffff"
-          strokeWidth="2.5"
+          strokeWidth="2.8"
           strokeLinecap="round"
         />
 
@@ -250,24 +257,27 @@ export function ArcZoomDial({
           x2={stop1.xOut}
           y2={stop1.yOut}
           stroke="#00f0ff"
-          strokeWidth="2.5"
+          strokeWidth="2.8"
           strokeLinecap="round"
-          style={{ filter: "drop-shadow(0 0 4px #00e5ff)" }}
         />
         <circle
           cx={stop1.dotX}
           cy={stop1.dotY}
-          r={2.8}
+          r={3.2}
           fill="#ffffff"
-          style={{ filter: "drop-shadow(0 0 3px #00e5ff)" }}
+          stroke="#00f0ff"
+          strokeWidth="1.5"
         />
         <text
           x={stop1.dotX + 9}
-          y={stop1.dotY + 4}
+          y={stop1.dotY + 4.5}
           textAnchor="start"
           fill="#ffffff"
-          fontSize="12"
-          fontWeight="700"
+          stroke="rgba(10, 15, 25, 0.7)"
+          strokeWidth="0.8"
+          paintOrder="stroke fill"
+          fontSize="13"
+          fontWeight="bold"
           fontFamily="system-ui, -apple-system, sans-serif"
           className="pointer-events-none select-none"
         >
@@ -281,24 +291,27 @@ export function ArcZoomDial({
           x2={stop2.xOut}
           y2={stop2.yOut}
           stroke="#00f0ff"
-          strokeWidth="2.5"
+          strokeWidth="2.8"
           strokeLinecap="round"
-          style={{ filter: "drop-shadow(0 0 4px #00e5ff)" }}
         />
         <circle
           cx={stop2.dotX}
           cy={stop2.dotY}
-          r={2.8}
+          r={3.2}
           fill="#ffffff"
-          style={{ filter: "drop-shadow(0 0 3px #00e5ff)" }}
+          stroke="#00f0ff"
+          strokeWidth="1.5"
         />
         <text
           x={stop2.dotX + 9}
-          y={stop2.dotY + 4}
+          y={stop2.dotY + 4.5}
           textAnchor="start"
           fill="#ffffff"
-          fontSize="12"
-          fontWeight="700"
+          stroke="rgba(10, 15, 25, 0.7)"
+          strokeWidth="0.8"
+          paintOrder="stroke fill"
+          fontSize="13"
+          fontWeight="bold"
           fontFamily="system-ui, -apple-system, sans-serif"
           className="pointer-events-none select-none"
         >
@@ -312,16 +325,16 @@ export function ArcZoomDial({
           x2={stop3.xOut}
           y2={stop3.yOut}
           stroke="#00f0ff"
-          strokeWidth="2.5"
+          strokeWidth="2.8"
           strokeLinecap="round"
-          style={{ filter: "drop-shadow(0 0 4px #00e5ff)" }}
         />
         <circle
           cx={stop3.dotX}
           cy={stop3.dotY}
-          r={2.8}
+          r={3.2}
           fill="#ffffff"
-          style={{ filter: "drop-shadow(0 0 3px #00e5ff)" }}
+          stroke="#00f0ff"
+          strokeWidth="1.5"
         />
 
         {/* Connettore ciano neon continuo verso la pillola [ 2x ] */}
@@ -331,29 +344,26 @@ export function ArcZoomDial({
           x2={stop2.dotX - 2.5}
           y2={cy}
           stroke="#00f0ff"
-          strokeWidth="2.4"
+          strokeWidth="2.6"
           strokeLinecap="round"
-          style={{ filter: "drop-shadow(0 0 4px #00e5ff)" }}
         />
 
         {/* Sferetta / bead luminosa che segue fluidamente lo zoom come un cursore di vetro */}
         <circle
           cx={beadX}
           cy={beadY}
-          r={5.5}
+          r={6}
           fill="#ffffff"
           stroke="#00f0ff"
-          strokeWidth="2.2"
-          style={{ filter: "drop-shadow(0 0 5px #00e5ff)" }}
+          strokeWidth="2.5"
         />
 
-        {/* ZONA TOUCH DEDICATA: traccia trasparente lungo l'arco
-            Intercetta solo i tocchi lungo la ghiera, lasciando libero lo shutter */}
+        {/* ZONA TOUCH DEDICATA: traccia trasparente lungo l'arco */}
         <path
           d={trackPath}
           fill="none"
           stroke="transparent"
-          strokeWidth="32"
+          strokeWidth="34"
           strokeLinecap="round"
           className="cursor-pointer pointer-events-auto touch-none"
           onPointerDown={onPointerDown}
