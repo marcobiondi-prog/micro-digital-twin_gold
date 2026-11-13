@@ -2623,37 +2623,53 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   cursor: grab;
 }
 
-/* Landscape Bottom Photo Carousel */
-.ar-landscape-bottom-carousel {
-  position: absolute;
-  bottom: max(0.85rem, env(safe-area-inset-bottom));
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(34rem, 55vw);
-  z-index: 28;
-  pointer-events: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+/* Landscape Photo Carousel under Bilancia Termica */
+.ar-landscape-carousel-slot {
+  width: 100% !important;
+  margin-top: 0.25rem !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  pointer-events: auto !important;
 }
-.ar-landscape-bottom-carousel .ar-burst-shelf {
+
+.ar-landscape-left .ar-burst-shelf {
   position: relative !important;
   left: auto !important;
   right: auto !important;
   bottom: auto !important;
+  top: auto !important;
   width: 100% !important;
   max-width: 100% !important;
   margin: 0 !important;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
+  background: rgba(18, 24, 32, 0.78) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  border-radius: 16px !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35) !important;
+  padding: 0.5rem 0.75rem !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  overflow: visible !important;
 }
-.ar-landscape-bottom-carousel .ar-burst-carousel {
-  padding-inline: calc(50% - 28px) !important;
+
+.ar-landscape-left .ar-burst-shelf .ar-burst-carousel {
+  padding-inline: 0.5rem !important;
   width: 100% !important;
-  min-height: 5.5rem !important;
-  padding-top: 1.85rem !important;
+  min-height: 4.5rem !important;
+  padding-top: 1rem !important;
   padding-bottom: 0.25rem !important;
+  gap: 0.5rem !important;
+  scroll-padding-inline: 0.5rem !important;
+}
+
+.ar-landscape-left .ar-burst-shelf .ar-burst-header-long {
+  display: none !important;
+}
+.ar-landscape-left .ar-burst-shelf .ar-burst-header-short {
+  display: inline !important;
 }
 
 .ar-landscape-layout {
@@ -2707,8 +2723,12 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 }
 
 .camera-capture-dock.is-vertical {
-  width: auto !important;
+  width: 104px !important;
   margin: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  pointer-events: auto !important;
 }
 
 .camera-capture-row.is-vertical {
@@ -2716,8 +2736,75 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   flex-direction: column !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 0.75rem !important;
+  gap: 22px !important;
+  width: 100% !important;
+  pointer-events: auto !important;
+}
+
+.camera-capture-dock.is-vertical .camera-capture-side {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  pointer-events: auto !important;
+}
+
+.camera-capture-dock.is-vertical .ar-landscape-pill-btn {
+  background: rgba(35, 43, 54, 0.72) !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  border-radius: 9999px !important;
+  color: #ffffff !important;
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  padding: 0.45rem 1.15rem !important;
+  min-height: 2.15rem !important;
+  height: auto !important;
   width: auto !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  transition: transform 0.12s ease, background 0.15s ease !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  z-index: 50 !important;
+}
+
+.camera-capture-dock.is-vertical .ar-landscape-pill-btn:hover {
+  background: rgba(48, 58, 72, 0.85) !important;
+}
+
+.camera-capture-dock.is-vertical .ar-landscape-pill-btn:active {
+  transform: scale(0.95) !important;
+}
+
+/* Shutter in landscape: vibrant cyan glowing ring around white core */
+.ar-camera-surface[data-landscape=true] .camera-shutter,
+.camera-hud[data-landscape=true] .camera-shutter {
+  width: 66px !important;
+  height: 66px !important;
+  border-radius: 50% !important;
+  border: 3.5px solid #00e5ff !important;
+  box-shadow: 0 0 14px rgba(0, 229, 255, 0.75), inset 0 0 4px rgba(0, 229, 255, 0.4) !important;
+  background: rgba(0, 0, 0, 0.35) !important;
+  padding: 3.5px !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  z-index: 50 !important;
+  transition: transform 0.12s ease !important;
+}
+
+.ar-camera-surface[data-landscape=true] .camera-shutter:active,
+.camera-hud[data-landscape=true] .camera-shutter:active {
+  transform: scale(0.93) !important;
+}
+
+.ar-camera-surface[data-landscape=true] .camera-shutter .camera-shutter-core,
+.camera-hud[data-landscape=true] .camera-shutter .camera-shutter-core {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 50% !important;
+  background: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
 }
 
 

@@ -1614,20 +1614,6 @@ export function ArCamera({
             >
               <Info className="size-4" />
             </Button>
-            {torchSupported && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="camera-tool size-10 grid place-items-center rounded-full"
-                disabled={torchBusy || scanning}
-                aria-pressed={torchOn}
-                aria-label={torchOn ? "Disattiva flash" : "Attiva flash"}
-                title={torchOn ? "Disattiva flash" : "Attiva flash"}
-                onClick={() => void toggleTorch()}
-              >
-                {torchOn ? <Zap className="size-4 text-yellow-400" /> : <ZapOff className="size-4" />}
-              </Button>
-            )}
           </div>
         </div>
       ) : (
@@ -2018,12 +2004,19 @@ export function ArCamera({
             disabled={!ready || scanning || recording}
             aria-label="Scansiona terreno e pianta"
             title="Scansiona terreno e pianta"
-            className={`camera-tool ar-scan-btn disabled:opacity-40${scanning ? " is-compact" : ""}`}
+            className={
+              landscape
+                ? "ar-landscape-pill-btn disabled:opacity-40"
+                : `camera-tool ar-scan-btn disabled:opacity-40${scanning ? " is-compact" : ""}`
+            }
           >
-            <ScanSearch className={`size-4 shrink-0 ${scanning ? "animate-pulse text-[#00f0ff]" : ""}`} />
+            {!landscape && (
+              <ScanSearch className={`size-4 shrink-0 ${scanning ? "animate-pulse text-[#00f0ff]" : ""}`} />
+            )}
             {!scanning && <span>Scansiona</span>}
+            {landscape && scanning && <span className="animate-pulse text-[#00e5ff]">Scansione…</span>}
           </Button>
-          {scanning && (
+          {!landscape && scanning && (
             <Button
               variant="ghost"
               size="icon"
@@ -2048,9 +2041,13 @@ export function ArCamera({
             aria-controls="ar-camera-tools"
             aria-label={toolsOpen ? "Nascondi strumenti" : "Mostra strumenti"}
             title={toolsOpen ? "Nascondi strumenti" : "Mostra strumenti"}
-            className="camera-tool ar-tools-btn"
+            className={
+              landscape
+                ? "ar-landscape-pill-btn"
+                : "camera-tool ar-tools-btn"
+            }
           >
-            <SlidersHorizontal className="size-4 shrink-0" />
+            {!landscape && <SlidersHorizontal className="size-4 shrink-0" />}
             <span>Strumenti</span>
           </Button>
         </div>
@@ -2207,26 +2204,26 @@ export function ArCamera({
                       </span>
                     </div>
                   </div>
-                </div>
 
-                {/* Carosello Foto in basso allo screen (Multiplo) */}
-                {burst && burstShelfElement && (
-                  <div className="ar-landscape-bottom-carousel" data-camera-controls>
-                    {burstShelfElement}
-                  </div>
-                )}
+                  {/* Carosello Foto SOTTO al div della bilancia termica */}
+                  {burst && burstShelfElement && (
+                    <div className="ar-landscape-carousel-slot" data-camera-controls>
+                      {burstShelfElement}
+                    </div>
+                  )}
+                </div>
 
                 {/* Colonna Destra: Controlli Fotocamera ed Ergonomia con il pollice */}
                 <div className="ar-landscape-right">
                   {toolsOpen && toolsPanelElement}
-                  <div className="relative flex items-center justify-end">
+                  <div className="relative flex items-center justify-end select-none">
                     <ArcZoomDial
                       zoom={zoom}
                       max={ZOOM_MAX}
                       onZoom={setZoom}
                       disabled={!ready || scanning}
                     />
-                    <div className="relative z-30 pointer-events-auto">
+                    <div className="relative z-50 pointer-events-auto">
                       {captureControlElement}
                     </div>
                   </div>
