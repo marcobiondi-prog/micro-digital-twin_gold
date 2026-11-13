@@ -1506,127 +1506,264 @@ export function ArCamera({
     : "is-tools-open is-tools-compact";
 
   const topBarElement = (
-    <div data-camera-hud className="ar-camera-topbar">
-      <div className="ar-camera-actions" data-camera-controls>
-        {/* Left: Close button */}
-        <div className="ar-topbar-left">
-          <Button
-            variant="ghost"
-            size="icon"
-            type="button"
-            onClick={onClose}
-            disabled={recording}
-            aria-label="Chiudi"
-            className="camera-tool grid size-10 place-items-center rounded-full disabled:opacity-40"
-          >
-            <X className="size-5" />
-          </Button>
-        </div>
-
-        {/* Center: ARCore status & toggle + Focus options */}
-        <div className="ar-topbar-center">
-          <Button
-            variant="ghost"
-            size="sm"
-            type="button"
-            onClick={(e) => toggleAr(e)}
-            className={`camera-tool flex items-center gap-1.5 transition-all ${
-              layers.has("grid") ? "ar-pill-active" : "ar-pill-inactive"
-            }`}
-            title={layers.has("grid") ? "AR Core attivo sul terreno (tocca per disattivare)" : "Attiva la Realtà Aumentata AR Core"}
-            aria-pressed={layers.has("grid")}
-            aria-label={layers.has("grid") ? "Disattiva AR Core" : "Attiva AR Core"}
-          >
-            {layers.has("grid") ? (
-              <>
-                <span className="size-2 rounded-full bg-[#042017] animate-pulse" />
-                <span className="font-semibold">AR Core</span>
-              </>
-            ) : (
-              <>
-                <Scan className="size-3.5 shrink-0" />
-                <span>AR Core</span>
-              </>
-            )}
-          </Button>
-
-          <div className="ar-focus-wrap">
-            {(() => {
-              const onRecord = scanRecords.length > 1 && viewPage >= 0 && viewPage < scanRecords.length;
-              return (
-                <span
-                  className="ar-scan-counter"
-                  role="status"
-                  aria-label={onRecord ? `Scansione ${viewPage + 1} di ${scanRecords.length}` : `${scanRecords.length} ${scanRecords.length === 1 ? "scansione registrata" : "scansioni registrate"} nel report`}
-                  title="Scansioni registrate nel report"
-                >
-                  {onRecord ? `${viewPage + 1}/${scanRecords.length}` : scanRecords.length}
-                </span>
-              );
-            })()}
-            <div className="ar-focus-options" role="radiogroup" aria-label={kind === "urban" ? "Obiettivo camera urbana" : "Obiettivo camera vitivinicola"}>
-              {AR_FOCUS[kind].map(o => (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  key={o.id}
-                  type="button"
-                  role="radio"
-                  aria-label={o.label}
-                  title={o.label}
-                  aria-checked={arFocusOption(kind, target).id === o.id}
-                  className="camera-tool ar-focus-pill"
-                  onClick={() => selectTarget(o.id)}
-                >
-                  {FOCUS_LABELS[o.id]}
-                </Button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Esito, Guide, Flash */}
-        <div className="ar-topbar-right">
-          {(found || species || viewedRecord) && !scanning && (
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label="Mostra esito analisi"
-              title="Mostra esito analisi"
-              className="camera-tool ar-esito-chip"
-              onClick={() => { setToolsOpen(true); setActiveTool("analysis"); setPanelOpen(true); }}
-            >
-              <Activity className="size-4 shrink-0" />
-              <span>Esito</span>
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="camera-tool size-10"
-            aria-label="Guida inquadratura"
-            title="Guida inquadratura"
-            aria-pressed={guideOpen}
-            onClick={() => setGuideOpen(v => !v)}
-          >
-            <Info className="size-4" />
-          </Button>
-          {torchSupported && (
+    <div
+      data-camera-hud
+      className={`ar-camera-topbar ${landscape ? "ar-camera-topbar-landscape" : "ar-camera-topbar-portrait"}`}
+    >
+      {landscape ? (
+        <div className="flex w-full items-center justify-between px-3" data-camera-controls>
+          {/* Left: Close + ARCore */}
+          <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="icon"
-              className="camera-tool size-10"
-              disabled={torchBusy || scanning}
-              aria-pressed={torchOn}
-              aria-label={torchOn ? "Disattiva flash" : "Attiva flash"}
-              title={torchOn ? "Disattiva flash" : "Attiva flash"}
-              onClick={() => void toggleTorch()}
+              type="button"
+              onClick={onClose}
+              disabled={recording}
+              aria-label="Chiudi"
+              className="camera-tool grid size-10 place-items-center rounded-full disabled:opacity-40"
             >
-              {torchOn ? <Zap className="size-4 text-yellow-400" /> : <ZapOff className="size-4" />}
+              <X className="size-5" />
             </Button>
-          )}
+            <Button
+              variant="ghost"
+              size="sm"
+              type="button"
+              onClick={(e) => toggleAr(e)}
+              className={`camera-tool flex items-center gap-1.5 transition-all ${
+                layers.has("grid") ? "ar-pill-active" : "ar-pill-inactive"
+              }`}
+              title={layers.has("grid") ? "AR Core attivo sul terreno (tocca per disattivare)" : "Attiva la Realtà Aumentata AR Core"}
+              aria-pressed={layers.has("grid")}
+              aria-label={layers.has("grid") ? "Disattiva AR Core" : "Attiva AR Core"}
+            >
+              {layers.has("grid") ? (
+                <>
+                  <span className="size-2 rounded-full bg-[#042017] animate-pulse" />
+                  <span className="font-semibold">AR Core</span>
+                </>
+              ) : (
+                <>
+                  <Scan className="size-3.5 shrink-0" />
+                  <span>AR Core</span>
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Center: Vegetazione | Suolo */}
+          <div className="flex items-center justify-center">
+            <div className="ar-focus-wrap">
+              {scanRecords.length > 0 && (() => {
+                const onRecord = scanRecords.length > 1 && viewPage >= 0 && viewPage < scanRecords.length;
+                return (
+                  <span
+                    className="ar-scan-counter"
+                    role="status"
+                    aria-label={onRecord ? `Scansione ${viewPage + 1} di ${scanRecords.length}` : `${scanRecords.length} ${scanRecords.length === 1 ? "scansione registrata" : "scansioni registrate"} nel report`}
+                    title="Scansioni registrate nel report"
+                  >
+                    {onRecord ? `${viewPage + 1}/${scanRecords.length}` : scanRecords.length}
+                  </span>
+                );
+              })()}
+              <div className="ar-focus-options" role="radiogroup" aria-label={kind === "urban" ? "Obiettivo camera urbana" : "Obiettivo camera vitivinicola"}>
+                {AR_FOCUS[kind].map(o => (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    key={o.id}
+                    type="button"
+                    role="radio"
+                    aria-label={o.label}
+                    title={o.label}
+                    aria-checked={arFocusOption(kind, target).id === o.id}
+                    className="camera-tool ar-focus-pill"
+                    onClick={() => selectTarget(o.id)}
+                  >
+                    {FOCUS_LABELS[o.id]}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Singolo / Multiplo switcher + Esito + Guide + Flash */}
+          <div className="flex items-center gap-2">
+            {!error && mode === "photo" && (
+              <div role="radiogroup" aria-label="Tipo di scatto" className="flex rounded-full bg-black/55 p-0.5 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur">
+                <button type="button" role="radio" aria-checked={!burst} onClick={backToSingle}
+                  className={`h-7 rounded-full px-2.5 transition-colors ${!burst ? "bg-white text-black font-bold" : "text-white/80"}`}>Singolo</button>
+                <button type="button" role="radio" aria-checked={burst} onClick={() => setBurst(true)}
+                  className={`h-7 rounded-full px-2.5 transition-colors ${burst ? "bg-white text-black font-bold" : "text-white/80"}`}>Multiplo</button>
+              </div>
+            )}
+            {(found || species || viewedRecord) && !scanning && (
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label="Mostra esito analisi"
+                title="Mostra esito analisi"
+                className="camera-tool ar-esito-chip"
+                onClick={() => { setToolsOpen(true); setActiveTool("analysis"); setPanelOpen(true); }}
+              >
+                <Activity className="size-4 shrink-0" />
+                <span>Esito</span>
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="camera-tool size-10 grid place-items-center rounded-full"
+              aria-label="Guida inquadratura"
+              title="Guida inquadratura"
+              aria-pressed={guideOpen}
+              onClick={() => setGuideOpen(v => !v)}
+            >
+              <Info className="size-4" />
+            </Button>
+            {torchSupported && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="camera-tool size-10 grid place-items-center rounded-full"
+                disabled={torchBusy || scanning}
+                aria-pressed={torchOn}
+                aria-label={torchOn ? "Disattiva flash" : "Attiva flash"}
+                title={torchOn ? "Disattiva flash" : "Attiva flash"}
+                onClick={() => void toggleTorch()}
+              >
+                {torchOn ? <Zap className="size-4 text-yellow-400" /> : <ZapOff className="size-4" />}
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
+      ) : (
+        /* Portrait: Two balanced, centered rows */
+        <div className="flex flex-col items-center gap-2.5 w-full px-3" data-camera-controls>
+          {/* Row 1: Left [ ✕ ], Center [ ● ARCore ], Right [ Esito ] [ ⓘ ] [ ⚡ ] */}
+          <div className="flex w-full items-center justify-between">
+            <div className="flex items-center">
+              <Button
+                variant="ghost"
+                size="icon"
+                type="button"
+                onClick={onClose}
+                disabled={recording}
+                aria-label="Chiudi"
+                className="camera-tool grid size-10 place-items-center rounded-full disabled:opacity-40"
+              >
+                <X className="size-5" />
+              </Button>
+            </div>
+
+            <div className="flex items-center justify-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                type="button"
+                onClick={(e) => toggleAr(e)}
+                className={`camera-tool flex items-center gap-1.5 transition-all ${
+                  layers.has("grid") ? "ar-pill-active" : "ar-pill-inactive"
+                }`}
+                title={layers.has("grid") ? "AR Core attivo sul terreno (tocca per disattivare)" : "Attiva la Realtà Aumentata AR Core"}
+                aria-pressed={layers.has("grid")}
+                aria-label={layers.has("grid") ? "Disattiva AR Core" : "Attiva AR Core"}
+              >
+                {layers.has("grid") ? (
+                  <>
+                    <span className="size-2 rounded-full bg-[#042017] animate-pulse" />
+                    <span className="font-semibold">AR Core</span>
+                  </>
+                ) : (
+                  <>
+                    <Scan className="size-3.5 shrink-0" />
+                    <span>AR Core</span>
+                  </>
+                )}
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-1.5 justify-end">
+              {(found || species || viewedRecord) && !scanning && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Mostra esito analisi"
+                  title="Mostra esito analisi"
+                  className="camera-tool ar-esito-chip"
+                  onClick={() => { setToolsOpen(true); setActiveTool("analysis"); setPanelOpen(true); }}
+                >
+                  <Activity className="size-4 shrink-0" />
+                  <span>Esito</span>
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="camera-tool size-10 grid place-items-center rounded-full"
+                aria-label="Guida inquadratura"
+                title="Guida inquadratura"
+                aria-pressed={guideOpen}
+                onClick={() => setGuideOpen(v => !v)}
+              >
+                <Info className="size-4" />
+              </Button>
+              {torchSupported && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="camera-tool size-10 grid place-items-center rounded-full"
+                  disabled={torchBusy || scanning}
+                  aria-pressed={torchOn}
+                  aria-label={torchOn ? "Disattiva flash" : "Attiva flash"}
+                  title={torchOn ? "Disattiva flash" : "Attiva flash"}
+                  onClick={() => void toggleTorch()}
+                >
+                  {torchOn ? <Zap className="size-4 text-yellow-400" /> : <ZapOff className="size-4" />}
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Row 2: Centered directly beneath ARCore */}
+          <div className="flex items-center justify-center">
+            <div className="ar-focus-wrap">
+              {scanRecords.length > 0 && (() => {
+                const onRecord = scanRecords.length > 1 && viewPage >= 0 && viewPage < scanRecords.length;
+                return (
+                  <span
+                    className="ar-scan-counter"
+                    role="status"
+                    aria-label={onRecord ? `Scansione ${viewPage + 1} di ${scanRecords.length}` : `${scanRecords.length} ${scanRecords.length === 1 ? "scansione registrata" : "scansioni registrate"} nel report`}
+                    title="Scansioni registrate nel report"
+                  >
+                    {onRecord ? `${viewPage + 1}/${scanRecords.length}` : scanRecords.length}
+                  </span>
+                );
+              })()}
+              <div className="ar-focus-options" role="radiogroup" aria-label={kind === "urban" ? "Obiettivo camera urbana" : "Obiettivo camera vitivinicola"}>
+                {AR_FOCUS[kind].map(o => (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    key={o.id}
+                    type="button"
+                    role="radio"
+                    aria-label={o.label}
+                    title={o.label}
+                    aria-checked={arFocusOption(kind, target).id === o.id}
+                    className="camera-tool ar-focus-pill"
+                    onClick={() => selectTarget(o.id)}
+                  >
+                    {FOCUS_LABELS[o.id]}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -1754,6 +1891,14 @@ export function ArCamera({
       {toolsOpen && (
         <div className="ar-tools-panel flex w-full flex-col items-center gap-2">
           <div className="ar-tool-options" data-camera-controls>
+            {!error && mode === "photo" && (
+              <div role="radiogroup" aria-label="Tipo di scatto" className="flex rounded-full bg-black/55 p-0.5 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur">
+                <button type="button" role="radio" aria-checked={!burst} onClick={backToSingle}
+                  className={`h-7 rounded-full px-3 transition-colors ${!burst ? "bg-white text-black font-bold" : "text-white/80"}`}>Singolo</button>
+                <button type="button" role="radio" aria-checked={burst} onClick={() => setBurst(true)}
+                  className={`h-7 rounded-full px-3 transition-colors ${burst ? "bg-white text-black font-bold" : "text-white/80"}`}>Multiplo</button>
+              </div>
+            )}
             <Button variant="ghost" size="sm" className="camera-tool" title="Analisi" aria-label="Analisi" aria-pressed={activeTool === "analysis"} onClick={() => { setActiveTool(v => v === "analysis" ? null : "analysis"); setPanelOpen(true); }}><Info className="size-4" />Analisi</Button>
             <Button variant="ghost" size="sm" className="camera-tool" title="Livelli" aria-label="Livelli" aria-pressed={activeTool === "manage"} onClick={() => { setActiveTool(v => v === "manage" ? null : "manage"); }}><SlidersHorizontal className="size-4" />Livelli</Button>
             <Button
@@ -1901,19 +2046,18 @@ export function ArCamera({
       onCapture={mode === "photo" ? shoot : record}
       {...(mode !== "video" ? { onHold: arHold } : {})}
       left={
-        <div className="camera-labelled-tool ar-scan-tools">
+        <div className="flex items-center justify-center">
           <Button
             variant="ghost"
-            size="icon"
             type="button"
             data-no-ui-click
             onClick={() => void scan()}
             disabled={!ready || scanning || recording}
             aria-label="Scansiona terreno e pianta"
             title="Scansiona terreno e pianta"
-            className={`camera-tool size-11 disabled:opacity-40${scanning ? " is-compact" : ""}`}
+            className={`camera-tool ar-scan-btn disabled:opacity-40${scanning ? " is-compact" : ""}`}
           >
-            <ScanSearch className={`size-5 ${scanning ? "animate-pulse text-primary" : ""}`} />
+            <ScanSearch className={`size-4 shrink-0 ${scanning ? "animate-pulse text-[#00f0ff]" : ""}`} />
             {!scanning && <span>Scansiona</span>}
           </Button>
           {scanning && (
@@ -1924,27 +2068,26 @@ export function ArCamera({
               onClick={cancelScan}
               aria-label="Termina scansione"
               title="Termina scansione"
-              className="camera-tool is-compact"
+              className="camera-tool size-10 rounded-full ml-1.5"
             >
-              <Square className="size-4 fill-current" />
+              <Square className="size-4 fill-current text-destructive" />
             </Button>
           )}
         </div>
       }
       right={
-        <div className="camera-labelled-tool">
+        <div className="flex items-center justify-center">
           <Button
             variant="ghost"
-            size="icon"
             type="button"
             onClick={() => { setToolsOpen((open) => !open); setActiveTool("analysis"); setPanelOpen(true); }}
             aria-expanded={toolsOpen}
             aria-controls="ar-camera-tools"
             aria-label={toolsOpen ? "Nascondi strumenti" : "Mostra strumenti"}
             title={toolsOpen ? "Nascondi strumenti" : "Mostra strumenti"}
-            className="camera-tool size-11"
+            className="camera-tool ar-tools-btn"
           >
-            <SlidersHorizontal className="size-5" />
+            <SlidersHorizontal className="size-4 shrink-0" />
             <span>Strumenti</span>
           </Button>
         </div>
@@ -2073,7 +2216,7 @@ export function ArCamera({
 
                 {/* Colonna Destra: Controlli Fotocamera ed Ergonomia con il pollice */}
                 <div className="ar-landscape-right">
-                  {burstBarElement}
+                  {burst && burstBarElement}
                   {toolsPanelElement}
                   {zoomDialElement}
                   {captureControlElement}
@@ -2088,7 +2231,7 @@ export function ArCamera({
                   data-camera-hud
                   className="camera-bottom absolute z-20 flex flex-col items-center gap-2"
                 >
-                  {burstBarElement}
+                  {burst && burstBarElement}
                   {toolsPanelElement}
                   {!toolsOpen && specimenDock}
                   {zoomDialElement}

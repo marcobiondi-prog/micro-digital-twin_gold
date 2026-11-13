@@ -66,11 +66,14 @@ export function ZoomDial({ zoom, max, onZoom, disabled = false, className = "", 
     hideTimer.current = window.setTimeout(() => setShown(false), 900);
   };
 
-  const side = (lens: number | undefined, label: string) => (
-    <button type="button" className="ar-zoom-lens" disabled={disabled || lens === undefined}
-      aria-label={lens === undefined ? label : `${label}: ${zoomLabel(lens)}`}
-      onClick={() => lens !== undefined && onZoom(lens)}>{lens ?? "·"}</button>
-  );
+  const side = (lens: number | undefined, defaultVal: number, defaultText: string, label: string) => {
+    const val = lens ?? defaultVal;
+    return (
+      <button type="button" className="ar-zoom-lens" disabled={disabled}
+        aria-label={`${label}: ${zoomLabel(val)}`}
+        onClick={() => onZoom(val)}>{lens !== undefined ? `${lens}x` : defaultText}</button>
+    );
+  };
 
   return (
     <div className={`relative mx-auto w-fit ${className}`}>
@@ -89,10 +92,10 @@ export function ZoomDial({ zoom, max, onZoom, disabled = false, className = "", 
       <div className="ar-zoom-lenses touch-none" role="group" aria-label="Zoom della fotocamera: tocca un numero o scorri di lato" data-camera-controls
         onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
         onClickCapture={(e) => { if (swallowClick.current) { swallowClick.current = false; e.stopPropagation(); e.preventDefault(); } }}>
-        {side(lower, "Riduci zoom")}
+        {side(lower, 0.5, "0.5x", "Riduci zoom")}
         <button type="button" className="ar-zoom-lens" data-active disabled={disabled}
           aria-label={`Zoom ${zoomLabel(zoom)}: tocca per tornare a 1×`} onClick={() => onZoom(1)}>{zoomLabel(zoom)}</button>
-        {side(higher, "Aumenta zoom")}
+        {side(higher, 2, "2x", "Aumenta zoom")}
       </div>
     </div>
   );
