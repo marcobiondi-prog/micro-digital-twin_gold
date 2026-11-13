@@ -2169,7 +2169,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   position: absolute;
   left: 0;
   right: 0;
-  bottom: calc(13.5rem + env(safe-area-inset-bottom));
+  bottom: var(--ar-burst-shelf-bottom, calc(13.5rem + env(safe-area-inset-bottom)));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2187,8 +2187,20 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .ar-burst-shelf > .burst-flash {
   pointer-events: none !important;
 }
+.ar-burst-shelf.is-tools-closed {
+  bottom: var(--ar-burst-shelf-bottom, calc(13.5rem + env(safe-area-inset-bottom)));
+}
 .ar-burst-shelf.is-tools-open {
-  bottom: calc(19.25rem + env(safe-area-inset-bottom));
+  bottom: var(--ar-burst-shelf-bottom, calc(19.25rem + env(safe-area-inset-bottom)));
+}
+.ar-burst-shelf.is-tools-compact {
+  bottom: var(--ar-burst-shelf-bottom, calc(13.75rem + env(safe-area-inset-bottom)));
+}
+.ar-burst-shelf.is-analysis-min {
+  bottom: var(--ar-burst-shelf-bottom, calc(15.75rem + env(safe-area-inset-bottom)));
+}
+.ar-burst-shelf.is-analysis-expanded {
+  bottom: var(--ar-burst-shelf-bottom, calc(19.25rem + env(safe-area-inset-bottom)));
 }
 .ar-burst-shelf .ar-burst-carousel {
   padding-inline: calc(50vw - 28px);
@@ -2200,7 +2212,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .ar-camera-surface[data-landscape=true] .ar-burst-shelf {
   left: max(0.75rem, env(safe-area-inset-left));
   right: calc(50% + 5.5rem);
-  bottom: calc(4.85rem + env(safe-area-inset-bottom));
+  bottom: calc(4.85rem + env(safe-area-inset-bottom)) !important;
   width: auto;
   max-width: none;
   background: transparent;
@@ -2228,7 +2240,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   .camera-hud .ar-burst-shelf {
     left: max(0.75rem, env(safe-area-inset-left));
     right: calc(50% + 5.5rem);
-    bottom: calc(4.85rem + env(safe-area-inset-bottom));
+    bottom: calc(4.85rem + env(safe-area-inset-bottom)) !important;
     width: auto;
     max-width: none;
     background: transparent;

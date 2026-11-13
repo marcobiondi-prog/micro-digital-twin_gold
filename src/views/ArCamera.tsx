@@ -945,9 +945,23 @@ export function ArCamera({
     if (!surface || !hud) return;
     const measure = () => {
       const summary = surface.querySelector(".ar-thermal-summary");
-      if (!summary) return;
-      const room = Math.max(96, Math.round(hud.getBoundingClientRect().top - summary.getBoundingClientRect().top - 12));
-      if (surface.style.getPropertyValue("--ar-summary-room") !== `${room}px`) surface.style.setProperty("--ar-summary-room", `${room}px`);
+      if (summary) {
+        const room = Math.max(96, Math.round(hud.getBoundingClientRect().top - summary.getBoundingClientRect().top - 12));
+        if (surface.style.getPropertyValue("--ar-summary-room") !== `${room}px`) surface.style.setProperty("--ar-summary-room", `${room}px`);
+      }
+      if (!landscape) {
+        const burstBar = hud.querySelector<HTMLElement>(".ar-burst-bar");
+        if (burstBar) {
+          const barRect = burstBar.getBoundingClientRect();
+          const surfaceRect = surface.getBoundingClientRect();
+          const bottomPx = Math.max(0, Math.round(surfaceRect.bottom - barRect.top + 6));
+          if (surface.style.getPropertyValue("--ar-burst-shelf-bottom") !== `${bottomPx}px`) {
+            surface.style.setProperty("--ar-burst-shelf-bottom", `${bottomPx}px`);
+          }
+        }
+      } else {
+        surface.style.removeProperty("--ar-burst-shelf-bottom");
+      }
     };
     measure();
     if (hudObserver.current?.el !== hud && typeof ResizeObserver !== "undefined") {
@@ -1336,6 +1350,17 @@ export function ArCamera({
     setRecording(true);
   };
 
+  const hasAnalysisContent = Boolean(species || soil || found || survey || viewedRecord);
+  const isAnalysisCardExpanded = Boolean(toolsOpen && activeTool === "analysis" && panelOpen && !panelMin && hasAnalysisContent);
+  const isAnalysisCardMinimized = Boolean(toolsOpen && activeTool === "analysis" && panelOpen && panelMin && hasAnalysisContent);
+  const burstShelfStateClass = !toolsOpen
+    ? "is-tools-closed"
+    : isAnalysisCardExpanded
+    ? "is-tools-open is-analysis-expanded"
+    : isAnalysisCardMinimized
+    ? "is-tools-open is-analysis-min"
+    : "is-tools-open is-tools-compact";
+
   return (
     <Dialog modal
       open={mode !== null}
@@ -1455,7 +1480,7 @@ export function ArCamera({
             {burstFlash > 0 && <div key={burstFlash} onAnimationEnd={() => setBurstFlash(0)} className="burst-flash pointer-events-none fixed inset-0 bg-white" aria-hidden="true" />}
             {burst && burstShots.length > 0 && (
               <aside
-                className={`ar-burst-shelf ${toolsOpen ? "is-tools-open" : "is-tools-closed"}`}
+                className={`ar-burst-shelf ${burstShelfStateClass}`}
                 data-camera-controls
                 aria-hidden={Boolean(thermalInfoOpen || confirmClear || guideOpen)}
               >
@@ -1532,7 +1557,7 @@ export function ArCamera({
               {/* Singolo | Multiplo for photos, and while shooting the strip of the shots kept with "Fine · n". */}
               {!error && mode === "photo" && (
                 <div
-                  className={`ar-burst-bar ${toolsOpen ? "is-tools-open" : "is-tools-closed"}`}
+                  className={`ar-burst-bar ${burstShelfStateClass}`}
                   data-camera-controls
                   aria-hidden={Boolean(thermalInfoOpen || confirmClear || guideOpen)}
                 >
