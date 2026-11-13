@@ -1521,8 +1521,8 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
   .ar-thermal-summary:not(.ar-thermal-summary-min) { top: calc(max(.375rem, env(safe-area-inset-top)) + 2.75rem) !important; width: min(34vw, 21rem); max-width: calc(50vw - 4.5rem); z-index: 22; pointer-events: auto !important; }
   .ar-thermal-summary-min { top: calc(max(.375rem, env(safe-area-inset-top)) + 2.75rem) !important; width: auto !important; max-width: min(85vw, 22rem) !important; z-index: 22; pointer-events: auto !important; }
 }
-/* Landscape: stima termica più leggibile (valori e testo ingranditi solo qui) */
-@media (orientation: landscape) {
+/* Landscape: stima termica più leggibile (valori e testo ingranditi solo su tablet) */
+@media (orientation: landscape) and (min-height: 601px) {
   .ar-thermal-summary:not(.ar-thermal-summary-min) .ar-thermal-heading { font-size: .8125rem; }
   .ar-thermal-summary:not(.ar-thermal-summary-min) .ar-thermal-values dd { font-size: 1.375rem; }
   .ar-thermal-summary:not(.ar-thermal-summary-min) .ar-thermal-values dt,
@@ -1548,7 +1548,7 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
   .camera-capture-row { grid-template-columns: 1fr 60px 1fr; }
   .camera-shutter { width: 60px; height: 60px; }
   .camera-capture-dock { gap: .125rem; }
-  .ar-thermal-summary:not(.ar-thermal-summary-min) { max-height: calc(100% - max(1rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 12.5rem); }
+  .ar-thermal-summary:not(.ar-thermal-summary-min) { max-height: min(28dvh, 7.5rem) !important; padding: .25rem .5rem; }
 }
 @media (prefers-reduced-motion: reduce) { .camera-shutter { transition: none; } }
 
@@ -1737,7 +1737,7 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 
 .ar-camera-surface[data-landscape=true] .ar-thermal-summary:not(.ar-thermal-summary-min) { top: calc(max(.375rem, env(safe-area-inset-top)) + 2.75rem) !important; width: min(34vw, 21rem); max-width: calc(50vw - 4.5rem); z-index: 22; pointer-events: auto !important; }
 .ar-camera-surface[data-landscape=true] .ar-thermal-summary-min { top: calc(max(.375rem, env(safe-area-inset-top)) + 2.75rem) !important; width: auto !important; max-width: min(85vw, 22rem) !important; z-index: 22; pointer-events: auto !important; }
-.ar-camera-surface[data-landscape=true] .ar-thermal-summary:not(.ar-thermal-summary-min) { max-height: calc(var(--ar-camera-height, 100dvh) - max(.375rem, env(safe-area-inset-top)) - env(safe-area-inset-bottom) - 9.5rem); }
+.ar-camera-surface[data-landscape=true] .ar-thermal-summary:not(.ar-thermal-summary-min) { max-height: min(28dvh, 7.5rem); }
 /* Landscape: the compact top bar and the goal selectors sit higher so the view keeps its height. */
 .ar-camera-surface[data-landscape=true] .ar-camera-topbar { top: max(.375rem, env(safe-area-inset-top)); }
 .ar-camera-surface[data-landscape=true] .ar-camera-topbar .camera-tool.size-11 { width: 2.25rem; height: 2.25rem; }
@@ -1983,7 +1983,21 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   .ar-camera-surface[data-landscape=true] .camera-tool,
   .camera-hud[data-landscape=true] .camera-tool { pointer-events: auto !important; }
   .ar-camera-surface[data-landscape=true] .ar-cooling-readout { margin-top: 1.4rem; }
-  .ar-camera-surface[data-landscape=true] .ar-thermal-summary:not(.ar-thermal-summary-min) { max-height: calc(var(--ar-camera-height) - var(--ar-header-bottom) - env(safe-area-inset-bottom) - 6.5rem); }
+  .ar-camera-surface[data-landscape=true] .ar-thermal-summary:not(.ar-thermal-summary-min) {
+    max-height: min(28dvh, 7.5rem) !important;
+    padding: .25rem .5rem;
+  }
+  .ar-camera-surface[data-landscape=true] .ar-thermal-summary:not(.ar-thermal-summary-min) .ar-thermal-values dd {
+    font-size: .95rem;
+    line-height: 1.15;
+  }
+  .ar-camera-surface[data-landscape=true] .ar-thermal-summary:not(.ar-thermal-summary-min) .ar-thermal-values dt {
+    font-size: .625rem;
+  }
+  .ar-camera-surface[data-landscape=true] .ar-thermal-summary:not(.ar-thermal-summary-min) .ar-thermal-values {
+    gap: .25rem .5rem;
+    margin-top: .15rem;
+  }
 }
 
 /* Smartphone portrait: the expanded summary stops above the bottom HUD (balance, zoom, capture) and scrolls,
@@ -2354,6 +2368,10 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   flex-direction: column;
   align-items: center;
   overflow: visible !important;
+}
+.ar-camera-surface[data-landscape=true]:has(.ar-burst-shelf) .ar-thermal-summary:not(.ar-thermal-summary-min),
+.camera-hud[data-landscape=true]:has(.ar-burst-shelf) .ar-thermal-summary:not(.ar-thermal-summary-min) {
+  max-height: min(25dvh, 6.75rem) !important;
 }
 .ar-camera-surface[data-landscape=true] .ar-burst-shelf .ar-burst-carousel,
 .camera-hud[data-landscape=true] .ar-burst-shelf .ar-burst-carousel {
