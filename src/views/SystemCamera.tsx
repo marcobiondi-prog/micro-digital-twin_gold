@@ -370,61 +370,68 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
               </span>
               <span className="flex items-center gap-1 font-bold text-[#00d296]">
                 <Star className="size-2.5 fill-current" />
-                <span className="ar-burst-header-long">Tocca per scegliere la migliore</span>
-                <span className="ar-burst-header-short">Migliore</span>
+                <span className="ar-burst-header-long">Scatto al centro selezionato</span>
+                <span className="ar-burst-header-short">Al centro</span>
               </span>
             </div>
-            <div
-              ref={carouselRef}
-              onScroll={updateDockEffect}
-              data-map-gestures
-              className="ar-burst-carousel w-full max-w-full"
-            >
-              {shots.map((s, i) => {
-                const isBest = s.id === (bestShotId ?? shots[shots.length - 1]?.id);
-                return (
-                  <div
-                    key={s.id}
-                    data-burst-item
-                    data-burst-id={s.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => pickBestShot(s.id, e.currentTarget)}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickBestShot(s.id, e.currentTarget as HTMLElement); } }}
-                    aria-label={`Foto ${i + 1}${isBest ? " (Scatto migliore selezionato)" : " (Tocca per scegliere come migliore)"}`}
-                    className={`relative shrink-0 snap-center rounded-lg p-0.5 cursor-pointer transition-opacity duration-150 ${
-                      isBest
-                        ? "ring-2 ring-[#00d296] shadow-[0_0_16px_rgba(0,210,150,0.85)] opacity-100"
-                        : "ring-1 ring-white/35 hover:ring-white/70 opacity-65 hover:opacity-95"
-                    }`}
-                  >
-                    <img
-                      src={s.thumb}
-                      alt={`Foto ${i + 1}`}
-                      className="size-12 rounded-md object-cover"
-                    />
-                    <span className="absolute bottom-1 left-1.5 rounded-full bg-black/75 px-1 text-[8.5px] font-bold text-white [text-shadow:0_1px_2px_black]">
-                      {i + 1}
-                    </span>
-                    {isBest && (
-                      <span className="absolute -top-2 left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded-full bg-[#00d296] px-1.5 py-0.2 text-[8.5px] font-extrabold text-[#042017] shadow-sm whitespace-nowrap">
-                        <Star className="size-2 fill-current" /> Migliore
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        dropShot(s.id);
-                      }}
-                      aria-label={`Togli la foto ${i + 1}`}
-                      className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-black/85 text-white ring-1 ring-white/40 hover:bg-destructive hover:scale-110 transition-transform"
+            <div className="ar-burst-track-wrap relative w-full max-w-full flex flex-col items-center overflow-visible">
+              {/* Selettore verde fisso al centro: non scorre con le foto, indica sempre lo scatto centrale attivo */}
+              <div
+                className="ar-burst-center-selector pointer-events-none absolute left-1/2 -translate-x-1/2 top-0.5 z-30 flex flex-col items-center"
+                aria-hidden="true"
+              >
+                <span className="flex items-center gap-1 rounded-full bg-[#00d296] px-2 py-0.5 text-[9px] font-extrabold text-[#042017] shadow-[0_2px_10px_rgba(0,210,150,0.7)] whitespace-nowrap">
+                  <Star className="size-2.5 fill-current" /> Migliore
+                </span>
+                <span className="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-[#00d296] -mt-[0.5px]" />
+              </div>
+              <div
+                ref={carouselRef}
+                onScroll={updateDockEffect}
+                data-map-gestures
+                className="ar-burst-carousel w-full max-w-full"
+              >
+                {shots.map((s, i) => {
+                  const isBest = s.id === (bestShotId ?? shots[shots.length - 1]?.id);
+                  return (
+                    <div
+                      key={s.id}
+                      data-burst-item
+                      data-burst-id={s.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => pickBestShot(s.id, e.currentTarget)}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickBestShot(s.id, e.currentTarget as HTMLElement); } }}
+                      aria-label={`Foto ${i + 1}${isBest ? " (Scatto migliore selezionato al centro)" : " (Tocca per portare al centro)"}`}
+                      className={`relative shrink-0 snap-center rounded-lg p-0.5 cursor-pointer transition-opacity duration-150 ${
+                        isBest
+                          ? "ring-2 ring-[#00d296] shadow-[0_0_16px_rgba(0,210,150,0.85)] opacity-100"
+                          : "ring-1 ring-white/35 hover:ring-white/70 opacity-65 hover:opacity-95"
+                      }`}
                     >
-                      <X className="size-3" />
-                    </button>
-                  </div>
-                );
-              })}
+                      <img
+                        src={s.thumb}
+                        alt={`Foto ${i + 1}`}
+                        className="size-12 rounded-md object-cover"
+                      />
+                      <span className="absolute bottom-1 left-1.5 rounded-full bg-black/75 px-1 text-[8.5px] font-bold text-white [text-shadow:0_1px_2px_black]">
+                        {i + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          dropShot(s.id);
+                        }}
+                        aria-label={`Togli la foto ${i + 1}`}
+                        className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-black/85 text-white ring-1 ring-white/40 hover:bg-destructive hover:scale-110 transition-transform"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </aside>
         )}

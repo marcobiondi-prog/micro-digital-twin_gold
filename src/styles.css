@@ -2208,6 +2208,29 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .ar-burst-header-short { display: none; }
 .ar-burst-header-long { display: inline; }
 
+.ar-burst-track-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: visible !important;
+}
+
+.ar-burst-center-selector {
+  position: absolute;
+  left: 50%;
+  top: 0.15rem;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 8px rgba(0, 210, 150, 0.55));
+}
+
 /* Landscape: containment shelf widened and moved to the left to give ample breathing space */
 .ar-camera-surface[data-landscape=true] .ar-burst-shelf {
   left: max(0.75rem, env(safe-area-inset-left));
@@ -2225,13 +2248,14 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   display: flex;
   flex-direction: column;
   align-items: center;
+  overflow: visible !important;
 }
 .ar-camera-surface[data-landscape=true] .ar-burst-shelf .ar-burst-carousel {
   padding-inline: calc(50% - 28px);
   width: 100%;
-  min-height: 6rem;
-  padding-top: 1.75rem;
-  padding-bottom: 0.25rem;
+  min-height: 6.25rem;
+  padding-top: 2.35rem;
+  padding-bottom: 0.35rem;
 }
 .ar-camera-surface[data-landscape=true] .ar-burst-shelf .ar-burst-header-long { display: none; }
 .ar-camera-surface[data-landscape=true] .ar-burst-shelf .ar-burst-header-short { display: inline; }
@@ -2253,13 +2277,14 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
     display: flex;
     flex-direction: column;
     align-items: center;
+    overflow: visible !important;
   }
   .camera-hud .ar-burst-shelf .ar-burst-carousel {
     padding-inline: calc(50% - 28px);
     width: 100%;
-    min-height: 6rem;
-    padding-top: 1.75rem;
-    padding-bottom: 0.25rem;
+    min-height: 6.25rem;
+    padding-top: 2.35rem;
+    padding-bottom: 0.35rem;
   }
   .camera-hud .ar-burst-shelf .ar-burst-header-long { display: none; }
   .camera-hud .ar-burst-shelf .ar-burst-header-short { display: inline; }
