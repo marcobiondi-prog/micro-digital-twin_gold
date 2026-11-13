@@ -54,8 +54,8 @@ export function freezeCameraFrame(target: HTMLCanvasElement, video: HTMLVideoEle
 export function paintArFrame(canvas: HTMLCanvasElement, source: ArFrameSource, showGrid: boolean): boolean {
   const { video, scene, heat } = source;
   if (!video.videoWidth || !video.videoHeight) return false;
-  // Canvas con le proporzioni dello schermo: il video viene ritagliato "a riempimento", così foto e overlay coincidono con ciò che si vede.
-  const k = Math.min(2, window.devicePixelRatio || 1);
+  // Canvas con le proporzioni dello schermo: fattore bilanciato a max 1.5 per fluidità e leggerezza su mobile
+  const k = Math.min(1.5, window.devicePixelRatio || 1);
   const cw = Math.round((canvas.clientWidth || 360) * k);
   const ch = Math.round((canvas.clientHeight || 640) * k);
   if (canvas.width !== cw || canvas.height !== ch) {

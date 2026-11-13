@@ -155,25 +155,33 @@ export function createArScene(): ArScene {
     render: (w, h, showGrid) => {
       if (canvas.width !== w || canvas.height !== h) { renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
       renderer.clear();
-      grid.visible = showGrid;
       const targetVisible = target.visible;
-      target.visible = false;
-      plants.forEach((plant) => { plant.visible = false; });
-      renderer.setScissor(0, 0, w, Math.floor(h * 0.52));
-      renderer.setScissorTest(true);
-      renderer.render(scene, camera);
-      renderer.setScissorTest(false);
-      grid.visible = false;
-      target.visible = targetVisible;
-      plants.forEach((plant) => {
-        plant.visible = true;
-        const height = compactPlantHeight(camera.position.distanceTo(plant.position), camera.fov, camera.aspect, plant.userData['imageAspect'], plant.userData['requestedHeight']);
-        plant.scale.setScalar(height / plant.userData['initialHeight']);
-        plant.rotation.y = Math.atan2(camera.position.x - plant.position.x, camera.position.z - plant.position.z);
-      });
-      renderer.autoClear = false;
-      renderer.render(scene, camera);
-      renderer.autoClear = true;
+      const hasPlants = plants.length > 0;
+      if (!showGrid && !hasPlants && !targetVisible) {
+        return;
+      }
+      if (showGrid) {
+        grid.visible = true;
+        target.visible = false;
+        plants.forEach((plant) => { plant.visible = false; });
+        renderer.setScissor(0, 0, w, Math.floor(h * 0.52));
+        renderer.setScissorTest(true);
+        renderer.render(scene, camera);
+        renderer.setScissorTest(false);
+        grid.visible = false;
+      }
+      if (hasPlants || targetVisible) {
+        target.visible = targetVisible;
+        plants.forEach((plant) => {
+          plant.visible = true;
+          const height = compactPlantHeight(camera.position.distanceTo(plant.position), camera.fov, camera.aspect, plant.userData['imageAspect'], plant.userData['requestedHeight']);
+          plant.scale.setScalar(height / plant.userData['initialHeight']);
+          plant.rotation.y = Math.atan2(camera.position.x - plant.position.x, camera.position.z - plant.position.z);
+        });
+        if (showGrid) renderer.autoClear = false;
+        renderer.render(scene, camera);
+        renderer.autoClear = true;
+      }
     },
     dispose: () => { plants.splice(0).forEach(release); release(grid); release(target); renderer.dispose(); },
     setRealSurfaceHit: (hit) => { realSurfaceHit = hit; },

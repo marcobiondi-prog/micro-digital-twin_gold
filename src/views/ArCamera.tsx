@@ -326,7 +326,8 @@ export function ArCamera({
 
   const xrActive = false;
   // Eye tracking del soggetto: il mirino cerca e segue la pianta dal primo fotogramma.
-  const [subject, setSubject] = useState<SubjectBox>(SEARCH_BOX);
+  const subjectRef = useRef<SubjectBox>(SEARCH_BOX);
+  const viewfinderRef = useRef<HTMLDivElement>(null);
   const [subjectLocked, setSubjectLocked] = useState(false);
   const [framingHint, setFramingHint] = useState(false);
   const [swipeHint, setSwipeHint] = useState(false);
@@ -409,7 +410,14 @@ export function ArCamera({
       box = smoothBox(box, found && (locked || hits > 0) ? found : locked ? box : SEARCH_BOX, locked ? 0.45 : 0.3);
       if (Math.hypot(box.x - prevBox.x, box.y - prevBox.y, box.w - prevBox.w, box.h - prevBox.h) > 0.015) {
         prevBox = box;
-        setSubject(box);
+        subjectRef.current = box;
+        const vf = viewfinderRef.current;
+        if (vf) {
+          vf.style.left = `${(box.x * 100).toFixed(2)}%`;
+          vf.style.top = `${(box.y * 100).toFixed(2)}%`;
+          vf.style.width = `${(box.w * 100).toFixed(2)}%`;
+          vf.style.height = `${(box.h * 100).toFixed(2)}%`;
+        }
       }
       if (locked !== prevLocked) {
         prevLocked = locked;
@@ -417,8 +425,13 @@ export function ArCamera({
       }
     };
     tick();
-    const id = window.setInterval(tick, 200);
-    return () => { window.clearInterval(id); setSubject(SEARCH_BOX); setSubjectLocked(false); greenLockRef.current = false; };
+    const id = window.setInterval(tick, 300);
+    return () => {
+      window.clearInterval(id);
+      subjectRef.current = SEARCH_BOX;
+      setSubjectLocked(false);
+      greenLockRef.current = false;
+    };
   }, [mode, ready]);
   const surfaceRef = useRef<HTMLDivElement>(null);
   const rotationRef = useRef(0);
@@ -776,7 +789,7 @@ export function ArCamera({
       playCameraSound("scan-start", 1.8);
       // Same frozen frame, with a second close-up preserving leaf edges and veins.
       const detail = document.createElement("canvas");
-      const focus = subjectLocked ? subject : SEARCH_BOX;
+      const focus = subjectLocked ? subjectRef.current : SEARCH_BOX;
       const x = Math.max(0, focus.x - 0.08), y = Math.max(0, focus.y - 0.08);
       const w = Math.min(1 - x, focus.w + 0.16), h = Math.min(1 - y, focus.h + 0.16);
       const scale = Math.min(1, SCAN_DETAIL_PX / Math.max(w * small.width, h * small.height));
@@ -784,7 +797,7 @@ export function ArCamera({
       detail.height = Math.max(1, Math.round(h * small.height * scale));
       detail.getContext("2d")?.drawImage(small, x * small.width, y * small.height, w * small.width, h * small.height, 0, 0, detail.width, detail.height);
       const detailImage = detail.toDataURL("image/jpeg", 0.85);
-      const request = { kind, target: arFocusOption(kind, target).id, ...(subjectLocked ? { focus: subject } : {}), ...(satellite ? { satellite } : {}) };
+      const request = { kind, target: arFocusOption(kind, target).id, ...(subjectLocked ? { focus: subjectRef.current } : {}), ...(satellite ? { satellite } : {}) };
       let r: Awaited<ReturnType<typeof detectArObject>>;
       try {
         r = await detectArObject({ data: { ...request, image, ...(detailImage.length <= 1_000_000 ? { detailImage } : {}) } });
@@ -1421,8 +1434,8 @@ export function ArCamera({
               className="absolute inset-0 h-full w-full touch-none bg-muted"
               aria-label="Anteprima in realtà aumentata"
             />
-            {ready && <div className={`ar-viewfinder${subjectLocked ? " is-locked" : ""}${scanning ? " is-locking" : ""}`} aria-hidden="true"
-              style={{ left: `${subject.x * 100}%`, top: `${subject.y * 100}%`, width: `${subject.w * 100}%`, height: `${subject.h * 100}%` }}>
+            {ready && <div ref={viewfinderRef} className={`ar-viewfinder${subjectLocked ? " is-locked" : ""}${scanning ? " is-locking" : ""}`} aria-hidden="true"
+              style={{ left: `${(subjectRef.current.x * 100).toFixed(2)}%`, top: `${(subjectRef.current.y * 100).toFixed(2)}%`, width: `${(subjectRef.current.w * 100).toFixed(2)}%`, height: `${(subjectRef.current.h * 100).toFixed(2)}%` }}>
               <span className="ar-viewfinder-corner tl" /><span className="ar-viewfinder-corner tr" />
               <span className="ar-viewfinder-corner bl" /><span className="ar-viewfinder-corner br" />
               <span className="ar-viewfinder-label">{scanning ? phaseText.tag : subjectLocked ? "Agganciato" : "Ricerca…"}</span>
