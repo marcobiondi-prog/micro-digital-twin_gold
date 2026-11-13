@@ -803,9 +803,25 @@ export function ArCamera({
       try {
         r = await detectArObject({ data: { ...request, image, ...(detailImage.length <= 1_000_000 ? { detailImage } : {}) } });
       } catch (first) {
-        // An HTTP error with an empty body (oversized or too slow): one retry, smaller and without the close-up.
-        if (version !== scanVersion.current || !isEmptyHttpError(first)) throw first;
-        r = await detectArObject({ data: { ...request, image: encodeFrame(small, SCAN_RETRY_PX, 0.78) } });
+        const errMsg = first instanceof Error ? first.message : "";
+        if (/Unauthorized/.test(errMsg)) {
+          try {
+            const { supabase } = await import("@/integrations/supabase/client");
+            const { data: refreshed, error: refErr } = await supabase.auth.refreshSession();
+            if (!refErr && refreshed.session && version === scanVersion.current) {
+              r = await detectArObject({ data: { ...request, image, ...(detailImage.length <= 1_000_000 ? { detailImage } : {}) } });
+            } else {
+              throw first;
+            }
+          } catch {
+            throw first;
+          }
+        } else if (version !== scanVersion.current || !isEmptyHttpError(first)) {
+          throw first;
+        } else {
+          // An HTTP error with an empty body (oversized or too slow): one retry, smaller and without the close-up.
+          r = await detectArObject({ data: { ...request, image: encodeFrame(small, SCAN_RETRY_PX, 0.78) } });
+        }
       }
       if (version !== scanVersion.current) return;
       const d = r.detection;
@@ -1182,7 +1198,7 @@ export function ArCamera({
               <span className="mt-1 block font-semibold text-primary">Raffrescamento stimato {coolingLabel(r.species.cooling)}{r.species.shade !== null ? ` · ombra ≈ ${Math.round(r.species.shade)} m²` : ""}</span>
             )}
           </p>
-        ) : <p>{r.result}</p>}
+        ) : <p className="font-semibold text-foreground mb-1">{r.result}</p>}
         {r.species && <p className="ar-identification-badge">{r.species.level}</p>}
         {r.count > 0 && r.totalCooling !== null && <p className="mt-1 text-muted-foreground">{r.count} {r.count === 1 ? "esemplare" : "esemplari"} · {coolingLabel(r.totalCooling)}{r.totalShade !== null ? ` · ombra ≈ ${Math.round(r.totalShade)} m²` : ""}</p>}
         {r.soil && (
@@ -1672,13 +1688,13 @@ export function ArCamera({
                   </div>
                   <div
                     data-camera-scroll
-                    className="max-h-[32dvh] overflow-y-auto rounded-lg bg-background/95 px-3 py-3 pr-9 text-xs leading-relaxed backdrop-blur-md"
+                    className="max-h-[32dvh] overflow-y-auto rounded-lg bg-background/95 px-3.5 py-3 pr-20 text-xs leading-relaxed backdrop-blur-md"
                     aria-live="polite"
                   >
                   {viewedRecord ? recordEsito(viewedRecord) : <>
                   <EsitoPhoto scan={realPhoto} reference={species?.photo ?? null} name={species?.commonName ?? null} />
                   {species ? (
-                    <p>
+                    <p className="pr-1">
                       <span className="text-sm font-semibold">{species.commonName}</span>{" "}
                       <span className="italic text-muted-foreground">{species.scientificName}</span>
                       {species.cooling && (
@@ -1686,7 +1702,7 @@ export function ArCamera({
                       )}
                     </p>
                   ) : (
-                    found && <p>{found}</p>
+                    found && <p className="font-semibold text-foreground mb-1">{found}</p>
                   )}
                   {identificationBadge}
                   {species?.identification && <p className="mt-1 text-muted-foreground">{species.identification.evidence}</p>}
