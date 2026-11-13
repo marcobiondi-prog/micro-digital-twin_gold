@@ -68,6 +68,8 @@ export function createArScene(): ArScene {
   const ray = new THREE.Raycaster();
   const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   const plants: THREE.Group[] = [];
+  const planesGroup = new THREE.Group();
+  scene.add(planesGroup);
   let arCoreManager: ArCoreManager | null = null;
   let realSurfaceHit: ArCoreHitPoint | null = null;
 
@@ -79,6 +81,19 @@ export function createArScene(): ArScene {
     if (arCoreManager?.isActive()) {
       const hit = arCoreManager.performHitTest(nx, ny);
       if (hit) return new THREE.Vector3(hit.x, hit.y, hit.z);
+
+      // Snap sul piano orizzontale reale rilevato più vicino
+      const planes = arCoreManager.getDetectedPlanes?.()?.filter((p) => p.orientation === "horizontal") ?? [];
+      if (planes.length > 0 && isGroundPoint(ny)) {
+        ray.setFromCamera(new THREE.Vector2(nx * 2 - 1, 1 - ny * 2), camera);
+        for (const pl of planes) {
+          const planeGround = new THREE.Plane(new THREE.Vector3(0, 1, 0), -pl.center.y);
+          const planeHit = ray.ray.intersectPlane(planeGround, new THREE.Vector3());
+          if (planeHit && camera.position.distanceTo(planeHit) <= 18) {
+            return planeHit;
+          }
+        }
+      }
     }
     // 2. Fallback su piano matematico orizzontale
     if (!isGroundPoint(ny)) return null;
@@ -90,12 +105,21 @@ export function createArScene(): ArScene {
   const release = (obj: THREE.Object3D) => {
     scene.remove(obj);
     obj.traverse((child) => {
-      if (child instanceof THREE.Mesh || child instanceof THREE.LineSegments) {
-        child.geometry.dispose();
+      if (child instanceof THREE.Mesh || child instanceof THREE.LineSegments || child instanceof THREE.Line) {
+        child.geometry?.dispose?.();
         const materials = Array.isArray(child.material) ? child.material : [child.material];
-        materials.forEach((m) => { if (m instanceof THREE.MeshBasicMaterial) m.map?.dispose(); m.dispose(); });
+        materials.forEach((m) => { if (m instanceof THREE.MeshBasicMaterial) m.map?.dispose(); m?.dispose?.(); });
       }
     });
+  };
+  const clearPlanes = () => {
+    while (planesGroup.children.length > 0) {
+      const child = planesGroup.children[0];
+      if (child) {
+        planesGroup.remove(child);
+        release(child);
+      }
+    }
   };
   // Superficie indicativa del terreno visibile: larghezza e profondità del piano inquadrato.
   const MAX_SNAP_DISTANCE = 18;
@@ -157,11 +181,58 @@ export function createArScene(): ArScene {
       renderer.clear();
       const targetVisible = target.visible;
       const hasPlants = plants.length > 0;
-      if (!showGrid && !hasPlants && !targetVisible) {
+
+      // Aggiornamento geometrie dei piani reali tracciati da ARCore
+      const detectedPlanes = arCoreManager?.getDetectedPlanes?.() ?? [];
+      const horizontalPlanes = detectedPlanes.filter((p) => p.orientation === "horizontal" && p.polygon.length >= 3);
+      if (horizontalPlanes.length > 0) {
+        clearPlanes();
+        horizontalPlanes.forEach((pl) => {
+          try {
+            const shape = new THREE.Shape();
+            pl.polygon.forEach((pt, i) => {
+              if (i === 0) shape.moveTo(pt.x, -pt.z);
+              else shape.lineTo(pt.x, -pt.z);
+            });
+            shape.closePath();
+            const geom = new THREE.ShapeGeometry(shape);
+            geom.rotateX(-Math.PI / 2);
+            const planeMesh = new THREE.Mesh(
+              geom,
+              new THREE.MeshBasicMaterial({
+                color: ink,
+                transparent: true,
+                opacity: 0.18,
+                depthWrite: false,
+                side: THREE.DoubleSide,
+              })
+            );
+            planeMesh.position.set(pl.center.x, pl.center.y + 0.005, pl.center.z);
+            planesGroup.add(planeMesh);
+
+            const borderPts = pl.polygon.map((pt) => new THREE.Vector3(pt.x, 0.008, pt.z));
+            if (borderPts.length > 0 && borderPts[0]) borderPts.push(borderPts[0].clone());
+            const lineGeom = new THREE.BufferGeometry().setFromPoints(borderPts);
+            const borderLine = new THREE.Line(
+              lineGeom,
+              new THREE.LineBasicMaterial({ color: ink, transparent: true, opacity: 0.75 })
+            );
+            borderLine.position.set(pl.center.x, pl.center.y, pl.center.z);
+            planesGroup.add(borderLine);
+          } catch {
+            // Geometria non valida o degenere, ignora
+          }
+        });
+      } else if (planesGroup.children.length > 0) {
+        clearPlanes();
+      }
+
+      if (!showGrid && !hasPlants && !targetVisible && planesGroup.children.length === 0) {
         return;
       }
       if (showGrid) {
         grid.visible = true;
+        planesGroup.visible = true;
         target.visible = false;
         plants.forEach((plant) => { plant.visible = false; });
         renderer.setScissor(0, 0, w, Math.floor(h * 0.52));
@@ -169,6 +240,7 @@ export function createArScene(): ArScene {
         renderer.render(scene, camera);
         renderer.setScissorTest(false);
         grid.visible = false;
+        planesGroup.visible = false;
       }
       if (hasPlants || targetVisible) {
         target.visible = targetVisible;
@@ -183,9 +255,9 @@ export function createArScene(): ArScene {
         renderer.autoClear = true;
       }
     },
-    dispose: () => { plants.splice(0).forEach(release); release(grid); release(target); renderer.dispose(); },
+    dispose: () => { plants.splice(0).forEach(release); clearPlanes(); release(grid); release(target); release(planesGroup); renderer.dispose(); },
     setRealSurfaceHit: (hit) => { realSurfaceHit = hit; },
     setArCoreManager: (m) => { arCoreManager = m; },
-    isArCoreTracking: () => Boolean(realSurfaceHit || arCoreManager?.isActive()),
+    isArCoreTracking: () => Boolean(realSurfaceHit || arCoreManager?.isActive() || (arCoreManager?.getDetectedPlanes?.()?.length ?? 0) > 0),
   };
 }

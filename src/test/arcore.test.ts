@@ -107,7 +107,13 @@ describe("ARCore WebXR Integration", () => {
 
       await manager.stopSession();
       expect(manager.isActive()).toBe(false);
+      expect(manager.getDetectedPlanes()).toEqual([]);
       expect(mockSession.end).toHaveBeenCalled();
+    });
+
+    it("initializes getDetectedPlanes with an empty array", () => {
+      const manager = createArCoreManager();
+      expect(manager.getDetectedPlanes()).toEqual([]);
     });
   });
 
@@ -134,6 +140,38 @@ describe("ARCore WebXR Integration", () => {
 
       scene.setRealSurfaceHit?.(null);
       expect(scene.isArCoreTracking?.()).toBe(false);
+      scene.dispose();
+    });
+
+    it("recognizes tracking when ARCore manager detects planes", () => {
+      vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+        fillStyle: "",
+        fillRect: vi.fn(),
+        getImageData: vi.fn().mockReturnValue({ data: [0, 0, 0, 255] }),
+      } as unknown as CanvasRenderingContext2D);
+
+      const scene = createArScene();
+      const mockManager = {
+        isSupported: vi.fn().mockResolvedValue(true),
+        startSession: vi.fn().mockResolvedValue(true),
+        stopSession: vi.fn().mockResolvedValue(undefined),
+        performHitTest: vi.fn().mockReturnValue(null),
+        getLightEstimate: vi.fn().mockReturnValue(null),
+        isActive: vi.fn().mockReturnValue(false),
+        subscribeStatus: vi.fn().mockReturnValue(() => {}),
+        getDetectedPlanes: vi.fn().mockReturnValue([
+          {
+            id: "plane_0",
+            orientation: "horizontal" as const,
+            polygon: [{ x: -1, z: -1 }, { x: 1, z: -1 }, { x: 1, z: 1 }, { x: -1, z: 1 }],
+            center: { x: 0, y: 0, z: -2 },
+          },
+        ]),
+      };
+
+      scene.setArCoreManager?.(mockManager);
+      expect(scene.isArCoreTracking?.()).toBe(true);
+      scene.render(800, 600, true);
       scene.dispose();
     });
   });

@@ -14,6 +14,14 @@ export type ArCoreHitPoint = {
   isRealSurface: true;
 };
 
+export type ArCorePlane = {
+  id: string;
+  orientation: "horizontal" | "vertical";
+  polygon: { x: number; z: number }[];
+  center: { x: number; y: number; z: number };
+  matrix?: number[];
+};
+
 export type ArCoreLightEstimate = {
   intensity: number; // 0..2
   colorTemperature?: number;
@@ -25,9 +33,11 @@ export type ArCoreManager = {
   startSession: (options?: { domOverlay?: HTMLElement }) => Promise<boolean>;
   stopSession: () => Promise<void>;
   performHitTest: (normalizedX: number, normalizedY: number) => ArCoreHitPoint | null;
+  getDetectedPlanes: () => ArCorePlane[];
   getLightEstimate: () => ArCoreLightEstimate | null;
   isActive: () => boolean;
   subscribeStatus: (callback: (status: ArCoreStatus) => void) => () => void;
+  subscribePlanes?: (callback: (planes: ArCorePlane[]) => void) => () => void;
 };
 
 /** Verifica se il dispositivo e il browser supportano ARCore nativo tramite WebXR */
@@ -87,6 +97,8 @@ export function createArCoreManager(): ArCoreManager {
   const listeners = new Set<(s: ArCoreStatus) => void>();
   let lastHit: ArCoreHitPoint | null = null;
   let lastLight: ArCoreLightEstimate | null = null;
+  let lastPlanes: ArCorePlane[] = [];
+  const planeListeners = new Set<(planes: ArCorePlane[]) => void>();
 
   const notify = (s: ArCoreStatus) => {
     status = s;
@@ -130,6 +142,7 @@ export function createArCoreManager(): ArCoreManager {
 
       const onXRFrame: XRFrameRequestCallback = (_time, frame) => {
         if (!session) return;
+        // 1. Hit testing per punto d'impatto sul centro/reticolo
         if (hitTestSource && refSpace) {
           const hitTestResults = frame.getHitTestResults(hitTestSource);
           if (hitTestResults.length > 0) {
@@ -147,6 +160,44 @@ export function createArCoreManager(): ArCoreManager {
             }
           }
         }
+
+        // 2. Plane Detection: perimetro geometrico dei piani reali calcolati da ARCore
+        const frameAny = frame as unknown as { detectedPlanes?: Iterable<{
+          planeSpace: XRSpace;
+          polygon?: ArrayLike<{ x: number; z: number }>;
+          orientation?: "horizontal" | "vertical";
+          id?: string;
+        }> };
+        if (frameAny?.detectedPlanes && refSpace) {
+          const detectedList: ArCorePlane[] = [];
+          let idx = 0;
+          for (const plane of frameAny.detectedPlanes) {
+            const pose = frame.getPose(plane.planeSpace, refSpace);
+            if (pose) {
+              const poly: { x: number; z: number }[] = [];
+              if (plane.polygon) {
+                const len = plane.polygon.length ?? 0;
+                for (let i = 0; i < len; i++) {
+                  const pt = plane.polygon[i];
+                  if (pt && typeof pt.x === "number" && typeof pt.z === "number") {
+                    poly.push({ x: pt.x, z: pt.z });
+                  }
+                }
+              }
+              const pos = pose.transform.position;
+              detectedList.push({
+                id: plane.id ?? `plane_${idx++}`,
+                orientation: plane.orientation ?? "horizontal",
+                polygon: poly,
+                center: { x: pos.x, y: pos.y, z: pos.z },
+                matrix: Array.from(pose.transform.matrix ?? []),
+              });
+            }
+          }
+          lastPlanes = detectedList;
+          planeListeners.forEach((fn) => fn(detectedList));
+        }
+
         session.requestAnimationFrame(onXRFrame);
       };
       session.requestAnimationFrame(onXRFrame);
@@ -155,6 +206,8 @@ export function createArCoreManager(): ArCoreManager {
         session = null;
         refSpace = null;
         hitTestSource = null;
+        lastPlanes = [];
+        planeListeners.forEach((fn) => fn([]));
         notify("supported");
       });
 
@@ -172,6 +225,8 @@ export function createArCoreManager(): ArCoreManager {
       session = null;
       refSpace = null;
       hitTestSource = null;
+      lastPlanes = [];
+      planeListeners.forEach((fn) => fn([]));
       notify("supported");
     }
   };
@@ -193,12 +248,18 @@ export function createArCoreManager(): ArCoreManager {
     startSession,
     stopSession,
     performHitTest,
+    getDetectedPlanes: () => lastPlanes,
     getLightEstimate,
     isActive: () => status === "active",
     subscribeStatus: (cb) => {
       listeners.add(cb);
       cb(status);
       return () => listeners.delete(cb);
+    },
+    subscribePlanes: (cb) => {
+      planeListeners.add(cb);
+      cb(lastPlanes);
+      return () => planeListeners.delete(cb);
     },
   };
 }
