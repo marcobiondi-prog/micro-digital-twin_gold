@@ -8,8 +8,9 @@ import { dialZoom, DIAL_PX, rulerTicks } from "@/lib/zoom-dial";
  * the dial of the Xperia camera: swiping left brings the bigger numbers under the mark (zoom in), right zooms out.
  * The ruler is logarithmic, so every doubling (1→2, 2→4) takes the same swipe.
  */
-export function ZoomDial({ zoom, max, onZoom, disabled = false, className = "" }: {
+export function ZoomDial({ zoom, max, onZoom, disabled = false, className = "", onRulerChange }: {
   zoom: number; max: number; onZoom: (value: number) => void; disabled?: boolean; className?: string;
+  onRulerChange?: (active: boolean) => void;
 }) {
   const [dialing, setDialing] = useState(false);
   const [shown, setShown] = useState(false);
@@ -17,6 +18,10 @@ export function ZoomDial({ zoom, max, onZoom, disabled = false, className = "" }
   const swallowClick = useRef(false);
   const hideTimer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(hideTimer.current), []);
+
+  useEffect(() => {
+    onRulerChange?.(shown || dialing);
+  }, [shown, dialing, onRulerChange]);
   // A zoom changed elsewhere (a pinch, a tapped chip) shows the ruler for a moment too, so one sees where it is.
   const lastZoom = useRef(zoom);
   useEffect(() => {

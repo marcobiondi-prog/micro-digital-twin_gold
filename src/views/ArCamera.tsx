@@ -219,6 +219,7 @@ export function ArCamera({
     if (haptic) hapticTick([...haptic]);
     setZoomState(zoomRef.current);
   };
+  const [zoomRulerActive, setZoomRulerActive] = useState(false);
   const onPinch = (ratio: number, start: boolean) => {
     if (start) pinchFrom.current = zoomRef.current;
     else setZoom(pinchZoom(pinchFrom.current, 1, ratio));
@@ -1577,7 +1578,7 @@ export function ArCamera({
               {/* Singolo | Multiplo for photos, and while shooting the strip of the shots kept with "Fine · n". */}
               {!error && mode === "photo" && (
                 <div
-                  className={`ar-burst-bar ${burstShelfStateClass}`}
+                  className={`ar-burst-bar ${burstShelfStateClass}${zoomRulerActive ? " is-zoom-active" : ""}`}
                   data-camera-controls
                   aria-hidden={Boolean(thermalInfoOpen || confirmClear || guideOpen)}
                 >
@@ -1737,7 +1738,7 @@ export function ArCamera({
                {!toolsOpen && specimenDock}
                {/* Three chips (the neighbouring lenses on the sides, the live value in the centre, tap = 1×) and a sideways
                    swipe on them for the Xperia-style ruler. */}
-               {!toolsOpen && <ZoomDial zoom={zoom} max={ZOOM_MAX} disabled={!ready || scanning} onZoom={setZoom} />}
+               {!toolsOpen && <ZoomDial zoom={zoom} max={ZOOM_MAX} disabled={!ready || scanning} onZoom={setZoom} onRulerChange={setZoomRulerActive} />}
                <CameraCaptureControl mode={mode ?? "photo"} recording={recording} ar disabled={!ready || scanning || xrActive} onCapture={mode === "photo" ? shoot : record} {...(mode !== "video" ? { onHold: arHold } : {})} left={<div className="camera-labelled-tool ar-scan-tools">
                 <Button variant="ghost" size="icon"
                   type="button"

@@ -1967,7 +1967,12 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
      through: only its controls catch them, and the minimized summary chip reopens. */
   .ar-camera-surface[data-landscape=true] .camera-bottom,
   .ar-camera-surface[data-landscape=true] #ar-camera-tools { pointer-events: none; }
-  .ar-camera-surface[data-landscape=true] .camera-bottom > :not(#ar-camera-tools),
+  .ar-camera-surface[data-landscape=true] .camera-bottom > *,
+  .ar-camera-surface[data-landscape=true] .ar-tools-panel,
+  .ar-camera-surface[data-landscape=true] .camera-capture-dock,
+  .ar-camera-surface[data-landscape=true] .camera-capture-row,
+  .ar-camera-surface[data-landscape=true] .camera-shutter,
+  .ar-camera-surface[data-landscape=true] .camera-tool { pointer-events: auto !important; }
   .ar-camera-surface[data-landscape=true] .ar-cooling-readout { margin-top: 1.4rem; }
   .ar-camera-surface[data-landscape=true] .ar-thermal-summary:not(.ar-thermal-summary-min) { max-height: calc(var(--ar-camera-height) - var(--ar-header-bottom) - env(safe-area-inset-bottom) - 6.5rem); }
 }
@@ -2366,21 +2371,35 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 }
 
 /* AI camera: Singolo | Multiplo above the capture row */
-.ar-burst-bar { position: relative; z-index: 20; display: flex; justify-content: center; align-items: center; width: 100%; pointer-events: none; overflow: visible; margin-bottom: 2.5rem; }
+.ar-burst-bar {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  pointer-events: none;
+  overflow: visible;
+  margin-bottom: 0.35rem;
+  transition: margin-bottom 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
 .ar-burst-bar > * { pointer-events: auto; }
 .ar-burst-bar > .burst-flash { pointer-events: none !important; }
 .ar-burst-bar.is-tools-open { margin-bottom: 0.5rem; }
-.ar-camera-surface[data-landscape=true] .ar-burst-bar { margin-bottom: 2.35rem; }
+.ar-burst-bar.is-zoom-active { margin-bottom: 2.5rem; }
+.ar-camera-surface[data-landscape=true] .ar-burst-bar { margin-bottom: 0.2rem; }
 .ar-camera-surface[data-landscape=true] .ar-burst-bar.is-tools-open { margin-bottom: 0.35rem; }
+.ar-camera-surface[data-landscape=true] .ar-burst-bar.is-zoom-active { margin-bottom: 2.35rem; }
 .ar-burst-carousel { display: flex; align-items: flex-end; gap: .75rem; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scroll-padding-inline: calc(50% - 28px); -webkit-overflow-scrolling: touch; touch-action: pan-x; scrollbar-width: none; min-height: 7.25rem; padding-top: 2.5rem; padding-bottom: .875rem; padding-inline: calc(50% - 28px); }
 .ar-burst-carousel::-webkit-scrollbar { display: none; }
 [data-burst-item] { transform-origin: bottom center; transition: transform 70ms ease-out; will-change: transform; scroll-snap-align: center; scroll-snap-stop: always; }
 @media (max-width: 767.98px) {
-  /* Su mobile mantieni le pillole Singolo/Multiplo posizionate sopra al righello dello zoom */
-  .ar-burst-bar { margin-bottom: 2.5rem; }
+  .ar-burst-bar { margin-bottom: 0.35rem; }
   .ar-burst-bar.is-tools-open { margin-bottom: 0.5rem; }
-  .ar-camera-surface[data-landscape=true] .ar-burst-bar { margin-bottom: 2.35rem; }
+  .ar-burst-bar.is-zoom-active { margin-bottom: 2.5rem; }
+  .ar-camera-surface[data-landscape=true] .ar-burst-bar { margin-bottom: 0.2rem; }
   .ar-camera-surface[data-landscape=true] .ar-burst-bar.is-tools-open { margin-bottom: 0.35rem; }
+  .ar-camera-surface[data-landscape=true] .ar-burst-bar.is-zoom-active { margin-bottom: 2.35rem; }
 }
 
 /* Xperia-style zoom ruler: shown while swiping on the lens chips, it slides under a fixed centre mark. */
