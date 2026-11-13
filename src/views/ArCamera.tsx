@@ -1505,6 +1505,463 @@ export function ArCamera({
     ? "is-tools-open is-analysis-min"
     : "is-tools-open is-tools-compact";
 
+  const topBarElement = (
+    <div data-camera-hud className="ar-camera-topbar">
+      <div className="ar-camera-actions" data-camera-controls>
+        {/* Left: Close button */}
+        <div className="ar-topbar-left">
+          <Button
+            variant="ghost"
+            size="icon"
+            type="button"
+            onClick={onClose}
+            disabled={recording}
+            aria-label="Chiudi"
+            className="camera-tool grid size-10 place-items-center rounded-full disabled:opacity-40"
+          >
+            <X className="size-5" />
+          </Button>
+        </div>
+
+        {/* Center: ARCore status & toggle + Focus options */}
+        <div className="ar-topbar-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            type="button"
+            onClick={(e) => toggleAr(e)}
+            className={`camera-tool flex items-center gap-1.5 transition-all ${
+              layers.has("grid") ? "ar-pill-active" : "ar-pill-inactive"
+            }`}
+            title={layers.has("grid") ? "AR Core attivo sul terreno (tocca per disattivare)" : "Attiva la Realtà Aumentata AR Core"}
+            aria-pressed={layers.has("grid")}
+            aria-label={layers.has("grid") ? "Disattiva AR Core" : "Attiva AR Core"}
+          >
+            {layers.has("grid") ? (
+              <>
+                <span className="size-2 rounded-full bg-[#042017] animate-pulse" />
+                <span className="font-semibold">AR Core</span>
+              </>
+            ) : (
+              <>
+                <Scan className="size-3.5 shrink-0" />
+                <span>AR Core</span>
+              </>
+            )}
+          </Button>
+
+          <div className="ar-focus-wrap">
+            {(() => {
+              const onRecord = scanRecords.length > 1 && viewPage >= 0 && viewPage < scanRecords.length;
+              return (
+                <span
+                  className="ar-scan-counter"
+                  role="status"
+                  aria-label={onRecord ? `Scansione ${viewPage + 1} di ${scanRecords.length}` : `${scanRecords.length} ${scanRecords.length === 1 ? "scansione registrata" : "scansioni registrate"} nel report`}
+                  title="Scansioni registrate nel report"
+                >
+                  {onRecord ? `${viewPage + 1}/${scanRecords.length}` : scanRecords.length}
+                </span>
+              );
+            })()}
+            <div className="ar-focus-options" role="radiogroup" aria-label={kind === "urban" ? "Obiettivo camera urbana" : "Obiettivo camera vitivinicola"}>
+              {AR_FOCUS[kind].map(o => (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  key={o.id}
+                  type="button"
+                  role="radio"
+                  aria-label={o.label}
+                  title={o.label}
+                  aria-checked={arFocusOption(kind, target).id === o.id}
+                  className="camera-tool ar-focus-pill"
+                  onClick={() => selectTarget(o.id)}
+                >
+                  {FOCUS_LABELS[o.id]}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Esito, Guide, Flash */}
+        <div className="ar-topbar-right">
+          {(found || species || viewedRecord) && !scanning && (
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label="Mostra esito analisi"
+              title="Mostra esito analisi"
+              className="camera-tool ar-esito-chip"
+              onClick={() => { setToolsOpen(true); setActiveTool("analysis"); setPanelOpen(true); }}
+            >
+              <Activity className="size-4 shrink-0" />
+              <span>Esito</span>
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="camera-tool size-10"
+            aria-label="Guida inquadratura"
+            title="Guida inquadratura"
+            aria-pressed={guideOpen}
+            onClick={() => setGuideOpen(v => !v)}
+          >
+            <Info className="size-4" />
+          </Button>
+          {torchSupported && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="camera-tool size-10"
+              disabled={torchBusy || scanning}
+              aria-pressed={torchOn}
+              aria-label={torchOn ? "Disattiva flash" : "Attiva flash"}
+              title={torchOn ? "Disattiva flash" : "Attiva flash"}
+              onClick={() => void toggleTorch()}
+            >
+              {torchOn ? <Zap className="size-4 text-yellow-400" /> : <ZapOff className="size-4" />}
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const burstShelfElement = burst && burstShots.length > 0 && (
+    <aside
+      className={`ar-burst-shelf ${burstShelfStateClass}`}
+      data-camera-controls
+      aria-hidden={Boolean(thermalInfoOpen || confirmClear || guideOpen)}
+    >
+      <div className="ar-burst-header flex w-full max-w-[min(26rem,92vw)] items-center justify-between px-2 text-[10.5px] font-semibold text-white/90 [text-shadow:0_1px_2px_black]">
+        <span>
+          {burstShots.length}{" "}
+          <span className="ar-burst-header-long">{burstShots.length === 1 ? "foto scattata" : "foto scattate"}</span>
+          <span className="ar-burst-header-short">foto</span>
+        </span>
+        <span className="flex items-center gap-1 font-bold text-[#00d296]">
+          <Star className="size-2.5 fill-current" />
+          <span className="ar-burst-header-long">Scatto al centro selezionato</span>
+          <span className="ar-burst-header-short">Al centro</span>
+        </span>
+      </div>
+      <div className="ar-burst-track-wrap relative w-full max-w-full flex flex-col items-center overflow-visible">
+        <div
+          className="ar-burst-center-selector pointer-events-none absolute left-1/2 -translate-x-1/2 top-0.5 z-30 flex flex-col items-center"
+          aria-hidden="true"
+        >
+          <span className="flex items-center gap-1 rounded-full bg-[#00d296] px-2 py-0.5 text-[9px] font-extrabold text-[#042017] shadow-[0_2px_10px_rgba(0,210,150,0.7)] whitespace-nowrap">
+            <Star className="size-2.5 fill-current" /> Migliore
+          </span>
+          <span className="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-[#00d296] -mt-[0.5px]" />
+        </div>
+        <div
+          ref={carouselRef}
+          onScroll={updateDockEffect}
+          data-map-gestures
+          className="ar-burst-carousel w-full max-w-full"
+        >
+          {burstShots.map((s, i) => {
+            const isBest = s.id === (bestShotId ?? burstShots[burstShots.length - 1]?.id);
+            return (
+              <div
+                key={s.id}
+                data-burst-item
+                data-burst-id={s.id}
+                role="button"
+                tabIndex={0}
+                onClick={(e) => pickBestShot(s.id, e.currentTarget)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickBestShot(s.id, e.currentTarget as HTMLElement); } }}
+                aria-label={`Foto ${i + 1}${isBest ? " (Scatto migliore selezionato al centro)" : " (Tocca per portare al centro)"}`}
+                className={`relative shrink-0 snap-center rounded-lg p-0.5 cursor-pointer transition-opacity duration-150 ${
+                  isBest
+                    ? "ring-2 ring-[#00d296] shadow-[0_0_16px_rgba(0,210,150,0.85)] opacity-100"
+                    : "ring-1 ring-white/35 hover:ring-white/70 opacity-65 hover:opacity-95"
+                }`}
+              >
+                <img
+                  src={s.thumb}
+                  alt={`Foto ${i + 1}`}
+                  className="size-12 rounded-md object-cover"
+                />
+                <span className="absolute bottom-1 left-1.5 rounded-full bg-black/75 px-1 text-[8.5px] font-bold text-white [text-shadow:0_1px_2px_black]">
+                  {i + 1}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    dropBurstShot(s.id);
+                  }}
+                  aria-label={`Togli la foto ${i + 1}`}
+                  className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-black/85 text-white ring-1 ring-white/40 hover:bg-destructive hover:scale-110 transition-transform"
+                >
+                  <X className="size-3" aria-hidden="true" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </aside>
+  );
+
+  const burstBarElement = !error && mode === "photo" && (
+    <div
+      className={`ar-burst-bar ${burstShelfStateClass}${zoomRulerActive && !hasDock ? " is-zoom-active" : ""}`}
+      data-camera-controls
+      aria-hidden={Boolean(thermalInfoOpen || confirmClear || guideOpen)}
+    >
+      <div className="relative flex items-center justify-center gap-2">
+        <div role="radiogroup" aria-label="Tipo di scatto" className="flex rounded-full bg-black/55 p-0.5 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur">
+          <button type="button" role="radio" aria-checked={!burst} onClick={backToSingle}
+            className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""}`}>Singolo</button>
+          <button type="button" role="radio" aria-checked={burst} onClick={() => setBurst(true)} className={`h-8 rounded-full px-3 ${burst ? "bg-white text-black" : ""}`}>Multiplo</button>
+        </div>
+        {layers.has("grid") && (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => handlePlace3DTree(0.5, 0.65)}
+            title="Posiziona il modello 3D del Leccio sul terreno tracciato da ARCore"
+            aria-label="Posiziona albero 3D sul terreno"
+            className="h-8 rounded-full bg-[#00f0ff]/20 text-[#00f0ff] ring-1 ring-[#00f0ff]/50 hover:bg-[#00f0ff]/30 backdrop-blur px-3 text-xs font-bold flex items-center gap-1.5 shadow-[0_0_12px_rgba(0,240,255,0.35)]"
+          >
+            <span className="size-2 rounded-full bg-[#00f0ff] animate-ping" />
+            <span>Posiziona Albero 3D</span>
+          </Button>
+        )}
+        {burst && burstShots.length > 0 && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute left-[calc(100%+0.5rem)] top-1/2 -translate-y-1/2 inline-flex h-8 items-center gap-1 rounded-full bg-white px-3.5 text-xs font-semibold text-black shadow-md whitespace-nowrap"
+          >
+            <Check className="size-3.5" aria-hidden="true" />Fine · {burstShots.length}
+          </button>
+        )}
+      </div>
+      <span className="sr-only" role="status" aria-live="polite">{burst ? `${burstShots.length} foto scattate` : ""}</span>
+    </div>
+  );
+
+  const toolsPanelElement = (
+    <div id="ar-camera-tools" hidden={!toolsOpen} className="w-full">
+      {toolsOpen && (
+        <div className="ar-tools-panel flex w-full flex-col items-center gap-2">
+          <div className="ar-tool-options" data-camera-controls>
+            <Button variant="ghost" size="sm" className="camera-tool" title="Analisi" aria-label="Analisi" aria-pressed={activeTool === "analysis"} onClick={() => { setActiveTool(v => v === "analysis" ? null : "analysis"); setPanelOpen(true); }}><Info className="size-4" />Analisi</Button>
+            <Button variant="ghost" size="sm" className="camera-tool" title="Livelli" aria-label="Livelli" aria-pressed={activeTool === "manage"} onClick={() => { setActiveTool(v => v === "manage" ? null : "manage"); }}><SlidersHorizontal className="size-4" />Livelli</Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              type="button"
+              onClick={(e) => toggleAr(e)}
+              className={`camera-tool flex items-center gap-1.5 transition-all ${
+                layers.has("grid") ? "ar-pill-active" : "ar-pill-inactive"
+              }`}
+              title={layers.has("grid") ? "AR Core attivo sul terreno (tocca per disattivare)" : "Attiva la Realtà Aumentata AR Core"}
+              aria-pressed={layers.has("grid")}
+              aria-label={layers.has("grid") ? "Disattiva AR Core" : "Attiva AR Core"}
+            >
+              {layers.has("grid") ? (
+                <>
+                  <span className="size-2 rounded-full bg-[#042017] animate-pulse" />
+                  <span className="font-semibold">AR Core</span>
+                </>
+              ) : (
+                <>
+                  <Scan className="size-3.5 shrink-0" />
+                  <span>AR Core</span>
+                </>
+              )}
+            </Button>
+            {activeTool === "manage" && (
+              <div className="flex flex-wrap items-center justify-center gap-1.5" data-camera-controls>
+                <Button variant="ghost" size="icon" className="camera-tool" aria-label="Mostra griglia" title="Griglia" aria-pressed={layers.has("grid")} onClick={() => toggle("grid")}><Grid2X2 className="size-4" /></Button>
+                <Button variant="ghost" size="icon" className="camera-tool" aria-label="Mappa termica simulata" title="Calore simulato" aria-pressed={layers.has("heat")} onClick={() => { if (!layers.has("heat")) setThermalInfoOpen(true); toggle("heat"); }}><Flame className="size-4" /></Button>
+                {layers.has("grid") && (
+                  <Button variant="ghost" size="sm" className="camera-tool ar-plant-button text-[#00f0ff] font-bold w-auto px-3 shrink-0 whitespace-nowrap" aria-label="Posiziona albero 3D" title="Posiziona albero 3D" onClick={() => handlePlace3DTree(0.5, 0.65)}>🌳 Pianta 3D</Button>
+                )}
+              </div>
+            )}
+          </div>
+          {!torchSupported && <p className="text-xs text-muted-foreground">Flash non supportato su questa fotocamera.</p>}
+          {(species || soil || found || survey || viewedRecord) && activeTool === "analysis" && panelOpen && panelMin && (
+            <Button variant="ghost" type="button" data-camera-controls
+              className="ar-analysis-min"
+              onClick={() => setPanelMin(false)}
+              aria-label="Espandi esito analisi" title="Espandi esito analisi">
+              <Info className="size-3.5" /><span>Esito analisi</span><ChevronUp className="size-3.5" />
+            </Button>
+          )}
+          {(species || soil || found || survey || viewedRecord) && activeTool === "analysis" && panelOpen && !panelMin && (
+            <div className="relative w-[min(92%,24rem)]">
+              <div className="absolute right-2 top-2 z-10 flex gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setPanelMin(true)}
+                  aria-label="Minimizza esito analisi"
+                  title="Minimizza esito analisi"
+                  className="grid size-7 place-items-center rounded-full bg-background/80 backdrop-blur-md"
+                >
+                  <ChevronDown className="size-3.5" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => { setPanelOpen(false); setActiveTool(null); }}
+                  aria-label="Chiudi esito analisi"
+                  title="Chiudi esito analisi"
+                  className="grid size-7 place-items-center rounded-full bg-background/80 backdrop-blur-md"
+                >
+                  <X className="size-3.5" />
+                </Button>
+              </div>
+              <div
+                data-camera-scroll
+                className="max-h-[32dvh] overflow-y-auto rounded-lg bg-background/95 px-3.5 py-3 pr-20 text-xs leading-relaxed backdrop-blur-md"
+                aria-live="polite"
+              >
+                {viewedRecord ? recordEsito(viewedRecord) : (
+                  <>
+                    <EsitoPhoto scan={realPhoto} reference={species?.photo ?? null} name={species?.commonName ?? null} />
+                    {species ? (
+                      <p className="pr-1">
+                        <span className="text-sm font-semibold">{species.commonName}</span>{" "}
+                        <span className="italic text-muted-foreground">{species.scientificName}</span>
+                        {species.cooling && (
+                          <span className="mt-1 block font-semibold text-primary">Raffrescamento stimato {coolingLabel(species.cooling.deltaT)} · ombra ≈ {species.cooling.shadeM2} m²</span>
+                        )}
+                      </p>
+                    ) : (
+                      found && <p className="font-semibold text-foreground mb-1">{found}</p>
+                    )}
+                    {identificationBadge}
+                    {species?.identification && <p className="mt-1 text-muted-foreground">{species.identification.evidence}</p>}
+                    {soil && (
+                      <p className="text-muted-foreground">
+                        Terreno {soil.label} · permeabilità {soil.permeability} ·{" "}
+                        <span className={soil.plantable ? "text-primary" : "text-destructive"}>
+                          {soil.plantable ? "potenzialmente piantabile" : "superficie non idonea"}
+                        </span>
+                      </p>
+                    )}
+                    {survey && (
+                      <dl className="mt-2 space-y-1">
+                        <div><dt className="font-semibold">Consistenza apparente</dt><dd className="text-muted-foreground">{survey.consistency}</dd></div>
+                        <div><dt className="font-semibold">Calore / esposizione</dt><dd className="text-muted-foreground">{survey.heatNote}</dd></div>
+                        <div><dt className="font-semibold">Temperatura del terreno</dt><dd className="text-muted-foreground">Non misurata · serve una sonda termica</dd></div>
+                      </dl>
+                    )}
+                    {soil?.note && <p className="text-muted-foreground">{soil.note}</p>}
+                    <p className="mt-1 text-muted-foreground">Identificazione e suolo: stime visive, non analisi strumentali.</p>
+                    {found && species && <p role="status">{found}</p>}
+                    {species && (
+                      <p className="text-muted-foreground">
+                        Stima indicativa · piano virtuale
+                        {species.family && <>{" · "}{species.family}</>}
+                        {species.colUrl && (
+                          <>{" · "}<a href={species.colUrl} target="_blank" rel="noreferrer" className="underline">Scheda della specie</a></>
+                        )}
+                        {species.gbifUrl && (
+                          <>{" · "}<a href={species.gbifUrl} target="_blank" rel="noreferrer" className="underline">Osservazioni</a></>
+                        )}
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+          {activeTool === "manage" && (count > 0 || scanRecords.length > 0) && (
+            <div className="flex flex-wrap items-center justify-center gap-2" data-camera-controls>
+              {count > 0 && <Button variant="ghost" size="sm" className="camera-tool" onClick={removeLast} title="Elimina ultimo elemento"><Undo2 className="size-4" />Annulla</Button>}
+              {(count > 1 || scanRecords.length > 0) && <Button variant="ghost" size="sm" className="camera-tool text-destructive" onClick={removeAll} title="Elimina esemplari e tutte le scansioni registrate"><Trash2 className="size-4" />Elimina tutti</Button>}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  const captureControlElement = (
+    <CameraCaptureControl
+      mode={mode ?? "photo"}
+      recording={recording}
+      ar
+      disabled={!ready || scanning || xrActive}
+      onCapture={mode === "photo" ? shoot : record}
+      {...(mode !== "video" ? { onHold: arHold } : {})}
+      left={
+        <div className="camera-labelled-tool ar-scan-tools">
+          <Button
+            variant="ghost"
+            size="icon"
+            type="button"
+            data-no-ui-click
+            onClick={() => void scan()}
+            disabled={!ready || scanning || recording}
+            aria-label="Scansiona terreno e pianta"
+            title="Scansiona terreno e pianta"
+            className={`camera-tool size-11 disabled:opacity-40${scanning ? " is-compact" : ""}`}
+          >
+            <ScanSearch className={`size-5 ${scanning ? "animate-pulse text-primary" : ""}`} />
+            {!scanning && <span>Scansiona</span>}
+          </Button>
+          {scanning && (
+            <Button
+              variant="ghost"
+              size="icon"
+              type="button"
+              onClick={cancelScan}
+              aria-label="Termina scansione"
+              title="Termina scansione"
+              className="camera-tool is-compact"
+            >
+              <Square className="size-4 fill-current" />
+            </Button>
+          )}
+        </div>
+      }
+      right={
+        <div className="camera-labelled-tool">
+          <Button
+            variant="ghost"
+            size="icon"
+            type="button"
+            onClick={() => { setToolsOpen((open) => !open); setActiveTool("analysis"); setPanelOpen(true); }}
+            aria-expanded={toolsOpen}
+            aria-controls="ar-camera-tools"
+            aria-label={toolsOpen ? "Nascondi strumenti" : "Mostra strumenti"}
+            title={toolsOpen ? "Nascondi strumenti" : "Mostra strumenti"}
+            className="camera-tool size-11"
+          >
+            <SlidersHorizontal className="size-5" />
+            <span>Strumenti</span>
+          </Button>
+        </div>
+      }
+    />
+  );
+
+  const zoomDialElement = !toolsOpen && (
+    <ZoomDial zoom={zoom} max={ZOOM_MAX} disabled={!ready || scanning} onZoom={setZoom} onRulerChange={setZoomRulerActive} />
+  );
+
+  const swipeHintElement = (
+    <p className="ar-start-swipe-hint" data-visible={swipeHint} role="status" aria-hidden={!swipeHint}>
+      Fai uno swipe dal basso verso l’alto per chiudere.
+    </p>
+  );
+
   return (
     <Dialog modal
       open={mode !== null}
@@ -1594,35 +2051,7 @@ export function ArCamera({
             )}
             <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-background/50 to-transparent" />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-background/60 to-transparent" />
-            <div data-camera-hud className="ar-camera-topbar">
-              <div className="ar-camera-actions flex shrink-0 gap-1" data-camera-controls>
-                <div className="ar-focus-wrap">
-                {/* Scans recorded for this flow's report: a badge on the first section pill, taking no row width. */}
-                {(() => {
-                  // Follows the summary pager: "2/5" is the scan on view, the bare total when there is one or none.
-                  const onRecord = scanRecords.length > 1 && viewPage >= 0 && viewPage < scanRecords.length;
-                  return <span className="ar-scan-counter" role="status" aria-label={onRecord ? `Scansione ${viewPage + 1} di ${scanRecords.length}` : `${scanRecords.length} ${scanRecords.length === 1 ? "scansione registrata" : "scansioni registrate"} nel report`} title="Scansioni registrate nel report">{onRecord ? `${viewPage + 1}/${scanRecords.length}` : scanRecords.length}</span>;
-                })()}
-                <div className="ar-focus-options" role="radiogroup" aria-label={kind === "urban" ? "Obiettivo camera urbana" : "Obiettivo camera vitivinicola"}>
-                  {/* Switching section stops any running scan and clears the previous result. */}
-                  {AR_FOCUS[kind].map(o => <Button variant="ghost" size="sm" key={o.id} type="button" role="radio" aria-label={o.label} title={o.label} aria-checked={arFocusOption(kind, target).id === o.id} className="camera-tool ar-focus-pill" onClick={() => selectTarget(o.id)}>{FOCUS_LABELS[o.id]}</Button>)}
-                </div>
-                </div>
-                {(found || species || viewedRecord) && !scanning && <Button variant="ghost" size="sm" aria-label="Mostra esito analisi" title="Mostra esito analisi" className="camera-tool ar-esito-chip" onClick={() => { setToolsOpen(true); setActiveTool("analysis"); setPanelOpen(true); }}><Activity className="size-4 shrink-0" />Esito</Button>}
-                <Button variant="ghost" size="icon" className="camera-tool size-11" aria-label="Guida inquadratura" title="Guida inquadratura" aria-pressed={guideOpen} onClick={() => setGuideOpen(v => !v)}><Info className="size-4" /></Button>
-                {torchSupported && <Button variant="ghost" size="icon" className="camera-tool size-11" disabled={torchBusy || scanning} aria-pressed={torchOn} aria-label={torchOn ? "Disattiva flash" : "Attiva flash"} title={torchOn ? "Disattiva flash" : "Attiva flash"} onClick={() => void toggleTorch()}>{torchOn ? <Zap className="size-4" /> : <ZapOff className="size-4" />}</Button>}
-                <Button variant="ghost" size="icon"
-                  type="button"
-                  onClick={onClose}
-                  disabled={recording}
-                  aria-label="Chiudi"
-                  className="camera-tool grid size-11 place-items-center disabled:opacity-40"
-                >
-                  <X className="size-4" />
-                </Button>
-              </div>
-            </div>
-            {thermalSummary}
+            {topBarElement}
             {torchError && <p className="ar-flash-error" role="status" data-camera-controls>{torchError}</p>}
             {toolsOpen && activeTool === "manage" && layers.has("heat") && (
               <div role="button" tabIndex={0} data-camera-controls aria-label="Come leggere la mappa termica simulata" onClick={() => setThermalInfoOpen(true)} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setThermalInfoOpen(true); } }} className="ar-heat-legend">
@@ -1632,303 +2061,42 @@ export function ArCamera({
               </div>
             )}
             {burstFlash > 0 && <div key={burstFlash} onAnimationEnd={() => setBurstFlash(0)} className="burst-flash pointer-events-none fixed inset-0 bg-white" aria-hidden="true" />}
-            {burst && burstShots.length > 0 && (
-              <aside
-                className={`ar-burst-shelf ${burstShelfStateClass}`}
-                data-camera-controls
-                aria-hidden={Boolean(thermalInfoOpen || confirmClear || guideOpen)}
-              >
-                <div className="ar-burst-header flex w-full max-w-[min(26rem,92vw)] items-center justify-between px-2 text-[10.5px] font-semibold text-white/90 [text-shadow:0_1px_2px_black]">
-                  <span>
-                    {burstShots.length}{" "}
-                    <span className="ar-burst-header-long">{burstShots.length === 1 ? "foto scattata" : "foto scattate"}</span>
-                    <span className="ar-burst-header-short">foto</span>
-                  </span>
-                  <span className="flex items-center gap-1 font-bold text-[#00d296]">
-                    <Star className="size-2.5 fill-current" />
-                    <span className="ar-burst-header-long">Scatto al centro selezionato</span>
-                    <span className="ar-burst-header-short">Al centro</span>
-                  </span>
-                </div>
-                <div className="ar-burst-track-wrap relative w-full max-w-full flex flex-col items-center overflow-visible">
-                  {/* Selettore verde fisso al centro: non scorre con le foto, indica sempre lo scatto centrale attivo */}
-                  <div
-                    className="ar-burst-center-selector pointer-events-none absolute left-1/2 -translate-x-1/2 top-0.5 z-30 flex flex-col items-center"
-                    aria-hidden="true"
-                  >
-                    <span className="flex items-center gap-1 rounded-full bg-[#00d296] px-2 py-0.5 text-[9px] font-extrabold text-[#042017] shadow-[0_2px_10px_rgba(0,210,150,0.7)] whitespace-nowrap">
-                      <Star className="size-2.5 fill-current" /> Migliore
-                    </span>
-                    <span className="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-[#00d296] -mt-[0.5px]" />
-                  </div>
-                  <div
-                    ref={carouselRef}
-                    onScroll={updateDockEffect}
-                    data-map-gestures
-                    className="ar-burst-carousel w-full max-w-full"
-                  >
-                    {burstShots.map((s, i) => {
-                      const isBest = s.id === (bestShotId ?? burstShots[burstShots.length - 1]?.id);
-                      return (
-                        <div
-                          key={s.id}
-                          data-burst-item
-                          data-burst-id={s.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={(e) => pickBestShot(s.id, e.currentTarget)}
-                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickBestShot(s.id, e.currentTarget as HTMLElement); } }}
-                          aria-label={`Foto ${i + 1}${isBest ? " (Scatto migliore selezionato al centro)" : " (Tocca per portare al centro)"}`}
-                          className={`relative shrink-0 snap-center rounded-lg p-0.5 cursor-pointer transition-opacity duration-150 ${
-                            isBest
-                              ? "ring-2 ring-[#00d296] shadow-[0_0_16px_rgba(0,210,150,0.85)] opacity-100"
-                              : "ring-1 ring-white/35 hover:ring-white/70 opacity-65 hover:opacity-95"
-                          }`}
-                        >
-                          <img
-                            src={s.thumb}
-                            alt={`Foto ${i + 1}`}
-                            className="size-12 rounded-md object-cover"
-                          />
-                          <span className="absolute bottom-1 left-1.5 rounded-full bg-black/75 px-1 text-[8.5px] font-bold text-white [text-shadow:0_1px_2px_black]">
-                            {i + 1}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              dropBurstShot(s.id);
-                            }}
-                            aria-label={`Togli la foto ${i + 1}`}
-                            className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-black/85 text-white ring-1 ring-white/40 hover:bg-destructive hover:scale-110 transition-transform"
-                          >
-                            <X className="size-3" aria-hidden="true" />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </aside>
-            )}
-            <div
-              data-camera-hud
-              className={`camera-bottom absolute z-20 flex flex-col items-center ${landscape ? "gap-1.5" : "gap-2"}`}
-            >
-              {/* Singolo | Multiplo for photos, and while shooting the strip of the shots kept with "Fine · n". */}
-              {!error && mode === "photo" && (
-                <div
-                  className={`ar-burst-bar ${burstShelfStateClass}${zoomRulerActive && !hasDock ? " is-zoom-active" : ""}`}
-                  data-camera-controls
-                  aria-hidden={Boolean(thermalInfoOpen || confirmClear || guideOpen)}
-                >
-                  <div className="relative flex items-center justify-center gap-2">
-                    <div role="radiogroup" aria-label="Tipo di scatto" className="flex rounded-full bg-black/55 p-0.5 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur">
-                      <button type="button" role="radio" aria-checked={!burst} onClick={backToSingle}
-                        className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""}`}>Singolo</button>
-                      <button type="button" role="radio" aria-checked={burst} onClick={() => setBurst(true)} className={`h-8 rounded-full px-3 ${burst ? "bg-white text-black" : ""}`}>Multiplo</button>
-                    </div>
-                    {layers.has("grid") && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handlePlace3DTree(0.5, 0.65)}
-                        title="Posiziona il modello 3D del Leccio sul terreno tracciato da ARCore"
-                        aria-label="Posiziona albero 3D sul terreno"
-                        className="h-8 rounded-full bg-[#00f0ff]/20 text-[#00f0ff] ring-1 ring-[#00f0ff]/50 hover:bg-[#00f0ff]/30 backdrop-blur px-3 text-xs font-bold flex items-center gap-1.5 shadow-[0_0_12px_rgba(0,240,255,0.35)]"
-                      >
-                        <span className="size-2 rounded-full bg-[#00f0ff] animate-ping" />
-                        <span>Posiziona Albero 3D</span>
-                      </Button>
-                    )}
-                    {burst && burstShots.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={onClose}
-                        className="absolute left-[calc(100%+0.5rem)] top-1/2 -translate-y-1/2 inline-flex h-8 items-center gap-1 rounded-full bg-white px-3.5 text-xs font-semibold text-black shadow-md whitespace-nowrap"
-                      >
-                        <Check className="size-3.5" aria-hidden="true" />Fine · {burstShots.length}
-                      </button>
-                    )}
-                  </div>
-                  <span className="sr-only" role="status" aria-live="polite">{burst ? `${burstShots.length} foto scattate` : ""}</span>
-                </div>
-              )}
-              <div id="ar-camera-tools" hidden={!toolsOpen} className="w-full">
-              {toolsOpen && <div className="ar-tools-panel flex w-full flex-col items-center gap-2">
-              <div className="ar-tool-options" data-camera-controls>
-                <Button variant="ghost" size="sm" className="camera-tool" title="Analisi" aria-label="Analisi" aria-pressed={activeTool === "analysis"} onClick={() => { setActiveTool(v => v === "analysis" ? null : "analysis"); setPanelOpen(true); }}><Info className="size-4" />Analisi</Button>
-                <Button variant="ghost" size="sm" className="camera-tool" title="Livelli" aria-label="Livelli" aria-pressed={activeTool === "manage"} onClick={() => { setActiveTool(v => v === "manage" ? null : "manage"); }}><SlidersHorizontal className="size-4" />Livelli</Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  type="button"
-                  onClick={(e) => toggleAr(e)}
-                  className={`camera-tool flex items-center gap-1.5 transition-all ${
-                    layers.has("grid") ? "ar-pill-active" : "ar-pill-inactive"
-                  }`}
-                  title={layers.has("grid") ? "AR Core attivo sul terreno (tocca per disattivare)" : "Attiva la Realtà Aumentata AR Core"}
-                  aria-pressed={layers.has("grid")}
-                  aria-label={layers.has("grid") ? "Disattiva AR Core" : "Attiva AR Core"}
-                >
-                  {layers.has("grid") ? (
-                    <>
-                      <span className="size-2 rounded-full bg-[#042017] animate-pulse" />
-                      <span className="font-semibold">AR Core</span>
-                    </>
-                  ) : (
-                    <>
-                      <Scan className="size-3.5 shrink-0" />
-                      <span>AR Core</span>
-                    </>
-                  )}
-                </Button>
-              {activeTool === "manage" && <div className="flex flex-wrap items-center justify-center gap-1.5" data-camera-controls>
-                <Button variant="ghost" size="icon" className="camera-tool" aria-label="Mostra griglia" title="Griglia" aria-pressed={layers.has("grid")} onClick={() => toggle("grid")}><Grid2X2 className="size-4" /></Button>
-                <Button variant="ghost" size="icon" className="camera-tool" aria-label="Mappa termica simulata" title="Calore simulato" aria-pressed={layers.has("heat")} onClick={() => { if (!layers.has("heat")) setThermalInfoOpen(true); toggle("heat"); }}><Flame className="size-4" /></Button>
-                {layers.has("grid") && (
-                  <Button variant="ghost" size="sm" className="camera-tool ar-plant-button text-[#00f0ff] font-bold w-auto px-3 shrink-0 whitespace-nowrap" aria-label="Posiziona albero 3D" title="Posiziona albero 3D" onClick={() => handlePlace3DTree(0.5, 0.65)}>🌳 Pianta 3D</Button>
-                )}
-              </div>}
-              </div>
-              {!torchSupported && <p className="text-xs text-muted-foreground">Flash non supportato su questa fotocamera.</p>}
-              {(species || soil || found || survey || viewedRecord) && activeTool === "analysis" && panelOpen && panelMin && (
-                <Button variant="ghost" type="button" data-camera-controls
-                  className="ar-analysis-min"
-                  onClick={() => setPanelMin(false)}
-                  aria-label="Espandi esito analisi" title="Espandi esito analisi">
-                  <Info className="size-3.5" /><span>Esito analisi</span><ChevronUp className="size-3.5" />
-                </Button>
-              )}
-              {(species || soil || found || survey || viewedRecord) && activeTool === "analysis" && panelOpen && !panelMin && (
-                <div className="relative w-[min(92%,24rem)]">
-                  <div className="absolute right-2 top-2 z-10 flex gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setPanelMin(true)}
-                      aria-label="Minimizza esito analisi"
-                      title="Minimizza esito analisi"
-                      className="grid size-7 place-items-center rounded-full bg-background/80 backdrop-blur-md"
-                    >
-                      <ChevronDown className="size-3.5" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => { setPanelOpen(false); setActiveTool(null); }}
-                      aria-label="Chiudi esito analisi"
-                      title="Chiudi esito analisi"
-                      className="grid size-7 place-items-center rounded-full bg-background/80 backdrop-blur-md"
-                    >
-                      <X className="size-3.5" />
-                    </Button>
-                  </div>
-                  <div
-                    data-camera-scroll
-                    className="max-h-[32dvh] overflow-y-auto rounded-lg bg-background/95 px-3.5 py-3 pr-20 text-xs leading-relaxed backdrop-blur-md"
-                    aria-live="polite"
-                  >
-                  {viewedRecord ? recordEsito(viewedRecord) : <>
-                  <EsitoPhoto scan={realPhoto} reference={species?.photo ?? null} name={species?.commonName ?? null} />
-                  {species ? (
-                    <p className="pr-1">
-                      <span className="text-sm font-semibold">{species.commonName}</span>{" "}
-                      <span className="italic text-muted-foreground">{species.scientificName}</span>
-                      {species.cooling && (
-                        <span className="mt-1 block font-semibold text-primary">Raffrescamento stimato {coolingLabel(species.cooling.deltaT)} · ombra ≈ {species.cooling.shadeM2} m²</span>
-                      )}
-                    </p>
-                  ) : (
-                    found && <p className="font-semibold text-foreground mb-1">{found}</p>
-                  )}
-                  {identificationBadge}
-                  {species?.identification && <p className="mt-1 text-muted-foreground">{species.identification.evidence}</p>}
-                  {soil && (
-                    <p className="text-muted-foreground">
-                      Terreno {soil.label} · permeabilità {soil.permeability} ·{" "}
-                      <span className={soil.plantable ? "text-primary" : "text-destructive"}>
-                        {soil.plantable ? "potenzialmente piantabile" : "superficie non idonea"}
-                      </span>
-                    </p>
-                  )}
-                  {survey && <dl className="mt-2 space-y-1">
-                    <div><dt className="font-semibold">Consistenza apparente</dt><dd className="text-muted-foreground">{survey.consistency}</dd></div>
-                    <div><dt className="font-semibold">Calore / esposizione</dt><dd className="text-muted-foreground">{survey.heatNote}</dd></div>
-                    <div><dt className="font-semibold">Temperatura del terreno</dt><dd className="text-muted-foreground">Non misurata · serve una sonda termica</dd></div>
-                  </dl>}
-                  {soil?.note && <p className="text-muted-foreground">{soil.note}</p>}
-                  <p className="mt-1 text-muted-foreground">Identificazione e suolo: stime visive, non analisi strumentali.</p>
-                  {found && species && <p role="status">{found}</p>}
-                  {species && (
-                    <p className="text-muted-foreground">
-                      Stima indicativa · piano virtuale
-                      {species.family && <>{" · "}{species.family}</>}
-                      {species.colUrl && (
-                        <>
-                          {" · "}
-                          <a href={species.colUrl} target="_blank" rel="noreferrer" className="underline">Scheda della specie</a>
-                        </>
-                      )}
-                      {species.gbifUrl && (
-                        <>
-                          {" · "}
-                          <a href={species.gbifUrl} target="_blank" rel="noreferrer" className="underline">Osservazioni</a>
-                        </>
-                      )}
 
-                    </p>
-                  )}
-                  </>}
-                  </div>
+            {landscape ? (
+              <div className="ar-landscape-layout" data-camera-controls>
+                {/* Colonna Sinistra: Informazioni e Analisi */}
+                <div className="ar-landscape-left">
+                  {thermalSummary}
+                  {!toolsOpen && specimenDock}
+                  {burstShelfElement}
                 </div>
-              )}
-              {activeTool === "manage" && (count > 0 || scanRecords.length > 0) && <div className="flex flex-wrap items-center justify-center gap-2" data-camera-controls>
-                {count > 0 && <Button variant="ghost" size="sm" className="camera-tool" onClick={removeLast} title="Elimina ultimo elemento"><Undo2 className="size-4" />Annulla</Button>}
-                {(count > 1 || scanRecords.length > 0) && <Button variant="ghost" size="sm" className="camera-tool text-destructive" onClick={removeAll} title="Elimina esemplari e tutte le scansioni registrate"><Trash2 className="size-4" />Elimina tutti</Button>}
-              </div>}
-              </div>}
+
+                {/* Colonna Destra: Controlli Fotocamera ed Ergonomia con il pollice */}
+                <div className="ar-landscape-right">
+                  {burstBarElement}
+                  {toolsPanelElement}
+                  {zoomDialElement}
+                  {captureControlElement}
+                  {swipeHintElement}
+                </div>
               </div>
-               {!toolsOpen && specimenDock}
-               {/* Three chips (the neighbouring lenses on the sides, the live value in the centre, tap = 1×) and a sideways
-                   swipe on them for the Xperia-style ruler. */}
-               {!toolsOpen && <ZoomDial zoom={zoom} max={ZOOM_MAX} disabled={!ready || scanning} onZoom={setZoom} onRulerChange={setZoomRulerActive} />}
-               <CameraCaptureControl mode={mode ?? "photo"} recording={recording} ar disabled={!ready || scanning || xrActive} onCapture={mode === "photo" ? shoot : record} {...(mode !== "video" ? { onHold: arHold } : {})} left={<div className="camera-labelled-tool ar-scan-tools">
-                <Button variant="ghost" size="icon"
-                  type="button"
-                  data-no-ui-click
-                  onClick={() => void scan()}
-                  disabled={!ready || scanning || recording}
-                  aria-label="Scansiona terreno e pianta"
-                  title="Scansiona terreno e pianta"
-                  className={`camera-tool size-11 disabled:opacity-40${scanning ? " is-compact" : ""}`}
+            ) : (
+              <>
+                {thermalSummary}
+                {burstShelfElement}
+                <div
+                  data-camera-hud
+                  className="camera-bottom absolute z-20 flex flex-col items-center gap-2"
                 >
-                  <ScanSearch className={`size-5 ${scanning ? "animate-pulse text-primary" : ""}`} />{!scanning && <span>Scansiona</span>}
-                 </Button>
-                {/* While scanning the scan button shrinks to its icon and a stop icon sits beside it. */}
-                {scanning && <Button variant="ghost" size="icon" type="button" onClick={cancelScan} aria-label="Termina scansione" title="Termina scansione" className="camera-tool is-compact">
-                  <Square className="size-4 fill-current" />
-                </Button>}
-</div>} right={<div className="camera-labelled-tool">
-                <Button variant="ghost" size="icon"
-                  type="button"
-                  onClick={() => { setToolsOpen((open) => !open); setActiveTool("analysis"); setPanelOpen(true); }}
-                  aria-expanded={toolsOpen}
-                  aria-controls="ar-camera-tools"
-                  aria-label={toolsOpen ? "Nascondi strumenti" : "Mostra strumenti"}
-                  title={toolsOpen ? "Nascondi strumenti" : "Mostra strumenti"}
-                  className="camera-tool size-11"
-                >
-                  <SlidersHorizontal className="size-5" /><span>Strumenti</span>
-                </Button>
-              </div>} />
-              <p className="ar-start-swipe-hint" data-visible={swipeHint} role="status" aria-hidden={!swipeHint}>
-                Fai uno swipe dal basso verso l’alto per chiudere.
-              </p>
-            </div>
+                  {burstBarElement}
+                  {toolsPanelElement}
+                  {!toolsOpen && specimenDock}
+                  {zoomDialElement}
+                  {captureControlElement}
+                  {swipeHintElement}
+                </div>
+              </>
+            )}
             {/* Modal veils & alert dialogs: render over all camera controls and burst bar */}
             {guideOpen && <div className="ar-tutorial-veil" data-camera-controls aria-hidden="true" />}
             {confirmClear && <div className="ar-confirm-veil" data-camera-controls onClick={() => { if (!emptying) setConfirmClear(false); }}>

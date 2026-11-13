@@ -1662,9 +1662,33 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 .ar-thermal-balance-value { position: absolute; top: 1.15rem; transform: translateX(-50%); font-size: .7rem; font-weight: 700; color: var(--camera-ink); font-variant-numeric: tabular-nums; white-space: nowrap; text-shadow: var(--camera-shadow); }
 @media (prefers-reduced-motion: reduce) { .ar-thermal-balance-value { transition: none; } }
 
-/* Field camera: compact one-handed controls, isolated from close gestures. */
-.ar-camera-topbar { position: absolute; inset-inline: max(1rem, env(safe-area-inset-left), env(safe-area-inset-right)); top: max(1rem, env(safe-area-inset-top)); display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: .5rem; pointer-events: none; }
+/* Field camera: topbar layout */
+.ar-camera-topbar {
+  position: absolute;
+  inset-inline: 0;
+  top: max(.625rem, env(safe-area-inset-top));
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  z-index: 24;
+}
 .ar-camera-topbar > * { pointer-events: auto; }
+.ar-camera-topbar .ar-camera-actions {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline: max(0.75rem, env(safe-area-inset-left)) max(0.75rem, env(safe-area-inset-right));
+  gap: 0.35rem;
+}
+.ar-topbar-left,
+.ar-topbar-center,
+.ar-topbar-right {
+  display: flex;
+  align-items: center;
+  pointer-events: auto;
+}
 .ar-framing-hint { position: absolute; top: calc(max(1rem, env(safe-area-inset-top)) + 3.5rem); left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 2rem); border-radius: 6px; padding: .5rem .75rem; background: var(--camera-glass); color: var(--camera-ink); font-size: .75rem; text-align: center; pointer-events: none; opacity: 0; transition: opacity 180ms ease; }
 .ar-framing-hint[data-visible=true] { opacity: 1; }
 .ar-framing-hint[data-camera-controls] { pointer-events: auto; z-index: 30; max-height: calc(100dvh - 12rem); overflow-y: auto; }
@@ -1925,8 +1949,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 
 /* Tab-specific AI camera targets: urban and vineyard expose different commands. */
 .ar-camera-surface { --ar-header-bottom: calc(max(1rem, env(safe-area-inset-top)) + 6rem); }
-.ar-camera-topbar { z-index: 21; }
-.ar-camera-actions { grid-column: 1 / -1; grid-row: 1; justify-content: flex-end; align-items: center; }
+.ar-camera-topbar { z-index: 24; }
 .ar-focus-options { display:flex; align-items:center; gap:.25rem; padding:.3125rem; border-radius:999px; background:var(--camera-glass); border:1px solid var(--camera-border); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow:0 2px 10px color-mix(in oklab, oklch(0 0 0) 35%, transparent); }
 .ar-camera-surface:not([data-landscape=true]) .ar-thermal-summary { top:var(--ar-header-bottom); }
 .ar-camera-surface[data-landscape=true] .ar-thermal-summary { top: calc(max(.375rem, env(safe-area-inset-top)) + 2.75rem) !important; z-index: 22; pointer-events: auto !important; }
@@ -2474,6 +2497,112 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   .ar-camera-surface[data-landscape=true] .ar-specimen-dock.is-zoom-active,
   .camera-hud[data-landscape=true] .ar-specimen-dock.is-zoom-active { margin-bottom: 2.35rem; }
 }
+
+/* -------------------------------------------------------------
+   AR Camera Landscape 2-Column Redesign & Live View Priority
+   ------------------------------------------------------------- */
+.ar-landscape-layout {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 22;
+}
+
+.ar-landscape-left {
+  position: absolute;
+  left: max(0.75rem, env(safe-area-inset-left));
+  top: calc(max(.375rem, env(safe-area-inset-top)) + 3.125rem);
+  bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  width: min(36vw, 22rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  justify-content: flex-start;
+  align-items: stretch;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  pointer-events: none;
+}
+
+.ar-landscape-left > * {
+  pointer-events: auto !important;
+  position: relative !important;
+  inset: auto !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+}
+
+.ar-landscape-left .ar-specimen-dock {
+  align-self: stretch !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.ar-landscape-left .ar-thermal-summary:not(.ar-thermal-summary-min) {
+  max-height: min(34dvh, 11rem) !important;
+  overflow-y: auto !important;
+}
+
+.ar-landscape-left .ar-burst-shelf {
+  padding: 0.5rem 0.625rem !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--camera-border) !important;
+  background: var(--camera-glass) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  overflow: visible !important;
+}
+
+.ar-landscape-left .ar-burst-shelf .ar-burst-carousel {
+  width: 100% !important;
+  min-height: auto !important;
+  padding: 1.75rem 0.5rem 0.25rem !important;
+}
+
+.ar-landscape-right {
+  position: absolute;
+  right: max(0.75rem, env(safe-area-inset-right));
+  top: calc(max(.375rem, env(safe-area-inset-top)) + 3.125rem);
+  bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  width: min(36vw, 21rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  pointer-events: none;
+  z-index: 22;
+}
+
+.ar-landscape-right > * {
+  pointer-events: auto !important;
+}
+
+.ar-landscape-right .camera-capture-dock {
+  width: 100% !important;
+  margin-inline: 0 !important;
+}
+
+.ar-landscape-right #ar-camera-tools {
+  width: 100% !important;
+}
+
+.ar-landscape-right .ar-tools-panel {
+  width: 100% !important;
+  max-height: min(44dvh, 15rem) !important;
+  overflow-y: auto !important;
+}
+
+.ar-landscape-right .ar-burst-bar {
+  margin-bottom: 0.2rem !important;
+}
+
 
 /* Xperia-style zoom ruler: shown while swiping on the lens chips, it slides under a fixed centre mark. */
 .zoom-ruler { position: absolute; left: 50%; bottom: calc(100% + .375rem); width: min(15rem, 76vw); height: 2rem; transform: translateX(-50%); overflow: hidden; background: transparent; mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent); -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent); animation: zoom-ruler-in .16s ease-out; pointer-events: none; filter: drop-shadow(0 1px 2px oklch(0 0 0 / 55%)); }
