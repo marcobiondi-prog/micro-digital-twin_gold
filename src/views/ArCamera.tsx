@@ -1715,7 +1715,7 @@ export function ArCamera({
     </div>
   );
 
-  const burstShelfElement = burst && burstShots.length > 0 && (
+  const burstShelfElement = burstShots.length > 0 && (
     <aside
       className={`ar-burst-shelf ${burstShelfStateClass}`}
       data-camera-controls
@@ -2205,8 +2205,8 @@ export function ArCamera({
                     </div>
                   </div>
 
-                  {/* Carosello Foto SOTTO al div della bilancia termica */}
-                  {burst && burstShelfElement && (
+                  {/* Miniature delle foto scattate sotto la bilancia termica */}
+                  {burstShelfElement && (
                     <div className="ar-landscape-carousel-slot" data-camera-controls>
                       {burstShelfElement}
                     </div>
