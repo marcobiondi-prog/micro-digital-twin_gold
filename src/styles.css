@@ -2758,6 +2758,13 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
    the phone to itself. */
 html[data-sys-camera] body > :not([data-sys-camera-root]):not(:has([data-sys-camera-root])) { visibility: hidden; }
 html[data-sys-camera] body > :not([data-sys-camera-root]):not(:has([data-sys-camera-root])) * { animation-play-state: paused !important; }
+html[data-sys-camera] #app-header,
+html[data-sys-camera] #main-content,
+html[data-sys-camera] footer,
+html[data-sys-camera] nav {
+  display: none !important;
+  visibility: hidden !important;
+}
 
 /* The map's temperature pill answers each change of the elements with a short pulse. */
 /* Only scale: the pill is centred by its own translate (Tailwind -translate-x-1/2), so a transform translateX here moved it a further half-width left while the pulse ran. */

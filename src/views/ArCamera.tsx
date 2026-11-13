@@ -2219,14 +2219,16 @@ export function ArCamera({
                 {/* Colonna Destra: Controlli Fotocamera ed Ergonomia con il pollice */}
                 <div className="ar-landscape-right">
                   {toolsOpen && toolsPanelElement}
-                  <div className="relative flex items-center justify-center">
+                  <div className="relative flex items-center justify-end">
                     <ArcZoomDial
                       zoom={zoom}
                       max={ZOOM_MAX}
                       onZoom={setZoom}
                       disabled={!ready || scanning}
                     />
-                    {captureControlElement}
+                    <div className="relative z-30 pointer-events-auto">
+                      {captureControlElement}
+                    </div>
                   </div>
                 </div>
               </div>
