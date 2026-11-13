@@ -1511,7 +1511,7 @@ export function ArCamera({
       className={`ar-camera-topbar ${landscape ? "ar-camera-topbar-landscape" : "ar-camera-topbar-portrait"}`}
     >
       {landscape ? (
-        <div className="flex w-full items-center justify-between px-3" data-camera-controls>
+        <div className="flex w-full items-center justify-between px-4 pt-1" data-camera-controls>
           {/* Left: Close + ARCore */}
           <div className="flex items-center gap-2">
             <Button
@@ -1537,79 +1537,20 @@ export function ArCamera({
               aria-pressed={layers.has("grid")}
               aria-label={layers.has("grid") ? "Disattiva AR Core" : "Attiva AR Core"}
             >
-              {layers.has("grid") ? (
-                <>
-                  <span className="size-2 rounded-full bg-[#042017] animate-pulse" />
-                  <span className="font-semibold">AR Core</span>
-                </>
-              ) : (
-                <>
-                  <Scan className="size-3.5 shrink-0" />
-                  <span>AR Core</span>
-                </>
-              )}
+              <span className={`size-2 rounded-full ${layers.has("grid") ? "bg-[#042017]" : "bg-[#22c55e]"} animate-pulse`} />
+              <span className="font-semibold">ARCore</span>
             </Button>
           </div>
 
-          {/* Center: Vegetazione | Suolo */}
-          <div className="flex items-center justify-center">
-            <div className="ar-focus-wrap">
-              {scanRecords.length > 0 && (() => {
-                const onRecord = scanRecords.length > 1 && viewPage >= 0 && viewPage < scanRecords.length;
-                return (
-                  <span
-                    className="ar-scan-counter"
-                    role="status"
-                    aria-label={onRecord ? `Scansione ${viewPage + 1} di ${scanRecords.length}` : `${scanRecords.length} ${scanRecords.length === 1 ? "scansione registrata" : "scansioni registrate"} nel report`}
-                    title="Scansioni registrate nel report"
-                  >
-                    {onRecord ? `${viewPage + 1}/${scanRecords.length}` : scanRecords.length}
-                  </span>
-                );
-              })()}
-              <div className="ar-focus-options" role="radiogroup" aria-label={kind === "urban" ? "Obiettivo camera urbana" : "Obiettivo camera vitivinicola"}>
-                {AR_FOCUS[kind].map(o => (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    key={o.id}
-                    type="button"
-                    role="radio"
-                    aria-label={o.label}
-                    title={o.label}
-                    aria-checked={arFocusOption(kind, target).id === o.id}
-                    className="camera-tool ar-focus-pill"
-                    onClick={() => selectTarget(o.id)}
-                  >
-                    {FOCUS_LABELS[o.id]}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Right: Singolo / Multiplo switcher + Esito + Guide + Flash */}
+          {/* Right: Singolo / Multiplo switcher + Guide */}
           <div className="flex items-center gap-2">
             {!error && mode === "photo" && (
-              <div role="radiogroup" aria-label="Tipo di scatto" className="flex rounded-full bg-black/55 p-0.5 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur">
+              <div role="radiogroup" aria-label="Tipo di scatto" className="flex rounded-full bg-black/60 p-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur">
                 <button type="button" role="radio" aria-checked={!burst} onClick={backToSingle}
-                  className={`h-7 rounded-full px-2.5 transition-colors ${!burst ? "bg-white text-black font-bold" : "text-white/80"}`}>Singolo</button>
+                  className={`h-7 rounded-full px-3.5 transition-all ${!burst ? "bg-white text-black font-bold shadow-sm" : "text-white/80 hover:text-white"}`}>Singolo</button>
                 <button type="button" role="radio" aria-checked={burst} onClick={() => setBurst(true)}
-                  className={`h-7 rounded-full px-2.5 transition-colors ${burst ? "bg-white text-black font-bold" : "text-white/80"}`}>Multiplo</button>
+                  className={`h-7 rounded-full px-3.5 transition-all ${burst ? "bg-white text-black font-bold shadow-sm" : "text-white/80 hover:text-white"}`}>Multiplo</button>
               </div>
-            )}
-            {(found || species || viewedRecord) && !scanning && (
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-label="Mostra esito analisi"
-                title="Mostra esito analisi"
-                className="camera-tool ar-esito-chip"
-                onClick={() => { setToolsOpen(true); setActiveTool("analysis"); setPanelOpen(true); }}
-              >
-                <Activity className="size-4 shrink-0" />
-                <span>Esito</span>
-              </Button>
             )}
             <Button
               variant="ghost"
@@ -1640,8 +1581,8 @@ export function ArCamera({
         </div>
       ) : (
         /* Portrait: Two balanced, centered rows */
-        <div className="flex flex-col items-center gap-2.5 w-full px-3" data-camera-controls>
-          {/* Row 1: Left [ ✕ ], Center [ ● ARCore ], Right [ Esito ] [ ⓘ ] [ ⚡ ] */}
+        <div className="flex flex-col items-center gap-2.5 w-full px-4 pt-1" data-camera-controls>
+          {/* Row 1: Left [ ✕ ], Center [ ● ARCore ], Right [ ⓘ ] */}
           <div className="flex w-full items-center justify-between">
             <div className="flex items-center">
               <Button
@@ -1670,34 +1611,12 @@ export function ArCamera({
                 aria-pressed={layers.has("grid")}
                 aria-label={layers.has("grid") ? "Disattiva AR Core" : "Attiva AR Core"}
               >
-                {layers.has("grid") ? (
-                  <>
-                    <span className="size-2 rounded-full bg-[#042017] animate-pulse" />
-                    <span className="font-semibold">AR Core</span>
-                  </>
-                ) : (
-                  <>
-                    <Scan className="size-3.5 shrink-0" />
-                    <span>AR Core</span>
-                  </>
-                )}
+                <span className={`size-2 rounded-full ${layers.has("grid") ? "bg-[#042017]" : "bg-[#22c55e]"} animate-pulse`} />
+                <span className="font-semibold">ARCore</span>
               </Button>
             </div>
 
             <div className="flex items-center gap-1.5 justify-end">
-              {(found || species || viewedRecord) && !scanning && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  aria-label="Mostra esito analisi"
-                  title="Mostra esito analisi"
-                  className="camera-tool ar-esito-chip"
-                  onClick={() => { setToolsOpen(true); setActiveTool("analysis"); setPanelOpen(true); }}
-                >
-                  <Activity className="size-4 shrink-0" />
-                  <span>Esito</span>
-                </Button>
-              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -1728,38 +1647,30 @@ export function ArCamera({
 
           {/* Row 2: Centered directly beneath ARCore */}
           <div className="flex items-center justify-center">
-            <div className="ar-focus-wrap">
-              {scanRecords.length > 0 && (() => {
-                const onRecord = scanRecords.length > 1 && viewPage >= 0 && viewPage < scanRecords.length;
+            <div className="flex items-center rounded-full bg-[rgba(20,26,34,0.75)] p-1 ring-1 ring-white/15 backdrop-blur-md" role="radiogroup" aria-label="Obiettivo camera">
+              {AR_FOCUS[kind].map((o, idx) => {
+                const isChecked = arFocusOption(kind, target).id === o.id;
                 return (
-                  <span
-                    className="ar-scan-counter"
-                    role="status"
-                    aria-label={onRecord ? `Scansione ${viewPage + 1} di ${scanRecords.length}` : `${scanRecords.length} ${scanRecords.length === 1 ? "scansione registrata" : "scansioni registrate"} nel report`}
-                    title="Scansioni registrate nel report"
-                  >
-                    {onRecord ? `${viewPage + 1}/${scanRecords.length}` : scanRecords.length}
-                  </span>
+                  <div key={o.id} className="flex items-center">
+                    {idx > 0 && <span className="mx-1.5 h-3.5 w-[1px] bg-white/20" aria-hidden="true" />}
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-label={o.label}
+                      title={o.label}
+                      aria-checked={isChecked}
+                      onClick={() => selectTarget(o.id)}
+                      className={`h-8 rounded-full px-4 text-xs font-semibold transition-all ${
+                        isChecked
+                          ? "bg-[#00f0ff]/20 text-[#00f0ff] ring-1 ring-[#00f0ff]/70 shadow-[0_0_12px_rgba(0,240,255,0.4)]"
+                          : "text-white/75 hover:text-white"
+                      }`}
+                    >
+                      {FOCUS_LABELS[o.id]}
+                    </button>
+                  </div>
                 );
-              })()}
-              <div className="ar-focus-options" role="radiogroup" aria-label={kind === "urban" ? "Obiettivo camera urbana" : "Obiettivo camera vitivinicola"}>
-                {AR_FOCUS[kind].map(o => (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    key={o.id}
-                    type="button"
-                    role="radio"
-                    aria-label={o.label}
-                    title={o.label}
-                    aria-checked={arFocusOption(kind, target).id === o.id}
-                    className="camera-tool ar-focus-pill"
-                    onClick={() => selectTarget(o.id)}
-                  >
-                    {FOCUS_LABELS[o.id]}
-                  </Button>
-                ))}
-              </div>
+              })}
             </div>
           </div>
         </div>
@@ -2042,6 +1953,7 @@ export function ArCamera({
       mode={mode ?? "photo"}
       recording={recording}
       ar
+      vertical={landscape}
       disabled={!ready || scanning || xrActive}
       onCapture={mode === "photo" ? shoot : record}
       {...(mode !== "video" ? { onHold: arHold } : {})}
@@ -2209,31 +2121,46 @@ export function ArCamera({
               <div className="ar-landscape-layout" data-camera-controls>
                 {/* Colonna Sinistra: Informazioni e Analisi */}
                 <div className="ar-landscape-left">
-                  {thermalSummary}
-                  {!toolsOpen && specimenDock}
-                  {burstShelfElement}
+                  <div className="ar-landscape-specimen-card" data-camera-controls>
+                    <p className="text-xs font-bold text-white">Alberi e ombra · Leccio · x{dockCount || 1}</p>
+                    <div className="mt-1 space-y-0.5 text-[11px] text-white/80 font-variant-numeric tabular-nums">
+                      <p>Ombreggiatura ≈ {18 * (dockCount || 1)} m²</p>
+                      <p>Riduzione ≈ -{((0.4 * (dockCount || 1))).toFixed(1).replace(".", ",")} °C</p>
+                    </div>
+                  </div>
+                  <div className="ar-landscape-balance-card" data-camera-controls>
+                    <p className="text-xs font-bold text-white mb-1.5">Bilancia termica</p>
+                    <div className="ar-thermal-balance" data-camera-controls role="slider" tabIndex={0}
+                      aria-valuemin={0} aria-valuemax={MAX_GREEN} aria-valuenow={dockCount}
+                      aria-label="Bilancia termica">
+                      <span className="ar-thermal-balance-track is-draggable" onPointerDown={balanceDrag}>
+                        <span className="ar-thermal-balance-marker" style={{ left: `${Math.min(100, Math.max(0, (dockCount / MAX_GREEN) * 100))}%` }} />
+                      </span>
+                    </div>
+                  </div>
+                  {burst && burstShelfElement}
                 </div>
 
                 {/* Colonna Destra: Controlli Fotocamera ed Ergonomia con il pollice */}
                 <div className="ar-landscape-right">
-                  {burst && burstBarElement}
-                  {toolsPanelElement}
+                  {toolsOpen && toolsPanelElement}
                   {zoomDialElement}
                   {captureControlElement}
-                  {swipeHintElement}
                 </div>
               </div>
             ) : (
               <>
-                {thermalSummary}
-                {burstShelfElement}
                 <div
                   data-camera-hud
-                  className="camera-bottom absolute z-20 flex flex-col items-center gap-2"
+                  className="camera-bottom absolute z-20 flex flex-col items-center gap-2.5 w-full"
                 >
-                  {burst && burstBarElement}
-                  {toolsPanelElement}
-                  {!toolsOpen && specimenDock}
+                  {/* Card informativo specie / raffrescamento */}
+                  <div className="ar-portrait-specimen-card" data-camera-controls>
+                    <p className="ar-portrait-specimen-title">{species?.name ? `${species.name} (${species.scientificName ?? "Quercus ilex"})` : (kind === "urban" ? "Leccio (Quercus ilex)" : "Vite (Vitis vinifera)")}</p>
+                    <p className="ar-portrait-specimen-desc">Ombra stimata ≈ {18 * (dockCount || 1)} m² · Raffrescamento ≈ -{((0.4 * (dockCount || 1))).toFixed(1).replace(".", ",")} °C</p>
+                  </div>
+                  {toolsOpen && toolsPanelElement}
+                  {burst && burstShelfElement}
                   {zoomDialElement}
                   {captureControlElement}
                   {swipeHintElement}

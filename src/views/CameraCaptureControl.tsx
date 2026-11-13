@@ -3,11 +3,11 @@ import { HOLD_MS } from "@/lib/hold-burst";
 import { Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export function CameraCaptureControl({ mode, recording, disabled, onCapture, onHold, left, right, ar = false }: {
+export function CameraCaptureControl({ mode, recording, disabled, onCapture, onHold, left, right, ar = false, vertical = false }: {
   mode: "photo" | "video"; recording: boolean; disabled: boolean; onCapture: () => void;
   /** Photo mode: holding the shutter starts a multiple shot (true) that lasts until the finger lifts (false). */
   onHold?: (holding: boolean) => void;
-  left?: ReactNode; right?: ReactNode; ar?: boolean;
+  left?: ReactNode; right?: ReactNode; ar?: boolean; vertical?: boolean;
 }) {
   const holdTimer = useRef<number | undefined>(undefined);
   const held = useRef(false);
@@ -25,11 +25,11 @@ export function CameraCaptureControl({ mode, recording, disabled, onCapture, onH
     return () => window.clearInterval(timer);
   }, [recording]);
   const label = mode === "photo" ? `Scatta foto${ar ? " AR" : ""}` : recording ? "Termina e salva" : `Avvia registrazione${ar ? " AR" : ""}`;
-  return <div className="camera-capture-dock" data-camera-controls>
+  return <div className={`camera-capture-dock${vertical ? " is-vertical" : ""}`} data-camera-controls>
     <div className="camera-capture-status" role="status" hidden={(ar || mode === "photo") && !recording}>
       {recording ? <><span className="camera-rec-dot" />REC · {String(Math.floor(seconds / 60)).padStart(2, "0")}:{String(seconds % 60).padStart(2, "0")}</> : mode === "photo" ? "FOTO" : "VIDEO"}
     </div>
-    <div className="camera-capture-row">
+    <div className={`camera-capture-row${vertical ? " is-vertical" : ""}`}>
       <div className="camera-capture-side">{left}</div>
       <Button variant="ghost" size="icon" disabled={disabled}
         onClick={() => { if (held.current) { held.current = false; return; } onCapture(); }}

@@ -2555,6 +2555,67 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 /* -------------------------------------------------------------
    AR Camera Landscape 2-Column Redesign & Live View Priority
    ------------------------------------------------------------- */
+.ar-camera-dialog {
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100dvw !important;
+  height: 100dvh !important;
+  max-width: none !important;
+  max-height: none !important;
+  transform: none !important;
+  border-radius: 0 !important;
+  border: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  z-index: 1000000005 !important;
+  background: #000000 !important;
+  overflow: hidden !important;
+}
+
+/* Portrait Specimen Card */
+.ar-portrait-specimen-card {
+  width: min(92%, 24rem);
+  margin-inline: auto;
+  padding: 0.75rem 1.125rem;
+  border-radius: 16px;
+  background: rgba(18, 24, 32, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  text-align: left;
+}
+.ar-portrait-specimen-title {
+  color: #ffffff;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.ar-portrait-specimen-desc {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-top: 0.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Landscape Left Cards */
+.ar-landscape-specimen-card,
+.ar-landscape-balance-card {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 16px;
+  background: rgba(18, 24, 32, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
 .ar-landscape-layout {
   position: absolute;
   inset: 0;
@@ -2564,19 +2625,17 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 
 .ar-landscape-left {
   position: absolute;
-  left: max(0.75rem, env(safe-area-inset-left));
-  top: calc(max(.375rem, env(safe-area-inset-top)) + 3.125rem);
-  bottom: calc(0.75rem + env(safe-area-inset-bottom));
-  width: min(36vw, 22rem);
+  left: max(1.25rem, env(safe-area-inset-left));
+  top: 50%;
+  transform: translateY(-50%);
+  width: min(36vw, 20rem);
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  justify-content: flex-start;
+  gap: 0.75rem;
+  justify-content: center;
   align-items: stretch;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
   pointer-events: none;
+  z-index: 22;
 }
 
 .ar-landscape-left > * {
@@ -2588,48 +2647,17 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   margin: 0 !important;
 }
 
-.ar-landscape-left .ar-specimen-dock {
-  align-self: stretch !important;
-  width: 100% !important;
-  max-width: 100% !important;
-}
-
-.ar-landscape-left .ar-thermal-summary:not(.ar-thermal-summary-min) {
-  max-height: min(34dvh, 11rem) !important;
-  overflow-y: auto !important;
-}
-
-.ar-landscape-left .ar-burst-shelf {
-  padding: 0.5rem 0.625rem !important;
-  border-radius: 12px !important;
-  border: 1px solid var(--camera-border) !important;
-  background: var(--camera-glass) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  backdrop-filter: blur(12px) !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  overflow: visible !important;
-}
-
-.ar-landscape-left .ar-burst-shelf .ar-burst-carousel {
-  width: 100% !important;
-  min-height: auto !important;
-  padding: 1.75rem 0.5rem 0.25rem !important;
-}
-
 .ar-landscape-right {
   position: absolute;
-  right: max(0.75rem, env(safe-area-inset-right));
-  top: calc(max(.375rem, env(safe-area-inset-top)) + 3.125rem);
-  bottom: calc(0.75rem + env(safe-area-inset-bottom));
-  width: min(36vw, 21rem);
+  right: max(1.25rem, env(safe-area-inset-right));
+  top: 50%;
+  transform: translateY(-50%);
+  width: auto;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: flex-end;
-  gap: 0.4rem;
+  gap: 1.5rem;
   pointer-events: none;
   z-index: 22;
 }
@@ -2638,23 +2666,18 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   pointer-events: auto !important;
 }
 
-.ar-landscape-right .camera-capture-dock {
-  width: 100% !important;
-  margin-inline: 0 !important;
+.camera-capture-dock.is-vertical {
+  width: auto !important;
+  margin: 0 !important;
 }
 
-.ar-landscape-right #ar-camera-tools {
-  width: 100% !important;
-}
-
-.ar-landscape-right .ar-tools-panel {
-  width: 100% !important;
-  max-height: min(44dvh, 15rem) !important;
-  overflow-y: auto !important;
-}
-
-.ar-landscape-right .ar-burst-bar {
-  margin-bottom: 0.2rem !important;
+.camera-capture-row.is-vertical {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.75rem !important;
+  width: auto !important;
 }
 
 
