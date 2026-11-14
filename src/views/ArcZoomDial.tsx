@@ -51,9 +51,9 @@ export function ArcZoomDial({
   const yB_big = cy + R_big * Math.sin(radBig);
   const cerchioGrandePath = `M ${xT_big.toFixed(1)} ${yT_big.toFixed(1)} A ${R_big} ${R_big} 0 0 0 ${xB_big.toFixed(1)} ${yB_big.toFixed(1)} L ${W} ${yB_big.toFixed(1)} L ${W} ${yT_big.toFixed(1)} Z`;
 
-  // Cerchio 2 (Vetro satinato trasparente con i numeri dentro):
-  const R_dot = 138.0; // Raggio dei pallini bianchi dentro il vetro satinato
-  const R_text = 118.0; // Raggio dei numeri dello zoom dentro il vetro satinato
+  // Cerchio 2 (Vetro satinato trasparente con i numeri dentro spostati più avanti):
+  const R_dot = 152.0; // Raggio dei pallini bianchi dentro il vetro satinato (avanzati verso l'arco)
+  const R_text = 135.0; // Raggio dei numeri dello zoom dentro il vetro satinato (avanzati per non finire sotto Scansiona e Strumenti)
 
   const degTop = 56.0;
   const degBot = 66.0;
@@ -231,11 +231,11 @@ export function ArcZoomDial({
             <feGaussianBlur in="SourceGraphic" stdDeviation="1.5 16" result="vBlur" />
           </filter>
 
-          {/* Sfumatura radiale satinata: alfa del 20% per il secondo cerchio */}
+          {/* Sfumatura radiale satinata: alfa del 25% per il secondo cerchio */}
           <radialGradient id="cerchioGrandeGrad" cx={cx} cy={cy} r={R_big} gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.20" />
-            <stop offset="55%" stopColor="#e2ecf8" stopOpacity="0.20" />
-            <stop offset="85%" stopColor="#b0c6df" stopOpacity="0.10" />
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.25" />
+            <stop offset="55%" stopColor="#e2ecf8" stopOpacity="0.25" />
+            <stop offset="85%" stopColor="#b0c6df" stopOpacity="0.14" />
             <stop offset="100%" stopColor="#7a9bc2" stopOpacity="0.0" />
           </radialGradient>
 
