@@ -2705,7 +2705,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 
 .ar-landscape-right {
   position: absolute;
-  right: env(safe-area-inset-right, 0px) !important;
+  right: max(1rem, env(safe-area-inset-right));
   top: 50%;
   transform: translateY(-50%);
   width: auto;
@@ -2713,7 +2713,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   flex-direction: row;
   align-items: center;
   justify-content: flex-end;
-  gap: 0 !important;
+  gap: 0.75rem;
   pointer-events: none;
   z-index: 22;
 }
@@ -2723,10 +2723,8 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 }
 
 .camera-capture-dock.is-vertical {
-  width: auto !important;
-  min-width: 96px !important;
+  width: 104px !important;
   margin: 0 !important;
-  padding-right: 22px !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
@@ -2738,7 +2736,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   flex-direction: column !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 18px !important;
+  gap: 52px !important;
   width: 100% !important;
   pointer-events: auto !important;
 }

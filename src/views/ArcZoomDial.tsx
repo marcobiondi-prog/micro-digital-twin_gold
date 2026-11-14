@@ -3,14 +3,13 @@ import { zoomLabel, ZOOM_MIN, ZOOM_MAX } from "@/lib/camera-zoom";
 import { hapticTick } from "@/lib/haptics";
 
 /**
- * Ghiera zoom landscape (Camera Jog Dial / Goniometro) - Architettura a 2 cerchi concentrici:
- * 1. CERCHIO 1 (Ghiera esterna): nastro curvo regolare con le linee graduate all'interno.
- * 2. CERCHIO 2 (Vetro satinato trasparente interno): semicerchio satinato trasparente
- *    attorno allo shutter con i numeri (0.5x, 1x, 2x, 3x, 5x) e i pallini bianchi al suo interno.
- *    È QUESTO cerchio satinato trasparente che ruota al variare dello zoom.
- * - L'INTERO BLOCCO è a filo del bordo destro dello schermo.
- * - Pillola fissa all'apice (0° orizzontale) a filo con [ Singolo | Multiplo ] con valore zoom live e mirino ciano.
- * - Rotazione fluida 1:1 al trascinamento del pollice e feedback aptico.
+ * Ghiera zoom landscape (Camera Jog Dial / Goniometro) - Replica esatta ad ampio respiro:
+ * - Geometria calibrata al mockup di riferimento: centro (cx=272, cy=190), R=153px, ampiezza 324x380px
+ * - Nastro curvo satinato regolare con estremità arrotondate che abbraccia elegantemente i comandi
+ * - Numeri ben visibili e leggibili all'interno dell'arco (0.5x, 1x, 2x, 3x, 5x) con tracciamento nitido
+ * - Tacche radiali graduate ogni ~4.9° con accenti ciano (#00f0ff) e punti bianchi sui preset
+ * - Pillola fissa all'apice (0° orizzontale) a filo con [ Singolo | Multiplo ] con valore zoom live e mirino ciano
+ * - Rotazione fluida 1:1 con il trascinamento del pollice e feedback aptico
  */
 export function ArcZoomDial({
   zoom,
@@ -30,50 +29,33 @@ export function ArcZoomDial({
   const lastAngle = useRef(0);
   const lastHapticZoom = useRef(zoom);
 
-  // Dimensioni calibrate: blocco a filo del bordo destro (W=280, H=380)
-  const W = 280;
-  const H = 380;
-  const cx = 240;
+  // Dimensioni ampie ed ergonomiche: centro rotazione (cx, cy) concentrico allo shutter button
+  const cx = 272;
   const cy = 190;
+  const R = 153.0; // Raggio della traccia graduata centrale
+  const Ro = 175.0; // Raggio esterno del nastro satinato
+  const Ri = 120.0; // Raggio interno del nastro satinato
+  const R_dot = 140.0; // Raggio dei punti bianchi di stop
+  const R_text = 123.0; // Raggio dei numeri dello zoom all'interno dell'arco
 
-  // Cerchio 1 (Ghiera esterna resa leggermente più compatta e spostata più avanti):
-  const Ro = 194.0; // Raggio esterno ghiera (leggermente più piccola)
-  const Rm = 168.0; // Raggio interno ghiera (spostato più avanti per distaccarsi dai numeri)
-  const R = 181.0; // Raggio linea centrale delle tacche graduate (nastro da 26px)
-
-  // Cerchio Grande (indicato in rosso dall'utente):
-  // Raggio ampio R_big = 206px attorno a (cx, cy) che abbraccia l'intero blocco comandi
-  const R_big = 206.0;
-  const radBig = (78.0 * Math.PI) / 180;
-  const xT_big = cx - R_big * Math.cos(radBig);
-  const yT_big = cy - R_big * Math.sin(radBig);
-  const xB_big = xT_big;
-  const yB_big = cy + R_big * Math.sin(radBig);
-  const cerchioGrandePath = `M ${xT_big.toFixed(1)} ${yT_big.toFixed(1)} A ${R_big} ${R_big} 0 0 0 ${xB_big.toFixed(1)} ${yB_big.toFixed(1)} L ${W} ${yB_big.toFixed(1)} L ${W} ${yT_big.toFixed(1)} Z`;
-
-  // Cerchio 2 (Vetro satinato trasparente con i numeri dentro):
-  // Raggi calibrati con 22px di distacco dal primo cerchio per non toccarsi mai
-  const R_dot = 146.0; // Raggio dei pallini bianchi dentro il vetro satinato
-  const R_text = 128.0; // Raggio dei numeri dello zoom dentro il vetro satinato
-
-  const degTop = 56.0;
-  const degBot = 66.0;
+  const degTop = 54.0;
+  const degBot = 64.0;
   const radT = (degTop * Math.PI) / 180;
   const radB = (degBot * Math.PI) / 180;
 
-  // Coordinate Cerchio 1 (Ghiera esterna)
+  // Calcolo punti perimetrali del nastro curvo con terminazioni arrotondate
   const xTo = cx - Ro * Math.cos(radT);
   const yTo = cy - Ro * Math.sin(radT);
   const xBo = cx - Ro * Math.cos(radB);
   const yBo = cy + Ro * Math.sin(radB);
-  const xBm = cx - Rm * Math.cos(radB);
-  const yBm = cy + Rm * Math.sin(radB);
-  const xTm = cx - Rm * Math.cos(radT);
-  const yTm = cy - Rm * Math.sin(radT);
-  const capR1 = (Ro - Rm) / 2; // 16.5px
+  const xBi = cx - Ri * Math.cos(radB);
+  const yBi = cy + Ri * Math.sin(radB);
+  const xTi = cx - Ri * Math.cos(radT);
+  const yTi = cy - Ri * Math.sin(radT);
+  const capR = (Ro - Ri) / 2; // 27.5px
 
-  // Path SVG Cerchio 1 (Ghiera esterna con estremità arrotondate)
-  const ghieraPath = `M ${xTo.toFixed(1)} ${yTo.toFixed(1)} A ${Ro} ${Ro} 0 0 0 ${xBo.toFixed(1)} ${yBo.toFixed(1)} A ${capR1.toFixed(1)} ${capR1.toFixed(1)} 0 0 0 ${xBm.toFixed(1)} ${yBm.toFixed(1)} A ${Rm} ${Rm} 0 0 1 ${xTm.toFixed(1)} ${yTm.toFixed(1)} A ${capR1.toFixed(1)} ${capR1.toFixed(1)} 0 0 0 ${xTo.toFixed(1)} ${yTo.toFixed(1)} Z`;
+  // Path SVG del nastro satinato a semicerchio regolare
+  const ribbonPath = `M ${xTo.toFixed(1)} ${yTo.toFixed(1)} A ${Ro} ${Ro} 0 0 0 ${xBo.toFixed(1)} ${yBo.toFixed(1)} A ${capR.toFixed(1)} ${capR.toFixed(1)} 0 0 0 ${xBi.toFixed(1)} ${yBi.toFixed(1)} A ${Ri} ${Ri} 0 0 1 ${xTi.toFixed(1)} ${yTi.toFixed(1)} A ${capR.toFixed(1)} ${capR.toFixed(1)} 0 0 0 ${xTo.toFixed(1)} ${yTo.toFixed(1)} Z`;
 
   // Mappatura angolare continua: 1x a -39°, 2x all'apice 0°, 3x a +39°
   const angleForZoom = (z: number) => {
@@ -115,8 +97,8 @@ export function ArcZoomDial({
   const getPointerAngle = (e: ReactPointerEvent<SVGElement>) => {
     if (!svgRef.current) return 0;
     const rect = svgRef.current.getBoundingClientRect();
-    const scaleX = rect.width / W;
-    const scaleY = rect.height / H;
+    const scaleX = rect.width / 324;
+    const scaleY = rect.height / 380;
     const screenCx = rect.left + cx * scaleX;
     const screenCy = rect.top + cy * scaleY;
     const dx = e.clientX - screenCx;
@@ -153,7 +135,7 @@ export function ArcZoomDial({
     dragging.current = false;
   };
 
-  // Stop principali (0.5x, 1x, 2x, 3x, 5x): numeri e pallini posizionati dentro il Cerchio 2
+  // Stop principali lungo l'arco (0.5x, 1x, 2x, 3x, 5x) con numeri visibili dentro l'arco
   const stops = [
     { label: "0.5x", zoomVal: 0.5 },
     { label: "1x", zoomVal: 1 },
@@ -179,17 +161,17 @@ export function ArcZoomDial({
     };
   });
 
-  // Tacche graduate secondarie dentro il Cerchio 1 (ghiera) ogni 4.875°
-  const ticks: Array<{ deg: number; x1: number; y1: number; x2: number; y2: number; isCyan?: boolean; isStop?: boolean }> = [];
+  // Tacche graduate secondarie ogni 4.875°
+  const ticks: Array<{ deg: number; x1: number; y1: number; x2: number; y2: number; isCyan?: boolean }> = [];
   for (let i = -16; i <= 16; i++) {
     const d = i * 4.875;
     if (d < -degTop - 25 || d > degBot + 25) continue;
-    const isStop = stops.some((s) => Math.abs(s.deg - d) < 2.0);
+    if (stops.some((s) => Math.abs(s.deg - d) < 2.0)) continue;
     const rad = (d * Math.PI) / 180;
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
-    const isCyan = Math.abs(i % 4) === 0 || isStop;
-    const tlen = isStop ? 7.0 : isCyan ? 4.5 : 3.0;
+    const isCyan = Math.abs(i % 4) === 0;
+    const tlen = isCyan ? 4.5 : 3.0;
     ticks.push({
       deg: d,
       x1: cx - (R - tlen) * cos,
@@ -197,102 +179,66 @@ export function ArcZoomDial({
       x2: cx - (R + tlen) * cos,
       y2: cy + (R + tlen) * sin,
       isCyan,
-      isStop,
     });
   }
 
-  // Apice orizzontale della ghiera a sinistra: cx - R = 232 - 158 = 74px
+  // Apice orizzontale a sinistra: cx - R = 272 - 153 = 119px
   const apexX = cx - R;
 
-  // Tocco sulla pillola fissa: passa ai preset rapidi (0.5x, 1x, 2x, 3x, 5x)
+  // Tocco sulla pillola fissa: passa ai preset rapidi
   const handlePillClick = () => {
     if (zoom < 1) onZoom(1);
     else if (zoom < 2) onZoom(2);
     else if (zoom < 3) onZoom(3);
-    else if (zoom < 5) onZoom(5);
-    else onZoom(0.5);
+    else onZoom(1);
     hapticTick();
   };
 
   return (
     <div
       className={`absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none select-none z-10 flex items-center justify-end ${className}`}
-      style={{ width: `${W}px`, height: `${H}px` }}
+      style={{ width: "324px", height: "380px" }}
       data-camera-controls
     >
       <svg
         ref={svgRef}
-        viewBox={`0 0 ${W} ${H}`}
+        viewBox="0 0 324 380"
         className="w-full h-full overflow-visible pointer-events-none select-none"
         aria-hidden="true"
       >
         <defs>
-          {/* Blur in verticale per sfumare morbidamente i bordi del secondo cerchio */}
-          <filter id="verticalGlassBlur" x="-30%" y="-40%" width="160%" height="180%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="6 22" result="vBlur" />
-          </filter>
-
-          {/* Sfumatura radiale satinata: alfa del 30% per il secondo cerchio */}
-          <radialGradient id="cerchioGrandeGrad" cx={cx} cy={cy} r={R_big} gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.30" />
-            <stop offset="50%" stopColor="#e2ecf8" stopOpacity="0.30" />
-            <stop offset="78%" stopColor="#b0c6df" stopOpacity="0.18" />
-            <stop offset="92%" stopColor="#9cb8d6" stopOpacity="0.08" />
-            <stop offset="100%" stopColor="#7a9bc2" stopOpacity="0.0" />
-          </radialGradient>
-
-          {/* Gradiente ricco e scuro per dare carattere alla ghiera esterna */}
-          <linearGradient id="outerGhieraGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="rgba(48, 62, 82, 0.94)" />
-            <stop offset="35%" stopColor="rgba(30, 40, 54, 0.96)" />
-            <stop offset="70%" stopColor="rgba(18, 26, 38, 0.96)" />
-            <stop offset="100%" stopColor="rgba(36, 48, 66, 0.92)" />
-          </linearGradient>
-
-          {/* Ombra di profondità per far staccare la ghiera esterna */}
-          <filter id="ghieraDepth" x="-25%" y="-25%" width="150%" height="150%">
-            <feDropShadow dx="-2" dy="2" stdDeviation="4" floodColor="#000000" floodOpacity="0.65" />
-          </filter>
-
-          {/* Bagliore ciano per la tacca indice dello zenit */}
-          <filter id="cyanGlow" x="-20%" y="-60%" width="140%" height="220%">
-            <feDropShadow dx="0" dy="0" stdDeviation="2.5" floodColor="#00f0ff" floodOpacity="0.75" />
-          </filter>
-
-          {/* Ombra per far risaltare perfettamente i numeri sopra al vetro */}
-          <filter id="numShadow" x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" floodColor="#000000" floodOpacity="0.9" />
-          </filter>
+          <clipPath id="dialRibbonClip">
+            <path d={ribbonPath} />
+          </clipPath>
         </defs>
 
-        {/* 
-          1. IL CERCHIO GRANDE (ALFA AL 30%, BLUR VERTICALE SFUMATO, NIENTE BORDER):
-          - Vetro satinato con alfa del 30% e blur verticale morbido per sfumare i bordi
-          - Senza bordo (niente border)
-          - Si estende sopra Scansiona (y=9) e sotto Strumenti (y=371)
-        */}
+        {/* Nastro satinato a semicerchio regolare (sfondo naturale del goniometro) */}
         <path
-          d={cerchioGrandePath}
-          fill="url(#cerchioGrandeGrad)"
-          filter="url(#verticalGlassBlur)"
+          d={ribbonPath}
+          fill="rgba(32, 38, 48, 0.76)"
+          stroke="rgba(255, 255, 255, 0.16)"
+          strokeWidth="1"
         />
 
         {/* 
-          2. CERCHIO ESTERNO (GHIERA CON CARATTERE - SENZA BORDO):
-          Tonalità smoked dark glass con profondità e riflesso, bordo rimosso (stroke="none")
+          GHIERA ROTANTE AMPIA (GONIOMETRO CAMERA RADIAL ZOOM):
+          Ruota fluidamente attorno al centro dello shutter (cx, cy).
+          I numeri e le tacche scorrono all'interno del nastro satinato.
         */}
-        <path
-          d={ghieraPath}
-          fill="url(#outerGhieraGrad)"
-          stroke="none"
-          filter="url(#ghieraDepth)"
-        />
+        <g
+          clipPath="url(#dialRibbonClip)"
+          transform={`rotate(${dialRotation}, ${cx}, ${cy})`}
+          className="transition-transform duration-75 ease-out"
+        >
+          {/* Traccia circolare guida sottile */}
+          <path
+            d={`M ${xTo.toFixed(1)} ${yTo.toFixed(1)} A ${R} ${R} 0 0 0 ${xBo.toFixed(1)} ${yBo.toFixed(1)}`}
+            fill="none"
+            stroke="rgba(255, 255, 255, 0.22)"
+            strokeWidth="1"
+          />
 
-        {/* 
-          LINEE FISSE DENTRO IL CERCHIO ESTERNO:
-          Le tacche graduate fisse della ghiera con contrasto e carattere
-        */}
-        <g>
+          {/* Tacche graduate secondarie */}
           {ticks.map((t, idx) => (
             <line
               key={idx}
@@ -300,82 +246,73 @@ export function ArcZoomDial({
               y1={t.y1}
               x2={t.x2}
               y2={t.y2}
-              stroke={t.isCyan ? "#00f0ff" : "rgba(255, 255, 255, 0.88)"}
-              strokeWidth={t.isStop ? "2.8" : t.isCyan ? "1.8" : "1.2"}
+              stroke={t.isCyan ? "#00f0ff" : "rgba(255, 255, 255, 0.70)"}
+              strokeWidth={t.isCyan ? "1.6" : "1.1"}
               strokeLinecap="round"
             />
+          ))}
+
+          {/* Stop principali: tacca ciano, punto bianco e NUMERI VISIBILI DENTRO L'ARCO */}
+          {stops.map((s) => (
+            <g key={s.label}>
+              <line
+                x1={s.xIn}
+                y1={s.yIn}
+                x2={s.xOut}
+                y2={s.yOut}
+                stroke="#00f0ff"
+                strokeWidth="2.6"
+                strokeLinecap="round"
+              />
+              <circle
+                cx={s.dotX}
+                cy={s.dotY}
+                r={3.5}
+                fill="#ffffff"
+              />
+              <text
+                x={s.textX}
+                y={s.textY}
+                transform={`rotate(${s.deg}, ${s.textX}, ${s.textY})`}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fill="#ffffff"
+                stroke="rgba(10, 15, 25, 0.85)"
+                strokeWidth="1.2"
+                paintOrder="stroke fill"
+                fontSize="14"
+                fontWeight="700"
+                fontFamily="system-ui, -apple-system, sans-serif"
+                className="pointer-events-none select-none"
+              >
+                {s.label}
+              </text>
+            </g>
           ))}
         </g>
 
         {/* 
-          3. LIVELLO DEI NUMERI SOPRA AL CERCHIO INTERNO:
-          Portati sopra al vetro satinato, nitidi e privi di clipping.
-          I numeri e i pallini ruotano fluidamente con lo zoom.
-        */}
-        <g
-          transform={`rotate(${dialRotation}, ${cx}, ${cy})`}
-          className="transition-transform duration-75 ease-out"
-          filter="url(#numShadow)"
-        >
-          {stops.map((s) => {
-            const screenAngle = Math.abs(s.deg + dialRotation);
-            // Dissolvenza morbida: i numeri sono pienamente visibili nell'arco utile,
-            // e sfumano a 0 se ruotano troppo in alto o in basso verso Scansiona/Strumenti
-            const opacity = screenAngle <= 44 ? 1 : Math.max(0, 1 - (screenAngle - 44) / 8);
-            if (opacity <= 0.02) return null;
-            return (
-              <g key={s.label} opacity={opacity}>
-                <circle
-                  cx={s.dotX}
-                  cy={s.dotY}
-                  r={3.5}
-                  fill="#ffffff"
-                />
-                <text
-                  x={s.textX}
-                  y={s.textY}
-                  transform={`rotate(${s.deg}, ${s.textX}, ${s.textY})`}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  fill="#ffffff"
-                  stroke="rgba(10, 15, 25, 0.85)"
-                  strokeWidth="1.2"
-                  paintOrder="stroke fill"
-                  fontSize="14.5"
-                  fontWeight="700"
-                  fontFamily="system-ui, -apple-system, sans-serif"
-                  className="pointer-events-none select-none"
-                >
-                  {s.label}
-                </text>
-              </g>
-            );
-          })}
-        </g>
-
-        {/* 
-          LINEA INDICE DELLO ZENIT (0° ORIZZONTALE):
-          Raccordo ciano tra la pillola dello zenit e l'apice della ghiera con bagliore
+          ELEMENTI FISSI ALL'APICE (0° ORIZZONTALE):
+          Linea orizzontale ciano che connette la pillola fissa all'apice dell'arco
         */}
         <line
-          x1={56}
+          x1={84}
           y1={cy}
           x2={apexX}
           y2={cy}
           stroke="#00f0ff"
           strokeWidth="2.8"
           strokeLinecap="round"
-          filter="url(#cyanGlow)"
         />
 
         {/* 
-          ZONA TOUCH DEDICATA: traccia trasparente curva ampia per swipe fluido con il pollice
+          ZONA TOUCH DEDICATA: traccia trasparente curva ampia (60px) per swipe fluido con il pollice
         */}
         <path
-          d={`M ${cx - Ro * Math.cos(radT)} ${cy - Ro * Math.sin(radT)} A ${Ro} ${Ro} 0 0 0 ${cx - Ro * Math.cos(radB)} ${cy + Ro * Math.sin(radB)}`}
+          d={`M ${cx - R * Math.cos(radT)} ${cy - R * Math.sin(radT)} A ${R} ${R} 0 0 0 ${cx - R * Math.cos(radB)} ${cy + R * Math.sin(radB)}`}
           fill="none"
           stroke="transparent"
-          strokeWidth="68"
+          strokeWidth="64"
           strokeLinecap="round"
           className="cursor-ns-resize pointer-events-auto touch-none"
           onPointerDown={onPointerDown}
@@ -386,25 +323,25 @@ export function ArcZoomDial({
       </svg>
 
       {/* 
-        IN GIALLO LA PILLOLA:
-        - Pillola fissa all'apice (0° orizzontale) a filo con la ghiera come cerchiato in giallo
-        - Mostra il valore zoom live in tempo reale (es. "2x")
-        - Toccandola passa ai preset rapidi (0.5x, 1x, 2x, 3x, 5x)
+        PILLOLA FISSA ALL'APICE (0° ORIZZONTALE):
+        - Fissa all'apice orizzontale a filo con [ Singolo | Multiplo ]
+        - Mostra il valore zoom corrente in tempo reale
+        - Toccandola passa ai preset rapidi
       */}
       <button
         type="button"
         onClick={handlePillClick}
-        className="absolute pointer-events-auto flex items-center justify-center rounded-full bg-[rgba(24,30,40,0.82)] border border-white/25 backdrop-blur-md px-2.5 shadow-md active:scale-95 transition-transform"
+        className="absolute pointer-events-auto flex items-center justify-center rounded-full bg-[rgba(36,42,52,0.85)] border border-white/22 px-2.5 shadow-lg active:scale-95 transition-transform"
         style={{
-          left: "12px",
+          left: "40px",
           top: `${cy - 15}px`,
           height: "30px",
-          minWidth: "44px",
+          minWidth: "42px",
         }}
-        aria-label={`Zoom corrente: ${zoom % 1 === 0 ? zoom : zoom.toFixed(1)}x. Tocca per cambiare preset.`}
+        aria-label={`Zoom corrente: ${zoomLabel(zoom)}. Tocca per cambiare preset.`}
       >
         <span className="text-[13.5px] font-bold text-white tracking-tight tabular-nums">
-          {zoom % 1 === 0 ? zoom : zoom.toFixed(1)}x
+          {zoomLabel(zoom)}
         </span>
       </button>
     </div>
