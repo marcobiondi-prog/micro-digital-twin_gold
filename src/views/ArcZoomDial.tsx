@@ -17,8 +17,8 @@ import { hapticTick } from "@/lib/haptics";
  * arco molto più largo (raggio calcolato, sempre tangente: nessuno spigolo né ammaccatura) fino a TAIL_END, il
  * punto in fondo alla linea disegnata dall'utente sullo screenshot, poco sotto il bordo dello schermo.
  */
-const TAIL_START_DEG = 12;
-const TAIL_END: readonly [number, number] = [100.7, 386.4];
+const TAIL_START_DEG = 8;
+const TAIL_END: readonly [number, number] = [108, 386.4];
 /** Spazio in più sotto il viewBox, così l'aggiunta si chiude fuori dallo schermo senza essere tagliata dal riquadro. */
 const SVG_EXTRA_BOTTOM = 110;
 
