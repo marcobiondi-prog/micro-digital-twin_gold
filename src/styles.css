@@ -2748,6 +2748,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   justify-content: center !important;
   width: 100% !important;
   pointer-events: auto !important;
+  transform: translateX(-16px) !important;
 }
 
 .camera-capture-dock.is-vertical .ar-landscape-pill-btn {
