@@ -232,13 +232,13 @@ export function ArcZoomDial({
             <feGaussianBlur stdDeviation="8" result="blur" />
           </filter>
 
-          {/* Sfumatura radiale: il cerchio grande si fonde verso l'esterno con la ghiera */}
+          {/* Sfumatura radiale: cerchio grande più chiaro e trasparente (vetro satinato luminoso) */}
           <radialGradient id="cerchioGrandeGrad" cx={cx} cy={cy} r={R_big} gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#0c111a" stopOpacity="0.86" />
-            <stop offset="60%" stopColor="#121824" stopOpacity="0.80" />
-            <stop offset="82%" stopColor="#1a2334" stopOpacity="0.65" />
-            <stop offset="93%" stopColor="#243044" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#303f58" stopOpacity="0.0" />
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.26" />
+            <stop offset="45%" stopColor="#dce6f2" stopOpacity="0.20" />
+            <stop offset="75%" stopColor="#9bb4d0" stopOpacity="0.14" />
+            <stop offset="92%" stopColor="#607c9e" stopOpacity="0.06" />
+            <stop offset="100%" stopColor="#405876" stopOpacity="0.0" />
           </radialGradient>
 
           {/* Gradiente per la ghiera esterna: tonalità più chiara a contrasto con il cerchio grande */}
@@ -255,10 +255,10 @@ export function ArcZoomDial({
         </defs>
 
         {/* 
-          1. IL CERCHIO GRANDE (INDICATO IN ROSSO DALL'UTENTE):
-          - Sfondo satinato sfocato e continuo che si estende sopra Scansiona (y=9) e sotto Strumenti (y=371)
-          - Abbraccia l'intero blocco comandi a filo con il bordo destro dello schermo
-          - Si fonde morbidamente verso l'esterno con la ghiera
+          1. IL CERCHIO GRANDE (SFONDO PIÙ CHIARO E TRASPARENTE):
+          - Vetro satinato chiaro, luminoso e trasparente che lascia trasparire la scena
+          - Si estende sopra Scansiona (y=9) e sotto Strumenti (y=371)
+          - Sfocato e sfumato morbidamente verso l'esterno
         */}
         <path
           d={cerchioGrandePath}
@@ -268,6 +268,8 @@ export function ArcZoomDial({
         <path
           d={cerchioGrandePath}
           fill="url(#cerchioGrandeGrad)"
+          stroke="rgba(255, 255, 255, 0.15)"
+          strokeWidth="0.8"
         />
 
         {/* 
