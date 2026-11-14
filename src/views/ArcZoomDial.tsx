@@ -42,6 +42,17 @@ export function ArcZoomDial({
   const Rm = 142.0; // Raggio interno ghiera / confine con il vetro satinato
   const R = 158.0; // Raggio linea centrale delle tacche graduate
 
+  // Cerchio Grande (indicato in rosso dall'utente):
+  // Raggio ampio R_big = 185px attorno a (cx, cy) che abbraccia l'intero blocco comandi:
+  // Si estende sopra Scansiona (y=9) e sotto Strumenti (y=371) fino al bordo destro x=W.
+  const R_big = 185.0;
+  const radBig = (78.0 * Math.PI) / 180;
+  const xT_big = cx - R_big * Math.cos(radBig); // 193.5
+  const yT_big = cy - R_big * Math.sin(radBig); // 9.1 (sopra Scansiona)
+  const xB_big = xT_big;
+  const yB_big = cy + R_big * Math.sin(radBig); // 370.9 (sotto Strumenti)
+  const cerchioGrandePath = `M ${xT_big.toFixed(1)} ${yT_big.toFixed(1)} A ${R_big} ${R_big} 0 0 0 ${xB_big.toFixed(1)} ${yB_big.toFixed(1)} L ${W} ${yB_big.toFixed(1)} L ${W} ${yT_big.toFixed(1)} Z`;
+
   // Cerchio 2 (Vetro satinato trasparente con i numeri dentro):
   const R_dot = 126.0; // Raggio dei pallini bianchi dentro il vetro satinato
   const R_text = 108.0; // Raggio dei numeri dello zoom dentro il vetro satinato
@@ -64,9 +75,6 @@ export function ArcZoomDial({
 
   // Path SVG Cerchio 1 (Ghiera esterna con estremità arrotondate)
   const ghieraPath = `M ${xTo.toFixed(1)} ${yTo.toFixed(1)} A ${Ro} ${Ro} 0 0 0 ${xBo.toFixed(1)} ${yBo.toFixed(1)} A ${capR1.toFixed(1)} ${capR1.toFixed(1)} 0 0 0 ${xBm.toFixed(1)} ${yBm.toFixed(1)} A ${Rm} ${Rm} 0 0 1 ${xTm.toFixed(1)} ${yTm.toFixed(1)} A ${capR1.toFixed(1)} ${capR1.toFixed(1)} 0 0 0 ${xTo.toFixed(1)} ${yTo.toFixed(1)} Z`;
-
-  // Path SVG Cerchio 2 (Vetro satinato trasparente interno attorno allo shutter a filo con il bordo destro x=W)
-  const satinatoPath = `M ${xTm.toFixed(1)} ${yTm.toFixed(1)} A ${Rm} ${Rm} 0 0 0 ${xBm.toFixed(1)} ${yBm.toFixed(1)} L ${W} ${yBm.toFixed(1)} L ${W} ${yTm.toFixed(1)} Z`;
 
   // Mappatura angolare continua: 1x a -39°, 2x all'apice 0°, 3x a +39°
   const angleForZoom = (z: number) => {
@@ -219,25 +227,25 @@ export function ArcZoomDial({
         aria-hidden="true"
       >
         <defs>
-          {/* Blur filter per lo sfondo satinato del cerchio interno */}
+          {/* Blur filter per lo sfondo satinato del cerchio grande */}
           <filter id="dialGlassBlur" x="-30%" y="-30%" width="160%" height="160%">
-            <feGaussianBlur stdDeviation="6" result="blur" />
+            <feGaussianBlur stdDeviation="8" result="blur" />
           </filter>
 
-          {/* Sfumatura radiale: il cerchio interno si fonde dolcemente nel cerchio esterno */}
-          <radialGradient id="innerBlendGrad" cx={cx} cy={cy} r={Ro - 10} gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#0e131d" stopOpacity="0.84" />
-            <stop offset="55%" stopColor="#121824" stopOpacity="0.76" />
-            <stop offset="78%" stopColor="#1a2232" stopOpacity="0.58" />
-            <stop offset="90%" stopColor="#253144" stopOpacity="0.30" />
-            <stop offset="100%" stopColor="#34435b" stopOpacity="0.0" />
+          {/* Sfumatura radiale: il cerchio grande si fonde verso l'esterno con la ghiera */}
+          <radialGradient id="cerchioGrandeGrad" cx={cx} cy={cy} r={R_big} gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#0c111a" stopOpacity="0.86" />
+            <stop offset="60%" stopColor="#121824" stopOpacity="0.80" />
+            <stop offset="82%" stopColor="#1a2334" stopOpacity="0.65" />
+            <stop offset="93%" stopColor="#243044" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#303f58" stopOpacity="0.0" />
           </radialGradient>
 
-          {/* Gradiente per la ghiera esterna: tonalità più chiara a contrasto con il cerchio interno */}
+          {/* Gradiente per la ghiera esterna: tonalità più chiara a contrasto con il cerchio grande */}
           <linearGradient id="outerGhieraGrad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="rgba(68, 82, 106, 0.88)" />
-            <stop offset="50%" stopColor="rgba(56, 68, 88, 0.82)" />
-            <stop offset="100%" stopColor="rgba(46, 56, 74, 0.78)" />
+            <stop offset="0%" stopColor="rgba(72, 86, 110, 0.90)" />
+            <stop offset="50%" stopColor="rgba(58, 70, 92, 0.84)" />
+            <stop offset="100%" stopColor="rgba(46, 56, 76, 0.80)" />
           </linearGradient>
 
           {/* Ombra per far risaltare perfettamente i numeri sopra al vetro */}
@@ -247,22 +255,24 @@ export function ArcZoomDial({
         </defs>
 
         {/* 
-          1. CERCHIO INTERNO: SFUMATO E SFOCATO
-          Si fonde morbidamente verso il cerchio esterno senza stacchi netti
+          1. IL CERCHIO GRANDE (INDICATO IN ROSSO DALL'UTENTE):
+          - Sfondo satinato sfocato e continuo che si estende sopra Scansiona (y=9) e sotto Strumenti (y=371)
+          - Abbraccia l'intero blocco comandi a filo con il bordo destro dello schermo
+          - Si fonde morbidamente verso l'esterno con la ghiera
         */}
         <path
-          d={satinatoPath}
-          fill="url(#innerBlendGrad)"
+          d={cerchioGrandePath}
+          fill="url(#cerchioGrandeGrad)"
           filter="url(#dialGlassBlur)"
         />
         <path
-          d={satinatoPath}
-          fill="url(#innerBlendGrad)"
+          d={cerchioGrandePath}
+          fill="url(#cerchioGrandeGrad)"
         />
 
         {/* 
           2. CERCHIO ESTERNO (GHIERA CON LINEE DENTRO):
-          Tonalità più chiara a contrasto con il cerchio interno
+          Tonalità più chiara a contrasto con il cerchio grande
         */}
         <path
           d={ghieraPath}
@@ -331,10 +341,10 @@ export function ArcZoomDial({
 
         {/* 
           LINEA INDICE DELLO ZENIT (0° ORIZZONTALE):
-          Raccordo ciano tra la pillola dello zenit e l'apice della ghiera
+          Raccordo ciano tra la pillola dello zenit e l'apice della ghiera (cerchiato in giallo)
         */}
         <line
-          x1={70}
+          x1={56}
           y1={cy}
           x2={apexX}
           y2={cy}
@@ -361,24 +371,24 @@ export function ArcZoomDial({
       </svg>
 
       {/* 
-        IL PUNTO FISSO LO ZENIT:
-        - Pillola con i numeri che cambiano in tempo reale a seconda dello zoom
-        - Bordo ciano ad alto contrasto con ombra e bagliore
-        - Cliccabile per scorrere tra i preset rapidi
+        IN GIALLO LA PILLOLA:
+        - Pillola fissa all'apice (0° orizzontale) a filo con la ghiera come cerchiato in giallo
+        - Mostra il valore zoom live in tempo reale
+        - Toccandola passa ai preset rapidi (0.5x, 1x, 2x, 3x, 5x)
       */}
       <button
         type="button"
         onClick={handlePillClick}
-        className="absolute pointer-events-auto flex items-center justify-center rounded-full bg-[rgba(14,19,28,0.94)] border border-[#00f0ff] shadow-[0_0_14px_rgba(0,240,255,0.4),0_4px_12px_rgba(0,0,0,0.6)] px-2.5 active:scale-95 transition-transform"
+        className="absolute pointer-events-auto flex items-center justify-center rounded-full bg-[rgba(30,37,48,0.88)] border border-white/22 px-2.5 shadow-lg active:scale-95 transition-transform"
         style={{
-          left: "20px",
-          top: `${cy - 16}px`,
-          height: "32px",
-          minWidth: "50px",
+          left: "12px",
+          top: `${cy - 15}px`,
+          height: "30px",
+          minWidth: "44px",
         }}
         aria-label={`Zoom corrente: ${zoomLabel(zoom)}. Tocca per cambiare preset.`}
       >
-        <span className="text-[14px] font-extrabold text-white tracking-tight tabular-nums drop-shadow-sm">
+        <span className="text-[13.5px] font-bold text-white tracking-tight tabular-nums">
           {zoomLabel(zoom)}
         </span>
       </button>
