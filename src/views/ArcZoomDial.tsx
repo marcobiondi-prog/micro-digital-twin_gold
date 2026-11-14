@@ -3,13 +3,14 @@ import { zoomLabel, ZOOM_MIN, ZOOM_MAX } from "@/lib/camera-zoom";
 import { hapticTick } from "@/lib/haptics";
 
 /**
- * Ghiera zoom landscape (Camera Jog Dial / Goniometro) - Replica esatta ad ampio respiro:
- * - Geometria calibrata al mockup di riferimento: centro (cx=272, cy=190), R=153px, ampiezza 324x380px
- * - Nastro curvo satinato regolare con estremità arrotondate che abbraccia elegantemente i comandi
- * - Numeri ben visibili e leggibili all'interno dell'arco (0.5x, 1x, 2x, 3x, 5x) con tracciamento nitido
- * - Tacche radiali graduate ogni ~4.9° con accenti ciano (#00f0ff) e punti bianchi sui preset
- * - Pillola fissa all'apice (0° orizzontale) a filo con [ Singolo | Multiplo ] con valore zoom live e mirino ciano
- * - Rotazione fluida 1:1 con il trascinamento del pollice e feedback aptico
+ * Ghiera zoom landscape (Camera Jog Dial / Goniometro) - Architettura a 2 cerchi concentrici:
+ * 1. CERCHIO 1 (Ghiera esterna): nastro curvo regolare con le linee graduate all'interno.
+ * 2. CERCHIO 2 (Vetro satinato trasparente interno): semicerchio satinato trasparente
+ *    attorno allo shutter con i numeri (0.5x, 1x, 2x, 3x, 5x) e i pallini bianchi al suo interno.
+ *    È QUESTO cerchio satinato trasparente che ruota al variare dello zoom.
+ * - L'INTERO BLOCCO è a filo del bordo destro dello schermo.
+ * - Pillola fissa all'apice (0° orizzontale) a filo con [ Singolo | Multiplo ] con valore zoom live e mirino ciano.
+ * - Rotazione fluida 1:1 al trascinamento del pollice e feedback aptico.
  */
 export function ArcZoomDial({
   zoom,
@@ -29,33 +30,43 @@ export function ArcZoomDial({
   const lastAngle = useRef(0);
   const lastHapticZoom = useRef(zoom);
 
-  // Dimensioni ampie ed ergonomiche: centro rotazione (cx, cy) concentrico allo shutter button
-  const cx = 272;
+  // Dimensioni calibrate: blocco a filo del bordo destro (W=280, H=380)
+  // Il centro dello shutter è a 48px dal bordo destro dello schermo -> cx = 280 - 48 = 232
+  const W = 280;
+  const H = 380;
+  const cx = 232;
   const cy = 190;
-  const R = 153.0; // Raggio della traccia graduata centrale
-  const Ro = 175.0; // Raggio esterno del nastro satinato
-  const Ri = 120.0; // Raggio interno del nastro satinato
-  const R_dot = 140.0; // Raggio dei punti bianchi di stop
-  const R_text = 123.0; // Raggio dei numeri dello zoom all'interno dell'arco
 
-  const degTop = 54.0;
-  const degBot = 64.0;
+  // Cerchio 1 (Ghiera esterna con le linee dentro):
+  const Ro = 175.0; // Raggio esterno ghiera
+  const Rm = 142.0; // Raggio interno ghiera / confine con il vetro satinato
+  const R = 158.0; // Raggio linea centrale delle tacche graduate
+
+  // Cerchio 2 (Vetro satinato trasparente con i numeri dentro):
+  const R_dot = 126.0; // Raggio dei pallini bianchi dentro il vetro satinato
+  const R_text = 108.0; // Raggio dei numeri dello zoom dentro il vetro satinato
+
+  const degTop = 56.0;
+  const degBot = 66.0;
   const radT = (degTop * Math.PI) / 180;
   const radB = (degBot * Math.PI) / 180;
 
-  // Calcolo punti perimetrali del nastro curvo con terminazioni arrotondate
+  // Coordinate Cerchio 1 (Ghiera esterna)
   const xTo = cx - Ro * Math.cos(radT);
   const yTo = cy - Ro * Math.sin(radT);
   const xBo = cx - Ro * Math.cos(radB);
   const yBo = cy + Ro * Math.sin(radB);
-  const xBi = cx - Ri * Math.cos(radB);
-  const yBi = cy + Ri * Math.sin(radB);
-  const xTi = cx - Ri * Math.cos(radT);
-  const yTi = cy - Ri * Math.sin(radT);
-  const capR = (Ro - Ri) / 2; // 27.5px
+  const xBm = cx - Rm * Math.cos(radB);
+  const yBm = cy + Rm * Math.sin(radB);
+  const xTm = cx - Rm * Math.cos(radT);
+  const yTm = cy - Rm * Math.sin(radT);
+  const capR1 = (Ro - Rm) / 2; // 16.5px
 
-  // Path SVG del nastro satinato a semicerchio regolare
-  const ribbonPath = `M ${xTo.toFixed(1)} ${yTo.toFixed(1)} A ${Ro} ${Ro} 0 0 0 ${xBo.toFixed(1)} ${yBo.toFixed(1)} A ${capR.toFixed(1)} ${capR.toFixed(1)} 0 0 0 ${xBi.toFixed(1)} ${yBi.toFixed(1)} A ${Ri} ${Ri} 0 0 1 ${xTi.toFixed(1)} ${yTi.toFixed(1)} A ${capR.toFixed(1)} ${capR.toFixed(1)} 0 0 0 ${xTo.toFixed(1)} ${yTo.toFixed(1)} Z`;
+  // Path SVG Cerchio 1 (Ghiera esterna con estremità arrotondate)
+  const ghieraPath = `M ${xTo.toFixed(1)} ${yTo.toFixed(1)} A ${Ro} ${Ro} 0 0 0 ${xBo.toFixed(1)} ${yBo.toFixed(1)} A ${capR1.toFixed(1)} ${capR1.toFixed(1)} 0 0 0 ${xBm.toFixed(1)} ${yBm.toFixed(1)} A ${Rm} ${Rm} 0 0 1 ${xTm.toFixed(1)} ${yTm.toFixed(1)} A ${capR1.toFixed(1)} ${capR1.toFixed(1)} 0 0 0 ${xTo.toFixed(1)} ${yTo.toFixed(1)} Z`;
+
+  // Path SVG Cerchio 2 (Vetro satinato trasparente interno attorno allo shutter a filo con il bordo destro x=W)
+  const satinatoPath = `M ${xTm.toFixed(1)} ${yTm.toFixed(1)} A ${Rm} ${Rm} 0 0 0 ${xBm.toFixed(1)} ${yBm.toFixed(1)} L ${W} ${yBm.toFixed(1)} L ${W} ${yTm.toFixed(1)} Z`;
 
   // Mappatura angolare continua: 1x a -39°, 2x all'apice 0°, 3x a +39°
   const angleForZoom = (z: number) => {
@@ -97,8 +108,8 @@ export function ArcZoomDial({
   const getPointerAngle = (e: ReactPointerEvent<SVGElement>) => {
     if (!svgRef.current) return 0;
     const rect = svgRef.current.getBoundingClientRect();
-    const scaleX = rect.width / 324;
-    const scaleY = rect.height / 380;
+    const scaleX = rect.width / W;
+    const scaleY = rect.height / H;
     const screenCx = rect.left + cx * scaleX;
     const screenCy = rect.top + cy * scaleY;
     const dx = e.clientX - screenCx;
@@ -135,7 +146,7 @@ export function ArcZoomDial({
     dragging.current = false;
   };
 
-  // Stop principali lungo l'arco (0.5x, 1x, 2x, 3x, 5x) con numeri visibili dentro l'arco
+  // Stop principali (0.5x, 1x, 2x, 3x, 5x): numeri e pallini posizionati dentro il Cerchio 2
   const stops = [
     { label: "0.5x", zoomVal: 0.5 },
     { label: "1x", zoomVal: 1 },
@@ -161,17 +172,17 @@ export function ArcZoomDial({
     };
   });
 
-  // Tacche graduate secondarie ogni 4.875°
-  const ticks: Array<{ deg: number; x1: number; y1: number; x2: number; y2: number; isCyan?: boolean }> = [];
+  // Tacche graduate secondarie dentro il Cerchio 1 (ghiera) ogni 4.875°
+  const ticks: Array<{ deg: number; x1: number; y1: number; x2: number; y2: number; isCyan?: boolean; isStop?: boolean }> = [];
   for (let i = -16; i <= 16; i++) {
     const d = i * 4.875;
     if (d < -degTop - 25 || d > degBot + 25) continue;
-    if (stops.some((s) => Math.abs(s.deg - d) < 2.0)) continue;
+    const isStop = stops.some((s) => Math.abs(s.deg - d) < 2.0);
     const rad = (d * Math.PI) / 180;
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
-    const isCyan = Math.abs(i % 4) === 0;
-    const tlen = isCyan ? 4.5 : 3.0;
+    const isCyan = Math.abs(i % 4) === 0 || isStop;
+    const tlen = isStop ? 7.0 : isCyan ? 4.5 : 3.0;
     ticks.push({
       deg: d,
       x1: cx - (R - tlen) * cos,
@@ -179,10 +190,11 @@ export function ArcZoomDial({
       x2: cx - (R + tlen) * cos,
       y2: cy + (R + tlen) * sin,
       isCyan,
+      isStop,
     });
   }
 
-  // Apice orizzontale a sinistra: cx - R = 272 - 153 = 119px
+  // Apice orizzontale della ghiera a sinistra: cx - R = 232 - 158 = 74px
   const apexX = cx - R;
 
   // Tocco sulla pillola fissa: passa ai preset rapidi
@@ -197,48 +209,56 @@ export function ArcZoomDial({
   return (
     <div
       className={`absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none select-none z-10 flex items-center justify-end ${className}`}
-      style={{ width: "324px", height: "380px" }}
+      style={{ width: `${W}px`, height: `${H}px` }}
       data-camera-controls
     >
       <svg
         ref={svgRef}
-        viewBox="0 0 324 380"
+        viewBox={`0 0 ${W} ${H}`}
         className="w-full h-full overflow-visible pointer-events-none select-none"
         aria-hidden="true"
       >
         <defs>
-          <clipPath id="dialRibbonClip">
-            <path d={ribbonPath} />
+          <clipPath id="dialSatinatoClip">
+            <path d={satinatoPath} />
           </clipPath>
         </defs>
 
-        {/* Nastro satinato a semicerchio regolare (sfondo naturale del goniometro) */}
+        {/* 
+          CERCHIO 2: VETRO SATINATO TRASPARENTE CON I NUMERI DENTRO
+          Semicerchio interno attorno allo shutter che abbraccia il bordo destro
+        */}
         <path
-          d={ribbonPath}
-          fill="rgba(32, 38, 48, 0.76)"
-          stroke="rgba(255, 255, 255, 0.16)"
+          d={satinatoPath}
+          fill="rgba(34, 42, 54, 0.52)"
+          stroke="rgba(255, 255, 255, 0.14)"
           strokeWidth="1"
         />
 
         {/* 
-          GHIERA ROTANTE AMPIA (GONIOMETRO CAMERA RADIAL ZOOM):
-          Ruota fluidamente attorno al centro dello shutter (cx, cy).
-          I numeri e le tacche scorrono all'interno del nastro satinato.
+          CERCHIO 1: LA GHIERA CON LE LINEE DENTRO
+          Nastro curvo esterno scuro con le tacche graduate all'interno
         */}
-        <g
-          clipPath="url(#dialRibbonClip)"
-          transform={`rotate(${dialRotation}, ${cx}, ${cy})`}
-          className="transition-transform duration-75 ease-out"
-        >
-          {/* Traccia circolare guida sottile */}
-          <path
-            d={`M ${xTo.toFixed(1)} ${yTo.toFixed(1)} A ${R} ${R} 0 0 0 ${xBo.toFixed(1)} ${yBo.toFixed(1)}`}
-            fill="none"
-            stroke="rgba(255, 255, 255, 0.22)"
-            strokeWidth="1"
-          />
+        <path
+          d={ghieraPath}
+          fill="rgba(20, 25, 34, 0.84)"
+          stroke="rgba(255, 255, 255, 0.18)"
+          strokeWidth="1"
+        />
 
-          {/* Tacche graduate secondarie */}
+        {/* Traccia circolare guida sottile di confine tra i due cerchi */}
+        <path
+          d={`M ${xTm.toFixed(1)} ${yTm.toFixed(1)} A ${Rm} ${Rm} 0 0 0 ${xBm.toFixed(1)} ${yBm.toFixed(1)}`}
+          fill="none"
+          stroke="rgba(255, 255, 255, 0.22)"
+          strokeWidth="1"
+        />
+
+        {/* 
+          LINEE FISSE DENTRO IL CERCHIO 1 (GHIERA):
+          Le tacche graduate fisse della ghiera
+        */}
+        <g>
           {ticks.map((t, idx) => (
             <line
               key={idx}
@@ -247,23 +267,24 @@ export function ArcZoomDial({
               x2={t.x2}
               y2={t.y2}
               stroke={t.isCyan ? "#00f0ff" : "rgba(255, 255, 255, 0.70)"}
-              strokeWidth={t.isCyan ? "1.6" : "1.1"}
+              strokeWidth={t.isStop ? "2.6" : t.isCyan ? "1.6" : "1.1"}
               strokeLinecap="round"
             />
           ))}
+        </g>
 
-          {/* Stop principali: tacca ciano, punto bianco e NUMERI VISIBILI DENTRO L'ARCO */}
+        {/* 
+          CERCHIO DENTRO SATINATO TRASPARENTE CHE RUOTA CON I NUMERI:
+          Ruota fluidamente al variare dello zoom attorno a (cx, cy).
+          I numeri e i pallini bianchi scorrono nel cerchio satinato trasparente.
+        */}
+        <g
+          clipPath="url(#dialSatinatoClip)"
+          transform={`rotate(${dialRotation}, ${cx}, ${cy})`}
+          className="transition-transform duration-75 ease-out"
+        >
           {stops.map((s) => (
             <g key={s.label}>
-              <line
-                x1={s.xIn}
-                y1={s.yIn}
-                x2={s.xOut}
-                y2={s.yOut}
-                stroke="#00f0ff"
-                strokeWidth="2.6"
-                strokeLinecap="round"
-              />
               <circle
                 cx={s.dotX}
                 cy={s.dotY}
@@ -293,10 +314,10 @@ export function ArcZoomDial({
 
         {/* 
           ELEMENTI FISSI ALL'APICE (0° ORIZZONTALE):
-          Linea orizzontale ciano che connette la pillola fissa all'apice dell'arco
+          Linea orizzontale ciano che connette la pillola fissa all'apice della ghiera
         */}
         <line
-          x1={84}
+          x1={54}
           y1={cy}
           x2={apexX}
           y2={cy}
@@ -306,13 +327,13 @@ export function ArcZoomDial({
         />
 
         {/* 
-          ZONA TOUCH DEDICATA: traccia trasparente curva ampia (60px) per swipe fluido con il pollice
+          ZONA TOUCH DEDICATA: traccia trasparente curva ampia per swipe fluido con il pollice
         */}
         <path
-          d={`M ${cx - R * Math.cos(radT)} ${cy - R * Math.sin(radT)} A ${R} ${R} 0 0 0 ${cx - R * Math.cos(radB)} ${cy + R * Math.sin(radB)}`}
+          d={`M ${cx - Ro * Math.cos(radT)} ${cy - Ro * Math.sin(radT)} A ${Ro} ${Ro} 0 0 0 ${cx - Ro * Math.cos(radB)} ${cy + Ro * Math.sin(radB)}`}
           fill="none"
           stroke="transparent"
-          strokeWidth="64"
+          strokeWidth="68"
           strokeLinecap="round"
           className="cursor-ns-resize pointer-events-auto touch-none"
           onPointerDown={onPointerDown}
@@ -325,7 +346,7 @@ export function ArcZoomDial({
       {/* 
         PILLOLA FISSA ALL'APICE (0° ORIZZONTALE):
         - Fissa all'apice orizzontale a filo con [ Singolo | Multiplo ]
-        - Mostra il valore zoom corrente in tempo reale
+        - Mostra il valore zoom live in tempo reale
         - Toccandola passa ai preset rapidi
       */}
       <button
@@ -333,7 +354,7 @@ export function ArcZoomDial({
         onClick={handlePillClick}
         className="absolute pointer-events-auto flex items-center justify-center rounded-full bg-[rgba(36,42,52,0.85)] border border-white/22 px-2.5 shadow-lg active:scale-95 transition-transform"
         style={{
-          left: "40px",
+          left: "12px",
           top: `${cy - 15}px`,
           height: "30px",
           minWidth: "42px",
