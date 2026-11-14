@@ -51,6 +51,8 @@ import { tutorialSwipeStep } from "@/lib/ar-tutorial-swipe";
 import { CameraCenterCapture } from "@/views/CameraCenterCapture";
 import { CameraCaptureControl } from "@/views/CameraCaptureControl";
 import { useHoldBurst } from "@/lib/hold-burst";
+import { ZoomDial } from "@/views/ZoomDial";
+import { ArcZoomDial } from "@/views/ArcZoomDial";
 import { playAiShutter, playCameraSound, preloadAiShutter, startScanLoop } from "@/lib/camera-sounds";
 import { useLab } from "@/models/lab-store";
 import { createTrackZoomer, pinchZoom, splitZoom, trackZoomRange, zoomHaptic, ZOOM_MAX, ZOOM_MIN } from "@/lib/camera-zoom";
@@ -2053,6 +2055,10 @@ export function ArCamera({
     />
   );
 
+  const zoomDialElement = !toolsOpen && (
+    <ZoomDial zoom={zoom} max={ZOOM_MAX} disabled={!ready || scanning} onZoom={setZoom} onRulerChange={setZoomRulerActive} />
+  );
+
   const swipeHintElement = (
     <p className="ar-start-swipe-hint" data-visible={swipeHint} role="status" aria-hidden={!swipeHint}>
       Fai uno swipe dal basso verso l’alto per chiudere.
@@ -2162,11 +2168,11 @@ export function ArCamera({
 
             {landscape ? (
               <div className="ar-landscape-layout" data-camera-controls>
-                {/* Colonna Sinistra: Schermo Puro - Pillola Specie e Clima */}
+                {/* Colonna Sinistra: Informazioni e Analisi */}
                 <div className="ar-landscape-left">
                   {!infoBannerDismissed && (
                     <div
-                      className="ar-pure-badge cursor-grab pointer-events-auto"
+                      className="ar-landscape-specimen-card cursor-grab"
                       data-camera-controls
                       style={
                         infoBannerDragging
@@ -2179,17 +2185,27 @@ export function ArCamera({
                       onPointerCancel={onBannerPointerUp}
                       title="Fai uno swipe per togliere la Tab info"
                     >
-                      <span className="text-xs font-bold text-white tracking-tight">
+                      <p className="text-xs font-bold text-white">
                         {species?.name ? `${species.name} · x${dockCount || 1}` : `Alberi e ombra · Leccio · x${dockCount || 1}`}
-                      </span>
-                      <span className="text-white/40">|</span>
-                      <span className="text-xs font-medium text-emerald-400 tabular-nums">
-                        -{((0.4 * (dockCount || 1))).toFixed(1).replace(".", ",")} °C
-                      </span>
+                      </p>
+                      <div className="mt-1 space-y-0.5 text-[11px] text-white/80 font-variant-numeric tabular-nums">
+                        <p>Ombreggiatura ≈ {18 * (dockCount || 1)} m²</p>
+                        <p>Riduzione ≈ -{((0.4 * (dockCount || 1))).toFixed(1).replace(".", ",")} °C</p>
+                      </div>
                     </div>
                   )}
+                  <div className="ar-landscape-balance-card" data-camera-controls>
+                    <p className="text-xs font-bold text-white mb-1.5">Bilancia termica</p>
+                    <div className="ar-thermal-balance" data-camera-controls role="slider" tabIndex={0}
+                      aria-valuemin={0} aria-valuemax={MAX_GREEN} aria-valuenow={dockCount}
+                      aria-label="Bilancia termica">
+                      <span className="ar-thermal-balance-track is-draggable" onPointerDown={balanceDrag}>
+                        <span className="ar-thermal-balance-marker" style={{ left: `${Math.min(100, Math.max(0, (dockCount / MAX_GREEN) * 100))}%` }} />
+                      </span>
+                    </div>
+                  </div>
 
-                  {/* Miniature delle foto scattate */}
+                  {/* Miniature delle foto scattate sotto la bilancia termica */}
                   {burstShelfElement && (
                     <div className="ar-landscape-carousel-slot" data-camera-controls>
                       {burstShelfElement}
@@ -2197,47 +2213,16 @@ export function ArCamera({
                   )}
                 </div>
 
-                {/* Colonna Destra: Schermo Puro - Dock Verticale con Zoom a 1 tocco */}
+                {/* Colonna Destra: Controlli Fotocamera ed Ergonomia con il pollice */}
                 <div className="ar-landscape-right">
                   {toolsOpen && toolsPanelElement}
-                  <div className="relative flex items-center justify-end gap-3 select-none">
-                    {/* Micro Capsule Zoom [ 1x | 2x ] */}
-                    <div
-                      role="radiogroup"
-                      aria-label="Livello di zoom"
-                      className="flex flex-col gap-1.5 p-1 rounded-full bg-[rgba(20,26,36,0.78)] border border-white/20 backdrop-blur-md shadow-xl pointer-events-auto"
-                    >
-                      <button
-                        type="button"
-                        role="radio"
-                        aria-checked={Math.abs(zoom - 1) < 0.2}
-                        onClick={() => { setZoom(1); hapticTick(); }}
-                        aria-label="Zoom 1x"
-                        className={`size-7 rounded-full text-xs font-bold transition-all ${
-                          Math.abs(zoom - 1) < 0.2
-                            ? "bg-white text-black shadow-md font-extrabold"
-                            : "text-white/70 hover:text-white"
-                        }`}
-                      >
-                        1x
-                      </button>
-                      <button
-                        type="button"
-                        role="radio"
-                        aria-checked={Math.abs(zoom - 2) < 0.2}
-                        onClick={() => { setZoom(2); hapticTick(); }}
-                        aria-label="Zoom 2x"
-                        className={`size-7 rounded-full text-xs font-bold transition-all ${
-                          Math.abs(zoom - 2) < 0.2
-                            ? "bg-white text-black shadow-md font-extrabold"
-                            : "text-white/70 hover:text-white"
-                        }`}
-                      >
-                        2x
-                      </button>
-                    </div>
-
-                    {/* Shutter Vertical Dock (Scansiona | Scatto | Strumenti) */}
+                  <div className="relative flex items-center justify-end select-none">
+                    <ArcZoomDial
+                      zoom={zoom}
+                      max={ZOOM_MAX}
+                      onZoom={setZoom}
+                      disabled={!ready || scanning}
+                    />
                     <div className="relative z-50 pointer-events-auto">
                       {captureControlElement}
                     </div>
@@ -2248,12 +2233,12 @@ export function ArCamera({
               <>
                 <div
                   data-camera-hud
-                  className="camera-bottom absolute z-20 flex flex-col items-center gap-2 w-full"
+                  className="camera-bottom absolute z-20 flex flex-col items-center gap-2.5 w-full"
                 >
-                  {/* Schermo Puro - Pillola Compatta Specie & Clima */}
+                  {/* Card informativo specie / raffrescamento */}
                   {!infoBannerDismissed && (
                     <div
-                      className="ar-pure-badge cursor-grab pointer-events-auto mb-0.5"
+                      className="ar-portrait-specimen-card cursor-grab"
                       data-camera-controls
                       style={
                         infoBannerDragging
@@ -2266,58 +2251,17 @@ export function ArCamera({
                       onPointerCancel={onBannerPointerUp}
                       title="Fai uno swipe verso il basso per togliere la Tab info"
                     >
-                      <span className="text-xs font-bold text-white tracking-tight">
-                        {species?.name ? `${species.name} · x${dockCount || 1}` : (kind === "urban" ? "Leccio · x1" : "Vite · x1")}
-                      </span>
-                      <span className="text-white/40">|</span>
-                      <span className="text-xs font-medium text-emerald-400 tabular-nums">
-                        -{((0.4 * (dockCount || 1))).toFixed(1).replace(".", ",")} °C
-                      </span>
+                      <p className="ar-portrait-specimen-title truncate">
+                        {species?.name ? `${species.name} (${species.scientificName ?? "Quercus ilex"})` : (kind === "urban" ? "Leccio (Quercus ilex)" : "Vite (Vitis vinifera)")}
+                      </p>
+                      <p className="ar-portrait-specimen-desc">
+                        Ombra stimata ≈ {18 * (dockCount || 1)} m² · Raffrescamento ≈ -{((0.4 * (dockCount || 1))).toFixed(1).replace(".", ",")} °C
+                      </p>
                     </div>
                   )}
-
                   {toolsOpen && toolsPanelElement}
                   {burst && burstShelfElement}
-
-                  {/* Schermo Puro - Capsula Zoom 1x | 2x orizzontale compatta */}
-                  {!toolsOpen && (
-                    <div
-                      role="radiogroup"
-                      aria-label="Livello di zoom"
-                      className="flex items-center gap-1 p-1 rounded-full bg-[rgba(20,26,36,0.78)] border border-white/20 backdrop-blur-md shadow-lg mb-1 pointer-events-auto"
-                      data-camera-controls
-                    >
-                      <button
-                        type="button"
-                        role="radio"
-                        aria-checked={Math.abs(zoom - 1) < 0.2}
-                        onClick={() => { setZoom(1); hapticTick(); }}
-                        aria-label="Zoom 1x"
-                        className={`h-6 px-3 rounded-full text-xs font-bold transition-all ${
-                          Math.abs(zoom - 1) < 0.2
-                            ? "bg-white text-black shadow-sm font-extrabold"
-                            : "text-white/70 hover:text-white"
-                        }`}
-                      >
-                        1x
-                      </button>
-                      <button
-                        type="button"
-                        role="radio"
-                        aria-checked={Math.abs(zoom - 2) < 0.2}
-                        onClick={() => { setZoom(2); hapticTick(); }}
-                        aria-label="Zoom 2x"
-                        className={`h-6 px-3 rounded-full text-xs font-bold transition-all ${
-                          Math.abs(zoom - 2) < 0.2
-                            ? "bg-white text-black shadow-sm font-extrabold"
-                            : "text-white/70 hover:text-white"
-                        }`}
-                      >
-                        2x
-                      </button>
-                    </div>
-                  )}
-
+                  {zoomDialElement}
                   {captureControlElement}
                   {swipeHintElement}
                 </div>
