@@ -2206,7 +2206,6 @@ export function ArCamera({
                       max={ZOOM_MAX}
                       onZoom={setZoom}
                       disabled={!ready || scanning}
-                      fitHeight={viewport.height ? viewport.height - AR_LANDSCAPE_TOP_RESERVE - AR_LANDSCAPE_BOTTOM_RESERVE : undefined}
                     />
                     <div className="relative z-50 pointer-events-auto">
                       {captureControlElement}
