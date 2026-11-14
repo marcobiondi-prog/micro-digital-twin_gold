@@ -36,14 +36,14 @@ export function ArcZoomDial({
   const cx = 240;
   const cy = 190;
 
-  // Cerchio 1 (Ghiera esterna spostata più avanti verso l'interno schermo):
-  const Ro = 196.0; // Raggio esterno ghiera (spostato più avanti)
-  const Rm = 162.0; // Raggio interno ghiera / confine con il vetro satinato
-  const R = 179.0; // Raggio linea centrale delle tacche graduate
+  // Cerchio 1 (Ghiera esterna resa leggermente più compatta e spostata più avanti):
+  const Ro = 194.0; // Raggio esterno ghiera (leggermente più piccola)
+  const Rm = 168.0; // Raggio interno ghiera (spostato più avanti per distaccarsi dai numeri)
+  const R = 181.0; // Raggio linea centrale delle tacche graduate (nastro da 26px)
 
   // Cerchio Grande (indicato in rosso dall'utente):
-  // Raggio ampio R_big = 208px attorno a (cx, cy) che abbraccia l'intero blocco comandi
-  const R_big = 208.0;
+  // Raggio ampio R_big = 206px attorno a (cx, cy) che abbraccia l'intero blocco comandi
+  const R_big = 206.0;
   const radBig = (78.0 * Math.PI) / 180;
   const xT_big = cx - R_big * Math.cos(radBig);
   const yT_big = cy - R_big * Math.sin(radBig);
@@ -51,9 +51,10 @@ export function ArcZoomDial({
   const yB_big = cy + R_big * Math.sin(radBig);
   const cerchioGrandePath = `M ${xT_big.toFixed(1)} ${yT_big.toFixed(1)} A ${R_big} ${R_big} 0 0 0 ${xB_big.toFixed(1)} ${yB_big.toFixed(1)} L ${W} ${yB_big.toFixed(1)} L ${W} ${yT_big.toFixed(1)} Z`;
 
-  // Cerchio 2 (Vetro satinato trasparente con i numeri dentro spostati più avanti):
-  const R_dot = 156.0; // Raggio dei pallini bianchi dentro il vetro satinato (avanzati verso l'arco)
-  const R_text = 138.0; // Raggio dei numeri dello zoom dentro il vetro satinato (avanzati per non finire sotto Scansiona e Strumenti)
+  // Cerchio 2 (Vetro satinato trasparente con i numeri dentro):
+  // Raggi calibrati con 22px di distacco dal primo cerchio per non toccarsi mai
+  const R_dot = 146.0; // Raggio dei pallini bianchi dentro il vetro satinato
+  const R_text = 128.0; // Raggio dei numeri dello zoom dentro il vetro satinato
 
   const degTop = 56.0;
   const degBot = 66.0;
@@ -226,16 +227,17 @@ export function ArcZoomDial({
         aria-hidden="true"
       >
         <defs>
-          {/* Blur in verticale per il cerchio interno satinato */}
+          {/* Blur in verticale per sfumare morbidamente i bordi del secondo cerchio */}
           <filter id="verticalGlassBlur" x="-30%" y="-40%" width="160%" height="180%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="1.5 16" result="vBlur" />
+            <feGaussianBlur in="SourceGraphic" stdDeviation="6 22" result="vBlur" />
           </filter>
 
-          {/* Sfumatura radiale satinata: alfa del 25% per il secondo cerchio */}
+          {/* Sfumatura radiale satinata: alfa del 30% per il secondo cerchio */}
           <radialGradient id="cerchioGrandeGrad" cx={cx} cy={cy} r={R_big} gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.25" />
-            <stop offset="55%" stopColor="#e2ecf8" stopOpacity="0.25" />
-            <stop offset="85%" stopColor="#b0c6df" stopOpacity="0.14" />
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.30" />
+            <stop offset="50%" stopColor="#e2ecf8" stopOpacity="0.30" />
+            <stop offset="78%" stopColor="#b0c6df" stopOpacity="0.18" />
+            <stop offset="92%" stopColor="#9cb8d6" stopOpacity="0.08" />
             <stop offset="100%" stopColor="#7a9bc2" stopOpacity="0.0" />
           </radialGradient>
 
@@ -264,8 +266,8 @@ export function ArcZoomDial({
         </defs>
 
         {/* 
-          1. IL CERCHIO GRANDE (ALFA AL 10%, BLUR VERTICALE, NIENTE BORDER):
-          - Vetro satinato trasparente e leggero con alfa del 10% e blur verticale
+          1. IL CERCHIO GRANDE (ALFA AL 30%, BLUR VERTICALE SFUMATO, NIENTE BORDER):
+          - Vetro satinato con alfa del 30% e blur verticale morbido per sfumare i bordi
           - Senza bordo (niente border)
           - Si estende sopra Scansiona (y=9) e sotto Strumenti (y=371)
         */}
@@ -276,14 +278,13 @@ export function ArcZoomDial({
         />
 
         {/* 
-          2. CERCHIO ESTERNO (GHIERA CON CARATTERE):
-          Tonalità smoked dark glass con profondità, riflesso e bordo marcato
+          2. CERCHIO ESTERNO (GHIERA CON CARATTERE - SENZA BORDO):
+          Tonalità smoked dark glass con profondità e riflesso, bordo rimosso (stroke="none")
         */}
         <path
           d={ghieraPath}
           fill="url(#outerGhieraGrad)"
-          stroke="rgba(255, 255, 255, 0.38)"
-          strokeWidth="1.2"
+          stroke="none"
           filter="url(#ghieraDepth)"
         />
 
