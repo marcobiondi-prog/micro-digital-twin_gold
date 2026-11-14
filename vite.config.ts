@@ -49,8 +49,8 @@ export default defineConfig(({ command }) => ({
       manifest: false,
       filename: "sw.js",
       // Nitro writes the client build here for node-server, cloudflare-module and
-      // most presets; adjust if your host uses another static dir (Vercel: .vercel/output/static).
-      outDir: process.env["PWA_OUT_DIR"] ?? ".output/public",
+      // most presets; on Vercel it defaults to .vercel/output/static.
+      outDir: process.env["PWA_OUT_DIR"] ?? (process.env["VERCEL"] ? ".vercel/output/static" : ".output/public"),
       devOptions: { enabled: false },
       workbox: {
         navigateFallback: null,
