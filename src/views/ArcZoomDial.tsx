@@ -233,11 +233,11 @@ export function ArcZoomDial({
             <feGaussianBlur in="SourceGraphic" stdDeviation="1.5 16" result="vBlur" />
           </filter>
 
-          {/* Sfumatura radiale satinata: alfa del 10% per il cerchio interno */}
+          {/* Sfumatura radiale satinata: alfa del 15% per il cerchio interno */}
           <radialGradient id="cerchioGrandeGrad" cx={cx} cy={cy} r={R_big} gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.10" />
-            <stop offset="55%" stopColor="#e2ecf8" stopOpacity="0.10" />
-            <stop offset="85%" stopColor="#b0c6df" stopOpacity="0.05" />
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.15" />
+            <stop offset="55%" stopColor="#e2ecf8" stopOpacity="0.15" />
+            <stop offset="85%" stopColor="#b0c6df" stopOpacity="0.08" />
             <stop offset="100%" stopColor="#7a9bc2" stopOpacity="0.0" />
           </radialGradient>
 

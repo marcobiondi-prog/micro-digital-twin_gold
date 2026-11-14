@@ -1562,7 +1562,7 @@ export function ArCamera({
       className={`ar-camera-topbar ${landscape ? "ar-camera-topbar-landscape" : "ar-camera-topbar-portrait"}`}
     >
       {landscape ? (
-        <div className="flex w-full items-center justify-between px-4 pt-1" data-camera-controls>
+        <div className="flex w-full items-center justify-between pl-4 pr-0 pt-1" data-camera-controls>
           {/* Left: Close + ARCore */}
           <div className="flex items-center gap-2">
             <Button
@@ -1593,8 +1593,11 @@ export function ArCamera({
             </Button>
           </div>
 
-          {/* Right: Singolo / Multiplo switcher + Guide */}
-          <div className="flex items-center gap-2">
+          {/* Right: Singolo / Multiplo switcher + Guide - allineati a filo con la pillola dell'arco (W = 232px, left: 12px) */}
+          <div
+            className="flex items-center justify-start gap-2 pl-3"
+            style={{ width: "232px" }}
+          >
             {!error && mode === "photo" && (
               <div role="radiogroup" aria-label="Tipo di scatto" className="flex rounded-full bg-[rgba(32,36,44,0.72)] p-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur-md shadow-lg">
                 <button type="button" role="radio" aria-checked={!burst} onClick={backToSingle}

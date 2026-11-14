@@ -2723,9 +2723,10 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 }
 
 .camera-capture-dock.is-vertical {
-  width: 96px !important;
+  width: auto !important;
+  min-width: 96px !important;
   margin: 0 !important;
-  padding-right: 6px !important;
+  padding-right: 22px !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
@@ -2737,7 +2738,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   flex-direction: column !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 52px !important;
+  gap: 18px !important;
   width: 100% !important;
   pointer-events: auto !important;
 }
