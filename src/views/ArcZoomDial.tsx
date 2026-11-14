@@ -13,12 +13,16 @@ import { hapticTick } from "@/lib/haptics";
  * - Rotazione fluida 1:1 al trascinamento del pollice e feedback aptico.
  */
 /**
- * Aggiunta in basso alla ghiera: il bordo esterno lascia il cerchio tangente a TAIL_START_DEG e scende con un
- * arco molto più largo (raggio calcolato, sempre tangente: nessuno spigolo né ammaccatura) fino a TAIL_END, il
- * punto in fondo alla linea disegnata dall'utente sullo screenshot, poco sotto il bordo dello schermo.
+ * Aggiunta in basso alla ghiera: il bordo esterno lascia il cerchio tangente a TAIL_START_DEG e scende con una
+ * curva (Bézier cubica, sempre tangente: nessuno spigolo né ammaccatura) più piegata all'inizio e quasi dritta
+ * in fondo, fino a TAIL_END, il punto in fondo alla linea disegnata dall'utente, poco sotto il bordo dello schermo.
+ * TAIL_PULL_START corto = più curva all'inizio; TAIL_END_DIR e TAIL_PULL_END danno la direzione d'arrivo.
  */
 const TAIL_START_DEG = 8;
 const TAIL_END: readonly [number, number] = [108, 386.4];
+const TAIL_PULL_START = 28;
+const TAIL_END_DIR: readonly [number, number] = [0.2, 0.98];
+const TAIL_PULL_END = 95;
 /** Spazio in più sotto il viewBox, così l'aggiunta si chiude fuori dallo schermo senza essere tagliata dal riquadro. */
 const SVG_EXTRA_BOTTOM = 110;
 
@@ -73,21 +77,21 @@ export function ArcZoomDial({
 
   // Path SVG Cerchio 1: ghiera esterna piena (non trasparente) fusa in un solo pezzo con un'aggiunta in basso.
   // In alto l'estremità arrotondata di sempre; il bordo esterno segue il cerchio fino a poco sotto l'apice, poi
-  // un arco più largo e tangente (TAIL_START_DEG → TAIL_END), e si chiude sotto, fuori dallo schermo. Bordo interno, tacche e numeri restano sul cerchio.
-  // Arco dell'aggiunta: centro sulla retta che va dal punto di tangenza T al centro della ghiera, raggio tale da
-  // passare per TAIL_END (|T - E + r·u| = r  →  r = -|T - E|² / (2 u·(T - E))).
+  // una curva tangente, più piegata all'inizio (TAIL_START_DEG → TAIL_END), e si chiude sotto, fuori dallo schermo. Bordo interno, tacche e numeri restano sul cerchio.
+  // Curva dell'aggiunta: parte in T, il punto del cerchio a TAIL_START_DEG.
   const radS = (TAIL_START_DEG * Math.PI) / 180;
   const xTs = cx - Ro * Math.cos(radS);
   const yTs = cy + Ro * Math.sin(radS);
-  const tdx = xTs - TAIL_END[0], tdy = yTs - TAIL_END[1];
-  const tailR = -(tdx * tdx + tdy * tdy) / (2 * ((cx - xTs) / Ro * tdx + (cy - yTs) / Ro * tdy));
+  // Controlli della Bézier: il primo lungo la tangente al cerchio in T, il secondo prima di TAIL_END.
+  const xC1 = xTs + Math.sin(radS) * TAIL_PULL_START, yC1 = yTs + Math.cos(radS) * TAIL_PULL_START;
+  const xC2 = TAIL_END[0] - TAIL_END_DIR[0] * TAIL_PULL_END, yC2 = TAIL_END[1] - TAIL_END_DIR[1] * TAIL_PULL_END;
   const innerEndDeg = 70;
   const xIe = cx - Rm * Math.cos((innerEndDeg * Math.PI) / 180);
   const yIe = cy + Rm * Math.sin((innerEndDeg * Math.PI) / 180);
   const ghieraPath = [
     `M ${xTo.toFixed(1)} ${yTo.toFixed(1)}`,
     `A ${Ro} ${Ro} 0 0 0 ${xTs.toFixed(1)} ${yTs.toFixed(1)}`,
-    `A ${tailR.toFixed(1)} ${tailR.toFixed(1)} 0 0 0 ${TAIL_END[0]} ${TAIL_END[1]}`,
+    `C ${xC1.toFixed(1)} ${yC1.toFixed(1)} ${xC2.toFixed(1)} ${yC2.toFixed(1)} ${TAIL_END[0]} ${TAIL_END[1]}`,
     `L ${TAIL_END[0] + 8} ${H + 80}`,
     `L ${(xIe + 30).toFixed(1)} ${H + 80}`,
     `L ${xIe.toFixed(1)} ${yIe.toFixed(1)}`,
