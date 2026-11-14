@@ -15,11 +15,13 @@ export async function reloadFresh() {
   try { if ("serviceWorker" in navigator) await Promise.all((await navigator.serviceWorker.getRegistrations()).map((r) => r.unregister())); } catch { /* no worker */ }
   window.location.reload();
 }
+/** Reloads clean at most once every 10 s; says whether it did. */
 function reloadForStaleChunk() {
   const last = Number(sessionStorage.getItem(RELOAD_KEY) ?? 0);
-  if (Date.now() - last < 10_000) return;
+  if (Date.now() - last < 10_000) return false;
   sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
   void reloadFresh();
+  return true;
 }
 /** A page of one version running with files of another: a missing chunk, or a route the loaded files do not know. */
 export const isChunkError = (e: unknown) =>
@@ -27,9 +29,11 @@ export const isChunkError = (e: unknown) =>
     String((e as { message?: string })?.message ?? e),
   );
 if (typeof window !== "undefined") {
+  // A page file that did not load: reload clean once. When that was already tried, the error is NOT swallowed:
+  // preventDefault makes the import resolve to undefined, and the router then failed with a misleading
+  // "reading 'component'" instead of the real "Failed to fetch dynamically imported module: <file>".
   window.addEventListener("vite:preloadError", (event) => {
-    event.preventDefault();
-    reloadForStaleChunk();
+    if (reloadForStaleChunk()) event.preventDefault();
   });
   window.addEventListener("unhandledrejection", (event) => {
     if (isChunkError(event.reason)) reloadForStaleChunk();
