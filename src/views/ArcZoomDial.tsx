@@ -219,43 +219,60 @@ export function ArcZoomDial({
         aria-hidden="true"
       >
         <defs>
-          <clipPath id="dialSatinatoClip">
-            <path d={satinatoPath} />
-          </clipPath>
+          {/* Blur filter per lo sfondo satinato del cerchio interno */}
+          <filter id="dialGlassBlur" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="6" result="blur" />
+          </filter>
+
+          {/* Sfumatura radiale: il cerchio interno si fonde dolcemente nel cerchio esterno */}
+          <radialGradient id="innerBlendGrad" cx={cx} cy={cy} r={Ro - 10} gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#0e131d" stopOpacity="0.84" />
+            <stop offset="55%" stopColor="#121824" stopOpacity="0.76" />
+            <stop offset="78%" stopColor="#1a2232" stopOpacity="0.58" />
+            <stop offset="90%" stopColor="#253144" stopOpacity="0.30" />
+            <stop offset="100%" stopColor="#34435b" stopOpacity="0.0" />
+          </radialGradient>
+
+          {/* Gradiente per la ghiera esterna: tonalità più chiara a contrasto con il cerchio interno */}
+          <linearGradient id="outerGhieraGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="rgba(68, 82, 106, 0.88)" />
+            <stop offset="50%" stopColor="rgba(56, 68, 88, 0.82)" />
+            <stop offset="100%" stopColor="rgba(46, 56, 74, 0.78)" />
+          </linearGradient>
+
+          {/* Ombra per far risaltare perfettamente i numeri sopra al vetro */}
+          <filter id="numShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" floodColor="#000000" floodOpacity="0.9" />
+          </filter>
         </defs>
 
         {/* 
-          CERCHIO 2: VETRO SATINATO TRASPARENTE CON I NUMERI DENTRO
-          Semicerchio interno attorno allo shutter che abbraccia il bordo destro
+          1. CERCHIO INTERNO: SFUMATO E SFOCATO
+          Si fonde morbidamente verso il cerchio esterno senza stacchi netti
         */}
         <path
           d={satinatoPath}
-          fill="rgba(34, 42, 54, 0.52)"
-          stroke="rgba(255, 255, 255, 0.14)"
-          strokeWidth="1"
+          fill="url(#innerBlendGrad)"
+          filter="url(#dialGlassBlur)"
+        />
+        <path
+          d={satinatoPath}
+          fill="url(#innerBlendGrad)"
         />
 
         {/* 
-          CERCHIO 1: LA GHIERA CON LE LINEE DENTRO
-          Nastro curvo esterno scuro con le tacche graduate all'interno
+          2. CERCHIO ESTERNO (GHIERA CON LINEE DENTRO):
+          Tonalità più chiara a contrasto con il cerchio interno
         */}
         <path
           d={ghieraPath}
-          fill="rgba(20, 25, 34, 0.84)"
-          stroke="rgba(255, 255, 255, 0.18)"
-          strokeWidth="1"
-        />
-
-        {/* Traccia circolare guida sottile di confine tra i due cerchi */}
-        <path
-          d={`M ${xTm.toFixed(1)} ${yTm.toFixed(1)} A ${Rm} ${Rm} 0 0 0 ${xBm.toFixed(1)} ${yBm.toFixed(1)}`}
-          fill="none"
-          stroke="rgba(255, 255, 255, 0.22)"
+          fill="url(#outerGhieraGrad)"
+          stroke="rgba(255, 255, 255, 0.28)"
           strokeWidth="1"
         />
 
         {/* 
-          LINEE FISSE DENTRO IL CERCHIO 1 (GHIERA):
+          LINEE FISSE DENTRO IL CERCHIO ESTERNO:
           Le tacche graduate fisse della ghiera
         */}
         <g>
@@ -266,7 +283,7 @@ export function ArcZoomDial({
               y1={t.y1}
               x2={t.x2}
               y2={t.y2}
-              stroke={t.isCyan ? "#00f0ff" : "rgba(255, 255, 255, 0.70)"}
+              stroke={t.isCyan ? "#00f0ff" : "rgba(255, 255, 255, 0.75)"}
               strokeWidth={t.isStop ? "2.6" : t.isCyan ? "1.6" : "1.1"}
               strokeLinecap="round"
             />
@@ -274,14 +291,14 @@ export function ArcZoomDial({
         </g>
 
         {/* 
-          CERCHIO DENTRO SATINATO TRASPARENTE CHE RUOTA CON I NUMERI:
-          Ruota fluidamente al variare dello zoom attorno a (cx, cy).
-          I numeri e i pallini bianchi scorrono nel cerchio satinato trasparente.
+          3. LIVELLO DEI NUMERI SOPRA AL CERCHIO INTERNO:
+          Portati sopra al vetro satinato, nitidi e privi di clipping.
+          I numeri e i pallini ruotano fluidamente con lo zoom.
         */}
         <g
-          clipPath="url(#dialSatinatoClip)"
           transform={`rotate(${dialRotation}, ${cx}, ${cy})`}
           className="transition-transform duration-75 ease-out"
+          filter="url(#numShadow)"
         >
           {stops.map((s) => (
             <g key={s.label}>
@@ -301,7 +318,7 @@ export function ArcZoomDial({
                 stroke="rgba(10, 15, 25, 0.85)"
                 strokeWidth="1.2"
                 paintOrder="stroke fill"
-                fontSize="14"
+                fontSize="14.5"
                 fontWeight="700"
                 fontFamily="system-ui, -apple-system, sans-serif"
                 className="pointer-events-none select-none"
@@ -313,11 +330,11 @@ export function ArcZoomDial({
         </g>
 
         {/* 
-          ELEMENTI FISSI ALL'APICE (0° ORIZZONTALE):
-          Linea orizzontale ciano che connette la pillola fissa all'apice della ghiera
+          LINEA INDICE DELLO ZENIT (0° ORIZZONTALE):
+          Raccordo ciano tra la pillola dello zenit e l'apice della ghiera
         */}
         <line
-          x1={54}
+          x1={70}
           y1={cy}
           x2={apexX}
           y2={cy}
@@ -344,24 +361,24 @@ export function ArcZoomDial({
       </svg>
 
       {/* 
-        PILLOLA FISSA ALL'APICE (0° ORIZZONTALE):
-        - Fissa all'apice orizzontale a filo con [ Singolo | Multiplo ]
-        - Mostra il valore zoom live in tempo reale
-        - Toccandola passa ai preset rapidi
+        IL PUNTO FISSO LO ZENIT:
+        - Pillola con i numeri che cambiano in tempo reale a seconda dello zoom
+        - Bordo ciano ad alto contrasto con ombra e bagliore
+        - Cliccabile per scorrere tra i preset rapidi
       */}
       <button
         type="button"
         onClick={handlePillClick}
-        className="absolute pointer-events-auto flex items-center justify-center rounded-full bg-[rgba(36,42,52,0.85)] border border-white/22 px-2.5 shadow-lg active:scale-95 transition-transform"
+        className="absolute pointer-events-auto flex items-center justify-center rounded-full bg-[rgba(14,19,28,0.94)] border border-[#00f0ff] shadow-[0_0_14px_rgba(0,240,255,0.4),0_4px_12px_rgba(0,0,0,0.6)] px-2.5 active:scale-95 transition-transform"
         style={{
-          left: "12px",
-          top: `${cy - 15}px`,
-          height: "30px",
-          minWidth: "42px",
+          left: "20px",
+          top: `${cy - 16}px`,
+          height: "32px",
+          minWidth: "50px",
         }}
         aria-label={`Zoom corrente: ${zoomLabel(zoom)}. Tocca per cambiare preset.`}
       >
-        <span className="text-[13.5px] font-bold text-white tracking-tight tabular-nums">
+        <span className="text-[14px] font-extrabold text-white tracking-tight tabular-nums drop-shadow-sm">
           {zoomLabel(zoom)}
         </span>
       </button>
