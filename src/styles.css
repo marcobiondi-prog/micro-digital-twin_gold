@@ -2877,3 +2877,48 @@ html[data-sys-camera] nav {
 [class*="backdrop-"] {
   -webkit-backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,);
 }
+
+/* AI camera landscape (mockup 2026-11-14): central summary pill in the top bar, larger top controls,
+   larger shutter and Scansiona/Strumenti pills beside the zoom dial. */
+.ar-landscape-info-pill {
+  /* A flex item between the left and right groups (order 1, the right group order 2): it can never cover them. */
+  order: 1; margin-inline: .75rem; min-width: 0; overflow: hidden;
+  display: flex; align-items: center; gap: .75rem; white-space: nowrap;
+  height: 2.75rem; padding: 0 1.1rem; border-radius: 999px;
+  background: rgba(18, 22, 30, 0.78); border: 1px solid rgba(255, 255, 255, 0.14);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  color: rgba(255, 255, 255, 0.82); font-size: .75rem; font-weight: 500; font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.ar-landscape-info-pill b { color: #22d3ee; font-weight: 600; }
+.ar-landscape-info-pill .ar-info-species { display: inline-flex; align-items: center; gap: .35rem; color: #fff; }
+.ar-landscape-info-pill .ar-info-species strong { font-weight: 700; }
+.ar-landscape-info-pill .ar-info-count { padding: .05rem .4rem; border-radius: 999px; background: rgba(34, 211, 238, 0.2); color: #22d3ee; font-size: .68rem; font-weight: 700; }
+.ar-landscape-info-pill .ar-info-sep { width: 1px; height: 1.1rem; background: rgba(255, 255, 255, 0.18); }
+.ar-landscape-info-pill .ar-info-status { display: inline-flex; align-items: center; gap: .4rem; color: #fff; font-weight: 600; }
+.ar-landscape-info-pill .ar-info-dot { width: .45rem; height: .45rem; border-radius: 999px; background: #f59e0b; box-shadow: 0 0 6px #f59e0b; }
+.ar-landscape-info-pill .ar-info-status[data-ok=true] .ar-info-dot { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+/* Narrow landscape phones: the pill drops the labels' spacing before it can touch the side controls. */
+@media (max-width: 860px) {
+  .ar-landscape-info-pill { gap: .5rem; padding: 0 .75rem; font-size: .68rem; }
+  /* Small landscape phones: the status keeps only its coloured dot (the text stays for screen readers). */
+  .ar-landscape-info-pill .ar-info-status-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+}
+.ar-camera-topbar-landscape > div > :last-child { order: 2; }
+
+.ar-camera-topbar-landscape .camera-tool { min-height: 2.75rem; }
+.ar-camera-topbar-landscape .camera-tool.size-10 { width: 2.75rem; height: 2.75rem; }
+.ar-camera-topbar-landscape .camera-tool.ar-pill-inactive { color: #fff !important; padding-inline: 1rem; font-size: 1rem; }
+.ar-camera-topbar-landscape .camera-tool.ar-pill-active { padding-inline: 1rem; font-size: 1rem; }
+.ar-camera-topbar-landscape [role=radiogroup] { padding: .25rem; font-size: 1rem; }
+.ar-camera-topbar-landscape [role=radiogroup] > button { height: 2.25rem; padding-inline: 1rem; }
+.ar-camera-topbar-landscape [aria-label="Guida inquadratura"] { width: 2.75rem; height: 2.75rem; }
+
+.ar-camera-surface[data-landscape=true] .camera-shutter {
+  width: 92px !important; height: 92px !important; border-width: 5px !important; padding: 6px !important;
+}
+.camera-capture-dock.is-vertical .ar-landscape-pill-btn {
+  font-size: 1.05rem !important; padding: .55rem 1.1rem !important; min-height: 2.6rem !important;
+}
+.camera-capture-row.is-vertical { gap: 22px !important; }

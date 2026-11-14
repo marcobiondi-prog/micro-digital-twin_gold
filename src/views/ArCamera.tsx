@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { flushSync } from "react-dom";
 import { toast } from "sonner";
-import { Activity, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grid2X2, Minus, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Star, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
+import { Activity, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grid2X2, Leaf, Minus, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Star, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
 import { supportsCameraTorch, setCameraTorch } from "@/lib/camera-torch";
 import { detectArObject, getReferencePhoto, type Detection, type Soil } from "@/controllers/ar-detect.functions";
 import { gbifPhotoSearchUrl, pickGbifPhoto, type ReferencePhoto } from "@/models/ar-reference-photo";
@@ -1562,7 +1562,24 @@ export function ArCamera({
       className={`ar-camera-topbar ${landscape ? "ar-camera-topbar-landscape" : "ar-camera-topbar-portrait"}`}
     >
       {landscape ? (
-        <div className="flex w-full items-center justify-between px-4 pt-1" data-camera-controls>
+        <div className="relative flex w-full items-center justify-between px-4 pt-1" data-camera-controls>
+          {/* Centro: riepilogo specie · ombra · raffrescamento · stato termico */}
+          <div className="ar-landscape-info-pill" role="status" aria-label="Riepilogo analisi">
+            <span className="ar-info-species">
+              <Leaf className="size-3.5 text-[#4ade80]" aria-hidden="true" />
+              <strong>{species?.commonName ?? (kind === "urban" ? "Leccio" : "Vite")}</strong>
+              <span className="ar-info-count">x{dockCount || 1}</span>
+            </span>
+            <span className="ar-info-sep" aria-hidden="true" />
+            <span>Ombra: <b>{18 * (dockCount || 1)} m²</b></span>
+            <span className="ar-info-sep" aria-hidden="true" />
+            <span>Raffrescamento: <b>-{(0.4 * (dockCount || 1)).toFixed(1).replace(".", ",")} °C</b></span>
+            <span className="ar-info-sep" aria-hidden="true" />
+            <span className="ar-info-status" data-ok={dockCount > 0} title={dockCount > 0 ? "Termica Ottimale" : "Termica da migliorare"}>
+              <span className="ar-info-dot" aria-hidden="true" />
+              <span className="ar-info-status-text">{dockCount > 0 ? "Termica Ottimale" : "Termica da migliorare"}</span>
+            </span>
+          </div>
           {/* Left: Close + ARCore */}
           <div className="flex items-center gap-2">
             <Button
@@ -2170,42 +2187,7 @@ export function ArCamera({
               <div className="ar-landscape-layout" data-camera-controls>
                 {/* Colonna Sinistra: Informazioni e Analisi */}
                 <div className="ar-landscape-left">
-                  {!infoBannerDismissed && (
-                    <div
-                      className="ar-landscape-specimen-card cursor-grab"
-                      data-camera-controls
-                      style={
-                        infoBannerDragging
-                          ? { transform: `translateY(${infoBannerDragY}px)`, opacity: Math.max(0, 1 - Math.abs(infoBannerDragY) / 90), transition: "none" }
-                          : undefined
-                      }
-                      onPointerDown={onBannerPointerDown}
-                      onPointerMove={onBannerPointerMove}
-                      onPointerUp={onBannerPointerUp}
-                      onPointerCancel={onBannerPointerUp}
-                      title="Fai uno swipe per togliere la Tab info"
-                    >
-                      <p className="text-xs font-bold text-white">
-                        {species?.name ? `${species.name} · x${dockCount || 1}` : `Alberi e ombra · Leccio · x${dockCount || 1}`}
-                      </p>
-                      <div className="mt-1 space-y-0.5 text-[11px] text-white/80 font-variant-numeric tabular-nums">
-                        <p>Ombreggiatura ≈ {18 * (dockCount || 1)} m²</p>
-                        <p>Riduzione ≈ -{((0.4 * (dockCount || 1))).toFixed(1).replace(".", ",")} °C</p>
-                      </div>
-                    </div>
-                  )}
-                  <div className="ar-landscape-balance-card" data-camera-controls>
-                    <p className="text-xs font-bold text-white mb-1.5">Bilancia termica</p>
-                    <div className="ar-thermal-balance" data-camera-controls role="slider" tabIndex={0}
-                      aria-valuemin={0} aria-valuemax={MAX_GREEN} aria-valuenow={dockCount}
-                      aria-label="Bilancia termica">
-                      <span className="ar-thermal-balance-track is-draggable" onPointerDown={balanceDrag}>
-                        <span className="ar-thermal-balance-marker" style={{ left: `${Math.min(100, Math.max(0, (dockCount / MAX_GREEN) * 100))}%` }} />
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Miniature delle foto scattate sotto la bilancia termica */}
+                  {/* Riepilogo specie/ombra/raffrescamento nella pillola centrale in alto: a sinistra solo le miniature */}
                   {burstShelfElement && (
                     <div className="ar-landscape-carousel-slot" data-camera-controls>
                       {burstShelfElement}
@@ -2252,7 +2234,7 @@ export function ArCamera({
                       title="Fai uno swipe verso il basso per togliere la Tab info"
                     >
                       <p className="ar-portrait-specimen-title truncate">
-                        {species?.name ? `${species.name} (${species.scientificName ?? "Quercus ilex"})` : (kind === "urban" ? "Leccio (Quercus ilex)" : "Vite (Vitis vinifera)")}
+                        {species?.commonName ? `${species.commonName} (${species.scientificName})` : (kind === "urban" ? "Leccio (Quercus ilex)" : "Vite (Vitis vinifera)")}
                       </p>
                       <p className="ar-portrait-specimen-desc">
                         Ombra stimata ≈ {18 * (dockCount || 1)} m² · Raffrescamento ≈ -{((0.4 * (dockCount || 1))).toFixed(1).replace(".", ",")} °C

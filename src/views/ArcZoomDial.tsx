@@ -75,31 +75,22 @@ export function ArcZoomDial({
   // Path SVG Cerchio 1 (Ghiera esterna con estremità arrotondate)
   const ghieraPath = `M ${xTo.toFixed(1)} ${yTo.toFixed(1)} A ${Ro} ${Ro} 0 0 0 ${xBo.toFixed(1)} ${yBo.toFixed(1)} A ${capR1.toFixed(1)} ${capR1.toFixed(1)} 0 0 0 ${xBm.toFixed(1)} ${yBm.toFixed(1)} A ${Rm} ${Rm} 0 0 1 ${xTm.toFixed(1)} ${yTm.toFixed(1)} A ${capR1.toFixed(1)} ${capR1.toFixed(1)} 0 0 0 ${xTo.toFixed(1)} ${yTo.toFixed(1)} Z`;
 
-  // Mappatura angolare continua: 1x a -39°, 2x all'apice 0°, 3x a +39°
+  // Mappatura angolare continua: STEP gradi tra uno stop e l'altro (1x a -STEP, 2x all'apice 0°, 3x a +STEP),
+  // stretta come nel mockup così all'apice restano visibili anche gli stop vicini.
+  const STEP = 26;
   const angleForZoom = (z: number) => {
-    if (z <= 1) {
-      return -78 + ((z - 0.5) / 0.5) * 39;
-    }
-    if (z <= 2) {
-      return -39 + (z - 1) * 39;
-    }
-    if (z <= 3) {
-      return (z - 2) * 39;
-    }
-    return 39 + ((Math.min(max, z) - 3) / 2) * 25;
+    if (z <= 1) return -2 * STEP + ((z - 0.5) / 0.5) * STEP;
+    if (z <= 2) return -STEP + (z - 1) * STEP;
+    if (z <= 3) return (z - 2) * STEP;
+    return STEP + ((Math.min(max, z) - 3) / 2) * STEP;
   };
 
   const zoomForAngle = (deg: number) => {
     let z: number;
-    if (deg <= -39) {
-      z = 0.5 + ((deg + 78) / 39) * 0.5;
-    } else if (deg <= 0) {
-      z = 1 + (deg + 39) / 39;
-    } else if (deg <= 39) {
-      z = 2 + deg / 39;
-    } else {
-      z = 3 + ((deg - 39) / 25) * 2;
-    }
+    if (deg <= -STEP) z = 0.5 + ((deg + 2 * STEP) / STEP) * 0.5;
+    else if (deg <= 0) z = 1 + (deg + STEP) / STEP;
+    else if (deg <= STEP) z = 2 + deg / STEP;
+    else z = 3 + ((deg - STEP) / STEP) * 2;
     const clamped = Math.min(max, Math.max(ZOOM_MIN, z));
     if (Math.abs(clamped - 0.5) < 0.06) return 0.5;
     if (Math.abs(clamped - 1) < 0.06) return 1;
@@ -109,8 +100,9 @@ export function ArcZoomDial({
     return Math.round(clamped * 10) / 10;
   };
 
-  // Rotazione per portare il valore corrente all'apice (0°)
-  const dialRotation = -angleForZoom(zoom);
+  // Rotazione per portare il valore corrente all'apice (0°). I punti sono a (cx - R·cosθ, cy + R·sinθ):
+  // rotate(φ) in SVG li porta all'angolo θ − φ, quindi φ = angolo dello zoom corrente.
+  const dialRotation = angleForZoom(zoom);
 
   const getPointerAngle = (e: ReactPointerEvent<SVGElement>) => {
     if (!svgRef.current) return 0;
@@ -319,10 +311,10 @@ export function ArcZoomDial({
           filter="url(#numShadow)"
         >
           {stops.map((s) => {
-            const screenAngle = Math.abs(s.deg + dialRotation);
+            const screenAngle = Math.abs(s.deg - dialRotation);
             // Dissolvenza morbida: i numeri sono pienamente visibili nell'arco utile,
             // e sfumano a 0 se ruotano troppo in alto o in basso verso Scansiona/Strumenti
-            const opacity = screenAngle <= 44 ? 1 : Math.max(0, 1 - (screenAngle - 44) / 8);
+            const opacity = screenAngle <= 30 ? 1 : Math.max(0, 1 - (screenAngle - 30) / 8);
             if (opacity <= 0.02) return null;
             return (
               <g key={s.label} opacity={opacity}>
@@ -335,7 +327,7 @@ export function ArcZoomDial({
                 <text
                   x={s.textX}
                   y={s.textY}
-                  transform={`rotate(${s.deg}, ${s.textX}, ${s.textY})`}
+                  transform={`rotate(${-dialRotation}, ${s.textX}, ${s.textY})`}
                   textAnchor="middle"
                   dominantBaseline="central"
                   fill="#ffffff"
