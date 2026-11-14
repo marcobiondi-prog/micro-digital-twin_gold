@@ -4,12 +4,11 @@ import { hapticTick } from "@/lib/haptics";
 
 /**
  * Ghiera zoom landscape (Camera Jog Dial / Goniometro) - Architettura a 2 cerchi concentrici:
- * 1. CERCHIO 1 (Ghiera esterna): nastro curvo regolare con le linee graduate fisse all'interno.
- * 2. CERCHIO 2 (Vetro satinato trasparente interno): cerchio continuo (circonferenza non tagliata)
- *    con sfocatura dello sfondo (backdrop-filter: blur) e numeri (0.5x, 1x, 2x, 3x, 5x) e pallini bianchi.
+ * 1. CERCHIO 1 (Ghiera esterna): nastro curvo regolare con le linee graduate all'interno.
+ * 2. CERCHIO 2 (Vetro satinato trasparente interno): semicerchio satinato trasparente
+ *    attorno allo shutter con i numeri (0.5x, 1x, 2x, 3x, 5x) e i pallini bianchi al suo interno.
  *    È QUESTO cerchio satinato trasparente che ruota al variare dello zoom.
  * - L'INTERO BLOCCO è a filo del bordo destro dello schermo.
- * - Scansiona e Strumenti distanziati e spostati leggermente a sinistra (non toccano gli angoli curvi dello schermo).
  * - Pillola fissa all'apice (0° orizzontale) a filo con [ Singolo | Multiplo ] con valore zoom live e mirino ciano.
  * - Rotazione fluida 1:1 al trascinamento del pollice e feedback aptico.
  */
@@ -40,7 +39,7 @@ export function ArcZoomDial({
 
   // Cerchio 1 (Ghiera esterna con le linee dentro):
   const Ro = 175.0; // Raggio esterno ghiera
-  const Rm = 142.0; // Raggio interno ghiera / raggio del Cerchio 2 (vetro satinato)
+  const Rm = 142.0; // Raggio interno ghiera / confine con il vetro satinato
   const R = 158.0; // Raggio linea centrale delle tacche graduate
 
   // Cerchio 2 (Vetro satinato trasparente con i numeri dentro):
@@ -65,6 +64,9 @@ export function ArcZoomDial({
 
   // Path SVG Cerchio 1 (Ghiera esterna con estremità arrotondate)
   const ghieraPath = `M ${xTo.toFixed(1)} ${yTo.toFixed(1)} A ${Ro} ${Ro} 0 0 0 ${xBo.toFixed(1)} ${yBo.toFixed(1)} A ${capR1.toFixed(1)} ${capR1.toFixed(1)} 0 0 0 ${xBm.toFixed(1)} ${yBm.toFixed(1)} A ${Rm} ${Rm} 0 0 1 ${xTm.toFixed(1)} ${yTm.toFixed(1)} A ${capR1.toFixed(1)} ${capR1.toFixed(1)} 0 0 0 ${xTo.toFixed(1)} ${yTo.toFixed(1)} Z`;
+
+  // Path SVG Cerchio 2 (Vetro satinato trasparente interno attorno allo shutter a filo con il bordo destro x=W)
+  const satinatoPath = `M ${xTm.toFixed(1)} ${yTm.toFixed(1)} A ${Rm} ${Rm} 0 0 0 ${xBm.toFixed(1)} ${yBm.toFixed(1)} L ${W} ${yBm.toFixed(1)} L ${W} ${yTm.toFixed(1)} Z`;
 
   // Mappatura angolare continua: 1x a -39°, 2x all'apice 0°, 3x a +39°
   const angleForZoom = (z: number) => {
@@ -163,6 +165,10 @@ export function ArcZoomDial({
       dotY: cy + R_dot * sin,
       textX: cx - R_text * cos,
       textY: cy + R_text * sin,
+      xIn: cx - (R - 7) * cos,
+      yIn: cy + (R - 7) * sin,
+      xOut: cx - (R + 7) * cos,
+      yOut: cy + (R + 7) * sin,
     };
   });
 
@@ -206,32 +212,29 @@ export function ArcZoomDial({
       style={{ width: `${W}px`, height: `${H}px` }}
       data-camera-controls
     >
-      {/* 
-        CERCHIO 2: VETRO SATINATO TRASPARENTE CON SFOCATURA SFONDO E CIRCONFERENZA CONTINUA:
-        - Circonferenza circolare completa e continua a raggio Rm (non tagliata)
-        - Sfoca leggermente lo sfondo della fotocamera (backdrop-filter: blur)
-      */}
-      <div
-        className="absolute pointer-events-none select-none rounded-full"
-        style={{
-          width: `${Rm * 2}px`,
-          height: `${Rm * 2}px`,
-          left: `${cx - Rm}px`,
-          top: `${cy - Rm}px`,
-          background: "rgba(28, 36, 48, 0.45)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          border: "1px solid rgba(255, 255, 255, 0.14)",
-          boxShadow: "inset 0 0 18px rgba(0, 0, 0, 0.28)",
-        }}
-      />
-
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
         className="w-full h-full overflow-visible pointer-events-none select-none"
         aria-hidden="true"
       >
+        <defs>
+          <clipPath id="dialSatinatoClip">
+            <path d={satinatoPath} />
+          </clipPath>
+        </defs>
+
+        {/* 
+          CERCHIO 2: VETRO SATINATO TRASPARENTE CON I NUMERI DENTRO
+          Semicerchio interno attorno allo shutter che abbraccia il bordo destro
+        */}
+        <path
+          d={satinatoPath}
+          fill="rgba(34, 42, 54, 0.52)"
+          stroke="rgba(255, 255, 255, 0.14)"
+          strokeWidth="1"
+        />
+
         {/* 
           CERCHIO 1: LA GHIERA CON LE LINEE DENTRO
           Nastro curvo esterno scuro con le tacche graduate all'interno
@@ -243,8 +246,16 @@ export function ArcZoomDial({
           strokeWidth="1"
         />
 
+        {/* Traccia circolare guida sottile di confine tra i due cerchi */}
+        <path
+          d={`M ${xTm.toFixed(1)} ${yTm.toFixed(1)} A ${Rm} ${Rm} 0 0 0 ${xBm.toFixed(1)} ${yBm.toFixed(1)}`}
+          fill="none"
+          stroke="rgba(255, 255, 255, 0.22)"
+          strokeWidth="1"
+        />
+
         {/* 
-          LINEE DENTRO IL CERCHIO 1 (GHIERA):
+          LINEE FISSE DENTRO IL CERCHIO 1 (GHIERA):
           Le tacche graduate fisse della ghiera
         */}
         <g>
@@ -268,6 +279,7 @@ export function ArcZoomDial({
           I numeri e i pallini bianchi scorrono nel cerchio satinato trasparente.
         */}
         <g
+          clipPath="url(#dialSatinatoClip)"
           transform={`rotate(${dialRotation}, ${cx}, ${cy})`}
           className="transition-transform duration-75 ease-out"
         >
