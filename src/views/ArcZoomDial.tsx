@@ -31,31 +31,29 @@ export function ArcZoomDial({
   const lastHapticZoom = useRef(zoom);
 
   // Dimensioni calibrate: blocco a filo del bordo destro (W=280, H=380)
-  // Il centro dello shutter è a 48px dal bordo destro dello schermo -> cx = 280 - 48 = 232
   const W = 280;
   const H = 380;
-  const cx = 232;
+  const cx = 240;
   const cy = 190;
 
-  // Cerchio 1 (Ghiera esterna con le linee dentro):
-  const Ro = 175.0; // Raggio esterno ghiera
-  const Rm = 142.0; // Raggio interno ghiera / confine con il vetro satinato
-  const R = 158.0; // Raggio linea centrale delle tacche graduate
+  // Cerchio 1 (Ghiera esterna spostata più avanti verso l'interno schermo):
+  const Ro = 192.0; // Raggio esterno ghiera (spostato più avanti)
+  const Rm = 158.0; // Raggio interno ghiera / confine con il vetro satinato
+  const R = 175.0; // Raggio linea centrale delle tacche graduate
 
   // Cerchio Grande (indicato in rosso dall'utente):
-  // Raggio ampio R_big = 185px attorno a (cx, cy) che abbraccia l'intero blocco comandi:
-  // Si estende sopra Scansiona (y=9) e sotto Strumenti (y=371) fino al bordo destro x=W.
-  const R_big = 185.0;
+  // Raggio ampio R_big = 204px attorno a (cx, cy) che abbraccia l'intero blocco comandi
+  const R_big = 204.0;
   const radBig = (78.0 * Math.PI) / 180;
-  const xT_big = cx - R_big * Math.cos(radBig); // 193.5
-  const yT_big = cy - R_big * Math.sin(radBig); // 9.1 (sopra Scansiona)
+  const xT_big = cx - R_big * Math.cos(radBig);
+  const yT_big = cy - R_big * Math.sin(radBig);
   const xB_big = xT_big;
-  const yB_big = cy + R_big * Math.sin(radBig); // 370.9 (sotto Strumenti)
+  const yB_big = cy + R_big * Math.sin(radBig);
   const cerchioGrandePath = `M ${xT_big.toFixed(1)} ${yT_big.toFixed(1)} A ${R_big} ${R_big} 0 0 0 ${xB_big.toFixed(1)} ${yB_big.toFixed(1)} L ${W} ${yB_big.toFixed(1)} L ${W} ${yT_big.toFixed(1)} Z`;
 
   // Cerchio 2 (Vetro satinato trasparente con i numeri dentro):
-  const R_dot = 126.0; // Raggio dei pallini bianchi dentro il vetro satinato
-  const R_text = 108.0; // Raggio dei numeri dello zoom dentro il vetro satinato
+  const R_dot = 138.0; // Raggio dei pallini bianchi dentro il vetro satinato
+  const R_text = 118.0; // Raggio dei numeri dello zoom dentro il vetro satinato
 
   const degTop = 56.0;
   const degBot = 66.0;
@@ -233,11 +231,11 @@ export function ArcZoomDial({
             <feGaussianBlur in="SourceGraphic" stdDeviation="1.5 16" result="vBlur" />
           </filter>
 
-          {/* Sfumatura radiale satinata: alfa del 15% per il cerchio interno */}
+          {/* Sfumatura radiale satinata: alfa del 20% per il secondo cerchio */}
           <radialGradient id="cerchioGrandeGrad" cx={cx} cy={cy} r={R_big} gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.15" />
-            <stop offset="55%" stopColor="#e2ecf8" stopOpacity="0.15" />
-            <stop offset="85%" stopColor="#b0c6df" stopOpacity="0.08" />
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.20" />
+            <stop offset="55%" stopColor="#e2ecf8" stopOpacity="0.20" />
+            <stop offset="85%" stopColor="#b0c6df" stopOpacity="0.10" />
             <stop offset="100%" stopColor="#7a9bc2" stopOpacity="0.0" />
           </radialGradient>
 
