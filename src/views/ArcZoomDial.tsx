@@ -232,31 +232,31 @@ export function ArcZoomDial({
             <feGaussianBlur in="SourceGraphic" stdDeviation="6 22" result="vBlur" />
           </filter>
 
-          {/* Sfumatura radiale satinata: alfa del 30% per il secondo cerchio */}
+          {/* Sfumatura radiale satinata: tonalità smoked glass scuro e morbido fedele allo screenshot */}
           <radialGradient id="cerchioGrandeGrad" cx={cx} cy={cy} r={R_big} gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.30" />
-            <stop offset="50%" stopColor="#e2ecf8" stopOpacity="0.30" />
-            <stop offset="78%" stopColor="#b0c6df" stopOpacity="0.18" />
-            <stop offset="92%" stopColor="#9cb8d6" stopOpacity="0.08" />
-            <stop offset="100%" stopColor="#7a9bc2" stopOpacity="0.0" />
+            <stop offset="0%" stopColor="#141922" stopOpacity="0.65" />
+            <stop offset="45%" stopColor="#181e28" stopOpacity="0.55" />
+            <stop offset="75%" stopColor="#1c232e" stopOpacity="0.35" />
+            <stop offset="90%" stopColor="#222b38" stopOpacity="0.15" />
+            <stop offset="100%" stopColor="#222b38" stopOpacity="0.0" />
           </radialGradient>
 
-          {/* Gradiente ricco e scuro per dare carattere alla ghiera esterna */}
+          {/* Tonalità smoked dark slate glass della ghiera esterna calibrata allo screenshot */}
           <linearGradient id="outerGhieraGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="rgba(48, 62, 82, 0.94)" />
-            <stop offset="35%" stopColor="rgba(30, 40, 54, 0.96)" />
-            <stop offset="70%" stopColor="rgba(18, 26, 38, 0.96)" />
-            <stop offset="100%" stopColor="rgba(36, 48, 66, 0.92)" />
+            <stop offset="0%" stopColor="rgba(40, 48, 62, 0.88)" />
+            <stop offset="35%" stopColor="rgba(26, 32, 42, 0.94)" />
+            <stop offset="70%" stopColor="rgba(18, 22, 30, 0.94)" />
+            <stop offset="100%" stopColor="rgba(28, 36, 48, 0.90)" />
           </linearGradient>
 
           {/* Ombra di profondità per far staccare la ghiera esterna */}
           <filter id="ghieraDepth" x="-25%" y="-25%" width="150%" height="150%">
-            <feDropShadow dx="-2" dy="2" stdDeviation="4" floodColor="#000000" floodOpacity="0.65" />
+            <feDropShadow dx="-2" dy="2" stdDeviation="4" floodColor="#000000" floodOpacity="0.55" />
           </filter>
 
-          {/* Bagliore ciano per la tacca indice dello zenit */}
-          <filter id="cyanGlow" x="-20%" y="-60%" width="140%" height="220%">
-            <feDropShadow dx="0" dy="0" stdDeviation="2.5" floodColor="#00f0ff" floodOpacity="0.75" />
+          {/* Bagliore ciano vibrante per la tacca indice dello zenit e fermi */}
+          <filter id="cyanGlow" x="-30%" y="-70%" width="160%" height="240%">
+            <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#00e5ff" floodOpacity="0.85" />
           </filter>
 
           {/* Ombra per far risaltare perfettamente i numeri sopra al vetro */}
@@ -300,9 +300,10 @@ export function ArcZoomDial({
               y1={t.y1}
               x2={t.x2}
               y2={t.y2}
-              stroke={t.isCyan ? "#00f0ff" : "rgba(255, 255, 255, 0.88)"}
+              stroke={t.isCyan ? "#00e5ff" : "rgba(255, 255, 255, 0.85)"}
               strokeWidth={t.isStop ? "2.8" : t.isCyan ? "1.8" : "1.2"}
               strokeLinecap="round"
+              filter={t.isCyan ? "url(#cyanGlow)" : undefined}
             />
           ))}
         </g>
@@ -362,7 +363,7 @@ export function ArcZoomDial({
           y1={cy}
           x2={apexX}
           y2={cy}
-          stroke="#00f0ff"
+          stroke="#00e5ff"
           strokeWidth="2.8"
           strokeLinecap="round"
           filter="url(#cyanGlow)"
@@ -394,7 +395,7 @@ export function ArcZoomDial({
       <button
         type="button"
         onClick={handlePillClick}
-        className="absolute pointer-events-auto flex items-center justify-center rounded-full bg-[rgba(24,30,40,0.82)] border border-white/25 backdrop-blur-md px-2.5 shadow-md active:scale-95 transition-transform"
+        className="absolute pointer-events-auto flex items-center justify-center rounded-full bg-[rgba(32,38,48,0.85)] border border-white/20 backdrop-blur-md px-2.5 shadow-md active:scale-95 transition-transform"
         style={{
           left: "12px",
           top: `${cy - 15}px`,
