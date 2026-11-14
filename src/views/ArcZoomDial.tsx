@@ -205,12 +205,13 @@ export function ArcZoomDial({
   // Apice orizzontale della ghiera a sinistra: cx - R = 232 - 158 = 74px
   const apexX = cx - R;
 
-  // Tocco sulla pillola fissa: passa ai preset rapidi
+  // Tocco sulla pillola fissa: passa ai preset rapidi (0.5x, 1x, 2x, 3x, 5x)
   const handlePillClick = () => {
     if (zoom < 1) onZoom(1);
     else if (zoom < 2) onZoom(2);
     else if (zoom < 3) onZoom(3);
-    else onZoom(1);
+    else if (zoom < 5) onZoom(5);
+    else onZoom(0.5);
     hapticTick();
   };
 
@@ -232,13 +233,12 @@ export function ArcZoomDial({
             <feGaussianBlur in="SourceGraphic" stdDeviation="1.5 16" result="vBlur" />
           </filter>
 
-          {/* Sfumatura radiale satinata con alfa aumentato per autentico vetro satinato */}
+          {/* Sfumatura radiale satinata: alfa del 30% per il cerchio interno */}
           <radialGradient id="cerchioGrandeGrad" cx={cx} cy={cy} r={R_big} gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.55" />
-            <stop offset="40%" stopColor="#e8eef6" stopOpacity="0.46" />
-            <stop offset="70%" stopColor="#c2d2e4" stopOpacity="0.36" />
-            <stop offset="90%" stopColor="#8faac8" stopOpacity="0.20" />
-            <stop offset="100%" stopColor="#6080a8" stopOpacity="0.0" />
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.30" />
+            <stop offset="55%" stopColor="#e2ecf8" stopOpacity="0.30" />
+            <stop offset="85%" stopColor="#b0c6df" stopOpacity="0.20" />
+            <stop offset="100%" stopColor="#7a9bc2" stopOpacity="0.0" />
           </radialGradient>
 
           {/* Gradiente per la ghiera esterna: tonalità più chiara a contrasto con il cerchio grande */}
@@ -255,21 +255,15 @@ export function ArcZoomDial({
         </defs>
 
         {/* 
-          1. IL CERCHIO GRANDE (BLUR IN VERTICALE CON ALFA AUMENTATO - VETRO SATINATO):
-          - Vetro satinato con blur verticale e opacità aumentata
+          1. IL CERCHIO GRANDE (ALFA AL 30%, BLUR VERTICALE, NIENTE BORDER):
+          - Vetro satinato con alfa del 30% e blur verticale
+          - Senza bordo (niente border)
           - Si estende sopra Scansiona (y=9) e sotto Strumenti (y=371)
-          - Rifinito con bordo satinato chiaro
         */}
         <path
           d={cerchioGrandePath}
           fill="url(#cerchioGrandeGrad)"
           filter="url(#verticalGlassBlur)"
-        />
-        <path
-          d={cerchioGrandePath}
-          fill="url(#cerchioGrandeGrad)"
-          stroke="rgba(255, 255, 255, 0.32)"
-          strokeWidth="1"
         />
 
         {/* 
@@ -375,23 +369,23 @@ export function ArcZoomDial({
       {/* 
         IN GIALLO LA PILLOLA:
         - Pillola fissa all'apice (0° orizzontale) a filo con la ghiera come cerchiato in giallo
-        - Mostra il valore zoom live in tempo reale
+        - Mostra il valore zoom live in tempo reale (es. "2x")
         - Toccandola passa ai preset rapidi (0.5x, 1x, 2x, 3x, 5x)
       */}
       <button
         type="button"
         onClick={handlePillClick}
-        className="absolute pointer-events-auto flex items-center justify-center rounded-full bg-[rgba(30,37,48,0.88)] border border-white/22 px-2.5 shadow-lg active:scale-95 transition-transform"
+        className="absolute pointer-events-auto flex items-center justify-center rounded-full bg-[rgba(24,30,40,0.82)] border border-white/25 backdrop-blur-md px-2.5 shadow-md active:scale-95 transition-transform"
         style={{
           left: "12px",
           top: `${cy - 15}px`,
           height: "30px",
           minWidth: "44px",
         }}
-        aria-label={`Zoom corrente: ${zoomLabel(zoom)}. Tocca per cambiare preset.`}
+        aria-label={`Zoom corrente: ${zoom % 1 === 0 ? zoom : zoom.toFixed(1)}x. Tocca per cambiare preset.`}
       >
         <span className="text-[13.5px] font-bold text-white tracking-tight tabular-nums">
-          {zoomLabel(zoom)}
+          {zoom % 1 === 0 ? zoom : zoom.toFixed(1)}x
         </span>
       </button>
     </div>
