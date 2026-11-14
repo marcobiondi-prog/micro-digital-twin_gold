@@ -2736,7 +2736,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   flex-direction: column !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 28px !important;
+  gap: 52px !important;
   width: 100% !important;
   pointer-events: auto !important;
 }
@@ -2750,19 +2750,19 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 }
 
 .camera-capture-dock.is-vertical .ar-landscape-pill-btn {
-  background: rgba(35, 43, 54, 0.72) !important;
-  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  background: rgba(40, 46, 56, 0.72) !important;
+  border: 1px solid rgba(255, 255, 255, 0.20) !important;
   border-radius: 9999px !important;
   color: #ffffff !important;
-  font-size: 0.8125rem !important;
+  font-size: 0.84375rem !important;
   font-weight: 500 !important;
-  padding: 0.45rem 1.15rem !important;
-  min-height: 2.15rem !important;
+  padding: 0.5rem 1.35rem !important;
+  min-height: 2.25rem !important;
   height: auto !important;
   width: auto !important;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
   transition: transform 0.12s ease, background 0.15s ease !important;
   cursor: pointer !important;
   pointer-events: auto !important;

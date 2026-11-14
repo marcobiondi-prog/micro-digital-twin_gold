@@ -1596,17 +1596,17 @@ export function ArCamera({
           {/* Right: Singolo / Multiplo switcher + Guide */}
           <div className="flex items-center gap-2">
             {!error && mode === "photo" && (
-              <div role="radiogroup" aria-label="Tipo di scatto" className="flex rounded-full bg-black/60 p-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur">
+              <div role="radiogroup" aria-label="Tipo di scatto" className="flex rounded-full bg-[rgba(32,36,44,0.72)] p-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur-md shadow-lg">
                 <button type="button" role="radio" aria-checked={!burst} onClick={backToSingle}
-                  className={`h-7 rounded-full px-3.5 transition-all ${!burst ? "bg-white text-black font-bold shadow-sm" : "text-white/80 hover:text-white"}`}>Singolo</button>
+                  className={`h-7 rounded-full px-3.5 transition-all ${!burst ? "bg-[#505660] text-white font-medium shadow-sm" : "text-white/80 hover:text-white"}`}>Singolo</button>
                 <button type="button" role="radio" aria-checked={burst} onClick={() => setBurst(true)}
-                  className={`h-7 rounded-full px-3.5 transition-all ${burst ? "bg-white text-black font-bold shadow-sm" : "text-white/80 hover:text-white"}`}>Multiplo</button>
+                  className={`h-7 rounded-full px-3.5 transition-all ${burst ? "bg-[#505660] text-white font-medium shadow-sm" : "text-white/80 hover:text-white"}`}>Multiplo</button>
               </div>
             )}
             <Button
               variant="ghost"
               size="icon"
-              className="camera-tool size-10 grid place-items-center rounded-full"
+              className="size-9 grid place-items-center rounded-full bg-[rgba(32,36,44,0.72)] border border-white/20 text-white backdrop-blur-md hover:bg-[rgba(50,56,66,0.85)]"
               aria-label="Guida inquadratura"
               title="Guida inquadratura"
               aria-pressed={guideOpen}
