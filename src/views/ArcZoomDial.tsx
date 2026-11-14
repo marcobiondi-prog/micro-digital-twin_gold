@@ -268,6 +268,9 @@ export function ArcZoomDial({
   // La maschera va solo sull'SVG: sul vetro o su un suo antenato spegnerebbe il backdrop-filter.
   const endFade = "linear-gradient(to bottom, transparent 3%, #000 24%, #000 76%, transparent 97%)";
   const fadeStyle = { WebkitMaskImage: endFade, maskImage: endFade };
+  // Da dove a dove (in verticale) sfumano i capi dell'arco esterno: dal capo in alto al capo in basso.
+  const FADE_TOP = yTo - capR1;
+  const FADE_BOT = yBo + capR1;
   // Rotazione come stile CSS (non attributo SVG), così si anima: segue il dito senza ritardo mentre si trascina,
   // e gira morbida quando lo zoom cambia da un tocco (pillola, stop toccato, pizzico).
   const spin = (deg: number, ox: number, oy: number) => ({
@@ -340,8 +343,22 @@ export function ArcZoomDial({
           <filter id="pillShadow" x="-25%" y="-60%" width="150%" height="220%">
             <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#000000" floodOpacity="0.45" />
           </filter>
+          {/*
+            Sfumatura delle due estremità dell'arco esterno (ghiera, bordi e tacche): piena nella parte centrale,
+            svanisce gradualmente verso i due capi invece di finire con un taglio netto.
+          */}
+          <linearGradient id="ghieraEndsGrad" gradientUnits="userSpaceOnUse" x1="0" y1={FADE_TOP} x2="0" y2={FADE_BOT}>
+            <stop offset="0" stopColor="#fff" stopOpacity="0" />
+            <stop offset="0.3" stopColor="#fff" stopOpacity="1" />
+            <stop offset="0.7" stopColor="#fff" stopOpacity="1" />
+            <stop offset="1" stopColor="#fff" stopOpacity="0" />
+          </linearGradient>
+          <mask id="ghieraEndsFade" maskUnits="userSpaceOnUse" x={-40} y={-40} width={W + 80} height={H + 80}>
+            <rect x={-40} y={-40} width={W + 80} height={H + 80} fill="url(#ghieraEndsGrad)" />
+          </mask>
         </defs>
 
+        <g mask="url(#ghieraEndsFade)">
         {/*
           CERCHIO ESTERNO (ghiera): chiaro e semitrasparente, senza bordo né ombra, così si fonde con il
           cerchio interno di vetro sfocato disegnato sotto (livello HTML .ar-dial-glass).
@@ -384,6 +401,7 @@ export function ArcZoomDial({
               />
             );
           })}
+        </g>
         </g>
 
         {/*
