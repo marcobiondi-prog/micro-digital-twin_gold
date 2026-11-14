@@ -13,10 +13,12 @@ import { hapticTick } from "@/lib/haptics";
  * - Rotazione fluida 1:1 al trascinamento del pollice e feedback aptico.
  */
 /**
- * Bordo esterno dell'aggiunta in basso alla ghiera, nelle coordinate del suo viewBox (W=280, H=380): la linea
- * disegnata a mano dall'utente su uno screenshot, ricampionata e lievemente levigata. Dall'alto verso il basso.
+ * Aggiunta in basso alla ghiera: il bordo esterno lascia il cerchio tangente a TAIL_START_DEG e scende con un
+ * arco molto più largo (raggio calcolato, sempre tangente: nessuno spigolo né ammaccatura) fino a TAIL_END, il
+ * punto in fondo alla linea disegnata dall'utente sullo screenshot, poco sotto il bordo dello schermo.
  */
-const GHIERA_TAIL: ReadonlyArray<readonly [number, number]> = [[57.7,236],[58,240.5],[58.6,245],[59.1,249.5],[59.8,254],[60.5,258.5],[61.2,263],[61.9,267.4],[62.7,271.9],[63.8,276.4],[65.3,280.9],[67.3,285.4],[69.7,289.9],[72.1,294.4],[74.4,298.9],[76.3,303.4],[78.3,307.9],[80.7,312.3],[83.2,316.8],[85.1,321.3],[85.8,325.8],[85.3,330.3],[83.8,334.8],[82.4,339.3],[81.9,343.8],[82.9,348.3],[84.7,352.8],[86.8,357.2],[89,361.7],[91.3,366.2],[93.5,370.7],[95.8,375.2],[98.2,379.7],[100,384.2],[100.7,386.4]];
+const TAIL_START_DEG = 12;
+const TAIL_END: readonly [number, number] = [100.7, 386.4];
 /** Spazio in più sotto il viewBox, così l'aggiunta si chiude fuori dallo schermo senza essere tagliata dal riquadro. */
 const SVG_EXTRA_BOTTOM = 110;
 
@@ -71,18 +73,22 @@ export function ArcZoomDial({
 
   // Path SVG Cerchio 1: ghiera esterna piena (non trasparente) fusa in un solo pezzo con un'aggiunta in basso.
   // In alto l'estremità arrotondata di sempre; il bordo esterno segue il cerchio fino a poco sotto l'apice, poi
-  // la linea disegnata dall'utente (GHIERA_TAIL: scende più dritta, con una piccola curva all'altezza di
-  // Strumenti) e si chiude sotto, fuori dallo schermo. Bordo interno, tacche e numeri restano sul cerchio.
-  const tailStartDeg = (Math.asin((GHIERA_TAIL[0][1] - cy) / Ro) * 180) / Math.PI - 4;
-  const tailLast = GHIERA_TAIL[GHIERA_TAIL.length - 1];
+  // un arco più largo e tangente (TAIL_START_DEG → TAIL_END), e si chiude sotto, fuori dallo schermo. Bordo interno, tacche e numeri restano sul cerchio.
+  // Arco dell'aggiunta: centro sulla retta che va dal punto di tangenza T al centro della ghiera, raggio tale da
+  // passare per TAIL_END (|T - E + r·u| = r  →  r = -|T - E|² / (2 u·(T - E))).
+  const radS = (TAIL_START_DEG * Math.PI) / 180;
+  const xTs = cx - Ro * Math.cos(radS);
+  const yTs = cy + Ro * Math.sin(radS);
+  const tdx = xTs - TAIL_END[0], tdy = yTs - TAIL_END[1];
+  const tailR = -(tdx * tdx + tdy * tdy) / (2 * ((cx - xTs) / Ro * tdx + (cy - yTs) / Ro * tdy));
   const innerEndDeg = 70;
   const xIe = cx - Rm * Math.cos((innerEndDeg * Math.PI) / 180);
   const yIe = cy + Rm * Math.sin((innerEndDeg * Math.PI) / 180);
   const ghieraPath = [
     `M ${xTo.toFixed(1)} ${yTo.toFixed(1)}`,
-    `A ${Ro} ${Ro} 0 0 0 ${(cx - Ro * Math.cos((tailStartDeg * Math.PI) / 180)).toFixed(1)} ${(cy + Ro * Math.sin((tailStartDeg * Math.PI) / 180)).toFixed(1)}`,
-    ...GHIERA_TAIL.map(([x, y]) => `L ${x} ${y}`),
-    `L ${tailLast[0] + 10} ${tailLast[1] + 60}`,
+    `A ${Ro} ${Ro} 0 0 0 ${xTs.toFixed(1)} ${yTs.toFixed(1)}`,
+    `A ${tailR.toFixed(1)} ${tailR.toFixed(1)} 0 0 0 ${TAIL_END[0]} ${TAIL_END[1]}`,
+    `L ${TAIL_END[0] + 8} ${H + 80}`,
     `L ${(xIe + 30).toFixed(1)} ${H + 80}`,
     `L ${xIe.toFixed(1)} ${yIe.toFixed(1)}`,
     `A ${Rm} ${Rm} 0 0 1 ${xTm.toFixed(1)} ${yTm.toFixed(1)}`,
