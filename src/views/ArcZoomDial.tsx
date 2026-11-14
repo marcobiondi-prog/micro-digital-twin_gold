@@ -12,21 +12,6 @@ import { hapticTick } from "@/lib/haptics";
  * - Pillola fissa all'apice (0° orizzontale) a filo con [ Singolo | Multiplo ] con valore zoom live e mirino ciano.
  * - Rotazione fluida 1:1 al trascinamento del pollice e feedback aptico.
  */
-/**
- * Aggiunta in basso alla ghiera, come nel disegno dell'utente: il bordo esterno lascia il cerchio a TAIL_START_DEG,
- * appena sotto la pillola (che copre il piccolo cambio di direzione), scende in diagonale verso destra lungo
- * TAIL_START_DIR, poi curva e finisce verticale (TAIL_END_DIR) in TAIL_END, sotto il bordo dello schermo.
- * TAIL_PULL_START lungo = tratto diagonale più dritto; TAIL_PULL_END corto = curva più stretta verso la verticale.
- */
-const TAIL_START_DEG = 5;
-const TAIL_START_DIR: readonly [number, number] = [0.276, 0.961];
-const TAIL_END: readonly [number, number] = [68, 386.4];
-const TAIL_PULL_START = 75;
-const TAIL_END_DIR: readonly [number, number] = [0, 1];
-const TAIL_PULL_END = 60;
-/** Spazio in più sotto il viewBox, così l'aggiunta si chiude fuori dallo schermo senza essere tagliata dal riquadro. */
-const SVG_EXTRA_BOTTOM = 110;
-
 export function ArcZoomDial({
   zoom,
   max = ZOOM_MAX,
@@ -76,29 +61,13 @@ export function ArcZoomDial({
   const yTm = cy - Rm * Math.sin(radT);
   const capR1 = (Ro - Rm) / 2; // 16.5px
 
-  // Path SVG Cerchio 1: ghiera esterna piena (non trasparente) fusa in un solo pezzo con un'aggiunta in basso.
-  // In alto l'estremità arrotondata di sempre; il bordo esterno segue il cerchio fino a poco sotto l'apice, poi
-  // la diagonale del disegno che curva fino alla verticale (TAIL_START_DEG → TAIL_END), e si chiude sotto, fuori dallo schermo. Bordo interno, tacche e numeri restano sul cerchio.
-  // Curva dell'aggiunta: parte in T, il punto del cerchio a TAIL_START_DEG.
-  const radS = (TAIL_START_DEG * Math.PI) / 180;
-  const xTs = cx - Ro * Math.cos(radS);
-  const yTs = cy + Ro * Math.sin(radS);
-  // Controlli della Bézier: il primo lungo la diagonale disegnata (TAIL_START_DIR), il secondo prima di TAIL_END.
-  const xC1 = xTs + TAIL_START_DIR[0] * TAIL_PULL_START, yC1 = yTs + TAIL_START_DIR[1] * TAIL_PULL_START;
-  const xC2 = TAIL_END[0] - TAIL_END_DIR[0] * TAIL_PULL_END, yC2 = TAIL_END[1] - TAIL_END_DIR[1] * TAIL_PULL_END;
-  const innerEndDeg = 70;
-  const xIe = cx - Rm * Math.cos((innerEndDeg * Math.PI) / 180);
-  const yIe = cy + Rm * Math.sin((innerEndDeg * Math.PI) / 180);
-  const ghieraPath = [
-    `M ${xTo.toFixed(1)} ${yTo.toFixed(1)}`,
-    `A ${Ro} ${Ro} 0 0 0 ${xTs.toFixed(1)} ${yTs.toFixed(1)}`,
-    `C ${xC1.toFixed(1)} ${yC1.toFixed(1)} ${xC2.toFixed(1)} ${yC2.toFixed(1)} ${TAIL_END[0]} ${TAIL_END[1]}`,
-    `L ${TAIL_END[0]} ${H + 80}`,
-    `L ${(xIe + 30).toFixed(1)} ${H + 80}`,
-    `L ${xIe.toFixed(1)} ${yIe.toFixed(1)}`,
-    `A ${Rm} ${Rm} 0 0 1 ${xTm.toFixed(1)} ${yTm.toFixed(1)}`,
-    `A ${capR1.toFixed(1)} ${capR1.toFixed(1)} 0 0 0 ${xTo.toFixed(1)} ${yTo.toFixed(1)} Z`,
-  ].join(" ");
+  const xBo = cx - Ro * Math.cos(radB);
+  const yBo = cy + Ro * Math.sin(radB);
+  const xBm = cx - Rm * Math.cos(radB);
+  const yBm = cy + Rm * Math.sin(radB);
+
+  // Path SVG Cerchio 1: ghiera esterna piena (non trasparente) con estremità arrotondate.
+  const ghieraPath = `M ${xTo.toFixed(1)} ${yTo.toFixed(1)} A ${Ro} ${Ro} 0 0 0 ${xBo.toFixed(1)} ${yBo.toFixed(1)} A ${capR1.toFixed(1)} ${capR1.toFixed(1)} 0 0 0 ${xBm.toFixed(1)} ${yBm.toFixed(1)} A ${Rm} ${Rm} 0 0 1 ${xTm.toFixed(1)} ${yTm.toFixed(1)} A ${capR1.toFixed(1)} ${capR1.toFixed(1)} 0 0 0 ${xTo.toFixed(1)} ${yTo.toFixed(1)} Z`;
 
   // Mappatura angolare continua: STEP gradi tra uno stop e l'altro (1x a -STEP, 2x all'apice 0°, 3x a +STEP),
   // stretta come nel mockup così all'apice restano visibili anche gli stop vicini.
@@ -133,7 +102,7 @@ export function ArcZoomDial({
     if (!svgRef.current) return 0;
     const rect = svgRef.current.getBoundingClientRect();
     const scaleX = rect.width / W;
-    const scaleY = rect.height / (H + SVG_EXTRA_BOTTOM);
+    const scaleY = rect.height / H;
     const screenCx = rect.left + cx * scaleX;
     const screenCy = rect.top + cy * scaleY;
     const dx = e.clientX - screenCx;
@@ -248,9 +217,8 @@ export function ArcZoomDial({
   // Margine sopra e sotto il riquadro del vetro, così il disco (più alto della ghiera) non viene tagliato in orizzontale.
   const GLASS_PAD = 40;
   const GLASS_EDGE = 12;
-  // La maschera va solo sull'SVG: sul vetro o su un suo antenato spegnerebbe il backdrop-filter. Sfuma solo il
-  // capo in alto (sotto i tasti); in basso la ghiera esce dallo schermo e non serve sfumarla.
-  const endFade = `linear-gradient(to bottom, transparent ${(0.03 * H).toFixed(1)}px, #000 ${(0.24 * H).toFixed(1)}px)`;
+  // La maschera va solo sull'SVG: sul vetro o su un suo antenato spegnerebbe il backdrop-filter.
+  const endFade = "linear-gradient(to bottom, transparent 3%, #000 24%, #000 76%, transparent 97%)";
   const fadeStyle = { WebkitMaskImage: endFade, maskImage: endFade };
 
   return (
@@ -290,9 +258,9 @@ export function ArcZoomDial({
       </div>
       <svg
         ref={svgRef}
-        viewBox={`0 0 ${W} ${H + SVG_EXTRA_BOTTOM}`}
-        className="relative w-full overflow-visible pointer-events-none select-none"
-        style={{ ...fadeStyle, height: `${H + SVG_EXTRA_BOTTOM}px` }}
+        viewBox={`0 0 ${W} ${H}`}
+        className="relative w-full h-full overflow-visible pointer-events-none select-none"
+        style={fadeStyle}
         aria-hidden="true"
       >
         <defs>
