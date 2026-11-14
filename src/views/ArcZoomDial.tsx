@@ -233,20 +233,31 @@ export function ArcZoomDial({
             <feGaussianBlur in="SourceGraphic" stdDeviation="1.5 16" result="vBlur" />
           </filter>
 
-          {/* Sfumatura radiale satinata: alfa del 30% per il cerchio interno */}
+          {/* Sfumatura radiale satinata: alfa del 10% per il cerchio interno */}
           <radialGradient id="cerchioGrandeGrad" cx={cx} cy={cy} r={R_big} gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.30" />
-            <stop offset="55%" stopColor="#e2ecf8" stopOpacity="0.30" />
-            <stop offset="85%" stopColor="#b0c6df" stopOpacity="0.20" />
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.10" />
+            <stop offset="55%" stopColor="#e2ecf8" stopOpacity="0.10" />
+            <stop offset="85%" stopColor="#b0c6df" stopOpacity="0.05" />
             <stop offset="100%" stopColor="#7a9bc2" stopOpacity="0.0" />
           </radialGradient>
 
-          {/* Gradiente per la ghiera esterna: tonalità più chiara a contrasto con il cerchio grande */}
-          <linearGradient id="outerGhieraGrad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="rgba(72, 86, 110, 0.90)" />
-            <stop offset="50%" stopColor="rgba(58, 70, 92, 0.84)" />
-            <stop offset="100%" stopColor="rgba(46, 56, 76, 0.80)" />
+          {/* Gradiente ricco e scuro per dare carattere alla ghiera esterna */}
+          <linearGradient id="outerGhieraGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="rgba(48, 62, 82, 0.94)" />
+            <stop offset="35%" stopColor="rgba(30, 40, 54, 0.96)" />
+            <stop offset="70%" stopColor="rgba(18, 26, 38, 0.96)" />
+            <stop offset="100%" stopColor="rgba(36, 48, 66, 0.92)" />
           </linearGradient>
+
+          {/* Ombra di profondità per far staccare la ghiera esterna */}
+          <filter id="ghieraDepth" x="-25%" y="-25%" width="150%" height="150%">
+            <feDropShadow dx="-2" dy="2" stdDeviation="4" floodColor="#000000" floodOpacity="0.65" />
+          </filter>
+
+          {/* Bagliore ciano per la tacca indice dello zenit */}
+          <filter id="cyanGlow" x="-20%" y="-60%" width="140%" height="220%">
+            <feDropShadow dx="0" dy="0" stdDeviation="2.5" floodColor="#00f0ff" floodOpacity="0.75" />
+          </filter>
 
           {/* Ombra per far risaltare perfettamente i numeri sopra al vetro */}
           <filter id="numShadow" x="-20%" y="-20%" width="140%" height="140%">
@@ -255,8 +266,8 @@ export function ArcZoomDial({
         </defs>
 
         {/* 
-          1. IL CERCHIO GRANDE (ALFA AL 30%, BLUR VERTICALE, NIENTE BORDER):
-          - Vetro satinato con alfa del 30% e blur verticale
+          1. IL CERCHIO GRANDE (ALFA AL 10%, BLUR VERTICALE, NIENTE BORDER):
+          - Vetro satinato trasparente e leggero con alfa del 10% e blur verticale
           - Senza bordo (niente border)
           - Si estende sopra Scansiona (y=9) e sotto Strumenti (y=371)
         */}
@@ -267,19 +278,20 @@ export function ArcZoomDial({
         />
 
         {/* 
-          2. CERCHIO ESTERNO (GHIERA CON LINEE DENTRO):
-          Tonalità più chiara a contrasto con il cerchio grande
+          2. CERCHIO ESTERNO (GHIERA CON CARATTERE):
+          Tonalità smoked dark glass con profondità, riflesso e bordo marcato
         */}
         <path
           d={ghieraPath}
           fill="url(#outerGhieraGrad)"
-          stroke="rgba(255, 255, 255, 0.28)"
-          strokeWidth="1"
+          stroke="rgba(255, 255, 255, 0.38)"
+          strokeWidth="1.2"
+          filter="url(#ghieraDepth)"
         />
 
         {/* 
           LINEE FISSE DENTRO IL CERCHIO ESTERNO:
-          Le tacche graduate fisse della ghiera
+          Le tacche graduate fisse della ghiera con contrasto e carattere
         */}
         <g>
           {ticks.map((t, idx) => (
@@ -289,8 +301,8 @@ export function ArcZoomDial({
               y1={t.y1}
               x2={t.x2}
               y2={t.y2}
-              stroke={t.isCyan ? "#00f0ff" : "rgba(255, 255, 255, 0.75)"}
-              strokeWidth={t.isStop ? "2.6" : t.isCyan ? "1.6" : "1.1"}
+              stroke={t.isCyan ? "#00f0ff" : "rgba(255, 255, 255, 0.88)"}
+              strokeWidth={t.isStop ? "2.8" : t.isCyan ? "1.8" : "1.2"}
               strokeLinecap="round"
             />
           ))}
@@ -337,7 +349,7 @@ export function ArcZoomDial({
 
         {/* 
           LINEA INDICE DELLO ZENIT (0° ORIZZONTALE):
-          Raccordo ciano tra la pillola dello zenit e l'apice della ghiera (cerchiato in giallo)
+          Raccordo ciano tra la pillola dello zenit e l'apice della ghiera con bagliore
         */}
         <line
           x1={56}
@@ -347,6 +359,7 @@ export function ArcZoomDial({
           stroke="#00f0ff"
           strokeWidth="2.8"
           strokeLinecap="round"
+          filter="url(#cyanGlow)"
         />
 
         {/* 
