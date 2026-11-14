@@ -29,6 +29,9 @@ export function ArcZoomDial({
   const dragging = useRef(false);
   const lastAngle = useRef(0);
   const lastHapticZoom = useRef(zoom);
+  // Un trascinamento partito dalla pillola non deve anche cambiare preset al rilascio.
+  const dragMoved = useRef(false);
+  const dragDialAngle = useRef(0);
 
   // Dimensioni calibrate: blocco a filo del bordo destro (W=280, H=380)
   const W = 280;
@@ -104,7 +107,7 @@ export function ArcZoomDial({
   // rotate(φ) in SVG li porta all'angolo θ − φ, quindi φ = angolo dello zoom corrente.
   const dialRotation = angleForZoom(zoom);
 
-  const getPointerAngle = (e: ReactPointerEvent<SVGElement>) => {
+  const getPointerAngle = (e: ReactPointerEvent<Element>) => {
     if (!svgRef.current) return 0;
     const rect = svgRef.current.getBoundingClientRect();
     const scaleX = rect.width / W;
@@ -117,22 +120,26 @@ export function ArcZoomDial({
     return (rad * 180) / Math.PI;
   };
 
-  const onPointerDown = (e: ReactPointerEvent<SVGElement>) => {
+  const onPointerDown = (e: ReactPointerEvent<Element>) => {
     if (disabled || (e.pointerType === "mouse" && e.button !== 0)) return;
     dragging.current = true;
+    dragMoved.current = false;
     lastAngle.current = getPointerAngle(e);
+    dragDialAngle.current = angleForZoom(zoom);
     e.currentTarget.setPointerCapture(e.pointerId);
   };
 
-  const onPointerMove = (e: ReactPointerEvent<SVGElement>) => {
+  const onPointerMove = (e: ReactPointerEvent<Element>) => {
     if (!dragging.current) return;
     const currentPtrAngle = getPointerAngle(e);
     const deltaAngle = currentPtrAngle - lastAngle.current;
+    if (Math.abs(deltaAngle) > 0.5) dragMoved.current = true;
     lastAngle.current = currentPtrAngle;
 
-    const currentDialAngle = angleForZoom(zoom);
-    const newDialAngle = currentDialAngle - deltaAngle;
-    const nextZoom = zoomForAngle(newDialAngle);
+    // The angle accumulates in a ref: recomputing it from the snapped zoom would pull every small
+    // finger step back onto the nearest stop, and the dial would stick there.
+    dragDialAngle.current = Math.min(angleForZoom(max), Math.max(angleForZoom(ZOOM_MIN), dragDialAngle.current - deltaAngle));
+    const nextZoom = zoomForAngle(dragDialAngle.current);
 
     if (Math.abs(nextZoom - lastHapticZoom.current) >= 0.1) {
       lastHapticZoom.current = nextZoom;
@@ -193,11 +200,16 @@ export function ArcZoomDial({
     });
   }
 
-  // Apice orizzontale della ghiera a sinistra: cx - R = 232 - 158 = 74px
-  const apexX = cx - R;
+  // Pillola dello zenit: dal bordo sinistro fino a poco prima del numero all'apice del secondo cerchio
+  // (il numero è centrato a cx - R_text; 14 px lasciano spazio a metà etichetta più un piccolo stacco).
+  const pillH = 30;
+  const pillLeft = 12;
+  const pillRight = cx - R_text - 14;
+  const zoomText = zoom % 1 === 0 ? String(zoom) : zoom.toFixed(1);
 
   // Tocco sulla pillola fissa: passa ai preset rapidi (0.5x, 1x, 2x, 3x, 5x)
   const handlePillClick = () => {
+    if (dragMoved.current) { dragMoved.current = false; return; }
     if (zoom < 1) onZoom(1);
     else if (zoom < 2) onZoom(2);
     else if (zoom < 3) onZoom(3);
@@ -300,7 +312,36 @@ export function ArcZoomDial({
           ))}
         </g>
 
-        {/* 
+        {/*
+          PILLOLA DELLO ZENIT: dal bordo sinistro attraversa la ghiera fino al numero del secondo cerchio
+          all'apice. Disegnata sotto pallini e numeri, così restano visibili sopra la pillola.
+        */}
+        <rect
+          x={pillLeft}
+          y={cy - pillH / 2}
+          width={pillRight - pillLeft}
+          height={pillH}
+          rx={pillH / 2}
+          fill="rgba(32, 38, 48, 0.85)"
+          stroke="rgba(255, 255, 255, 0.2)"
+          strokeWidth="1"
+          filter="url(#ghieraDepth)"
+        />
+        <text
+          x={pillLeft + 22}
+          y={cy}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill="#ffffff"
+          fontSize="13.5"
+          fontWeight="700"
+          fontFamily="system-ui, -apple-system, sans-serif"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
+          {zoomText}x
+        </text>
+
+        {/*
           3. LIVELLO DEI NUMERI SOPRA AL CERCHIO INTERNO:
           Portati sopra al vetro satinato, nitidi e privi di clipping.
           I numeri e i pallini ruotano fluidamente con lo zoom.
@@ -347,21 +388,6 @@ export function ArcZoomDial({
         </g>
 
         {/* 
-          LINEA INDICE DELLO ZENIT (0° ORIZZONTALE):
-          Raccordo ciano tra la pillola dello zenit e l'apice della ghiera con bagliore
-        */}
-        <line
-          x1={56}
-          y1={cy}
-          x2={apexX}
-          y2={cy}
-          stroke="#00e5ff"
-          strokeWidth="2.8"
-          strokeLinecap="round"
-          filter="url(#cyanGlow)"
-        />
-
-        {/* 
           ZONA TOUCH DEDICATA: traccia trasparente curva ampia per swipe fluido con il pollice
         */}
         <path
@@ -378,28 +404,26 @@ export function ArcZoomDial({
         />
       </svg>
 
-      {/* 
-        IN GIALLO LA PILLOLA:
-        - Pillola fissa all'apice (0° orizzontale) a filo con la ghiera come cerchiato in giallo
-        - Mostra il valore zoom live in tempo reale (es. "2x")
-        - Toccandola passa ai preset rapidi (0.5x, 1x, 2x, 3x, 5x)
+      {/*
+        Area di tocco della pillola dello zenit (disegnata nell'SVG): toccandola passa ai preset rapidi
+        (0.5x, 1x, 2x, 3x, 5x).
       */}
       <button
         type="button"
         onClick={handlePillClick}
-        className="absolute pointer-events-auto flex items-center justify-center rounded-full bg-[rgba(32,38,48,0.85)] border border-white/20 backdrop-blur-md px-2.5 shadow-md active:scale-95 transition-transform"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        className="absolute pointer-events-auto touch-none rounded-full bg-transparent active:bg-white/10"
         style={{
-          left: "12px",
-          top: `${cy - 15}px`,
-          height: "30px",
-          minWidth: "44px",
+          left: `${pillLeft}px`,
+          top: `${cy - pillH / 2}px`,
+          height: `${pillH}px`,
+          width: `${pillRight - pillLeft}px`,
         }}
-        aria-label={`Zoom corrente: ${zoom % 1 === 0 ? zoom : zoom.toFixed(1)}x. Tocca per cambiare preset.`}
-      >
-        <span className="text-[13.5px] font-bold text-white tracking-tight tabular-nums">
-          {zoom % 1 === 0 ? zoom : zoom.toFixed(1)}x
-        </span>
-      </button>
+        aria-label={`Zoom corrente: ${zoomText}x. Tocca per cambiare preset.`}
+      />
     </div>
   );
 }
