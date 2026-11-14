@@ -5,6 +5,8 @@ import tailwindcss from "@tailwindcss/vite";
 import tsConfigPaths from "vite-tsconfig-paths";
 import { nitro } from "nitro/vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 // Deploy target: nitro detects Vercel/Netlify/Cloudflare automatically and falls
 // back to a Node server (`npm start`). Force one with NITRO_PRESET, e.g.
@@ -13,6 +15,30 @@ import { VitePWA } from "vite-plugin-pwa";
 // can tell whether the version it runs is the one online (lib/app-version).
 const BUILD_TIME = new Date().toISOString();
 
+/**
+ * Vercel: the year-long immutable cache header must reach only page files that exist. Nitro's Vercel output puts it
+ * on every /assets/ path before the filesystem check, so a file asked for while a deploy was switching got a 404
+ * cached for a year — on that phone the page then never loaded again ("Failed to fetch dynamically imported module",
+ * shown as "reading 'component'"), and clearing the app's caches did not help, as it sits in the browser's HTTP
+ * cache. The rule is moved to Vercel's "hit" phase, which runs only when a static file was found.
+ */
+function cacheOnlyFoundAssets(outputDir: string) {
+  const file = join(outputDir, "config.json");
+  if (!existsSync(file)) return;
+  type VercelRoute = { src?: string; headers?: Record<string, string>; handle?: string; continue?: boolean; dest?: string };
+  const config = JSON.parse(readFileSync(file, "utf8")) as { routes?: VercelRoute[] };
+  const routes = config.routes ?? [];
+  const isAssetCache = (r: VercelRoute) => r.src === "/assets/(.*)" && !!r.headers && !r.dest && !r.handle;
+  const assetRule = routes.find(isAssetCache);
+  if (!assetRule) return;
+  config.routes = [
+    ...routes.filter((r) => !isAssetCache(r)),
+    { handle: "hit" },
+    { src: "^/assets/(.*)$", headers: assetRule.headers ?? {}, continue: true },
+  ];
+  writeFileSync(file, JSON.stringify(config, null, 2));
+}
+
 export default defineConfig(({ command }) => ({
   server: { host: "::", port: 8080 },
   // Simulated sign-in (src/lib/demo-login.ts): dev server and Vercel previews only, never production.
@@ -20,6 +46,9 @@ export default defineConfig(({ command }) => ({
   resolve: {
     dedupe: ["react", "react-dom", "@tanstack/react-query", "@tanstack/query-core"],
   },
+  // Hex hashes (2026-11-14): every page file got a new name once, so the 404s already cached for a year on phones
+  // under the old names (see cacheOnlyFoundAssets) are never asked for again.
+  build: { rollupOptions: { output: { hashCharacters: "hex" } } },
   plugins: [
     tailwindcss(),
     tsConfigPaths({ projects: ["./tsconfig.json"] }),
@@ -32,7 +61,15 @@ export default defineConfig(({ command }) => ({
       },
     }),
     // Vercel: AI recognition can outlast the default 10 s function limit (60 s fits every plan).
-    ...(command === "build" ? [nitro({ vercel: { functions: { maxDuration: 60 } } })] : []),
+    ...(command === "build"
+      ? [
+          nitro({
+            vercel: { functions: { maxDuration: 60 } },
+            // Added with hooks.hook (a plain `hooks` option replaced the Vercel preset's own and no config.json was written).
+            modules: [(n) => { n.hooks.hook("compiled", () => cacheOnlyFoundAssets(n.options.output.dir)); }],
+          }),
+        ]
+      : []),
     viteReact(),
     {
       name: "mdt-version-json",
