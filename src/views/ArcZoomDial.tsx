@@ -213,6 +213,8 @@ export function ArcZoomDial({
   // può passare un po' sotto i tasti in alto. I due capi del nastro sfumano (maschera verticale) invece di vedersi
   // tagliati dal bordo dello schermo.
   const DIAL_SCALE = 1.18;
+  // Margine sopra e sotto il riquadro del vetro, così il disco (più alto della ghiera) non viene tagliato in orizzontale.
+  const GLASS_PAD = 40;
   // La maschera va solo sull'SVG: sul vetro o su un suo antenato spegnerebbe il backdrop-filter.
   const endFade = "linear-gradient(to bottom, transparent 3%, #000 24%, #000 76%, transparent 97%)";
   const fadeStyle = { WebkitMaskImage: endFade, maskImage: endFade };
@@ -238,11 +240,20 @@ export function ArcZoomDial({
         rispettava il ritaglio e sfocava tutto il rettangolo: si vedevano tagli dritti in alto e a sinistra.
         Il border-radius invece lo rispetta sempre.
       */}
+      {/*
+        Il disco si ferma esattamente al bordo destro dello schermo (W dopo l'ingrandimento attorno a cx): oltre il
+        bordo non c'è immagine da sfocare e il backdrop-filter disegnava lì una striscia chiara.
+      */}
       <div
-        className="ar-dial-glass"
+        className="absolute overflow-hidden pointer-events-none"
         aria-hidden="true"
-        style={{ left: `${cx - Ro}px`, top: `${cy - Ro}px`, width: `${2 * Ro}px`, height: `${2 * Ro}px` }}
-      />
+        style={{ left: 0, top: `${-GLASS_PAD}px`, width: `${cx + (W - cx) / DIAL_SCALE}px`, height: `${H + 2 * GLASS_PAD}px` }}
+      >
+        <div
+          className="ar-dial-glass"
+          style={{ left: `${cx - Ro}px`, top: `${cy - Ro + GLASS_PAD}px`, width: `${2 * Ro}px`, height: `${2 * Ro}px` }}
+        />
+      </div>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
