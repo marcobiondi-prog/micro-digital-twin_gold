@@ -232,13 +232,13 @@ export function ArcZoomDial({
             <feGaussianBlur stdDeviation="8" result="blur" />
           </filter>
 
-          {/* Sfumatura radiale: cerchio grande più chiaro e trasparente (vetro satinato luminoso) */}
+          {/* Sfumatura radiale: cerchio grande ultra-chiaro e trasparente (vetro satinato puro) */}
           <radialGradient id="cerchioGrandeGrad" cx={cx} cy={cy} r={R_big} gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.26" />
-            <stop offset="45%" stopColor="#dce6f2" stopOpacity="0.20" />
-            <stop offset="75%" stopColor="#9bb4d0" stopOpacity="0.14" />
-            <stop offset="92%" stopColor="#607c9e" stopOpacity="0.06" />
-            <stop offset="100%" stopColor="#405876" stopOpacity="0.0" />
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.18" />
+            <stop offset="45%" stopColor="#ffffff" stopOpacity="0.11" />
+            <stop offset="75%" stopColor="#ffffff" stopOpacity="0.05" />
+            <stop offset="92%" stopColor="#ffffff" stopOpacity="0.015" />
+            <stop offset="100%" stopColor="#ffffff" stopOpacity="0.0" />
           </radialGradient>
 
           {/* Gradiente per la ghiera esterna: tonalità più chiara a contrasto con il cerchio grande */}
@@ -255,20 +255,15 @@ export function ArcZoomDial({
         </defs>
 
         {/* 
-          1. IL CERCHIO GRANDE (SFONDO PIÙ CHIARO E TRASPARENTE):
-          - Vetro satinato chiaro, luminoso e trasparente che lascia trasparire la scena
+          1. IL CERCHIO GRANDE (SFONDO ULTRA-CHIARO E TRASPARENTE):
+          - Vetro satinato puro, chiaro e trasparente che lascia trasparire l'inquadratura
           - Si estende sopra Scansiona (y=9) e sotto Strumenti (y=371)
-          - Sfocato e sfumato morbidamente verso l'esterno
+          - Bordo satinato sottile e dissolvenza morbida
         */}
         <path
           d={cerchioGrandePath}
           fill="url(#cerchioGrandeGrad)"
-          filter="url(#dialGlassBlur)"
-        />
-        <path
-          d={cerchioGrandePath}
-          fill="url(#cerchioGrandeGrad)"
-          stroke="rgba(255, 255, 255, 0.15)"
+          stroke="rgba(255, 255, 255, 0.22)"
           strokeWidth="0.8"
         />
 
