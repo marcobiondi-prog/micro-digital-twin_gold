@@ -37,13 +37,13 @@ export function ArcZoomDial({
   const cy = 190;
 
   // Cerchio 1 (Ghiera esterna spostata più avanti verso l'interno schermo):
-  const Ro = 192.0; // Raggio esterno ghiera (spostato più avanti)
-  const Rm = 158.0; // Raggio interno ghiera / confine con il vetro satinato
-  const R = 175.0; // Raggio linea centrale delle tacche graduate
+  const Ro = 196.0; // Raggio esterno ghiera (spostato più avanti)
+  const Rm = 162.0; // Raggio interno ghiera / confine con il vetro satinato
+  const R = 179.0; // Raggio linea centrale delle tacche graduate
 
   // Cerchio Grande (indicato in rosso dall'utente):
-  // Raggio ampio R_big = 204px attorno a (cx, cy) che abbraccia l'intero blocco comandi
-  const R_big = 204.0;
+  // Raggio ampio R_big = 208px attorno a (cx, cy) che abbraccia l'intero blocco comandi
+  const R_big = 208.0;
   const radBig = (78.0 * Math.PI) / 180;
   const xT_big = cx - R_big * Math.cos(radBig);
   const yT_big = cy - R_big * Math.sin(radBig);
@@ -52,8 +52,8 @@ export function ArcZoomDial({
   const cerchioGrandePath = `M ${xT_big.toFixed(1)} ${yT_big.toFixed(1)} A ${R_big} ${R_big} 0 0 0 ${xB_big.toFixed(1)} ${yB_big.toFixed(1)} L ${W} ${yB_big.toFixed(1)} L ${W} ${yT_big.toFixed(1)} Z`;
 
   // Cerchio 2 (Vetro satinato trasparente con i numeri dentro spostati più avanti):
-  const R_dot = 152.0; // Raggio dei pallini bianchi dentro il vetro satinato (avanzati verso l'arco)
-  const R_text = 135.0; // Raggio dei numeri dello zoom dentro il vetro satinato (avanzati per non finire sotto Scansiona e Strumenti)
+  const R_dot = 156.0; // Raggio dei pallini bianchi dentro il vetro satinato (avanzati verso l'arco)
+  const R_text = 138.0; // Raggio dei numeri dello zoom dentro il vetro satinato (avanzati per non finire sotto Scansiona e Strumenti)
 
   const degTop = 56.0;
   const degBot = 66.0;
@@ -316,33 +316,40 @@ export function ArcZoomDial({
           className="transition-transform duration-75 ease-out"
           filter="url(#numShadow)"
         >
-          {stops.map((s) => (
-            <g key={s.label}>
-              <circle
-                cx={s.dotX}
-                cy={s.dotY}
-                r={3.5}
-                fill="#ffffff"
-              />
-              <text
-                x={s.textX}
-                y={s.textY}
-                transform={`rotate(${s.deg}, ${s.textX}, ${s.textY})`}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fill="#ffffff"
-                stroke="rgba(10, 15, 25, 0.85)"
-                strokeWidth="1.2"
-                paintOrder="stroke fill"
-                fontSize="14.5"
-                fontWeight="700"
-                fontFamily="system-ui, -apple-system, sans-serif"
-                className="pointer-events-none select-none"
-              >
-                {s.label}
-              </text>
-            </g>
-          ))}
+          {stops.map((s) => {
+            const screenAngle = Math.abs(s.deg + dialRotation);
+            // Dissolvenza morbida: i numeri sono pienamente visibili nell'arco utile,
+            // e sfumano a 0 se ruotano troppo in alto o in basso verso Scansiona/Strumenti
+            const opacity = screenAngle <= 44 ? 1 : Math.max(0, 1 - (screenAngle - 44) / 8);
+            if (opacity <= 0.02) return null;
+            return (
+              <g key={s.label} opacity={opacity}>
+                <circle
+                  cx={s.dotX}
+                  cy={s.dotY}
+                  r={3.5}
+                  fill="#ffffff"
+                />
+                <text
+                  x={s.textX}
+                  y={s.textY}
+                  transform={`rotate(${s.deg}, ${s.textX}, ${s.textY})`}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fill="#ffffff"
+                  stroke="rgba(10, 15, 25, 0.85)"
+                  strokeWidth="1.2"
+                  paintOrder="stroke fill"
+                  fontSize="14.5"
+                  fontWeight="700"
+                  fontFamily="system-ui, -apple-system, sans-serif"
+                  className="pointer-events-none select-none"
+                >
+                  {s.label}
+                </text>
+              </g>
+            );
+          })}
         </g>
 
         {/* 
