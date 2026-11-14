@@ -227,18 +227,18 @@ export function ArcZoomDial({
         aria-hidden="true"
       >
         <defs>
-          {/* Blur filter per lo sfondo satinato del cerchio grande */}
-          <filter id="dialGlassBlur" x="-30%" y="-30%" width="160%" height="160%">
-            <feGaussianBlur stdDeviation="8" result="blur" />
+          {/* Blur in verticale per il cerchio interno satinato */}
+          <filter id="verticalGlassBlur" x="-30%" y="-40%" width="160%" height="180%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="1.5 16" result="vBlur" />
           </filter>
 
-          {/* Sfumatura radiale: cerchio grande ultra-chiaro e trasparente (vetro satinato puro) */}
+          {/* Sfumatura radiale satinata con alfa aumentato per autentico vetro satinato */}
           <radialGradient id="cerchioGrandeGrad" cx={cx} cy={cy} r={R_big} gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.18" />
-            <stop offset="45%" stopColor="#ffffff" stopOpacity="0.11" />
-            <stop offset="75%" stopColor="#ffffff" stopOpacity="0.05" />
-            <stop offset="92%" stopColor="#ffffff" stopOpacity="0.015" />
-            <stop offset="100%" stopColor="#ffffff" stopOpacity="0.0" />
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.55" />
+            <stop offset="40%" stopColor="#e8eef6" stopOpacity="0.46" />
+            <stop offset="70%" stopColor="#c2d2e4" stopOpacity="0.36" />
+            <stop offset="90%" stopColor="#8faac8" stopOpacity="0.20" />
+            <stop offset="100%" stopColor="#6080a8" stopOpacity="0.0" />
           </radialGradient>
 
           {/* Gradiente per la ghiera esterna: tonalità più chiara a contrasto con il cerchio grande */}
@@ -255,16 +255,21 @@ export function ArcZoomDial({
         </defs>
 
         {/* 
-          1. IL CERCHIO GRANDE (SFONDO ULTRA-CHIARO E TRASPARENTE):
-          - Vetro satinato puro, chiaro e trasparente che lascia trasparire l'inquadratura
+          1. IL CERCHIO GRANDE (BLUR IN VERTICALE CON ALFA AUMENTATO - VETRO SATINATO):
+          - Vetro satinato con blur verticale e opacità aumentata
           - Si estende sopra Scansiona (y=9) e sotto Strumenti (y=371)
-          - Bordo satinato sottile e dissolvenza morbida
+          - Rifinito con bordo satinato chiaro
         */}
         <path
           d={cerchioGrandePath}
           fill="url(#cerchioGrandeGrad)"
-          stroke="rgba(255, 255, 255, 0.22)"
-          strokeWidth="0.8"
+          filter="url(#verticalGlassBlur)"
+        />
+        <path
+          d={cerchioGrandePath}
+          fill="url(#cerchioGrandeGrad)"
+          stroke="rgba(255, 255, 255, 0.32)"
+          strokeWidth="1"
         />
 
         {/* 
