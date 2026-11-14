@@ -18,15 +18,12 @@ export function ArcZoomDial({
   onZoom,
   disabled = false,
   className = "",
-  fitHeight,
 }: {
   zoom: number;
   max?: number;
   onZoom: (value: number) => void;
   disabled?: boolean;
   className?: string;
-  /** Altezza disponibile in px: la ghiera si rimpicciolisce per starci dentro (mai sotto le pillole in alto). */
-  fitHeight?: number | undefined;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragging = useRef(false);
@@ -67,11 +64,6 @@ export function ArcZoomDial({
   const xTm = cx - Rm * Math.cos(radT);
   const yTm = cy - Rm * Math.sin(radT);
   const capR1 = (Ro - Rm) / 2; // 16.5px
-
-  // Cerchio interno di vetro: dall'estremità alta della ghiera, lungo il suo bordo esterno, fino
-  // all'estremità bassa, poi chiuso sul bordo destro. Un livello HTML con backdrop-filter ritagliato
-  // su questa forma sfoca lo sfondo; la ghiera (semitrasparente) ci si fonde sopra.
-  const glassClip = `M ${xTo.toFixed(1)} ${yTo.toFixed(1)} A ${Ro} ${Ro} 0 0 0 ${xBo.toFixed(1)} ${yBo.toFixed(1)} L ${W} ${yBo.toFixed(1)} L ${W} ${yTo.toFixed(1)} Z`;
 
   // Path SVG Cerchio 1 (Ghiera esterna con estremità arrotondate)
   const ghieraPath = `M ${xTo.toFixed(1)} ${yTo.toFixed(1)} A ${Ro} ${Ro} 0 0 0 ${xBo.toFixed(1)} ${yBo.toFixed(1)} A ${capR1.toFixed(1)} ${capR1.toFixed(1)} 0 0 0 ${xBm.toFixed(1)} ${yBm.toFixed(1)} A ${Rm} ${Rm} 0 0 1 ${xTm.toFixed(1)} ${yTm.toFixed(1)} A ${capR1.toFixed(1)} ${capR1.toFixed(1)} 0 0 0 ${xTo.toFixed(1)} ${yTo.toFixed(1)} Z`;
@@ -217,22 +209,45 @@ export function ArcZoomDial({
     hapticTick();
   };
 
-  // Scala per stare nello spazio libero (tra la barra in alto e il bordo): mai oltre la misura piena.
-  const scale = fitHeight && fitHeight > 0 ? Math.max(0.55, Math.min(1, fitHeight / H)) : 1;
+  // Ghiera ingrandita attorno al centro dello shutter (cx, cy): lo shutter resta al centro dei cerchi e la ghiera
+  // può passare un po' sotto i tasti in alto. I due capi del nastro sfumano (maschera verticale) invece di vedersi
+  // tagliati dal bordo dello schermo.
+  const DIAL_SCALE = 1.18;
+  // La maschera va solo sull'SVG: sul vetro o su un suo antenato spegnerebbe il backdrop-filter.
+  const endFade = "linear-gradient(to bottom, transparent 3%, #000 24%, #000 76%, transparent 97%)";
+  const fadeStyle = { WebkitMaskImage: endFade, maskImage: endFade };
 
   return (
     <div
       className={`absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none select-none z-10 ${className}`}
-      style={{ width: `${W * scale}px`, height: `${H * scale}px` }}
+      style={{ width: `${W}px`, height: `${H}px` }}
       data-camera-controls
     >
-      <div className="absolute left-0 top-0 origin-top-left" style={{ width: `${W}px`, height: `${H}px`, transform: `scale(${scale})` }}>
-      {/* Cerchio interno di vetro: sfoca lo sfondo fino al bordo esterno della ghiera, che ci si fonde sopra */}
-      <div className="ar-dial-glass" aria-hidden="true" style={{ clipPath: `path("${glassClip}")` }} />
+      <div
+        className="absolute left-0 top-0"
+        style={{
+          width: `${W}px`,
+          height: `${H}px`,
+          transform: `scale(${DIAL_SCALE})`,
+          transformOrigin: `${cx}px ${cy}px`,
+        }}
+      >
+      {/*
+        Cerchio interno di vetro: un disco intero di raggio Ro attorno allo shutter che sfoca lo sfondo fino al bordo
+        esterno della ghiera. Prima era una forma a D ritagliata con clip-path, ma il backdrop-filter non ne
+        rispettava il ritaglio e sfocava tutto il rettangolo: si vedevano tagli dritti in alto e a sinistra.
+        Il border-radius invece lo rispetta sempre.
+      */}
+      <div
+        className="ar-dial-glass"
+        aria-hidden="true"
+        style={{ left: `${cx - Ro}px`, top: `${cy - Ro}px`, width: `${2 * Ro}px`, height: `${2 * Ro}px` }}
+      />
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
         className="relative w-full h-full overflow-visible pointer-events-none select-none"
+        style={fadeStyle}
         aria-hidden="true"
       >
         <defs>

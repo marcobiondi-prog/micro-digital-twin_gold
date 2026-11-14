@@ -29,8 +29,6 @@ function encodeFrame(frame: HTMLCanvasElement, maxSide: number, quality: number)
 }
 /** Native fullscreen rotation: wait this long for the reported size to settle before re-laying out. */
 const NATIVE_SETTLE_MS = 120;
-// Landscape: room kept free above (top bar) and below the zoom dial column, so the dial never slides under the pills.
-const AR_LANDSCAPE_TOP_RESERVE = 64, AR_LANDSCAPE_BOTTOM_RESERVE = 10;
 type SpeciesInfo = NonNullable<D["species"]> & { cooling: D["cooling"]; identification: D["identification"] };
 /** One camera section's scan, set aside while another section is open. */
 type TabResult = {
@@ -2198,7 +2196,7 @@ export function ArCamera({
                 </div>
 
                 {/* Colonna Destra: Controlli Fotocamera ed Ergonomia con il pollice */}
-                <div className="ar-landscape-right" style={{ top: `calc(50% + ${(AR_LANDSCAPE_TOP_RESERVE - AR_LANDSCAPE_BOTTOM_RESERVE) / 2}px)` }}>
+                <div className="ar-landscape-right">
                   {toolsOpen && toolsPanelElement}
                   <div className="relative flex items-center justify-end select-none">
                     <ArcZoomDial
