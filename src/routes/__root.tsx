@@ -72,6 +72,12 @@ function ErrorComponent({ error }: ErrorComponentProps) {
         <h1 className="text-xl font-semibold text-foreground">La pagina non si è caricata</h1>
         {/* The technical reason, small, so a screenshot is enough to diagnose the failure. */}
         <p className="mt-2 break-words text-xs text-muted-foreground">{String((error as Error)?.message ?? error).slice(0, 160)}</p>
+        {/* Where it broke: the page open and the first lines of the stack, for a screenshot to be enough. */}
+        <p className="mt-3 break-all text-left font-mono text-[10px] leading-snug text-muted-foreground/80">
+          {typeof window !== "undefined" ? window.location.pathname + window.location.search : ""}
+          {"\n"}
+          {String((error as Error)?.stack ?? "").split("\n").slice(1, 6).map((l) => l.trim().replace(/^at /, "").replace(/https?:\/\/[^/]+/g, "")).join(" ← ")}
+        </p>
         <button onClick={() => void reloadFresh()} className="mt-6 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Riprova</button>
       </div>
     </div>
