@@ -2703,9 +2703,11 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   margin: 0 !important;
 }
 
+/* Anchored to the screen edge itself, not the safe-area inset: with the inset the column stopped ~10 px short and
+   the raw camera showed as a light strip beside the dial's glass. */
 .ar-landscape-right {
   position: absolute;
-  right: env(safe-area-inset-right, 0px) !important;
+  right: 0 !important;
   top: 50%;
   transform: translateY(-50%);
   width: auto;

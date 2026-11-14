@@ -215,6 +215,7 @@ export function ArcZoomDial({
   const DIAL_SCALE = 1.18;
   // Margine sopra e sotto il riquadro del vetro, così il disco (più alto della ghiera) non viene tagliato in orizzontale.
   const GLASS_PAD = 40;
+  const GLASS_EDGE = 12;
   // La maschera va solo sull'SVG: sul vetro o su un suo antenato spegnerebbe il backdrop-filter.
   const endFade = "linear-gradient(to bottom, transparent 3%, #000 24%, #000 76%, transparent 97%)";
   const fadeStyle = { WebkitMaskImage: endFade, maskImage: endFade };
@@ -241,13 +242,13 @@ export function ArcZoomDial({
         Il border-radius invece lo rispetta sempre.
       */}
       {/*
-        Il disco si ferma esattamente al bordo destro dello schermo (W dopo l'ingrandimento attorno a cx): oltre il
-        bordo non c'è immagine da sfocare e il backdrop-filter disegnava lì una striscia chiara.
+        Il disco va un po' oltre il bordo destro dello schermo (GLASS_EDGE), così tra il vetro e il bordo non resta mai
+        una striscia di fotocamera non sfocata.
       */}
       <div
         className="absolute overflow-hidden pointer-events-none"
         aria-hidden="true"
-        style={{ left: 0, top: `${-GLASS_PAD}px`, width: `${cx + (W - cx) / DIAL_SCALE}px`, height: `${H + 2 * GLASS_PAD}px` }}
+        style={{ left: 0, top: `${-GLASS_PAD}px`, width: `${W + GLASS_EDGE}px`, height: `${H + 2 * GLASS_PAD}px` }}
       >
         <div
           className="ar-dial-glass"
