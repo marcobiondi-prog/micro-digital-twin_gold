@@ -2679,17 +2679,36 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   z-index: 22;
 }
 
+/* Schermo Puro - Pill Badge (Portrait & Landscape) */
+.ar-pure-badge {
+  background: rgba(20, 26, 36, 0.78) !important;
+  border: 1px solid rgba(255, 255, 255, 0.20) !important;
+  border-radius: 9999px !important;
+  padding: 0.45rem 1.15rem !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+  pointer-events: auto !important;
+  touch-action: pan-y pan-x !important;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease-out !important;
+  width: auto !important;
+  max-width: fit-content !important;
+}
+
 .ar-landscape-left {
   position: absolute;
-  left: max(1.25rem, env(safe-area-inset-left));
-  top: 50%;
-  transform: translateY(-50%);
-  width: min(36vw, 20rem);
+  left: max(1.5rem, env(safe-area-inset-left));
+  top: 5rem;
+  width: auto;
+  max-width: min(50vw, 24rem);
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  justify-content: center;
-  align-items: stretch;
+  justify-content: flex-start;
+  align-items: flex-start;
   pointer-events: none;
   z-index: 22;
 }
@@ -2698,7 +2717,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   pointer-events: auto !important;
   position: relative !important;
   inset: auto !important;
-  width: 100% !important;
+  width: auto !important;
   max-width: 100% !important;
   margin: 0 !important;
 }
