@@ -2002,7 +2002,10 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .home-video-player[data-controls-hidden] .home-video-toolbar { transform: translateY(-.5rem); }
 
 /* Tab-specific AI camera targets: urban and vineyard expose different commands. */
-.ar-camera-surface { --ar-header-bottom: calc(max(1rem, env(safe-area-inset-top)) + 6rem); }
+/* Nothing inside the camera may make it scroll: the enlarged zoom dial reaches past the screen's top and bottom, and
+   the overflow showed Android's scrollbar as a thin light line along the right edge. clip, not hidden, so the surface
+   never becomes a scroll container itself. */
+.ar-camera-surface { --ar-header-bottom: calc(max(1rem, env(safe-area-inset-top)) + 6rem); overflow: hidden; overflow: clip; }
 .ar-camera-topbar { z-index: 24; }
 .ar-focus-options { display:flex; align-items:center; gap:.25rem; padding:.3125rem; border-radius:999px; background:var(--camera-glass); border:1px solid var(--camera-border); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow:0 2px 10px color-mix(in oklab, oklch(0 0 0) 35%, transparent); }
 .ar-camera-surface:not([data-landscape=true]) .ar-thermal-summary { top:var(--ar-header-bottom); }
