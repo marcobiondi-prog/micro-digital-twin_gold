@@ -13,16 +13,17 @@ import { hapticTick } from "@/lib/haptics";
  * - Rotazione fluida 1:1 al trascinamento del pollice e feedback aptico.
  */
 /**
- * Aggiunta in basso alla ghiera: il bordo esterno lascia il cerchio tangente a TAIL_START_DEG e scende con una
- * curva (Bézier cubica, sempre tangente: nessuno spigolo né ammaccatura) più piegata all'inizio e quasi dritta
- * in fondo, fino a TAIL_END, il punto in fondo alla linea disegnata dall'utente, poco sotto il bordo dello schermo.
- * TAIL_PULL_START corto = più curva all'inizio; TAIL_END_DIR e TAIL_PULL_END danno la direzione d'arrivo.
+ * Aggiunta in basso alla ghiera, come nel disegno dell'utente: il bordo esterno lascia il cerchio a TAIL_START_DEG,
+ * appena sotto la pillola (che copre il piccolo cambio di direzione), scende in diagonale verso destra lungo
+ * TAIL_START_DIR, poi curva e finisce verticale (TAIL_END_DIR) in TAIL_END, sotto il bordo dello schermo.
+ * TAIL_PULL_START lungo = tratto diagonale più dritto; TAIL_PULL_END corto = curva più stretta verso la verticale.
  */
-const TAIL_START_DEG = 6;
+const TAIL_START_DEG = 5;
+const TAIL_START_DIR: readonly [number, number] = [0.276, 0.961];
 const TAIL_END: readonly [number, number] = [68, 386.4];
-const TAIL_PULL_START = 55;
+const TAIL_PULL_START = 75;
 const TAIL_END_DIR: readonly [number, number] = [0, 1];
-const TAIL_PULL_END = 90;
+const TAIL_PULL_END = 60;
 /** Spazio in più sotto il viewBox, così l'aggiunta si chiude fuori dallo schermo senza essere tagliata dal riquadro. */
 const SVG_EXTRA_BOTTOM = 110;
 
@@ -77,13 +78,13 @@ export function ArcZoomDial({
 
   // Path SVG Cerchio 1: ghiera esterna piena (non trasparente) fusa in un solo pezzo con un'aggiunta in basso.
   // In alto l'estremità arrotondata di sempre; il bordo esterno segue il cerchio fino a poco sotto l'apice, poi
-  // una curva tangente, più piegata all'inizio (TAIL_START_DEG → TAIL_END), e si chiude sotto, fuori dallo schermo. Bordo interno, tacche e numeri restano sul cerchio.
+  // la diagonale del disegno che curva fino alla verticale (TAIL_START_DEG → TAIL_END), e si chiude sotto, fuori dallo schermo. Bordo interno, tacche e numeri restano sul cerchio.
   // Curva dell'aggiunta: parte in T, il punto del cerchio a TAIL_START_DEG.
   const radS = (TAIL_START_DEG * Math.PI) / 180;
   const xTs = cx - Ro * Math.cos(radS);
   const yTs = cy + Ro * Math.sin(radS);
-  // Controlli della Bézier: il primo lungo la tangente al cerchio in T, il secondo prima di TAIL_END.
-  const xC1 = xTs + Math.sin(radS) * TAIL_PULL_START, yC1 = yTs + Math.cos(radS) * TAIL_PULL_START;
+  // Controlli della Bézier: il primo lungo la diagonale disegnata (TAIL_START_DIR), il secondo prima di TAIL_END.
+  const xC1 = xTs + TAIL_START_DIR[0] * TAIL_PULL_START, yC1 = yTs + TAIL_START_DIR[1] * TAIL_PULL_START;
   const xC2 = TAIL_END[0] - TAIL_END_DIR[0] * TAIL_PULL_END, yC2 = TAIL_END[1] - TAIL_END_DIR[1] * TAIL_PULL_END;
   const innerEndDeg = 70;
   const xIe = cx - Rm * Math.cos((innerEndDeg * Math.PI) / 180);
