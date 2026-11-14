@@ -12,6 +12,14 @@ import { hapticTick } from "@/lib/haptics";
  * - Pillola fissa all'apice (0° orizzontale) a filo con [ Singolo | Multiplo ] con valore zoom live e mirino ciano.
  * - Rotazione fluida 1:1 al trascinamento del pollice e feedback aptico.
  */
+/**
+ * Bordo esterno dell'aggiunta in basso alla ghiera, nelle coordinate del suo viewBox (W=280, H=380): la linea
+ * disegnata a mano dall'utente su uno screenshot, ricampionata e lievemente levigata. Dall'alto verso il basso.
+ */
+const GHIERA_TAIL: ReadonlyArray<readonly [number, number]> = [[57.7,236],[58,240.5],[58.6,245],[59.1,249.5],[59.8,254],[60.5,258.5],[61.2,263],[61.9,267.4],[62.7,271.9],[63.8,276.4],[65.3,280.9],[67.3,285.4],[69.7,289.9],[72.1,294.4],[74.4,298.9],[76.3,303.4],[78.3,307.9],[80.7,312.3],[83.2,316.8],[85.1,321.3],[85.8,325.8],[85.3,330.3],[83.8,334.8],[82.4,339.3],[81.9,343.8],[82.9,348.3],[84.7,352.8],[86.8,357.2],[89,361.7],[91.3,366.2],[93.5,370.7],[95.8,375.2],[98.2,379.7],[100,384.2],[100.7,386.4]];
+/** Spazio in più sotto il viewBox, così l'aggiunta si chiude fuori dallo schermo senza essere tagliata dal riquadro. */
+const SVG_EXTRA_BOTTOM = 110;
+
 export function ArcZoomDial({
   zoom,
   max = ZOOM_MAX,
@@ -57,16 +65,29 @@ export function ArcZoomDial({
   // Coordinate Cerchio 1 (Ghiera esterna)
   const xTo = cx - Ro * Math.cos(radT);
   const yTo = cy - Ro * Math.sin(radT);
-  const xBo = cx - Ro * Math.cos(radB);
-  const yBo = cy + Ro * Math.sin(radB);
-  const xBm = cx - Rm * Math.cos(radB);
-  const yBm = cy + Rm * Math.sin(radB);
   const xTm = cx - Rm * Math.cos(radT);
   const yTm = cy - Rm * Math.sin(radT);
   const capR1 = (Ro - Rm) / 2; // 16.5px
 
-  // Path SVG Cerchio 1 (Ghiera esterna con estremità arrotondate)
-  const ghieraPath = `M ${xTo.toFixed(1)} ${yTo.toFixed(1)} A ${Ro} ${Ro} 0 0 0 ${xBo.toFixed(1)} ${yBo.toFixed(1)} A ${capR1.toFixed(1)} ${capR1.toFixed(1)} 0 0 0 ${xBm.toFixed(1)} ${yBm.toFixed(1)} A ${Rm} ${Rm} 0 0 1 ${xTm.toFixed(1)} ${yTm.toFixed(1)} A ${capR1.toFixed(1)} ${capR1.toFixed(1)} 0 0 0 ${xTo.toFixed(1)} ${yTo.toFixed(1)} Z`;
+  // Path SVG Cerchio 1: ghiera esterna piena (non trasparente) fusa in un solo pezzo con un'aggiunta in basso.
+  // In alto l'estremità arrotondata di sempre; il bordo esterno segue il cerchio fino a poco sotto l'apice, poi
+  // la linea disegnata dall'utente (GHIERA_TAIL: scende più dritta, con una piccola curva all'altezza di
+  // Strumenti) e si chiude sotto, fuori dallo schermo. Bordo interno, tacche e numeri restano sul cerchio.
+  const tailStartDeg = (Math.asin((GHIERA_TAIL[0][1] - cy) / Ro) * 180) / Math.PI - 4;
+  const tailLast = GHIERA_TAIL[GHIERA_TAIL.length - 1];
+  const innerEndDeg = 70;
+  const xIe = cx - Rm * Math.cos((innerEndDeg * Math.PI) / 180);
+  const yIe = cy + Rm * Math.sin((innerEndDeg * Math.PI) / 180);
+  const ghieraPath = [
+    `M ${xTo.toFixed(1)} ${yTo.toFixed(1)}`,
+    `A ${Ro} ${Ro} 0 0 0 ${(cx - Ro * Math.cos((tailStartDeg * Math.PI) / 180)).toFixed(1)} ${(cy + Ro * Math.sin((tailStartDeg * Math.PI) / 180)).toFixed(1)}`,
+    ...GHIERA_TAIL.map(([x, y]) => `L ${x} ${y}`),
+    `L ${tailLast[0] + 10} ${tailLast[1] + 60}`,
+    `L ${(xIe + 30).toFixed(1)} ${H + 80}`,
+    `L ${xIe.toFixed(1)} ${yIe.toFixed(1)}`,
+    `A ${Rm} ${Rm} 0 0 1 ${xTm.toFixed(1)} ${yTm.toFixed(1)}`,
+    `A ${capR1.toFixed(1)} ${capR1.toFixed(1)} 0 0 0 ${xTo.toFixed(1)} ${yTo.toFixed(1)} Z`,
+  ].join(" ");
 
   // Mappatura angolare continua: STEP gradi tra uno stop e l'altro (1x a -STEP, 2x all'apice 0°, 3x a +STEP),
   // stretta come nel mockup così all'apice restano visibili anche gli stop vicini.
@@ -101,7 +122,7 @@ export function ArcZoomDial({
     if (!svgRef.current) return 0;
     const rect = svgRef.current.getBoundingClientRect();
     const scaleX = rect.width / W;
-    const scaleY = rect.height / H;
+    const scaleY = rect.height / (H + SVG_EXTRA_BOTTOM);
     const screenCx = rect.left + cx * scaleX;
     const screenCy = rect.top + cy * scaleY;
     const dx = e.clientX - screenCx;
@@ -216,8 +237,9 @@ export function ArcZoomDial({
   // Margine sopra e sotto il riquadro del vetro, così il disco (più alto della ghiera) non viene tagliato in orizzontale.
   const GLASS_PAD = 40;
   const GLASS_EDGE = 12;
-  // La maschera va solo sull'SVG: sul vetro o su un suo antenato spegnerebbe il backdrop-filter.
-  const endFade = "linear-gradient(to bottom, transparent 3%, #000 24%, #000 76%, transparent 97%)";
+  // La maschera va solo sull'SVG: sul vetro o su un suo antenato spegnerebbe il backdrop-filter. Sfuma solo il
+  // capo in alto (sotto i tasti); in basso la ghiera esce dallo schermo e non serve sfumarla.
+  const endFade = `linear-gradient(to bottom, transparent ${(0.03 * H).toFixed(1)}px, #000 ${(0.24 * H).toFixed(1)}px)`;
   const fadeStyle = { WebkitMaskImage: endFade, maskImage: endFade };
 
   return (
@@ -257,17 +279,16 @@ export function ArcZoomDial({
       </div>
       <svg
         ref={svgRef}
-        viewBox={`0 0 ${W} ${H}`}
-        className="relative w-full h-full overflow-visible pointer-events-none select-none"
-        style={fadeStyle}
+        viewBox={`0 0 ${W} ${H + SVG_EXTRA_BOTTOM}`}
+        className="relative w-full overflow-visible pointer-events-none select-none"
+        style={{ ...fadeStyle, height: `${H + SVG_EXTRA_BOTTOM}px` }}
         aria-hidden="true"
       >
         <defs>
-          {/* Ghiera esterna in tonalità chiara e semitrasparente: si fonde con il vetro sfocato sotto */}
+          {/* Ghiera esterna piena, non trasparente: grigio-blu scuro con una leggera sfumatura */}
           <linearGradient id="outerGhieraGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="rgba(150, 162, 180, 0.42)" />
-            <stop offset="50%" stopColor="rgba(120, 132, 150, 0.36)" />
-            <stop offset="100%" stopColor="rgba(140, 152, 170, 0.40)" />
+            <stop offset="0%" stopColor="#4a5262" />
+            <stop offset="100%" stopColor="#3b4250" />
           </linearGradient>
 
           {/* Bagliore ciano vibrante per la tacca indice dello zenit e fermi */}
