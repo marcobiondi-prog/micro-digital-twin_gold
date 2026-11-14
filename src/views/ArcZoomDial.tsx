@@ -18,11 +18,11 @@ import { hapticTick } from "@/lib/haptics";
  * in fondo, fino a TAIL_END, il punto in fondo alla linea disegnata dall'utente, poco sotto il bordo dello schermo.
  * TAIL_PULL_START corto = più curva all'inizio; TAIL_END_DIR e TAIL_PULL_END danno la direzione d'arrivo.
  */
-const TAIL_START_DEG = 8;
-const TAIL_END: readonly [number, number] = [108, 386.4];
-const TAIL_PULL_START = 28;
-const TAIL_END_DIR: readonly [number, number] = [0.2, 0.98];
-const TAIL_PULL_END = 95;
+const TAIL_START_DEG = 6;
+const TAIL_END: readonly [number, number] = [68, 386.4];
+const TAIL_PULL_START = 55;
+const TAIL_END_DIR: readonly [number, number] = [0, 1];
+const TAIL_PULL_END = 90;
 /** Spazio in più sotto il viewBox, così l'aggiunta si chiude fuori dallo schermo senza essere tagliata dal riquadro. */
 const SVG_EXTRA_BOTTOM = 110;
 
@@ -92,7 +92,7 @@ export function ArcZoomDial({
     `M ${xTo.toFixed(1)} ${yTo.toFixed(1)}`,
     `A ${Ro} ${Ro} 0 0 0 ${xTs.toFixed(1)} ${yTs.toFixed(1)}`,
     `C ${xC1.toFixed(1)} ${yC1.toFixed(1)} ${xC2.toFixed(1)} ${yC2.toFixed(1)} ${TAIL_END[0]} ${TAIL_END[1]}`,
-    `L ${TAIL_END[0] + 8} ${H + 80}`,
+    `L ${TAIL_END[0]} ${H + 80}`,
     `L ${(xIe + 30).toFixed(1)} ${H + 80}`,
     `L ${xIe.toFixed(1)} ${yIe.toFixed(1)}`,
     `A ${Rm} ${Rm} 0 0 1 ${xTm.toFixed(1)} ${yTm.toFixed(1)}`,
