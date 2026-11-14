@@ -18,12 +18,15 @@ export function ArcZoomDial({
   onZoom,
   disabled = false,
   className = "",
+  fitHeight,
 }: {
   zoom: number;
   max?: number;
   onZoom: (value: number) => void;
   disabled?: boolean;
   className?: string;
+  /** Altezza disponibile in px: la ghiera si rimpicciolisce per starci dentro (mai sotto le pillole in alto). */
+  fitHeight?: number | undefined;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragging = useRef(false);
@@ -43,16 +46,6 @@ export function ArcZoomDial({
   const Ro = 194.0; // Raggio esterno ghiera (leggermente più piccola)
   const Rm = 168.0; // Raggio interno ghiera (spostato più avanti per distaccarsi dai numeri)
   const R = 181.0; // Raggio linea centrale delle tacche graduate (nastro da 26px)
-
-  // Cerchio Grande (indicato in rosso dall'utente):
-  // Raggio ampio R_big = 206px attorno a (cx, cy) che abbraccia l'intero blocco comandi
-  const R_big = 206.0;
-  const radBig = (78.0 * Math.PI) / 180;
-  const xT_big = cx - R_big * Math.cos(radBig);
-  const yT_big = cy - R_big * Math.sin(radBig);
-  const xB_big = xT_big;
-  const yB_big = cy + R_big * Math.sin(radBig);
-  const cerchioGrandePath = `M ${xT_big.toFixed(1)} ${yT_big.toFixed(1)} A ${R_big} ${R_big} 0 0 0 ${xB_big.toFixed(1)} ${yB_big.toFixed(1)} L ${W} ${yB_big.toFixed(1)} L ${W} ${yT_big.toFixed(1)} Z`;
 
   // Cerchio 2 (Vetro satinato trasparente con i numeri dentro):
   // Raggi calibrati con 22px di distacco dal primo cerchio per non toccarsi mai
@@ -74,6 +67,11 @@ export function ArcZoomDial({
   const xTm = cx - Rm * Math.cos(radT);
   const yTm = cy - Rm * Math.sin(radT);
   const capR1 = (Ro - Rm) / 2; // 16.5px
+
+  // Cerchio interno di vetro: dall'estremità alta della ghiera, lungo il suo bordo esterno, fino
+  // all'estremità bassa, poi chiuso sul bordo destro. Un livello HTML con backdrop-filter ritagliato
+  // su questa forma sfoca lo sfondo; la ghiera (semitrasparente) ci si fonde sopra.
+  const glassClip = `M ${xTo.toFixed(1)} ${yTo.toFixed(1)} A ${Ro} ${Ro} 0 0 0 ${xBo.toFixed(1)} ${yBo.toFixed(1)} L ${W} ${yBo.toFixed(1)} L ${W} ${yTo.toFixed(1)} Z`;
 
   // Path SVG Cerchio 1 (Ghiera esterna con estremità arrotondate)
   const ghieraPath = `M ${xTo.toFixed(1)} ${yTo.toFixed(1)} A ${Ro} ${Ro} 0 0 0 ${xBo.toFixed(1)} ${yBo.toFixed(1)} A ${capR1.toFixed(1)} ${capR1.toFixed(1)} 0 0 0 ${xBm.toFixed(1)} ${yBm.toFixed(1)} A ${Rm} ${Rm} 0 0 1 ${xTm.toFixed(1)} ${yTm.toFixed(1)} A ${capR1.toFixed(1)} ${capR1.toFixed(1)} 0 0 0 ${xTo.toFixed(1)} ${yTo.toFixed(1)} Z`;
@@ -182,7 +180,8 @@ export function ArcZoomDial({
   const ticks: Array<{ deg: number; x1: number; y1: number; x2: number; y2: number; isCyan?: boolean; isStop?: boolean }> = [];
   for (let i = -16; i <= 16; i++) {
     const d = i * 4.875;
-    if (d < -degTop - 25 || d > degBot + 25) continue;
+    // Solo dentro il nastro della ghiera: niente tacche oltre le sue estremità.
+    if (d < -degTop + 3 || d > degBot - 3) continue;
     const isStop = stops.some((s) => Math.abs(s.deg - d) < 2.0);
     const rad = (d * Math.PI) / 180;
     const cos = Math.cos(rad);
@@ -218,45 +217,31 @@ export function ArcZoomDial({
     hapticTick();
   };
 
+  // Scala per stare nello spazio libero (tra la barra in alto e il bordo): mai oltre la misura piena.
+  const scale = fitHeight && fitHeight > 0 ? Math.max(0.55, Math.min(1, fitHeight / H)) : 1;
+
   return (
     <div
-      className={`absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none select-none z-10 flex items-center justify-end ${className}`}
-      style={{ width: `${W}px`, height: `${H}px` }}
+      className={`absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none select-none z-10 ${className}`}
+      style={{ width: `${W * scale}px`, height: `${H * scale}px` }}
       data-camera-controls
     >
+      <div className="absolute left-0 top-0 origin-top-left" style={{ width: `${W}px`, height: `${H}px`, transform: `scale(${scale})` }}>
+      {/* Cerchio interno di vetro: sfoca lo sfondo fino al bordo esterno della ghiera, che ci si fonde sopra */}
+      <div className="ar-dial-glass" aria-hidden="true" style={{ clipPath: `path("${glassClip}")` }} />
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full h-full overflow-visible pointer-events-none select-none"
+        className="relative w-full h-full overflow-visible pointer-events-none select-none"
         aria-hidden="true"
       >
         <defs>
-          {/* Blur in verticale per sfumare morbidamente i bordi del secondo cerchio */}
-          <filter id="verticalGlassBlur" x="-30%" y="-40%" width="160%" height="180%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="6 22" result="vBlur" />
-          </filter>
-
-          {/* Sfumatura radiale satinata: tonalità smoked glass scuro e morbido fedele allo screenshot */}
-          <radialGradient id="cerchioGrandeGrad" cx={cx} cy={cy} r={R_big} gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#141922" stopOpacity="0.65" />
-            <stop offset="45%" stopColor="#181e28" stopOpacity="0.55" />
-            <stop offset="75%" stopColor="#1c232e" stopOpacity="0.35" />
-            <stop offset="90%" stopColor="#222b38" stopOpacity="0.15" />
-            <stop offset="100%" stopColor="#222b38" stopOpacity="0.0" />
-          </radialGradient>
-
-          {/* Tonalità smoked dark slate glass della ghiera esterna calibrata allo screenshot */}
+          {/* Ghiera esterna in tonalità chiara e semitrasparente: si fonde con il vetro sfocato sotto */}
           <linearGradient id="outerGhieraGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="rgba(40, 48, 62, 0.88)" />
-            <stop offset="35%" stopColor="rgba(26, 32, 42, 0.94)" />
-            <stop offset="70%" stopColor="rgba(18, 22, 30, 0.94)" />
-            <stop offset="100%" stopColor="rgba(28, 36, 48, 0.90)" />
+            <stop offset="0%" stopColor="rgba(150, 162, 180, 0.42)" />
+            <stop offset="50%" stopColor="rgba(120, 132, 150, 0.36)" />
+            <stop offset="100%" stopColor="rgba(140, 152, 170, 0.40)" />
           </linearGradient>
-
-          {/* Ombra di profondità per far staccare la ghiera esterna */}
-          <filter id="ghieraDepth" x="-25%" y="-25%" width="150%" height="150%">
-            <feDropShadow dx="-2" dy="2" stdDeviation="4" floodColor="#000000" floodOpacity="0.55" />
-          </filter>
 
           {/* Bagliore ciano vibrante per la tacca indice dello zenit e fermi */}
           <filter id="cyanGlow" x="-30%" y="-70%" width="160%" height="240%">
@@ -267,29 +252,19 @@ export function ArcZoomDial({
           <filter id="numShadow" x="-20%" y="-20%" width="140%" height="140%">
             <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" floodColor="#000000" floodOpacity="0.9" />
           </filter>
+          <filter id="pillShadow" x="-25%" y="-60%" width="150%" height="220%">
+            <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#000000" floodOpacity="0.45" />
+          </filter>
         </defs>
 
-        {/* 
-          1. IL CERCHIO GRANDE (ALFA AL 30%, BLUR VERTICALE SFUMATO, NIENTE BORDER):
-          - Vetro satinato con alfa del 30% e blur verticale morbido per sfumare i bordi
-          - Senza bordo (niente border)
-          - Si estende sopra Scansiona (y=9) e sotto Strumenti (y=371)
-        */}
-        <path
-          d={cerchioGrandePath}
-          fill="url(#cerchioGrandeGrad)"
-          filter="url(#verticalGlassBlur)"
-        />
-
-        {/* 
-          2. CERCHIO ESTERNO (GHIERA CON CARATTERE - SENZA BORDO):
-          Tonalità smoked dark glass con profondità e riflesso, bordo rimosso (stroke="none")
+        {/*
+          CERCHIO ESTERNO (ghiera): chiaro e semitrasparente, senza bordo né ombra, così si fonde con il
+          cerchio interno di vetro sfocato disegnato sotto (livello HTML .ar-dial-glass).
         */}
         <path
           d={ghieraPath}
           fill="url(#outerGhieraGrad)"
           stroke="none"
-          filter="url(#ghieraDepth)"
         />
 
         {/* 
@@ -325,7 +300,7 @@ export function ArcZoomDial({
           fill="rgba(32, 38, 48, 0.85)"
           stroke="rgba(255, 255, 255, 0.2)"
           strokeWidth="1"
-          filter="url(#ghieraDepth)"
+          filter="url(#pillShadow)"
         />
         <text
           x={pillLeft + 22}
@@ -424,6 +399,7 @@ export function ArcZoomDial({
         }}
         aria-label={`Zoom corrente: ${zoomText}x. Tocca per cambiare preset.`}
       />
+      </div>
     </div>
   );
 }

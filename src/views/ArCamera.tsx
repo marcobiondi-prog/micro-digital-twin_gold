@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { flushSync } from "react-dom";
 import { toast } from "sonner";
-import { Activity, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grid2X2, Leaf, Minus, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Star, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
+import { Activity, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grid2X2, Leaf, Minus, Snowflake, Umbrella, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Star, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
 import { supportsCameraTorch, setCameraTorch } from "@/lib/camera-torch";
 import { detectArObject, getReferencePhoto, type Detection, type Soil } from "@/controllers/ar-detect.functions";
 import { gbifPhotoSearchUrl, pickGbifPhoto, type ReferencePhoto } from "@/models/ar-reference-photo";
@@ -29,6 +29,8 @@ function encodeFrame(frame: HTMLCanvasElement, maxSide: number, quality: number)
 }
 /** Native fullscreen rotation: wait this long for the reported size to settle before re-laying out. */
 const NATIVE_SETTLE_MS = 120;
+// Landscape: room kept free above (top bar) and below the zoom dial column, so the dial never slides under the pills.
+const AR_LANDSCAPE_TOP_RESERVE = 64, AR_LANDSCAPE_BOTTOM_RESERVE = 10;
 type SpeciesInfo = NonNullable<D["species"]> & { cooling: D["cooling"]; identification: D["identification"] };
 /** One camera section's scan, set aside while another section is open. */
 type TabResult = {
@@ -1571,9 +1573,9 @@ export function ArCamera({
               <span className="ar-info-count">x{dockCount || 1}</span>
             </span>
             <span className="ar-info-sep" aria-hidden="true" />
-            <span>Ombra: <b>{18 * (dockCount || 1)} m²</b></span>
+            <span className="ar-info-item" title="Ombra"><Umbrella className="ar-info-icon" aria-hidden="true" /><span className="ar-info-label">Ombra: </span><b>{18 * (dockCount || 1)} m²</b></span>
             <span className="ar-info-sep" aria-hidden="true" />
-            <span>Raffrescamento: <b>-{(0.4 * (dockCount || 1)).toFixed(1).replace(".", ",")} °C</b></span>
+            <span className="ar-info-item" title="Raffrescamento"><Snowflake className="ar-info-icon" aria-hidden="true" /><span className="ar-info-label">Raffrescamento: </span><b>-{(0.4 * (dockCount || 1)).toFixed(1).replace(".", ",")} °C</b></span>
             <span className="ar-info-sep" aria-hidden="true" />
             <span className="ar-info-status" data-ok={dockCount > 0} title={dockCount > 0 ? "Termica Ottimale" : "Termica da migliorare"}>
               <span className="ar-info-dot" aria-hidden="true" />
@@ -2196,7 +2198,7 @@ export function ArCamera({
                 </div>
 
                 {/* Colonna Destra: Controlli Fotocamera ed Ergonomia con il pollice */}
-                <div className="ar-landscape-right">
+                <div className="ar-landscape-right" style={{ top: `calc(50% + ${(AR_LANDSCAPE_TOP_RESERVE - AR_LANDSCAPE_BOTTOM_RESERVE) / 2}px)` }}>
                   {toolsOpen && toolsPanelElement}
                   <div className="relative flex items-center justify-end select-none">
                     <ArcZoomDial
@@ -2204,6 +2206,7 @@ export function ArCamera({
                       max={ZOOM_MAX}
                       onZoom={setZoom}
                       disabled={!ready || scanning}
+                      fitHeight={viewport.height ? viewport.height - AR_LANDSCAPE_TOP_RESERVE - AR_LANDSCAPE_BOTTOM_RESERVE : undefined}
                     />
                     <div className="relative z-50 pointer-events-auto">
                       {captureControlElement}
