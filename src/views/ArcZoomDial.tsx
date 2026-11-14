@@ -1,4 +1,4 @@
-import { useRef, type PointerEvent as ReactPointerEvent } from "react";
+import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { zoomLabel, ZOOM_MIN, ZOOM_MAX } from "@/lib/camera-zoom";
 import { hapticTick } from "@/lib/haptics";
 
@@ -27,7 +27,9 @@ export function ArcZoomDial({
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragging = useRef(false);
-  const lastAngle = useRef(0);
+  // Durante il trascinamento la ghiera segue il dito senza animazione; ai tocchi (preset) ruota morbida.
+  const [isDragging, setIsDragging] = useState(false);
+  const lastPoint = useRef<{ x: number; y: number } | null>(null);
   const lastHapticZoom = useRef(zoom);
   // Un trascinamento partito dalla pillola non deve anche cambiare preset al rilascio.
   const dragMoved = useRef(false);
@@ -48,6 +50,11 @@ export function ArcZoomDial({
   // Raggi calibrati con 22px di distacco dal primo cerchio per non toccarsi mai
   const R_dot = 146.0; // Raggio dei pallini bianchi dentro il vetro satinato
   const R_text = 128.0; // Raggio dei numeri dello zoom dentro il vetro satinato
+
+  // Zona di tocco: una fascia dai numeri fino a poco oltre il bordo esterno della ghiera, così il pollice la prende
+  // anche appoggiato sui numeri.
+  const TOUCH_R = 166;
+  const TOUCH_W = 96;
 
   const degTop = 56.0;
   const degBot = 66.0;
@@ -72,6 +79,7 @@ export function ArcZoomDial({
   // Mappatura angolare continua: STEP gradi tra uno stop e l'altro (1x a -STEP, 2x all'apice 0°, 3x a +STEP),
   // stretta come nel mockup così all'apice restano visibili anche gli stop vicini.
   const STEP = 26;
+  const STOP_VALUES = [0.5, 1, 2, 3, 5];
   const angleForZoom = (z: number) => {
     if (z <= 1) return -2 * STEP + ((z - 0.5) / 0.5) * STEP;
     if (z <= 2) return -STEP + (z - 1) * STEP;
@@ -86,11 +94,12 @@ export function ArcZoomDial({
     else if (deg <= STEP) z = 2 + deg / STEP;
     else z = 3 + ((deg - STEP) / STEP) * 2;
     const clamped = Math.min(max, Math.max(ZOOM_MIN, z));
-    if (Math.abs(clamped - 0.5) < 0.06) return 0.5;
-    if (Math.abs(clamped - 1) < 0.06) return 1;
-    if (Math.abs(clamped - 2) < 0.08) return 2;
-    if (Math.abs(clamped - 3) < 0.08) return 3;
-    if (Math.abs(clamped - 5) < 0.1) return 5;
+    // Piccoli "scatti" sugli stop (circa 2,5° di ghiera): fermarsi esattamente su 1x, 2x... è facile.
+    if (Math.abs(clamped - 0.5) < 0.05) return 0.5;
+    if (Math.abs(clamped - 1) < 0.1) return 1;
+    if (Math.abs(clamped - 2) < 0.1) return 2;
+    if (Math.abs(clamped - 3) < 0.1) return 3;
+    if (Math.abs(clamped - 5) < 0.2) return 5;
     return Math.round(clamped * 10) / 10;
   };
 
@@ -98,49 +107,83 @@ export function ArcZoomDial({
   // rotate(φ) in SVG li porta all'angolo θ − φ, quindi φ = angolo dello zoom corrente.
   const dialRotation = angleForZoom(zoom);
 
-  const getPointerAngle = (e: ReactPointerEvent<Element>) => {
-    if (!svgRef.current) return 0;
-    const rect = svgRef.current.getBoundingClientRect();
-    const scaleX = rect.width / W;
-    const scaleY = rect.height / H;
-    const screenCx = rect.left + cx * scaleX;
-    const screenCy = rect.top + cy * scaleY;
-    const dx = e.clientX - screenCx;
-    const dy = e.clientY - screenCy;
-    const rad = Math.atan2(dy, -dx); // 0° è orizzontale a sinistra (apice)
-    return (rad * 180) / Math.PI;
+  /** Centro della ghiera e raggio delle tacche sullo schermo (la ghiera è scalata con DIAL_SCALE). */
+  const screenGeometry = () => {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+    const sx = rect.width / W;
+    const sy = rect.height / H;
+    return { x: rect.left + cx * sx, y: rect.top + cy * sy, r: R * sx };
+  };
+  /** Angolo del dito sulla ghiera: 0° all'apice (orizzontale a sinistra del centro), positivo verso il basso. */
+  const pointerAngle = (e: ReactPointerEvent<Element>) => {
+    const g = screenGeometry();
+    if (!g) return 0;
+    return (Math.atan2(e.clientY - g.y, -(e.clientX - g.x)) * 180) / Math.PI;
   };
 
   const onPointerDown = (e: ReactPointerEvent<Element>) => {
     if (disabled || (e.pointerType === "mouse" && e.button !== 0)) return;
     dragging.current = true;
     dragMoved.current = false;
-    lastAngle.current = getPointerAngle(e);
+    lastPoint.current = { x: e.clientX, y: e.clientY };
     dragDialAngle.current = angleForZoom(zoom);
     e.currentTarget.setPointerCapture(e.pointerId);
   };
 
   const onPointerMove = (e: ReactPointerEvent<Element>) => {
-    if (!dragging.current) return;
-    const currentPtrAngle = getPointerAngle(e);
-    const deltaAngle = currentPtrAngle - lastAngle.current;
-    if (Math.abs(deltaAngle) > 0.5) dragMoved.current = true;
-    lastAngle.current = currentPtrAngle;
+    if (!dragging.current || !lastPoint.current) return;
+    const g = screenGeometry();
+    if (!g) return;
+    const mx = e.clientX - lastPoint.current.x;
+    const my = e.clientY - lastPoint.current.y;
+    // Piccolo margine prima di iniziare: un tocco un po' mosso resta un tocco.
+    if (!dragMoved.current && Math.hypot(e.clientX - (lastPoint.current.x), e.clientY - lastPoint.current.y) < 4) return;
+    if (!dragMoved.current) { dragMoved.current = true; setIsDragging(true); }
+    lastPoint.current = { x: e.clientX, y: e.clientY };
 
-    // The angle accumulates in a ref: recomputing it from the snapped zoom would pull every small
-    // finger step back onto the nearest stop, and the dial would stick there.
-    dragDialAngle.current = Math.min(angleForZoom(max), Math.max(angleForZoom(ZOOM_MIN), dragDialAngle.current - deltaAngle));
+    // Sensibilità costante: conta solo lo spostamento lungo la ghiera (componente tangente) diviso per il raggio
+    // delle tacche, così 1 px di dito = 1 px di ghiera ovunque si appoggi il pollice. Con l'angolo dal centro,
+    // un dito vicino allo shutter faceva saltare lo zoom e uno lontano lo muoveva appena.
+    const th = (pointerAngle(e) * Math.PI) / 180;
+    const along = mx * Math.sin(th) + my * Math.cos(th);
+    const deltaDeg = ((along / g.r) * 180) / Math.PI;
+
+    // L'angolo si accumula in un ref: ricalcolarlo dallo zoom arrotondato riporterebbe ogni piccolo passo sullo
+    // stop più vicino e la ghiera resterebbe incollata lì.
+    dragDialAngle.current = Math.min(
+      angleForZoom(max),
+      Math.max(angleForZoom(ZOOM_MIN), dragDialAngle.current - deltaDeg),
+    );
     const nextZoom = zoomForAngle(dragDialAngle.current);
+    if (nextZoom === zoom) return;
 
+    // Scatto aptico leggero a ogni decimo (era il doppio impulso pieno: trascinando diventava un ronzio);
+    // quello pieno solo quando si arriva su uno stop (0.5x, 1x, 2x, 3x, 5x).
     if (Math.abs(nextZoom - lastHapticZoom.current) >= 0.1) {
       lastHapticZoom.current = nextZoom;
-      hapticTick();
+      hapticTick(STOP_VALUES.includes(nextZoom) ? undefined : 8);
     }
     onZoom(nextZoom);
   };
 
-  const onPointerUp = () => {
+  const onPointerUp = (e: ReactPointerEvent<Element>) => {
+    const wasDrag = dragMoved.current;
     dragging.current = false;
+    lastPoint.current = null;
+    setIsDragging(false);
+    // Tocco sulla ghiera (non sulla pillola) senza trascinare: va allo stop toccato, se il dito è vicino a uno.
+    if (!wasDrag && e.type === "pointerup" && e.currentTarget instanceof SVGElement && !disabled) {
+      const target = dragDialAngle.current + pointerAngle(e);
+      const near = STOP_VALUES.map((v) => ({ v, d: Math.abs(angleForZoom(v) - target) }))
+        .filter((s) => s.v <= max)
+        .sort((p, q) => p.d - q.d)[0];
+      if (near && near.d < STEP * 0.4 && near.v !== zoom) {
+        lastHapticZoom.current = near.v;
+        hapticTick();
+        onZoom(near.v);
+      }
+    }
   };
 
   // Stop principali (0.5x, 1x, 2x, 3x, 5x): numeri e pallini posizionati dentro il Cerchio 2
@@ -160,8 +203,9 @@ export function ArcZoomDial({
       deg,
       dotX: cx - R_dot * cos,
       dotY: cy + R_dot * sin,
-      textX: cx - R_text * cos,
-      textY: cy + R_text * sin,
+      // Le etichette lunghe (0.5x) si spostano un po' verso lo shutter, così non coprono il loro pallino.
+      textX: cx - (R_text - (s.label.length - 2) * 4) * cos,
+      textY: cy + (R_text - (s.label.length - 2) * 4) * sin,
       xIn: cx - (R - 7) * cos,
       yIn: cy + (R - 7) * sin,
       xOut: cx - (R + 7) * cos,
@@ -169,26 +213,27 @@ export function ArcZoomDial({
     };
   });
 
-  // Tacche graduate secondarie dentro il Cerchio 1 (ghiera) ogni 4.875°
-  const ticks: Array<{ deg: number; x1: number; y1: number; x2: number; y2: number; isCyan?: boolean; isStop?: boolean }> = [];
-  for (let i = -16; i <= 16; i++) {
-    const d = i * 4.875;
-    // Solo dentro il nastro della ghiera: niente tacche oltre le sue estremità.
-    if (d < -degTop + 3 || d > degBot - 3) continue;
-    const isStop = stops.some((s) => Math.abs(s.deg - d) < 2.0);
+  // Tacche graduate: girano con i numeri (come una ghiera vera), una ogni ottavo di STEP, così ogni stop ha la
+  // sua tacca lunga ciano proprio accanto al suo pallino. Generate su tutta la corsa; si disegnano solo quelle
+  // che in quel momento cadono dentro il nastro della ghiera.
+  const TICK = STEP / 8;
+  const ticks: Array<{ deg: number; x1: number; y1: number; x2: number; y2: number; isStop: boolean; isHalf: boolean }> = [];
+  for (let i = -48; i <= 48; i++) {
+    const d = i * TICK;
+    const isStop = i % 8 === 0 && Math.abs(i) <= 16;
+    const isHalf = !isStop && Math.abs(i % 4) === 0;
+    const tlen = isStop ? 7.0 : isHalf ? 4.5 : 3.0;
     const rad = (d * Math.PI) / 180;
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
-    const isCyan = Math.abs(i % 4) === 0 || isStop;
-    const tlen = isStop ? 7.0 : isCyan ? 4.5 : 3.0;
     ticks.push({
       deg: d,
       x1: cx - (R - tlen) * cos,
       y1: cy + (R - tlen) * sin,
       x2: cx - (R + tlen) * cos,
       y2: cy + (R + tlen) * sin,
-      isCyan,
       isStop,
+      isHalf,
     });
   }
 
@@ -201,7 +246,10 @@ export function ArcZoomDial({
 
   // Tocco sulla pillola fissa: passa ai preset rapidi (0.5x, 1x, 2x, 3x, 5x)
   const handlePillClick = () => {
-    if (dragMoved.current) { dragMoved.current = false; return; }
+    if (dragMoved.current) {
+      dragMoved.current = false;
+      return;
+    }
     if (zoom < 1) onZoom(1);
     else if (zoom < 2) onZoom(2);
     else if (zoom < 3) onZoom(3);
@@ -220,6 +268,14 @@ export function ArcZoomDial({
   // La maschera va solo sull'SVG: sul vetro o su un suo antenato spegnerebbe il backdrop-filter.
   const endFade = "linear-gradient(to bottom, transparent 3%, #000 24%, #000 76%, transparent 97%)";
   const fadeStyle = { WebkitMaskImage: endFade, maskImage: endFade };
+  // Rotazione come stile CSS (non attributo SVG), così si anima: segue il dito senza ritardo mentre si trascina,
+  // e gira morbida quando lo zoom cambia da un tocco (pillola, stop toccato, pizzico).
+  const spin = (deg: number, ox: number, oy: number) => ({
+    transform: `rotate(${deg}deg)`,
+    transformOrigin: `${ox}px ${oy}px`,
+    transformBox: "view-box" as const,
+    transition: isDragging ? "none" : "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+  });
 
   return (
     <div
@@ -271,7 +327,9 @@ export function ArcZoomDial({
           </linearGradient>
 
           {/* Bagliore ciano vibrante per la tacca indice dello zenit e fermi */}
-          <filter id="cyanGlow" x="-30%" y="-70%" width="160%" height="240%">
+          {/* Regione in coordinate della ghiera, non della tacca: una tacca orizzontale ha altezza 0 e con le
+              percentuali il filtro la faceva sparire. */}
+          <filter id="cyanGlow" filterUnits="userSpaceOnUse" x={-40} y={-40} width={W + 80} height={H + 80}>
             <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#00e5ff" floodOpacity="0.85" />
           </filter>
 
@@ -288,30 +346,44 @@ export function ArcZoomDial({
           CERCHIO ESTERNO (ghiera): chiaro e semitrasparente, senza bordo né ombra, così si fonde con il
           cerchio interno di vetro sfocato disegnato sotto (livello HTML .ar-dial-glass).
         */}
+        <path d={ghieraPath} fill="url(#outerGhieraGrad)" stroke="none" />
+        {/* Filo di luce sui due bordi della ghiera: le dà spessore senza appesantirla. */}
         <path
-          d={ghieraPath}
-          fill="url(#outerGhieraGrad)"
-          stroke="none"
+          d={`M ${xTo.toFixed(1)} ${yTo.toFixed(1)} A ${Ro} ${Ro} 0 0 0 ${xBo.toFixed(1)} ${yBo.toFixed(1)}`}
+          fill="none"
+          stroke="rgba(255, 255, 255, 0.16)"
+          strokeWidth="1"
+        />
+        <path
+          d={`M ${xTm.toFixed(1)} ${yTm.toFixed(1)} A ${Rm} ${Rm} 0 0 0 ${xBm.toFixed(1)} ${yBm.toFixed(1)}`}
+          fill="none"
+          stroke="rgba(0, 0, 0, 0.35)"
+          strokeWidth="1"
         />
 
         {/* 
           LINEE FISSE DENTRO IL CERCHIO ESTERNO:
           Le tacche graduate fisse della ghiera con contrasto e carattere
         */}
-        <g>
-          {ticks.map((t, idx) => (
-            <line
-              key={idx}
-              x1={t.x1}
-              y1={t.y1}
-              x2={t.x2}
-              y2={t.y2}
-              stroke={t.isCyan ? "#00e5ff" : "rgba(255, 255, 255, 0.85)"}
-              strokeWidth={t.isStop ? "2.8" : t.isCyan ? "1.8" : "1.2"}
-              strokeLinecap="round"
-              filter={t.isCyan ? "url(#cyanGlow)" : undefined}
-            />
-          ))}
+        <g style={spin(dialRotation, cx, cy)}>
+          {ticks.map((t) => {
+            // Posizione sullo schermo: fuori dal nastro non si disegna; ai due capi sfuma con la maschera.
+            const screenDeg = t.deg - dialRotation;
+            if (screenDeg < -degTop + 3 || screenDeg > degBot - 3) return null;
+            return (
+              <line
+                key={t.deg}
+                x1={t.x1}
+                y1={t.y1}
+                x2={t.x2}
+                y2={t.y2}
+                stroke={t.isStop ? "#00e5ff" : t.isHalf ? "rgba(255, 255, 255, 0.95)" : "rgba(255, 255, 255, 0.55)"}
+                strokeWidth={t.isStop ? 2.8 : t.isHalf ? 1.8 : 1.2}
+                strokeLinecap="round"
+                filter={t.isStop ? "url(#cyanGlow)" : undefined}
+              />
+            );
+          })}
         </g>
 
         {/*
@@ -348,11 +420,7 @@ export function ArcZoomDial({
           Portati sopra al vetro satinato, nitidi e privi di clipping.
           I numeri e i pallini ruotano fluidamente con lo zoom.
         */}
-        <g
-          transform={`rotate(${dialRotation}, ${cx}, ${cy})`}
-          className="transition-transform duration-75 ease-out"
-          filter="url(#numShadow)"
-        >
+        <g style={spin(dialRotation, cx, cy)} filter="url(#numShadow)">
           {stops.map((s) => {
             const screenAngle = Math.abs(s.deg - dialRotation);
             // Dissolvenza morbida: i numeri sono pienamente visibili nell'arco utile,
@@ -364,16 +432,16 @@ export function ArcZoomDial({
                 <circle
                   cx={s.dotX}
                   cy={s.dotY}
-                  r={3.5}
-                  fill="#ffffff"
+                  r={Math.abs(s.zoomVal - zoom) < 0.05 ? 4.2 : 3.2}
+                  fill={Math.abs(s.zoomVal - zoom) < 0.05 ? "#00e5ff" : "#ffffff"}
                 />
                 <text
                   x={s.textX}
                   y={s.textY}
-                  transform={`rotate(${-dialRotation}, ${s.textX}, ${s.textY})`}
+                  style={spin(-dialRotation, s.textX, s.textY)}
                   textAnchor="middle"
                   dominantBaseline="central"
-                  fill="#ffffff"
+                  fill={Math.abs(s.zoomVal - zoom) < 0.05 ? "#00e5ff" : "#ffffff"}
                   stroke="rgba(10, 15, 25, 0.85)"
                   strokeWidth="1.2"
                   paintOrder="stroke fill"
@@ -393,10 +461,10 @@ export function ArcZoomDial({
           ZONA TOUCH DEDICATA: traccia trasparente curva ampia per swipe fluido con il pollice
         */}
         <path
-          d={`M ${cx - Ro * Math.cos(radT)} ${cy - Ro * Math.sin(radT)} A ${Ro} ${Ro} 0 0 0 ${cx - Ro * Math.cos(radB)} ${cy + Ro * Math.sin(radB)}`}
+          d={`M ${cx - TOUCH_R * Math.cos(radT)} ${cy - TOUCH_R * Math.sin(radT)} A ${TOUCH_R} ${TOUCH_R} 0 0 0 ${cx - TOUCH_R * Math.cos(radB)} ${cy + TOUCH_R * Math.sin(radB)}`}
           fill="none"
           stroke="transparent"
-          strokeWidth="68"
+          strokeWidth={TOUCH_W}
           strokeLinecap="round"
           className="cursor-ns-resize pointer-events-auto touch-none"
           onPointerDown={onPointerDown}
