@@ -45,7 +45,7 @@ type V = { x: number; y: number; z: number };
  * camera on a floor guessed from how the phone is held (eyes at 1,5 m, the floor's tilt from the phone's tilt), so sizes
  * are close but not anchored. With a session it is the real live AR.
  */
-export function ArLive({ kind, session, stream = null, plants = [], onEnd }: { kind: ArKind; session: XRSession | null; stream?: MediaStream | null; plants?: ArObjectDef[]; onEnd: () => void }) {
+export function ArLive({ kind, session, stream = null, plants = [], onShot, onEnd }: { kind: ArKind; session: XRSession | null; stream?: MediaStream | null; plants?: ArObjectDef[]; onShot?: (file: File) => void; onEnd: () => void }) {
   // The plants recognised by «Rileva» come first (key "p:<i>"), then the flow's own objects (key = their id).
   const choices = useMemo(() => [
     ...plants.map((d, i) => ({ key: `p:${i}`, def: d })),
@@ -80,7 +80,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onEnd }: { k
   defOfRef.current = defOf;
   const live = useRef({ selected, tool, placed, alignPts, measure });
   live.current = { selected, tool, placed, alignPts, measure };
-  const three = useRef<{ scene: THREE.Scene; reticle: THREE.Object3D; hit: V | null; objects: Map<string, THREE.Object3D>; overlay: THREE.Group; measure: THREE.Group; floorY: number | null } | null>(null);
+  const three = useRef<{ scene: THREE.Scene; reticle: THREE.Object3D; hit: V | null; objects: Map<string, THREE.Object3D>; overlay: THREE.Group; measure: THREE.Group; floorY: number | null; renderer: THREE.WebGLRenderer; camera: THREE.Camera } | null>(null);
 
   const lab = getLab();
   const loc = kind === "urban" ? lab.urban.location : lab.vineyard.location;
@@ -111,7 +111,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onEnd }: { k
     scene.add(reticle);
     const overlay = new THREE.Group(), measureG = new THREE.Group();
     scene.add(overlay, measureG);
-    three.current = { scene, reticle, hit: null, objects: new Map(), overlay, measure: measureG, floorY: null };
+    three.current = { scene, reticle, hit: null, objects: new Map(), overlay, measure: measureG, floorY: null, renderer, camera };
 
     // Where the phone is and points at the start: the map's alignment until the two corners are touched.
     void readFix().then((fix) => {
@@ -348,6 +348,39 @@ export function ArLive({ kind, session, stream = null, plants = [], onEnd }: { k
     window.setTimeout(() => setNotice((n) => (n?.text.startsWith("Pavimento") ? null : n)), 1800);
   };
 
+  // «Scatta»: the camera's picture with the objects put on it, as one photo of the project. With ARCore the browser
+  // does not hand the camera's image to the page, so the phone's own screenshot is the way.
+  const [flash, setFlash] = useState(0);
+  const [shots, setShots] = useState(0);
+  const shoot = () => {
+    const t = three.current, host = canvasHost.current;
+    if (session || !t || !host) { setNotice({ text: "Con ARCore fai uno screenshot del telefono", tone: "warn" }); return; }
+    const W = host.clientWidth, H = host.clientHeight, k = Math.min(2, window.devicePixelRatio || 1);
+    const c = document.createElement("canvas");
+    c.width = Math.round(W * k); c.height = Math.round(H * k);
+    const g = c.getContext("2d");
+    if (!g) return;
+    const v = videoRef.current;
+    if (v && v.videoWidth) {
+      // The video as the screen shows it (object-fit: cover).
+      const s = Math.max(c.width / v.videoWidth, c.height / v.videoHeight);
+      const dw = v.videoWidth * s, dh = v.videoHeight * s;
+      g.drawImage(v, (c.width - dw) / 2, (c.height - dh) / 2, dw, dh);
+    }
+    t.reticle.visible = false;
+    t.renderer.render(t.scene, t.camera);
+    g.drawImage(t.renderer.domElement, 0, 0, c.width, c.height);
+    setFlash((n) => n + 1);
+    hapticTick([25]);
+    c.toBlob((b) => {
+      if (!b) return;
+      onShot?.(new File([b], `foto-ar-prova-${Date.now()}.jpg`, { type: "image/jpeg" }));
+      setShots((n) => n + 1);
+      setNotice({ text: "Foto salvata nel progetto", tone: "ok" });
+      window.setTimeout(() => setNotice((n) => (n?.text.startsWith("Foto salvata") ? null : n)), 1600);
+    }, "image/jpeg", 0.9);
+  };
+
   const round = "grid size-11 shrink-0 place-items-center rounded-full bg-black/55 backdrop-blur";
   return (
     <>
@@ -366,6 +399,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onEnd }: { k
         </div>
       </div>
     )}
+    {flash > 0 && <div key={flash} className="pointer-events-none fixed inset-0 z-[60] animate-out fade-out-0 bg-white duration-300 fill-mode-forwards" aria-hidden="true" />}
     <div ref={hudRef} className="ar-live-hud pointer-events-none fixed inset-0 z-50 flex flex-col justify-between text-white" style={{ padding: "env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)" }}>
       <div className="pointer-events-auto flex items-center gap-2 p-3">
         <button type="button" onClick={end} aria-label="Esci dalla prova" className={round}><X className="size-5" /></button>
@@ -399,6 +433,11 @@ export function ArLive({ kind, session, stream = null, plants = [], onEnd }: { k
             <button type="button" onClick={undo} disabled={!placed.length} aria-label="Annulla l’ultimo" className={`${round} disabled:opacity-40`}><Undo2 className="size-5" /></button>
             <button type="button" onClick={() => { setTool(tool === "measure" ? "place" : "measure"); setMeasure([]); }} aria-pressed={tool === "measure"} aria-label="Misura"
               className={`${round} ${tool === "measure" ? "!bg-white !text-black" : ""}`}><Ruler className="size-5" /></button>
+            <button type="button" onClick={shoot} aria-label={shots ? `Scatta una foto · ${shots} fatte` : "Scatta una foto"} data-no-ui-click
+              className="relative grid size-14 shrink-0 place-items-center rounded-full border-[3px] border-white bg-white/25 backdrop-blur active:scale-95">
+              <span className="size-10 rounded-full bg-white" aria-hidden="true" />
+              {shots > 0 && <span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-[#00e5ff] px-1 text-[11px] font-bold text-black">{shots}</span>}
+            </button>
             <button type="button" onClick={backToMap} disabled={!placed.length}
               className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-white px-5 text-sm font-bold text-black disabled:opacity-40 landscape:flex-none">
               <MapPinned className="size-4" aria-hidden="true" />{tool === "align" ? "Tocca i 2 punti" : `Riporta${placed.length ? ` · ${placed.length}` : ""}`}
