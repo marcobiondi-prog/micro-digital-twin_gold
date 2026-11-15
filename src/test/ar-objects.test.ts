@@ -81,7 +81,7 @@ describe("recognised plants in Prova", () => {
     expect(plantObject("vineyard", sp("Vitis vinifera", "vine", 2, 1))!.w).toBe(4);
   });
   it("skips older records without a shape and lists each species once, newest first", () => {
-    const old = { ...sp("Quercus ilex", "round"), form: undefined };
+    const { form: _drop, ...old } = sp("Quercus ilex", "round");
     const list = recognisedPlants("urban", [sp("Quercus ilex", "round"), null, old, sp("Pinus pinea", "round"), sp("Quercus ilex", "round")]);
     expect(list.map((d) => d.plant?.scientificName)).toEqual(["Quercus ilex", "Pinus pinea"]);
   });
