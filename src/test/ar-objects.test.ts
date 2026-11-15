@@ -66,3 +66,23 @@ describe("floor adjustment", () => {
     for (const ny of [0.1, 0.3, 0.5, 0.45]) expect(horizonAt(pitchForHorizon(ny, 70), 70)).toBeCloseTo(ny, 6);
   });
 });
+
+import { plantObject, recognisedPlants } from "@/models/ar-objects";
+describe("recognised plants in Prova", () => {
+  const sp = (scientificName: string, form: "conical" | "round" | "shrub" | "vine", heightM = 10, crownM = 6) =>
+    ({ commonName: scientificName.split(" ")[0]!, scientificName, family: null, level: "Specie probabile", cooling: 0.3, shade: 20, form, heightM, crownM, evergreen: true });
+  it("takes the species' shape and size, within bounds", () => {
+    const fir = plantObject("urban", sp("Abies alba", "conical", 30, 8))!;
+    expect(fir.id).toBe("pianta");
+    expect(fir.plant?.form).toBe("conical");
+    expect([fir.w, fir.h, fir.zone]).toEqual([8, 30, "alberi"]);
+    expect(plantObject("urban", sp("Nerium oleander", "shrub", 3, 2))!.zone).toBe("prato");
+    expect(plantObject("urban", sp("X y", "round", 400, 900))!.h).toBe(40);
+    expect(plantObject("vineyard", sp("Vitis vinifera", "vine", 2, 1))!.w).toBe(4);
+  });
+  it("skips older records without a shape and lists each species once, newest first", () => {
+    const old = { ...sp("Quercus ilex", "round"), form: undefined };
+    const list = recognisedPlants("urban", [sp("Quercus ilex", "round"), null, old, sp("Pinus pinea", "round"), sp("Quercus ilex", "round")]);
+    expect(list.map((d) => d.plant?.scientificName)).toEqual(["Quercus ilex", "Pinus pinea"]);
+  });
+});

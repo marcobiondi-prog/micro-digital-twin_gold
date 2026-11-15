@@ -14,7 +14,10 @@ export type ScanSpecies = {
   cooling: number | null; shade: number | null;
   /** Reference photo from a botanical database (Kew POWO or GBIF); absent on older records. */
   photo?: ReferencePhoto | null;
+  /** The plant's shape and typical size for the simulation (absent on older records): «Prova» draws it in 3D. */
+  form?: PlantForm; heightM?: number; crownM?: number; evergreen?: boolean;
 };
+export type PlantForm = "columnar" | "conical" | "round" | "umbrella" | "vine" | "shrub";
 export type ScanSoil = { label: string; permeability: string; plantable: boolean; note: string };
 export type ScanRecord = {
   id: string; at: string; kind: ArKind;

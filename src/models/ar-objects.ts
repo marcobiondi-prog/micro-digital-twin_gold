@@ -1,13 +1,14 @@
 import type { ArKind } from "@/models/ar-focus";
 import type { SubArea, ZoneKind } from "@/models/drawn-area";
 import type { Ring } from "@/models/place-area";
+import type { PlantForm, ScanSpecies } from "@/models/ar-scan-log";
 
 /**
  * What «Prova» can put in the real world, at real size (metres): the piazza's tree, pergola, flower bed and misting
  * pole, the vineyard's shade cloth, windbreak and drip line. Each one also says which zone of the simulation it becomes
  * when it is brought back to the map («Riporta sulla mappa»).
  */
-export type ArObjectId = "albero" | "pergolato" | "aiuola" | "nebulizzatore" | "telo" | "frangivento" | "irrigazione";
+export type ArObjectId = "albero" | "pergolato" | "aiuola" | "nebulizzatore" | "telo" | "frangivento" | "irrigazione" | "pianta";
 export type ArObjectDef = {
   id: ArObjectId;
   label: string;
@@ -17,6 +18,8 @@ export type ArObjectDef = {
   /** Height, metres. */
   h: number;
   zone: ZoneKind;
+  /** A plant recognised by «Rileva»: its shape and leaves, drawn like the species (id "pianta"). */
+  plant?: { form: PlantForm; evergreen: boolean; scientificName: string };
 };
 
 export const AR_OBJECTS: Record<ArKind, readonly ArObjectDef[]> = {
@@ -35,7 +38,7 @@ export const AR_OBJECTS: Record<ArKind, readonly ArObjectDef[]> = {
 export const arObject = (kind: ArKind, id: ArObjectId) => AR_OBJECTS[kind].find((o) => o.id === id) ?? AR_OBJECTS[kind][0]!;
 
 /** One object put in the AR scene: where on the floor (AR metres, x east-ish, z towards the viewer) and turned by yaw (rad). */
-export type PlacedObject = { uid: string; id: ArObjectId; x: number; z: number; yaw: number };
+export type PlacedObject = { uid: string; id: ArObjectId; x: number; z: number; yaw: number; def?: ArObjectDef };
 
 /** A point on the floor in a local metre frame: e = east, n = north. */
 export type EN = { e: number; n: number };
@@ -106,7 +109,7 @@ export function footprintRing(o: PlacedObject, def: ArObjectDef, a: Alignment, o
 /** «Riporta sulla mappa»: every placed object becomes a zone of its kind inside the area, as drawn by hand. */
 export function objectsToZones(kind: ArKind, objs: readonly PlacedObject[], a: Alignment, origin: { lat: number; lng: number }, now = Date.now()): SubArea[] {
   return objs.map((o, i) => {
-    const def = arObject(kind, o.id);
+    const def = o.def ?? arObject(kind, o.id);
     return { id: `ar-${now.toString(36)}-${i}`, kind: def.zone, ring: footprintRing(o, def, a, origin) };
   });
 }
@@ -139,4 +142,34 @@ export function horizonAt(pitchDeg: number, fovDeg: number): number {
 }
 export function pitchForHorizon(ny: number, fovDeg: number): number {
   return (Math.atan((ny - 0.5) * 2 * Math.tan((fovDeg * Math.PI) / 360)) * 180) / Math.PI;
+}
+
+/**
+ * The plant «Rileva» recognised, as an object «Prova» can put at real size: its own shape (a cone for a fir, a column
+ * for a cypress, a round crown for a holm oak, an umbrella for a stone pine, a bush, a vine row), height and crown from
+ * the species' typical sizes, kept within sane bounds; null for an older record without them. A shrub or vine becomes
+ * the matching zone (aiuole in the piazza, irrigation in the vineyard is not a plant: vines stay trees' zone there).
+ */
+export function plantObject(kind: ArKind, sp: ScanSpecies): ArObjectDef | null {
+  if (!sp.form || !Number.isFinite(sp.heightM) || !Number.isFinite(sp.crownM)) return null;
+  const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+  const h = clamp(sp.heightM!, 0.4, 40);
+  const vine = sp.form === "vine";
+  const crown = vine ? clamp(sp.crownM!, 0.6, 1.2) : clamp(sp.crownM!, 0.4, 25);
+  const zone: ZoneKind = kind === "vineyard" ? (vine ? "lotto" : "frangivento") : sp.form === "shrub" ? "prato" : "alberi";
+  return {
+    id: "pianta", label: sp.commonName, w: vine ? 4 : crown, d: crown, h: vine ? clamp(h, 1.2, 2.2) : h, zone,
+    plant: { form: sp.form, evergreen: sp.evergreen ?? true, scientificName: sp.scientificName },
+  };
+}
+/** The species recognised in a flow's scans, once each, newest first (at most `max`). */
+export function recognisedPlants(kind: ArKind, species: ReadonlyArray<ScanSpecies | null>, max = 6): ArObjectDef[] {
+  const seen = new Set<string>(), out: ArObjectDef[] = [];
+  for (let i = species.length - 1; i >= 0 && out.length < max; i--) {
+    const sp = species[i];
+    if (!sp || seen.has(sp.scientificName)) continue;
+    const def = plantObject(kind, sp);
+    if (def) { seen.add(sp.scientificName); out.push(def); }
+  }
+  return out;
 }

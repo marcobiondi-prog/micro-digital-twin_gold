@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { toast } from "sonner";
-import { Check, Crosshair, MapPinned, MoveVertical, Ruler, Undo2, X } from "lucide-react";
+import { Check, Crosshair, Leaf, MapPinned, MoveVertical, Ruler, Undo2, X } from "lucide-react";
 import type { ArKind } from "@/models/ar-focus";
 import {
   AR_OBJECTS, alignFromFix, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, arObject, enToAr, metresText, objectsToZones, toEN,
-  type Alignment, type ArObjectId, type PlacedObject,
+  type Alignment, type ArObjectDef, type PlacedObject,
 } from "@/models/ar-objects";
 import { getLab, setUrban, setVineyard } from "@/models/lab-store";
 import { drawnAreaFor, type DrawnArea } from "@/models/drawn-area";
@@ -45,9 +45,14 @@ type V = { x: number; y: number; z: number };
  * camera on a floor guessed from how the phone is held (eyes at 1,5 m, the floor's tilt from the phone's tilt), so sizes
  * are close but not anchored. With a session it is the real live AR.
  */
-export function ArLive({ kind, session, stream = null, onEnd }: { kind: ArKind; session: XRSession | null; stream?: MediaStream | null; onEnd: () => void }) {
-  const objects = AR_OBJECTS[kind];
-  const [selected, setSelected] = useState<ArObjectId>(objects[0]!.id);
+export function ArLive({ kind, session, stream = null, plants = [], onEnd }: { kind: ArKind; session: XRSession | null; stream?: MediaStream | null; plants?: ArObjectDef[]; onEnd: () => void }) {
+  // The plants recognised by «Rileva» come first (key "p:<i>"), then the flow's own objects (key = their id).
+  const choices = useMemo(() => [
+    ...plants.map((d, i) => ({ key: `p:${i}`, def: d })),
+    ...AR_OBJECTS[kind].map((d) => ({ key: d.id as string, def: d })),
+  ], [kind, plants]);
+  const [selected, setSelected] = useState<string>(choices[0]!.key);
+  const defOf = (key: string) => choices.find((c) => c.key === key)?.def ?? AR_OBJECTS[kind][0]!;
   const [tool, setTool] = useState<Tool>("place");
   // «Regola pavimento» (preview only): an offset added to the phone's tilt so the guessed floor meets the real one.
   // The first time on this phone the preview opens on it, so the floor is set before anything is put.
@@ -71,6 +76,8 @@ export function ArLive({ kind, session, stream = null, onEnd }: { kind: ArKind; 
   }, [stream]);
   const canvasHost = useRef<HTMLDivElement>(null);
   const end = () => { if (session) void session.end().catch(() => undefined); else onEnd(); };
+  const defOfRef = useRef(defOf);
+  defOfRef.current = defOf;
   const live = useRef({ selected, tool, placed, alignPts, measure });
   live.current = { selected, tool, placed, alignPts, measure };
   const three = useRef<{ scene: THREE.Scene; reticle: THREE.Object3D; hit: V | null; objects: Map<string, THREE.Object3D>; overlay: THREE.Group; measure: THREE.Group; floorY: number | null } | null>(null);
@@ -227,14 +234,14 @@ export function ArLive({ kind, session, stream = null, onEnd }: { kind: ArKind; 
       if (!t || !hit) return;
       const { tool: tl } = live.current;
       if (tl === "place") {
-        const def = arObject(kind, live.current.selected);
+        const def = defOfRef.current(live.current.selected);
         const uid = `o${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
         const g = objectMesh(def);
         g.add(contactShadow(def));
         g.position.set(hit.x, hit.y, hit.z);
         t.scene.add(g);
         t.objects.set(uid, g);
-        setPlaced((l) => [...l, { uid, id: def.id, x: hit.x, z: hit.z, yaw: 0 }]);
+        setPlaced((l) => [...l, { uid, id: def.id, x: hit.x, z: hit.z, yaw: 0, ...(def.plant ? { def } : {}) }]);
         hapticTick([20]);
       } else if (tl === "align") {
         setAlignPts((pts) => (pts.length >= 2 ? [hit] : [...pts, hit]));
@@ -316,7 +323,7 @@ export function ArLive({ kind, session, stream = null, onEnd }: { kind: ArKind; 
       ? alignPts.length === 0 ? "Tocca sul pavimento il punto 1 dell’area" : "Ora tocca il punto 2 dell’area"
       : tool === "measure"
         ? dist !== null ? `Distanza ${metresText(dist)}` : measure.length === 1 ? "Tocca il secondo punto" : "Tocca il primo punto da misurare"
-        : `Tocca il pavimento per mettere: ${arObject(kind, selected).label}`;
+        : `Tocca il pavimento per mettere: ${defOf(selected).label}`;
 
   const dragHorizon = (e: React.PointerEvent<HTMLDivElement>) => {
     const host = canvasHost.current;
@@ -372,9 +379,12 @@ export function ArLive({ kind, session, stream = null, onEnd }: { kind: ArKind; 
         )}
         {alignment && <p className="mx-auto w-fit rounded-full bg-black/55 px-3 py-1 text-xs backdrop-blur">{alignment.how === "corners" ? "Area allineata sul pavimento" : "Allineata col GPS e la bussola · tocca Allinea per precisione"}</p>}
         <div className="flex gap-2 overflow-x-auto pb-1" role="radiogroup" aria-label="Oggetto da mettere">
-          {objects.map((o) => (
-            <button key={o.id} type="button" role="radio" aria-checked={tool === "place" && selected === o.id} onClick={() => { setSelected(o.id); setTool("place"); }}
-              className={`${pill} shrink-0 ${tool === "place" && selected === o.id ? "bg-[#00e5ff] text-black" : "bg-black/55 backdrop-blur"}`}>{o.label}</button>
+          {choices.map(({ key, def: o }) => (
+            <button key={key} type="button" role="radio" aria-checked={tool === "place" && selected === key} onClick={() => { setSelected(key); setTool("place"); }}
+              aria-label={o.plant ? `${o.label}, riconosciuto: ${o.plant.scientificName}, alto circa ${Math.round(o.h)} m` : undefined}
+              className={`${pill} shrink-0 ${tool === "place" && selected === key ? "bg-[#00e5ff] text-black" : o.plant ? "bg-[#14532d]/80 ring-1 ring-[#4ade80]/60 backdrop-blur" : "bg-black/55 backdrop-blur"}`}>
+              {o.plant && <Leaf className="size-4" aria-hidden="true" />}{o.label}
+            </button>
           ))}
         </div>
         <div className="flex flex-wrap items-center justify-center gap-2">

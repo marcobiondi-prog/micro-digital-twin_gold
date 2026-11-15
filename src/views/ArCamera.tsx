@@ -3,6 +3,7 @@ import { createPortal, flushSync } from "react-dom";
 import { isTouchDevice } from "@/lib/touch-device";
 import { isTabletViewport } from "@/lib/tablet-camera";
 import { ArLive, requestArSession } from "@/views/ArLive";
+import { recognisedPlants } from "@/models/ar-objects";
 import { toast } from "sonner";
 import { Activity, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grid2X2, Leaf, Minus, Snowflake, Umbrella, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Star, TreePine, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
 import { supportsCameraTorch, setCameraTorch } from "@/lib/camera-torch";
@@ -849,6 +850,7 @@ export function ArCamera({
         commonName: sp.commonName, scientificName: sp.scientificName, family: sp.family ?? null,
         level: sp.identification?.level === "species" ? "Specie probabile" : sp.identification?.level === "genus" ? "Genere probabile" : "Identificazione incerta",
         cooling: sp.cooling?.deltaT ?? null, shade: sp.cooling?.shadeM2 ?? null, photo: sp.photo,
+        form: sp.form, heightM: sp.heightM, crownM: sp.crownM, evergreen: sp.evergreen,
       } : null,
       soil: ground ? { label: ground.label, permeability: ground.permeability, plantable: ground.plantable, note: ground.note } : null,
       count: 0, totalCooling: sp?.cooling ? 0 : null, totalShade: sp?.cooling ? 0 : null, satellite: satelliteText,
@@ -1636,10 +1638,12 @@ export function ArCamera({
     had?.root.remove();
     if (had?.session) setCamEpoch((n) => n + 1);
   };
+  // The plants «Rileva» recognised in this flow, so «Prova» can put the very species at its size.
+  const arPlants = recognisedPlants(kind, scanRecords.map((r) => r.species));
   const liveView = liveAr ? createPortal(
     // The camera's own gestures (close swipe, tap to place) must not see the live view's taps.
     <div onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()} onPointerMove={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
-      <ArLive kind={kind} session={liveAr.session} stream={liveAr.session ? null : streamRef.current} onEnd={endLive} />
+      <ArLive kind={kind} session={liveAr.session} stream={liveAr.session ? null : streamRef.current} plants={arPlants} onEnd={endLive} />
     </div>, liveAr.root) : null;
   // «Prova» is for phones only: on tablets and computers the camera stays on «Rileva» and the switch is not shown.
   const modeSwitch = !onPhone ? null : (
