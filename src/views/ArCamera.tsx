@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal, flushSync } from "react-dom";
+import { isTouchDevice } from "@/lib/touch-device";
+import { isTabletViewport } from "@/lib/tablet-camera";
 import { ArLive, requestArSession } from "@/views/ArLive";
 import { toast } from "sonner";
 import { Activity, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grid2X2, Leaf, Minus, Snowflake, Umbrella, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Star, TreePine, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
@@ -332,6 +334,13 @@ export function ArCamera({
   // «Prova» live: the WebXR session (null = the preview without ARCore) and the element its overlay lives in.
   const [liveAr, setLiveAr] = useState<{ session: XRSession | null; root: HTMLElement } | null>(null);
   const [camEpoch, setCamEpoch] = useState(0);
+  const [onPhone, setOnPhone] = useState(false);
+  useEffect(() => {
+    const sync = () => setOnPhone(isTouchDevice() && !isTabletViewport(window.screen?.width || window.innerWidth, window.screen?.height || window.innerHeight));
+    sync();
+    window.addEventListener("resize", sync);
+    return () => window.removeEventListener("resize", sync);
+  }, []);
   const liveHostRef = useRef<HTMLDivElement>(null);
   const liveArRef = useRef(liveAr);
   liveArRef.current = liveAr;
@@ -1632,7 +1641,8 @@ export function ArCamera({
     <div onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()} onPointerMove={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
       <ArLive kind={kind} session={liveAr.session} stream={liveAr.session ? null : streamRef.current} onEnd={endLive} />
     </div>, liveAr.root) : null;
-  const modeSwitch = (
+  // «Prova» is for phones only: on tablets and computers the camera stays on «Rileva» and the switch is not shown.
+  const modeSwitch = !onPhone ? null : (
     <div role="radiogroup" aria-label="Modalità della fotocamera AI" className="flex rounded-full bg-[rgba(20,26,34,0.78)] p-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur-md shadow-lg">
       {(["rileva", "prova"] as const).map((m) => {
         const on = (m === "prova") === proving;
