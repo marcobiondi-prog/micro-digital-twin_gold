@@ -57,3 +57,12 @@ describe("zonesInside", () => {
     expect(r.out).toBe(1);
   });
 });
+
+import { horizonAt, pitchForHorizon } from "@/models/ar-objects";
+describe("floor adjustment", () => {
+  it("puts the horizon where the line is dragged", () => {
+    expect(horizonAt(0, 70)).toBeCloseTo(0.5);
+    expect(horizonAt(-14, 70)).toBeLessThan(0.5);
+    for (const ny of [0.1, 0.3, 0.5, 0.45]) expect(horizonAt(pitchForHorizon(ny, 70), 70)).toBeCloseTo(ny, 6);
+  });
+});

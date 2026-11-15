@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { toast } from "sonner";
-import { Check, Crosshair, MapPinned, Ruler, Undo2, X } from "lucide-react";
+import { Check, Crosshair, MapPinned, MoveVertical, Ruler, Undo2, X } from "lucide-react";
 import type { ArKind } from "@/models/ar-focus";
 import {
-  AR_OBJECTS, alignFromFix, zonesInside, alignTwoPoints, arDistance, arObject, enToAr, metresText, objectsToZones, toEN,
+  AR_OBJECTS, alignFromFix, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, arObject, enToAr, metresText, objectsToZones, toEN,
   type Alignment, type ArObjectId, type PlacedObject,
 } from "@/models/ar-objects";
 import { getLab, setUrban, setVineyard } from "@/models/lab-store";
@@ -49,6 +49,13 @@ export function ArLive({ kind, session, stream = null, onEnd }: { kind: ArKind; 
   const objects = AR_OBJECTS[kind];
   const [selected, setSelected] = useState<ArObjectId>(objects[0]!.id);
   const [tool, setTool] = useState<Tool>("place");
+  // «Regola pavimento» (preview only): an offset added to the phone's tilt so the guessed floor meets the real one.
+  // The first time on this phone the preview opens on it, so the floor is set before anything is put.
+  const [adjusting, setAdjusting] = useState(() => !session && !hasFloorOffset());
+  const adjustingRef = useRef(false);
+  adjustingRef.current = adjusting;
+  const floorRef = useRef({ tilt: -14, offset: readFloorOffset() });
+  const horizonLine = useRef<HTMLDivElement>(null);
   const [found, setFound] = useState(false);
   const [placed, setPlaced] = useState<PlacedObject[]>([]);
   const [alignPts, setAlignPts] = useState<V[]>([]);
@@ -169,8 +176,8 @@ export function ArLive({ kind, session, stream = null, onEnd }: { kind: ArKind; 
       camera.aspect = w / h; camera.fov = 70; camera.near = 0.05; camera.far = 200; camera.updateProjectionMatrix();
     };
     size();
-    let pitch = -14;
-    const onTilt = (e: DeviceOrientationEvent) => { if (e.beta !== null) pitch = Math.max(-80, Math.min(-8, e.beta - 90)); };
+    const fl = floorRef.current;
+    const onTilt = (e: DeviceOrientationEvent) => { if (e.beta !== null) fl.tilt = Math.max(-80, Math.min(-8, e.beta - 90)); };
     window.addEventListener("deviceorientation", onTilt);
     window.addEventListener("resize", size);
     camera.position.set(0, 1.5, 0);
@@ -185,7 +192,9 @@ export function ArLive({ kind, session, stream = null, onEnd }: { kind: ArKind; 
     if (three.current) three.current.floorY = 0;
     setFound(true);
     renderer.setAnimationLoop(() => {
+      const pitch = Math.max(-80, Math.min(10, fl.tilt + fl.offset));
       camera.rotation.set((pitch * Math.PI) / 180, 0, 0, "YXZ");
+      if (horizonLine.current) horizonLine.current.style.top = `${(horizonAt(pitch, camera.fov) * 100).toFixed(2)}%`;
       camera.updateMatrixWorld();
       const t = three.current;
       const c = at(0.5, 0.62);
@@ -195,6 +204,7 @@ export function ArLive({ kind, session, stream = null, onEnd }: { kind: ArKind; 
       renderer.render(scene, camera);
     });
     const onTap = (e: PointerEvent) => {
+      if (adjustingRef.current) return;
       const r = el.getBoundingClientRect();
       const p = at((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
       if (p && three.current) { three.current.hit = p; placeAtHit(); }
@@ -308,10 +318,40 @@ export function ArLive({ kind, session, stream = null, onEnd }: { kind: ArKind; 
         ? dist !== null ? `Distanza ${metresText(dist)}` : measure.length === 1 ? "Tocca il secondo punto" : "Tocca il primo punto da misurare"
         : `Tocca il pavimento per mettere: ${arObject(kind, selected).label}`;
 
+  const dragHorizon = (e: React.PointerEvent<HTMLDivElement>) => {
+    const host = canvasHost.current;
+    if (!host || (e.type === "pointermove" && !e.currentTarget.hasPointerCapture(e.pointerId))) return;
+    if (e.type === "pointerdown") e.currentTarget.setPointerCapture(e.pointerId);
+    const r = host.getBoundingClientRect();
+    const ny = Math.max(0.05, Math.min(0.9, (e.clientY - r.top) / r.height));
+    const fl = floorRef.current;
+    fl.offset = pitchForHorizon(ny, 70) - fl.tilt;
+  };
+  const finishAdjust = () => {
+    setAdjusting(false);
+    saveFloorOffset(floorRef.current.offset);
+    setNotice({ text: "Pavimento regolato: tocca dove vuoi mettere gli oggetti.", tone: "ok" });
+    window.setTimeout(() => setNotice((n) => (n?.text.startsWith("Pavimento") ? null : n)), 2200);
+  };
+
   const pill = "inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm font-semibold";
   return (
     <>
     {!session && <div ref={canvasHost} className="fixed inset-0 z-40 bg-black">{stream && <video ref={videoRef} muted playsInline autoPlay className="absolute inset-0 size-full object-cover" />}</div>}
+    {!session && adjusting && (
+      <div className="pointer-events-none fixed inset-0 z-[45]">
+        <div ref={horizonLine} className="absolute inset-x-0 -translate-y-1/2" style={{ top: "30%" }}>
+          <div role="slider" aria-label="Linea dell’orizzonte" aria-valuetext="Trascina sulla linea dove il pavimento incontra il fondo" tabIndex={0}
+            onPointerDown={dragHorizon} onPointerMove={dragHorizon}
+            onKeyDown={(e) => { const fl = floorRef.current; if (e.key === "ArrowUp") fl.offset += 0.5; else if (e.key === "ArrowDown") fl.offset -= 0.5; }}
+            className="pointer-events-auto relative flex h-14 touch-none cursor-ns-resize items-center">
+            <div className="h-0.5 w-full bg-[#00e5ff] shadow-[0_0_10px_#00e5ff]" />
+            <span className="absolute left-1/2 grid size-11 -translate-x-1/2 place-items-center rounded-full bg-[#00e5ff] text-black shadow-lg"><MoveVertical className="size-5" aria-hidden="true" /></span>
+            <span className="absolute left-3 top-0 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-semibold">Orizzonte</span>
+          </div>
+        </div>
+      </div>
+    )}
     <div ref={hudRef} className="ar-live-hud pointer-events-none fixed inset-0 z-50 flex flex-col justify-between text-white" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
       <div className="pointer-events-auto flex items-center gap-2 p-3">
         <button type="button" onClick={end} aria-label="Esci dalla realtà aumentata" className="grid size-11 place-items-center rounded-full bg-black/55 backdrop-blur"><X className="size-5" /></button>
@@ -321,7 +361,15 @@ export function ArLive({ kind, session, stream = null, onEnd }: { kind: ArKind; 
       </div>
       <div className="pointer-events-none space-y-2 p-3 [&>*]:pointer-events-auto">
         {notice && <p role="alert" className={`mx-auto max-w-sm rounded-2xl px-4 py-2.5 text-center text-sm font-semibold shadow-lg ${notice.tone === "ok" ? "bg-[#22c55e] text-black" : "bg-[#facc15] text-black"}`}>{notice.text}</p>}
-        {!session && <p className="mx-auto w-fit rounded-full bg-[#facc15]/90 px-3 py-1 text-xs font-bold text-black">Anteprima: senza ARCore le misure sono indicative</p>}
+        {!session && adjusting && <p className="mx-auto max-w-sm rounded-2xl bg-black/70 px-4 py-2.5 text-center text-sm backdrop-blur">Trascina la linea azzurra dove il pavimento incontra il fondo (la base dei muri, l’orizzonte). Così gli oggetti poggiano a terra.</p>}
+        {!session && (
+          <div className="flex items-center justify-center gap-2">
+            <p className="w-fit rounded-full bg-[#facc15]/90 px-3 py-1 text-xs font-bold text-black">Anteprima: senza ARCore le misure sono indicative</p>
+            {adjusting
+              ? <button type="button" onClick={finishAdjust} className="h-8 rounded-full bg-white px-3 text-xs font-bold text-black">Fatto</button>
+              : <button type="button" onClick={() => setAdjusting(true)} className="inline-flex h-8 items-center gap-1 rounded-full bg-black/55 px-3 text-xs font-semibold backdrop-blur"><MoveVertical className="size-3.5" aria-hidden="true" />Regola pavimento</button>}
+          </div>
+        )}
         {alignment && <p className="mx-auto w-fit rounded-full bg-black/55 px-3 py-1 text-xs backdrop-blur">{alignment.how === "corners" ? "Area allineata sul pavimento" : "Allineata col GPS e la bussola · tocca Allinea per precisione"}</p>}
         <div className="flex gap-2 overflow-x-auto pb-1" role="radiogroup" aria-label="Oggetto da mettere">
           {objects.map((o) => (
@@ -339,4 +387,15 @@ export function ArLive({ kind, session, stream = null, onEnd }: { kind: ArKind; 
     </div>
     </>
   );
+}
+
+const FLOOR_KEY = "mdt-ar-floor-v1";
+function readFloorOffset(): number {
+  try { const v = Number(localStorage.getItem(FLOOR_KEY)); return Number.isFinite(v) ? Math.max(-40, Math.min(40, v)) : 0; } catch { return 0; }
+}
+function hasFloorOffset(): boolean {
+  try { return localStorage.getItem(FLOOR_KEY) !== null; } catch { return false; }
+}
+function saveFloorOffset(v: number) {
+  try { localStorage.setItem(FLOOR_KEY, String(Math.round(v * 10) / 10)); } catch { /* memory only */ }
 }

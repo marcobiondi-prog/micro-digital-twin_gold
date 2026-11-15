@@ -128,3 +128,15 @@ export function zonesInside(zones: SubArea[], area: Ring): { kept: SubArea[]; ou
   });
   return { kept, out: zones.length - kept.length };
 }
+
+/**
+ * «Regola pavimento» in the preview without ARCore: the floor is guessed from the phone's tilt, so the person drags a
+ * line onto the photo's horizon. Where the horizon falls on screen (0 top … 1 bottom) for a camera pitched by `pitchDeg`
+ * (negative = looking down) with a vertical field of view `fovDeg`, and the pitch that puts it at `ny`.
+ */
+export function horizonAt(pitchDeg: number, fovDeg: number): number {
+  return 0.5 + (0.5 * Math.tan((pitchDeg * Math.PI) / 180)) / Math.tan((fovDeg * Math.PI) / 360);
+}
+export function pitchForHorizon(ny: number, fovDeg: number): number {
+  return (Math.atan((ny - 0.5) * 2 * Math.tan((fovDeg * Math.PI) / 360)) * 180) / Math.PI;
+}
