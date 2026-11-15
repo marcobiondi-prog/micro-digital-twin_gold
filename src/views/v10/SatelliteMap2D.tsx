@@ -1,8 +1,9 @@
+import { moveFind } from "@/models/field-finds";
 import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap, Marker } from "maplibre-gl";
 import type { Ring } from "@/models/place-area";
 import { MAX_PINS } from "@/models/drawn-area";
-import { addAreaLayers, addSimLayers, handleElement, misterElement, placePinElement, ringCentre, tagElement, zoneTag, pinElement, setAreaData, setOutlineData, setSimData, setBedData, setSimGhost, type SimLayout, MAP_LOCALE } from "@/views/v10/map-area";
+import { addAreaLayers, addSimLayers, findElement, handleElement, misterElement, placePinElement, ringCentre, tagElement, zoneTag, pinElement, setAreaData, setOutlineData, setSimData, setBedData, setSimGhost, type SimLayout, MAP_LOCALE } from "@/views/v10/map-area";
 import { ringContains } from "@/models/place-area";
 import type { LatLng } from "@/models/area-layout";
 
@@ -212,6 +213,12 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
     // Every misting pole numbered, in the zones drawn for them first (solid) then those the app placed (white).
     if (sim?.kind === "piazza" && !drawing) sim.data.misters.forEach((m, i) => handles.current.push(new lib.Marker({ element: misterElement(i + 1, i < sim.data.mistersInZones) }).setLngLat([m[1], m[0]]).addTo(map)));
     if (sim && !drawing && !arranging) for (const z of sim.inner ?? []) { if (z.ring.length < 3) continue; const c = ringCentre(z.ring); handles.current.push(new lib.Marker({ element: tagElement(zoneTag(z)) }).setLngLat([c[1], c[0]]).addTo(map)); }
+    // The AI camera's finds, draggable to put their spot right.
+    if (sim && !drawing) for (const f of sim.finds ?? []) {
+      const m = new lib.Marker({ element: findElement(f), draggable: true }).setLngLat([f.lng, f.lat]).addTo(map);
+      m.on("dragend", () => { const q = m.getLngLat(); moveFind(f.id, q.lat, q.lng); });
+      handles.current.push(m);
+    }
     if (!arranging || drawing || !sim) return;
     const add = (at: LatLng, label: string | null, done: (to: LatLng) => void) => {
       const m = new lib.Marker({ element: handleElement(label), draggable: true }).setLngLat([at[1], at[0]]).addTo(map);

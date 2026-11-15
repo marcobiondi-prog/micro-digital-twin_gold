@@ -1,3 +1,4 @@
+import type { FieldFind } from "@/models/field-finds";
 import type { Map as MlMap, GeoJSONSource } from "maplibre-gl";
 import { ringContains, type Ring } from "@/models/place-area";
 import type { RealObject } from "@/models/real-objects";
@@ -66,7 +67,7 @@ export function pinElement(n: number, drawing: boolean): HTMLElement {
 
 /** `inner`: the smaller areas drawn inside the big one (free zones, zones for one intervention, lots). */
 /** `shadows`: the piazza's shadows at the simulation's season and hour (models/area-layout piazzaShadows); none at night. */
-export type SimLayout = ({ kind: "piazza"; data: PiazzaLayout; shadows?: Ring[]; real?: RealObject[] } | { kind: "vigneto"; data: VineLayout; thirst: number[] }) & { inner?: SubArea[] };
+export type SimLayout = ({ kind: "piazza"; data: PiazzaLayout; shadows?: Ring[]; real?: RealObject[] } | { kind: "vigneto"; data: VineLayout; thirst: number[] }) & { inner?: SubArea[]; finds?: FieldFind[] };
 /** The outline colour of each kind of inner zone. */
 export const ZONE_COLORS: Record<ZoneKind, string> = { libera: "#cbd5e1", alberi: "#4ade80", prato: "#86efac", ombra: PERGOLA_COLORS.slat, nebulizzatori: "#7dd3fc", irrigazione: "#38bdf8", teli: "#94a3b8", frangivento: "#22c55e", lotto: "#fbbf24" };
 /** A zone's short name on the map. */
@@ -421,6 +422,20 @@ export function misterElement(n: number, inZone: boolean): HTMLElement {
   el.setAttribute("aria-hidden", "true");
   el.textContent = String(n);
   el.style.cssText = `display:grid;place-items:center;width:20px;height:20px;border-radius:9999px;font:700 11px/1 system-ui,sans-serif;pointer-events:none;box-shadow:0 1px 4px rgb(0 0 0/.45);${inZone ? "background:#38bdf8;color:#0b0f15;border:2px solid #e0f2fe" : "background:#f8fafc;color:#0369a1;border:2px solid #38bdf8"}`;
+  return el;
+}
+
+/**
+ * Something the AI camera found (Rileva → «Aggiungi al progetto»): its photo in a round frame with a coloured ring by kind
+ * (green trees and vines, amber soil), draggable to put it right.
+ */
+export function findElement(f: FieldFind): HTMLElement {
+  const el = document.createElement("div");
+  el.title = `${f.title} · ${f.detail}`;
+  const ring = f.kind === "ground" || f.kind === "interrow" ? "#f59e0b" : "#22c55e";
+  el.style.cssText = `width:34px;height:34px;border-radius:9999px;border:3px solid ${ring};background:#0b0f15 center/cover no-repeat;box-shadow:0 0 0 2px #fff,0 2px 8px rgb(0 0 0/.5);touch-action:none;cursor:grab`;
+  if (f.thumb) el.style.backgroundImage = `url("${f.thumb}")`;
+  else { el.textContent = f.kind === "ground" || f.kind === "interrow" ? "▦" : "✿"; el.style.cssText += ";display:grid;place-items:center;color:#fff;font:700 15px/1 system-ui"; }
   return el;
 }
 

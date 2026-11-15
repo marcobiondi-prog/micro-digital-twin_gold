@@ -1,0 +1,59 @@
+import { describe, expect, it } from "vitest";
+import { alignFromFix, alignTwoPoints, arDistance, arToEn, AR_OBJECTS, enToAr, fromEN, metresText, objectsToZones, toEN } from "@/models/ar-objects";
+
+describe("AR alignment and objects", () => {
+  it("round-trips map and AR points through any alignment", () => {
+    const a = { theta: 0.7, tx: 3, tz: -2 };
+    const p = { e: 12.5, n: -4 };
+    const q = arToEn(enToAr(p, a), a);
+    expect(q.e).toBeCloseTo(p.e, 9);
+    expect(q.n).toBeCloseTo(p.n, 9);
+  });
+
+  it("puts two map corners exactly on the two AR points touched", () => {
+    const A = { e: 0, n: 0 }, B = { e: 10, n: 0 };
+    const a = { x: 1, z: -2 }, b = { x: 1, z: -12 }; // the corner B straight ahead of A, 10 m away
+    const al = alignTwoPoints(A, B, a, b);
+    const pa = enToAr(A, al), pb = enToAr(B, al);
+    expect(pa.x).toBeCloseTo(1, 9); expect(pa.z).toBeCloseTo(-2, 9);
+    expect(pb.x).toBeCloseTo(1, 9); expect(pb.z).toBeCloseTo(-12, 9);
+    expect(arDistance(pa, pb)).toBeCloseTo(10, 9);
+  });
+
+  it("from the GPS fix: the fix is the origin and the heading is straight ahead (−z)", () => {
+    const fix = { e: 5, n: 5 };
+    const al = alignFromFix(fix, 90); // looking east
+    const o = enToAr(fix, al);
+    expect(o.x).toBeCloseTo(0, 9); expect(o.z).toBeCloseTo(0, 9);
+    const ahead = enToAr({ e: 15, n: 5 }, al);
+    expect(ahead.x).toBeCloseTo(0, 9); expect(ahead.z).toBeCloseTo(-10, 9);
+  });
+
+  it("lat/lng and metres agree, and the objects become zones of their kind", () => {
+    const o = { lat: 45.44, lng: 10.99 };
+    const [lat, lng] = fromEN({ e: 20, n: -30 }, o);
+    const back = toEN(lat, lng, o);
+    expect(back.e).toBeCloseTo(20, 6); expect(back.n).toBeCloseTo(-30, 6);
+    const al = { theta: 0, tx: 0, tz: 0 };
+    const zones = objectsToZones("urban", [{ uid: "1", id: "pergolato", x: 0, z: -5, yaw: 0 }, { uid: "2", id: "albero", x: 3, z: -5, yaw: 0 }], al, o, 1);
+    expect(zones.map((z) => z.kind)).toEqual(["ombra", "alberi"]);
+    const ring = zones[0]!.ring.map(([a, b]) => toEN(a, b, o));
+    expect(Math.max(...ring.map((p) => p.e)) - Math.min(...ring.map((p) => p.e))).toBeCloseTo(4, 6);
+    expect(ring.every((p) => p.n > 2.9 && p.n < 7.1)).toBe(true); // −z in AR is north here
+    expect(AR_OBJECTS.vineyard.map((d) => d.zone)).toEqual(["teli", "frangivento", "irrigazione"]);
+    expect(metresText(3.456)).toBe("3,46 m");
+  });
+});
+
+import { insideRing, zonesInside } from "@/models/ar-objects";
+describe("zonesInside", () => {
+  it("keeps only the zones whose middle is in the area", () => {
+    const area: Array<[number, number]> = [[0, 0], [0, 1], [1, 1], [1, 0]];
+    expect(insideRing(0.5, 0.5, area)).toBe(true);
+    expect(insideRing(1.5, 0.5, area)).toBe(false);
+    const z = (lat: number) => ({ id: String(lat), kind: "alberi" as const, ring: [[lat, 0.4], [lat, 0.6], [lat + 0.1, 0.5]] as Array<[number, number]> });
+    const r = zonesInside([z(0.4), z(2)], area);
+    expect(r.kept.map((x) => x.id)).toEqual(["0.4"]);
+    expect(r.out).toBe(1);
+  });
+});

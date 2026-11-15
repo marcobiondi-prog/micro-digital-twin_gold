@@ -26,7 +26,8 @@ import type { Ring } from "@/models/place-area";
 import { openSimTab, type SimKind } from "@/views/v8/console";
 import { PlaceSearch } from "@/views/SimulationGrid";
 import { loadRealObjects } from "@/lib/real-objects-client";
-import { realCountText, type RealObject } from "@/models/real-objects";
+import { circleRing, realCountText, type RealObject } from "@/models/real-objects";
+import { findsCountText, useFieldFinds, type FieldFind } from "@/models/field-finds";
 /** No objects found (a stable empty list, so the layout is not worked out again on every render). */
 const NO_REAL: RealObject[] = [];
 
@@ -115,7 +116,19 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   // What already stands in the drawn area (existing trees, fountains, buildings, monuments): the piazza's interventions keep off it.
   const realKey = saved && kind === "urban" ? saved.ring.map(([a, b]) => `${a.toFixed(5)},${b.toFixed(5)}`).join(";") : "";
   const realQ = useQuery({ queryKey: ["real-objects", realKey], queryFn: () => loadRealObjects(saved!.ring), enabled: !!realKey, staleTime: Infinity, retry: 1 });
-  const real = (realKey && realQ.data) || NO_REAL;
+  const mapReal = (realKey && realQ.data) || NO_REAL;
+  // What the AI camera found and was added to the project («Aggiungi al progetto»), near this area: shown on the map,
+  // and the piazza's trees found count as already standing there.
+  const allFinds = useFieldFinds(kind);
+  const finds = useMemo<FieldFind[]>(() => {
+    if (!saved) return [];
+    const [cLat, cLng] = saved.ring.reduce((a, q) => [a[0] + q[0] / saved.ring.length, a[1] + q[1] / saved.ring.length], [0, 0]);
+    return allFinds.filter((f) => Math.hypot((f.lat - cLat) * 111_320, (f.lng - cLng) * 111_320 * Math.cos((cLat * Math.PI) / 180)) < 400);
+  }, [allFinds, saved]);
+  const real = useMemo<RealObject[]>(() => {
+    const trees = kind === "urban" ? finds.filter((f) => f.kind === "tree").map((f) => ({ kind: "albero" as const, ring: circleRing(f.lat, f.lng, Math.max(1.5, (f.crownM ?? 6) / 2)), name: f.species ?? "Albero rilevato" })) : [];
+    return trees.length ? [...mapReal, ...trees] : mapReal;
+  }, [mapReal, finds, kind]);
   const sim = useMemo<SimLayout | null>(() => {
     if (!saved) return null;
     const edits = saved.edits ?? {}, inner = zonesOfArea(saved);
@@ -125,12 +138,12 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
       // The shadows with the sun of the simulation's season and hour (its "when" chip), on the area's place.
       const when = getSimWhen("urban"), season = rSeason ?? when?.season, hour = rHour ?? when?.hour;
       const sun = season !== undefined && hour !== undefined ? sunAt(saved.lat, saved.lng, season, hour, when?.minute ?? 0, when?.dst) : null;
-      return { kind: "piazza", data, inner, shadows: piazzaShadows(data, sun), real };
+      return { kind: "piazza", data, inner, shadows: piazzaShadows(data, sun), real, finds };
     }
     const v = lab.vineyard, fallback = vineMixOf(v);
     const data = vineLayout(saved.ring, v.zones.map((z) => zoneMixOf(z, fallback)), edits, inner);
-    return data ? { kind: "vigneto", data, thirst: vineMetrics(v).results.map((r) => r.s), inner } : null;
-  }, [saved, kind, lab.urban, lab.vineyard, rSeason, rHour, real]);
+    return data ? { kind: "vigneto", data, thirst: vineMetrics(v).results.map((r) => r.s), inner, finds } : null;
+  }, [saved, kind, lab.urban, lab.vineyard, rSeason, rHour, real, finds]);
   const setZones = (zones: SubArea[]) => {
     if (!saved) return;
     const area = { ...saved, zones };
@@ -561,6 +574,7 @@ function SimBar({ sim, when, arranging, edited, best, only, canOnly, onArrange, 
         {legend.map(([icon, text]) => <li key={text} className="inline-flex items-center gap-1.5">{icon}{text}</li>)}
       </ul>
       {sim.kind === "piazza" && <p className="text-sm text-muted-foreground">{shadowText(sim, when)}{roomText(sim.data)}</p>}
+      {(sim.finds?.length ?? 0) > 0 && <p className="text-sm text-muted-foreground">Rilevati con la fotocamera AI: {findsCountText(sim.finds ?? [])}{sim.kind === "piazza" && sim.finds?.some((f) => f.kind === "tree") ? ". Gli alberi rilevati contano come già presenti." : "."} Trascinali sulla mappa 2D se la posizione non è precisa.</p>}
       {sim.kind === "piazza" && (sim.real?.length ?? 0) > 0 && <p className="text-sm text-muted-foreground">Già nell’area: {realCountText(sim.real ?? [])}. Gli interventi non ci vanno sopra (contorni tratteggiati sulla mappa 2D).</p>}
       <p className="text-sm text-muted-foreground">{arranging
         ? sim.kind === "piazza" ? `Trascina gli alberi, o le etichette Aiuole e Ombra.${(sim.inner ?? []).length ? " Le etichette con ✥ spostano le tue zone con tutto quello che contengono; \"✥ Tutte le zone\" le sposta insieme." : ""}` : `Trascina l’etichetta Frangivento verso il lato dove lo vuoi.${(sim.inner ?? []).length ? " Le etichette con ✥ spostano le tue zone; \"✥ Tutte le zone\" le sposta insieme." : ""}`

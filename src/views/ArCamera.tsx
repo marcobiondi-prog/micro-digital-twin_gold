@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import { flushSync } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
+import { ArLive, requestArSession } from "@/views/ArLive";
 import { toast } from "sonner";
 import { Activity, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grid2X2, Leaf, Minus, Snowflake, Umbrella, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Star, TreePine, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
 import { supportsCameraTorch, setCameraTorch } from "@/lib/camera-torch";
@@ -44,6 +45,9 @@ import { drawCameraVideo, freezeCameraFrame, paintArFrame } from "@/lib/ar-frame
 import { startArFrameLoop } from "@/lib/ar-frame-loop";
 import { captureSummaryLines } from "@/models/ar-capture-summary";
 import { isArCoreSupported, createArCoreManager, type ArCoreManager } from "@/lib/arcore";
+import { addFind, findFromScan, placedText, useFieldFinds, type FindKind } from "@/models/field-finds";
+import { readFix, smallThumb } from "@/lib/find-position";
+import { getLab } from "@/models/lab-store";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cameraViewport, groundTilt, isGroundPoint, setArOrientationActive, shortestRotationDelta } from "@/lib/ar-orientation";
 import { CameraCloseGestures } from "@/views/CameraCloseGestures";
@@ -325,6 +329,22 @@ export function ArCamera({
   const [arCoreSupported, setArCoreSupported] = useState(false);
   const [arCoreActive, setArCoreActive] = useState(false);
   const arCoreRef = useRef<ArCoreManager | null>(null);
+  // «Prova» live: the WebXR session (null = the preview without ARCore) and the element its overlay lives in.
+  const [liveAr, setLiveAr] = useState<{ session: XRSession | null; root: HTMLElement } | null>(null);
+  const [camEpoch, setCamEpoch] = useState(0);
+  const liveHostRef = useRef<HTMLDivElement>(null);
+  const liveArRef = useRef(liveAr);
+  liveArRef.current = liveAr;
+  // Closing the camera ends the live AR too (the session would keep the camera).
+  useEffect(() => () => { void liveArRef.current?.session?.end().catch(() => undefined); liveArRef.current?.root.remove(); }, []);
+  useEffect(() => { if (mode === null && liveArRef.current) { void liveArRef.current.session?.end().catch(() => undefined); liveArRef.current.root.remove(); setLiveAr(null); } }, [mode]);
+  const liveRootEl = () => {
+    const root = document.createElement("div");
+    root.className = "ar-live-root";
+    root.style.cssText = "position:fixed;inset:0;z-index:2147483000";
+    (liveHostRef.current ?? document.body).appendChild(root);
+    return root;
+  };
 
   useEffect(() => {
     let active = true;
@@ -760,7 +780,7 @@ export function ArCamera({
       sceneRef.current?.dispose();
       sceneRef.current = null;
     };
-  }, [mode, kind]);
+  }, [mode, kind, camEpoch]);
 
   const toggle = (l: Layer) =>
     setLayers((s) => {
@@ -1546,12 +1566,72 @@ export function ArCamera({
   };
 
   const hasAnalysisContent = Boolean(species || soil || found || survey || viewedRecord);
+  // Fase 2: «Aggiungi al progetto». Lo scansionato diventa un punto sulla mappa (GPS + bussola + distanza tipica),
+  // con quello che ha detto la scansione; gli alberi poi contano come «già nell'area» nella simulazione.
+  const shownRecord = viewedRecord ?? (liveRecord >= 0 ? scanRecords[liveRecord] ?? null : null);
+  const finds = useFieldFinds(kind);
+  const shownAdded = Boolean(shownRecord && finds.some((f) => f.scanId === shownRecord.id));
+  const [adding, setAdding] = useState(false);
+  const canAdd = Boolean(shownRecord && (shownRecord.species || shownRecord.soil) && !scanning);
+  const addToProject = async (e?: React.SyntheticEvent) => {
+    e?.stopPropagation();
+    const rec = shownRecord;
+    if (!rec || adding) return;
+    setAdding(true);
+    try {
+      const findKind: FindKind = AR_FOCUS[kind].find((o) => o.label === rec.target)?.id ?? (rec.species ? (kind === "urban" ? "tree" : "leaf") : kind === "urban" ? "ground" : "interrow");
+      const [fix, thumb] = await Promise.all([readFix(), smallThumb(scanPhoto(rec.id))]);
+      const loc = kind === "urban" ? getLab().urban.location : getLab().vineyard.location;
+      const find = findFromScan(rec, findKind, fix, { lat: loc.lat, lng: loc.lng }, thumb);
+      addFind(find);
+      hapticTick([20]);
+      toast.success(`Aggiunto al progetto · ${find.title}`, { description: `${placedText(find)}. Lo trovi sulla mappa della ${kind === "urban" ? "piazza" : "vigna"}.` });
+    } finally { setAdding(false); }
+  };
+  const addButton = canAdd ? (
+    <button type="button" onClick={(e) => void addToProject(e)} onPointerDown={(e) => e.stopPropagation()} disabled={adding || shownAdded}
+      className={`mt-2 inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-xs font-bold ${shownAdded ? "bg-white/10 text-white/70" : "bg-white text-black"} disabled:cursor-default`}>
+      {shownAdded ? <><Check className="size-3.5" aria-hidden="true" />Nel progetto</> : adding ? "Aggiungo…" : <><Plus className="size-3.5" aria-hidden="true" />Aggiungi al progetto</>}
+    </button>
+  ) : null;
   // Fase 1 della nuova fotocamera AI: due modalità. «Rileva» riconosce ciò che c'è (scansione con l'AI);
   // «Prova» mostra sul posto l'intervento (oggi: la griglia e la posa della pianta, ARCore vero nella fase 3).
-  const proving = layers.has("grid");
+  const proving = layers.has("grid") || !!liveAr;
   const setCamMode = (next: "rileva" | "prova", e?: React.MouseEvent) => {
+    if (next === "prova" && !liveAr) {
+      e?.stopPropagation();
+      e?.preventDefault();
+      // ARCore: the live view takes the camera, so ours is stopped first; the session is asked inside this tap.
+      if (arCoreSupported && navigator.xr) {
+        const root = liveRootEl();
+        streamRef.current?.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        requestArSession(root)
+          .then((session) => setLiveAr({ session, root }))
+          .catch((err: unknown) => {
+            root.remove();
+            setCamEpoch((n) => n + 1);
+            toast.error("ARCore non è partito", { description: `${err instanceof Error ? err.message : String(err)} · Uso l’anteprima.` });
+            setLiveAr({ session: null, root: liveRootEl() });
+          });
+      } else {
+        setLiveAr({ session: null, root: liveRootEl() });
+      }
+      return;
+    }
     if ((next === "prova") !== proving) toggleAr(e);
   };
+  const endLive = () => {
+    const had = liveAr;
+    setLiveAr(null);
+    had?.root.remove();
+    if (had?.session) setCamEpoch((n) => n + 1);
+  };
+  const liveView = liveAr ? createPortal(
+    // The camera's own gestures (close swipe, tap to place) must not see the live view's taps.
+    <div onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()} onPointerMove={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
+      <ArLive kind={kind} session={liveAr.session} stream={liveAr.session ? null : streamRef.current} onEnd={endLive} />
+    </div>, liveAr.root) : null;
   const modeSwitch = (
     <div role="radiogroup" aria-label="Modalità della fotocamera AI" className="flex rounded-full bg-[rgba(20,26,34,0.78)] p-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur-md shadow-lg">
       {(["rileva", "prova"] as const).map((m) => {
@@ -2084,6 +2164,8 @@ export function ArCamera({
         overlayClassName="!animate-none !fixed !inset-0 !h-auto bg-camera-surface"
         className="camera-hud ar-pill-hud !animate-none overflow-hidden border-0 bg-camera-surface text-camera-ink p-0 shadow-none sm:max-h-none sm:rounded-none [&>button]:hidden"
       >
+        <div ref={liveHostRef} className="contents" />
+        {liveView}
         <DialogTitle className="sr-only">
           {mode === "video" ? "Video" : "Foto"} in realtà aumentata
         </DialogTitle>
@@ -2206,13 +2288,18 @@ export function ArCamera({
                       title="Fai uno swipe verso il basso per togliere la Tab info"
                     >
                       <p className="ar-portrait-specimen-title truncate">
-                        {species?.commonName ? `${species.commonName} (${species.scientificName})` : proving ? "Prova" : arFocusOption(kind, target).label}
+                        {shownRecord?.species ? `${shownRecord.species.commonName} (${shownRecord.species.scientificName})` : shownRecord?.soil ? `Suolo: ${shownRecord.soil.label}` : species?.commonName ? `${species.commonName} (${species.scientificName})` : proving ? "Prova" : arFocusOption(kind, target).label}
                       </p>
                       <p className="ar-portrait-specimen-desc">
-                        {species?.cooling
-                          ? `Questa pianta fa circa ${species.cooling.shadeM2} m² d’ombra · fresco stimato ${coolingLabel(species.cooling.deltaT)}`
-                          : proving ? "Tocca il terreno per posare la pianta: è un’anteprima." : "Inquadra e avvia la scansione: l’AI riconosce cosa c’è."}
+                        {shownRecord?.species?.shade
+                          ? `Questa pianta fa circa ${shownRecord.species.shade} m² d’ombra${shownRecord.species.cooling !== null ? ` · fresco stimato ${coolingLabel(shownRecord.species.cooling)}` : ""}`
+                          : shownRecord?.soil
+                            ? `Permeabilità ${shownRecord.soil.permeability} · ${shownRecord.soil.plantable ? "si può piantare" : "non adatta a piantare"}`
+                            : species?.cooling
+                              ? `Questa pianta fa circa ${species.cooling.shadeM2} m² d’ombra · fresco stimato ${coolingLabel(species.cooling.deltaT)}`
+                              : proving ? "Tocca il terreno per posare la pianta: è un’anteprima." : "Inquadra e avvia la scansione: l’AI riconosce cosa c’è."}
                       </p>
+                      {!proving && addButton}
                     </div>
                   )}
                   {toolsOpen && toolsPanelElement}
