@@ -12,6 +12,8 @@ import { drawnAreaFor, type DrawnArea } from "@/models/drawn-area";
 import { readFix } from "@/lib/find-position";
 import { hapticTick } from "@/lib/haptics";
 import { contactShadow, floorLoop, objectMesh } from "@/views/ar-object-meshes";
+import { ArcZoomDial } from "@/views/ArcZoomDial";
+import { ZOOM_MAX } from "@/lib/camera-zoom";
 
 /**
  * «Prova» in live view with ARCore (WebXR immersive-ar, Chrome on Android): the phone's own camera with the floor found
@@ -61,6 +63,11 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   adjustingRef.current = adjusting;
   const floorRef = useRef({ tilt: -14, offset: readFloorOffset() });
   const horizonLine = useRef<HTMLDivElement>(null);
+  // Zoom of the preview (the camera's own dial, in landscape): the picture is cropped from its middle and the 3D
+  // camera narrows its view by the same amount, so the objects stay on the floor they were put on.
+  const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(1);
+  zoomRef.current = zoom;
   const [found, setFound] = useState(false);
   const [placed, setPlaced] = useState<PlacedObject[]>([]);
   const [alignPts, setAlignPts] = useState<V[]>([]);
@@ -180,7 +187,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     const size = () => {
       const w = host.clientWidth || window.innerWidth, h = host.clientHeight || window.innerHeight;
       renderer.setSize(w, h, false);
-      camera.aspect = w / h; camera.fov = 70; camera.near = 0.05; camera.far = 200; camera.updateProjectionMatrix();
+      camera.aspect = w / h; camera.fov = fovAt(zoomRef.current); camera.near = 0.05; camera.far = 200; camera.updateProjectionMatrix();
     };
     size();
     const fl = floorRef.current;
@@ -199,6 +206,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     if (three.current) three.current.floorY = 0;
     setFound(true);
     renderer.setAnimationLoop(() => {
+      const fov = fovAt(zoomRef.current);
+      if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
       const pitch = Math.max(-80, Math.min(10, fl.tilt + fl.offset));
       camera.rotation.set((pitch * Math.PI) / 180, 0, 0, "YXZ");
       if (horizonLine.current) horizonLine.current.style.top = `${(horizonAt(pitch, camera.fov) * 100).toFixed(2)}%`;
@@ -339,7 +348,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     const r = host.getBoundingClientRect();
     const ny = Math.max(0.05, Math.min(0.9, (e.clientY - r.top) / r.height));
     const fl = floorRef.current;
-    fl.offset = pitchForHorizon(ny, 70) - fl.tilt;
+    fl.offset = pitchForHorizon(ny, fovAt(zoomRef.current)) - fl.tilt;
   };
   const finishAdjust = () => {
     setAdjusting(false);
@@ -363,7 +372,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     const v = videoRef.current;
     if (v && v.videoWidth) {
       // The video as the screen shows it (object-fit: cover).
-      const s = Math.max(c.width / v.videoWidth, c.height / v.videoHeight);
+      const s = Math.max(c.width / v.videoWidth, c.height / v.videoHeight) * zoomRef.current;
       const dw = v.videoWidth * s, dh = v.videoHeight * s;
       g.drawImage(v, (c.width - dw) / 2, (c.height - dh) / 2, dw, dh);
     }
@@ -381,10 +390,27 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     }, "image/jpeg", 0.9);
   };
 
+  const shutter = (outer: string, inner: string) => (
+    <button type="button" onClick={shoot} aria-label={shots ? `Scatta una foto · ${shots} fatte` : "Scatta una foto"} data-no-ui-click
+      className={`relative grid ${outer} shrink-0 place-items-center rounded-full border-[3px] border-white bg-white/25 backdrop-blur active:scale-95`}>
+      <span className={`${inner} rounded-full bg-white`} aria-hidden="true" />
+      {shots > 0 && <span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-[#00e5ff] px-1 text-[11px] font-bold text-black">{shots}</span>}
+    </button>
+  );
+  // The landscape dial is the preview's only: with ARCore the browser drives the camera.
+  const dialOn = !session && !adjusting;
+  const dialBox = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const fit = () => dialBox.current?.style.setProperty("--ar-dial-k", String(Math.min(1, (window.innerHeight - 8) / 380)));
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [dialOn]);
+
   const round = "grid size-11 shrink-0 place-items-center rounded-full bg-black/55 backdrop-blur";
   return (
     <>
-    {!session && <div ref={canvasHost} className="fixed inset-0 z-40 bg-black">{stream && <video ref={videoRef} muted playsInline autoPlay className="absolute inset-0 size-full object-cover" />}</div>}
+    {!session && <div ref={canvasHost} className="fixed inset-0 z-40 bg-black">{stream && <video ref={videoRef} muted playsInline autoPlay className="absolute inset-0 size-full object-cover" style={{ transform: zoom !== 1 ? `scale(${zoom})` : undefined }} />}</div>}
     {!session && adjusting && (
       <div className="pointer-events-none fixed inset-0 z-[45]">
         <div ref={horizonLine} className="absolute inset-x-0 -translate-y-1/2" style={{ top: "30%" }}>
@@ -401,7 +427,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     )}
     {flash > 0 && <div key={flash} className="pointer-events-none fixed inset-0 z-[60] animate-out fade-out-0 bg-white duration-300 fill-mode-forwards" aria-hidden="true" />}
     <div ref={hudRef} className="ar-live-hud pointer-events-none fixed inset-0 z-50 flex flex-col justify-between text-white" style={{ padding: "env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)" }}>
-      <div className="pointer-events-auto flex items-center gap-2 p-3">
+      <div className={`pointer-events-auto flex items-center gap-2 p-3 ${dialOn ? "landscape:pr-[150px]" : ""}`}>
         <button type="button" onClick={end} aria-label="Esci dalla prova" className={round}><X className="size-5" /></button>
         <p role="status" className={`flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-[22px] px-4 py-2 text-sm font-semibold leading-tight transition-colors ${statusTone}`}>
           {!notice && <span className={`size-2 shrink-0 rounded-full ${found ? "bg-[#22c55e]" : "animate-pulse bg-[#facc15]"}`} aria-hidden="true" />}
@@ -416,7 +442,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         )}
       </div>
       {!adjusting && (
-        <div className="pointer-events-auto flex flex-col gap-2 p-3 landscape:flex-row landscape:items-center">
+        <div className={`pointer-events-auto flex flex-col gap-2 p-3 landscape:flex-row landscape:items-center ${dialOn ? "landscape:pr-[236px]" : ""}`}>
           <div className="flex min-w-0 gap-2 overflow-x-auto landscape:flex-1" role="radiogroup" aria-label="Cosa mettere" data-map-gestures>
             {choices.map(({ key, def: o }) => {
               const on = tool === "place" && selected === key;
@@ -433,11 +459,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
             <button type="button" onClick={undo} disabled={!placed.length} aria-label="Annulla l’ultimo" className={`${round} disabled:opacity-40`}><Undo2 className="size-5" /></button>
             <button type="button" onClick={() => { setTool(tool === "measure" ? "place" : "measure"); setMeasure([]); }} aria-pressed={tool === "measure"} aria-label="Misura"
               className={`${round} ${tool === "measure" ? "!bg-white !text-black" : ""}`}><Ruler className="size-5" /></button>
-            <button type="button" onClick={shoot} aria-label={shots ? `Scatta una foto · ${shots} fatte` : "Scatta una foto"} data-no-ui-click
-              className="relative grid size-14 shrink-0 place-items-center rounded-full border-[3px] border-white bg-white/25 backdrop-blur active:scale-95">
-              <span className="size-10 rounded-full bg-white" aria-hidden="true" />
-              {shots > 0 && <span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-[#00e5ff] px-1 text-[11px] font-bold text-black">{shots}</span>}
-            </button>
+            <div className={dialOn ? "landscape:hidden" : ""}>{shutter("size-14", "size-10")}</div>
             <button type="button" onClick={backToMap} disabled={!placed.length}
               className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-white px-5 text-sm font-bold text-black disabled:opacity-40 landscape:flex-none">
               <MapPinned className="size-4" aria-hidden="true" />{tool === "align" ? "Tocca i 2 punti" : `Riporta${placed.length ? ` · ${placed.length}` : ""}`}
@@ -445,9 +467,22 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
           </div>
         </div>
       )}
+      {dialOn && (
+        <div className="pointer-events-none absolute right-0 top-1/2 hidden -translate-y-1/2 landscape:block" style={{ marginRight: "env(safe-area-inset-right)" }}>
+          <div className="relative h-[380px] w-[280px] origin-right" style={{ transform: "scale(var(--ar-dial-k, 1))" }} ref={dialBox}>
+            <ArcZoomDial zoom={zoom} max={ZOOM_MAX} onZoom={(z) => setZoom(Math.max(1, Math.min(ZOOM_MAX, z)))} />
+            <div className="pointer-events-auto absolute right-[40px] top-1/2 z-20 -translate-y-1/2 translate-x-1/2">{shutter("size-[72px]", "size-[54px]")}</div>
+          </div>
+        </div>
+      )}
     </div>
     </>
   );
+}
+
+/** The 3D camera's vertical view for a zoom: the 70° preview narrowed like the cropped picture. */
+function fovAt(zoom: number): number {
+  return (2 * Math.atan(Math.tan((35 * Math.PI) / 180) / Math.max(1, zoom)) * 180) / Math.PI;
 }
 
 const FLOOR_KEY = "mdt-ar-floor-v1";
