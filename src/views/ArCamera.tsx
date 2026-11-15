@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { flushSync } from "react-dom";
 import { toast } from "sonner";
-import { Activity, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grid2X2, Leaf, Minus, Snowflake, Umbrella, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Star, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
+import { Activity, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grid2X2, Leaf, Minus, Snowflake, Umbrella, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Star, TreePine, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
 import { supportsCameraTorch, setCameraTorch } from "@/lib/camera-torch";
 import { detectArObject, getReferencePhoto, type Detection, type Soil } from "@/controllers/ar-detect.functions";
 import { gbifPhotoSearchUrl, pickGbifPhoto, type ReferencePhoto } from "@/models/ar-reference-photo";
@@ -73,14 +73,14 @@ const FOCUS_LABELS = { tree: "Vegetazione", ground: "Suolo", leaf: "Foglia", can
 const URBAN_TUTORIAL = [
   { title: "1 · Scegli l’obiettivo", text: "In alto scegli «Alberi e ombra» per un albero della piazza o «Suolo e depavimentazione» per la pavimentazione." },
   { title: "2 · Scansiona", text: "Inquadra chioma e tronco, oppure il suolo davanti a te, e avvia la scansione: specie, ombra e permeabilità." },
-  { title: "3 · Bilancia termica", text: "Usa − / + o trascina la bilancia Caldo/Fresco per simulare più alberi e vedere ombra e gradi percepiti in meno." },
+  { title: "3 · Prova", text: "In alto passa da «Rileva» a «Prova»: tocca il terreno per posare la pianta rilevata e vedere come sta nella piazza." },
   { title: "4 · Scatta", text: "Scatta foto o video: la griglia non compare e la stima va nel Lab e nei report della piazza." },
 ] as const;
 
 const TUTORIAL = [
   { title: "1 · Inquadra", text: "Avvicinati a 20–30 cm da una foglia o dalla chioma: il mirino si aggancia da solo alla vegetazione." },
   { title: "2 · Scansiona", text: "Avvia la scansione: prima la forma della foglia, poi il confronto botanico e la stima del terreno." },
-  { title: "3 · Bilancia termica", text: "Usa − / + o trascina la bilancia Caldo/Fresco per vedere i gradi di raffrescamento e l’ombra." },
+  { title: "3 · Prova", text: "In alto passa da «Rileva» a «Prova»: tocca il terreno per posare la pianta e vederla sul posto." },
   { title: "4 · Scatta", text: "Scatta foto o video: la griglia non compare e la stima botanico-termica va nel Lab e nei report." },
 ] as const;
 
@@ -358,7 +358,7 @@ export function ArCamera({
     if (willEnable) {
       setLayers((s) => new Set(s).add("grid").add("objects"));
       setArCoreActive(true);
-      toast.success("AR Core attivo: griglia del terreno agganciata.");
+      toast.success("Prova · Tocca il terreno per posare la pianta. È un’anteprima: non è ancora ancorata al suolo.");
     } else {
       setLayers((s) => {
         const n = new Set(s);
@@ -368,7 +368,7 @@ export function ArCamera({
       });
       sceneRef.current?.hideTarget?.();
       setArCoreActive(false);
-      toast.info("AR Core disattivato.");
+      toast.info("Rileva · Inquadra e avvia la scansione.");
     }
     window.setTimeout(() => {
       arTransitionRef.current = false;
@@ -1546,6 +1546,26 @@ export function ArCamera({
   };
 
   const hasAnalysisContent = Boolean(species || soil || found || survey || viewedRecord);
+  // Fase 1 della nuova fotocamera AI: due modalità. «Rileva» riconosce ciò che c'è (scansione con l'AI);
+  // «Prova» mostra sul posto l'intervento (oggi: la griglia e la posa della pianta, ARCore vero nella fase 3).
+  const proving = layers.has("grid");
+  const setCamMode = (next: "rileva" | "prova", e?: React.MouseEvent) => {
+    if ((next === "prova") !== proving) toggleAr(e);
+  };
+  const modeSwitch = (
+    <div role="radiogroup" aria-label="Modalità della fotocamera AI" className="flex rounded-full bg-[rgba(20,26,34,0.78)] p-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur-md shadow-lg">
+      {(["rileva", "prova"] as const).map((m) => {
+        const on = (m === "prova") === proving;
+        return (
+          <button key={m} type="button" role="radio" aria-checked={on} disabled={scanning}
+            onClick={(e) => setCamMode(m, e)}
+            className={`h-8 rounded-full px-4 transition-all disabled:opacity-50 ${on ? "bg-[#00f0ff]/20 text-[#00f0ff] ring-1 ring-[#00f0ff]/70" : "text-white/80 hover:text-white"}`}>
+            {m === "rileva" ? "Rileva" : "Prova"}
+          </button>
+        );
+      })}
+    </div>
+  );
   const isAnalysisCardExpanded = Boolean(toolsOpen && activeTool === "analysis" && panelOpen && !panelMin && hasAnalysisContent);
   const isAnalysisCardMinimized = Boolean(toolsOpen && activeTool === "analysis" && panelOpen && panelMin && hasAnalysisContent);
   const burstShelfStateClass = !toolsOpen
@@ -1567,18 +1587,17 @@ export function ArCamera({
           <div className="ar-landscape-info-pill" role="status" aria-label="Riepilogo analisi">
             <span className="ar-info-species">
               <Leaf className="size-3.5 text-[#4ade80]" aria-hidden="true" />
-              <strong>{species?.commonName ?? (kind === "urban" ? "Leccio" : "Vite")}</strong>
-              <span className="ar-info-count">x{dockCount || 1}</span>
+              <strong>{species?.commonName ?? (proving ? "Prova" : arFocusOption(kind, target).label)}</strong>
             </span>
-            <span className="ar-info-sep" aria-hidden="true" />
-            <span className="ar-info-item" title="Ombra"><Umbrella className="ar-info-icon" aria-hidden="true" /><span className="ar-info-label">Ombra: </span><b>{18 * (dockCount || 1)} m²</b></span>
-            <span className="ar-info-sep" aria-hidden="true" />
-            <span className="ar-info-item" title="Raffrescamento"><Snowflake className="ar-info-icon" aria-hidden="true" /><span className="ar-info-label">Raffrescamento: </span><b>-{(0.4 * (dockCount || 1)).toFixed(1).replace(".", ",")} °C</b></span>
-            <span className="ar-info-sep" aria-hidden="true" />
-            <span className="ar-info-status" data-ok={dockCount > 0} title={dockCount > 0 ? "Termica Ottimale" : "Termica da migliorare"}>
-              <span className="ar-info-dot" aria-hidden="true" />
-              <span className="ar-info-status-text">{dockCount > 0 ? "Termica Ottimale" : "Termica da migliorare"}</span>
-            </span>
+            {species?.cooling && (
+              <>
+                <span className="ar-info-sep" aria-hidden="true" />
+                <span className="ar-info-item" title="Ombra stimata"><Umbrella className="ar-info-icon" aria-hidden="true" /><span className="ar-info-label">Ombra ≈ </span><b>{species.cooling.shadeM2} m²</b></span>
+                <span className="ar-info-sep" aria-hidden="true" />
+                <span className="ar-info-item" title="Raffrescamento stimato"><Snowflake className="ar-info-icon" aria-hidden="true" /><span className="ar-info-label">Fresco stimato </span><b>{coolingLabel(species.cooling.deltaT)}</b></span>
+              </>
+            )}
+            {!species && <><span className="ar-info-sep" aria-hidden="true" /><span className="ar-info-item">{proving ? "Tocca il terreno per posare la pianta" : "Inquadra e avvia la scansione"}</span></>}
           </div>
           {/* Left: Close + ARCore */}
           <div className="flex items-center gap-2">
@@ -1593,21 +1612,7 @@ export function ArCamera({
             >
               <X className="size-5" />
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              type="button"
-              onClick={(e) => toggleAr(e)}
-              className={`camera-tool flex items-center gap-1.5 transition-all ${
-                layers.has("grid") ? "ar-pill-active" : "ar-pill-inactive"
-              }`}
-              title={layers.has("grid") ? "AR Core attivo sul terreno (tocca per disattivare)" : "Attiva la Realtà Aumentata AR Core"}
-              aria-pressed={layers.has("grid")}
-              aria-label={layers.has("grid") ? "Disattiva AR Core" : "Attiva AR Core"}
-            >
-              <span className={`size-2 rounded-full ${layers.has("grid") ? "bg-[#042017]" : "bg-[#22c55e]"} animate-pulse`} />
-              <span className="font-semibold">ARCore</span>
-            </Button>
+            {modeSwitch}
           </div>
 
           {/* Right: Singolo / Multiplo switcher + Guide */}
@@ -1653,21 +1658,7 @@ export function ArCamera({
             </div>
 
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-auto">
-              <Button
-                variant="ghost"
-                size="sm"
-                type="button"
-                onClick={(e) => toggleAr(e)}
-                className={`camera-tool flex items-center gap-1.5 transition-all ${
-                  layers.has("grid") ? "ar-pill-active" : "ar-pill-inactive"
-                }`}
-                title={layers.has("grid") ? "AR Core attivo sul terreno (tocca per disattivare)" : "Attiva la Realtà Aumentata AR Core"}
-                aria-pressed={layers.has("grid")}
-                aria-label={layers.has("grid") ? "Disattiva AR Core" : "Attiva AR Core"}
-              >
-                <span className={`size-2 rounded-full ${layers.has("grid") ? "bg-[#042017]" : "bg-[#22c55e]"} animate-pulse`} />
-                <span className="font-semibold">ARCore</span>
-              </Button>
+              {modeSwitch}
             </div>
 
             <div className="flex items-center gap-1.5 justify-end z-10">
@@ -1699,7 +1690,12 @@ export function ArCamera({
             </div>
           </div>
 
-          {/* Row 2: Centered directly beneath ARCore */}
+          {/* Row 2: in Rileva what to scan; in Prova what to do */}
+          {proving ? (
+            <p className="rounded-full bg-[rgba(20,26,34,0.75)] px-4 py-1.5 text-xs font-semibold text-white ring-1 ring-white/15 backdrop-blur-md" role="status">
+              Tocca il terreno per posare la pianta · anteprima
+            </p>
+          ) : (
           <div className="flex items-center justify-center">
             <div className="flex items-center rounded-full bg-[rgba(20,26,34,0.75)] p-1 ring-1 ring-white/15 backdrop-blur-md" role="radiogroup" aria-label="Obiettivo camera">
               {AR_FOCUS[kind].map((o, idx) => {
@@ -1727,6 +1723,7 @@ export function ArCamera({
               })}
             </div>
           </div>
+          )}
         </div>
       )}
     </div>
@@ -1823,20 +1820,6 @@ export function ArCamera({
             className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""}`}>Singolo</button>
           <button type="button" role="radio" aria-checked={burst} onClick={() => setBurst(true)} className={`h-8 rounded-full px-3 ${burst ? "bg-white text-black" : ""}`}>Multiplo</button>
         </div>
-        {layers.has("grid") && (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => handlePlace3DTree(0.5, 0.65)}
-            title="Posiziona il modello 3D del Leccio sul terreno tracciato da ARCore"
-            aria-label="Posiziona albero 3D sul terreno"
-            className="h-8 rounded-full bg-[#00f0ff]/20 text-[#00f0ff] ring-1 ring-[#00f0ff]/50 hover:bg-[#00f0ff]/30 backdrop-blur px-3 text-xs font-bold flex items-center gap-1.5 shadow-[0_0_12px_rgba(0,240,255,0.35)]"
-          >
-            <span className="size-2 rounded-full bg-[#00f0ff] animate-ping" />
-            <span>Posiziona Albero 3D</span>
-          </Button>
-        )}
         {burst && burstShots.length > 0 && (
           <button
             type="button"
@@ -1866,37 +1849,11 @@ export function ArCamera({
             )}
             <Button variant="ghost" size="sm" className="camera-tool" title="Analisi" aria-label="Analisi" aria-pressed={activeTool === "analysis"} onClick={() => { setActiveTool(v => v === "analysis" ? null : "analysis"); setPanelOpen(true); }}><Info className="size-4" />Analisi</Button>
             <Button variant="ghost" size="sm" className="camera-tool" title="Livelli" aria-label="Livelli" aria-pressed={activeTool === "manage"} onClick={() => { setActiveTool(v => v === "manage" ? null : "manage"); }}><SlidersHorizontal className="size-4" />Livelli</Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              type="button"
-              onClick={(e) => toggleAr(e)}
-              className={`camera-tool flex items-center gap-1.5 transition-all ${
-                layers.has("grid") ? "ar-pill-active" : "ar-pill-inactive"
-              }`}
-              title={layers.has("grid") ? "AR Core attivo sul terreno (tocca per disattivare)" : "Attiva la Realtà Aumentata AR Core"}
-              aria-pressed={layers.has("grid")}
-              aria-label={layers.has("grid") ? "Disattiva AR Core" : "Attiva AR Core"}
-            >
-              {layers.has("grid") ? (
-                <>
-                  <span className="size-2 rounded-full bg-[#042017] animate-pulse" />
-                  <span className="font-semibold">AR Core</span>
-                </>
-              ) : (
-                <>
-                  <Scan className="size-3.5 shrink-0" />
-                  <span>AR Core</span>
-                </>
-              )}
-            </Button>
+            
             {activeTool === "manage" && (
               <div className="flex flex-wrap items-center justify-center gap-1.5" data-camera-controls>
                 <Button variant="ghost" size="icon" className="camera-tool" aria-label="Mostra griglia" title="Griglia" aria-pressed={layers.has("grid")} onClick={() => toggle("grid")}><Grid2X2 className="size-4" /></Button>
                 <Button variant="ghost" size="icon" className="camera-tool" aria-label="Mappa termica simulata" title="Calore simulato" aria-pressed={layers.has("heat")} onClick={() => { if (!layers.has("heat")) setThermalInfoOpen(true); toggle("heat"); }}><Flame className="size-4" /></Button>
-                {layers.has("grid") && (
-                  <Button variant="ghost" size="sm" className="camera-tool ar-plant-button text-[#00f0ff] font-bold w-auto px-3 shrink-0 whitespace-nowrap" aria-label="Posiziona albero 3D" title="Posiziona albero 3D" onClick={() => handlePlace3DTree(0.5, 0.65)}>🌳 Pianta 3D</Button>
-                )}
               </div>
             )}
           </div>
@@ -2011,7 +1968,22 @@ export function ArCamera({
       disabled={!ready || scanning || xrActive}
       onCapture={mode === "photo" ? shoot : record}
       {...(mode !== "video" ? { onHold: arHold } : {})}
-      left={
+      left={proving ? (
+        <div className="flex items-center justify-center">
+          <Button
+            variant="ghost"
+            type="button"
+            onClick={() => handlePlace3DTree(0.5, 0.65)}
+            disabled={!ready || recording}
+            aria-label="Posa la pianta al centro dell’inquadratura"
+            title="Posa la pianta al centro dell’inquadratura"
+            className={landscape ? "ar-landscape-pill-btn disabled:opacity-40" : "camera-tool ar-scan-btn disabled:opacity-40"}
+          >
+            {!landscape && <TreePine className="size-4 shrink-0 text-[#00f0ff]" />}
+            <span>Posa pianta</span>
+          </Button>
+        </div>
+      ) : (
         <div className="flex items-center justify-center">
           <Button
             variant="ghost"
@@ -2047,7 +2019,7 @@ export function ArCamera({
             </Button>
           )}
         </div>
-      }
+      )}
       right={
         <div className="flex items-center justify-center">
           <Button
@@ -2234,10 +2206,12 @@ export function ArCamera({
                       title="Fai uno swipe verso il basso per togliere la Tab info"
                     >
                       <p className="ar-portrait-specimen-title truncate">
-                        {species?.commonName ? `${species.commonName} (${species.scientificName})` : (kind === "urban" ? "Leccio (Quercus ilex)" : "Vite (Vitis vinifera)")}
+                        {species?.commonName ? `${species.commonName} (${species.scientificName})` : proving ? "Prova" : arFocusOption(kind, target).label}
                       </p>
                       <p className="ar-portrait-specimen-desc">
-                        Ombra stimata ≈ {18 * (dockCount || 1)} m² · Raffrescamento ≈ -{((0.4 * (dockCount || 1))).toFixed(1).replace(".", ",")} °C
+                        {species?.cooling
+                          ? `Questa pianta fa circa ${species.cooling.shadeM2} m² d’ombra · fresco stimato ${coolingLabel(species.cooling.deltaT)}`
+                          : proving ? "Tocca il terreno per posare la pianta: è un’anteprima." : "Inquadra e avvia la scansione: l’AI riconosce cosa c’è."}
                       </p>
                     </div>
                   )}
