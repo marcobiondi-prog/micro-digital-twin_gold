@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { toast } from "sonner";
-import { Check, Crosshair, Leaf, MapPinned, MoveVertical, Ruler, Undo2, X } from "lucide-react";
+import { Check, Leaf, MapPinned, MoveVertical, Ruler, Undo2, X } from "lucide-react";
 import type { ArKind } from "@/models/ar-focus";
 import {
   AR_OBJECTS, alignFromFix, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, arObject, enToAr, metresText, objectsToZones, toEN,
@@ -296,34 +296,41 @@ export function ArLive({ kind, session, stream = null, plants = [], onEnd }: { k
   };
   const backToMap = () => {
     if (!placed.length) return;
-    if (!area) { setNotice({ text: "Prima disegna l’area nella scheda Mappa: gli oggetti diventano zone dentro l’area.", tone: "warn" }); return; }
-    if (!alignment) {
+    if (!area) { setNotice({ text: "Disegna prima l’area nella scheda Mappa", tone: "warn" }); return; }
+    if (!alignment || (alignment.how === "gps" && !sendAfterAlign.current)) {
+      // One button: «Riporta» first asks the two corners, then sends by itself.
+      sendAfterAlign.current = true;
       setTool("align"); setAlignPts([]);
-      setNotice({ text: "Prima allinea l’area: tocca sul pavimento i punti 1 e 2 dell’area disegnata.", tone: "warn" });
       return;
     }
+    sendAfterAlign.current = false;
     const { kept: zones, out } = zonesInside(objectsToZones(kind, placed, alignment.a, origin), area.ring);
-    if (!zones.length) { setNotice({ text: "Gli oggetti cadono fuori dall’area disegnata: mettili dentro, o allinea di nuovo l’area.", tone: "warn" }); return; }
+    if (!zones.length) { setNotice({ text: "Sono tutti fuori dall’area disegnata", tone: "warn" }); return; }
     const next: DrawnArea = { ...area, zones: [...(area.zones ?? []), ...zones] };
     if (kind === "urban") setUrban({ area: next }); else setVineyard({ area: next });
     hapticTick([20, 40, 20]);
-    setNotice({
-      text: `${zones.length} ${zones.length === 1 ? "oggetto riportato" : "oggetti riportati"} sulla mappa · ${alignment.how === "corners" ? "sono zone della simulazione, le trovi nella scheda Mappa" : "posizione dal GPS e dalla bussola: controllale nella scheda Mappa"}.${out ? ` ${out} fuori dall’area non riportat${out === 1 ? "o" : "i"}.` : ""}`,
-      tone: "ok",
-    });
+    setNotice({ text: `${zones.length} sulla mappa${out ? ` · ${out} fuori dall’area` : ""}`, tone: "ok" });
     window.setTimeout(end, 2200);
   };
-  useEffect(() => { if (alignPts.length === 2) setNotice({ text: "Area allineata: l’area disegnata ora è sul pavimento vero.", tone: "ok" }); }, [alignPts.length]);
+  const sendAfterAlign = useRef(false);
+  // Once the two corners are touched after «Riporta», send at once.
+  useEffect(() => {
+    if (alignment?.how === "corners" && sendAfterAlign.current) backToMap();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alignment]);
   useEffect(() => { if (!notice || notice.tone === "ok") return; const t = window.setTimeout(() => setNotice(null), 5000); return () => window.clearTimeout(t); }, [notice]);
 
   const dist = measure.length === 2 ? arDistance(measure[0]!, measure[1]!) : null;
-  const status = !found
-    ? "Muovi piano il telefono verso il pavimento…"
-    : tool === "align"
-      ? alignPts.length === 0 ? "Tocca sul pavimento il punto 1 dell’area" : "Ora tocca il punto 2 dell’area"
-      : tool === "measure"
-        ? dist !== null ? `Distanza ${metresText(dist)}` : measure.length === 1 ? "Tocca il secondo punto" : "Tocca il primo punto da misurare"
-        : `Tocca il pavimento per mettere: ${defOf(selected).label}`;
+  const status = notice?.text ?? (!found
+    ? "Inquadra il pavimento…"
+    : adjusting
+      ? "Trascina la linea sulla base dei muri"
+      : tool === "align"
+        ? alignPts.length === 0 ? "Tocca il punto 1 dell’area" : "Tocca il punto 2 dell’area"
+        : tool === "measure"
+          ? dist !== null ? `Distanza ${metresText(dist)}` : measure.length === 1 ? "Tocca il secondo punto" : "Tocca il primo punto"
+          : `Tocca a terra: ${defOf(selected).label}`);
+  const statusTone = notice ? (notice.tone === "ok" ? "bg-[#22c55e] text-black" : "bg-[#facc15] text-black") : "bg-black/55 text-white backdrop-blur";
 
   const dragHorizon = (e: React.PointerEvent<HTMLDivElement>) => {
     const host = canvasHost.current;
@@ -337,11 +344,11 @@ export function ArLive({ kind, session, stream = null, plants = [], onEnd }: { k
   const finishAdjust = () => {
     setAdjusting(false);
     saveFloorOffset(floorRef.current.offset);
-    setNotice({ text: "Pavimento regolato: tocca dove vuoi mettere gli oggetti.", tone: "ok" });
-    window.setTimeout(() => setNotice((n) => (n?.text.startsWith("Pavimento") ? null : n)), 2200);
+    setNotice({ text: "Pavimento regolato", tone: "ok" });
+    window.setTimeout(() => setNotice((n) => (n?.text.startsWith("Pavimento") ? null : n)), 1800);
   };
 
-  const pill = "inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm font-semibold";
+  const round = "grid size-11 shrink-0 place-items-center rounded-full bg-black/55 backdrop-blur";
   return (
     <>
     {!session && <div ref={canvasHost} className="fixed inset-0 z-40 bg-black">{stream && <video ref={videoRef} muted playsInline autoPlay className="absolute inset-0 size-full object-cover" />}</div>}
@@ -359,41 +366,46 @@ export function ArLive({ kind, session, stream = null, plants = [], onEnd }: { k
         </div>
       </div>
     )}
-    <div ref={hudRef} className="ar-live-hud pointer-events-none fixed inset-0 z-50 flex flex-col justify-between text-white" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+    <div ref={hudRef} className="ar-live-hud pointer-events-none fixed inset-0 z-50 flex flex-col justify-between text-white" style={{ padding: "env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)" }}>
       <div className="pointer-events-auto flex items-center gap-2 p-3">
-        <button type="button" onClick={end} aria-label="Esci dalla realtà aumentata" className="grid size-11 place-items-center rounded-full bg-black/55 backdrop-blur"><X className="size-5" /></button>
-        <p role="status" className="flex-1 truncate rounded-full bg-black/55 px-4 py-2.5 text-sm font-semibold backdrop-blur">
-          <span className={`mr-2 inline-block size-2 rounded-full ${found ? "bg-[#22c55e]" : "animate-pulse bg-[#facc15]"}`} aria-hidden="true" />{status}
+        <button type="button" onClick={end} aria-label="Esci dalla prova" className={round}><X className="size-5" /></button>
+        <p role="status" className={`flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-[22px] px-4 py-2 text-sm font-semibold leading-tight transition-colors ${statusTone}`}>
+          {!notice && <span className={`size-2 shrink-0 rounded-full ${found ? "bg-[#22c55e]" : "animate-pulse bg-[#facc15]"}`} aria-hidden="true" />}
+          <span className="line-clamp-2">{status}</span>
+          {!session && !notice && <span className="ml-auto shrink-0 rounded-full bg-[#facc15] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-black" title="Senza ARCore le misure sono indicative">Anteprima</span>}
         </p>
-      </div>
-      <div className="pointer-events-none space-y-2 p-3 [&>*]:pointer-events-auto">
-        {notice && <p role="alert" className={`mx-auto max-w-sm rounded-2xl px-4 py-2.5 text-center text-sm font-semibold shadow-lg ${notice.tone === "ok" ? "bg-[#22c55e] text-black" : "bg-[#facc15] text-black"}`}>{notice.text}</p>}
-        {!session && adjusting && <p className="mx-auto max-w-sm rounded-2xl bg-black/70 px-4 py-2.5 text-center text-sm backdrop-blur">Trascina la linea azzurra dove il pavimento incontra il fondo (la base dei muri, l’orizzonte). Così gli oggetti poggiano a terra.</p>}
         {!session && (
-          <div className="flex items-center justify-center gap-2">
-            <p className="w-fit rounded-full bg-[#facc15]/90 px-3 py-1 text-xs font-bold text-black">Anteprima: senza ARCore le misure sono indicative</p>
-            {adjusting
-              ? <button type="button" onClick={finishAdjust} className="h-8 rounded-full bg-white px-3 text-xs font-bold text-black">Fatto</button>
-              : <button type="button" onClick={() => setAdjusting(true)} className="inline-flex h-8 items-center gap-1 rounded-full bg-black/55 px-3 text-xs font-semibold backdrop-blur"><MoveVertical className="size-3.5" aria-hidden="true" />Regola pavimento</button>}
-          </div>
+          <button type="button" onClick={() => (adjusting ? finishAdjust() : setAdjusting(true))} aria-pressed={adjusting}
+            aria-label={adjusting ? "Fatto, pavimento regolato" : "Regola pavimento"} className={`${round} ${adjusting ? "!bg-white !text-black" : ""}`}>
+            {adjusting ? <Check className="size-5" /> : <MoveVertical className="size-5" />}
+          </button>
         )}
-        {alignment && <p className="mx-auto w-fit rounded-full bg-black/55 px-3 py-1 text-xs backdrop-blur">{alignment.how === "corners" ? "Area allineata sul pavimento" : "Allineata col GPS e la bussola · tocca Allinea per precisione"}</p>}
-        <div className="flex gap-2 overflow-x-auto pb-1" role="radiogroup" aria-label="Oggetto da mettere">
-          {choices.map(({ key, def: o }) => (
-            <button key={key} type="button" role="radio" aria-checked={tool === "place" && selected === key} onClick={() => { setSelected(key); setTool("place"); }}
-              aria-label={o.plant ? `${o.label}, riconosciuto: ${o.plant.scientificName}, alto circa ${Math.round(o.h)} m` : undefined}
-              className={`${pill} shrink-0 ${tool === "place" && selected === key ? "bg-[#00e5ff] text-black" : o.plant ? "bg-[#14532d]/80 ring-1 ring-[#4ade80]/60 backdrop-blur" : "bg-black/55 backdrop-blur"}`}>
-              {o.plant && <Leaf className="size-4" aria-hidden="true" />}{o.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          {area && <button type="button" onClick={() => { setTool("align"); setAlignPts([]); }} aria-pressed={tool === "align"} className={`${pill} ${tool === "align" ? "bg-white text-black" : "bg-black/55 backdrop-blur"}`}><Crosshair className="size-4" />Allinea</button>}
-          <button type="button" onClick={() => { setTool(tool === "measure" ? "place" : "measure"); setMeasure([]); }} aria-pressed={tool === "measure"} className={`${pill} ${tool === "measure" ? "bg-white text-black" : "bg-black/55 backdrop-blur"}`}><Ruler className="size-4" />Misura</button>
-          <button type="button" onClick={undo} disabled={!placed.length} className={`${pill} bg-black/55 backdrop-blur disabled:opacity-40`}><Undo2 className="size-4" />Annulla</button>
-          <button type="button" onClick={backToMap} disabled={!placed.length} className={`${pill} bg-white text-black disabled:opacity-40`}>{placed.length ? <MapPinned className="size-4" /> : <Check className="size-4" />}Riporta sulla mappa{placed.length ? ` · ${placed.length}` : ""}</button>
-        </div>
       </div>
+      {!adjusting && (
+        <div className="pointer-events-auto flex flex-col gap-2 p-3 landscape:flex-row landscape:items-center">
+          <div className="flex min-w-0 gap-2 overflow-x-auto landscape:flex-1" role="radiogroup" aria-label="Cosa mettere" data-map-gestures>
+            {choices.map(({ key, def: o }) => {
+              const on = tool === "place" && selected === key;
+              return (
+                <button key={key} type="button" role="radio" aria-checked={on} onClick={() => { setSelected(key); setTool("place"); }}
+                  aria-label={o.plant ? `${o.label}, riconosciuto: ${o.plant.scientificName}, alto circa ${Math.round(o.h)} m` : undefined}
+                  className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold ${on ? "bg-[#00e5ff] text-black" : "bg-black/55 backdrop-blur"}`}>
+                  {o.plant && <Leaf className={`size-3.5 ${on ? "" : "text-[#4ade80]"}`} aria-hidden="true" />}{o.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button type="button" onClick={undo} disabled={!placed.length} aria-label="Annulla l’ultimo" className={`${round} disabled:opacity-40`}><Undo2 className="size-5" /></button>
+            <button type="button" onClick={() => { setTool(tool === "measure" ? "place" : "measure"); setMeasure([]); }} aria-pressed={tool === "measure"} aria-label="Misura"
+              className={`${round} ${tool === "measure" ? "!bg-white !text-black" : ""}`}><Ruler className="size-5" /></button>
+            <button type="button" onClick={backToMap} disabled={!placed.length}
+              className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-white px-5 text-sm font-bold text-black disabled:opacity-40 landscape:flex-none">
+              <MapPinned className="size-4" aria-hidden="true" />{tool === "align" ? "Tocca i 2 punti" : `Riporta${placed.length ? ` · ${placed.length}` : ""}`}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
     </>
   );
