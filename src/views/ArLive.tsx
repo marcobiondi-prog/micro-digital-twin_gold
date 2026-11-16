@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { toast } from "sonner";
-import { Box, Check, ChevronDown, ChevronLeft, RotateCw, Zap, ZapOff, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
+import { Box, Check, Layers, ChevronDown, ChevronLeft, RotateCw, Zap, ZapOff, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
 import type { ArKind } from "@/models/ar-focus";
 import {
   AR_OBJECTS, alignFromFix, placeHaptic, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, arObject, enToAr, metresText, objectsToZones, toEN,
@@ -17,6 +17,7 @@ import { ArcZoomDial } from "@/views/ArcZoomDial";
 import { ZOOM_MAX } from "@/lib/camera-zoom";
 import { probeCameraTorch, setCameraTorch, supportsCameraTorch } from "@/lib/camera-torch";
 import { HOLD_MS, useHoldBurst } from "@/lib/hold-burst";
+import { DEPTH_INIT, DepthOccluder, patchGpuDepthQuery } from "@/views/ar-depth";
 import { BurstReviewSheet, BurstThumb, burstThumbOf, type BurstShot } from "@/views/BurstReview";
 
 /**
@@ -53,6 +54,8 @@ export async function requestArSession(overlayRoot: HTMLElement): Promise<XRSess
   // shows its own close button; a tap on the floor still puts the chosen object), then the bare session. Every
   // refusal is reported together when none starts.
   const tries: Array<[string, XRSessionInit]> = [
+    // ARCore's depth first (real walls hide the objects): optional, so a phone without it still starts.
+    ["overlay+pavimento+profondità", { requiredFeatures: ["hit-test", "dom-overlay"], optionalFeatures: ["local-floor", "camera-access", "depth-sensing"], depthSensing: DEPTH_INIT, domOverlay: { root: overlayRoot } } as unknown as XRSessionInit],
     ["overlay+pavimento", { requiredFeatures: ["hit-test", "dom-overlay"], optionalFeatures: ["local-floor", "camera-access"], domOverlay: { root: overlayRoot } } as XRSessionInit],
     ["overlay", { requiredFeatures: ["dom-overlay"], optionalFeatures: ["hit-test", "local-floor", "camera-access"], domOverlay: { root: overlayRoot } } as XRSessionInit],
     ["pavimento", { requiredFeatures: ["hit-test"], optionalFeatures: ["local-floor", "camera-access"] }],
@@ -143,7 +146,12 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   // Why the preview runs instead of ARCore: written in the status line once, at the start.
   useEffect(() => { if (why) setNotice({ text: why, tone: "warn" }); }, [why]);
   // What the AR session really got (shown in the open status bar): to tell, on a phone, why it does not work.
-  const [diag, setDiag] = useState<{ hit?: boolean; overlay?: boolean; feats?: string; frames: number; error?: string }>({ frames: 0 });
+  const [diag, setDiag] = useState<{ hit?: boolean; overlay?: boolean; feats?: string; frames: number; error?: string; depth?: boolean }>({ frames: 0 });
+  // ARCore's depth: real walls and furniture hide the objects behind them. «Profondità» in the fan turns it off.
+  const depthRef = useRef<DepthOccluder | null>(null);
+  const [depthOn, setDepthOn] = useState(true);
+  const [depthLive, setDepthLive] = useState(false);
+  useEffect(() => { if (depthRef.current) depthRef.current.enabled = depthOn; }, [depthOn]);
   const framesRef = useRef(0);
   useEffect(() => {
     if (!session) return;
@@ -233,6 +241,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       setAlignment((cur) => cur ?? { a: alignFromFix(toEN(fix.lat, fix.lng, origin), fix.heading!), how: "gps" });
     });
     let hitSource: XRHitTestSource | null = null;
+    const occluder = session ? new DepthOccluder() : null;
+    if (occluder) { occluder.enabled = depthOn; scene.add(occluder.mesh); depthRef.current = occluder; patchGpuDepthQuery(); }
     if (!session) return startPreview(renderer, scene, camera, reticle, () => { disposed = true; });
     void (async () => {
       try {
@@ -273,6 +283,13 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
           lostAt = 0;
         } else { reticle.visible = false; t.hit = null; if (sawFloor && !lostAt) lostAt = performance.now(); }
       }
+      if (frame && occluder) {
+        const ref = renderer.xr.getReferenceSpace();
+        const view = ref ? frame.getViewerPose(ref)?.views[0] : undefined;
+        const had = occluder.live;
+        occluder.update(frame, view, (session as XRSession & { depthDataFormat?: string }).depthDataFormat);
+        if (had !== occluder.live) { setDepthLive(occluder.live); setDiag((d) => ({ ...d, depth: occluder.live })); }
+      }
       renderer.render(scene, camera);
       if (frame && wantShot.current) {
         const multi = wantShot.current === "multi";
@@ -293,6 +310,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       hud?.removeEventListener("beforexrselect", block);
       session.removeEventListener("end", onEndSession);
       renderer.setAnimationLoop(null);
+      occluder?.dispose();
+      depthRef.current = null;
       renderer.dispose();
       three.current = null;
     };
@@ -648,6 +667,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     { key: "t:misura", label: "Misura", Icon: Ruler, tool: true, on: tool === "measure", onPick: () => { setTool("measure"); setMeasure([]); setTrayOpen(false); } },
     { key: "t:modellino", label: model ? "Grandezza vera" : "Modellino", Icon: Box, tool: true, on: model, aria: model ? "Torna alla grandezza vera" : "Modellino in scala 1:10",
       onPick: () => { setModel((m) => !m); setTrayOpen(false); setNotice({ text: model ? "Grandezza vera" : "Modellino 1:10 · per provare al chiuso o su un tavolo", tone: "ok" }); } },
+    ...(session && depthLive ? [{ key: "t:profondita", label: depthOn ? "Profondità" : "Profondità off", Icon: Layers, tool: true, on: depthOn,
+      aria: depthOn ? "Disattiva la profondità: gli oggetti si vedono anche dietro i muri" : "Attiva la profondità: muri e mobili veri coprono gli oggetti",
+      onPick: () => { setDepthOn((v) => !v); setTrayOpen(false); setNotice({ text: depthOn ? "Profondità spenta: gli oggetti si vedono anche dietro muri e mobili" : "Profondità accesa: muri e mobili veri coprono gli oggetti", tone: "ok" }); } }] : []),
     ...(!session ? [{ key: "t:pavimento", label: "Pavimento", Icon: MoveVertical, tool: true, on: false, aria: "Regola pavimento", onPick: () => { setAdjusting(true); setTrayOpen(false); } }] : []),
   ];
   const fanGroups: FanGroup[] = [
@@ -715,7 +737,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
                 {barHelp}{!session && " Anteprima: senza ARCore le misure sono indicative."}{!session && why ? ` ${why}` : ""}
                 {session && (
                   <span className="mt-1 block font-mono text-[10px] opacity-70">
-                    ARCore · pavimento {diag.hit === undefined ? "…" : diag.hit ? "sì" : "no"} · overlay {diag.overlay ? "sì" : "no"} · fotogrammi {diag.frames} · trovato {found ? "sì" : "no"}{diag.feats ? ` · ${diag.feats}` : ""}{diag.error ? ` · errore: ${diag.error}` : ""}
+                    ARCore · pavimento {diag.hit === undefined ? "…" : diag.hit ? "sì" : "no"} · overlay {diag.overlay ? "sì" : "no"} · profondità {diag.depth ? "sì" : "no"} · fotogrammi {diag.frames} · trovato {found ? "sì" : "no"}{diag.feats ? ` · ${diag.feats}` : ""}{diag.error ? ` · errore: ${diag.error}` : ""}
                   </span>
                 )}
               </span>
