@@ -30,14 +30,30 @@ export async function arLiveSupported(): Promise<boolean> {
   } catch { return false; }
 }
 
-/** Asks for the AR session; call it straight from a tap (the browser wants a user gesture). */
-export function requestArSession(overlayRoot: HTMLElement): Promise<XRSession> {
-  const init = {
-    requiredFeatures: ["hit-test"],
-    optionalFeatures: ["dom-overlay", "local-floor", "light-estimation", "anchors"],
-    domOverlay: { root: overlayRoot },
-  } as XRSessionInit;
-  return navigator.xr!.requestSession("immersive-ar", init);
+/** Asks for the AR session; call it straight from a tap (the browser wants a user gesture). Some phones refuse a
+ *  configuration ("The specified session configuration is not supported"): the camera's own fullscreen is left
+ *  first (Chrome's AR overlay takes the screen itself), then lighter configurations are tried in turn — hit-test
+ *  required with the HUD overlay, then everything optional, then the bare session — while the tap still counts. */
+export async function requestArSession(overlayRoot: HTMLElement): Promise<XRSession> {
+  if (typeof document !== "undefined" && document.fullscreenElement) {
+    await document.exitFullscreen().catch(() => undefined);
+  }
+  const tries: XRSessionInit[] = [
+    { requiredFeatures: ["hit-test"], optionalFeatures: ["dom-overlay", "local-floor", "light-estimation", "anchors"], domOverlay: { root: overlayRoot } } as XRSessionInit,
+    { optionalFeatures: ["hit-test", "dom-overlay", "local-floor"], domOverlay: { root: overlayRoot } } as XRSessionInit,
+    { optionalFeatures: ["hit-test"] },
+    {},
+  ];
+  let last: unknown = null;
+  for (const init of tries) {
+    try { return await navigator.xr!.requestSession("immersive-ar", init); }
+    catch (e) {
+      last = e;
+      // Only a refused configuration is worth another try; anything else (no gesture, denied camera) stops here.
+      if (!(e instanceof DOMException) || e.name !== "NotSupportedError") break;
+    }
+  }
+  throw last;
 }
 
 type Tool = "place" | "align" | "measure";
@@ -132,7 +148,10 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       try {
         await renderer.xr.setSession(session as unknown as Parameters<THREE.WebXRManager["setSession"]>[0]);
         const viewer = await session.requestReferenceSpace("viewer");
-        hitSource = (await session.requestHitTestSource?.({ space: viewer })) ?? null;
+        // A session granted without hit-test still runs; it just cannot find the floor, and says so.
+        const ask = session.requestHitTestSource?.bind(session);
+        hitSource = ask ? ((await ask({ space: viewer })?.catch(() => null)) ?? null) : null;
+        if (!hitSource) toast.message("ARCore è partito senza il rilevamento del pavimento", { description: "Su questo telefono gli oggetti non si posano a terra: usa l’anteprima (chiudi e riapri Prova)." });
       } catch (e) {
         toast.error("La realtà aumentata non è partita", { description: e instanceof Error ? e.message : String(e) });
         void session.end().catch(() => undefined);

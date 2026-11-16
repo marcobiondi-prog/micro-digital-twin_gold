@@ -1619,8 +1619,11 @@ export function ArCamera({
         const root = liveRootEl();
         streamRef.current?.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
+        // The AR session leaves the camera's fullscreen: that exit is not a Back, so the camera stays open.
+        arTransitionRef.current = true;
         requestArSession(root)
           .then((session) => setLiveAr({ session, root }))
+          .finally(() => { window.setTimeout(() => { arTransitionRef.current = false; }, 1500); })
           .catch((err: unknown) => {
             root.remove();
             setCamEpoch((n) => n + 1);
