@@ -44,7 +44,10 @@ export default defineConfig(({ command }) => ({
   // Simulated sign-in (src/lib/demo-login.ts): dev server and Vercel previews only, never production.
   define: { __DEMO_LOGIN__: JSON.stringify(command === "serve" || process.env["VERCEL_ENV"] === "preview"), __BUILD_TIME__: JSON.stringify(BUILD_TIME) },
   resolve: {
-    dedupe: ["react", "react-dom", "@tanstack/react-query", "@tanstack/query-core"],
+    dedupe: ["react", "react-dom", "@tanstack/react-query", "@tanstack/query-core", "three"],
+    // EZ-Tree's own sources (the package's build inlines its 3 MB of textures into the code): its pictures become
+    // separate files, fetched only when the AR draws a tree.
+    alias: { "ez-tree-src": join(process.cwd(), "node_modules/@dgreenheck/ez-tree/src/lib/index.js") },
   },
   // Hex hashes (2026-11-14): every page file got a new name once, so the 404s already cached for a year on phones
   // under the old names (see cacheOnlyFoundAssets) are never asked for again.
@@ -95,7 +98,7 @@ export default defineConfig(({ command }) => ({
         // The heavy files used only now and then (PDF, maps, AI camera scene, towns list, screenshots) are not
         // downloaded with every update: they are kept the first time they are used (the "assets" cache below), so a
         // new version installs in a few seconds instead of after ~6 MB.
-        globIgnores: ["**/pdf.worker*", "**/pdf-*", "**/maplibre-gl*", "**/ar-scene*", "**/jspdf*", "**/html2canvas*", "**/comuni-it*", "**/index.es-*", "**/purify*", "**/three.module*", "**/three-layer*", "**/ArCameraLazy*", "**/jszip*"],
+        globIgnores: ["**/pdf.worker*", "**/pdf-*", "**/maplibre-gl*", "**/ar-scene*", "**/jspdf*", "**/html2canvas*", "**/comuni-it*", "**/index.es-*", "**/purify*", "**/three.module*", "**/three-layer*", "**/ArCameraLazy*", "**/jszip*", "**/*_1k-*", "**/ash_color-*", "**/aspen_color-*", "**/oak_color-*", "**/pine_color-*", "**/ez-tree*", "**/ar-tree*"],
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         clientsClaim: true,

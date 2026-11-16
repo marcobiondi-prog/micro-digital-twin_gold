@@ -12,6 +12,8 @@ import { drawnAreaFor, type DrawnArea } from "@/models/drawn-area";
 import { readFix } from "@/lib/find-position";
 import { hapticTick } from "@/lib/haptics";
 import { contactShadow, floorLoop, objectMesh } from "@/views/ar-object-meshes";
+import { realTree, wantsRealTree } from "@/views/ar-tree";
+import { XREstimatedLight } from "three/examples/jsm/webxr/XREstimatedLight.js";
 import { ZoomDial } from "@/views/ZoomDial";
 import { ArcZoomDial } from "@/views/ArcZoomDial";
 import { ZOOM_MAX } from "@/lib/camera-zoom";
@@ -56,10 +58,10 @@ export async function requestArSession(overlayRoot: HTMLElement): Promise<XRSess
   const tries: Array<[string, XRSessionInit]> = [
     // ARCore's depth first (real walls and furniture hide the objects), on unless switched off by hand. Optional, so a
     // phone without it still starts.
-    ...(depthWanted() ? [["overlay+pavimento+profondità", { requiredFeatures: ["hit-test", "dom-overlay"], optionalFeatures: ["local-floor", "camera-access", "depth-sensing"], depthSensing: DEPTH_INIT, domOverlay: { root: overlayRoot } } as unknown as XRSessionInit] as [string, XRSessionInit]] : []),
-    ["overlay+pavimento", { requiredFeatures: ["hit-test", "dom-overlay"], optionalFeatures: ["local-floor", "camera-access"], domOverlay: { root: overlayRoot } } as XRSessionInit],
-    ["overlay", { requiredFeatures: ["dom-overlay"], optionalFeatures: ["hit-test", "local-floor", "camera-access"], domOverlay: { root: overlayRoot } } as XRSessionInit],
-    ["pavimento", { requiredFeatures: ["hit-test"], optionalFeatures: ["local-floor", "camera-access"] }],
+    ...(depthWanted() ? [["overlay+pavimento+profondità", { requiredFeatures: ["hit-test", "dom-overlay"], optionalFeatures: ["local-floor", "camera-access", "depth-sensing", "light-estimation"], depthSensing: DEPTH_INIT, domOverlay: { root: overlayRoot } } as unknown as XRSessionInit] as [string, XRSessionInit]] : []),
+    ["overlay+pavimento", { requiredFeatures: ["hit-test", "dom-overlay"], optionalFeatures: ["local-floor", "camera-access", "light-estimation"], domOverlay: { root: overlayRoot } } as XRSessionInit],
+    ["overlay", { requiredFeatures: ["dom-overlay"], optionalFeatures: ["hit-test", "local-floor", "camera-access", "light-estimation"], domOverlay: { root: overlayRoot } } as XRSessionInit],
+    ["pavimento", { requiredFeatures: ["hit-test"], optionalFeatures: ["local-floor", "camera-access", "light-estimation"] }],
     ["base", {}],
   ];
   const report: string[] = [];
@@ -229,6 +231,23 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     sun.position.set(3, 8, 2);
     scene.add(sun);
     const camera = new THREE.PerspectiveCamera();
+    // ARCore's light estimate: the objects take the room's or the piazza's own light and reflections instead of the
+    // fixed lights above, which come back if the estimate stops.
+    let est: XREstimatedLight | null = null;
+    if (session) {
+      est = new XREstimatedLight(renderer);
+      const fixed = scene.children.filter((c) => (c as THREE.Light).isLight);
+      const e = est;
+      e.addEventListener("estimationstart", () => {
+        for (const l of fixed) l.visible = false;
+        scene.add(e);
+      });
+      e.addEventListener("estimationend", () => {
+        scene.remove(e);
+        scene.environment = null;
+        for (const l of fixed) l.visible = true;
+      });
+    }
     const reticle = new THREE.Mesh(new THREE.RingGeometry(0.12, 0.16, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: "#00e5ff" }));
     reticle.matrixAutoUpdate = false;
     reticle.visible = false;
@@ -267,6 +286,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     let lostAt = 0;
     renderer.setAnimationLoop((_t, frame?: XRFrame) => {
       if (frame) framesRef.current += 1;
+      // The estimated reflections arrive a little after the light: used as soon as they do.
+      if (est?.parent && est.environment && scene.environment !== est.environment) scene.environment = est.environment;
       const t = three.current;
       if (!t) return;
       if (frame && hitSource) {
@@ -391,7 +412,15 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         const def = defOfRef.current(live.current.selected);
         const uid = `o${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
         const g = objectMesh(def);
-        if (def.id !== "pergolato") g.add(contactShadow(def));
+        const shadow = def.id !== "pergolato" ? contactShadow(def) : null;
+        if (shadow) g.add(shadow);
+        // A realistic tree (EZ-Tree) takes the simple shape's place once it is grown; until then, or if it fails, the
+        // simple one stays.
+        if (wantsRealTree(def)) void realTree(def).then((tree) => {
+          if (!tree || three.current?.objects.get(uid) !== g) return;
+          for (const c of [...g.children]) if (c !== shadow) g.remove(c);
+          g.add(tree);
+        });
         // A pergola or a shade cloth stands on posts at its edges: put by its centre, its posts fell 2 m beyond the
         // tap, often behind a desk or a wall, and it looked afloat. It is put instead with the middle of its near side
         // on the spot tapped, turned to face the phone, so its front posts stand right where one looks.

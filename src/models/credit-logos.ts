@@ -41,6 +41,7 @@ export const LIBRARIES: CreditItem[] = [
   item("recharts", "Recharts", "MIT"),
   item("maplibre", "MapLibre GL JS", "BSD-3-Clause"),
   item("three", "three.js", "MIT"),
+  item("ez-tree", "EZ-Tree (Daniel Greenheck)", "MIT"),
   item("d3", "D3", "ISC", si("d3")),
   item("jspdf", "jsPDF", "MIT"),
   item("jszip", "JSZip", "MIT"),
