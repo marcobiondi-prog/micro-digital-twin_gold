@@ -1646,7 +1646,13 @@ export function ArCamera({
             setCamEpoch((n) => n + 1);
             toast.error("ARCore non è partito", { description: `${err instanceof Error ? err.message : String(err)} · Uso l’anteprima.` });
             regainFullscreen(); // AR left the camera's fullscreen to ask the session: the preview takes it back
-            setLiveAr({ session: null, root: liveRootEl(), why: `ARCore non è partito (${err instanceof Error ? err.message : String(err)}): uso l’anteprima.` });
+            // Every configuration refused while the phone says it supports AR: Chrome has blocked augmented reality for
+            // this site (its own permission, kept per site). Said plainly, with where to turn it back on.
+            const msg = err instanceof Error ? err.message : String(err);
+            const blocked = msg.split(" · ").every((p) => p.trim().endsWith("NotSupportedError"));
+            setLiveAr({ session: null, root: liveRootEl(), why: blocked
+              ? "Chrome ha bloccato la realtà aumentata per questo sito. In Chrome tocca l’icona a sinistra dell’indirizzo → Autorizzazioni (o Impostazioni sito) → Realtà aumentata → Consenti, poi riprova. Intanto uso l’anteprima."
+              : `ARCore non è partito (${msg}): uso l’anteprima.` });
           });
       } else {
         // Why there is no ARCore, said over the camera (toasts sit under it).
