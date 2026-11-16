@@ -9,6 +9,15 @@ import * as THREE from "three";
  * A small bias keeps things lying on the floor (shadows, the reticle) from flickering under the floor's own depth.
  */
 
+/** The depth is a test switched on by hand (it made tracking shake on the user's Xperia), kept on this phone. */
+const WANT_KEY = "mdt-ar-depth-v1", FLIP_KEY = "mdt-ar-depth-flip-v1";
+export function depthWanted(): boolean { try { return localStorage.getItem(WANT_KEY) === "on"; } catch { return false; } }
+export function setDepthWanted(on: boolean) { try { if (on) localStorage.setItem(WANT_KEY, "on"); else localStorage.removeItem(WANT_KEY); } catch { /* private mode */ } }
+/** How the depth map is turned against the screen, to find the right one by trying: 0…3. */
+export const FLIP_MODES = 4;
+export function depthFlip(): number { try { const n = Number(localStorage.getItem(FLIP_KEY)); return n >= 0 && n < FLIP_MODES ? n : 0; } catch { return 0; } }
+export function setDepthFlip(n: number) { try { localStorage.setItem(FLIP_KEY, String(n)); } catch { /* private mode */ } }
+
 /** The depth asked with the session: CPU-side, as Chrome on ARCore gives it. */
 export const DEPTH_INIT = {
   usagePreference: ["cpu-optimized"],
@@ -43,10 +52,13 @@ uniform mat4 uvT;
 uniform mat4 proj;
 uniform vec2 size;
 uniform float bias;
+uniform int flip;
 void main() {
   // Normalized view coordinates start at the top left; the framebuffer's at the bottom left.
   vec2 uv = gl_FragCoord.xy / size;
-  uv.y = 1.0 - uv.y;
+  // flip 0: y from the top (the spec's reading); 1: as the framebuffer; 2 and 3: the same mirrored sideways.
+  if (flip == 0 || flip == 2) uv.y = 1.0 - uv.y;
+  if (flip >= 2) uv.x = 1.0 - uv.x;
   vec2 duv = (uvT * vec4(uv, 0.0, 1.0)).xy;
   float m = texture(depthTex, duv).r;
   if (m <= 0.0 || duv.x < 0.0 || duv.y < 0.0 || duv.x > 1.0 || duv.y > 1.0) { gl_FragDepth = 1.0; return; }
@@ -65,7 +77,9 @@ export class DepthOccluder {
     proj: { value: new THREE.Matrix4() },
     size: { value: new THREE.Vector2(1, 1) },
     bias: { value: 0.08 },
+    flip: { value: depthFlip() },
   };
+  setFlip(n: number) { this.u.flip.value = n; }
   /** Whether a depth map was given in the last frame. */
   live = false;
   /** Off by hand (the AI fan's «Profondità»). */
