@@ -37,10 +37,19 @@ export async function arLiveSupported(): Promise<boolean> {
  *  the app is locked portrait) is left only as a last try, when the phone refused both while in fullscreen, and
  *  taken back if that fails too, so a refusal falls back to the preview in the same orientation. */
 export async function requestArSession(overlayRoot: HTMLElement): Promise<XRSession> {
-  // Tried in turn while the tap still counts, each moving on only on NotSupportedError: with the HUD overlay first,
-  // then — when this phone's Chrome refuses the overlay — a session without it (Chrome then shows its own close
-  // button; a tap on the floor still puts the chosen object), then the bare session. Every refusal is kept and,
-  // if none starts, reported together so the reason can be read on the phone.
+  // Chrome on the user's Xperia refuses every immersive-ar session while the page is in fullscreen
+  // ("NotSupportedError" for each configuration, the bare one too), and starts it once out of it, as the first AR
+  // version did: so the camera's fullscreen is left first. Out of it the app's portrait lock comes back, so the
+  // orientation the phone is held in is asked to stay (it may be refused; then the AR opens portrait).
+  if (typeof document !== "undefined" && document.fullscreenElement) {
+    const held = screen.orientation?.type;
+    await document.exitFullscreen().catch(() => undefined);
+    const o = screen.orientation as ScreenOrientation & { lock?: (v: string) => Promise<void> };
+    if (held?.startsWith("landscape")) await o.lock?.(held).catch(() => undefined);
+  }
+  // Then tried in turn, each moving on only on NotSupportedError: with the HUD overlay first, then without it (Chrome
+  // shows its own close button; a tap on the floor still puts the chosen object), then the bare session. Every
+  // refusal is reported together when none starts.
   const tries: Array<[string, XRSessionInit]> = [
     ["overlay+pavimento", { requiredFeatures: ["hit-test", "dom-overlay"], optionalFeatures: ["local-floor"], domOverlay: { root: overlayRoot } } as XRSessionInit],
     ["overlay", { requiredFeatures: ["dom-overlay"], optionalFeatures: ["hit-test", "local-floor"], domOverlay: { root: overlayRoot } } as XRSessionInit],
@@ -48,20 +57,13 @@ export async function requestArSession(overlayRoot: HTMLElement): Promise<XRSess
     ["base", {}],
   ];
   const report: string[] = [];
-  const attempt = async (tag: string): Promise<XRSession | null> => {
-    for (const [name, init] of tries) {
-      try { return await navigator.xr!.requestSession("immersive-ar", init); }
-      catch (e) {
-        report.push(`${tag}${name}: ${e instanceof DOMException ? e.name : e instanceof Error ? e.message : String(e)}`);
-        if (!(e instanceof DOMException) || e.name !== "NotSupportedError") return null;
-      }
+  for (const [name, init] of tries) {
+    try { return await navigator.xr!.requestSession("immersive-ar", init); }
+    catch (e) {
+      report.push(`${name}: ${e instanceof DOMException ? e.name : e instanceof Error ? e.message : String(e)}`);
+      if (!(e instanceof DOMException) || e.name !== "NotSupportedError") break;
     }
-    return null;
-  };
-  // Asked in the camera's fullscreen only: leaving it and coming back made Chrome show its own fullscreen notice
-  // ("trascina dall'alto…") again over the camera every time.
-  const first = await attempt("");
-  if (first) return first;
+  }
   throw new Error(report.join(" · "));
 }
 

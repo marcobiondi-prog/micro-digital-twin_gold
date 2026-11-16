@@ -1645,6 +1645,7 @@ export function ArCamera({
             root.remove();
             setCamEpoch((n) => n + 1);
             toast.error("ARCore non è partito", { description: `${err instanceof Error ? err.message : String(err)} · Uso l’anteprima.` });
+            regainFullscreen(); // AR left the camera's fullscreen to ask the session: the preview takes it back
             setLiveAr({ session: null, root: liveRootEl(), why: `ARCore non è partito (${err instanceof Error ? err.message : String(err)}): uso l’anteprima.` });
           });
       } else {
