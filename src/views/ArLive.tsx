@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { toast } from "sonner";
-import { Check, Leaf, Sparkles, MapPinned, MoveVertical, Ruler, Undo2, X } from "lucide-react";
+import { Check, ChevronDown, Leaf, Sparkles, MapPinned, MoveVertical, Ruler, Undo2, X } from "lucide-react";
 import type { ArKind } from "@/models/ar-focus";
 import {
   AR_OBJECTS, alignFromFix, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, arObject, enToAr, metresText, objectsToZones, toEN,
@@ -338,7 +338,17 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         ? alignPts.length === 0 ? "Tocca il punto 1 dell’area" : "Tocca il punto 2 dell’area"
         : tool === "measure"
           ? dist !== null ? `Distanza ${metresText(dist)}` : measure.length === 1 ? "Tocca il secondo punto" : "Tocca il primo punto"
-          : `Tocca a terra: ${defOf(selected).label}`);
+          : `Tocca il pavimento per posare: ${defOf(selected).label}`);
+  // The bar on top stays a small pill (what a tap does, in two words); a tap opens it to the whole sentence and a
+  // line on how it works. Messages open it by themselves while they last.
+  const [barOpen, setBarOpen] = useState(false);
+  const barShort = !found ? "Cerco il pavimento…" : adjusting ? "Regola pavimento"
+    : tool === "measure" ? (dist !== null ? metresText(dist) : "Misura") : tool === "align" ? `Punto ${alignPts.length + 1} dell’area` : defOf(selected).label;
+  const barHelp = !found ? "Muovi piano il telefono verso il pavimento finché lo riconosco."
+    : tool === "measure" ? "Tocca due punti a terra: ti dico quanto distano."
+    : tool === "align" ? "Tocca a terra i punti 1 e 2 dell’area disegnata sulla mappa: così gli oggetti tornano al posto giusto."
+    : "Tocca il pavimento dove vuoi metterlo: compare a grandezza vera. Annulla toglie l’ultimo, il pulsante AI cambia oggetto.";
+  const barExpanded = barOpen || !!notice || adjusting;
   const statusTone = notice ? (notice.tone === "ok" ? "bg-[#22c55e] text-black" : "bg-[#facc15] text-black") : "bg-black/55 text-white backdrop-blur";
 
   const dragHorizon = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -438,11 +448,20 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     <div ref={hudRef} className="ar-live-hud pointer-events-none fixed inset-0 z-50 flex flex-col justify-between text-white" style={{ padding: "env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)" }}>
       <div className={`pointer-events-auto flex items-center gap-2 p-3 ${adjusting ? "" : "landscape:pr-[7.5rem]"}`}>
         <button type="button" onClick={end} aria-label="Esci dalla prova" className={round}><X className="size-5" /></button>
-        <p role="status" className={`flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-[22px] px-4 py-2 text-sm font-semibold leading-tight transition-colors ${statusTone}`}>
+        <button type="button" onClick={() => setBarOpen((o) => !o)} aria-expanded={barExpanded} aria-controls="ar-live-bar-help"
+          className={`flex min-h-11 min-w-0 items-center gap-2 rounded-[22px] px-4 py-2 text-left text-sm font-semibold leading-tight transition-colors ${statusTone} ${barExpanded ? "flex-1" : "max-w-[70%]"}`}>
           {!notice && <span className={`size-2 shrink-0 rounded-full ${found ? "bg-[#22c55e]" : "animate-pulse bg-[#facc15]"}`} aria-hidden="true" />}
-          <span className="line-clamp-2">{status}</span>
-          {!session && !notice && <span className="ml-auto shrink-0 rounded-full bg-[#facc15] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-black" title="Senza ARCore le misure sono indicative">Anteprima</span>}
-        </p>
+          <span role="status" className="min-w-0 flex-1">
+            <span className={barExpanded ? "line-clamp-2" : "line-clamp-1"}>{barExpanded ? status : barShort}</span>
+            {barExpanded && !notice && (
+              <span id="ar-live-bar-help" className="mt-0.5 block text-xs font-normal opacity-80">
+                {barHelp}{!session && " Anteprima: senza ARCore le misure sono indicative."}
+              </span>
+            )}
+          </span>
+          {!session && !notice && !barExpanded && <span className="shrink-0 rounded-full bg-[#facc15] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-black">Anteprima</span>}
+          {!notice && <ChevronDown className={`size-4 shrink-0 opacity-80 transition-transform ${barExpanded ? "rotate-180" : ""}`} aria-hidden="true" />}
+        </button>
 
       </div>
       {!adjusting && (
@@ -506,7 +525,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       {!adjusting && (
         // Landscape: the shutter stays on the right edge where Rileva has it, the zoom ruler just above it, so the
         // rest of the screen is left to the scene.
-        <div className="pointer-events-none absolute right-0 top-1/2 hidden -translate-y-1/2 landscape:block" style={{ marginRight: "calc(env(safe-area-inset-right) + 1rem)" }}>
+        <div className="pointer-events-none absolute right-0 top-[58%] hidden -translate-y-1/2 landscape:block" style={{ marginRight: "calc(env(safe-area-inset-right) + 1rem)" }}>
           <div className="pointer-events-auto relative">
             {shutter("size-[72px]", "size-[54px]")}
             {dialOn && !trayOpen && (
