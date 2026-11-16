@@ -41,7 +41,7 @@ type TabResult = {
   plantPhoto: HTMLCanvasElement | null; photoPreview: string | null; realPhoto: string | null; recordId: string | null; thermalMin: boolean;
 };
 import { type GroundSurvey } from "@/models/ar-recognition";
-import { AR_FOCUS, arFocusOption, defaultArFocus, scanMissing, scanPrecheck, type ArFocus } from "@/models/ar-focus";
+import { AR_FOCUS, arFocusOption, defaultArFocus, foundFocus, scanMissing, scanPrecheck, selectableFocus, type ArFocus } from "@/models/ar-focus";
 import type { ArScene } from "@/views/ar-scene";
 import { Button } from "@/components/ui/button";
 import { drawCameraVideo, freezeCameraFrame, paintArFrame } from "@/lib/ar-frame";
@@ -75,9 +75,9 @@ type Mode = "photo" | "video";
 type Layer = "heat" | "objects" | "grid";
 /** How long the scan runs visibly before stopping when the frame has nothing to analyse. */
 const PRECHECK_SCAN_MS = 1200;
-const FOCUS_LABELS = { tree: "Vegetazione", ground: "Suolo", leaf: "Foglia", canopy: "Chioma", interrow: "Interfila" };
+const FOCUS_LABELS = { auto: "Piante e suolo", tree: "Vegetazione", ground: "Suolo", leaf: "Foglia", canopy: "Chioma", interrow: "Interfila" };
 /** What to scan, as an icon only (the name stays for screen readers and as a tooltip). */
-const FOCUS_ICONS = { tree: TreeDeciduous, ground: Shovel, leaf: Leaf, canopy: Grape, interrow: Rows3 };
+const FOCUS_ICONS = { auto: ScanSearch, tree: TreeDeciduous, ground: Shovel, leaf: Leaf, canopy: Grape, interrow: Rows3 };
 
 const URBAN_TUTORIAL = [
   { title: "1 · Scegli l’obiettivo", text: "In alto scegli «Alberi e ombra» per un albero della piazza o «Suolo e depavimentazione» per la pavimentazione." },
@@ -852,7 +852,7 @@ export function ArCamera({
   // Every completed scan goes to the report log, photo or not.
   const logScan = (result: string, sp: SpeciesInfo | null, ground: Soil, photo: string | null = null) => {
     scanRecordId.current = recordScan({
-      kind, photo, target: arFocusOption(kind, target).label, context: context ?? "", result,
+      kind, photo, target: foundFocus(kind, target, !!sp).label, context: context ?? "", result,
       species: sp ? {
         commonName: sp.commonName, scientificName: sp.scientificName, family: sp.family ?? null,
         level: sp.identification?.level === "species" ? "Specie probabile" : sp.identification?.level === "genus" ? "Genere probabile" : "Identificazione incerta",
@@ -1597,7 +1597,7 @@ export function ArCamera({
     if (!rec || adding) return;
     setAdding(true);
     try {
-      const findKind: FindKind = AR_FOCUS[kind].find((o) => o.label === rec.target)?.id ?? (rec.species ? (kind === "urban" ? "tree" : "leaf") : kind === "urban" ? "ground" : "interrow");
+      const findKind: FindKind = (AR_FOCUS[kind].find((o) => o.label === rec.target && o.id !== "auto")?.id as FindKind | undefined) ?? (rec.species ? (kind === "urban" ? "tree" : "leaf") : kind === "urban" ? "ground" : "interrow");
       const [fix, thumb] = await Promise.all([readFix(), smallThumb(scanPhoto(rec.id))]);
       const loc = kind === "urban" ? getLab().urban.location : getLab().vineyard.location;
       const find = findFromScan(rec, findKind, fix, { lat: loc.lat, lng: loc.lng }, thumb);
@@ -1825,14 +1825,14 @@ export function ArCamera({
           </div>
 
           {/* Row 2: in Rileva what to scan; in Prova what to do */}
-          {proving ? (
+          {proving || !selectableFocus(kind).length ? (proving && (
             <p className="rounded-full bg-[rgba(20,26,34,0.75)] px-4 py-1.5 text-xs font-semibold text-white ring-1 ring-white/15 backdrop-blur-md" role="status">
               Tocca il terreno per posare la pianta · anteprima
             </p>
-          ) : (
+          )) : (
           <div className="flex items-center justify-center">
             <div className="flex items-center rounded-full bg-[rgba(20,26,34,0.75)] p-1 ring-1 ring-white/15 backdrop-blur-md" role="radiogroup" aria-label="Obiettivo camera">
-              {AR_FOCUS[kind].map((o, idx) => {
+              {selectableFocus(kind).map((o, idx) => {
                 const isChecked = arFocusOption(kind, target).id === o.id;
                 return (
                   <div key={o.id} className="flex items-center">

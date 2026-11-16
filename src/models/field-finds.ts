@@ -9,7 +9,7 @@ import type { ScanRecord } from "@/models/ar-scan-log";
  * Trees become «already in the area» for the piazza's layout (interventions keep off them); vineyard finds are
  * shown on the zone they fall in.
  */
-export type FindKind = ArFocus;
+export type FindKind = Exclude<ArFocus, "auto">;
 export type FieldFind = {
   id: string;
   at: string;

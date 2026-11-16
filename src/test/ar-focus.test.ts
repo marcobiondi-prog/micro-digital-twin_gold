@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { AR_FOCUS, arFocusOption, defaultArFocus, scanMissing, scanPrecheck } from "@/models/ar-focus";
+import { AR_FOCUS, arFocusOption, defaultArFocus, foundFocus, scanMissing, scanPrecheck, selectableFocus } from "@/models/ar-focus";
 describe("AI camera per tab", () => {
-  it("urban offers trees and ground", () => expect(AR_FOCUS.urban.map(o => o.id)).toEqual(["tree", "ground"]));
+  it("urban scans automatically, trees and ground kept to name the records", () => {
+    expect(AR_FOCUS.urban.map(o => o.id)).toEqual(["auto", "tree", "ground"]);
+    expect(defaultArFocus("urban")).toBe("auto");
+    expect(selectableFocus("urban")).toEqual([]);
+    expect(selectableFocus("vineyard").map(o => o.id)).toEqual(["leaf", "canopy", "interrow"]);
+    expect(foundFocus("urban", "auto", true).id).toBe("tree");
+    expect(foundFocus("urban", "auto", false).id).toBe("ground");
+    expect(scanPrecheck("urban", "auto", false)).toBeNull();
+    expect(scanMissing("urban", "auto", { plant: false, ground: true })).toBeNull();
+    expect(scanMissing("urban", "auto", { plant: true, ground: false })).toBeNull();
+    expect(scanMissing("urban", "auto", { plant: false, ground: false })).toMatch(/Né piante/);
+  });
   it("vineyard offers leaf, canopy and interrow", () => expect(AR_FOCUS.vineyard.map(o => o.id)).toEqual(["leaf", "canopy", "interrow"]));
   it("other tab’s target falls back", () => expect(arFocusOption("vineyard", "ground").id).toBe(defaultArFocus("vineyard")));
   it("stops a vegetation scan before the AI when no vegetation is locked, never a ground scan", () => {

@@ -1,16 +1,23 @@
 export type ArKind = "urban" | "vineyard";
-export type ArFocus = "tree" | "ground" | "leaf" | "canopy" | "interrow";
+export type ArFocus = "auto" | "tree" | "ground" | "leaf" | "canopy" | "interrow";
 
 /** One scan phase as shown to the user: the viewfinder tag and the status line. */
 type ScanPhaseText = { tag: string; status: string };
 /** What a target must find in the frame; `missing` is shown when the scan stops without it; `phases` name its two scan steps. */
 /** Result panel wording: title, heading when nothing is identified, idle hint and method note. */
 type SummaryText = { title: string; empty: string; idle: string; note: string };
-type FocusOption = { id: ArFocus; label: string; hint: string; prompt: string; seeks: "vegetation" | "ground"; missing: string; phases: readonly [ScanPhaseText, ScanPhaseText]; summary: SummaryText };
+type FocusOption = { id: ArFocus; label: string; hint: string; prompt: string; seeks: "vegetation" | "ground" | "any"; missing: string; phases: readonly [ScanPhaseText, ScanPhaseText]; summary: SummaryText };
 
 /** Each Lab tab opens its own AI camera: distinct targets, commands and analysis emphasis. */
 export const AR_FOCUS: Record<ArKind, readonly FocusOption[]> = {
   urban: [
+    // The piazza has no target selector: one scan, the AI tells a plant (species, crown, shade) from the paving
+    // (permeability, depaving). "tree" and "ground" stay to name the records by what was found (AUTO_FOUND).
+    { id: "auto", label: "Piante e suolo", hint: "Inquadra un albero o la pavimentazione: l’AI riconosce cosa c’è.",
+      prompt: "Obiettivo urbano: riconosci da solo cosa è inquadrato. Se c’è una pianta (albero, arbusto, siepe, aiuola) privilegia chioma, tronco e specie: l’ombra serve al comfort dei pedoni. Se non c’è nessuna pianta, privilegia soil e survey della pavimentazione: asfalto, cemento, lastricato o terra; nella note indica se la depavimentazione (aiuola, pozzo drenante) è fattibile e l’accumulo di calore apparente.",
+      seeks: "any", missing: "Né piante né pavimentazione riconosciute: inquadra un albero o la superficie a terra e riprova.",
+      phases: [{ tag: "Inquadratura", status: "Riconosco cosa c’è: pianta o pavimentazione…" }, { tag: "Analisi", status: "Specie e ombra, oppure suolo e calore…" }],
+      summary: { title: "Piante e suolo", empty: "Niente di riconosciuto", idle: "Inquadra un albero o la pavimentazione e avvia la scansione.", note: "Ombra da chioma tipica o permeabilità apparente dalla foto · temperatura non misurata" } },
     { id: "tree", label: "Alberi e ombra", hint: "Inquadra chioma e tronco: stima ombra e raffrescamento per i pedoni.",
       prompt: "Obiettivo urbano: alberatura stradale o di piazza. Privilegia chioma, tronco e specie arborea; l’ombra serve al comfort dei pedoni.",
       seeks: "vegetation", missing: "Nessun albero inquadrato: punta chioma o tronco e riprova.",
@@ -41,6 +48,17 @@ export const AR_FOCUS: Record<ArKind, readonly FocusOption[]> = {
   ],
 };
 
+/** The piazza's single scan names its record by what it found: a plant → "Alberi e ombra", else the paving. */
+export function foundFocus(kind: ArKind, focus: ArFocus | undefined, plant: boolean): FocusOption {
+  const option = arFocusOption(kind, focus);
+  if (option.seeks !== "any") return option;
+  return arFocusOption(kind, plant ? "tree" : "ground");
+}
+/** The targets shown in the selector (the piazza's automatic scan shows none). */
+export function selectableFocus(kind: ArKind): readonly FocusOption[] {
+  return AR_FOCUS[kind].some((o) => o.seeks === "any") ? [] : AR_FOCUS[kind];
+}
+
 export function defaultArFocus(kind: ArKind): ArFocus { return AR_FOCUS[kind][0]!.id; }
 
 /** Rejects a target belonging to the other tab, falling back to that tab's default. */
@@ -59,5 +77,6 @@ export function scanPrecheck(kind: ArKind, focus: ArFocus | undefined, vegetatio
 /** After the AI: the result must contain what the target looks for (a plant, or the ground). */
 export function scanMissing(kind: ArKind, focus: ArFocus | undefined, result: { plant: boolean; ground: boolean }): string | null {
   const option = arFocusOption(kind, focus);
-  return (option.seeks === "vegetation" ? result.plant : result.ground) ? null : option.missing;
+  const ok = option.seeks === "any" ? result.plant || result.ground : option.seeks === "vegetation" ? result.plant : result.ground;
+  return ok ? null : option.missing;
 }
