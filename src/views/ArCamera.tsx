@@ -5,7 +5,7 @@ import { isTabletViewport } from "@/lib/tablet-camera";
 import { ArLive, requestArSession } from "@/views/ArLive";
 import { recognisedPlants } from "@/models/ar-objects";
 import { toast } from "sonner";
-import { Activity, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grid2X2, Leaf, Minus, Snowflake, Umbrella, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Star, TreePine, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
+import { Activity, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grape, Grid2X2, Leaf, Minus, Rows3, Shovel, TreeDeciduous, Snowflake, Umbrella, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Star, TreePine, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
 import { supportsCameraTorch, setCameraTorch } from "@/lib/camera-torch";
 import { detectArObject, getReferencePhoto, type Detection, type Soil } from "@/controllers/ar-detect.functions";
 import { gbifPhotoSearchUrl, pickGbifPhoto, type ReferencePhoto } from "@/models/ar-reference-photo";
@@ -76,6 +76,8 @@ type Layer = "heat" | "objects" | "grid";
 /** How long the scan runs visibly before stopping when the frame has nothing to analyse. */
 const PRECHECK_SCAN_MS = 1200;
 const FOCUS_LABELS = { tree: "Vegetazione", ground: "Suolo", leaf: "Foglia", canopy: "Chioma", interrow: "Interfila" };
+/** What to scan, as an icon only (the name stays for screen readers and as a tooltip). */
+const FOCUS_ICONS = { tree: TreeDeciduous, ground: Shovel, leaf: Leaf, canopy: Grape, interrow: Rows3 };
 
 const URBAN_TUTORIAL = [
   { title: "1 · Scegli l’obiettivo", text: "In alto scegli «Alberi e ombra» per un albero della piazza o «Suolo e depavimentazione» per la pavimentazione." },
@@ -1800,17 +1802,17 @@ export function ArCamera({
                     <button
                       type="button"
                       role="radio"
-                      aria-label={o.label}
-                      title={o.label}
+                      aria-label={`${FOCUS_LABELS[o.id]} · ${o.label}`}
+                      title={FOCUS_LABELS[o.id]}
                       aria-checked={isChecked}
                       onClick={() => selectTarget(o.id)}
-                      className={`h-8 rounded-full px-4 text-xs font-semibold transition-all ${
+                      className={`ar-focus-icon grid h-10 w-14 place-items-center rounded-full transition-all ${
                         isChecked
                           ? "bg-[#00f0ff]/20 text-[#00f0ff] ring-1 ring-[#00f0ff]/70 shadow-[0_0_12px_rgba(0,240,255,0.4)]"
                           : "text-white/75 hover:text-white"
                       }`}
                     >
-                      {FOCUS_LABELS[o.id]}
+                      {(() => { const Icon = FOCUS_ICONS[o.id]; return <Icon className="size-5" aria-hidden="true" />; })()}
                     </button>
                   </div>
                 );
@@ -2089,15 +2091,11 @@ export function ArCamera({
             title="Scansiona terreno e pianta"
             className={
               landscape
-                ? "ar-landscape-pill-btn disabled:opacity-40"
-                : `camera-tool ar-scan-btn disabled:opacity-40${scanning ? " is-compact" : ""}`
+                ? "ar-landscape-pill-btn is-icon disabled:opacity-40"
+                : `camera-tool ar-scan-btn is-icon disabled:opacity-40${scanning ? " is-compact" : ""}`
             }
           >
-            {!landscape && (
-              <ScanSearch className={`size-4 shrink-0 ${scanning ? "animate-pulse text-[#00f0ff]" : ""}`} />
-            )}
-            {!scanning && <span>Scansiona</span>}
-            {landscape && scanning && <span className="animate-pulse text-[#00e5ff]">Scansione…</span>}
+            <ScanSearch className={`size-6 shrink-0 ${scanning ? "animate-pulse text-[#00f0ff]" : ""}`} aria-hidden="true" />
           </Button>
           {!landscape && scanning && (
             <Button
@@ -2126,12 +2124,11 @@ export function ArCamera({
             title={toolsOpen ? "Nascondi strumenti" : "Mostra strumenti"}
             className={
               landscape
-                ? "ar-landscape-pill-btn"
-                : "camera-tool ar-tools-btn"
+                ? "ar-landscape-pill-btn is-icon"
+                : "camera-tool ar-tools-btn is-icon"
             }
           >
-            {!landscape && <SlidersHorizontal className="size-4 shrink-0" />}
-            <span>Strumenti</span>
+            <SlidersHorizontal className="size-6 shrink-0" aria-hidden="true" />
           </Button>
         </div>
       }
