@@ -261,7 +261,7 @@ export function Tutorial() {
                 <span className="rounded-full border border-brand-turquoise/40 bg-brand-turquoise/15 px-2 py-0.5 text-[0.55em] font-bold tracking-[0.12em] text-brand-turquoise">BETA</span>
               </span>
             </p>
-            <h2 className="mt-[clamp(0.375rem,2dvh,1.5rem)] font-display text-[clamp(1.8rem,min(9vw,8dvh),3.75rem)] font-extralight leading-[1.02] tracking-tight text-foreground">Prova gli interventi<br />prima di farli.</h2>
+            <h2 className="mt-[clamp(0.375rem,2dvh,1.5rem)] font-display text-[clamp(1.8rem,min(9vw,8dvh),3.75rem)] font-extralight leading-[1.02] tracking-tight text-foreground">Simula gli interventi di raffrescamento,<br />prima di implementarli.</h2>
             <p className="mt-[clamp(0.25rem,1.2dvh,1rem)] text-[clamp(0.75rem,4.1dvh,0.9375rem)] text-foreground/60">Ecco come funziona, in quattro passi.</p>
           </Reveal>
         </section>
