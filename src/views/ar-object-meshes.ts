@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { ArObjectDef } from "@/models/ar-objects";
+import { realPergola } from "@/views/ar-pergola";
 
 /**
  * The 3D shapes «Prova» puts in the real world, in metres, standing on y = 0 and centred on x = z = 0: the same simple
@@ -32,27 +33,8 @@ export function objectMesh(def: ArObjectDef): THREE.Group {
       break;
     }
     case "pergolato": {
-      // Seen through the phone, thin posts far out at the corners left the roof looking afloat: sturdier posts every
-      // 2 m or less round the edge, each on a stone foot with its own small shadow.
-      const wood = mat("#7a4a22"), slat = mat("#c99a63"), stone = mat("#9ca3af");
-      const hw = def.w / 2 - 0.12, hd = def.d / 2 - 0.12;
-      const along = (a: number, b: number) => { const n = Math.max(1, Math.ceil((b - a) / 2)); return Array.from({ length: n + 1 }, (_, i) => a + ((b - a) * i) / n); };
-      const spots = new Map<string, [number, number]>();
-      for (const x of along(-hw, hw)) for (const z of [-hd, hd]) spots.set(`${x.toFixed(2)},${z}`, [x, z]);
-      for (const z of along(-hd, hd)) for (const x of [-hw, hw]) spots.set(`${x},${z.toFixed(2)}`, [x, z]);
-      for (const [x, z] of spots.values()) {
-        // A small dark shadow under each foot: a big sheet on the floor showed through walls as a floating slab.
-        const foot = new THREE.Mesh(new THREE.CircleGeometry(0.34, 20), new THREE.MeshBasicMaterial({ color: "#000", transparent: true, opacity: 0.35, depthWrite: false }));
-        foot.rotation.x = -Math.PI / 2; foot.position.set(x, 0.004, z);
-        g.add(foot);
-        g.add(box(0.32, 0.18, 0.32, stone, x, 0, z));
-        g.add(box(0.2, def.h - 0.2, 0.2, wood, x, 0, z));
-      }
-      g.add(box(def.w, 0.2, 0.16, wood, 0, def.h - 0.42, -hd));
-      g.add(box(def.w, 0.2, 0.16, wood, 0, def.h - 0.42, hd));
-      g.add(box(0.16, 0.2, def.d, wood, -hw, def.h - 0.42, 0));
-      g.add(box(0.16, 0.2, def.d, wood, hw, def.h - 0.42, 0));
-      for (let x = -hw; x <= hw + 1e-6; x += 0.5) g.add(box(0.08, 0.06, def.d, slat, x, def.h - 0.22, 0));
+      // A realistic timber pergola (views/ar-pergola): grained wood, steel bases, beams, braces, rafters, battens.
+      g.add(realPergola(def));
       break;
     }
     case "aiuola": {
