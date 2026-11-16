@@ -413,7 +413,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     if (alignment?.how === "corners" && sendAfterAlign.current) backToMap();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alignment]);
-  useEffect(() => { if (!notice || notice.tone === "ok") return; const t = window.setTimeout(() => setNotice(null), 5000); return () => window.clearTimeout(t); }, [notice]);
+  useEffect(() => { if (!notice || notice.tone === "ok" || notice.text === why) return; const t = window.setTimeout(() => setNotice(null), 5000); return () => window.clearTimeout(t); }, [notice, why]);
 
   const dist = measure.length === 2 ? arDistance(measure[0]!, measure[1]!) : null;
   const status = notice?.text ?? (!found
@@ -573,11 +573,11 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
           className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-black/55 pl-2.5 pr-3.5 text-sm font-semibold backdrop-blur">
           <ChevronLeft className="size-5" aria-hidden="true" />Esci da AR
         </button>
-        <button type="button" onClick={() => setBarOpen((o) => !o)} aria-expanded={barExpanded} aria-controls="ar-live-bar-help"
+        <button type="button" onClick={() => { if (notice) setNotice(null); else setBarOpen((o) => !o); }} aria-expanded={barExpanded} aria-controls="ar-live-bar-help"
           className={`flex min-h-11 min-w-0 items-center gap-2 rounded-[22px] px-4 py-2 text-left text-sm font-semibold leading-tight transition-colors ${statusTone} ${barExpanded ? "flex-1" : "max-w-[70%]"}`}>
           {!notice && <span className={`size-2 shrink-0 rounded-full ${found ? "bg-[#22c55e]" : "animate-pulse bg-[#facc15]"}`} aria-hidden="true" />}
           <span role="status" className="min-w-0 flex-1">
-            <span className={barExpanded ? "line-clamp-2" : "line-clamp-1"}>{barExpanded ? status : barShort}</span>
+            <span className={notice && notice.text === why ? "" : barExpanded ? "line-clamp-2" : "line-clamp-1"}>{barExpanded ? status : barShort}</span>
             {barExpanded && !notice && (
               <span id="ar-live-bar-help" className="mt-0.5 block text-xs font-normal opacity-80">
                 {barHelp}{!session && " Anteprima: senza ARCore le misure sono indicative."}{!session && why ? ` ${why}` : ""}

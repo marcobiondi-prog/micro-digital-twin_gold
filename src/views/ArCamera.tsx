@@ -1631,9 +1631,14 @@ export function ArCamera({
         const root = liveRootEl();
         streamRef.current?.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
+        if (videoRef.current) videoRef.current.srcObject = null;
         // The AR session leaves the camera's fullscreen: that exit is not a Back, so the camera stays open.
         arTransitionRef.current = true;
-        requestArSession(root)
+        // ARCore opens the phone's camera itself: asked while ours is still being released, the phone refuses the
+        // session ("The specified session configuration is not supported"). A short wait lets the camera go; the
+        // tap's activation lasts long enough (Chrome keeps it about 5 s).
+        new Promise((r) => window.setTimeout(r, 450))
+          .then(() => requestArSession(root))
           .then((session) => { setLiveAr({ session, root }); void resetAppOrientation(); })
           .finally(() => { window.setTimeout(() => { arTransitionRef.current = false; }, 1500); })
           .catch((err: unknown) => {
