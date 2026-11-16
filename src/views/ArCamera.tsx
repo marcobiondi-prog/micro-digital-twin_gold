@@ -82,14 +82,14 @@ const FOCUS_ICONS = { auto: ScanSearch, tree: TreeDeciduous, ground: Shovel, lea
 const URBAN_TUTORIAL = [
   { title: "1 · Scegli l’obiettivo", text: "In alto scegli «Alberi e ombra» per un albero della piazza o «Suolo e depavimentazione» per la pavimentazione." },
   { title: "2 · Scansiona", text: "Inquadra chioma e tronco, oppure il suolo davanti a te, e avvia la scansione: specie, ombra e permeabilità." },
-  { title: "3 · Prova", text: "In alto passa da «Rileva» a «Prova»: tocca il terreno per posare la pianta rilevata e vedere come sta nella piazza." },
+  { title: "3 · AR", text: "In alto passa da «Rileva» ad «AR»: tocca il terreno per posare la pianta rilevata e vedere come sta nella piazza." },
   { title: "4 · Scatta", text: "Scatta foto o video: la griglia non compare e la stima va nel Lab e nei report della piazza." },
 ] as const;
 
 const TUTORIAL = [
   { title: "1 · Inquadra", text: "Avvicinati a 20–30 cm da una foglia o dalla chioma: il mirino si aggancia da solo alla vegetazione." },
   { title: "2 · Scansiona", text: "Avvia la scansione: prima la forma della foglia, poi il confronto botanico e la stima del terreno." },
-  { title: "3 · Prova", text: "In alto passa da «Rileva» a «Prova»: tocca il terreno per posare la pianta e vederla sul posto." },
+  { title: "3 · AR", text: "In alto passa da «Rileva» ad «AR»: tocca il terreno per posare la pianta e vederla sul posto." },
   { title: "4 · Scatta", text: "Scatta foto o video: la griglia non compare e la stima botanico-termica va nel Lab e nei report." },
 ] as const;
 
@@ -1706,7 +1706,7 @@ export function ArCamera({
           <button key={m} type="button" role="radio" aria-checked={on} disabled={scanning}
             onClick={(e) => setCamMode(m, e)}
             className={`h-8 rounded-full px-4 transition-all disabled:opacity-50 ${on ? "bg-[#00f0ff]/20 text-[#00f0ff] ring-1 ring-[#00f0ff]/70" : "text-white/80 hover:text-white"}`}>
-            {m === "rileva" ? "Rileva" : "Prova"}
+            {m === "rileva" ? "Rileva" : <span aria-label="AR, realtà aumentata">AR</span>}
           </button>
         );
       })}
@@ -1733,7 +1733,7 @@ export function ArCamera({
           <div className="ar-landscape-info-pill" role="status" aria-label="Riepilogo analisi">
             <span className="ar-info-species">
               <Leaf className="size-3.5 text-[#4ade80]" aria-hidden="true" />
-              <strong>{species?.commonName ?? (proving ? "Prova" : arFocusOption(kind, target).label)}</strong>
+              <strong>{species?.commonName ?? (proving ? "AR" : arFocusOption(kind, target).label)}</strong>
             </span>
             {species?.cooling && (
               <>
@@ -2397,7 +2397,7 @@ export function ArCamera({
                       title="Fai uno swipe verso il basso per togliere la Tab info"
                     >
                       <p className="ar-portrait-specimen-title truncate">
-                        {shownRecord?.species ? `${shownRecord.species.commonName} (${shownRecord.species.scientificName})` : shownRecord?.soil ? `Suolo: ${shownRecord.soil.label}` : species?.commonName ? `${species.commonName} (${species.scientificName})` : proving ? "Prova" : arFocusOption(kind, target).label}
+                        {shownRecord?.species ? `${shownRecord.species.commonName} (${shownRecord.species.scientificName})` : shownRecord?.soil ? `Suolo: ${shownRecord.soil.label}` : species?.commonName ? `${species.commonName} (${species.scientificName})` : proving ? "AR" : arFocusOption(kind, target).label}
                       </p>
                       <p className="ar-portrait-specimen-desc">
                         {shownRecord?.species?.shade
