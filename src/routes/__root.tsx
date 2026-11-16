@@ -10,7 +10,6 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useHomeFocus } from "@/lib/home-focus";
 import { introSeen } from "@/lib/intro-seen";
-import { PREVIEW_BUILD } from "@/lib/demo-login";
 import { THEME_DARK, ThemeToggle, themeBootScript } from "@/views/theme-toggle";
 import { AccountControl } from "@/views/account-control";
 import { CameraDockButton, CameraSheet } from "@/views/CameraDock";
@@ -471,7 +470,7 @@ function RootComponent() {
       const start = Date.now();
       const check = () => {
         const onIndex = window.location.pathname === "/";
-        const tutorial = onIndex && (!introSeen() || PREVIEW_BUILD || /[?&](rivedi|scenario)=/.test(window.location.search));
+        const tutorial = onIndex && (!introSeen() || /[?&](rivedi|scenario)=/.test(window.location.search));
         if (!onIndex || tutorial || Date.now() - start > 3000) {
           // Not before the sector page is up when nobody is identified: the page behind (Benvenuto…) never shows.
           const free = /^\/(scegli|identificazione|privacy|legale|faq|chi-siamo|contatti|piani|reset-password|admin)(\/|$)/.test(window.location.pathname);

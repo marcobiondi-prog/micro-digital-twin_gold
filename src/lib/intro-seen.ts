@@ -1,11 +1,8 @@
-import { PREVIEW_BUILD } from "@/lib/demo-login";
-
 // The entrance (tutorial and choice) shows once, at the first access on this device: afterwards a fresh open lands on the map.
-// Previews (vite dev and preview deployments, never production) show it at every opening, to try it again and again.
+// Previews behave the same (they used to show it at every opening; dropped at the user's word).
 const KEY = "mdt-intro-seen";
 
 export function introSeen(): boolean {
-  if (PREVIEW_BUILD) return false;
   try { return window.localStorage.getItem(KEY) === "1"; } catch { return false; }
 }
 
