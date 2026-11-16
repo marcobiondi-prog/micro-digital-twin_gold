@@ -37,33 +37,37 @@ export async function arLiveSupported(): Promise<boolean> {
  *  the app is locked portrait) is left only as a last try, when the phone refused both while in fullscreen, and
  *  taken back if that fails too, so a refusal falls back to the preview in the same orientation. */
 export async function requestArSession(overlayRoot: HTMLElement): Promise<XRSession> {
-  const tries: XRSessionInit[] = [
-    { requiredFeatures: ["hit-test", "dom-overlay"], optionalFeatures: ["local-floor", "light-estimation", "anchors"], domOverlay: { root: overlayRoot } } as XRSessionInit,
-    { requiredFeatures: ["dom-overlay"], optionalFeatures: ["hit-test", "local-floor"], domOverlay: { root: overlayRoot } } as XRSessionInit,
+  // Tried in turn while the tap still counts, each moving on only on NotSupportedError: with the HUD overlay first,
+  // then — when this phone's Chrome refuses the overlay — a session without it (Chrome then shows its own close
+  // button; a tap on the floor still puts the chosen object), then the bare session. Every refusal is kept and,
+  // if none starts, reported together so the reason can be read on the phone.
+  const tries: Array<[string, XRSessionInit]> = [
+    ["overlay+pavimento", { requiredFeatures: ["hit-test", "dom-overlay"], optionalFeatures: ["local-floor"], domOverlay: { root: overlayRoot } } as XRSessionInit],
+    ["overlay", { requiredFeatures: ["dom-overlay"], optionalFeatures: ["hit-test", "local-floor"], domOverlay: { root: overlayRoot } } as XRSessionInit],
+    ["pavimento", { requiredFeatures: ["hit-test"], optionalFeatures: ["local-floor"] }],
+    ["base", {}],
   ];
-  const attempt = async (): Promise<XRSession | DOMException | unknown> => {
-    let last: unknown = null;
-    for (const init of tries) {
+  const report: string[] = [];
+  const attempt = async (tag: string): Promise<XRSession | null> => {
+    for (const [name, init] of tries) {
       try { return await navigator.xr!.requestSession("immersive-ar", init); }
       catch (e) {
-        last = e;
-        if (!(e instanceof DOMException) || e.name !== "NotSupportedError") break;
+        report.push(`${tag}${name}: ${e instanceof DOMException ? e.name : e instanceof Error ? e.message : String(e)}`);
+        if (!(e instanceof DOMException) || e.name !== "NotSupportedError") return null;
       }
     }
-    return last;
+    return null;
   };
-  const isSession = (v: unknown): v is XRSession => !!v && typeof (v as XRSession).end === "function";
-  const first = await attempt();
-  if (isSession(first)) return first;
+  const first = await attempt("");
+  if (first) return first;
   const fs = typeof document !== "undefined" ? document.fullscreenElement : null;
-  if (fs && first instanceof DOMException && first.name === "NotSupportedError") {
+  if (fs) {
     await document.exitFullscreen().catch(() => undefined);
-    const second = await attempt();
-    if (isSession(second)) return second;
+    const second = await attempt("senza schermo intero, ");
+    if (second) return second;
     await (fs as HTMLElement).requestFullscreen?.({ navigationUI: "hide" }).catch(() => undefined);
-    throw second;
   }
-  throw first;
+  throw new Error(report.join(" · "));
 }
 
 type Tool = "place" | "align" | "measure";
