@@ -83,12 +83,17 @@ type V = { x: number; y: number; z: number };
  * camera on a floor guessed from how the phone is held (eyes at 1,5 m, the floor's tilt from the phone's tilt), so sizes
  * are close but not anchored. With a session it is the real live AR.
  */
+/** The "Tocca per ruotare la vista AR" notice when the phone is turned during an ARCore session. */
+const ROTATE_PROMPT = false;
+
 export function ArLive({ kind, session, stream = null, plants = [], onShot, onEnd, onRotate, why, burst, torch = false, onFlashPreview }: { burst: ArBurst; torch?: boolean; onFlashPreview?: () => void; why?: string | undefined; kind: ArKind; session: XRSession | null; stream?: MediaStream | null; plants?: ArObjectDef[]; onShot?: (file: File) => void; onEnd: () => void; onRotate?: () => void }) {
   // Chrome locks the screen to the orientation the AR session started in, and a web page cannot unlock it. When the
   // phone is held the other way for a moment, a tap restarts the session in the new orientation (onRotate).
+  // Off at the user's word ("non mi deve uscire questo avviso quando ruoto"): the AR stays in the orientation it
+  // started in; ROTATE_PROMPT true brings the notice back.
   const [turned, setTurned] = useState(false);
   useEffect(() => {
-    if (!session || !onRotate) return;
+    if (!ROTATE_PROMPT || !session || !onRotate) return;
     const lockedLandscape = window.innerWidth > window.innerHeight;
     let since = 0;
     const onMotion = (e: DeviceMotionEvent) => {
