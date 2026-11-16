@@ -463,9 +463,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
 
   // Every choice sits behind one AI button: the tray opens over the camera only when asked.
   const [trayOpen, setTrayOpen] = useState(false);
-  // Landscape: the camera's own arc dial is the zoom at rest (like Rileva); while the AI tray is open the pills in a
-  // column take its place beside the shutter. The dial is scaled to fit the screen's height.
-  const arcOn = dialOn && !trayOpen;
+  // Landscape: in Prova the zoom is always the pills in a column beside the shutter with their ruler (the arc dial is
+  // Rileva's only). The arc code stays here, off: set ARC_IN_PROVA to bring it back at rest.
+  const arcOn = ARC_IN_PROVA && dialOn && !trayOpen;
   const dialBox = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const fit = () => dialBox.current?.style.setProperty("--ar-dial-k", String(Math.min(1, (window.innerHeight - 8) / 380)));
@@ -621,6 +621,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     </>
   );
 }
+
+const ARC_IN_PROVA = false;
 
 /** The 3D camera's vertical view for a zoom: the 70° preview narrowed like the cropped picture. */
 function fovAt(zoom: number): number {
