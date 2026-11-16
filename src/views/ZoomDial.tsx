@@ -11,7 +11,8 @@ import { dialZoom, DIAL_PX, rulerTicks } from "@/lib/zoom-dial";
 export function ZoomDial({ zoom, max, onZoom, disabled = false, className = "", onRulerChange, vertical = false }: {
   zoom: number; max: number; onZoom: (value: number) => void; disabled?: boolean; className?: string;
   onRulerChange?: (active: boolean) => void;
-  /** Chips in a column (the bigger stop on top) and a ruler beside them, moved by an up-and-down swipe: up zooms in. */
+  /** Chips in a column (the bigger stop on top) and an upright ruler beside them (bigger numbers on top too),
+   *  moved by an up-and-down swipe: the ruler follows the finger, so moving down zooms in. */
   vertical?: boolean;
 }) {
   const [dialing, setDialing] = useState(false);
@@ -56,7 +57,8 @@ export function ZoomDial({ zoom, max, onZoom, disabled = false, className = "", 
       setDialing(true);
       setShown(true);
     }
-    onZoom(dialZoom(d.from, along, max));
+    // Upright ruler: its bigger numbers are on top and it follows the finger, so moving down zooms in.
+    onZoom(dialZoom(d.from, vertical ? -along : along, max));
   };
   const up = (e: ReactPointerEvent<HTMLDivElement>) => {
     const d = drag.current;
@@ -93,7 +95,7 @@ export function ZoomDial({ zoom, max, onZoom, disabled = false, className = "", 
         </div>
       )}
       <div className="ar-zoom-lenses touch-none" data-vertical={vertical || undefined} role="group"
-        aria-label={`Zoom della fotocamera: tocca un numero o scorri ${vertical ? "in su o in giù" : "di lato"}`} data-camera-controls
+        aria-label={`Zoom della fotocamera: tocca un numero o scorri ${vertical ? "in giù per ingrandire" : "di lato"}`} data-camera-controls
         onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
         onClickCapture={(e) => { if (swallowClick.current) { swallowClick.current = false; e.stopPropagation(); e.preventDefault(); } }}>
         {vertical ? side(higher, 2, "2x", "Aumenta zoom") : side(lower, 0.5, "0.5x", "Riduci zoom")}
