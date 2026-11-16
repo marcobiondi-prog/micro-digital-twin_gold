@@ -1939,6 +1939,16 @@ export function ArCamera({
     </aside>
   );
 
+  const burstThumb = burstShots.length > 0 && (
+            // The multiple shot taken by holding the shutter: its last photo with the count; a tap opens the strip
+            // to drop some and add them, closing the camera adds them anyway.
+            <button type="button" onClick={() => setBurst((b) => !b)} aria-expanded={burst}
+              aria-label={`${burstShots.length} foto del multiplo · ${burst ? "chiudi" : "rivedi"}`}
+              className="relative size-11 shrink-0 rounded-xl ring-2 ring-white/80 shadow-lg active:scale-95">
+              <img src={burstShots[burstShots.length - 1]!.thumb} alt="" className="size-full rounded-xl object-cover" />
+              <span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-[#00e5ff] px-1 text-[11px] font-bold text-black">{burstShots.length}</span>
+            </button>
+  );
   // The multiple shot's review: a dark sheet rising from the bottom like the camera's, a grid of the shots (a tap
   // sets one aside, greyed with ✕), "Scarta tutte" and "Aggiungi n" (the rest goes to the project, the camera stays open).
   const keptShots = burstShots.filter((s) => !discarded.has(s.id));
@@ -2161,16 +2171,7 @@ export function ArCamera({
         </div>
       ) : (
         <div className="flex items-center justify-center gap-2">
-          {burstShots.length > 0 && (
-            // The multiple shot taken by holding the shutter: its last photo with the count; a tap opens the strip
-            // to drop some and add them, closing the camera adds them anyway.
-            <button type="button" onClick={() => setBurst((b) => !b)} aria-expanded={burst}
-              aria-label={`${burstShots.length} foto del multiplo · ${burst ? "chiudi" : "rivedi"}`}
-              className="relative size-11 shrink-0 rounded-xl ring-2 ring-white/80 shadow-lg active:scale-95">
-              <img src={burstShots[burstShots.length - 1]!.thumb} alt="" className="size-full rounded-xl object-cover" />
-              <span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-[#00e5ff] px-1 text-[11px] font-bold text-black">{burstShots.length}</span>
-            </button>
-          )}
+          {!landscape && burstThumb}
           <Button
             variant="ghost"
             type="button"
@@ -2338,6 +2339,10 @@ export function ArCamera({
             )}
             {burstFlash > 0 && <div key={burstFlash} onAnimationEnd={() => setBurstFlash(0)} className="burst-flash pointer-events-none fixed inset-0 bg-white" aria-hidden="true" />}
             {burstSheetElement}
+            {landscape && burstThumb && (
+              // Landscape: the series' thumbnail in the bottom right corner, under the shutter and the tools.
+              <div className="absolute z-30" data-camera-controls style={{ right: "calc(env(safe-area-inset-right) + 1.6rem)", bottom: "calc(env(safe-area-inset-bottom) + 0.9rem)" }}>{burstThumb}</div>
+            )}
 
             {landscape ? (
               <div className="ar-landscape-layout" data-camera-controls>
