@@ -15,7 +15,7 @@ import { contactShadow, floorLoop, objectMesh } from "@/views/ar-object-meshes";
 import { ZoomDial } from "@/views/ZoomDial";
 import { ArcZoomDial } from "@/views/ArcZoomDial";
 import { ZOOM_MAX } from "@/lib/camera-zoom";
-import { setCameraTorch, supportsCameraTorch } from "@/lib/camera-torch";
+import { probeCameraTorch, setCameraTorch, supportsCameraTorch } from "@/lib/camera-torch";
 import { HOLD_MS, useHoldBurst } from "@/lib/hold-burst";
 import { BurstReviewSheet, BurstThumb, burstThumbOf, type BurstShot } from "@/views/BurstReview";
 
@@ -153,23 +153,31 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   // Flash: the camera's own torch, in the preview only (with ARCore the browser owns the camera and gives the page
   // no way to light it). It starts as the AI camera left it, and is switched off when the AR view closes.
   const torchTrack = stream?.getVideoTracks()[0];
-  const torchOk = !session && supportsCameraTorch(torchTrack);
+  const [torchFound, setTorchFound] = useState(false);
+  useEffect(() => {
+    setTorchFound(false);
+    if (session || !torchTrack) return;
+    let gone = false;
+    void probeCameraTorch(torchTrack).then((ok) => { if (!gone) setTorchFound(ok); });
+    return () => { gone = true; };
+  }, [session, torchTrack]);
+  const torchOk = !session && (supportsCameraTorch(torchTrack) || torchFound);
   const [torchOn, setTorchOn] = useState(() => {
     try { return !!(torchTrack?.getSettings() as MediaTrackSettings & { torch?: boolean } | undefined)?.torch; } catch { return false; }
   });
   const toggleTorch = async () => {
     const next = !torchOn;
-    if (await setCameraTorch(torchTrack, next)) { setTorchOn(next); hapticTick([10]); }
+    if (await setCameraTorch(torchTrack, next, true)) { setTorchOn(next); hapticTick([10]); }
     else setNotice({ text: "Non riesco ad accendere il flash di questa fotocamera.", tone: "warn" });
   };
-  useEffect(() => () => { if (torchTrack) void setCameraTorch(torchTrack, false); }, [torchTrack]);
+  useEffect(() => () => { if (torchTrack) void setCameraTorch(torchTrack, false, true); }, [torchTrack]);
   // Come from ARCore through its flash button: the preview opens with the torch already on.
   const torchAsked = useRef(false);
   useEffect(() => {
     if (!torch || torchAsked.current || !torchOk) return;
     torchAsked.current = true;
     // Some phones refuse the torch for a moment while the camera is still starting: try a few times.
-    const tryOn = (left: number) => void setCameraTorch(torchTrack, true).then((ok) => {
+    const tryOn = (left: number) => void setCameraTorch(torchTrack, true, true).then((ok) => {
       if (ok) { setTorchOn(true); hapticTick([10]); setNotice({ text: "Flash acceso: sei nell’anteprima senza ARCore (le misure sono indicative)", tone: "ok" }); }
       else if (left > 0) window.setTimeout(() => tryOn(left - 1), 400);
       else setNotice({ text: "Non riesco ad accendere il flash: toccalo di nuovo in alto a destra.", tone: "warn" });

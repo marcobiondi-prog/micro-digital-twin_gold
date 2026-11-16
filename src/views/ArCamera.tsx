@@ -6,7 +6,7 @@ import { ArLive, requestArSession } from "@/views/ArLive";
 import { recognisedPlants } from "@/models/ar-objects";
 import { toast } from "sonner";
 import { Activity, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grape, Leaf, Minus, Rows3, Shovel, TreeDeciduous, Snowflake, Umbrella, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Star, TreePine, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
-import { supportsCameraTorch, setCameraTorch } from "@/lib/camera-torch";
+import { supportsCameraTorch, setCameraTorch, probeCameraTorch } from "@/lib/camera-torch";
 import { detectArObject, getReferencePhoto, type Detection, type Soil } from "@/controllers/ar-detect.functions";
 import { gbifPhotoSearchUrl, pickGbifPhoto, type ReferencePhoto } from "@/models/ar-reference-photo";
 import { findSubject, frameUsable, SEARCH_BOX, smoothBox, type SubjectBox } from "@/lib/ar-subject-tracker";
@@ -465,7 +465,7 @@ export function ArCamera({
     if (torchBusy || !torchSupported || scanning) return;
     setTorchBusy(true); setTorchError(null);
     const next = !torchOn;
-    const enabled = await setCameraTorch(streamRef.current?.getVideoTracks()[0], next);
+    const enabled = await setCameraTorch(streamRef.current?.getVideoTracks()[0], next, true);
     if (enabled) setTorchOn(next);
     else setTorchError("Impossibile attivare il flash su questo dispositivo.");
     setTorchBusy(false);
@@ -752,6 +752,7 @@ export function ArCamera({
         streamRef.current = stream;
         setStreamN((n) => n + 1);
         setTorchSupported(supportsCameraTorch(stream.getVideoTracks()[0]));
+        void probeCameraTorch(stream.getVideoTracks()[0]).then((ok) => { if (!cancelled && ok) setTorchSupported(true); });
         zoomRangeRef.current = trackZoomRange(stream.getVideoTracks()[0]);
         zoomerRef.current = zoomRangeRef.current ? createTrackZoomer(stream.getVideoTracks()[0]) : null;
         digitalZoomRef.current = 1; zoomRef.current = 1; setZoomState(1);

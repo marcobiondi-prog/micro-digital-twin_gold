@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Camera, Check, Star, Trash2, X, Zap, ZapOff } from "lucide-react";
-import { setCameraTorch, supportsCameraTorch } from "@/lib/camera-torch";
+import { probeCameraTorch, setCameraTorch, supportsCameraTorch } from "@/lib/camera-torch";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { releaseSystemCamera } from "@/lib/system-camera";
@@ -123,7 +123,7 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
   const [torchNote, setTorchNote] = useState("");
   const toggleTorch = async () => {
     const next = torch !== "on";
-    const ok = await setCameraTorch(streamRef.current?.getVideoTracks()[0], next);
+    const ok = await setCameraTorch(streamRef.current?.getVideoTracks()[0], next, true);
     if (ok) { setTorch(next ? "on" : "off"); setTorchNote(""); }
     else setTorchNote("Impossibile accendere il flash su questo telefono.");
   };  // Zoom like the AI camera: pinch on the preview or the lens chips 1·2·3·5; the camera's own (hardware) zoom first,
@@ -146,7 +146,7 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
     if (hardware !== null) {
       zoomerRef.current?.(hardware);
       // Some phones drop the torch when the zoom constraint is applied: turn it back on once the zoom settles.
-      if (torchOnRef.current) { window.clearTimeout(torchTimer.current); torchTimer.current = window.setTimeout(() => void setCameraTorch(streamRef.current?.getVideoTracks()[0], true), 350); }
+      if (torchOnRef.current) { window.clearTimeout(torchTimer.current); torchTimer.current = window.setTimeout(() => void setCameraTorch(streamRef.current?.getVideoTracks()[0], true, true), 350); }
     }
     const d = mode === "video" ? 1 : rest;
     digitalRef.current = d;
@@ -211,6 +211,7 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
         zoomRef.current = 1; digitalRef.current = 1; setZoomState(1); setDigital(1);
         setCanZoom(mode !== "video" || !!zoomRangeRef.current);
         setTorch(supportsCameraTorch(track) ? "off" : "none"); setTorchNote("");
+        if (!supportsCameraTorch(track)) void probeCameraTorch(track).then((ok) => { if (!cancelled && ok) setTorch((t) => (t === "none" ? "off" : t)); });
         if (!cancelled) setReady(true);
       } catch (cause) {
         if (cancelled) return;
