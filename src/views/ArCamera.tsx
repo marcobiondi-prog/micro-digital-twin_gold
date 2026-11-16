@@ -1670,6 +1670,7 @@ export function ArCamera({
     setLiveAr(null);
     had?.root.remove();
     if (had?.session) setCamEpoch((n) => n + 1);
+    setTorchOn(false); // the AR view switches the flash off as it closes
     // Back to the camera's fullscreen (and so to its landscape) if the AR session left it; the exit tap counts.
     arTransitionRef.current = true;
     void resetAppOrientation();

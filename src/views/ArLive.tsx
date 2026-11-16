@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { toast } from "sonner";
-import { Check, ChevronDown, ChevronLeft, RotateCw, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, RotateCw, Zap, ZapOff, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
 import type { ArKind } from "@/models/ar-focus";
 import {
   AR_OBJECTS, alignFromFix, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, arObject, enToAr, metresText, objectsToZones, toEN,
@@ -15,6 +15,7 @@ import { contactShadow, floorLoop, objectMesh } from "@/views/ar-object-meshes";
 import { ZoomDial } from "@/views/ZoomDial";
 import { ArcZoomDial } from "@/views/ArcZoomDial";
 import { ZOOM_MAX } from "@/lib/camera-zoom";
+import { setCameraTorch, supportsCameraTorch } from "@/lib/camera-torch";
 
 /**
  * «Prova» in live view with ARCore (WebXR immersive-ar, Chrome on Android): the phone's own camera with the floor found
@@ -124,6 +125,19 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const videoRef = useRef<HTMLVideoElement>(null);
   // Messages written over the camera: the app's toasts sit under the camera's dialog.
   const [notice, setNotice] = useState<{ text: string; tone: "ok" | "warn" } | null>(null);
+  // Flash: the camera's own torch, in the preview only (with ARCore the browser owns the camera and gives the page
+  // no way to light it). It starts as the AI camera left it, and is switched off when the AR view closes.
+  const torchTrack = stream?.getVideoTracks()[0];
+  const torchOk = !session && supportsCameraTorch(torchTrack);
+  const [torchOn, setTorchOn] = useState(() => {
+    try { return !!(torchTrack?.getSettings() as MediaTrackSettings & { torch?: boolean } | undefined)?.torch; } catch { return false; }
+  });
+  const toggleTorch = async () => {
+    const next = !torchOn;
+    if (await setCameraTorch(torchTrack, next)) { setTorchOn(next); hapticTick([10]); }
+    else setNotice({ text: "Non riesco ad accendere il flash di questa fotocamera.", tone: "warn" });
+  };
+  useEffect(() => () => { if (torchTrack) void setCameraTorch(torchTrack, false); }, [torchTrack]);
   useEffect(() => {
     const v = videoRef.current;
     if (v && stream) { v.srcObject = stream; void v.play().catch(() => undefined); }
@@ -551,6 +565,13 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
           {!session && !notice && !barExpanded && <span className="shrink-0 rounded-full bg-[#facc15] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-black">Anteprima</span>}
           {!notice && <ChevronDown className={`size-4 shrink-0 opacity-80 transition-transform ${barExpanded ? "rotate-180" : ""}`} aria-hidden="true" />}
         </button>
+        {torchOk && (
+          <button type="button" onClick={() => void toggleTorch()} aria-pressed={torchOn}
+            aria-label={torchOn ? "Disattiva flash" : "Attiva flash"} title={torchOn ? "Disattiva flash" : "Attiva flash"}
+            className={`ml-auto ${round} ${torchOn ? "bg-white/90 text-black" : ""}`}>
+            {torchOn ? <Zap className="size-5 fill-yellow-400 text-yellow-500" /> : <ZapOff className="size-5" />}
+          </button>
+        )}
 
       </div>
       {trayOpen && <button type="button" tabIndex={-1} aria-label="Chiudi le funzioni AI" onClick={() => setTrayOpen(false)} className="pointer-events-auto fixed inset-0 z-0 cursor-default" />}
