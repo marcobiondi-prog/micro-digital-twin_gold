@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { toast } from "sonner";
-import { Check, ChevronDown, ChevronLeft, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, RotateCw, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
 import type { ArKind } from "@/models/ar-focus";
 import {
   AR_OBJECTS, alignFromFix, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, arObject, enToAr, metresText, objectsToZones, toEN,
@@ -73,7 +73,28 @@ type V = { x: number; y: number; z: number };
  * camera on a floor guessed from how the phone is held (eyes at 1,5 m, the floor's tilt from the phone's tilt), so sizes
  * are close but not anchored. With a session it is the real live AR.
  */
-export function ArLive({ kind, session, stream = null, plants = [], onShot, onEnd }: { kind: ArKind; session: XRSession | null; stream?: MediaStream | null; plants?: ArObjectDef[]; onShot?: (file: File) => void; onEnd: () => void }) {
+export function ArLive({ kind, session, stream = null, plants = [], onShot, onEnd, onRotate }: { kind: ArKind; session: XRSession | null; stream?: MediaStream | null; plants?: ArObjectDef[]; onShot?: (file: File) => void; onEnd: () => void; onRotate?: () => void }) {
+  // Chrome locks the screen to the orientation the AR session started in, and a web page cannot unlock it. When the
+  // phone is held the other way for a moment, a tap restarts the session in the new orientation (onRotate).
+  const [turned, setTurned] = useState(false);
+  useEffect(() => {
+    if (!session || !onRotate) return;
+    const lockedLandscape = window.innerWidth > window.innerHeight;
+    let since = 0;
+    const onMotion = (e: DeviceMotionEvent) => {
+      const g = e.accelerationIncludingGravity;
+      if (!g || g.x == null || g.y == null) return;
+      const ax = Math.abs(g.x), ay = Math.abs(g.y);
+      if (Math.max(ax, ay) < 4) return; // flat: no side is down
+      const heldLandscape = ax > ay * 1.3, heldPortrait = ay > ax * 1.3;
+      const other = lockedLandscape ? heldPortrait : heldLandscape;
+      const now = performance.now();
+      if (other) { if (!since) since = now; if (now - since > 800) setTurned(true); }
+      else if (lockedLandscape ? heldLandscape : heldPortrait) { since = 0; setTurned(false); }
+    };
+    window.addEventListener("devicemotion", onMotion);
+    return () => window.removeEventListener("devicemotion", onMotion);
+  }, [session, onRotate]);
   // The plants recognised by «Rileva» come first (key "p:<i>"), then the flow's own objects (key = their id).
   const choices = useMemo(() => [
     ...plants.map((d, i) => ({ key: `p:${i}`, def: d })),
@@ -497,6 +518,16 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
             <span className="absolute left-3 top-0 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-semibold">Orizzonte</span>
           </div>
         </div>
+      </div>
+    )}
+    {turned && onRotate && (
+      <div className="pointer-events-none fixed inset-0 z-[55] grid place-items-center p-6">
+        <button type="button" onClick={() => { setTurned(false); onRotate(); }}
+          className="pointer-events-auto flex max-w-xs flex-col items-center gap-2 rounded-[28px] bg-black/70 px-6 py-5 text-center text-white shadow-2xl ring-1 ring-white/15 backdrop-blur">
+          <RotateCw className="size-8 text-[#00e5ff]" aria-hidden="true" />
+          <span className="text-base font-semibold">Tocca per ruotare la vista AR</span>
+          <span className="text-xs opacity-75">La realtà aumentata resta nel verso in cui è partita: la riavvio girata. Gli oggetti posati si azzerano.</span>
+        </button>
       </div>
     )}
     {flash > 0 && <div key={flash} className="pointer-events-none fixed inset-0 z-[60] animate-out fade-out-0 bg-white duration-300 fill-mode-forwards" aria-hidden="true" />}

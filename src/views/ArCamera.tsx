@@ -335,7 +335,8 @@ export function ArCamera({
   const [arCoreActive, setArCoreActive] = useState(false);
   const arCoreRef = useRef<ArCoreManager | null>(null);
   // «Prova» live: the WebXR session (null = the preview without ARCore) and the element its overlay lives in.
-  const [liveAr, setLiveAr] = useState<{ session: XRSession | null; root: HTMLElement } | null>(null);
+  const [liveAr, setLiveAr] = useState<{ session: XRSession | null; root: HTMLElement; n?: number } | null>(null);
+  const restartingRef = useRef(false);
   const [camEpoch, setCamEpoch] = useState(0);
   const [onPhone, setOnPhone] = useState(false);
   useEffect(() => {
@@ -1641,7 +1642,29 @@ export function ArCamera({
     }
     if ((next === "prova") !== proving) toggleAr(e);
   };
+  // Turning the phone during AR: Chrome keeps the session in the orientation it started in, so the session is ended,
+  // the screen left to turn, and a new one asked — all inside the tap on «Tocca per ruotare» (its activation lasts).
+  const rotateLive = () => {
+    const had = liveArRef.current;
+    if (!had?.session) return;
+    restartingRef.current = true;
+    arTransitionRef.current = true;
+    const wait = (ms: number) => new Promise((r) => window.setTimeout(r, ms));
+    void had.session.end().catch(() => undefined)
+      .then(() => wait(600))
+      .then(() => { void resetAppOrientation(); return wait(500); })
+      .then(() => requestArSession(had.root))
+      .then((session) => { setLiveAr({ session, root: had.root, n: (had.n ?? 0) + 1 }); void resetAppOrientation(); })
+      .catch((err: unknown) => {
+        toast.error("Non riesco a riavviare l’AR", { description: `${err instanceof Error ? err.message : String(err)} · Uso l’anteprima.` });
+        had.root.remove();
+        setCamEpoch((n) => n + 1);
+        setLiveAr({ session: null, root: liveRootEl(), n: (had.n ?? 0) + 1 });
+      })
+      .finally(() => { restartingRef.current = false; window.setTimeout(() => { arTransitionRef.current = false; }, 1500); });
+  };
   const endLive = () => {
+    if (restartingRef.current) return;
     const had = liveAr;
     setLiveAr(null);
     had?.root.remove();
@@ -1660,7 +1683,7 @@ export function ArCamera({
   const liveView = liveAr ? createPortal(
     // The camera's own gestures (close swipe, tap to place) must not see the live view's taps.
     <div onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()} onPointerMove={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
-      <ArLive kind={kind} session={liveAr.session} stream={liveAr.session ? null : streamRef.current} plants={arPlants} onShot={(f) => onCapture([f])} onEnd={endLive} />
+      <ArLive key={liveAr.n ?? 0} kind={kind} session={liveAr.session} stream={liveAr.session ? null : streamRef.current} plants={arPlants} onShot={(f) => onCapture([f])} onEnd={endLive} onRotate={rotateLive} />
     </div>, liveAr.root) : null;
   // «Prova» is for phones only: on tablets and computers the camera stays on «Rileva» and the switch is not shown.
   const modeSwitch = !onPhone ? null : (
