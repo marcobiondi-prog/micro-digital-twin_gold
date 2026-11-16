@@ -10,13 +10,15 @@ import * as THREE from "three";
  */
 
 /** Whether the depth is asked with the session, kept on this phone. */
-const WANT_KEY = "mdt-ar-depth-v1", FLIP_KEY = "mdt-ar-depth-flip-v1";
+const WANT_KEY = "mdt-ar-depth-v1", FLIP_KEY = "mdt-ar-depth-flip-v2";
 // On by default (the objects must see the room around them); «Spegni profondità» keeps it off on this phone.
 export function depthWanted(): boolean { try { return localStorage.getItem(WANT_KEY) !== "off"; } catch { return true; } }
 export function setDepthWanted(on: boolean) { try { localStorage.setItem(WANT_KEY, on ? "on" : "off"); } catch { /* private mode */ } }
 /** How the depth map is turned against the screen, to find the right one by trying: 0…3. */
 export const FLIP_MODES = 4;
-export function depthFlip(): number { try { const n = Number(localStorage.getItem(FLIP_KEY)); return n >= 0 && n < FLIP_MODES ? n : 0; } catch { return 0; } }
+// Default 1 (the framebuffer's own y): with the spec's top-left reading (0) on the user's Xperia the far part of the
+// screen read the near floor's depth and everything vanished. The key moved to v2 so the old choice does not stick.
+export function depthFlip(): number { try { const v = localStorage.getItem(FLIP_KEY); const n = v === null ? 1 : Number(v); return n >= 0 && n < FLIP_MODES ? n : 1; } catch { return 1; } }
 export function setDepthFlip(n: number) { try { localStorage.setItem(FLIP_KEY, String(n)); } catch { /* private mode */ } }
 
 /** The depth asked with the session: CPU-side, as Chrome on ARCore gives it. */
@@ -63,7 +65,8 @@ void main() {
   vec2 duv = (uvT * vec4(uv, 0.0, 1.0)).xy;
   float m = texture(depthTex, duv).r;
   if (m <= 0.0 || duv.x < 0.0 || duv.y < 0.0 || duv.x > 1.0 || duv.y > 1.0) { gl_FragDepth = 1.0; return; }
-  vec4 c = proj * vec4(0.0, 0.0, -(m + bias), 1.0);
+  // The depth map is coarse and noisy, more so far away: a margin growing with the distance keeps things on the floor.
+  vec4 c = proj * vec4(0.0, 0.0, -(m + bias + 0.05 * m), 1.0);
   gl_FragDepth = clamp(c.z / c.w * 0.5 + 0.5, 0.0, 1.0);
 }`;
 
@@ -77,7 +80,7 @@ export class DepthOccluder {
     uvT: { value: new THREE.Matrix4() },
     proj: { value: new THREE.Matrix4() },
     size: { value: new THREE.Vector2(1, 1) },
-    bias: { value: 0.08 },
+    bias: { value: 0.12 },
     flip: { value: depthFlip() },
   };
   setFlip(n: number) { this.u.flip.value = n; }
