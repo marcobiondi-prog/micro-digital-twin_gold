@@ -16,6 +16,7 @@ import { ZoomDial } from "@/views/ZoomDial";
 import { ArcZoomDial } from "@/views/ArcZoomDial";
 import { ZOOM_MAX } from "@/lib/camera-zoom";
 import { setCameraTorch, supportsCameraTorch } from "@/lib/camera-torch";
+import { HOLD_MS, useHoldBurst } from "@/lib/hold-burst";
 
 /**
  * «Prova» in live view with ARCore (WebXR immersive-ar, Chrome on Android): the phone's own camera with the floor found
@@ -127,7 +128,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   // Two fingers resize the last object put down; taps around a pinch never put a new one.
   const pinchUntil = useRef(0);
   // A photo asked with ARCore: taken in the next frame, when the camera image can be read.
-  const wantShot = useRef(false);
+  const wantShot = useRef<"" | "single" | "multi">("");
   // Whether this session gives the page the camera's image ("camera-access"): without it the shutter is hidden.
   const camShotOk = !session || !(session as XRSession & { enabledFeatures?: readonly string[] }).enabledFeatures
     || (session as XRSession & { enabledFeatures: readonly string[] }).enabledFeatures.includes("camera-access");
@@ -252,8 +253,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       }
       renderer.render(scene, camera);
       if (frame && wantShot.current) {
-        wantShot.current = false;
-        const file = captureXrPhoto(renderer, scene, reticle, session, frame);
+        const multi = wantShot.current === "multi";
+        wantShot.current = "";
+        const file = captureXrPhoto(renderer, scene, reticle, session, frame, multi);
         void file.then((f) => { if (f) savedShotRef.current(f); else setNotice({ text: "Questo telefono non dà la fotocamera all’AR: fai uno screenshot", tone: "warn" }); });
       }
     });
@@ -473,11 +475,11 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   // does not hand the camera's image to the page, so the phone's own screenshot is the way.
   const [flash, setFlash] = useState(0);
   const [shots, setShots] = useState(0);
-  const shoot = () => {
+  const shoot = (multi = false) => {
     const t = three.current, host = canvasHost.current;
     if (session) {
       // With ARCore the photo is taken in the next frame, from the camera's image and the objects drawn over it.
-      wantShot.current = true;
+      wantShot.current = multi ? "multi" : "single";
       setFlash((n) => n + 1);
       hapticTick([25]);
       return;
@@ -500,8 +502,14 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     g.drawImage(t.renderer.domElement, 0, 0, c.width, c.height);
     setFlash((n) => n + 1);
     hapticTick([25]);
-    c.toBlob((b) => { if (b) savedShotRef.current(new File([b], `foto-ar-prova-${Date.now()}.jpg`, { type: "image/jpeg" })); }, "image/jpeg", 0.9);
+    c.toBlob((b) => { if (b) savedShotRef.current(new File([b], `foto-ar-prova${multi ? "-multiplo" : ""}-${Date.now()}.jpg`, { type: "image/jpeg" })); }, "image/jpeg", 0.9);
   };
+  // Holding the shutter shoots a multiple shot (a photo every 200 ms) until the finger lifts, like the AI camera's.
+  const burst = useHoldBurst(() => shoot(true));
+  const heldShot = useRef(false);
+  const holdShotTimer = useRef<number | undefined>(undefined);
+  const releaseShot = () => { window.clearTimeout(holdShotTimer.current); if (heldShot.current) burst.onHold(false); };
+  useEffect(() => () => window.clearTimeout(holdShotTimer.current), []);
   const savedShotRef = useRef<(f: File) => void>(() => undefined);
   savedShotRef.current = (f: File) => {
     onShot?.(f);
@@ -566,7 +574,16 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
 
   // Without the camera's image (a phone giving ARCore no "camera-access") there is no shutter, only its room.
   const shutter = (outer: string, inner: string) => !camShotOk ? <span className={`${outer} shrink-0`} aria-hidden="true" /> : (
-    <button type="button" onClick={shoot} aria-label={shots ? `Scatta una foto · ${shots} fatte` : "Scatta una foto"} data-no-ui-click
+    <button type="button" aria-label={shots ? `Scatta una foto · tieni premuto per il multiplo · ${shots} fatte` : "Scatta una foto · tieni premuto per il multiplo"} data-no-ui-click
+      onClick={() => { if (heldShot.current) { heldShot.current = false; return; } shoot(); }}
+      onPointerDown={(e) => {
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+        heldShot.current = false;
+        window.clearTimeout(holdShotTimer.current);
+        holdShotTimer.current = window.setTimeout(() => { heldShot.current = true; burst.onHold(true); }, HOLD_MS);
+      }}
+      onPointerUp={releaseShot} onPointerCancel={releaseShot} onPointerLeave={releaseShot}
+      onContextMenu={(e) => e.preventDefault()}
       className={`relative grid ${outer} shrink-0 place-items-center rounded-full border-[3px] border-white bg-white/25 backdrop-blur active:scale-95`}>
       <span className={`${inner} rounded-full bg-white`} aria-hidden="true" />
       {shots > 0 && <span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-[#00e5ff] px-1 text-[11px] font-bold text-black">{shots}</span>}
@@ -776,7 +793,7 @@ const MODEL_SCALE = 0.1;
  * is read from the frame (XRWebGLBinding.getCameraImage), the objects drawn again over it into an off-screen target
  * from the same eye, and the two put together into a JPEG. Null when this phone gives no camera image.
  */
-async function captureXrPhoto(renderer: THREE.WebGLRenderer, scene: THREE.Scene, reticle: THREE.Object3D, session: XRSession, frame: XRFrame): Promise<File | null> {
+async function captureXrPhoto(renderer: THREE.WebGLRenderer, scene: THREE.Scene, reticle: THREE.Object3D, session: XRSession, frame: XRFrame, multi = false): Promise<File | null> {
   const Binding = (globalThis as unknown as { XRWebGLBinding?: new (s: XRSession, gl: WebGLRenderingContext | WebGL2RenderingContext) => { getCameraImage: (c: unknown) => WebGLTexture | null } }).XRWebGLBinding;
   const ref = renderer.xr.getReferenceSpace();
   const view = ref ? frame.getViewerPose(ref)?.views[0] : undefined;
@@ -835,7 +852,7 @@ async function captureXrPhoto(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
   og.putImageData(flip(objPx), 0, 0);
   g.drawImage(o, 0, 0);
   const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", 0.9));
-  return blob ? new File([blob], `foto-ar-prova-${Date.now()}.jpg`, { type: "image/jpeg" }) : null;
+  return blob ? new File([blob], `foto-ar-prova${multi ? "-multiplo" : ""}-${Date.now()}.jpg`, { type: "image/jpeg" }) : null;
 }
 
 type FanItem = { key: string; label: string; Icon: LucideIcon; on: boolean; plant?: boolean; tool?: boolean; aria?: string; onPick: () => void };
