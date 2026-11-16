@@ -74,7 +74,7 @@ type V = { x: number; y: number; z: number };
  * camera on a floor guessed from how the phone is held (eyes at 1,5 m, the floor's tilt from the phone's tilt), so sizes
  * are close but not anchored. With a session it is the real live AR.
  */
-export function ArLive({ kind, session, stream = null, plants = [], onShot, onEnd, onRotate }: { kind: ArKind; session: XRSession | null; stream?: MediaStream | null; plants?: ArObjectDef[]; onShot?: (file: File) => void; onEnd: () => void; onRotate?: () => void }) {
+export function ArLive({ kind, session, stream = null, plants = [], onShot, onEnd, onRotate, why }: { why?: string | undefined; kind: ArKind; session: XRSession | null; stream?: MediaStream | null; plants?: ArObjectDef[]; onShot?: (file: File) => void; onEnd: () => void; onRotate?: () => void }) {
   // Chrome locks the screen to the orientation the AR session started in, and a web page cannot unlock it. When the
   // phone is held the other way for a moment, a tap restarts the session in the new orientation (onRotate).
   const [turned, setTurned] = useState(false);
@@ -125,6 +125,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const videoRef = useRef<HTMLVideoElement>(null);
   // Messages written over the camera: the app's toasts sit under the camera's dialog.
   const [notice, setNotice] = useState<{ text: string; tone: "ok" | "warn" } | null>(null);
+  // Why the preview runs instead of ARCore: written in the status line once, at the start.
+  useEffect(() => { if (why) setNotice({ text: why, tone: "warn" }); }, [why]);
   // What the AR session really got (shown in the open status bar): to tell, on a phone, why it does not work.
   const [diag, setDiag] = useState<{ hit?: boolean; overlay?: boolean; feats?: string; frames: number; error?: string }>({ frames: 0 });
   const framesRef = useRef(0);
@@ -574,7 +576,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
             <span className={barExpanded ? "line-clamp-2" : "line-clamp-1"}>{barExpanded ? status : barShort}</span>
             {barExpanded && !notice && (
               <span id="ar-live-bar-help" className="mt-0.5 block text-xs font-normal opacity-80">
-                {barHelp}{!session && " Anteprima: senza ARCore le misure sono indicative."}
+                {barHelp}{!session && " Anteprima: senza ARCore le misure sono indicative."}{!session && why ? ` ${why}` : ""}
                 {session && (
                   <span className="mt-1 block font-mono text-[10px] opacity-70">
                     ARCore · pavimento {diag.hit === undefined ? "…" : diag.hit ? "sì" : "no"} · overlay {diag.overlay ? "sì" : "no"} · fotogrammi {diag.frames} · trovato {found ? "sì" : "no"}{diag.feats ? ` · ${diag.feats}` : ""}{diag.error ? ` · errore: ${diag.error}` : ""}

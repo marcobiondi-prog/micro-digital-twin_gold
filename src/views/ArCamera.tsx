@@ -339,7 +339,7 @@ export function ArCamera({
   const [arCoreActive, setArCoreActive] = useState(false);
   const arCoreRef = useRef<ArCoreManager | null>(null);
   // «Prova» live: the WebXR session (null = the preview without ARCore) and the element its overlay lives in.
-  const [liveAr, setLiveAr] = useState<{ session: XRSession | null; root: HTMLElement; n?: number } | null>(null);
+  const [liveAr, setLiveAr] = useState<{ session: XRSession | null; root: HTMLElement; n?: number; why?: string } | null>(null);
   const restartingRef = useRef(false);
   const [camEpoch, setCamEpoch] = useState(0);
   const [onPhone, setOnPhone] = useState(false);
@@ -1640,10 +1640,14 @@ export function ArCamera({
             root.remove();
             setCamEpoch((n) => n + 1);
             toast.error("ARCore non è partito", { description: `${err instanceof Error ? err.message : String(err)} · Uso l’anteprima.` });
-            setLiveAr({ session: null, root: liveRootEl() });
+            setLiveAr({ session: null, root: liveRootEl(), why: `ARCore non è partito (${err instanceof Error ? err.message : String(err)}): uso l’anteprima.` });
           });
       } else {
-        setLiveAr({ session: null, root: liveRootEl() });
+        // Why there is no ARCore, said over the camera (toasts sit under it).
+        const why = !navigator.xr
+          ? "Questo browser non offre la realtà aumentata: aprila in Chrome su Android per usare ARCore. Intanto uso l’anteprima."
+          : "ARCore non è disponibile su questo telefono (serve «Google Play Services per AR» aggiornato dal Play Store). Intanto uso l’anteprima.";
+        setLiveAr({ session: null, root: liveRootEl(), why });
       }
       return;
     }
@@ -1691,7 +1695,7 @@ export function ArCamera({
   const liveView = liveAr ? createPortal(
     // The camera's own gestures (close swipe, tap to place) must not see the live view's taps.
     <div onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()} onPointerMove={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
-      <ArLive key={liveAr.n ?? 0} kind={kind} session={liveAr.session} stream={liveAr.session ? null : streamRef.current} plants={arPlants} onShot={(f) => onCapture([f])} onEnd={endLive} onRotate={rotateLive} />
+      <ArLive key={liveAr.n ?? 0} kind={kind} session={liveAr.session} why={liveAr.why} stream={liveAr.session ? null : streamRef.current} plants={arPlants} onShot={(f) => onCapture([f])} onEnd={endLive} onRotate={rotateLive} />
     </div>, liveAr.root) : null;
   // «Prova» is for phones only: on tablets and computers the camera stays on «Rileva» and the switch is not shown.
   const modeSwitch = !onPhone ? null : (
