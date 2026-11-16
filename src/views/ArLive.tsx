@@ -18,6 +18,9 @@ import { ZOOM_MAX } from "@/lib/camera-zoom";
 import { probeCameraTorch, setCameraTorch, supportsCameraTorch } from "@/lib/camera-torch";
 import { HOLD_MS, useHoldBurst } from "@/lib/hold-burst";
 import { DEPTH_INIT, DepthOccluder, patchGpuDepthQuery } from "@/views/ar-depth";
+
+/** ARCore's depth (real walls hiding the objects): off after the first try on the phone. */
+const AR_DEPTH = false;
 import { BurstReviewSheet, BurstThumb, burstThumbOf, type BurstShot } from "@/views/BurstReview";
 
 /**
@@ -54,8 +57,9 @@ export async function requestArSession(overlayRoot: HTMLElement): Promise<XRSess
   // shows its own close button; a tap on the floor still puts the chosen object), then the bare session. Every
   // refusal is reported together when none starts.
   const tries: Array<[string, XRSessionInit]> = [
-    // ARCore's depth first (real walls hide the objects): optional, so a phone without it still starts.
-    ["overlay+pavimento+profondità", { requiredFeatures: ["hit-test", "dom-overlay"], optionalFeatures: ["local-floor", "camera-access", "depth-sensing"], depthSensing: DEPTH_INIT, domOverlay: { root: overlayRoot } } as unknown as XRSessionInit],
+    // ARCore's depth first (real walls hide the objects): tried on the user's Xperia it made things worse, so it is
+    // off (AR_DEPTH); true asks it again, optional, so a phone without it still starts.
+    ...(AR_DEPTH ? [["overlay+pavimento+profondità", { requiredFeatures: ["hit-test", "dom-overlay"], optionalFeatures: ["local-floor", "camera-access", "depth-sensing"], depthSensing: DEPTH_INIT, domOverlay: { root: overlayRoot } } as unknown as XRSessionInit] as [string, XRSessionInit]] : []),
     ["overlay+pavimento", { requiredFeatures: ["hit-test", "dom-overlay"], optionalFeatures: ["local-floor", "camera-access"], domOverlay: { root: overlayRoot } } as XRSessionInit],
     ["overlay", { requiredFeatures: ["dom-overlay"], optionalFeatures: ["hit-test", "local-floor", "camera-access"], domOverlay: { root: overlayRoot } } as XRSessionInit],
     ["pavimento", { requiredFeatures: ["hit-test"], optionalFeatures: ["local-floor", "camera-access"] }],
@@ -241,7 +245,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       setAlignment((cur) => cur ?? { a: alignFromFix(toEN(fix.lat, fix.lng, origin), fix.heading!), how: "gps" });
     });
     let hitSource: XRHitTestSource | null = null;
-    const occluder = session ? new DepthOccluder() : null;
+    const occluder = session && AR_DEPTH ? new DepthOccluder() : null;
     if (occluder) { occluder.enabled = depthOn; scene.add(occluder.mesh); depthRef.current = occluder; patchGpuDepthQuery(); }
     if (!session) return startPreview(renderer, scene, camera, reticle, () => { disposed = true; });
     void (async () => {
