@@ -58,15 +58,10 @@ export async function requestArSession(overlayRoot: HTMLElement): Promise<XRSess
     }
     return null;
   };
+  // Asked in the camera's fullscreen only: leaving it and coming back made Chrome show its own fullscreen notice
+  // ("trascina dall'alto…") again over the camera every time.
   const first = await attempt("");
   if (first) return first;
-  const fs = typeof document !== "undefined" ? document.fullscreenElement : null;
-  if (fs) {
-    await document.exitFullscreen().catch(() => undefined);
-    const second = await attempt("senza schermo intero, ");
-    if (second) return second;
-    await (fs as HTMLElement).requestFullscreen?.({ navigationUI: "hide" }).catch(() => undefined);
-  }
   throw new Error(report.join(" · "));
 }
 
