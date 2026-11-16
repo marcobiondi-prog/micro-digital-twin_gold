@@ -13,6 +13,7 @@ import { readFix } from "@/lib/find-position";
 import { hapticTick } from "@/lib/haptics";
 import { contactShadow, floorLoop, objectMesh } from "@/views/ar-object-meshes";
 import { realTree, wantsRealTree } from "@/views/ar-tree";
+import { ArShadows, castShadows } from "@/views/ar-shadow";
 import { XREstimatedLight } from "three/examples/jsm/webxr/XREstimatedLight.js";
 import { ZoomDial } from "@/views/ZoomDial";
 import { ArcZoomDial } from "@/views/ArcZoomDial";
@@ -211,6 +212,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   defOfRef.current = defOf;
   const live = useRef({ selected, tool, placed, alignPts, measure });
   live.current = { selected, tool, placed, alignPts, measure };
+  const shadowsRef = useRef<ArShadows | null>(null);
   const three = useRef<{ scene: THREE.Scene; reticle: THREE.Object3D; hit: V | null; objects: Map<string, THREE.Object3D>; overlay: THREE.Group; measure: THREE.Group; floorY: number | null; renderer: THREE.WebGLRenderer; camera: THREE.Camera } | null>(null);
 
   const lab = getLab();
@@ -236,6 +238,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     sun.position.set(3, 8, 2);
     scene.add(sun);
     const camera = new THREE.PerspectiveCamera();
+    // Real shadows on the floor (views/ar-shadow), from ARCore's light direction when it gives one.
+    const shadows = new ArShadows(renderer, scene);
+    shadowsRef.current = shadows;
     // ARCore's light estimate: the objects take the room's or the piazza's own light and reflections instead of the
     // fixed lights above, which come back if the estimate stops.
     let est: XREstimatedLight | null = null;
@@ -318,6 +323,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         occluder.update(frame, view, (session as XRSession & { depthDataFormat?: string }).depthDataFormat);
         if (had !== occluder.live) { setDepthLive(occluder.live); setDiag((d) => ({ ...d, depth: occluder.live })); }
       }
+      const estDir = est?.parent ? est.directionalLight?.position : null;
+      shadows.update(t.objects.values(), t.floorY, estDir);
       renderer.render(scene, camera);
       if (frame && wantShot.current) {
         const multi = wantShot.current === "multi";
@@ -388,6 +395,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       if (t) t.hit = c;
       reticle.visible = !!c;
       if (c) reticle.matrix.makeTranslation(c.x, 0.01, c.z);
+      if (t) shadowsRef.current?.update(t.objects.values(), t.floorY, null);
       renderer.render(scene, camera);
     });
     const onTap = (e: PointerEvent) => {
@@ -424,6 +432,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         if (wantsRealTree(def)) void realTree(def).then((tree) => {
           if (!tree || three.current?.objects.get(uid) !== g) return;
           for (const c of [...g.children]) if (c !== shadow) g.remove(c);
+          castShadows(tree);
           g.add(tree);
         });
         // A pergola or a shade cloth stands on posts at its edges: put by its centre, its posts fell 2 m beyond the
@@ -444,6 +453,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         }
         g.position.set(cx, hit.y, cz);
         g.scale.setScalar(modelRef.current);
+        castShadows(g);
         t.scene.add(g);
         t.objects.set(uid, g);
         setPlaced((l) => [...l, { uid, id: def.id, x: cx, z: cz, yaw, ...(def.plant ? { def } : {}) }]);
