@@ -77,7 +77,7 @@ type V = { x: number; y: number; z: number };
  * camera on a floor guessed from how the phone is held (eyes at 1,5 m, the floor's tilt from the phone's tilt), so sizes
  * are close but not anchored. With a session it is the real live AR.
  */
-export function ArLive({ kind, session, stream = null, plants = [], onShot, onEnd, onRotate, why }: { why?: string | undefined; kind: ArKind; session: XRSession | null; stream?: MediaStream | null; plants?: ArObjectDef[]; onShot?: (file: File) => void; onEnd: () => void; onRotate?: () => void }) {
+export function ArLive({ kind, session, stream = null, plants = [], onShot, onEnd, onRotate, why, burst, torch = false, onFlashPreview }: { burst: ArBurst; torch?: boolean; onFlashPreview?: () => void; why?: string | undefined; kind: ArKind; session: XRSession | null; stream?: MediaStream | null; plants?: ArObjectDef[]; onShot?: (file: File) => void; onEnd: () => void; onRotate?: () => void }) {
   // Chrome locks the screen to the orientation the AR session started in, and a web page cannot unlock it. When the
   // phone is held the other way for a moment, a tap restarts the session in the new orientation (onRotate).
   const [turned, setTurned] = useState(false);
@@ -163,6 +163,15 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     else setNotice({ text: "Non riesco ad accendere il flash di questa fotocamera.", tone: "warn" });
   };
   useEffect(() => () => { if (torchTrack) void setCameraTorch(torchTrack, false); }, [torchTrack]);
+  // Come from ARCore through its flash button: the preview opens with the torch already on.
+  const torchAsked = useRef(false);
+  useEffect(() => {
+    if (!torch || torchAsked.current || !torchOk) return;
+    torchAsked.current = true;
+    void setCameraTorch(torchTrack, true).then((ok) => {
+      if (ok) { setTorchOn(true); setNotice({ text: "Flash acceso: sei nell’anteprima senza ARCore (le misure sono indicative)", tone: "ok" }); }
+    });
+  }, [torch, torchOk, torchTrack]);
   useEffect(() => {
     const v = videoRef.current;
     if (v && stream) { v.srcObject = stream; void v.play().catch(() => undefined); }
@@ -506,36 +515,20 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     c.toBlob((b) => { if (b) savedShotRef.current(new File([b], `foto-ar-prova${multi ? "-multiplo" : ""}-${Date.now()}.jpg`, { type: "image/jpeg" }), multi); }, "image/jpeg", 0.9);
   };
   // Holding the shutter shoots a multiple shot (a photo every 200 ms) until the finger lifts, like the AI camera's.
-  const burst = useHoldBurst(() => shoot(true));
+  const holdBurst = useHoldBurst(() => shoot(true));
   const heldShot = useRef(false);
   const holdShotTimer = useRef<number | undefined>(undefined);
-  const releaseShot = () => { window.clearTimeout(holdShotTimer.current); if (heldShot.current) burst.onHold(false); };
+  const releaseShot = () => { window.clearTimeout(holdShotTimer.current); if (heldShot.current) holdBurst.onHold(false); };
   useEffect(() => () => window.clearTimeout(holdShotTimer.current), []);
-  // The multiple shot is kept here, like the AI camera's: its thumbnail beside Annulla opens the same review sheet;
-  // what is left when the AR view closes is handed over anyway.
-  const [burstShots, setBurstShots] = useState<BurstShot[]>([]);
-  const burstShotsRef = useRef(burstShots);
-  burstShotsRef.current = burstShots;
-  const [reviewOpen, setReviewOpen] = useState(false);
-  const [discarded, setDiscarded] = useState<Set<number>>(() => new Set());
-  const discardedRef = useRef(discarded);
-  discardedRef.current = discarded;
-  const onShotRef = useRef(onShot);
-  onShotRef.current = onShot;
-  useEffect(() => () => {
-    for (const b of burstShotsRef.current) if (!discardedRef.current.has(b.id)) onShotRef.current?.(b.file);
-  }, []);
-  const clearBurst = () => { burstShotsRef.current = []; setBurstShots([]); setDiscarded(new Set()); setReviewOpen(false); };
-  const addBurst = () => {
-    for (const b of burstShots) if (!discarded.has(b.id)) onShot?.(b.file);
-    setShots((n) => n + burstShots.filter((b) => !discarded.has(b.id)).length);
-    clearBurst();
-  };
+  // The multiple shot goes to the AI camera's own series (tagged "AR"): the same thumbnail and review sheet here and in
+  // Rileva, kept when the AR view closes and handed over with the camera's.
+  const burstRef = useRef(burst);
+  burstRef.current = burst;
   const savedShotRef = useRef<(f: File, multi?: boolean) => void>(() => undefined);
   savedShotRef.current = (f: File, multi = false) => {
     if (multi) {
       const id = Date.now() + Math.random();
-      void burstThumbOf(f).then((thumb) => setBurstShots((l) => [...l, { id, file: f, thumb }])).catch(() => undefined);
+      void burstThumbOf(f).then((thumb) => burstRef.current.push({ id, file: f, thumb, src: "ar" })).catch(() => undefined);
       return;
     }
     onShot?.(f);
@@ -606,7 +599,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         if (e.pointerType === "mouse" && e.button !== 0) return;
         heldShot.current = false;
         window.clearTimeout(holdShotTimer.current);
-        holdShotTimer.current = window.setTimeout(() => { heldShot.current = true; burst.onHold(true); }, HOLD_MS);
+        holdShotTimer.current = window.setTimeout(() => { heldShot.current = true; holdBurst.onHold(true); }, HOLD_MS);
       }}
       onPointerUp={releaseShot} onPointerCancel={releaseShot} onPointerLeave={releaseShot}
       onContextMenu={(e) => e.preventDefault()}
@@ -692,9 +685,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     )}
     {flash > 0 && <div key={flash} className="pointer-events-none fixed inset-0 z-[60] animate-out fade-out-0 bg-white duration-300 fill-mode-forwards" aria-hidden="true" />}
     <div ref={hudRef} className="ar-live-hud pointer-events-none fixed inset-0 z-50 flex select-none flex-col justify-between text-white [-webkit-touch-callout:none]" style={{ padding: `${session ? "max(env(safe-area-inset-top), 1.5rem)" : "env(safe-area-inset-top)"} env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)` }}>
-      {reviewOpen && burstShots.length > 0 && (
-      <BurstReviewSheet fixed shots={burstShots} discarded={discarded} onClose={() => setReviewOpen(false)} onAdd={addBurst} onDiscardAll={clearBurst}
-        onToggleShot={(id) => setDiscarded((d) => { const n = new Set(d); if (n.has(id)) n.delete(id); else n.add(id); return n; })} />
+      {burst.open && burst.shots.length > 0 && (
+      <BurstReviewSheet fixed shots={burst.shots} discarded={burst.discarded} onClose={() => burst.setOpen(false)} onAdd={burst.add} onDiscardAll={burst.discardAll} onToggleShot={burst.toggle} />
     )}
       <div className={`pointer-events-auto flex items-center gap-2 p-3 ${arcOn ? "landscape:pr-[250px]" : ""}`}>
         <button type="button" onClick={end} aria-label="Esci dalla realtà aumentata e torna alla fotocamera AI"
@@ -723,9 +715,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         {session && (
           // With ARCore the phone's camera belongs to ARCore and Chrome gives the page no flash: the button stays where
           // it is in the preview, dimmed, and a tap says why.
-          <button type="button" aria-disabled="true" aria-label="Flash non disponibile con ARCore" title="Flash non disponibile con ARCore"
-            onClick={() => setNotice({ text: "Con ARCore il flash non si può accendere: Chrome dà la fotocamera solo ad ARCore. Accendi una luce, aiuta anche a trovare il pavimento.", tone: "warn" })}
-            className={`ml-auto ${round} opacity-60`}>
+          <button type="button" aria-label="Accendi il flash: passa all’anteprima senza ARCore" title="Flash (passa all’anteprima)"
+            onClick={() => onFlashPreview ? onFlashPreview() : setNotice({ text: "Con ARCore il flash non si può accendere: Chrome dà la fotocamera solo ad ARCore. Accendi una luce, aiuta anche a trovare il pavimento.", tone: "warn" })}
+            className={`ml-auto ${round}`}>
             <ZapOff className="size-5" />
           </button>
         )}
@@ -762,7 +754,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
             </button>
             </div>
             <button type="button" onClick={undo} disabled={!placed.length} aria-label="Annulla l’ultimo" className={`${round} disabled:opacity-40`}><Undo2 className="size-5" /></button>
-            <BurstThumb shots={burstShots} open={reviewOpen} onToggle={() => setReviewOpen((o) => !o)} />
+            <BurstThumb shots={burst.shots} open={burst.open} onToggle={() => burst.setOpen((o) => !o)} />
             </div>
             <div className="landscape:hidden">{shutter("size-14", "size-10")}</div>
             <button type="button" onClick={backToMap} disabled={!placed.length}
@@ -827,6 +819,12 @@ function saveFloorOffset(v: number) {
 }
 
 const MODEL_SCALE = 0.1;
+
+/** The AI camera's multiple shot, shared with the AR view. */
+export type ArBurst = {
+  shots: readonly BurstShot[]; open: boolean; setOpen: (v: boolean | ((o: boolean) => boolean)) => void;
+  discarded: ReadonlySet<number>; toggle: (id: number) => void; add: () => void; discardAll: () => void; push: (s: BurstShot) => void;
+};
 
 /**
  * A photo with ARCore (the page sees no camera otherwise): with the session's "camera-access" the camera's own image

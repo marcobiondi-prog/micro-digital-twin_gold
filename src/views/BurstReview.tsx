@@ -1,6 +1,7 @@
 import { Check, X } from "lucide-react";
 
-export type BurstShot = { id: number; file: File; thumb: string };
+/** src: where it was shot — "ar" in the AR view, "ai" in Rileva (shown as a tag on each photo). */
+export type BurstShot = { id: number; file: File; thumb: string; src?: "ar" | "ai" };
 
 /**
  * The multiple shot's thumbnail (its last photo, the count in a turquoise badge) and its review sheet — shared by the
@@ -52,6 +53,7 @@ export function BurstReviewSheet({ shots, discarded, onToggleShot, onClose, onAd
                   className="relative block aspect-square h-auto w-full overflow-hidden rounded-xl bg-black/40">
                   <img src={s.thumb} alt="" className={`size-full object-cover transition ${off ? "scale-90 opacity-35 grayscale" : ""}`} />
                   <span className="absolute bottom-1 left-1 rounded-full bg-black/70 px-1.5 text-[10px] font-bold">{i + 1}</span>
+                  {s.src && <span className={`absolute right-1 top-1 rounded-full px-1.5 py-px text-[10px] font-bold ${s.src === "ar" ? "bg-violet-500 text-white" : "bg-[#00e5ff] text-black"}`}>{s.src === "ar" ? "AR" : "AI"}</span>}
                   {off && <span className="absolute inset-0 grid place-items-center"><span className="grid size-9 place-items-center rounded-full bg-black/75 ring-1 ring-white/40"><X className="size-5" aria-hidden="true" /></span></span>}
                 </button>
               );

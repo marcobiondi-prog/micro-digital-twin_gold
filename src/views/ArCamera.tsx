@@ -58,7 +58,7 @@ import { tutorialSwipeStep } from "@/lib/ar-tutorial-swipe";
 import { CameraCenterCapture } from "@/views/CameraCenterCapture";
 import { CameraCaptureControl } from "@/views/CameraCaptureControl";
 import { useHoldBurst } from "@/lib/hold-burst";
-import { BurstReviewSheet } from "@/views/BurstReview";
+import { BurstReviewSheet, type BurstShot } from "@/views/BurstReview";
 import { ZoomDial } from "@/views/ZoomDial";
 import { ArcZoomDial } from "@/views/ArcZoomDial";
 import { playAiShutter, playCameraSound, preloadAiShutter, startScanLoop } from "@/lib/camera-sounds";
@@ -118,13 +118,15 @@ export function ArCamera({
   // Multiple shot (Multiplo): the AI camera stays open, each shutter tap keeps one more captioned photo, and "Fine"
   // (or closing, Back included) adds them all at once — nothing shot is lost.
   const [burst, setBurst] = useState(false);
-  const [burstShots, setBurstShots] = useState<Array<{ id: number; file: File; thumb: string }>>([]);
+  const [burstShots, setBurstShots] = useState<BurstShot[]>([]);
   const [bestShotId, setBestShotId] = useState<number | null>(null);
   const burstRef = useRef(burstShots);
   burstRef.current = burstShots;
   const bestShotIdRef = useRef(bestShotId);
   bestShotIdRef.current = bestShotId;
   const [burstFlash, setBurstFlash] = useState(0);
+  // The review sheet's actions, defined further down, reached from the AR view built before them.
+  const burstActs = useRef({ add: () => {}, discardAll: () => {} });
   // Review sheet of the multiple shot: shots tapped there are set aside and left out when the rest is added.
   const [discarded, setDiscarded] = useState<Set<number>>(() => new Set());
   const discardedRef = useRef(discarded);
@@ -340,7 +342,7 @@ export function ArCamera({
   const [arCoreActive, setArCoreActive] = useState(false);
   const arCoreRef = useRef<ArCoreManager | null>(null);
   // «Prova» live: the WebXR session (null = the preview without ARCore) and the element its overlay lives in.
-  const [liveAr, setLiveAr] = useState<{ session: XRSession | null; root: HTMLElement; n?: number; why?: string } | null>(null);
+  const [liveAr, setLiveAr] = useState<{ session: XRSession | null; root: HTMLElement; n?: number; why?: string; torch?: boolean } | null>(null);
   const restartingRef = useRef(false);
   const [camEpoch, setCamEpoch] = useState(0);
   const [onPhone, setOnPhone] = useState(false);
@@ -1539,7 +1541,7 @@ export function ArCamera({
       saved.toBlob((b) => {
         if (!b) return;
         const file = new File([b], `foto-ar${tag}-multiplo-${id}.jpg`, { type: "image/jpeg" });
-        setBurstShots((p) => [...p, { id, file, thumb }]);
+        setBurstShots((p) => [...p, { id, file, thumb, src: "ai" }]);
         setBestShotId(id);
       }, "image/jpeg", 0.88);
       return;
@@ -1687,6 +1689,22 @@ export function ArCamera({
       })
       .finally(() => { restartingRef.current = false; window.setTimeout(() => { arTransitionRef.current = false; }, 1500); });
   };
+  // The flash with ARCore: ARCore holds the camera and Chrome gives the page no torch, so a tap on the flash leaves
+  // ARCore for the preview (the app's own camera) with the torch on.
+  const flashPreview = () => {
+    const had = liveArRef.current;
+    if (!had?.session) return;
+    restartingRef.current = true;
+    arTransitionRef.current = true;
+    void had.session.end().catch(() => undefined)
+      .then(() => {
+        had.root.remove();
+        setCamEpoch((n) => n + 1);
+        setLiveAr({ session: null, root: liveRootEl(), n: (had.n ?? 0) + 1, torch: true });
+        regainFullscreen();
+      })
+      .finally(() => { restartingRef.current = false; window.setTimeout(() => { arTransitionRef.current = false; }, 1500); });
+  };
   const endLive = () => {
     if (restartingRef.current) return;
     const had = liveAr;
@@ -1708,7 +1726,10 @@ export function ArCamera({
   const liveView = liveAr ? createPortal(
     // The camera's own gestures (close swipe, tap to place) must not see the live view's taps.
     <div onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()} onPointerMove={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
-      <ArLive key={liveAr.n ?? 0} kind={kind} session={liveAr.session} why={liveAr.why} stream={liveAr.session ? null : streamRef.current} plants={arPlants} onShot={(f) => onCapture([f])} onEnd={endLive} onRotate={rotateLive} />
+      <ArLive key={liveAr.n ?? 0} kind={kind} session={liveAr.session} why={liveAr.why} stream={liveAr.session ? null : streamRef.current} plants={arPlants} onShot={(f) => onCapture([f])} onEnd={endLive} onRotate={rotateLive} torch={liveAr.torch ?? false} onFlashPreview={flashPreview}
+        burst={{ shots: burstShots, open: burst, setOpen: setBurst, discarded, add: () => burstActs.current.add(), discardAll: () => burstActs.current.discardAll(),
+          push: (shot) => setBurstShots((p) => [...p, shot]),
+          toggle: (id) => setDiscarded((d) => { const n = new Set(d); if (n.has(id)) n.delete(id); else n.add(id); return n; }) }} />
     </div>, liveAr.root) : null;
   // «Prova» is for phones only: on tablets and computers the camera stays on «Rileva» and the switch is not shown.
   const modeSwitch = !onPhone ? null : (
@@ -1988,6 +2009,7 @@ export function ArCamera({
     setDiscarded(new Set());
     setBurst(false);
   };
+  burstActs.current = { add: addKept, discardAll };
   const burstSheetElement = burst && burstShots.length > 0 && (
     <BurstReviewSheet shots={burstShots} discarded={discarded} onClose={closeReview} onAdd={addKept} onDiscardAll={discardAll}
       onToggleShot={(id) => setDiscarded((d) => { const n = new Set(d); if (n.has(id)) n.delete(id); else n.add(id); return n; })} />
