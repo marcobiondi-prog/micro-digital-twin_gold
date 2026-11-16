@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import type { ArObjectDef } from "@/models/ar-objects";
 import { realPergola } from "@/views/ar-pergola";
+import { realBed } from "@/views/ar-bed";
+import { realMister } from "@/views/ar-mister";
 
 /**
  * The 3D shapes «Prova» puts in the real world, in metres, standing on y = 0 and centred on x = z = 0: the same simple
@@ -38,18 +40,13 @@ export function objectMesh(def: ArObjectDef): THREE.Group {
       break;
     }
     case "aiuola": {
-      g.add(box(def.w, 0.12, def.d, mat("#c8b99c")));
-      g.add(box(def.w - 0.15, def.h, def.d - 0.15, mat("#4f9a3e"), 0, 0.02, 0));
+      // A realistic flower bed dug into the floor (views/ar-bed): sunk border stones, pebbles, soil, grass, flowers.
+      g.add(realBed(def));
       break;
     }
     case "nebulizzatore": {
-      g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, def.h, 8), mat("#9aa4b2", { metalness: 0.6, roughness: 0.4 })).translateY(def.h / 2));
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.04, 8, 20), mat("#f8fafc"));
-      ring.rotation.x = Math.PI / 2; ring.position.y = def.h;
-      g.add(ring);
-      const mist = new THREE.Mesh(new THREE.ConeGeometry(1.6, def.h - 0.3, 20, 1, true), new THREE.MeshBasicMaterial({ color: "#bae6fd", transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false }));
-      mist.position.y = (def.h - 0.3) / 2; mist.rotation.x = Math.PI;
-      g.add(mist);
+      // A realistic misting pole on a footing in the floor (views/ar-mister), with live mist.
+      g.add(realMister(def));
       break;
     }
     case "telo": {

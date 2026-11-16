@@ -425,7 +425,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         const def = defOfRef.current(live.current.selected);
         const uid = `o${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
         const g = objectMesh(def);
-        const shadow = def.id !== "pergolato" ? contactShadow(def) : null;
+        // The pergola, the bed and the misting pole are planted in the floor with their own footings: no round shadow.
+        const shadow = def.id !== "pergolato" && def.id !== "aiuola" && def.id !== "nebulizzatore" ? contactShadow(def) : null;
         if (shadow) g.add(shadow);
         // A realistic tree (EZ-Tree) takes the simple shape's place once it is grown; until then, or if it fails, the
         // simple one stays.
