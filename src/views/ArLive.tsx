@@ -12,7 +12,7 @@ import { drawnAreaFor, type DrawnArea } from "@/models/drawn-area";
 import { readFix } from "@/lib/find-position";
 import { hapticTick } from "@/lib/haptics";
 import { contactShadow, floorLoop, objectMesh } from "@/views/ar-object-meshes";
-import { ArcZoomDial } from "@/views/ArcZoomDial";
+import { ZoomDial } from "@/views/ZoomDial";
 import { ZOOM_MAX } from "@/lib/camera-zoom";
 
 /**
@@ -397,15 +397,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       {shots > 0 && <span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-[#00e5ff] px-1 text-[11px] font-bold text-black">{shots}</span>}
     </button>
   );
-  // The landscape dial is the preview's only: with ARCore the browser drives the camera.
+  // The zoom ruler is the preview's only: with ARCore the browser drives the camera.
   const dialOn = !session && !adjusting;
-  const dialBox = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const fit = () => dialBox.current?.style.setProperty("--ar-dial-k", String(Math.min(1, (window.innerHeight - 8) / 380)));
-    fit();
-    window.addEventListener("resize", fit);
-    return () => window.removeEventListener("resize", fit);
-  }, [dialOn]);
+
 
   // Every choice sits behind one AI button: the tray opens over the camera only when asked.
   const [trayOpen, setTrayOpen] = useState(false);
@@ -442,7 +436,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     )}
     {flash > 0 && <div key={flash} className="pointer-events-none fixed inset-0 z-[60] animate-out fade-out-0 bg-white duration-300 fill-mode-forwards" aria-hidden="true" />}
     <div ref={hudRef} className="ar-live-hud pointer-events-none fixed inset-0 z-50 flex flex-col justify-between text-white" style={{ padding: "env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)" }}>
-      <div className={`pointer-events-auto flex items-center gap-2 p-3 ${dialOn ? "landscape:pr-[250px]" : ""}`}>
+      <div className={`pointer-events-auto flex items-center gap-2 p-3 `}>
         <button type="button" onClick={end} aria-label="Esci dalla prova" className={round}><X className="size-5" /></button>
         <p role="status" className={`flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-[22px] px-4 py-2 text-sm font-semibold leading-tight transition-colors ${statusTone}`}>
           {!notice && <span className={`size-2 shrink-0 rounded-full ${found ? "bg-[#22c55e]" : "animate-pulse bg-[#facc15]"}`} aria-hidden="true" />}
@@ -452,7 +446,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
 
       </div>
       {!adjusting && (
-        <div className={`pointer-events-auto relative flex flex-col items-start gap-2 p-3 ${dialOn ? "landscape:pr-[236px]" : ""}`}>
+        <div className={`pointer-events-auto relative flex flex-col items-start gap-2 p-3`}>
           {trayOpen && (
             <div id="ar-ai-tray" role="dialog" aria-label="Funzioni AI"
               className="absolute bottom-full left-3 right-3 max-h-[calc(100dvh-9rem)] max-w-md overflow-y-auto animate-in fade-in-0 slide-in-from-bottom-3 duration-200 rounded-3xl bg-black/70 p-3 shadow-2xl ring-1 ring-white/15 backdrop-blur-md">
@@ -478,7 +472,12 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
               </TrayGroup>
             </div>
           )}
-          <div className="flex w-full items-center gap-2 landscape:w-auto">
+          {dialOn && !trayOpen && (
+            <div className="flex w-full justify-center landscape:absolute landscape:bottom-[4.75rem] landscape:left-0 landscape:right-0">
+              <ZoomDial zoom={zoom} max={ZOOM_MAX} onZoom={(z) => setZoom(Math.max(1, Math.min(ZOOM_MAX, z)))} />
+            </div>
+          )}
+          <div className="flex w-full items-center gap-2">
             <button type="button" onClick={() => setTrayOpen((o) => !o)} aria-expanded={trayOpen} aria-controls="ar-ai-tray"
               aria-label={trayOpen ? "Chiudi le funzioni AI" : `Funzioni AI · ${tool === "measure" ? "Misura" : defOf(selected).label}`}
               className="relative grid size-12 shrink-0 place-items-center rounded-full p-[2px] shadow-[0_0_18px_rgba(0,229,255,0.45)] active:scale-95"
@@ -488,9 +487,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
               </span>
             </button>
             <button type="button" onClick={undo} disabled={!placed.length} aria-label="Annulla l’ultimo" className={`${round} disabled:opacity-40`}><Undo2 className="size-5" /></button>
-            <div className={`ml-auto landscape:ml-0 ${dialOn ? "landscape:hidden" : ""}`}>{shutter("size-14", "size-10")}</div>
+            <div className="mx-auto">{shutter("size-14", "size-10")}</div>
             <button type="button" onClick={backToMap} disabled={!placed.length}
-              className="ml-auto inline-flex h-11 items-center justify-center gap-2 rounded-full bg-white px-5 text-sm font-bold text-black disabled:opacity-40 landscape:ml-0">
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-white px-5 text-sm font-bold text-black disabled:opacity-40">
               <MapPinned className="size-4" aria-hidden="true" />{tool === "align" ? "Tocca i 2 punti" : `Riporta${placed.length ? ` · ${placed.length}` : ""}`}
             </button>
           </div>
@@ -503,14 +502,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
           </button>
         </div>
       )}
-      {dialOn && (
-        <div className="pointer-events-none absolute right-0 top-1/2 hidden -translate-y-1/2 landscape:block" style={{ marginRight: "env(safe-area-inset-right)" }}>
-          <div className="relative h-[380px] w-[280px] origin-right" style={{ transform: "scale(var(--ar-dial-k, 1))" }} ref={dialBox}>
-            <ArcZoomDial zoom={zoom} max={ZOOM_MAX} onZoom={(z) => setZoom(Math.max(1, Math.min(ZOOM_MAX, z)))} />
-            <div className="pointer-events-auto absolute right-[40px] top-1/2 z-20 -translate-y-1/2 translate-x-1/2">{shutter("size-[72px]", "size-[54px]")}</div>
-          </div>
-        </div>
-      )}
+
     </div>
     </>
   );
