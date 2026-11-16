@@ -1,3 +1,4 @@
+import { PREVIEW_BUILD } from "@/lib/demo-login";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
@@ -60,6 +61,9 @@ function loadGis(): Promise<Gis | null> {
  * pages instead. ("cancelled" is kept for callers; nothing returns it now.)
  */
 export async function googleInApp(opts: { loginHint?: string } = {}): Promise<"signed" | "cancelled" | "unavailable"> {
+  // Test previews change address at every build and Google's client lists only the app's own addresses, so its
+  // in-app chooser answers origin_mismatch there: previews go straight to Google's pages (the Supabase redirect).
+  if (PREVIEW_BUILD) return "unavailable";
   if (typeof window === "undefined" || !crypto?.subtle) return "unavailable";
   const gis = await loadGis();
   if (!gis) return "unavailable";
