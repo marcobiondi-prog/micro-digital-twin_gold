@@ -496,7 +496,10 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
               <ZoomDial zoom={zoom} max={ZOOM_MAX} onZoom={(z) => setZoom(Math.max(1, Math.min(ZOOM_MAX, z)))} />
             </div>
           )}
-          <div className="flex w-full items-center gap-2">
+          {/* Portrait: AI and Annulla on the left, the shutter in the very middle of the screen (the zoom chips centred
+              over it), Riporta on the right. Landscape: one row on the left, the shutter on the right edge. */}
+          <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-2 landscape:flex">
+            <div className="flex items-center gap-2">
             <button type="button" onClick={() => setTrayOpen((o) => !o)} aria-expanded={trayOpen} aria-controls="ar-ai-tray"
               aria-label={trayOpen ? "Chiudi le funzioni AI" : `Funzioni AI · ${tool === "measure" ? "Misura" : defOf(selected).label}`}
               className="relative grid size-12 shrink-0 place-items-center rounded-full p-[2px] shadow-[0_0_18px_rgba(0,229,255,0.45)] active:scale-95"
@@ -506,9 +509,10 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
               </span>
             </button>
             <button type="button" onClick={undo} disabled={!placed.length} aria-label="Annulla l’ultimo" className={`${round} disabled:opacity-40`}><Undo2 className="size-5" /></button>
-            <div className="mx-auto landscape:hidden">{shutter("size-14", "size-10")}</div>
+            </div>
+            <div className="landscape:hidden">{shutter("size-14", "size-10")}</div>
             <button type="button" onClick={backToMap} disabled={!placed.length}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-white px-5 text-sm font-bold text-black disabled:opacity-40 landscape:ml-1">
+              className="inline-flex h-11 items-center justify-center gap-2 justify-self-end rounded-full bg-white px-4 text-sm font-bold text-black disabled:opacity-40 landscape:ml-1">
               <MapPinned className="size-4" aria-hidden="true" />{tool === "align" ? "Tocca i 2 punti" : `Riporta${placed.length ? ` · ${placed.length}` : ""}`}
             </button>
           </div>
@@ -523,14 +527,14 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       )}
 
       {!adjusting && (
-        // Landscape: the shutter stays on the right edge where Rileva has it, the zoom ruler just above it, so the
-        // rest of the screen is left to the scene.
-        <div className="pointer-events-none absolute right-0 top-[58%] hidden -translate-y-1/2 landscape:block" style={{ marginRight: "calc(env(safe-area-inset-right) + 1rem)" }}>
+        // Landscape: the shutter stays on the right edge where Rileva has it, the zoom chips and ruler above it as in
+        // portrait (the ruler set against the screen's edge), so the rest of the screen is left to the scene.
+        <div className="pointer-events-none absolute right-0 top-1/2 hidden -translate-y-1/2 landscape:block" style={{ marginRight: "calc(env(safe-area-inset-right) + 2.25rem)" }}>
           <div className="pointer-events-auto relative">
             {shutter("size-[72px]", "size-[54px]")}
             {dialOn && !trayOpen && (
               <div className="absolute bottom-full left-1/2 mb-3 -translate-x-1/2">
-                <ZoomDial vertical zoom={zoom} max={ZOOM_MAX} onZoom={(z) => setZoom(Math.max(1, Math.min(ZOOM_MAX, z)))} />
+                <ZoomDial edge zoom={zoom} max={ZOOM_MAX} onZoom={(z) => setZoom(Math.max(1, Math.min(ZOOM_MAX, z)))} />
               </div>
             )}
           </div>

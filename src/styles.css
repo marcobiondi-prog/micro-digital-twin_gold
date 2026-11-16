@@ -2823,11 +2823,10 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .zoom-ruler-tick[data-major] { height: .4rem; background: oklch(0.98 0 0 / 80%); }
 .zoom-ruler-label { position: absolute; bottom: .55rem; left: 50%; transform: translateX(-50%); font-size: .625rem; font-weight: 500; color: oklch(0.98 0 0 / 85%); font-variant-numeric: tabular-nums; }
 .zoom-ruler-mark { position: absolute; left: 50%; top: 1.15rem; bottom: .1rem; width: 1.5px; margin-left: -.75px; border-radius: 2px; background: oklch(0.86 0.17 90); }
-/* Vertical dial (Prova in landscape): chips in a column above the shutter, the ruler above the column as in portrait,
-   set against the screen's right edge; an upward swipe on the column zooms in. */
-.ar-zoom-lenses[data-vertical] { flex-direction: column; }
-.zoom-ruler[data-vertical] { left: auto; right: -.75rem; width: 11rem; transform: none; animation: zoom-ruler-in-v .16s ease-out; }
-@keyframes zoom-ruler-in-v { from { opacity: 0; transform: translateY(4px); } }
+/* Zoom near the screen's right edge (Prova in landscape): the ruler is set against the edge instead of centred on
+   the chips, so it never runs off the screen. */
+.zoom-ruler[data-edge] { left: auto; right: -2rem; width: 13rem; transform: none; animation: zoom-ruler-in-e .16s ease-out; }
+@keyframes zoom-ruler-in-e { from { opacity: 0; transform: translateY(4px); } }
 @keyframes zoom-ruler-in { from { opacity: 0; transform: translateX(-50%) translateY(4px); } }
 @media (prefers-reduced-motion: reduce) { .zoom-ruler { animation: none; } .zoom-ruler-track { transition: none; } }
 
