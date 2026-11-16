@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { toast } from "sonner";
-import { Check, ChevronDown, ChevronLeft, RotateCw, Zap, ZapOff, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
+import { Box, Check, ChevronDown, ChevronLeft, RotateCw, Zap, ZapOff, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
 import type { ArKind } from "@/models/ar-focus";
 import {
   AR_OBJECTS, alignFromFix, placeHaptic, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, arObject, enToAr, metresText, objectsToZones, toEN,
@@ -51,9 +51,9 @@ export async function requestArSession(overlayRoot: HTMLElement): Promise<XRSess
   // shows its own close button; a tap on the floor still puts the chosen object), then the bare session. Every
   // refusal is reported together when none starts.
   const tries: Array<[string, XRSessionInit]> = [
-    ["overlay+pavimento", { requiredFeatures: ["hit-test", "dom-overlay"], optionalFeatures: ["local-floor"], domOverlay: { root: overlayRoot } } as XRSessionInit],
-    ["overlay", { requiredFeatures: ["dom-overlay"], optionalFeatures: ["hit-test", "local-floor"], domOverlay: { root: overlayRoot } } as XRSessionInit],
-    ["pavimento", { requiredFeatures: ["hit-test"], optionalFeatures: ["local-floor"] }],
+    ["overlay+pavimento", { requiredFeatures: ["hit-test", "dom-overlay"], optionalFeatures: ["local-floor", "camera-access"], domOverlay: { root: overlayRoot } } as XRSessionInit],
+    ["overlay", { requiredFeatures: ["dom-overlay"], optionalFeatures: ["hit-test", "local-floor", "camera-access"], domOverlay: { root: overlayRoot } } as XRSessionInit],
+    ["pavimento", { requiredFeatures: ["hit-test"], optionalFeatures: ["local-floor", "camera-access"] }],
     ["base", {}],
   ];
   const report: string[] = [];
@@ -119,6 +119,18 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   zoomRef.current = zoom;
   const [found, setFound] = useState(false);
   const [placed, setPlaced] = useState<PlacedObject[]>([]);
+  // «Modellino»: everything at 1:10, to try indoors or see the whole piazza on a table (not sent to the map).
+  const [model, setModel] = useState(false);
+  const modelK = model ? MODEL_SCALE : 1;
+  const modelRef = useRef(modelK);
+  modelRef.current = modelK;
+  // Two fingers resize the last object put down; taps around a pinch never put a new one.
+  const pinchUntil = useRef(0);
+  // A photo asked with ARCore: taken in the next frame, when the camera image can be read.
+  const wantShot = useRef(false);
+  // Whether this session gives the page the camera's image ("camera-access"): without it the shutter is hidden.
+  const camShotOk = !session || !(session as XRSession & { enabledFeatures?: readonly string[] }).enabledFeatures
+    || (session as XRSession & { enabledFeatures: readonly string[] }).enabledFeatures.includes("camera-access");
   const [alignPts, setAlignPts] = useState<V[]>([]);
   const [alignment, setAlignment] = useState<{ a: Alignment; how: "corners" | "gps" } | null>(null);
   const [measure, setMeasure] = useState<V[]>([]);
@@ -239,6 +251,11 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         } else { reticle.visible = false; t.hit = null; if (sawFloor && !lostAt) lostAt = performance.now(); }
       }
       renderer.render(scene, camera);
+      if (frame && wantShot.current) {
+        wantShot.current = false;
+        const file = captureXrPhoto(renderer, scene, reticle, session, frame);
+        void file.then((f) => { if (f) savedShotRef.current(f); else setNotice({ text: "Questo telefono non dà la fotocamera all’AR: fai uno screenshot", tone: "warn" }); });
+      }
     });
 
     session.addEventListener("select", () => placeAtHit());
@@ -323,7 +340,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
 
   function placeAtHit() {
       const t = three.current, hit = t?.hit;
-      if (!t || !hit) return;
+      if (!t || !hit || performance.now() < pinchUntil.current) return;
       const { tool: tl } = live.current;
       if (tl === "place") {
         const def = defOfRef.current(live.current.selected);
@@ -331,6 +348,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         const g = objectMesh(def);
         g.add(contactShadow(def));
         g.position.set(hit.x, hit.y, hit.z);
+        g.scale.setScalar(modelRef.current);
         t.scene.add(g);
         t.objects.set(uid, g);
         setPlaced((l) => [...l, { uid, id: def.id, x: hit.x, z: hit.z, yaw: 0, ...(def.plant ? { def } : {}) }]);
@@ -388,6 +406,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   };
   const backToMap = () => {
     if (!placed.length) return;
+    if (model) { setNotice({ text: "Nel modellino le posizioni non sono quelle vere: spegnilo per riportare sulla mappa", tone: "warn" }); return; }
     if (!area) { setNotice({ text: "Disegna prima l’area nella scheda Mappa", tone: "warn" }); return; }
     if (!alignment || (alignment.how === "gps" && !sendAfterAlign.current)) {
       // One button: «Riporta» first asks the two corners, then sends by itself.
@@ -456,7 +475,14 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const [shots, setShots] = useState(0);
   const shoot = () => {
     const t = three.current, host = canvasHost.current;
-    if (session || !t || !host) { setNotice({ text: "Con ARCore fai uno screenshot del telefono", tone: "warn" }); return; }
+    if (session) {
+      // With ARCore the photo is taken in the next frame, from the camera's image and the objects drawn over it.
+      wantShot.current = true;
+      setFlash((n) => n + 1);
+      hapticTick([25]);
+      return;
+    }
+    if (!t || !host) return;
     const W = host.clientWidth, H = host.clientHeight, k = Math.min(2, window.devicePixelRatio || 1);
     const c = document.createElement("canvas");
     c.width = Math.round(W * k); c.height = Math.round(H * k);
@@ -474,16 +500,72 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     g.drawImage(t.renderer.domElement, 0, 0, c.width, c.height);
     setFlash((n) => n + 1);
     hapticTick([25]);
-    c.toBlob((b) => {
-      if (!b) return;
-      onShot?.(new File([b], `foto-ar-prova-${Date.now()}.jpg`, { type: "image/jpeg" }));
-      setShots((n) => n + 1);
-      setNotice({ text: "Foto salvata nel progetto", tone: "ok" });
-      window.setTimeout(() => setNotice((n) => (n?.text.startsWith("Foto salvata") ? null : n)), 1600);
-    }, "image/jpeg", 0.9);
+    c.toBlob((b) => { if (b) savedShotRef.current(new File([b], `foto-ar-prova-${Date.now()}.jpg`, { type: "image/jpeg" })); }, "image/jpeg", 0.9);
   };
+  const savedShotRef = useRef<(f: File) => void>(() => undefined);
+  savedShotRef.current = (f: File) => {
+    onShot?.(f);
+    setShots((n) => n + 1);
+    setNotice({ text: "Foto salvata nel progetto", tone: "ok" });
+    window.setTimeout(() => setNotice((n) => (n?.text.startsWith("Foto salvata") ? null : n)), 1600);
+  };
+  // «Modellino» on or off: every object put down takes the new size.
+  useEffect(() => {
+    const t = three.current;
+    if (!t) return;
+    for (const o of placed) t.objects.get(o.uid)?.scale.setScalar(modelK * (o.scale ?? 1));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelK]);
+  // Two fingers on the screen resize the last object put down (0,1×…3× its real size), its height said as it changes.
+  const placedRef = useRef(placed);
+  placedRef.current = placed;
+  useEffect(() => {
+    let d0 = 0, base = 1, uid = "", cur = 1, lastSaid = 0;
+    const dist = (e: TouchEvent) => Math.hypot(e.touches[0]!.clientX - e.touches[1]!.clientX, e.touches[0]!.clientY - e.touches[1]!.clientY);
+    const start = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return;
+      const last = placedRef.current[placedRef.current.length - 1];
+      if (!last) return;
+      d0 = dist(e); uid = last.uid; base = last.scale ?? 1; cur = base;
+      pinchUntil.current = performance.now() + 600;
+    };
+    const move = (e: TouchEvent) => {
+      if (!uid || e.touches.length !== 2 || !d0) return;
+      e.preventDefault();
+      pinchUntil.current = performance.now() + 600;
+      cur = Math.max(0.1, Math.min(3, base * (dist(e) / d0)));
+      three.current?.objects.get(uid)?.scale.setScalar(modelRef.current * cur);
+      const now = performance.now();
+      if (now - lastSaid > 120) {
+        lastSaid = now;
+        const o = placedRef.current.find((p) => p.uid === uid);
+        const def = o ? (o.def ?? defOfRef.current(o.id)) : null;
+        if (def) setNotice({ text: `${def.label} · ${metresText(def.h * cur)} di altezza${cur !== 1 ? ` (vero: ${metresText(def.h)})` : ""}`, tone: "ok" });
+      }
+    };
+    const end = (e: TouchEvent) => {
+      if (!uid || e.touches.length >= 2) return;
+      const id = uid, k = Math.round(cur * 100) / 100;
+      uid = ""; d0 = 0;
+      pinchUntil.current = performance.now() + 400;
+      setPlaced((l) => l.map((p) => (p.uid === id ? { ...p, scale: k } : p)));
+      hapticTick([20]);
+      window.setTimeout(() => setNotice((n) => (n?.text.includes("di altezza") ? null : n)), 1800);
+    };
+    window.addEventListener("touchstart", start, { passive: true });
+    window.addEventListener("touchmove", move, { passive: false });
+    window.addEventListener("touchend", end);
+    window.addEventListener("touchcancel", end);
+    return () => {
+      window.removeEventListener("touchstart", start);
+      window.removeEventListener("touchmove", move);
+      window.removeEventListener("touchend", end);
+      window.removeEventListener("touchcancel", end);
+    };
+  }, []);
 
-  const shutter = (outer: string, inner: string) => (
+  // Without the camera's image (a phone giving ARCore no "camera-access") there is no shutter, only its room.
+  const shutter = (outer: string, inner: string) => !camShotOk ? <span className={`${outer} shrink-0`} aria-hidden="true" /> : (
     <button type="button" onClick={shoot} aria-label={shots ? `Scatta una foto · ${shots} fatte` : "Scatta una foto"} data-no-ui-click
       className={`relative grid ${outer} shrink-0 place-items-center rounded-full border-[3px] border-white bg-white/25 backdrop-blur active:scale-95`}>
       <span className={`${inner} rounded-full bg-white`} aria-hidden="true" />
@@ -516,6 +598,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const objectItems: FanItem[] = objectChoices.map(({ key, def: o }) => ({ key, label: o.label, Icon: OBJECT_ICONS[o.id] ?? Sparkles, on: tool === "place" && selected === key, onPick: () => pick(key) }));
   const toolItems: FanItem[] = [
     { key: "t:misura", label: "Misura", Icon: Ruler, tool: true, on: tool === "measure", onPick: () => { setTool("measure"); setMeasure([]); setTrayOpen(false); } },
+    { key: "t:modellino", label: model ? "Grandezza vera" : "Modellino", Icon: Box, tool: true, on: model, aria: model ? "Torna alla grandezza vera" : "Modellino in scala 1:10",
+      onPick: () => { setModel((m) => !m); setTrayOpen(false); setNotice({ text: model ? "Grandezza vera" : "Modellino 1:10 · per provare al chiuso o su un tavolo", tone: "ok" }); } },
     ...(!session ? [{ key: "t:pavimento", label: "Pavimento", Icon: MoveVertical, tool: true, on: false, aria: "Regola pavimento", onPick: () => { setAdjusting(true); setTrayOpen(false); } }] : []),
   ];
   const fanGroups: FanGroup[] = [
@@ -683,6 +767,75 @@ function hasFloorOffset(): boolean {
 }
 function saveFloorOffset(v: number) {
   try { localStorage.setItem(FLOOR_KEY, String(Math.round(v * 10) / 10)); } catch { /* memory only */ }
+}
+
+const MODEL_SCALE = 0.1;
+
+/**
+ * A photo with ARCore (the page sees no camera otherwise): with the session's "camera-access" the camera's own image
+ * is read from the frame (XRWebGLBinding.getCameraImage), the objects drawn again over it into an off-screen target
+ * from the same eye, and the two put together into a JPEG. Null when this phone gives no camera image.
+ */
+async function captureXrPhoto(renderer: THREE.WebGLRenderer, scene: THREE.Scene, reticle: THREE.Object3D, session: XRSession, frame: XRFrame): Promise<File | null> {
+  const Binding = (globalThis as unknown as { XRWebGLBinding?: new (s: XRSession, gl: WebGLRenderingContext | WebGL2RenderingContext) => { getCameraImage: (c: unknown) => WebGLTexture | null } }).XRWebGLBinding;
+  const ref = renderer.xr.getReferenceSpace();
+  const view = ref ? frame.getViewerPose(ref)?.views[0] : undefined;
+  const cam = (view as (XRView & { camera?: { width: number; height: number } }) | undefined)?.camera;
+  if (!Binding || !cam) return null;
+  const gl = renderer.getContext();
+  const tex = new Binding(session, gl).getCameraImage(cam);
+  if (!tex) return null;
+  const w = cam.width, h = cam.height;
+  // The camera's image.
+  const prev = gl.getParameter(gl.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
+  const fb = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  const camPx = new Uint8Array(w * h * 4);
+  gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, camPx);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, prev);
+  gl.deleteFramebuffer(fb);
+  // The objects, from the same eye, on a transparent target.
+  const eye = renderer.xr.getCamera().cameras[0] ?? renderer.xr.getCamera();
+  const shotCam = new THREE.PerspectiveCamera();
+  shotCam.matrixAutoUpdate = false;
+  shotCam.matrixWorldAutoUpdate = false;
+  shotCam.projectionMatrix.copy(eye.projectionMatrix);
+  shotCam.projectionMatrixInverse.copy(eye.projectionMatrixInverse);
+  shotCam.matrixWorld.copy(eye.matrixWorld);
+  shotCam.matrixWorldInverse.copy(eye.matrixWorldInverse);
+  const rt = new THREE.WebGLRenderTarget(w, h);
+  const wasVisible = reticle.visible, prevRt = renderer.getRenderTarget();
+  const clear = new THREE.Color(); renderer.getClearColor(clear); const alpha = renderer.getClearAlpha();
+  reticle.visible = false;
+  renderer.xr.enabled = false;
+  renderer.setRenderTarget(rt);
+  renderer.setClearColor(0x000000, 0);
+  renderer.clear();
+  renderer.render(scene, shotCam);
+  const objPx = new Uint8Array(w * h * 4);
+  renderer.readRenderTargetPixels(rt, 0, 0, w, h, objPx);
+  renderer.setRenderTarget(prevRt);
+  renderer.setClearColor(clear, alpha);
+  renderer.xr.enabled = true;
+  reticle.visible = wasVisible;
+  rt.dispose();
+  // Both read bottom-up: turned upright and put together.
+  const flip = (px: Uint8Array) => {
+    const out = new Uint8ClampedArray(w * h * 4), row = w * 4;
+    for (let y = 0; y < h; y++) out.set(px.subarray((h - 1 - y) * row, (h - y) * row), y * row);
+    return new ImageData(out, w, h);
+  };
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d");
+  const o = document.createElement("canvas"); o.width = w; o.height = h;
+  const og = o.getContext("2d");
+  if (!g || !og) return null;
+  g.putImageData(flip(camPx), 0, 0);
+  og.putImageData(flip(objPx), 0, 0);
+  g.drawImage(o, 0, 0);
+  const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", 0.9));
+  return blob ? new File([blob], `foto-ar-prova-${Date.now()}.jpg`, { type: "image/jpeg" }) : null;
 }
 
 type FanItem = { key: string; label: string; Icon: LucideIcon; on: boolean; plant?: boolean; tool?: boolean; aria?: string; onPick: () => void };

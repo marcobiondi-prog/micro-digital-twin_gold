@@ -38,7 +38,8 @@ export const AR_OBJECTS: Record<ArKind, readonly ArObjectDef[]> = {
 export const arObject = (kind: ArKind, id: ArObjectId) => AR_OBJECTS[kind].find((o) => o.id === id) ?? AR_OBJECTS[kind][0]!;
 
 /** One object put in the AR scene: where on the floor (AR metres, x east-ish, z towards the viewer) and turned by yaw (rad). */
-export type PlacedObject = { uid: string; id: ArObjectId; x: number; z: number; yaw: number; def?: ArObjectDef };
+/** scale: the size the person gave it with two fingers (1 = real size). */
+export type PlacedObject = { uid: string; id: ArObjectId; x: number; z: number; yaw: number; def?: ArObjectDef; scale?: number };
 
 /** A point on the floor in a local metre frame: e = east, n = north. */
 export type EN = { e: number; n: number };
@@ -109,7 +110,8 @@ export function footprintRing(o: PlacedObject, def: ArObjectDef, a: Alignment, o
 /** «Riporta sulla mappa»: every placed object becomes a zone of its kind inside the area, as drawn by hand. */
 export function objectsToZones(kind: ArKind, objs: readonly PlacedObject[], a: Alignment, origin: { lat: number; lng: number }, now = Date.now()): SubArea[] {
   return objs.map((o, i) => {
-    const def = o.def ?? arObject(kind, o.id);
+    const base = o.def ?? arObject(kind, o.id), k = o.scale ?? 1;
+    const def = k === 1 ? base : { ...base, w: base.w * k, d: base.d * k, h: base.h * k };
     return { id: `ar-${now.toString(36)}-${i}`, kind: def.zone, ring: footprintRing(o, def, a, origin) };
   });
 }
