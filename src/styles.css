@@ -2958,3 +2958,8 @@ html[data-sys-camera] nav {
 .camera-capture-dock.is-vertical .ar-landscape-pill-btn.is-icon { width: 3.25rem !important; height: 3.25rem !important; min-height: 3.25rem !important; padding: 0 !important; display: grid !important; place-items: center !important; }
 .ar-pill-hud .is-icon svg, .camera-capture-dock .ar-landscape-pill-btn.is-icon svg { width: 24px !important; height: 24px !important; }
 .ar-focus-icon svg { width: 26px !important; height: 26px !important; }
+
+/* Prova: the AI fan's icons come out of the AI button one after the other (still with reduced motion). */
+.ar-fan-item { animation: ar-fan-in .26s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes ar-fan-in { from { opacity: 0; transform: translate(-50%, -50%) scale(.35); } }
+@media (prefers-reduced-motion: reduce) { .ar-fan-item { animation: none; } }
