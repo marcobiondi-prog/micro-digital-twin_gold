@@ -33,20 +33,18 @@ export function objectMesh(def: ArObjectDef): THREE.Group {
     }
     case "pergolato": {
       // Seen through the phone, thin posts far out at the corners left the roof looking afloat: sturdier posts every
-      // 2 m or less round the edge, each on a stone foot, and the paving it stands on drawn on the floor with its shadow.
+      // 2 m or less round the edge, each on a stone foot with its own small shadow.
       const wood = mat("#7a4a22"), slat = mat("#c99a63"), stone = mat("#9ca3af");
       const hw = def.w / 2 - 0.12, hd = def.d / 2 - 0.12;
-      const floor = new THREE.Mesh(new THREE.PlaneGeometry(def.w, def.d), new THREE.MeshBasicMaterial({ color: "#d6c7a8", transparent: true, opacity: 0.45, depthWrite: false }));
-      floor.rotation.x = -Math.PI / 2; floor.position.y = 0.008;
-      g.add(floor);
-      const shade = new THREE.Mesh(new THREE.PlaneGeometry(def.w * 0.92, def.d * 0.92), new THREE.MeshBasicMaterial({ color: "#000", transparent: true, opacity: 0.22, depthWrite: false }));
-      shade.rotation.x = -Math.PI / 2; shade.position.y = 0.012;
-      g.add(shade);
       const along = (a: number, b: number) => { const n = Math.max(1, Math.ceil((b - a) / 2)); return Array.from({ length: n + 1 }, (_, i) => a + ((b - a) * i) / n); };
       const spots = new Map<string, [number, number]>();
       for (const x of along(-hw, hw)) for (const z of [-hd, hd]) spots.set(`${x.toFixed(2)},${z}`, [x, z]);
       for (const z of along(-hd, hd)) for (const x of [-hw, hw]) spots.set(`${x},${z.toFixed(2)}`, [x, z]);
       for (const [x, z] of spots.values()) {
+        // A small dark shadow under each foot: a big sheet on the floor showed through walls as a floating slab.
+        const foot = new THREE.Mesh(new THREE.CircleGeometry(0.34, 20), new THREE.MeshBasicMaterial({ color: "#000", transparent: true, opacity: 0.35, depthWrite: false }));
+        foot.rotation.x = -Math.PI / 2; foot.position.set(x, 0.004, z);
+        g.add(foot);
         g.add(box(0.32, 0.18, 0.32, stone, x, 0, z));
         g.add(box(0.2, def.h - 0.2, 0.2, wood, x, 0, z));
       }
