@@ -370,7 +370,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         const def = defOfRef.current(live.current.selected);
         const uid = `o${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
         const g = objectMesh(def);
-        g.add(contactShadow(def));
+        if (def.id !== "pergolato") g.add(contactShadow(def));
         g.position.set(hit.x, hit.y, hit.z);
         g.scale.setScalar(modelRef.current);
         t.scene.add(g);
