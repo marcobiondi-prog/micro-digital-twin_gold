@@ -56,7 +56,7 @@ function requestCameraFullscreen(): Promise<boolean> {
  * Back to fullscreen after Android dropped it while turning the phone (the camera stayed open, so it was not a
  * Back): at once when the browser allows it, else on the next tap anywhere, which carries the activation it needs.
  */
-function regainFullscreen() {
+export function regainFullscreen() {
   if (!cameraOpen || document.fullscreenElement || cameraChromeMode(document) !== "fullscreen") return;
   void requestCameraFullscreen().then((ok) => {
     if (ok || !cameraOpen || regainOnTap) return;

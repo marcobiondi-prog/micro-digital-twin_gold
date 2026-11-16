@@ -69,7 +69,7 @@ import { loadCopernicus } from "@/views/copernicus-client";
 import { coolingAmount, coolingLabel, coolingReadout, scannedSpecimenThermal, scannedSpecimenCount, MAX_SCANNED_SPECIMENS, type PlacementCooling } from "@/models/ar-placement";
 import { loadAirTemperature } from "@/views/air-temp-client";
 import { clearScans, recordScan, scanPhoto, setScanSpeciesPhoto, updateScan, useArScans, type ScanRecord } from "@/models/ar-scan-log";
-import { cameraRotatesNatively, enterCameraChrome, exitCameraChrome, fullscreenExitIsBack } from "@/lib/camera-chrome";
+import { cameraRotatesNatively, enterCameraChrome, exitCameraChrome, fullscreenExitIsBack, regainFullscreen } from "@/lib/camera-chrome";
 
 type Mode = "photo" | "video";
 type Layer = "heat" | "objects" | "grid";
@@ -346,6 +346,7 @@ export function ArCamera({
   }, []);
   const liveHostRef = useRef<HTMLDivElement>(null);
   const liveArRef = useRef(liveAr);
+  const endLiveRef = useRef<() => void>(() => undefined);
   liveArRef.current = liveAr;
   // Closing the camera ends the live AR too (the session would keep the camera).
   useEffect(() => () => { void liveArRef.current?.session?.end().catch(() => undefined); liveArRef.current?.root.remove(); }, []);
@@ -630,7 +631,10 @@ export function ArCamera({
     const onFullscreenChange = () => {
       const fullscreen = Boolean(document.fullscreenElement);
       if (wasFullscreen && !fullscreen && fullscreenExitIsBack(performance.now())) {
-        if (!arTransitionRef.current) onClose();
+        // In «Prova» the phone's Back leaves the AR view for the plain AI camera, not the camera itself.
+        if (arTransitionRef.current) { /* the AR session's own exit */ }
+        else if (liveArRef.current) endLiveRef.current();
+        else onClose();
       }
       wasFullscreen = fullscreen;
     };
@@ -1642,7 +1646,12 @@ export function ArCamera({
     setLiveAr(null);
     had?.root.remove();
     if (had?.session) setCamEpoch((n) => n + 1);
+    // Back to the camera's fullscreen (and so to its landscape) if the AR session left it; the exit tap counts.
+    arTransitionRef.current = true;
+    regainFullscreen();
+    window.setTimeout(() => { arTransitionRef.current = false; }, 1500);
   };
+  endLiveRef.current = endLive;
   // The plants «Rileva» recognised in this flow, so «Prova» can put the very species at its size.
   const arPlants = recognisedPlants(kind, scanRecords.map((r) => r.species));
   const liveView = liveAr ? createPortal(

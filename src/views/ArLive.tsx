@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { toast } from "sonner";
-import { Check, ChevronDown, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
 import type { ArKind } from "@/models/ar-focus";
 import {
   AR_OBJECTS, alignFromFix, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, arObject, enToAr, metresText, objectsToZones, toEN,
@@ -30,30 +30,39 @@ export async function arLiveSupported(): Promise<boolean> {
   } catch { return false; }
 }
 
-/** Asks for the AR session; call it straight from a tap (the browser wants a user gesture). Some phones refuse a
- *  configuration ("The specified session configuration is not supported"): the camera's own fullscreen is left
- *  first (Chrome's AR overlay takes the screen itself), then lighter configurations are tried in turn — hit-test
- *  required with the HUD overlay, then everything optional, then the bare session — while the tap still counts. */
+/** Asks for the AR session; call it straight from a tap (the browser wants a user gesture). The HUD overlay is
+ *  required in every try — without it the AR view would have no ✕ nor tools, and only the phone's Back would get
+ *  out —, hit-test first required, then optional. The camera's fullscreen (which keeps the landscape: outside it
+ *  the app is locked portrait) is left only as a last try, when the phone refused both while in fullscreen, and
+ *  taken back if that fails too, so a refusal falls back to the preview in the same orientation. */
 export async function requestArSession(overlayRoot: HTMLElement): Promise<XRSession> {
-  if (typeof document !== "undefined" && document.fullscreenElement) {
-    await document.exitFullscreen().catch(() => undefined);
-  }
   const tries: XRSessionInit[] = [
-    { requiredFeatures: ["hit-test"], optionalFeatures: ["dom-overlay", "local-floor", "light-estimation", "anchors"], domOverlay: { root: overlayRoot } } as XRSessionInit,
-    { optionalFeatures: ["hit-test", "dom-overlay", "local-floor"], domOverlay: { root: overlayRoot } } as XRSessionInit,
-    { optionalFeatures: ["hit-test"] },
-    {},
+    { requiredFeatures: ["hit-test", "dom-overlay"], optionalFeatures: ["local-floor", "light-estimation", "anchors"], domOverlay: { root: overlayRoot } } as XRSessionInit,
+    { requiredFeatures: ["dom-overlay"], optionalFeatures: ["hit-test", "local-floor"], domOverlay: { root: overlayRoot } } as XRSessionInit,
   ];
-  let last: unknown = null;
-  for (const init of tries) {
-    try { return await navigator.xr!.requestSession("immersive-ar", init); }
-    catch (e) {
-      last = e;
-      // Only a refused configuration is worth another try; anything else (no gesture, denied camera) stops here.
-      if (!(e instanceof DOMException) || e.name !== "NotSupportedError") break;
+  const attempt = async (): Promise<XRSession | DOMException | unknown> => {
+    let last: unknown = null;
+    for (const init of tries) {
+      try { return await navigator.xr!.requestSession("immersive-ar", init); }
+      catch (e) {
+        last = e;
+        if (!(e instanceof DOMException) || e.name !== "NotSupportedError") break;
+      }
     }
+    return last;
+  };
+  const isSession = (v: unknown): v is XRSession => !!v && typeof (v as XRSession).end === "function";
+  const first = await attempt();
+  if (isSession(first)) return first;
+  const fs = typeof document !== "undefined" ? document.fullscreenElement : null;
+  if (fs && first instanceof DOMException && first.name === "NotSupportedError") {
+    await document.exitFullscreen().catch(() => undefined);
+    const second = await attempt();
+    if (isSession(second)) return second;
+    await (fs as HTMLElement).requestFullscreen?.({ navigationUI: "hide" }).catch(() => undefined);
+    throw second;
   }
-  throw last;
+  throw first;
 }
 
 type Tool = "place" | "align" | "measure";
@@ -493,7 +502,10 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     {flash > 0 && <div key={flash} className="pointer-events-none fixed inset-0 z-[60] animate-out fade-out-0 bg-white duration-300 fill-mode-forwards" aria-hidden="true" />}
     <div ref={hudRef} className="ar-live-hud pointer-events-none fixed inset-0 z-50 flex flex-col justify-between text-white" style={{ padding: "env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)" }}>
       <div className={`pointer-events-auto flex items-center gap-2 p-3 ${arcOn ? "landscape:pr-[250px]" : ""}`}>
-        <button type="button" onClick={end} aria-label="Esci dalla prova" className={round}><X className="size-5" /></button>
+        <button type="button" onClick={end} aria-label="Esci dalla realtà aumentata e torna alla fotocamera AI"
+          className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-black/55 pl-2.5 pr-3.5 text-sm font-semibold backdrop-blur">
+          <ChevronLeft className="size-5" aria-hidden="true" />Esci da AR
+        </button>
         <button type="button" onClick={() => setBarOpen((o) => !o)} aria-expanded={barExpanded} aria-controls="ar-live-bar-help"
           className={`flex min-h-11 min-w-0 items-center gap-2 rounded-[22px] px-4 py-2 text-left text-sm font-semibold leading-tight transition-colors ${statusTone} ${barExpanded ? "flex-1" : "max-w-[70%]"}`}>
           {!notice && <span className={`size-2 shrink-0 rounded-full ${found ? "bg-[#22c55e]" : "animate-pulse bg-[#facc15]"}`} aria-hidden="true" />}
