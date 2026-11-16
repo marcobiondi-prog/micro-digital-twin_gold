@@ -146,6 +146,11 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
       pinMarker.on("dragend", () => { const p = pinMarker.getLngLat(); draggedTo.current = `${p.lat},${p.lng}`; pinMoveRef.current?.(p.lat, p.lng); });
       placePin.current = pinMarker;
       mapRef.current = map;
+      // Dev-only registry so demo scripts can drive the map (wide shot, zoom to the area); never in production builds.
+      if (import.meta.env.DEV) {
+        const w = window as unknown as { __mdtMaps?: unknown[] };
+        (w.__mdtMaps ??= []).push(map);
+      }
       remove = () => { offKey?.(); map.remove(); };
     }).catch(() => { if (!cancelled) setState("error"); });
     return () => { cancelled = true; mapRef.current = null; placePin.current = null; pins.current = []; handles.current = []; remove?.(); };
