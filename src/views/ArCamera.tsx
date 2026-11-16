@@ -5,7 +5,7 @@ import { isTabletViewport } from "@/lib/tablet-camera";
 import { ArLive, requestArSession } from "@/views/ArLive";
 import { recognisedPlants } from "@/models/ar-objects";
 import { toast } from "sonner";
-import { Activity, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grape, Grid2X2, Leaf, Minus, Rows3, Shovel, TreeDeciduous, Snowflake, Umbrella, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Star, TreePine, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
+import { Activity, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grape, Leaf, Minus, Rows3, Shovel, TreeDeciduous, Snowflake, Umbrella, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Star, TreePine, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
 import { supportsCameraTorch, setCameraTorch } from "@/lib/camera-torch";
 import { detectArObject, getReferencePhoto, type Detection, type Soil } from "@/controllers/ar-detect.functions";
 import { gbifPhotoSearchUrl, pickGbifPhoto, type ReferencePhoto } from "@/models/ar-reference-photo";
@@ -1614,7 +1614,8 @@ export function ArCamera({
   ) : null;
   // Fase 1 della nuova fotocamera AI: due modalità. «Rileva» riconosce ciò che c'è (scansione con l'AI);
   // «Prova» mostra sul posto l'intervento (oggi: la griglia e la posa della pianta, ARCore vero nella fase 3).
-  const proving = layers.has("grid") || !!liveAr;
+  // The old «Prova» on a grid (a tree put at random on a guessed floor) is gone: Prova is ArLive only.
+  const proving = !!liveAr;
   const setCamMode = (next: "rileva" | "prova", e?: React.MouseEvent) => {
     if (next === "prova" && !liveAr) {
       e?.stopPropagation();
@@ -1640,7 +1641,7 @@ export function ArCamera({
       }
       return;
     }
-    if ((next === "prova") !== proving) toggleAr(e);
+    if (next === "rileva" && liveAr) endLiveRef.current();
   };
   // Turning the phone during AR: Chrome keeps the session in the orientation it started in, so the session is ended,
   // the screen left to turn, and a new one asked — all inside the tap on «Tocca per ruotare» (its activation lasts).
@@ -1986,7 +1987,6 @@ export function ArCamera({
             
             {activeTool === "manage" && (
               <div className="flex flex-wrap items-center justify-center gap-1.5" data-camera-controls>
-                <Button variant="ghost" size="icon" className="camera-tool" aria-label="Mostra griglia" title="Griglia" aria-pressed={layers.has("grid")} onClick={() => toggle("grid")}><Grid2X2 className="size-4" /></Button>
                 <Button variant="ghost" size="icon" className="camera-tool" aria-label="Mappa termica simulata" title="Calore simulato" aria-pressed={layers.has("heat")} onClick={() => { if (!layers.has("heat")) setThermalInfoOpen(true); toggle("heat"); }}><Flame className="size-4" /></Button>
               </div>
             )}
