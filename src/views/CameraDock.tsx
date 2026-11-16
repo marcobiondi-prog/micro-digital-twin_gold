@@ -4,6 +4,7 @@ import { Building2, Camera, Grape, Images, Lock, MapPin, Video, Wrench, type Luc
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useInstalledApp } from "@/lib/installed-app";
+import { PREVIEW_BUILD } from "@/lib/demo-login";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { showSimMediaNow } from "@/views/v8/console";
 import { pushBackGuard } from "@/hooks/use-back-close";
@@ -20,11 +21,13 @@ import { appAllowed, guardUse } from "@/lib/app-permissions";
 type Kind = "urban" | "vineyard";
 const kindOf = (pathname: string): Kind | null => (pathname === "/urbano" ? "urban" : pathname === "/vigneto" ? "vineyard" : null);
 
-/** AI ready = signed in (or simulated in a preview) and, for real accounts, the installed app. */
+/** AI ready = signed in (or simulated in a preview) and, for real accounts, the installed app. On a test preview
+ *  (PREVIEW_BUILD: vite dev and Vercel previews, never production) it opens for everyone, also in a browser tab, so
+ *  the camera can be tried without signing in. */
 function useAiReady() {
   const { signedIn, demo } = useSignedIn();
   const installed = useInstalledApp();
-  return { signedIn, aiReady: !AI_STANDBY && signedIn && (installed || demo) };
+  return { signedIn: signedIn || PREVIEW_BUILD, aiReady: !AI_STANDBY && (PREVIEW_BUILD || (signedIn && (installed || demo))) };
 }
 
 /** Fotocamera al centro della barra ad arco, rialzata e luminosa (logo AI dopo l'accesso); apre il pannello con tutte le opzioni. */

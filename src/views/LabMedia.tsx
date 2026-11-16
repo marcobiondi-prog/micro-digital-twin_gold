@@ -19,6 +19,7 @@ import { useInstalledApp } from "@/lib/installed-app";
 import { useDemoSignedIn } from "@/lib/demo-login";
 import { registerCaptureHandler, registerFilesHandler, type Delivery } from "@/lib/camera-dock";
 import { AI_STANDBY } from "@/lib/ai-standby";
+import { PREVIEW_BUILD } from "@/lib/demo-login";
 import { galleryMultiple, openSystemCamera, prepareSystemCamera, supportsSystemCapture } from "@/lib/system-camera";
 import { SystemCamera } from "@/views/SystemCamera";
 import { GalleryReview } from "@/views/GalleryReview";
@@ -245,7 +246,8 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
   const demo = useDemoSignedIn();
   // AI_STANDBY: the AI camera is paused for now.
   const registeredEmail = useRegisteredEmail();
-  const aiReady = !AI_STANDBY && (Boolean(userId) || Boolean(registeredEmail) || demo) && (installedApp || demo);
+  // On a test preview (PREVIEW_BUILD, never production) it opens for everyone, also in a browser tab.
+  const aiReady = !AI_STANDBY && (PREVIEW_BUILD || ((Boolean(userId) || Boolean(registeredEmail) || demo) && (installedApp || demo)));
   // The central camera button of the menu starts captures here, inside the same tap.
   const captureRef = useRef<(action: "ai" | "photo" | "video" | "burst" | "gallery") => void>(() => undefined);
   captureRef.current = (action) => {
