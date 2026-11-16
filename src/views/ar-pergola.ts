@@ -5,7 +5,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
  * A realistic wooden pergola for the AR view, built in code (no files to download): larch-coloured timber with its
  * own grain (drawn once on a canvas, the grain running along each piece), posts on steel base plates over concrete
  * footings, double main beams clamping the posts, knee braces, rafters and thin top battens, a few
- * bolts. Stands on y = 0, centred, w along x and d along z, h tall (the object's real sizes).
+ * bolts, and climbing plants with lilac flowers over it. Stands on y = 0, centred, w along x and d along z, h tall (the object's real sizes).
  */
 
 let grainCache: { along: THREE.Texture; across: THREE.Texture; up: THREE.Texture } | null = null;
@@ -147,5 +147,88 @@ export function realPergola(def: { w: number; d: number; h: number }): THREE.Gro
     const merged = mergeGeometries(list, false);
     if (merged) out.add(new THREE.Mesh(merged, mat));
   }
+  out.add(climbers(W, D, H, xs, hd, topY));
   return out;
+}
+
+/** A leaf cluster texture: a few overlapping leaves of different greens on transparency, drawn once. */
+let leafTex: THREE.Texture | null = null;
+function leaves(): THREE.Texture {
+  if (leafTex) return leafTex;
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const g = c.getContext("2d")!;
+  const greens = ["#2f6b2a", "#3f7f32", "#4f9440", "#5f9e46", "#2a5d26"];
+  let seed = 11;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  for (let i = 0; i < 9; i++) {
+    const x = 28 + rnd() * 72, y = 28 + rnd() * 72, a = rnd() * Math.PI * 2, l = 22 + rnd() * 14;
+    g.save(); g.translate(x, y); g.rotate(a);
+    g.fillStyle = greens[i % greens.length]!;
+    g.beginPath(); g.moveTo(0, -l); g.quadraticCurveTo(l * 0.55, 0, 0, l); g.quadraticCurveTo(-l * 0.55, 0, 0, -l); g.fill();
+    g.strokeStyle = "rgba(20,45,15,0.55)"; g.lineWidth = 1.2;
+    g.beginPath(); g.moveTo(0, -l * 0.9); g.lineTo(0, l * 0.9); g.stroke();
+    g.restore();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  leafTex = t;
+  return t;
+}
+
+/**
+ * Climbing plants (like a wisteria): leaf clusters spread over the roof, thicker along the beams, drooping in short
+ * curtains from the edges, wound up some of the posts, and a few hanging lilac flower bunches. Instanced: one draw for
+ * the leaves, one for the flowers.
+ */
+function climbers(W: number, D: number, H: number, xs: number[], hd: number, topY: number): THREE.Group {
+  const g = new THREE.Group();
+  let seed = 23;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const spots: Array<[number, number, number, number]> = []; // x, y, z, size
+  // The roof: clusters over about two thirds of it, more along the two beams.
+  for (let i = 0; i < 520; i++) {
+    const nearBeam = rnd() < 0.45;
+    const x = (rnd() - 0.5) * (W + 0.2);
+    const z = nearBeam ? (rnd() < 0.5 ? -hd : hd) + (rnd() - 0.5) * 0.9 : (rnd() - 0.5) * (D + 0.2);
+    if (!nearBeam && rnd() < 0.35) continue; // gaps where the light comes through
+    spots.push([x, topY + 0.03 + rnd() * 0.12, z, 0.32 + rnd() * 0.28]);
+  }
+  // Curtains drooping from the long edges.
+  for (const side of [-1, 1]) for (let i = 0; i < 70; i++) {
+    const x = (rnd() - 0.5) * W, drop = rnd() * rnd() * 0.9;
+    spots.push([x, topY - 0.1 - drop, side * (D / 2 + 0.2) + (rnd() - 0.5) * 0.12, 0.26 + rnd() * 0.18]);
+  }
+  // Stems wound up the corner posts and one more, leaves spiralling round them.
+  const wound: Array<[number, number]> = [[xs[0]!, -hd], [xs[xs.length - 1]!, hd], [xs[Math.floor(xs.length / 2)]!, -hd]];
+  for (const [px, pz] of wound) for (let y = 0.25; y < H - 0.5; y += 0.09) {
+    const a = y * 7 + rnd();
+    spots.push([px + Math.cos(a) * 0.14, y, pz + Math.sin(a) * 0.14, 0.18 + rnd() * 0.14]);
+  }
+  const geo = new THREE.PlaneGeometry(1, 1);
+  const mat = new THREE.MeshStandardMaterial({ map: leaves(), alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.75 });
+  const im = new THREE.InstancedMesh(geo, mat, spots.length);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(), pos = new THREE.Vector3();
+  const tint = new THREE.Color();
+  spots.forEach(([x, y, z, s], i) => {
+    e.set(-Math.PI / 2 + (rnd() - 0.5) * 1.6, rnd() * Math.PI * 2, (rnd() - 0.5) * 1.2);
+    q.setFromEuler(e); sc.set(s, s, s); pos.set(x, y, z);
+    im.setMatrixAt(i, m.compose(pos, q, sc));
+    im.setColorAt(i, tint.setHSL(0.27 + rnd() * 0.06, 0.45, 0.55 + rnd() * 0.25));
+  });
+  g.add(im);
+  // Hanging lilac flower bunches under the roof.
+  const fl = 46;
+  const fgeo = new THREE.ConeGeometry(0.07, 0.32, 7);
+  fgeo.rotateX(Math.PI); // point down
+  const fim = new THREE.InstancedMesh(fgeo, new THREE.MeshStandardMaterial({ color: "#b8a2e0", roughness: 0.7 }), fl);
+  for (let i = 0; i < fl; i++) {
+    pos.set((rnd() - 0.5) * (W - 0.3), topY - 0.28 - rnd() * 0.12, (rnd() - 0.5) * (D - 0.2));
+    q.setFromEuler(e.set((rnd() - 0.5) * 0.3, 0, (rnd() - 0.5) * 0.3));
+    const k = 0.8 + rnd() * 0.5; sc.set(k, k, k);
+    fim.setMatrixAt(i, m.compose(pos, q, sc));
+    fim.setColorAt(i, tint.setHSL(0.72 + rnd() * 0.05, 0.45, 0.72 + rnd() * 0.1));
+  }
+  g.add(fim);
+  return g;
 }
