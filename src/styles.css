@@ -2399,7 +2399,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
   pointer-events: none !important;
 }
 .ar-burst-shelf.is-tools-closed {
-  bottom: var(--ar-burst-shelf-bottom, calc(15.75rem + env(safe-area-inset-bottom)));
+  bottom: var(--ar-burst-shelf-bottom, calc(11.25rem + env(safe-area-inset-bottom)));
 }
 .ar-burst-shelf.is-tools-open {
   bottom: var(--ar-burst-shelf-bottom, calc(21.25rem + env(safe-area-inset-bottom)));

@@ -1517,7 +1517,7 @@ export function ArCamera({
     wrapped.forEach((line, i) => g.fillText(line, fontSize, source.height + (i + 1.2) * fontSize * 1.5));
     // The photo is already frozen in `saved`: close the camera at once and let the JPEG encode
     // (the slow part on phones) finish in the background, then hand the file to the Lab queue.
-    if (burst || arHolding.current) {
+    if (arHolding.current) {
       // Still an AI shot (its kind in the history), marked as one of a multiple shot; the camera stays open.
       const id = Date.now();
       setBurstFlash((n) => n + 1);
@@ -1547,7 +1547,7 @@ export function ArCamera({
   };
 
   // Holding the shutter shoots a multiple shot until the finger lifts, without touching the switch first.
-  const { holding: arHolding, onHold: arHold } = useHoldBurst(() => shoot(), () => setBurst(true));
+  const { holding: arHolding, onHold: arHold } = useHoldBurst(() => shoot());
 
   const record = () => {
     if (recording) {
@@ -1753,14 +1753,6 @@ export function ArCamera({
 
           {/* Right: Singolo / Multiplo switcher + Guide */}
           <div className="flex items-center gap-2">
-            {!error && mode === "photo" && (
-              <div role="radiogroup" aria-label="Tipo di scatto" className="flex rounded-full bg-[rgba(32,36,44,0.72)] p-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur-md shadow-lg">
-                <button type="button" role="radio" aria-checked={!burst} onClick={backToSingle}
-                  className={`h-7 rounded-full px-3.5 transition-all ${!burst ? "bg-[#505660] text-white font-medium shadow-sm" : "text-white/80 hover:text-white"}`}>Singolo</button>
-                <button type="button" role="radio" aria-checked={burst} onClick={() => setBurst(true)}
-                  className={`h-7 rounded-full px-3.5 transition-all ${burst ? "bg-[#505660] text-white font-medium shadow-sm" : "text-white/80 hover:text-white"}`}>Multiplo</button>
-              </div>
-            )}
             <Button
               variant="ghost"
               size="icon"
@@ -1877,11 +1869,10 @@ export function ArCamera({
           <span className="ar-burst-header-long">{burstShots.length === 1 ? "foto scattata" : "foto scattate"}</span>
           <span className="ar-burst-header-short">foto</span>
         </span>
-        <span className="flex items-center gap-1 font-bold text-[#00d296]">
-          <Star className="size-2.5 fill-current" />
-          <span className="ar-burst-header-long">Scatto al centro selezionato</span>
-          <span className="ar-burst-header-short">Al centro</span>
-        </span>
+        <button type="button" onClick={backToSingle}
+          className="inline-flex h-7 items-center gap-1 rounded-full bg-white px-3 text-[11px] font-bold text-black shadow-md [text-shadow:none]">
+          <Check className="size-3.5" aria-hidden="true" />Aggiungi {burstShots.length}
+        </button>
       </div>
       <div className="ar-burst-track-wrap relative w-full max-w-full flex flex-col items-center overflow-visible">
         <div
@@ -1951,11 +1942,6 @@ export function ArCamera({
       aria-hidden={Boolean(thermalInfoOpen || confirmClear || guideOpen)}
     >
       <div className="relative flex items-center justify-center gap-2">
-        <div role="radiogroup" aria-label="Tipo di scatto" className="flex rounded-full bg-black/55 p-0.5 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur">
-          <button type="button" role="radio" aria-checked={!burst} onClick={backToSingle}
-            className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""}`}>Singolo</button>
-          <button type="button" role="radio" aria-checked={burst} onClick={() => setBurst(true)} className={`h-8 rounded-full px-3 ${burst ? "bg-white text-black" : ""}`}>Multiplo</button>
-        </div>
         {burst && burstShots.length > 0 && (
           <button
             type="button"
@@ -1975,14 +1961,6 @@ export function ArCamera({
       {toolsOpen && (
         <div className="ar-tools-panel flex w-full flex-col items-center gap-2">
           <div className="ar-tool-options" data-camera-controls>
-            {!error && mode === "photo" && (
-              <div role="radiogroup" aria-label="Tipo di scatto" className="flex rounded-full bg-black/55 p-0.5 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur">
-                <button type="button" role="radio" aria-checked={!burst} onClick={backToSingle}
-                  className={`h-7 rounded-full px-3 transition-colors ${!burst ? "bg-white text-black font-bold" : "text-white/80"}`}>Singolo</button>
-                <button type="button" role="radio" aria-checked={burst} onClick={() => setBurst(true)}
-                  className={`h-7 rounded-full px-3 transition-colors ${burst ? "bg-white text-black font-bold" : "text-white/80"}`}>Multiplo</button>
-              </div>
-            )}
             <Button variant="ghost" size="sm" className="camera-tool" title="Analisi" aria-label="Analisi" aria-pressed={activeTool === "analysis"} onClick={() => { setActiveTool(v => v === "analysis" ? null : "analysis"); setPanelOpen(true); }}><Info className="size-4" />Analisi</Button>
             <Button variant="ghost" size="sm" className="camera-tool" title="Livelli" aria-label="Livelli" aria-pressed={activeTool === "manage"} onClick={() => { setActiveTool(v => v === "manage" ? null : "manage"); }}><SlidersHorizontal className="size-4" />Livelli</Button>
             
@@ -2119,7 +2097,17 @@ export function ArCamera({
           </Button>
         </div>
       ) : (
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-center gap-2">
+          {burstShots.length > 0 && (
+            // The multiple shot taken by holding the shutter: its last photo with the count; a tap opens the strip
+            // to drop some and add them, closing the camera adds them anyway.
+            <button type="button" onClick={() => setBurst((b) => !b)} aria-expanded={burst}
+              aria-label={`${burstShots.length} foto del multiplo · ${burst ? "chiudi" : "rivedi"}`}
+              className="relative size-11 shrink-0 rounded-xl ring-2 ring-white/80 shadow-lg active:scale-95">
+              <img src={burstShots[burstShots.length - 1]!.thumb} alt="" className="size-full rounded-xl object-cover" />
+              <span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-[#00e5ff] px-1 text-[11px] font-bold text-black">{burstShots.length}</span>
+            </button>
+          )}
           <Button
             variant="ghost"
             type="button"
@@ -2292,7 +2280,7 @@ export function ArCamera({
                 {/* Colonna Sinistra: Informazioni e Analisi */}
                 <div className="ar-landscape-left">
                   {/* Riepilogo specie/ombra/raffrescamento nella pillola centrale in alto: a sinistra solo le miniature */}
-                  {burstShelfElement && (
+                  {burst && burstShelfElement && (
                     <div className="ar-landscape-carousel-slot" data-camera-controls>
                       {burstShelfElement}
                     </div>
@@ -2322,7 +2310,7 @@ export function ArCamera({
                   className="camera-bottom absolute z-20 flex flex-col items-center gap-2.5 w-full"
                 >
                   {/* Card informativo specie / raffrescamento */}
-                  {!infoBannerDismissed && (
+                  {!infoBannerDismissed && !burst && (
                     <div
                       className="ar-portrait-specimen-card cursor-grab"
                       data-camera-controls
