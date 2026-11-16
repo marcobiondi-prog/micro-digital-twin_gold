@@ -2000,20 +2000,24 @@ export function ArCamera({
           </div>
           <button type="button" onClick={closeReview} className="h-9 rounded-full bg-white/10 px-4 text-sm font-semibold">Chiudi</button>
         </div>
-        <div className="grid min-h-0 flex-1 grid-cols-3 gap-1.5 overflow-y-auto px-4 pb-3 landscape:grid-cols-6">
+        {/* The grid scrolls inside its own box: laid straight in the sheet's flex column its rows were squeezed and the
+            photos piled on one another once there were many. */}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-3" data-map-gestures>
+        <div className="grid grid-cols-3 content-start gap-1.5 landscape:grid-cols-6">
           {burstShots.map((s, i) => {
             const off = discarded.has(s.id);
             return (
               <button key={s.id} type="button" aria-pressed={off}
                 aria-label={`Foto ${i + 1}${off ? " · da scartare, tocca per tenerla" : " · tocca per scartarla"}`}
                 onClick={() => setDiscarded((d) => { const n = new Set(d); if (n.has(s.id)) n.delete(s.id); else n.add(s.id); return n; })}
-                className="relative aspect-square w-full overflow-hidden rounded-xl bg-black/40">
+                className="relative block aspect-square h-auto w-full overflow-hidden rounded-xl bg-black/40">
                 <img src={s.thumb} alt="" className={`size-full object-cover transition ${off ? "scale-90 opacity-35 grayscale" : ""}`} />
                 <span className="absolute bottom-1 left-1 rounded-full bg-black/70 px-1.5 text-[10px] font-bold">{i + 1}</span>
                 {off && <span className="absolute inset-0 grid place-items-center"><span className="grid size-9 place-items-center rounded-full bg-black/75 ring-1 ring-white/40"><X className="size-5" aria-hidden="true" /></span></span>}
               </button>
             );
           })}
+        </div>
         </div>
         <div className="flex items-center gap-2 px-4 pt-1">
           <button type="button" onClick={discardAll} className="h-11 flex-1 rounded-full bg-white/10 text-sm font-semibold text-red-300">Scarta tutte</button>

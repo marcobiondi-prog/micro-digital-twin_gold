@@ -690,6 +690,15 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
           {!session && !notice && !barExpanded && <span className="shrink-0 rounded-full bg-[#facc15] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-black">Anteprima</span>}
           {!notice && <ChevronDown className={`size-4 shrink-0 opacity-80 transition-transform ${barExpanded ? "rotate-180" : ""}`} aria-hidden="true" />}
         </button>
+        {session && (
+          // With ARCore the phone's camera belongs to ARCore and Chrome gives the page no flash: the button stays where
+          // it is in the preview, dimmed, and a tap says why.
+          <button type="button" aria-disabled="true" aria-label="Flash non disponibile con ARCore" title="Flash non disponibile con ARCore"
+            onClick={() => setNotice({ text: "Con ARCore il flash non si può accendere: Chrome dà la fotocamera solo ad ARCore. Accendi una luce, aiuta anche a trovare il pavimento.", tone: "warn" })}
+            className={`ml-auto ${round} opacity-60`}>
+            <ZapOff className="size-5" />
+          </button>
+        )}
         {torchOk && (
           <button type="button" onClick={() => void toggleTorch()} aria-pressed={torchOn}
             aria-label={torchOn ? "Disattiva flash" : "Attiva flash"} title={torchOn ? "Disattiva flash" : "Attiva flash"}
