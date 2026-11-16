@@ -52,7 +52,7 @@ import { addFind, findFromScan, placedText, useFieldFinds, type FindKind } from 
 import { readFix, smallThumb } from "@/lib/find-position";
 import { getLab } from "@/models/lab-store";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { cameraViewport, groundTilt, isGroundPoint, setArOrientationActive, shortestRotationDelta } from "@/lib/ar-orientation";
+import { cameraViewport, groundTilt, isGroundPoint, resetAppOrientation, setArOrientationActive, shortestRotationDelta } from "@/lib/ar-orientation";
 import { CameraCloseGestures } from "@/views/CameraCloseGestures";
 import { tutorialSwipeStep } from "@/lib/ar-tutorial-swipe";
 import { CameraCenterCapture } from "@/views/CameraCenterCapture";
@@ -1626,7 +1626,7 @@ export function ArCamera({
         // The AR session leaves the camera's fullscreen: that exit is not a Back, so the camera stays open.
         arTransitionRef.current = true;
         requestArSession(root)
-          .then((session) => setLiveAr({ session, root }))
+          .then((session) => { setLiveAr({ session, root }); void resetAppOrientation(); })
           .finally(() => { window.setTimeout(() => { arTransitionRef.current = false; }, 1500); })
           .catch((err: unknown) => {
             root.remove();
@@ -1648,7 +1648,10 @@ export function ArCamera({
     if (had?.session) setCamEpoch((n) => n + 1);
     // Back to the camera's fullscreen (and so to its landscape) if the AR session left it; the exit tap counts.
     arTransitionRef.current = true;
+    void resetAppOrientation();
     regainFullscreen();
+    // Chrome restores its own orientation a moment after the session's end: ask once more once it has.
+    window.setTimeout(() => { void resetAppOrientation().then(() => window.dispatchEvent(new Event("ar-orientation-change"))); }, 600);
     window.setTimeout(() => { arTransitionRef.current = false; }, 1500);
   };
   endLiveRef.current = endLive;

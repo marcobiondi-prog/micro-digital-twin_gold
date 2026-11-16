@@ -47,6 +47,17 @@ async function applyAppOrientation(): Promise<boolean> {
   }
 }
 
+/**
+ * Forgets the lock we think we hold and asks again. An AR session (WebXR) takes the screen's orientation for
+ * itself and, when it ends, Chrome puts back the manifest's portrait without telling the page: the cached lock
+ * then still read "any", so it was never asked again and the camera stayed portrait-locked (drawn turned by CSS,
+ * the page letterboxed) after leaving AR.
+ */
+export function resetAppOrientation(): Promise<boolean> {
+  heldLock = null;
+  return syncAppOrientation();
+}
+
 /** Phone home videos play landscape; hosts that refuse the lock fall back to the CSS-rotated surface. */
 export function setHomeVideoLandscape(active: boolean) {
   document.documentElement.toggleAttribute("data-home-video-landscape", active);
