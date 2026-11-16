@@ -173,3 +173,14 @@ export function recognisedPlants(kind: ArKind, species: ReadonlyArray<ScanSpecie
   }
   return out;
 }
+
+/**
+ * The vibration when an object is put on the floor follows its weight: its bulk (footprint × height) on a log scale,
+ * from a light tick for a misting pole to a firm double thud for a big tree.
+ */
+export function placeHaptic(def: Pick<ArObjectDef, "w" | "d" | "h">): number[] {
+  const bulk = Math.max(0, def.w * def.d * def.h);
+  const k = Math.max(0, Math.min(1, Math.log10(bulk + 1) / Math.log10(500)));
+  const first = Math.round(18 + 52 * k);
+  return k > 0.55 ? [first, 45, Math.round(30 + 70 * k)] : [first];
+}

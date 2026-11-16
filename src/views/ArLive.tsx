@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Check, ChevronDown, ChevronLeft, RotateCw, Zap, ZapOff, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
 import type { ArKind } from "@/models/ar-focus";
 import {
-  AR_OBJECTS, alignFromFix, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, arObject, enToAr, metresText, objectsToZones, toEN,
+  AR_OBJECTS, alignFromFix, placeHaptic, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, arObject, enToAr, metresText, objectsToZones, toEN,
   type Alignment, type ArObjectDef, type PlacedObject,
 } from "@/models/ar-objects";
 import { getLab, setUrban, setVineyard } from "@/models/lab-store";
@@ -214,6 +214,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     })();
 
     let sawFloor = false;
+    let lostAt = 0;
     renderer.setAnimationLoop((_t, frame?: XRFrame) => {
       if (frame) framesRef.current += 1;
       const t = three.current;
@@ -228,8 +229,11 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
           const p = pose.transform.position;
           t.hit = { x: p.x, y: p.y, z: p.z };
           if (t.floorY === null) t.floorY = p.y;
-          if (!sawFloor) { sawFloor = true; setFound(true); hapticTick([15]); }
-        } else { reticle.visible = false; t.hit = null; }
+          // The floor found: a clear double pulse the first time, a short one when it is found again after losing it.
+          if (!sawFloor) { sawFloor = true; setFound(true); hapticTick([40, 60, 40]); }
+          else if (lostAt && performance.now() - lostAt > 1500) hapticTick([30]);
+          lostAt = 0;
+        } else { reticle.visible = false; t.hit = null; if (sawFloor && !lostAt) lostAt = performance.now(); }
       }
       renderer.render(scene, camera);
     });
@@ -327,13 +331,13 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         t.scene.add(g);
         t.objects.set(uid, g);
         setPlaced((l) => [...l, { uid, id: def.id, x: hit.x, z: hit.z, yaw: 0, ...(def.plant ? { def } : {}) }]);
-        hapticTick([20]);
+        hapticTick(placeHaptic(def));
       } else if (tl === "align") {
         setAlignPts((pts) => (pts.length >= 2 ? [hit] : [...pts, hit]));
-        hapticTick([15]);
+        hapticTick([30]);
       } else {
         setMeasure((pts) => (pts.length >= 2 ? [hit] : [...pts, hit]));
-        hapticTick([15]);
+        hapticTick([30]);
       }
   }
 

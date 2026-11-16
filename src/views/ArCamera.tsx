@@ -477,7 +477,7 @@ export function ArCamera({
     if (!g) return;
     let box = SEARCH_BOX;
     let prevBox = SEARCH_BOX;
-    let hits = 0, misses = 0, locked = false, prevLocked = false;
+    let hits = 0, misses = 0, locked = false, prevLocked = false, lastLockBuzz = 0;
     let greenHits = 0, greenMisses = 0;
     greenLockRef.current = false;
     const tick = () => {
@@ -511,6 +511,8 @@ export function ArCamera({
       if (locked !== prevLocked) {
         prevLocked = locked;
         setSubjectLocked(locked);
+        // A plant caught in the viewfinder: one short tick, at most every 2 s so a flickering lock does not buzz.
+        if (locked && performance.now() - lastLockBuzz > 2000) { lastLockBuzz = performance.now(); hapticTick([25]); }
       }
     };
     tick();
@@ -886,7 +888,7 @@ export function ArCamera({
         playCameraSound("scan-start", 1.8);
         await new Promise((resolve) => window.setTimeout(resolve, PRECHECK_SCAN_MS));
         if (version !== scanVersion.current) return;
-        playCameraSound("scan-fail", 1.8);
+        playCameraSound("scan-fail", 1.8); hapticTick([90]);
         setFound(nothingToScan);
         return;
       }
@@ -938,19 +940,19 @@ export function ArCamera({
       setSoil(r.soil ?? null);
       setSurvey(r.survey ?? null);
       if (r.error) {
-        playCameraSound("scan-fail", 1.8);
+        playCameraSound("scan-fail", 1.8); hapticTick([90]);
         setFound(r.error);
         return;
       }
       // Each branch target stops when the result lacks what it looks for (a plant, or the ground).
       const missing = scanMissing(kind, target, { plant: Boolean(d && (d.type !== "object" || d.species)), ground: Boolean(r.soil || r.survey?.regions.length) });
       if (missing) {
-        playCameraSound("scan-fail", 1.8);
+        playCameraSound("scan-fail", 1.8); hapticTick([90]);
         setFound(missing);
         return;
       }
       if (!d) {
-        playCameraSound("scan-done", 1.8);
+        playCameraSound("scan-done", 1.8); hapticTick([40, 60, 40]);
         setFound("Terreno analizzato · nessuna specie identificata");
         logScan("Terreno analizzato · nessuna specie identificata", null, r.soil ?? null);
         return;
@@ -985,7 +987,7 @@ export function ArCamera({
           image: cutout ?? undefined,
         });
       }
-      playCameraSound("scan-done", 1.8);
+      playCameraSound("scan-done", 1.8); hapticTick([40, 60, 40]);
       const outcome = d.species
         ? `${d.species.commonName} · ${d.identification?.level === "genus" ? "genere probabile" : "specie probabile"}`
         : `${d.label} · specie incerta, inquadra una foglia da vicino`;
@@ -1019,7 +1021,7 @@ export function ArCamera({
       const message = error instanceof Error ? error.message : "";
       // The host's own error text (e.g. FUNCTION_INVOCATION_TIMEOUT) names the real cause.
       const detail = message.replace(/<(style|script)[\s\S]*?<\/\1>|<[^>]*>/gi, " ").replace(/\s+/g, " ").trim().slice(0, 140) || (isEmptyHttpError(error) ? "risposta vuota dal server" : "");
-      if (version === scanVersion.current) playCameraSound("scan-fail", 1.8);
+      if (version === scanVersion.current) { playCameraSound("scan-fail", 1.8); hapticTick([90]); }
       if (version === scanVersion.current) setFound(/Unauthorized/.test(message) ? "Sessione non sincronizzata: riprova la scansione." : `Analisi interrotta${detail ? ` (${detail})` : ""}. Controlla la connessione prima di una nuova analisi.`);
     } finally {
       scanBusy.current = false;
@@ -1079,7 +1081,7 @@ export function ArCamera({
 
     if (placed) {
       hapticTick([30]);
-      playCameraSound("scan-done", 1.8);
+      playCameraSound("scan-done", 1.8); hapticTick([40, 60, 40]);
 
       const effectiveSpecies: SpeciesInfo = species ?? {
         commonName: "Leccio",

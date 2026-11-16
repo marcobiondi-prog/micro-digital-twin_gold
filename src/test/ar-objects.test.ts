@@ -86,3 +86,14 @@ describe("recognised plants in Prova", () => {
     expect(list.map((d) => d.plant?.scientificName)).toEqual(["Quercus ilex", "Pinus pinea"]);
   });
 });
+
+import { placeHaptic } from "@/models/ar-objects";
+describe("placeHaptic", () => {
+  it("vibrates by the object's weight", () => {
+    const mister = placeHaptic({ w: 0.4, d: 0.4, h: 3 });
+    const tree = placeHaptic({ w: 6.2, d: 6.2, h: 9 });
+    expect(mister).toHaveLength(1);
+    expect(tree).toHaveLength(3);
+    expect(tree[0]!).toBeGreaterThan(mister[0]!);
+  });
+});
