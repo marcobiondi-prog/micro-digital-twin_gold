@@ -95,7 +95,7 @@ export default defineConfig(({ command }) => ({
         // The heavy files used only now and then (PDF, maps, AI camera scene, towns list, screenshots) are not
         // downloaded with every update: they are kept the first time they are used (the "assets" cache below), so a
         // new version installs in a few seconds instead of after ~6 MB.
-        globIgnores: ["**/pdf.worker*", "**/pdf-*", "**/maplibre-gl*", "**/ar-scene*", "**/jspdf*", "**/html2canvas*", "**/comuni-it*", "**/index.es-*", "**/purify*"],
+        globIgnores: ["**/pdf.worker*", "**/pdf-*", "**/maplibre-gl*", "**/ar-scene*", "**/jspdf*", "**/html2canvas*", "**/comuni-it*", "**/index.es-*", "**/purify*", "**/three.module*", "**/three-layer*", "**/ArCameraLazy*", "**/jszip*"],
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         clientsClaim: true,

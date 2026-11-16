@@ -1,5 +1,6 @@
 import { VideoPlayer } from "@/views/v10/VideoPlayer";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+const ArCameraLazy = lazy(() => import("@/views/ArCameraLazy"));
 import { createPortal } from "react-dom";
 import {
   Camera,
@@ -13,7 +14,6 @@ import {
   Video,
 } from "lucide-react";
 import { toast } from "sonner";
-import { ArCamera } from "@/views/ArCamera";
 import { prepareArOrientation } from "@/lib/ar-orientation";
 import { useInstalledApp } from "@/lib/installed-app";
 import { useDemoSignedIn } from "@/lib/demo-login";
@@ -240,6 +240,9 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
     pick(gallery.current);
   }
   const [ar, setAr] = useState<"photo" | "video" | null>(null);
+  // The AI camera's code (three.js included) is fetched the first time it is opened, then kept mounted.
+  const [arLoaded, setArLoaded] = useState(false);
+  useEffect(() => { if (ar) setArLoaded(true); }, [ar]);
   // The AI camera runs only in the installed app, never in a web browser tab
   // (the preview-only simulated sign-in shows it in a tab too, to try the interface).
   const installedApp = useInstalledApp();
@@ -421,7 +424,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
       </button>
       )}
       {overPage(<>
-      <ArCamera
+      {(ar || arLoaded) && <Suspense fallback={null}><ArCameraLazy
         mode={ar}
         kind={kind}
         context={context}
@@ -431,7 +434,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
           setAr(null);
           openCamera(m);
         }}
-      />
+      /></Suspense>}
       {input(cameraPhoto, "image/*", "environment")}
       <SystemCamera mode={systemCamera} onCapture={(files) => add(files)} onClose={closeSystemCamera} />
       <GalleryReview kind={kind} files={reviewing} zones={zoneNames} onAddMore={() => void pickGallery()} onClose={() => setReviewing(null)}

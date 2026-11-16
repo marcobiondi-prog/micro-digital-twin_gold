@@ -1,10 +1,10 @@
 import { GuestLock, useGuestOnly } from "@/views/v10/ProfileGate";
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+const DayChart = lazy(() => import("@/views/v10/DayChart"));
 import { loadPlaceArea } from "@/lib/place-area-client";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ArrowRight, CloudDrizzle, CloudRain, Sprout, Droplets, Leaf, Lock, Mail, MapPin, Send, ShieldCheck, Sparkles, Sun, TreePine, Umbrella, Wind, type LucideIcon } from "lucide-react";
 import { useLab, type LabState } from "@/models/lab-store";
 import { getPiazzaReading, usePiazzaReading, type PiazzaReading } from "@/models/sim-reading";
@@ -313,19 +313,7 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
             <span className="inline-flex items-center gap-1.5"><i className="size-2.5 rounded-full bg-ok" />Con gli interventi</span>
           </div>
           <div className="h-48 sm:h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={day} margin={{ top: 6, right: 4, bottom: 0, left: -22 }}>
-                <defs>
-                  <linearGradient id="dash-before" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="var(--radar-hot)" stopOpacity={0.35} /><stop offset="100%" stopColor="var(--radar-hot)" stopOpacity={0} /></linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="h" type="category" tickLine={false} axisLine={false} interval={5} tickFormatter={(h) => `${h}:00`} fontSize={11} />
-                <YAxis tickLine={false} axisLine={false} fontSize={11} domain={["dataMin - 1", "dataMax + 1"]} tickFormatter={(v) => `${Math.round(v)}°`} />
-                <Tooltip formatter={(v: number, n: string) => [`${fmt1(v)}°`, n === "prima" ? "Senza interventi" : "Con gli interventi"]} labelFormatter={(h) => `Ore ${h}:00`} contentStyle={{ borderRadius: 16, border: "none" }} />
-                <Area type="monotone" dataKey="prima" stroke="var(--radar-hot)" strokeWidth={2} fill="url(#dash-before)" isAnimationActive={!reduce} />
-                <Area type="monotone" dataKey="dopo" stroke="var(--ok)" strokeWidth={2.5} fill="none" isAnimationActive={!reduce} />
-              </AreaChart>
-            </ResponsiveContainer>
+            <Suspense fallback={<div className="size-full animate-pulse rounded-2xl bg-muted/40" aria-hidden="true" />}><DayChart day={day} reduce={!!reduce} fmt1={fmt1} /></Suspense>
           </div>
         </DashCard>
       </DashSection>

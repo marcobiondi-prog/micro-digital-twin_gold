@@ -8,7 +8,6 @@ import { ProfileIcon } from "@/views/ProfileIcon";
 import { useProId } from "@/lib/use-pro-id";
 import { proSummary } from "@/models/professional-id";
 import { clockText, getSimWhen } from "@/models/sim-when";
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertTriangle, Download, Plus, Building2, Grape, Copy, Printer, Activity, Trash2, Share2, Mail, LineChart as LineChartIcon, Leaf, NotebookPen, Droplets, Waves } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
