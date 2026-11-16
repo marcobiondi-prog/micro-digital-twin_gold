@@ -473,7 +473,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
             </div>
           )}
           {dialOn && !trayOpen && (
-            <div className="flex w-full justify-center landscape:absolute landscape:bottom-[4.75rem] landscape:left-0 landscape:right-0">
+            <div className="flex w-full justify-center landscape:hidden">
               <ZoomDial zoom={zoom} max={ZOOM_MAX} onZoom={(z) => setZoom(Math.max(1, Math.min(ZOOM_MAX, z)))} />
             </div>
           )}
@@ -487,9 +487,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
               </span>
             </button>
             <button type="button" onClick={undo} disabled={!placed.length} aria-label="Annulla l’ultimo" className={`${round} disabled:opacity-40`}><Undo2 className="size-5" /></button>
-            <div className="mx-auto">{shutter("size-14", "size-10")}</div>
+            <div className="mx-auto landscape:hidden">{shutter("size-14", "size-10")}</div>
             <button type="button" onClick={backToMap} disabled={!placed.length}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-white px-5 text-sm font-bold text-black disabled:opacity-40">
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-white px-5 text-sm font-bold text-black disabled:opacity-40 landscape:ml-1">
               <MapPinned className="size-4" aria-hidden="true" />{tool === "align" ? "Tocca i 2 punti" : `Riporta${placed.length ? ` · ${placed.length}` : ""}`}
             </button>
           </div>
@@ -503,6 +503,20 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         </div>
       )}
 
+      {!adjusting && (
+        // Landscape: the shutter stays on the right edge where Rileva has it, the zoom ruler just above it, so the
+        // rest of the screen is left to the scene.
+        <div className="pointer-events-none absolute right-0 top-1/2 hidden -translate-y-1/2 landscape:block" style={{ marginRight: "calc(env(safe-area-inset-right) + 1rem)" }}>
+          <div className="pointer-events-auto relative">
+            {shutter("size-[72px]", "size-[54px]")}
+            {dialOn && !trayOpen && (
+              <div className="absolute bottom-full right-0 mb-3 flex justify-end">
+                <ZoomDial zoom={zoom} max={ZOOM_MAX} onZoom={(z) => setZoom(Math.max(1, Math.min(ZOOM_MAX, z)))} />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
     </>
   );
