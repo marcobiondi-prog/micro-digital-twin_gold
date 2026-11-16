@@ -9,10 +9,11 @@ import * as THREE from "three";
  * A small bias keeps things lying on the floor (shadows, the reticle) from flickering under the floor's own depth.
  */
 
-/** The depth is a test switched on by hand (it made tracking shake on the user's Xperia), kept on this phone. */
+/** Whether the depth is asked with the session, kept on this phone. */
 const WANT_KEY = "mdt-ar-depth-v1", FLIP_KEY = "mdt-ar-depth-flip-v1";
-export function depthWanted(): boolean { try { return localStorage.getItem(WANT_KEY) === "on"; } catch { return false; } }
-export function setDepthWanted(on: boolean) { try { if (on) localStorage.setItem(WANT_KEY, "on"); else localStorage.removeItem(WANT_KEY); } catch { /* private mode */ } }
+// On by default (the objects must see the room around them); «Spegni profondità» keeps it off on this phone.
+export function depthWanted(): boolean { try { return localStorage.getItem(WANT_KEY) !== "off"; } catch { return true; } }
+export function setDepthWanted(on: boolean) { try { localStorage.setItem(WANT_KEY, on ? "on" : "off"); } catch { /* private mode */ } }
 /** How the depth map is turned against the screen, to find the right one by trying: 0…3. */
 export const FLIP_MODES = 4;
 export function depthFlip(): number { try { const n = Number(localStorage.getItem(FLIP_KEY)); return n >= 0 && n < FLIP_MODES ? n : 0; } catch { return 0; } }

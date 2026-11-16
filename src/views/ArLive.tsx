@@ -54,8 +54,8 @@ export async function requestArSession(overlayRoot: HTMLElement): Promise<XRSess
   // shows its own close button; a tap on the floor still puts the chosen object), then the bare session. Every
   // refusal is reported together when none starts.
   const tries: Array<[string, XRSessionInit]> = [
-    // ARCore's depth first (real walls hide the objects), only when its test is switched on by hand: on the user's
-    // Xperia it made tracking shake. Optional, so a phone without it still starts.
+    // ARCore's depth first (real walls and furniture hide the objects), on unless switched off by hand. Optional, so a
+    // phone without it still starts.
     ...(depthWanted() ? [["overlay+pavimento+profondità", { requiredFeatures: ["hit-test", "dom-overlay"], optionalFeatures: ["local-floor", "camera-access", "depth-sensing"], depthSensing: DEPTH_INIT, domOverlay: { root: overlayRoot } } as unknown as XRSessionInit] as [string, XRSessionInit]] : []),
     ["overlay+pavimento", { requiredFeatures: ["hit-test", "dom-overlay"], optionalFeatures: ["local-floor", "camera-access"], domOverlay: { root: overlayRoot } } as XRSessionInit],
     ["overlay", { requiredFeatures: ["dom-overlay"], optionalFeatures: ["hit-test", "local-floor", "camera-access"], domOverlay: { root: overlayRoot } } as XRSessionInit],
@@ -670,9 +670,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     { key: "t:modellino", label: model ? "Grandezza vera" : "Modellino", Icon: Box, tool: true, on: model, aria: model ? "Torna alla grandezza vera" : "Modellino in scala 1:10",
       onPick: () => { setModel((m) => !m); setTrayOpen(false); setNotice({ text: model ? "Grandezza vera" : "Modellino 1:10 · per provare al chiuso o su un tavolo", tone: "ok" }); } },
     // ARCore's depth as a test: switching it on or off restarts the session (it is asked when the session starts).
-    ...(session && onRotate ? [{ key: "t:profondita", label: depthWanted() ? "Spegni profondità" : "Profondità (prova)", Icon: Layers, tool: true, on: depthWanted(),
-      aria: depthWanted() ? "Spegni la prova della profondità e riavvia l’AR" : "Prova la profondità: muri e mobili veri coprono gli oggetti (riavvia l’AR, può rallentare)",
-      onPick: () => { const on = !depthWanted(); setDepthWanted(on); setTrayOpen(false); setNotice({ text: on ? "Riavvio l’AR con la profondità (prova): può tremare un po’" : "Riavvio l’AR senza profondità", tone: "ok" }); onRotate(); } }] : []),
+    ...(session && onRotate ? [{ key: "t:profondita", label: depthWanted() ? "Spegni profondità" : "Profondità", Icon: Layers, tool: true, on: depthWanted(),
+      aria: depthWanted() ? "Spegni la prova della profondità e riavvia l’AR" : "Accendi la profondità: muri e mobili veri coprono gli oggetti (riavvia l’AR)",
+      onPick: () => { const on = !depthWanted(); setDepthWanted(on); setTrayOpen(false); setNotice({ text: on ? "Riavvio l’AR con la profondità: muri e mobili coprono gli oggetti" : "Riavvio l’AR senza profondità", tone: "ok" }); onRotate(); } }] : []),
     ...(session && depthLive ? [{ key: "t:mappa", label: `Gira mappa ${flip + 1}/${FLIP_MODES}`, Icon: RotateCw, tool: true, on: false,
       aria: "Gira la mappa di profondità, se gli oggetti spariscono nei posti sbagliati",
       onPick: () => { const n = (flip + 1) % FLIP_MODES; setFlip(n); setDepthFlip(n); depthRef.current?.setFlip(n); setDepthOn(true); setTrayOpen(false); setNotice({ text: `Mappa di profondità ${n + 1} di ${FLIP_MODES}: guarda se i pali spariscono dietro persone e mobili`, tone: "ok" }); } },
