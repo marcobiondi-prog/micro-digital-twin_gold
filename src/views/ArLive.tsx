@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { toast } from "sonner";
-import { Check, Leaf, MapPinned, MoveVertical, Ruler, Undo2, X } from "lucide-react";
+import { Check, Leaf, Sparkles, MapPinned, MoveVertical, Ruler, Undo2, X } from "lucide-react";
 import type { ArKind } from "@/models/ar-focus";
 import {
   AR_OBJECTS, alignFromFix, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, arObject, enToAr, metresText, objectsToZones, toEN,
@@ -407,6 +407,21 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     return () => window.removeEventListener("resize", fit);
   }, [dialOn]);
 
+  // Every choice sits behind one AI button: the tray opens over the camera only when asked.
+  const [trayOpen, setTrayOpen] = useState(false);
+  const plantChoices = choices.filter((c) => c.def.plant);
+  const objectChoices = choices.filter((c) => !c.def.plant);
+  const chip = (key: string, o: ArObjectDef, icon: React.ReactNode) => {
+    const on = tool === "place" && selected === key;
+    return (
+      <button key={key} type="button" role="radio" aria-checked={on} onClick={() => { setSelected(key); setTool("place"); setTrayOpen(false); }}
+        aria-label={o.plant ? `${o.label}, riconosciuto: ${o.plant.scientificName}, alto circa ${Math.round(o.h)} m` : undefined}
+        className={`inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold ${on ? "bg-[#00e5ff] text-black" : "bg-white/10"}`}>
+        {icon}{o.label}
+      </button>
+    );
+  };
+
   const round = "grid size-11 shrink-0 place-items-center rounded-full bg-black/55 backdrop-blur";
   return (
     <>
@@ -427,44 +442,65 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     )}
     {flash > 0 && <div key={flash} className="pointer-events-none fixed inset-0 z-[60] animate-out fade-out-0 bg-white duration-300 fill-mode-forwards" aria-hidden="true" />}
     <div ref={hudRef} className="ar-live-hud pointer-events-none fixed inset-0 z-50 flex flex-col justify-between text-white" style={{ padding: "env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)" }}>
-      <div className={`pointer-events-auto flex items-center gap-2 p-3 ${dialOn ? "landscape:pr-[150px]" : ""}`}>
+      <div className={`pointer-events-auto flex items-center gap-2 p-3 ${dialOn ? "landscape:pr-[250px]" : ""}`}>
         <button type="button" onClick={end} aria-label="Esci dalla prova" className={round}><X className="size-5" /></button>
         <p role="status" className={`flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-[22px] px-4 py-2 text-sm font-semibold leading-tight transition-colors ${statusTone}`}>
           {!notice && <span className={`size-2 shrink-0 rounded-full ${found ? "bg-[#22c55e]" : "animate-pulse bg-[#facc15]"}`} aria-hidden="true" />}
           <span className="line-clamp-2">{status}</span>
           {!session && !notice && <span className="ml-auto shrink-0 rounded-full bg-[#facc15] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-black" title="Senza ARCore le misure sono indicative">Anteprima</span>}
         </p>
-        {!session && (
-          <button type="button" onClick={() => (adjusting ? finishAdjust() : setAdjusting(true))} aria-pressed={adjusting}
-            aria-label={adjusting ? "Fatto, pavimento regolato" : "Regola pavimento"} className={`${round} ${adjusting ? "!bg-white !text-black" : ""}`}>
-            {adjusting ? <Check className="size-5" /> : <MoveVertical className="size-5" />}
-          </button>
-        )}
+
       </div>
       {!adjusting && (
-        <div className={`pointer-events-auto flex flex-col gap-2 p-3 landscape:flex-row landscape:items-center ${dialOn ? "landscape:pr-[236px]" : ""}`}>
-          <div className="flex min-w-0 gap-2 overflow-x-auto landscape:flex-1" role="radiogroup" aria-label="Cosa mettere" data-map-gestures>
-            {choices.map(({ key, def: o }) => {
-              const on = tool === "place" && selected === key;
-              return (
-                <button key={key} type="button" role="radio" aria-checked={on} onClick={() => { setSelected(key); setTool("place"); }}
-                  aria-label={o.plant ? `${o.label}, riconosciuto: ${o.plant.scientificName}, alto circa ${Math.round(o.h)} m` : undefined}
-                  className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold ${on ? "bg-[#00e5ff] text-black" : "bg-black/55 backdrop-blur"}`}>
-                  {o.plant && <Leaf className={`size-3.5 ${on ? "" : "text-[#4ade80]"}`} aria-hidden="true" />}{o.label}
+        <div className={`pointer-events-auto relative flex flex-col items-start gap-2 p-3 ${dialOn ? "landscape:pr-[236px]" : ""}`}>
+          {trayOpen && (
+            <div id="ar-ai-tray" role="dialog" aria-label="Funzioni AI"
+              className="absolute bottom-full left-3 right-3 max-h-[calc(100dvh-9rem)] max-w-md overflow-y-auto animate-in fade-in-0 slide-in-from-bottom-3 duration-200 rounded-3xl bg-black/70 p-3 shadow-2xl ring-1 ring-white/15 backdrop-blur-md">
+              {plantChoices.length > 0 && (
+                <TrayGroup title="Piante riconosciute dall’AI">
+                  {plantChoices.map(({ key, def: o }) => chip(key, o, <Leaf className="size-3.5 text-[#4ade80]" aria-hidden="true" />))}
+                </TrayGroup>
+              )}
+              <TrayGroup title="Interventi">
+                {objectChoices.map(({ key, def: o }) => chip(key, o, null))}
+              </TrayGroup>
+              <TrayGroup title="Strumenti">
+                <button type="button" onClick={() => { setTool("measure"); setMeasure([]); setTrayOpen(false); }} aria-pressed={tool === "measure"}
+                  className={`inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold ${tool === "measure" ? "bg-[#00e5ff] text-black" : "bg-white/10"}`}>
+                  <Ruler className="size-4" aria-hidden="true" />Misura
                 </button>
-              );
-            })}
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
+                {!session && (
+                  <button type="button" onClick={() => { setAdjusting(true); setTrayOpen(false); }}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full bg-white/10 px-3.5 text-sm font-semibold">
+                    <MoveVertical className="size-4" aria-hidden="true" />Regola pavimento
+                  </button>
+                )}
+              </TrayGroup>
+            </div>
+          )}
+          <div className="flex w-full items-center gap-2 landscape:w-auto">
+            <button type="button" onClick={() => setTrayOpen((o) => !o)} aria-expanded={trayOpen} aria-controls="ar-ai-tray"
+              aria-label={trayOpen ? "Chiudi le funzioni AI" : `Funzioni AI · ${tool === "measure" ? "Misura" : defOf(selected).label}`}
+              className="relative grid size-12 shrink-0 place-items-center rounded-full p-[2px] shadow-[0_0_18px_rgba(0,229,255,0.45)] active:scale-95"
+              style={{ background: "conic-gradient(from 200deg, #00e5ff, #8b5cf6, #22c55e, #00e5ff)" }}>
+              <span className={`grid size-full place-items-center rounded-full ${trayOpen ? "bg-white text-black" : "bg-[#0b1118] text-white"}`}>
+                {trayOpen ? <X className="size-5" /> : <Sparkles className="size-5" />}
+              </span>
+            </button>
             <button type="button" onClick={undo} disabled={!placed.length} aria-label="Annulla l’ultimo" className={`${round} disabled:opacity-40`}><Undo2 className="size-5" /></button>
-            <button type="button" onClick={() => { setTool(tool === "measure" ? "place" : "measure"); setMeasure([]); }} aria-pressed={tool === "measure"} aria-label="Misura"
-              className={`${round} ${tool === "measure" ? "!bg-white !text-black" : ""}`}><Ruler className="size-5" /></button>
-            <div className={dialOn ? "landscape:hidden" : ""}>{shutter("size-14", "size-10")}</div>
+            <div className={`ml-auto landscape:ml-0 ${dialOn ? "landscape:hidden" : ""}`}>{shutter("size-14", "size-10")}</div>
             <button type="button" onClick={backToMap} disabled={!placed.length}
-              className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-white px-5 text-sm font-bold text-black disabled:opacity-40 landscape:flex-none">
+              className="ml-auto inline-flex h-11 items-center justify-center gap-2 rounded-full bg-white px-5 text-sm font-bold text-black disabled:opacity-40 landscape:ml-0">
               <MapPinned className="size-4" aria-hidden="true" />{tool === "align" ? "Tocca i 2 punti" : `Riporta${placed.length ? ` · ${placed.length}` : ""}`}
             </button>
           </div>
+        </div>
+      )}
+      {adjusting && (
+        <div className="pointer-events-auto flex justify-center p-3">
+          <button type="button" onClick={finishAdjust} className="inline-flex h-12 items-center gap-2 rounded-full bg-white px-6 text-sm font-bold text-black shadow-lg">
+            <Check className="size-5" aria-hidden="true" />Fatto
+          </button>
         </div>
       )}
       {dialOn && (
@@ -494,4 +530,13 @@ function hasFloorOffset(): boolean {
 }
 function saveFloorOffset(v: number) {
   try { localStorage.setItem(FLOOR_KEY, String(Math.round(v * 10) / 10)); } catch { /* memory only */ }
+}
+
+function TrayGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="mb-2 last:mb-0">
+      <p className="mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-white/60">{title}</p>
+      <div className="flex flex-wrap gap-2" role={title === "Strumenti" ? undefined : "radiogroup"} aria-label={title}>{children}</div>
+    </div>
+  );
 }
