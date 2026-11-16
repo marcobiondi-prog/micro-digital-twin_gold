@@ -2825,8 +2825,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .zoom-ruler-mark { position: absolute; left: 50%; top: 1.15rem; bottom: .1rem; width: 1.5px; margin-left: -.75px; border-radius: 2px; background: oklch(0.86 0.17 90); }
 /* Vertical zoom (Prova in landscape, beside the shutter): the chips in a column — the bigger stop on top — and the
    ruler standing upright to their left with the bigger numbers on top too, the numbers kept upright, ticks and
-   numbers a little stronger than the horizontal one so they read over the scene; the ruler follows the finger, so a
-   downward swipe brings the bigger numbers under the amber mark (zoom in). */
+   numbers a little stronger than the horizontal one so they read over the scene; an upward swipe zooms in. */
 .ar-zoom-lenses[data-vertical] { flex-direction: column; }
 .zoom-ruler[data-vertical] { left: auto; bottom: auto; right: calc(100% + 1.4rem - 5.5rem); top: 50%; width: 11rem; height: 2.4rem; transform: translateY(-50%) rotate(-90deg); transform-origin: center; animation: zoom-ruler-in-v .16s ease-out; filter: drop-shadow(0 0 3px oklch(0 0 0 / 70%)); }
 .zoom-ruler[data-vertical] .zoom-ruler-tick { background: oklch(0.98 0 0 / 70%); height: .3rem; }
