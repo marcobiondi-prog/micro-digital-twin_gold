@@ -125,6 +125,14 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const videoRef = useRef<HTMLVideoElement>(null);
   // Messages written over the camera: the app's toasts sit under the camera's dialog.
   const [notice, setNotice] = useState<{ text: string; tone: "ok" | "warn" } | null>(null);
+  // What the AR session really got (shown in the open status bar): to tell, on a phone, why it does not work.
+  const [diag, setDiag] = useState<{ hit?: boolean; overlay?: boolean; feats?: string; frames: number; error?: string }>({ frames: 0 });
+  const framesRef = useRef(0);
+  useEffect(() => {
+    if (!session) return;
+    const id = window.setInterval(() => setDiag((d) => (d.frames === framesRef.current ? d : { ...d, frames: framesRef.current })), 1000);
+    return () => window.clearInterval(id);
+  }, [session]);
   // Flash: the camera's own torch, in the preview only (with ARCore the browser owns the camera and gives the page
   // no way to light it). It starts as the AI camera left it, and is switched off when the AR view closes.
   const torchTrack = stream?.getVideoTracks()[0];
@@ -195,8 +203,11 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         // A session granted without hit-test still runs; it just cannot find the floor, and says so.
         const ask = session.requestHitTestSource?.bind(session);
         hitSource = ask ? ((await ask({ space: viewer })?.catch(() => null)) ?? null) : null;
-        if (!hitSource) toast.message("ARCore è partito senza il rilevamento del pavimento", { description: "Su questo telefono gli oggetti non si posano a terra: usa l’anteprima (chiudi e riapri Prova)." });
+        const feats = (session as XRSession & { enabledFeatures?: readonly string[] }).enabledFeatures;
+        setDiag((d) => ({ ...d, hit: !!hitSource, overlay: !!session.domOverlayState, feats: feats ? [...feats].join(", ") : "?" }));
+        if (!hitSource) setNotice({ text: "ARCore è partito senza il rilevamento del pavimento: gli oggetti non si posano a terra qui.", tone: "warn" });
       } catch (e) {
+        setDiag((d) => ({ ...d, error: e instanceof Error ? e.message : String(e) }));
         toast.error("La realtà aumentata non è partita", { description: e instanceof Error ? e.message : String(e) });
         void session.end().catch(() => undefined);
       }
@@ -204,6 +215,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
 
     let sawFloor = false;
     renderer.setAnimationLoop((_t, frame?: XRFrame) => {
+      if (frame) framesRef.current += 1;
       const t = three.current;
       if (!t) return;
       if (frame && hitSource) {
@@ -559,6 +571,11 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
             {barExpanded && !notice && (
               <span id="ar-live-bar-help" className="mt-0.5 block text-xs font-normal opacity-80">
                 {barHelp}{!session && " Anteprima: senza ARCore le misure sono indicative."}
+                {session && (
+                  <span className="mt-1 block font-mono text-[10px] opacity-70">
+                    ARCore · pavimento {diag.hit === undefined ? "…" : diag.hit ? "sì" : "no"} · overlay {diag.overlay ? "sì" : "no"} · fotogrammi {diag.frames} · trovato {found ? "sì" : "no"}{diag.feats ? ` · ${diag.feats}` : ""}{diag.error ? ` · errore: ${diag.error}` : ""}
+                  </span>
+                )}
               </span>
             )}
           </span>
