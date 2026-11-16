@@ -8,11 +8,11 @@ import { dialZoom, DIAL_PX, rulerTicks } from "@/lib/zoom-dial";
  * the dial of the Xperia camera: swiping left brings the bigger numbers under the mark (zoom in), right zooms out.
  * The ruler is logarithmic, so every doubling (1→2, 2→4) takes the same swipe.
  */
-export function ZoomDial({ zoom, max, onZoom, disabled = false, className = "", onRulerChange, edge = false }: {
+export function ZoomDial({ zoom, max, onZoom, disabled = false, className = "", onRulerChange, vertical = false }: {
   zoom: number; max: number; onZoom: (value: number) => void; disabled?: boolean; className?: string;
   onRulerChange?: (active: boolean) => void;
-  /** Near the screen's right edge: the ruler is set against that edge instead of centred on the chips. */
-  edge?: boolean;
+  /** Chips in a column (the bigger stop on top) and a ruler beside them, moved by an up-and-down swipe: up zooms in. */
+  vertical?: boolean;
 }) {
   const [dialing, setDialing] = useState(false);
   const [shown, setShown] = useState(false);
@@ -46,8 +46,8 @@ export function ZoomDial({ zoom, max, onZoom, disabled = false, className = "", 
   const move = (e: ReactPointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     if (!d || d.id !== e.pointerId) return;
-    const along = e.clientX - d.x;
-    const across = e.clientY - d.y;
+    const along = vertical ? e.clientY - d.y : e.clientX - d.x;
+    const across = vertical ? e.clientX - d.x : e.clientY - d.y;
     if (!d.moved) {
       if (Math.abs(along) < 6 || Math.abs(along) < Math.abs(across)) return;
       d.moved = true;
@@ -81,7 +81,7 @@ export function ZoomDial({ zoom, max, onZoom, disabled = false, className = "", 
   return (
     <div className={`relative mx-auto w-fit ${className}`}>
       {shown && (
-        <div className="zoom-ruler" data-edge={edge || undefined} data-dialing={dialing || undefined} aria-hidden="true">
+        <div className="zoom-ruler" data-vertical={vertical || undefined} data-dialing={dialing || undefined} aria-hidden="true">
           <div className="zoom-ruler-track" style={{ transform: `translateX(${-Math.log2(Math.max(ZOOM_MIN, zoom)) * DIAL_PX}px)` }}>
             {rulerTicks(max).map((t) => (
               <span key={t.value} className="zoom-ruler-tick" data-major={t.major || undefined} style={{ left: `${Math.log2(t.value) * DIAL_PX}px` }}>
@@ -92,13 +92,14 @@ export function ZoomDial({ zoom, max, onZoom, disabled = false, className = "", 
           <span className="zoom-ruler-mark" />
         </div>
       )}
-      <div className="ar-zoom-lenses touch-none" role="group" aria-label="Zoom della fotocamera: tocca un numero o scorri di lato" data-camera-controls
+      <div className="ar-zoom-lenses touch-none" data-vertical={vertical || undefined} role="group"
+        aria-label={`Zoom della fotocamera: tocca un numero o scorri ${vertical ? "in su o in giù" : "di lato"}`} data-camera-controls
         onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
         onClickCapture={(e) => { if (swallowClick.current) { swallowClick.current = false; e.stopPropagation(); e.preventDefault(); } }}>
-        {side(lower, 0.5, "0.5x", "Riduci zoom")}
+        {vertical ? side(higher, 2, "2x", "Aumenta zoom") : side(lower, 0.5, "0.5x", "Riduci zoom")}
         <button type="button" className="ar-zoom-lens" data-active disabled={disabled}
           aria-label={`Zoom ${zoomLabel(zoom)}: tocca per tornare a 1×`} onClick={() => onZoom(1)}>{zoomLabel(zoom)}</button>
-        {side(higher, 2, "2x", "Aumenta zoom")}
+        {vertical ? side(lower, 0.5, "0.5x", "Riduci zoom") : side(higher, 2, "2x", "Aumenta zoom")}
       </div>
     </div>
   );

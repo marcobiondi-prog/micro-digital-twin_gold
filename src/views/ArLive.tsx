@@ -446,7 +446,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     )}
     {flash > 0 && <div key={flash} className="pointer-events-none fixed inset-0 z-[60] animate-out fade-out-0 bg-white duration-300 fill-mode-forwards" aria-hidden="true" />}
     <div ref={hudRef} className="ar-live-hud pointer-events-none fixed inset-0 z-50 flex flex-col justify-between text-white" style={{ padding: "env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)" }}>
-      <div className={`pointer-events-auto flex items-center gap-2 p-3 ${adjusting ? "" : "landscape:pr-[7.5rem]"}`}>
+      <div className={`pointer-events-auto flex items-center gap-2 p-3`}>
         <button type="button" onClick={end} aria-label="Esci dalla prova" className={round}><X className="size-5" /></button>
         <button type="button" onClick={() => setBarOpen((o) => !o)} aria-expanded={barExpanded} aria-controls="ar-live-bar-help"
           className={`flex min-h-11 min-w-0 items-center gap-2 rounded-[22px] px-4 py-2 text-left text-sm font-semibold leading-tight transition-colors ${statusTone} ${barExpanded ? "flex-1" : "max-w-[70%]"}`}>
@@ -527,14 +527,14 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       )}
 
       {!adjusting && (
-        // Landscape: the shutter stays on the right edge where Rileva has it, the zoom chips and ruler above it as in
-        // portrait (the ruler set against the screen's edge), so the rest of the screen is left to the scene.
-        <div className="pointer-events-none absolute right-0 top-1/2 hidden -translate-y-1/2 landscape:block" style={{ marginRight: "calc(env(safe-area-inset-right) + 2.25rem)" }}>
+        // Landscape: the shutter stays on the right edge where Rileva has it, the zoom in a column just to its left
+        // (the ruler upright beside it), so the rest of the screen is left to the scene.
+        <div className="pointer-events-none absolute right-0 top-1/2 hidden -translate-y-1/2 landscape:block" style={{ marginRight: "calc(env(safe-area-inset-right) + 1rem)" }}>
           <div className="pointer-events-auto relative">
             {shutter("size-[72px]", "size-[54px]")}
             {dialOn && !trayOpen && (
-              <div className="absolute bottom-full left-1/2 mb-3 -translate-x-1/2">
-                <ZoomDial edge zoom={zoom} max={ZOOM_MAX} onZoom={(z) => setZoom(Math.max(1, Math.min(ZOOM_MAX, z)))} />
+              <div className="absolute right-full top-1/2 mr-3 -translate-y-1/2">
+                <ZoomDial vertical zoom={zoom} max={ZOOM_MAX} onZoom={(z) => setZoom(Math.max(1, Math.min(ZOOM_MAX, z)))} />
               </div>
             )}
           </div>
