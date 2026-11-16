@@ -392,11 +392,27 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         const uid = `o${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
         const g = objectMesh(def);
         if (def.id !== "pergolato") g.add(contactShadow(def));
-        g.position.set(hit.x, hit.y, hit.z);
+        // A pergola or a shade cloth stands on posts at its edges: put by its centre, its posts fell 2 m beyond the
+        // tap, often behind a desk or a wall, and it looked afloat. It is put instead with the middle of its near side
+        // on the spot tapped, turned to face the phone, so its front posts stand right where one looks.
+        let cx = hit.x, cz = hit.z, yaw = 0;
+        if (def.id === "pergolato" || def.id === "telo") {
+          const eye = new THREE.Vector3().setFromMatrixPosition((t.renderer.xr.isPresenting ? t.renderer.xr.getCamera() : t.camera).matrixWorld);
+          let dx = hit.x - eye.x, dz = hit.z - eye.z;
+          const len = Math.hypot(dx, dz);
+          if (len > 0.05) {
+            dx /= len; dz /= len;
+            const reach = (def.d / 2 - 0.12) * modelRef.current;
+            cx = hit.x + dx * reach; cz = hit.z + dz * reach;
+            g.rotation.y = Math.atan2(dx, dz);
+            yaw = -g.rotation.y;
+          }
+        }
+        g.position.set(cx, hit.y, cz);
         g.scale.setScalar(modelRef.current);
         t.scene.add(g);
         t.objects.set(uid, g);
-        setPlaced((l) => [...l, { uid, id: def.id, x: hit.x, z: hit.z, yaw: 0, ...(def.plant ? { def } : {}) }]);
+        setPlaced((l) => [...l, { uid, id: def.id, x: cx, z: cz, yaw, ...(def.plant ? { def } : {}) }]);
         hapticTick(placeHaptic(def));
       } else if (tl === "align") {
         setAlignPts((pts) => (pts.length >= 2 ? [hit] : [...pts, hit]));
