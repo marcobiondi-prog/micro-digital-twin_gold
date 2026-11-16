@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prova ARCore</title>
+<style>body{font:16px system-ui;background:#111;color:#eee;padding:20px}button{font:inherit;padding:14px 18px;margin:6px 0;border-radius:14px;border:0;background:#00e5ff;color:#000;width:100%}pre{white-space:pre-wrap;background:#222;padding:12px;border-radius:10px}</style></head>
+<body>
+<h2>Prova ARCore</h2>
+<p>Una pagina senza fotocamera e senza schermo intero, per capire cosa blocca l'AR. Tocca i pulsanti uno alla volta e manda lo screenshot.</p>
+<button id="a">1 · AR semplice</button>
+<button id="b">2 · AR con pavimento</button>
+<button id="c">3 · AR con pulsanti (overlay)</button>
+<button id="d">4 · Fotocamera accesa, poi AR</button>
+<pre id="log"></pre>
+<div id="ov"></div>
+<script>
+const log=(m)=>{document.getElementById('log').textContent+=m+'\n'};
+log('Browser: '+navigator.userAgent);
+log('App installata: '+(matchMedia('(display-mode: standalone)').matches||matchMedia('(display-mode: fullscreen)').matches||matchMedia('(display-mode: minimal-ui)').matches?'sì':'no'));
+log('WebXR: '+(!!navigator.xr?'sì':'no'));
+if(navigator.xr)navigator.xr.isSessionSupported('immersive-ar').then(v=>log('immersive-ar supportato: '+v)).catch(e=>log('isSessionSupported errore: '+e));
+const go=async(name,init)=>{try{const s=await navigator.xr.requestSession('immersive-ar',init);log(name+': PARTITO ✓ (si chiude da solo tra 3 s)');setTimeout(()=>s.end(),3000);}catch(e){log(name+': '+e.name+' · '+e.message);}};
+document.getElementById('a').onclick=()=>go('1 semplice',{});
+document.getElementById('b').onclick=()=>go('2 pavimento',{requiredFeatures:['hit-test']});
+document.getElementById('c').onclick=()=>go('3 overlay',{requiredFeatures:['dom-overlay'],domOverlay:{root:document.getElementById('ov')}});
+document.getElementById('d').onclick=async()=>{try{const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});st.getTracks().forEach(t=>t.stop());log('4 fotocamera aperta e chiusa');}catch(e){log('4 fotocamera: '+e.name);}setTimeout(()=>go('4 dopo fotocamera',{}),450);};
+</script>
+</body></html>
