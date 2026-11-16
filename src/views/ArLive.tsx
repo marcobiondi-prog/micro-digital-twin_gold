@@ -436,7 +436,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     )}
     {flash > 0 && <div key={flash} className="pointer-events-none fixed inset-0 z-[60] animate-out fade-out-0 bg-white duration-300 fill-mode-forwards" aria-hidden="true" />}
     <div ref={hudRef} className="ar-live-hud pointer-events-none fixed inset-0 z-50 flex flex-col justify-between text-white" style={{ padding: "env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)" }}>
-      <div className={`pointer-events-auto flex items-center gap-2 p-3 `}>
+      <div className={`pointer-events-auto flex items-center gap-2 p-3 ${adjusting ? "" : "landscape:pr-[7.5rem]"}`}>
         <button type="button" onClick={end} aria-label="Esci dalla prova" className={round}><X className="size-5" /></button>
         <p role="status" className={`flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-[22px] px-4 py-2 text-sm font-semibold leading-tight transition-colors ${statusTone}`}>
           {!notice && <span className={`size-2 shrink-0 rounded-full ${found ? "bg-[#22c55e]" : "animate-pulse bg-[#facc15]"}`} aria-hidden="true" />}
@@ -510,8 +510,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
           <div className="pointer-events-auto relative">
             {shutter("size-[72px]", "size-[54px]")}
             {dialOn && !trayOpen && (
-              <div className="absolute bottom-full right-0 mb-3 flex justify-end">
-                <ZoomDial zoom={zoom} max={ZOOM_MAX} onZoom={(z) => setZoom(Math.max(1, Math.min(ZOOM_MAX, z)))} />
+              <div className="absolute bottom-full left-1/2 mb-3 -translate-x-1/2">
+                <ZoomDial vertical zoom={zoom} max={ZOOM_MAX} onZoom={(z) => setZoom(Math.max(1, Math.min(ZOOM_MAX, z)))} />
               </div>
             )}
           </div>
