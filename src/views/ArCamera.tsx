@@ -58,6 +58,7 @@ import { tutorialSwipeStep } from "@/lib/ar-tutorial-swipe";
 import { CameraCenterCapture } from "@/views/CameraCenterCapture";
 import { CameraCaptureControl } from "@/views/CameraCaptureControl";
 import { useHoldBurst } from "@/lib/hold-burst";
+import { BurstReviewSheet } from "@/views/BurstReview";
 import { ZoomDial } from "@/views/ZoomDial";
 import { ArcZoomDial } from "@/views/ArcZoomDial";
 import { playAiShutter, playCameraSound, preloadAiShutter, startScanLoop } from "@/lib/camera-sounds";
@@ -1988,46 +1989,8 @@ export function ArCamera({
     setBurst(false);
   };
   const burstSheetElement = burst && burstShots.length > 0 && (
-    <div className="absolute inset-0 z-[70] flex flex-col justify-end" data-camera-controls role="dialog" aria-modal="true" aria-label="Scatti del multiplo">
-      <button type="button" tabIndex={-1} aria-label="Chiudi" onClick={closeReview} className="absolute inset-0 bg-black/55 backdrop-blur-[2px] animate-in fade-in-0 duration-200" />
-      <div className="relative mx-auto flex max-h-[85%] w-full max-w-xl flex-col rounded-t-[28px] bg-[oklch(0.25_0.02_255)] text-white shadow-[0_-12px_40px_rgba(0,0,0,0.55)] ring-1 ring-white/10 animate-in slide-in-from-bottom duration-300"
-        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
-        <span className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-white/30" aria-hidden="true" />
-        <div className="flex items-center justify-between px-5 pb-2 pt-3">
-          <div>
-            <p className="text-base font-semibold">{burstShots.length} {burstShots.length === 1 ? "scatto" : "scatti"}</p>
-            <p className="text-xs text-white/65">{discarded.size ? `${discarded.size} da scartare · tocca di nuovo per tenerli` : "Tocca una foto per scartarla"}</p>
-          </div>
-          <button type="button" onClick={closeReview} className="h-9 rounded-full bg-white/10 px-4 text-sm font-semibold">Chiudi</button>
-        </div>
-        {/* The grid scrolls inside its own box: laid straight in the sheet's flex column its rows were squeezed and the
-            photos piled on one another once there were many. */}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-3" data-map-gestures>
-        <div className="grid grid-cols-3 content-start gap-1.5 landscape:grid-cols-6">
-          {burstShots.map((s, i) => {
-            const off = discarded.has(s.id);
-            return (
-              <button key={s.id} type="button" aria-pressed={off}
-                aria-label={`Foto ${i + 1}${off ? " · da scartare, tocca per tenerla" : " · tocca per scartarla"}`}
-                onClick={() => setDiscarded((d) => { const n = new Set(d); if (n.has(s.id)) n.delete(s.id); else n.add(s.id); return n; })}
-                className="relative block aspect-square h-auto w-full overflow-hidden rounded-xl bg-black/40">
-                <img src={s.thumb} alt="" className={`size-full object-cover transition ${off ? "scale-90 opacity-35 grayscale" : ""}`} />
-                <span className="absolute bottom-1 left-1 rounded-full bg-black/70 px-1.5 text-[10px] font-bold">{i + 1}</span>
-                {off && <span className="absolute inset-0 grid place-items-center"><span className="grid size-9 place-items-center rounded-full bg-black/75 ring-1 ring-white/40"><X className="size-5" aria-hidden="true" /></span></span>}
-              </button>
-            );
-          })}
-        </div>
-        </div>
-        <div className="flex items-center gap-2 px-4 pt-1">
-          <button type="button" onClick={discardAll} className="h-11 flex-1 rounded-full bg-white/10 text-sm font-semibold text-red-300">Scarta tutte</button>
-          <button type="button" onClick={addKept} disabled={!keptShots.length}
-            className="inline-flex h-11 flex-[1.4] items-center justify-center gap-1.5 rounded-full bg-white text-sm font-bold text-black disabled:opacity-40">
-            <Check className="size-4" aria-hidden="true" />Aggiungi {keptShots.length}
-          </button>
-        </div>
-      </div>
-    </div>
+    <BurstReviewSheet shots={burstShots} discarded={discarded} onClose={closeReview} onAdd={addKept} onDiscardAll={discardAll}
+      onToggleShot={(id) => setDiscarded((d) => { const n = new Set(d); if (n.has(id)) n.delete(id); else n.add(id); return n; })} />
   );
 
   const burstBarElement = !error && mode === "photo" && (

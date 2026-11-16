@@ -17,6 +17,7 @@ import { ArcZoomDial } from "@/views/ArcZoomDial";
 import { ZOOM_MAX } from "@/lib/camera-zoom";
 import { setCameraTorch, supportsCameraTorch } from "@/lib/camera-torch";
 import { HOLD_MS, useHoldBurst } from "@/lib/hold-burst";
+import { BurstReviewSheet, BurstThumb, burstThumbOf, type BurstShot } from "@/views/BurstReview";
 
 /**
  * «Prova» in live view with ARCore (WebXR immersive-ar, Chrome on Android): the phone's own camera with the floor found
@@ -256,7 +257,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         const multi = wantShot.current === "multi";
         wantShot.current = "";
         const file = captureXrPhoto(renderer, scene, reticle, session, frame, multi);
-        void file.then((f) => { if (f) savedShotRef.current(f); else setNotice({ text: "Questo telefono non dà la fotocamera all’AR: fai uno screenshot", tone: "warn" }); });
+        void file.then((f) => { if (f) savedShotRef.current(f, multi); else setNotice({ text: "Questo telefono non dà la fotocamera all’AR: fai uno screenshot", tone: "warn" }); });
       }
     });
 
@@ -502,7 +503,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     g.drawImage(t.renderer.domElement, 0, 0, c.width, c.height);
     setFlash((n) => n + 1);
     hapticTick([25]);
-    c.toBlob((b) => { if (b) savedShotRef.current(new File([b], `foto-ar-prova${multi ? "-multiplo" : ""}-${Date.now()}.jpg`, { type: "image/jpeg" })); }, "image/jpeg", 0.9);
+    c.toBlob((b) => { if (b) savedShotRef.current(new File([b], `foto-ar-prova${multi ? "-multiplo" : ""}-${Date.now()}.jpg`, { type: "image/jpeg" }), multi); }, "image/jpeg", 0.9);
   };
   // Holding the shutter shoots a multiple shot (a photo every 200 ms) until the finger lifts, like the AI camera's.
   const burst = useHoldBurst(() => shoot(true));
@@ -510,8 +511,33 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const holdShotTimer = useRef<number | undefined>(undefined);
   const releaseShot = () => { window.clearTimeout(holdShotTimer.current); if (heldShot.current) burst.onHold(false); };
   useEffect(() => () => window.clearTimeout(holdShotTimer.current), []);
-  const savedShotRef = useRef<(f: File) => void>(() => undefined);
-  savedShotRef.current = (f: File) => {
+  // The multiple shot is kept here, like the AI camera's: its thumbnail beside Annulla opens the same review sheet;
+  // what is left when the AR view closes is handed over anyway.
+  const [burstShots, setBurstShots] = useState<BurstShot[]>([]);
+  const burstShotsRef = useRef(burstShots);
+  burstShotsRef.current = burstShots;
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [discarded, setDiscarded] = useState<Set<number>>(() => new Set());
+  const discardedRef = useRef(discarded);
+  discardedRef.current = discarded;
+  const onShotRef = useRef(onShot);
+  onShotRef.current = onShot;
+  useEffect(() => () => {
+    for (const b of burstShotsRef.current) if (!discardedRef.current.has(b.id)) onShotRef.current?.(b.file);
+  }, []);
+  const clearBurst = () => { burstShotsRef.current = []; setBurstShots([]); setDiscarded(new Set()); setReviewOpen(false); };
+  const addBurst = () => {
+    for (const b of burstShots) if (!discarded.has(b.id)) onShot?.(b.file);
+    setShots((n) => n + burstShots.filter((b) => !discarded.has(b.id)).length);
+    clearBurst();
+  };
+  const savedShotRef = useRef<(f: File, multi?: boolean) => void>(() => undefined);
+  savedShotRef.current = (f: File, multi = false) => {
+    if (multi) {
+      const id = Date.now() + Math.random();
+      void burstThumbOf(f).then((thumb) => setBurstShots((l) => [...l, { id, file: f, thumb }])).catch(() => undefined);
+      return;
+    }
     onShot?.(f);
     setShots((n) => n + 1);
     setNotice({ text: "Foto salvata nel progetto", tone: "ok" });
@@ -665,7 +691,11 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       </div>
     )}
     {flash > 0 && <div key={flash} className="pointer-events-none fixed inset-0 z-[60] animate-out fade-out-0 bg-white duration-300 fill-mode-forwards" aria-hidden="true" />}
-    <div ref={hudRef} className="ar-live-hud pointer-events-none fixed inset-0 z-50 flex select-none flex-col justify-between text-white [-webkit-touch-callout:none]" style={{ padding: "env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)" }}>
+    <div ref={hudRef} className="ar-live-hud pointer-events-none fixed inset-0 z-50 flex select-none flex-col justify-between text-white [-webkit-touch-callout:none]" style={{ padding: `${session ? "max(env(safe-area-inset-top), 1.5rem)" : "env(safe-area-inset-top)"} env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)` }}>
+      {reviewOpen && burstShots.length > 0 && (
+      <BurstReviewSheet fixed shots={burstShots} discarded={discarded} onClose={() => setReviewOpen(false)} onAdd={addBurst} onDiscardAll={clearBurst}
+        onToggleShot={(id) => setDiscarded((d) => { const n = new Set(d); if (n.has(id)) n.delete(id); else n.add(id); return n; })} />
+    )}
       <div className={`pointer-events-auto flex items-center gap-2 p-3 ${arcOn ? "landscape:pr-[250px]" : ""}`}>
         <button type="button" onClick={end} aria-label="Esci dalla realtà aumentata e torna alla fotocamera AI"
           className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-black/55 pl-2.5 pr-3.5 text-sm font-semibold backdrop-blur">
@@ -675,7 +705,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
           className={`flex min-h-11 min-w-0 items-center gap-2 rounded-[22px] px-4 py-2 text-left text-sm font-semibold leading-tight transition-colors ${statusTone} ${barExpanded ? "flex-1" : "max-w-[70%]"}`}>
           {!notice && <span className={`size-2 shrink-0 rounded-full ${found ? "bg-[#22c55e]" : "animate-pulse bg-[#facc15]"}`} aria-hidden="true" />}
           <span role="status" className="min-w-0 flex-1">
-            <span className={notice && notice.text === why ? "" : barExpanded ? "line-clamp-2" : "line-clamp-1"}>{barExpanded ? status : barShort}</span>
+            <span className={notice ? "" : barExpanded ? "line-clamp-2" : "line-clamp-1"}>{barExpanded ? status : barShort}</span>
             {barExpanded && !notice && (
               <span id="ar-live-bar-help" className="mt-0.5 block text-xs font-normal opacity-80">
                 {barHelp}{!session && " Anteprima: senza ARCore le misure sono indicative."}{!session && why ? ` ${why}` : ""}
@@ -732,6 +762,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
             </button>
             </div>
             <button type="button" onClick={undo} disabled={!placed.length} aria-label="Annulla l’ultimo" className={`${round} disabled:opacity-40`}><Undo2 className="size-5" /></button>
+            <BurstThumb shots={burstShots} open={reviewOpen} onToggle={() => setReviewOpen((o) => !o)} />
             </div>
             <div className="landscape:hidden">{shutter("size-14", "size-10")}</div>
             <button type="button" onClick={backToMap} disabled={!placed.length}
