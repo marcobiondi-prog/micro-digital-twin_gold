@@ -13,6 +13,7 @@ import { readFix } from "@/lib/find-position";
 import { hapticTick } from "@/lib/haptics";
 import { contactShadow, floorLoop, objectMesh } from "@/views/ar-object-meshes";
 import { ZoomDial } from "@/views/ZoomDial";
+import { ArcZoomDial } from "@/views/ArcZoomDial";
 import { ZOOM_MAX } from "@/lib/camera-zoom";
 
 /**
@@ -413,6 +414,16 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
 
   // Every choice sits behind one AI button: the tray opens over the camera only when asked.
   const [trayOpen, setTrayOpen] = useState(false);
+  // Landscape: the camera's own arc dial is the zoom at rest (like Rileva); while the AI tray is open the pills in a
+  // column take its place beside the shutter. The dial is scaled to fit the screen's height.
+  const arcOn = dialOn && !trayOpen;
+  const dialBox = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const fit = () => dialBox.current?.style.setProperty("--ar-dial-k", String(Math.min(1, (window.innerHeight - 8) / 380)));
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [arcOn]);
   const plantChoices = choices.filter((c) => c.def.plant);
   const objectChoices = choices.filter((c) => !c.def.plant);
   const chip = (key: string, o: ArObjectDef, icon: React.ReactNode) => {
@@ -446,7 +457,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     )}
     {flash > 0 && <div key={flash} className="pointer-events-none fixed inset-0 z-[60] animate-out fade-out-0 bg-white duration-300 fill-mode-forwards" aria-hidden="true" />}
     <div ref={hudRef} className="ar-live-hud pointer-events-none fixed inset-0 z-50 flex flex-col justify-between text-white" style={{ padding: "env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)" }}>
-      <div className={`pointer-events-auto flex items-center gap-2 p-3`}>
+      <div className={`pointer-events-auto flex items-center gap-2 p-3 ${arcOn ? "landscape:pr-[250px]" : ""}`}>
         <button type="button" onClick={end} aria-label="Esci dalla prova" className={round}><X className="size-5" /></button>
         <button type="button" onClick={() => setBarOpen((o) => !o)} aria-expanded={barExpanded} aria-controls="ar-live-bar-help"
           className={`flex min-h-11 min-w-0 items-center gap-2 rounded-[22px] px-4 py-2 text-left text-sm font-semibold leading-tight transition-colors ${statusTone} ${barExpanded ? "flex-1" : "max-w-[70%]"}`}>
@@ -526,13 +537,22 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         </div>
       )}
 
-      {!adjusting && (
-        // Landscape: the shutter stays on the right edge where Rileva has it, the zoom in a column just to its left
-        // (the ruler upright beside it), so the rest of the screen is left to the scene.
+      {arcOn && (
+        // Landscape at rest: the camera's own arc dial on the right edge, the shutter at its centre, as in Rileva.
+        <div className="pointer-events-none absolute right-0 top-1/2 hidden -translate-y-1/2 landscape:block" style={{ marginRight: "env(safe-area-inset-right)" }}>
+          <div className="relative h-[380px] w-[280px] origin-right" style={{ transform: "scale(var(--ar-dial-k, 1))" }} ref={dialBox}>
+            <ArcZoomDial zoom={zoom} max={ZOOM_MAX} onZoom={(z) => setZoom(Math.max(1, Math.min(ZOOM_MAX, z)))} />
+            <div className="pointer-events-auto absolute right-[40px] top-1/2 z-20 -translate-y-1/2 translate-x-1/2">{shutter("size-[72px]", "size-[54px]")}</div>
+          </div>
+        </div>
+      )}
+      {!adjusting && !arcOn && (
+        // Landscape with the AI tray open (or with ARCore): the shutter on the right edge and, in the preview, the zoom
+        // pills in a column just to its left (the ruler upright beside them).
         <div className="pointer-events-none absolute right-0 top-1/2 hidden -translate-y-1/2 landscape:block" style={{ marginRight: "calc(env(safe-area-inset-right) + 1rem)" }}>
           <div className="pointer-events-auto relative">
             {shutter("size-[72px]", "size-[54px]")}
-            {dialOn && !trayOpen && (
+            {dialOn && (
               <div className="absolute right-full top-1/2 mr-3 -translate-y-1/2">
                 <ZoomDial vertical zoom={zoom} max={ZOOM_MAX} onZoom={(z) => setZoom(Math.max(1, Math.min(ZOOM_MAX, z)))} />
               </div>
