@@ -345,6 +345,8 @@ export function ArCamera({
   const [liveAr, setLiveAr] = useState<{ session: XRSession | null; root: HTMLElement; n?: number; why?: string; torch?: boolean } | null>(null);
   const restartingRef = useRef(false);
   const [camEpoch, setCamEpoch] = useState(0);
+  // Bumped when a camera stream arrives, so the AR view (which reads streamRef) gets the new stream and its torch.
+  const [, setStreamN] = useState(0);
   const [onPhone, setOnPhone] = useState(false);
   useEffect(() => {
     const sync = () => setOnPhone(isTouchDevice() && !isTabletViewport(window.screen?.width || window.innerWidth, window.screen?.height || window.innerHeight));
@@ -731,17 +733,24 @@ export function ArCamera({
     videoRef.current = v;
     if (!navigator.mediaDevices?.getUserMedia) {
       setError("La fotocamera AR non è disponibile su questo dispositivo.");
-    } else navigator.mediaDevices
-      .getUserMedia({
+    } else {
+      // Right after an ARCore session the phone's camera can still be busy: ask again a few times before giving up.
+      const ask = (left: number): Promise<MediaStream> => navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment", width: { ideal: 1280, max: 1920 }, height: { ideal: 960, max: 1440 }, frameRate: { ideal: 30, max: 30 } },
         audio: mode === "video",
-      })
+      }).catch((e: unknown) => {
+        const name = (e as { name?: string })?.name;
+        if (left <= 0 || cancelled || name === "NotAllowedError" || name === "SecurityError") throw e;
+        return new Promise<MediaStream>((res, rej) => window.setTimeout(() => ask(left - 1).then(res, rej), 600));
+      });
+      ask(camEpoch > 0 ? 4 : 0)
       .then((stream) => {
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
         }
         streamRef.current = stream;
+        setStreamN((n) => n + 1);
         setTorchSupported(supportsCameraTorch(stream.getVideoTracks()[0]));
         zoomRangeRef.current = trackZoomRange(stream.getVideoTracks()[0]);
         zoomerRef.current = zoomRangeRef.current ? createTrackZoomer(stream.getVideoTracks()[0]) : null;
@@ -792,6 +801,7 @@ export function ArCamera({
       .catch(() => {
         if (!cancelled) setError("Permesso fotocamera negato o telecamera non disponibile.");
       });
+    }
     return () => {
       cancelled = true;
       scanVersion.current += 1;

@@ -168,9 +168,13 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   useEffect(() => {
     if (!torch || torchAsked.current || !torchOk) return;
     torchAsked.current = true;
-    void setCameraTorch(torchTrack, true).then((ok) => {
-      if (ok) { setTorchOn(true); setNotice({ text: "Flash acceso: sei nell’anteprima senza ARCore (le misure sono indicative)", tone: "ok" }); }
+    // Some phones refuse the torch for a moment while the camera is still starting: try a few times.
+    const tryOn = (left: number) => void setCameraTorch(torchTrack, true).then((ok) => {
+      if (ok) { setTorchOn(true); hapticTick([10]); setNotice({ text: "Flash acceso: sei nell’anteprima senza ARCore (le misure sono indicative)", tone: "ok" }); }
+      else if (left > 0) window.setTimeout(() => tryOn(left - 1), 400);
+      else setNotice({ text: "Non riesco ad accendere il flash: toccalo di nuovo in alto a destra.", tone: "warn" });
     });
+    tryOn(4);
   }, [torch, torchOk, torchTrack]);
   useEffect(() => {
     const v = videoRef.current;
