@@ -191,6 +191,7 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
       if (!lastFix.current) toast.success("GPS attivo", { description: pausedRef.current ? "Hai scelto tu la zona: il GPS resta acceso ma non la sposta." : "La mappa segue la tua posizione.", id: "gps-state" });
       lastFix.current = here;
       setLocating(false);
+      setError(null); // a fix came: any earlier "not available" is over
       // With no place chosen yet the first fix sets it, however near.
       // A coarse first fix (from the network, hundreds of metres off) is put right as soon as a sharper one comes:
       // a fix much more precise than the one the place came from moves it even within the 100 m step.
@@ -211,7 +212,10 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
     }, (geoError) => {
       setLocating(false);
       if (geoError.code === 1) { setGps(false); saveGps(false); setError("Permesso di posizione negato. Abilitalo nelle impostazioni del browser."); }
-      else setError("Posizione non disponibile per ora: il GPS resta attivo e riprova da solo.");
+      // A fix that did not come in time (indoors, under a roof) is said only while there is no place yet: with a place
+      // already set, or a fix already had, the GPS simply keeps trying and the map stays as it is — the red line,
+      // left on screen even after the next fix, read as an error.
+      else if (!lastFix.current && placeRef.current.pending) setError("Sto ancora cercando la posizione: il GPS resta attivo e riprova da solo.");
     }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 15000 });
     return () => { live = false; lastFix.current = null; appliedAcc.current = Infinity; navigator.geolocation.clearWatch(id); };
   }, [gps, reverseGoogle]);
