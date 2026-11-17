@@ -1057,16 +1057,18 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   // interventions, then the tools. A tap picks and folds the fan.
   const pick = (key: string) => { setSelected(key); setTool("place"); setTrayOpen(false); };
   const plantItems: FanItem[] = plantChoices.map(({ key, def: o }) => ({ key, label: o.label, Icon: plantIcon(o.plant?.form), plant: true, on: tool === "place" && selected === key,
+    hint: `${o.plant?.scientificName ?? "Riconosciuta dall’AI"} · alta circa ${metresText(Math.round(o.h))}`,
     aria: `${o.label}, riconosciuto: ${o.plant?.scientificName ?? ""}, alto circa ${Math.round(o.h)} m`, onPick: () => pick(key) }));
-  const objectItems: FanItem[] = objectChoices.map(({ key, def: o }) => ({ key, label: o.label, Icon: OBJECT_ICONS[o.id] ?? Sparkles, on: tool === "place" && selected === key, onPick: () => pick(key) }));
+  const objectItems: FanItem[] = objectChoices.map(({ key, def: o }) => ({ key, label: o.label, Icon: OBJECT_ICONS[o.id] ?? Sparkles, on: tool === "place" && selected === key,
+    hint: `${OBJECT_HINT[o.id] ?? ""}${OBJECT_HINT[o.id] ? " · " : ""}${metresText(o.w)} × ${metresText(o.d)}`, onPick: () => pick(key) }));
   const toolItems: FanItem[] = [
-    { key: "t:misura", label: "Misura", Icon: Ruler, tool: true, on: tool === "measure", onPick: () => { setTool("measure"); setMeasure([]); setTrayOpen(false); } },
-    ...(area ? [{ key: "t:progetto", label: "Progetto", Icon: MapPinned, tool: true, on: showPlan,
+    { key: "t:misura", label: "Misura", hint: "La distanza tra due punti a terra", Icon: Ruler, tool: true, on: tool === "measure", onPick: () => { setTool("measure"); setMeasure([]); setTrayOpen(false); } },
+    ...(area ? [{ key: "t:progetto", label: "Progetto", hint: showPlan ? "Gli interventi della mappa sono nel loro punto: tocca per nasconderli" : "Mostra gli interventi della mappa nel loro punto", Icon: MapPinned, tool: true, on: showPlan,
       aria: showPlan ? "Nascondi gli interventi della mappa" : "Mostra gli interventi della mappa nel loro punto",
       onPick: () => { setShowPlan((v) => !v); setTrayOpen(false); setNotice({ text: showPlan ? "Interventi della mappa nascosti" : "Interventi della mappa nel loro punto", tone: "ok" }); } }] : []),
-    ...(placed.length ? [{ key: "t:sposta", label: "Sposta", Icon: Move, tool: true, on: tool === "move", aria: "Sposta un oggetto già posato",
+    ...(placed.length ? [{ key: "t:sposta", label: "Sposta", hint: "Prendi un oggetto posato e rimettilo altrove; vicino a uno uguale si uniscono", Icon: Move, tool: true, on: tool === "move", aria: "Sposta un oggetto già posato",
       onPick: () => { setTool("move"); setGrabbed(null); setTrayOpen(false); } }] : []),
-    { key: "t:modellino", label: "Modellino", Icon: Box, tool: true, on: model, aria: model ? "Torna alla grandezza vera" : "Modellino in scala adatta allo spazio intorno",
+    { key: "t:modellino", label: "Modellino", hint: model ? `Attivo, 1:${Math.round(1 / modelScale)}: tocca per tornare alla grandezza vera` : "Tutto in piccolo, in una scala adatta allo spazio intorno", Icon: Box, tool: true, on: model, aria: model ? "Torna alla grandezza vera" : "Modellino in scala adatta allo spazio intorno",
       onPick: () => {
         setTrayOpen(false);
         if (model) { setModel(false); setNotice({ text: "Grandezza vera", tone: "ok" }); return; }
@@ -1075,7 +1077,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         setNotice({ text: `Modellino 1:${Math.round(1 / k)} · adatto allo spazio ${span !== null ? `(profondità rilevata: circa ${metresText(span)})` : "davanti a te"}`, tone: "ok" });
       } },
     // ARCore's depth as a test: switching it on or off restarts the session (it is asked when the session starts).
-    ...(session && onRotate ? [{ key: "t:profondita", label: "Profondità", Icon: Layers, tool: true, on: depthWanted(),
+    ...(session && onRotate ? [{ key: "t:profondita", label: "Profondità", hint: depthWanted() ? "Attiva: muri e mobili veri coprono gli oggetti (tocca per spegnerla, riavvia l’AR)" : "Muri e mobili veri coprono gli oggetti (riavvia l’AR)", Icon: Layers, tool: true, on: depthWanted(),
       aria: depthWanted() ? "Spegni la prova della profondità e riavvia l’AR" : "Accendi la profondità: muri e mobili veri coprono gli oggetti (riavvia l’AR)",
       onPick: () => { const on = !depthWanted(); setDepthWanted(on); setTrayOpen(false); setNotice({ text: on ? "Riavvio l’AR con la profondità: muri e mobili coprono gli oggetti" : "Riavvio l’AR senza profondità", tone: "ok" }); onRotate(); } }] : []),
     ...(DEPTH_TOOLS && session && depthLive ? [{ key: "t:mappa", label: `Gira mappa ${flip + 1}/${FLIP_MODES}`, Icon: RotateCw, tool: true, on: false,
@@ -1084,14 +1086,13 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       { key: "t:pausa", label: depthOn ? "Senza copertura" : "Con copertura", Icon: Layers, tool: true, on: !depthOn,
       aria: depthOn ? "Mostra gli oggetti anche dietro muri e mobili, per confrontare" : "Muri e mobili coprono di nuovo gli oggetti",
       onPick: () => { setDepthOn((v) => !v); setTrayOpen(false); } }] : []),
-    ...(!session ? [{ key: "t:pavimento", label: "Pavimento", Icon: MoveVertical, tool: true, on: false, aria: "Regola pavimento", onPick: () => { setAdjusting(true); setTrayOpen(false); } }] : []),
+    ...(!session ? [{ key: "t:pavimento", label: "Pavimento", hint: "Allinea il pavimento a quello vero, senza ARCore", Icon: MoveVertical, tool: true, on: false, aria: "Regola pavimento", onPick: () => { setAdjusting(true); setTrayOpen(false); } }] : []),
   ];
   const fanGroups: FanGroup[] = [
     { key: "piante", label: "Piante AI", Icon: Leaf, items: plantItems },
     { key: "interventi", label: "Interventi", Icon: kind === "vineyard" ? Grape : TreeDeciduous, items: objectItems },
     { key: "strumenti", label: "Strumenti", Icon: Ruler, items: toolItems },
   ];
-  const fanStart = tool === "measure" || tool === "move" ? "strumenti" : plantItems.some((i) => i.on) ? "piante" : objectItems.some((i) => i.on) ? "interventi" : plantItems.length ? "piante" : "interventi";
   const chip = (key: string, o: ArObjectDef, icon: React.ReactNode) => {
     const on = tool === "place" && selected === key;
     return (
@@ -1178,7 +1179,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         )}
 
       </div>
-      {trayOpen && <button type="button" tabIndex={-1} aria-label="Chiudi le funzioni AI" onClick={() => setTrayOpen(false)} className="pointer-events-auto fixed inset-0 z-0 cursor-default" />}
+      {trayOpen && <button type="button" tabIndex={-1} aria-label="Chiudi le funzioni AI" onClick={() => setTrayOpen(false)} className="pointer-events-auto fixed inset-0 z-30 cursor-default bg-black/35" />}
+      {trayOpen && <ArSheet groups={fanGroups} onClose={() => setTrayOpen(false)} />}
       {!adjusting && (
         <div className={`pointer-events-auto relative z-10 flex flex-col items-start gap-2 p-3`}>
           {dialOn && !trayOpen && (
@@ -1191,7 +1193,6 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
           <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-2 landscape:flex">
             <div className="flex items-center gap-2">
             <div className="relative shrink-0">
-            {trayOpen && <AiFan groups={fanGroups} start={fanStart} />}
             <button type="button" onClick={() => setTrayOpen((o) => !o)} aria-expanded={trayOpen} aria-controls="ar-ai-tray"
               aria-label={trayOpen ? "Chiudi le funzioni AI" : `Funzioni AI · ${tool === "measure" ? "Misura" : tool === "move" ? "Sposta" : defOf(selected).label}`}
               className="relative grid size-12 shrink-0 place-items-center rounded-full p-[2px] shadow-[0_0_18px_rgba(0,229,255,0.45)] active:scale-95"
@@ -1345,8 +1346,62 @@ async function captureXrPhoto(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
   return blob ? new File([blob], `foto-ar-prova${multi ? "-multiplo" : ""}-${Date.now()}.jpg`, { type: "image/jpeg" }) : null;
 }
 
-type FanItem = { key: string; label: string; Icon: LucideIcon; on: boolean; plant?: boolean; tool?: boolean; aria?: string; onPick: () => void };
-type FanGroup = { key: string; label: string; Icon: LucideIcon; items: FanItem[] };
+export type FanItem = { key: string; label: string; Icon: LucideIcon; on: boolean; plant?: boolean; tool?: boolean; aria?: string; hint?: string; onPick: () => void };
+export type FanGroup = { key: string; label: string; Icon: LucideIcon; items: FanItem[] };
+
+/** One line on what each object is for, in the AR sheet. */
+const OBJECT_HINT: Record<string, string> = {
+  albero: "Fa ombra e rinfresca l’aria", pergolato: "Ombra in legno con telo ed edera", aiuola: "Verde permeabile tra i ciottoli",
+  nebulizzatore: "Nebbia d’acqua che rinfresca vicino agli ugelli", innaffiatoio: "Bagna aiuole e terreno",
+  telo: "Rete ombreggiante sopra le viti", frangivento: "Siepe che ferma il vento", irrigazione: "Ala gocciolante lungo il filare",
+};
+
+/**
+ * The AR's menu: a sheet rising from the bottom over the camera, like the camera's own sheet — a handle, then one
+ * section per group (Piante riconosciute dall’AI, Interventi, Strumenti), each a list of rows with the icon in a
+ * round tile, the whole name and one line on what it does; the current choice turquoise with a check. A tap picks and
+ * closes it; a tap outside or ✕ closes it.
+ */
+export function ArSheet({ groups, onClose }: { groups: FanGroup[]; onClose: () => void }) {
+  const shown = groups.filter((g) => g.items.length > 0);
+  const TITLES: Record<string, string> = { piante: "Piante riconosciute dall’AI", interventi: "Interventi", strumenti: "Strumenti" };
+  return (
+    <div id="ar-ai-tray" role="dialog" aria-label="Funzioni AI" className="ar-sheet pointer-events-auto fixed inset-x-0 bottom-0 z-40 mx-auto flex max-h-[78dvh] w-full max-w-lg flex-col rounded-t-[28px] border-t border-white/15 text-white shadow-[0_-20px_60px_rgba(0,0,0,0.55)] landscape:max-h-[92dvh]"
+      style={{ background: "oklch(0.25 0.02 255 / 0.97)", paddingBottom: "max(env(safe-area-inset-bottom), 0.75rem)" }}>
+      <div className="flex items-center justify-between px-5 pb-1 pt-2">
+        <span className="mx-auto h-1.5 w-10 rounded-full bg-white/25" aria-hidden="true" />
+      </div>
+      <div className="flex items-center justify-between px-5 pb-2">
+        <h2 className="text-lg font-semibold">Cosa vuoi fare?</h2>
+        <button type="button" onClick={onClose} aria-label="Chiudi" className="grid size-10 place-items-center rounded-full bg-white/10"><X className="size-5" /></button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-2">
+        {shown.map((g) => (
+          <section key={g.key} aria-label={TITLES[g.key] ?? g.label} className="mb-3">
+            <h3 className="px-2 pb-1.5 pt-1 text-[11px] font-bold uppercase tracking-[0.14em] text-white/55">{TITLES[g.key] ?? g.label}</h3>
+            <ul className="overflow-hidden rounded-2xl bg-white/[0.06]">
+              {g.items.map((it, i) => (
+                <li key={it.key} className={i ? "border-t border-white/[0.07]" : ""}>
+                  <button type="button" onClick={it.onPick} aria-pressed={it.on} aria-label={it.aria ? `${it.label}: ${it.aria}` : undefined}
+                    className="flex w-full items-center gap-3 px-3 py-2.5 text-left active:bg-white/10">
+                    <span className={`grid size-11 shrink-0 place-items-center rounded-full ${it.on ? "bg-[#00e5ff] text-black" : it.plant ? "bg-[#4ade80]/15 text-[#4ade80] ring-1 ring-[#4ade80]/60" : "bg-white/10 text-white"}`}>
+                      <it.Icon className="size-[22px]" aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className={`block text-[15px] font-semibold leading-tight ${it.on ? "text-[#00e5ff]" : ""}`}>{it.label}</span>
+                      {it.hint && <span className="mt-0.5 block text-xs leading-snug text-white/65">{it.hint}</span>}
+                    </span>
+                    {it.on && <Check className="size-5 shrink-0 text-[#00e5ff]" aria-hidden="true" />}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 const OBJECT_ICONS: Record<string, LucideIcon> = {
   albero: TreeDeciduous, pergolato: Fence, aiuola: Flower2, nebulizzatore: CloudDrizzle, innaffiatoio: Droplets,
@@ -1356,48 +1411,3 @@ function plantIcon(form?: string): LucideIcon {
   return form === "conical" || form === "columnar" ? TreePine : form === "shrub" ? Shrub : form === "vine" ? Grape : TreeDeciduous;
 }
 
-/** The AI fan: three round groups fanned out over a quarter circle from the AI button (up → right) — Piante AI,
- *  Interventi, Strumenti — and, on a wider arc beyond them, the icons of the open group (the group of the current
- *  choice at first). Each comes out of the button a few ms after the one before; a tap outside folds it. */
-function AiFan({ groups, start }: { groups: FanGroup[]; start: string }) {
-  const [open, setOpen] = useState(start);
-  const shown = groups.filter((g) => g.items.length > 0);
-  const group = shown.find((g) => g.key === open) ?? shown[0];
-  const arc = (n: number, i: number, from: number, to: number) => (n === 1 ? (from + to) / 2 : from - (i * (from - to)) / (n - 1));
-  const at = (deg: number, r: number) => { const a = (deg * Math.PI) / 180; return { x: Math.round(r * Math.cos(a)), y: Math.round(-r * Math.sin(a)) }; };
-  const items = group?.items ?? [];
-  return (
-    <div id="ar-ai-tray" role="menu" aria-label="Funzioni AI" className="absolute left-1/2 top-1/2 z-10 size-0">
-      {shown.map((g, i) => {
-        const { x, y } = at(arc(shown.length, i, 90, 24), 118);
-        const on = g.key === group?.key;
-        return (
-          <button key={g.key} type="button" role="menuitem" aria-expanded={on} aria-label={g.label} onClick={() => setOpen(g.key)}
-            className="ar-fan-item absolute left-0 top-0 flex w-20 flex-col items-center gap-1"
-            style={{ transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`, animationDelay: `${i * 40}ms` }}>
-            <span className={`grid size-12 place-items-center rounded-full shadow-[0_6px_18px_rgba(0,0,0,0.45)] backdrop-blur-md transition-colors ${on ? "bg-white text-black" : "bg-black/60 text-white ring-1 ring-white/25"}`}>
-              <g.Icon className="size-5" aria-hidden="true" />
-            </span>
-            <span className="text-[10px] font-semibold leading-tight text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">{g.label}</span>
-          </button>
-        );
-      })}
-      {items.map((it, i) => {
-        // Kept above the bottom row (from straight up to 18°); with many icons every other one sits on a wider arc,
-        // so neighbours and their names never overlap.
-        const { x, y } = at(arc(items.length, i, 90, 18), items.length > 4 ? (i % 2 ? 252 : 192) : 196);
-        return (
-          <button key={`${group!.key}-${it.key}`} type="button" role="menuitemradio" aria-checked={it.on} aria-label={it.aria ?? it.label} onClick={it.onPick}
-            className="ar-fan-item absolute left-0 top-0 flex w-20 flex-col items-center gap-1"
-            style={{ transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`, animationDelay: `${120 + i * 30}ms` }}>
-            <span className={`grid size-12 place-items-center rounded-full shadow-[0_6px_18px_rgba(0,0,0,0.45)] backdrop-blur-md transition-colors ${
-              it.on ? "bg-[#00e5ff] text-black" : it.plant ? "bg-black/60 text-[#4ade80] ring-2 ring-[#4ade80]/80" : "bg-black/60 text-white ring-1 ring-white/25"}`}>
-              <it.Icon className="size-[22px]" aria-hidden="true" />
-            </span>
-            <span className="line-clamp-2 max-w-full text-center text-[10px] font-semibold leading-tight text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">{it.label}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}

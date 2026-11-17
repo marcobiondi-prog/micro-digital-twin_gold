@@ -962,8 +962,10 @@
 .ar-pill-hud .is-icon svg, .camera-capture-dock .ar-landscape-pill-btn.is-icon svg { width: 24px !important; height: 24px !important; }
 .ar-focus-icon svg { width: 26px !important; height: 26px !important; }
 .ar-fan-item { animation: ar-fan-in .26s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.ar-sheet { animation: ar-sheet-up .32s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes ar-sheet-up { from { transform: translateY(100%); } to { transform: none; } }
 @media (prefers-reduced-motion: reduce) {
-.ar-fan-item { animation: none; }
+.ar-fan-item, .ar-sheet { animation: none; }
 }
 @keyframes ar-trail { 0%, 100% { transform: scaleY(0); } 25% { transform: scaleY(1); } 50% { transform: scaleY(0); } 75% { transform: scaleY(-1); } }
 @keyframes ar-ground-sweep { 0%, 100% { transform: translateY(2%); } 50% { transform: translateY(96%); } }
