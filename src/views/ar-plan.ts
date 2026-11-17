@@ -77,16 +77,16 @@ function flat(pts: XZ[], color: string, opacity: number, y: number): THREE.Mesh 
 /** How many elements of the project went in, said in the status line. */
 export type PlanCount = { trees: number; pergolas: number; beds: number; misters: number; sprinklers: number; cloths: number; lines: number };
 
-/** Whether nearby pergolas are joined into one, the person's choice kept on this phone (on unless turned off). */
+/** Whether nearby pergolas are joined into one, the person's choice kept on this phone (separate unless turned on). */
 const MERGE_KEY = "mdt-ar-merge-pergola-v1";
 export function mergePergolas(): boolean {
-  try { return localStorage.getItem(MERGE_KEY) !== "off"; } catch { return true; }
+  try { return localStorage.getItem(MERGE_KEY) === "on"; } catch { return false; }
 }
 export function setMergePergolas(on: boolean) {
   try { localStorage.setItem(MERGE_KEY, on ? "on" : "off"); } catch { /* private mode */ }
 }
 
-export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: DrawnArea, origin: { lat: number; lng: number }, a: Alignment, merge = true): { group: THREE.Group; count: PlanCount } {
+export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: DrawnArea, origin: { lat: number; lng: number }, a: Alignment, merge = false): { group: THREE.Group; count: PlanCount } {
   const g = new THREE.Group();
   g.name = "plan";
   const count: PlanCount = { trees: 0, pergolas: 0, beds: 0, misters: 0, sprinklers: 0, cloths: 0, lines: 0 };
