@@ -2398,9 +2398,9 @@ export function ArCamera({
                   className="camera-bottom absolute z-20 flex flex-col items-center gap-2.5 w-full"
                 >
                   {/* Card informativo specie / raffrescamento */}
-                  {!infoBannerDismissed && !burst && (
+                  {!infoBannerDismissed && !burst && (shownRecord?.species || shownRecord?.soil || species || proving) && (
                     <div
-                      className="ar-portrait-specimen-card cursor-grab"
+                      className={`ar-portrait-specimen-card cursor-grab${zoomRulerActive ? " is-zoom-active" : ""}`}
                       data-camera-controls
                       style={
                         infoBannerDragging

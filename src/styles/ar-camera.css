@@ -764,6 +764,8 @@
   transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease-out;
   cursor: grab;
 }
+.ar-portrait-specimen-card.is-zoom-active { transform: translateY(-2.6rem); }
+@media (prefers-reduced-motion: reduce) { .ar-portrait-specimen-card { transition: opacity 0.22s ease-out; } }
 .ar-portrait-specimen-title {
   color: #ffffff;
   font-size: 0.9375rem;
