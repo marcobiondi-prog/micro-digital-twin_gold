@@ -22,7 +22,7 @@ import { realDrip } from "@/views/ar-drip";
 type XZ = { x: number; z: number };
 
 /** An oriented box of a patch in AR metres: its longest edge sets the direction. */
-function rectOf(pts: XZ[]): { cx: number; cz: number; w: number; d: number; yaw: number } {
+export function rectOf(pts: XZ[]): { cx: number; cz: number; w: number; d: number; yaw: number } {
   let best = 0, ang = 0;
   for (let i = 0; i < pts.length; i++) {
     const a = pts[i]!, b = pts[(i + 1) % pts.length]!, l = Math.hypot(b.x - a.x, b.z - a.z);

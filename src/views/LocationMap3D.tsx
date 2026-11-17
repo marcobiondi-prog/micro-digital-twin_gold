@@ -11,7 +11,7 @@ import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camer
  * library, billed through Map Tiles API). Loaded only when the user switches to 3D, with
  * the referrer-restricted browser key; the 2D embed stays the default.
  */
-type Maps3D = { Map3DElement: new (options: Record<string, unknown>) => HTMLElement; Marker3DElement: new (options: Record<string, unknown>) => HTMLElement; Polygon3DElement?: new (options: Record<string, unknown>) => HTMLElement; Polyline3DElement?: new (options: Record<string, unknown>) => HTMLElement };
+type Maps3D = { Map3DElement: new (options: Record<string, unknown>) => HTMLElement; Marker3DElement: new (options: Record<string, unknown>) => HTMLElement; Polygon3DElement?: new (options: Record<string, unknown>) => HTMLElement; Polyline3DElement?: new (options: Record<string, unknown>) => HTMLElement; Model3DElement?: new (options: Record<string, unknown>) => HTMLElement };
 type Map3D = HTMLElement & Partial<Camera> & { gestureHandling?: string; flyCameraTo?: (options: { endCamera: Camera; durationMillis: number }) => void };
 
 // The browser key can be refused for this address (its allowed sites do not include it): the API then calls
@@ -29,7 +29,10 @@ type Shape = HTMLElement & { outerCoordinates?: unknown; coordinates?: unknown }
  * shade net one see-through sheet. Heights start from the photographed mesh and every shape is drawn through it, so
  * nothing ends up buried under the photographed ground.
  */
-function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: Array<[number, number]>, sim: SimLayout | null, adj: Adjust = NO_ADJUST): HTMLElement[] {
+function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: Array<[number, number]>, sim: SimLayout | null, adj: Adjust = NO_ADJUST, models = false): HTMLElement[] {
+  // models: the realistic models (views/v10/g3d-models) stand for the trees, pergolas, aiuole, misting poles, shade
+  // nets and hedges, so their simple shapes are not drawn; the ground shapes (area, zones, shadows, mist veils, vine
+  // zones and rows, lines) stay.
   const out: HTMLElement[] = [];
   if (!Polygon3DElement) return out;
   // Every shape lies FLAT on Google's own ground model (RELATIVE_TO_GROUND, heights in metres above it), drawn through the
@@ -136,7 +139,7 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
       // (bedParts: a grid of square beds like the 2D, at most 48).
       // On Google's ground model like every other shape, over the area's veil (0,35 m) and the shadows: laid on the
       // photographed mesh instead they wrapped over the real trees' crowns as green wedges.
-      for (const p of bedParts(sim.data.patches.filter((x) => x.kind === "lawn").map((x) => x.ring), 50, area).parts) {
+      if (!models) for (const p of bedParts(sim.data.patches.filter((x) => x.kind === "lawn").map((x) => x.ring), 50, area).parts) {
         const grass = (BEDS_3D.grass as readonly string[]).includes(p.color);
         part(p, p.height, grass ? BEDS_3D.edge : "rgba(0,0,0,0)", grass ? 2 : 0);
       }
@@ -147,7 +150,7 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
         else ground(r, "rgba(11,15,21,0.4)");
       }
       for (const pt of sim.data.patches) {
-        if (pt.kind !== "shade") continue;
+        if (pt.kind !== "shade" || models) continue;
         for (const p of pt.exact ? pergolaRingParts(pt.ring, true) : pergolaParts(pt.ring, true)) {
           if (p.base === 0) part({ ...p, color: "#5c3a1c" });
           else if (p.height < 3.2) part(p, p.height, "#4a2e14", 1);
@@ -159,14 +162,16 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
       for (const m of sim.data.misters) {
         if (flat) out.push(absPoly({ fillColor: "rgba(125,211,252,0.22)", strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 }, crownRing(m, MIST_RADIUS_M, 16), 0.24));
         else ground(crownRing(m, MIST_RADIUS_M, 16), "rgba(125,211,252,0.22)");
-        part({ ring: crownRing(m, 0.06, 6), base: 0, height: 3, color: "#e2e8f0" });
-        part({ ring: crownRing(m, 0.32, 10), base: 2.95, height: 3.08, color: "#f8fafc" }, 3.08, "#38bdf8", 2);
+        if (!models) {
+          part({ ring: crownRing(m, 0.06, 6), base: 0, height: 3, color: "#e2e8f0" });
+          part({ ring: crownRing(m, 0.32, 10), base: 2.95, height: 3.08, color: "#f8fafc" }, 3.08, "#38bdf8", 2);
+        }
         part({ ring: crownRing(m, 0.9, 14), base: 2.55, height: 2.62, color: "rgba(224,242,254,0.32)" }, 2.62, "rgba(125,211,252,0.55)", 1);
         part({ ring: crownRing(m, 1.7, 16), base: 1.85, height: 1.9, color: "rgba(224,242,254,0.2)" }, 1.9, "rgba(125,211,252,0.35)", 1);
         part({ ring: crownRing(m, 2.5, 18), base: 1.1, height: 1.14, color: "rgba(224,242,254,0.12)" }, 1.14, "rgba(125,211,252,0.22)", 1);
       }
       // Each tree: a dark trunk, then three crown discs each ringed a deeper green, so the layers read as foliage.
-      for (const t of sim.data.trees) {
+      if (!models) for (const t of sim.data.trees) {
         for (const p of treeParts(t, undefined, 2.85)) {
           if (p.base === 0) part({ ...p, color: "#4e341c" });
           else part(p, (p.base + p.height) / 2, "rgba(14,52,20,0.75)", 1.5);
@@ -177,8 +182,10 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
       // The vines in relief: a low green wall per row across each zone, standing on the ground (kept to 160 rows).
       for (const p of vineRowParts(sim.data.patches.filter((x) => x.kind === "zone").map((x) => x.ring), 160, true)) part(p, p.height, "#2a5a22", 1);
       // The shade cloth: a see-through dark sheet on corner posts; the windbreak: a hedge along its edge.
-      for (const p of sim.data.patches.filter((x) => x.kind === "cloth").flatMap((x) => netParts(x.ring, true))) part(p, p.height, "#0b1220", 2);
-      for (const p of sim.data.lines.filter((l) => l.kind === "wind").flatMap((l) => hedgeParts(l.line, l.strength ?? 0))) part(p, p.height, "#1d4a1b", 1);
+      if (!models) {
+        for (const p of sim.data.patches.filter((x) => x.kind === "cloth").flatMap((x) => netParts(x.ring, true))) part(p, p.height, "#0b1220", 2);
+        for (const p of sim.data.lines.filter((l) => l.kind === "wind").flatMap((l) => hedgeParts(l.line, l.strength ?? 0))) part(p, p.height, "#1d4a1b", 1);
+      }
       if (Polyline3DElement) for (const l of sim.data.lines.filter((x) => x.kind !== "wind")) {
         const style = { strokeColor: l.kind === "drip" ? SIM_COLORS.drip : l.kind === "main" ? SIM_COLORS.main : "#ffffff", strokeWidth: l.kind === "drip" ? 2 : l.kind === "main" ? 5 : 3 };
         if (flat) { out.push(absLine(style, l.line.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, h: 0.5 })))); continue; }
@@ -214,7 +221,11 @@ function misterBadges(lib: Maps3D, map: HTMLElement, pool: Map<string, HTMLEleme
     const at = want.get(key) as [number, number] | undefined;
     const m = mk as HTMLElement & { position: unknown; drawsWhenOccluded: boolean; altitudeMode: string };
     if (at) { m.altitudeMode = mode; m.position = { lat: at[0], lng: at[1], altitude: up }; m.drawsWhenOccluded = true; want.delete(key); }
-    else { m.drawsWhenOccluded = false; m.position = { ...(m.position as object), altitude: -500 }; }
+    else {
+      // Its lat and lng are getters of Google's LatLngAltitude, lost by a spread (which threw and left the badge on show).
+      const p = m.position as { lat: number; lng: number };
+      m.drawsWhenOccluded = false; m.position = { lat: Number(p.lat), lng: Number(p.lng), altitude: -500 };
+    }
   }
   for (const [key, at] of want) {
     try {
@@ -315,12 +326,34 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
     if (!lib.Polygon3DElement || area.length < 3) { misterBadges(lib, map, badges.current, null); return; }
     const floor = adj;
     const added: HTMLElement[] = [];
+    let cancelled = false;
+    const Model = lib.Model3DElement;
     // Laid a moment after the levers stop, so a slide does not rebuild the shapes at every step.
     const timer = window.setTimeout(() => {
-      for (const node of build3DOverlay(lib, area, sim, floor)) { map.append(node); added.push(node); }
+      for (const node of build3DOverlay(lib, area, sim, floor, !!Model && !!sim)) { map.append(node); added.push(node); }
       misterBadges(lib, map, badges.current, sim, floor);
+      // The realistic models of the AR on their spots (views/v10/g3d-models), each kind built once and then reused.
+      if (!Model || !sim) return;
+      void import("@/views/v10/g3d-models").then(({ modelSpots }) => {
+        if (cancelled) return;
+        const { spots, ensure } = modelSpots(sim, { lat, lng });
+        const dLat = floor.n / 111_320, dLng = floor.e / (111_320 * Math.cos((lat * Math.PI) / 180));
+        const byKey = new Map<string, typeof spots>();
+        for (const sp of spots) byKey.set(sp.key, [...(byKey.get(sp.key) ?? []), sp]);
+        for (const [key, list] of byKey) {
+          void ensure(key).then((src) => {
+            if (cancelled || !src) return;
+            for (const sp of list) {
+              try {
+                const node = new Model({ src, position: { lat: sp.lat + dLat, lng: sp.lng + dLng, altitude: floor.h }, altitudeMode: "RELATIVE_TO_GROUND", orientation: { heading: sp.heading, tilt: 270, roll: 0 }, scale: 1 });
+                map.append(node); added.push(node);
+              } catch { /* an older build without models */ }
+            }
+          });
+        }
+      });
     }, 250);
-    return () => { window.clearTimeout(timer); added.forEach((node) => node.remove()); };
+    return () => { cancelled = true; window.clearTimeout(timer); added.forEach((node) => node.remove()); };
   }, [state, areaKey, simKey, adjKey]);
   // The panel grows when 3D opens (and on rotation): re-frame the place once the size settles.
   useEffect(() => {
