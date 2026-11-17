@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { toast } from "sonner";
-import { Box, Check, Layers, ChevronDown, ChevronLeft, RotateCw, Zap, ZapOff, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
+import { Box, Check, Layers, Sprout, ChevronDown, ChevronLeft, RotateCw, Zap, ZapOff, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
 import type { ArKind } from "@/models/ar-focus";
 import {
   AR_OBJECTS, alignFromFix, placeHaptic, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, arObject, enToAr, metresText, objectsToZones, toEN,
@@ -426,7 +426,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         const uid = `o${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
         const g = objectMesh(def);
         // The pergola, the bed and the misting pole are planted in the floor with their own footings: no round shadow.
-        const shadow = def.id !== "pergolato" && def.id !== "aiuola" && def.id !== "nebulizzatore" ? contactShadow(def) : null;
+        const shadow = def.id !== "pergolato" && def.id !== "aiuola" && def.id !== "nebulizzatore" && def.id !== "innaffiatoio" ? contactShadow(def) : null;
         if (shadow) g.add(shadow);
         // A realistic tree (EZ-Tree) takes the simple shape's place once it is grown; until then, or if it fails, the
         // simple one stays.
@@ -1001,7 +1001,7 @@ type FanItem = { key: string; label: string; Icon: LucideIcon; on: boolean; plan
 type FanGroup = { key: string; label: string; Icon: LucideIcon; items: FanItem[] };
 
 const OBJECT_ICONS: Record<string, LucideIcon> = {
-  albero: TreeDeciduous, pergolato: Fence, aiuola: Flower2, nebulizzatore: CloudDrizzle,
+  albero: TreeDeciduous, pergolato: Fence, aiuola: Flower2, nebulizzatore: CloudDrizzle, innaffiatoio: Sprout,
   telo: Umbrella, frangivento: Wind, irrigazione: Droplets,
 };
 function plantIcon(form?: string): LucideIcon {

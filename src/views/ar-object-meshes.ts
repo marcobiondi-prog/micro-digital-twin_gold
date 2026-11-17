@@ -3,6 +3,7 @@ import type { ArObjectDef } from "@/models/ar-objects";
 import { realPergola } from "@/views/ar-pergola";
 import { realBed } from "@/views/ar-bed";
 import { realMister } from "@/views/ar-mister";
+import { realSprinkler } from "@/views/ar-sprinkler";
 
 /**
  * The 3D shapes «Prova» puts in the real world, in metres, standing on y = 0 and centred on x = z = 0: the same simple
@@ -47,6 +48,11 @@ export function objectMesh(def: ArObjectDef): THREE.Group {
     case "nebulizzatore": {
       // A realistic misting pole on a footing in the floor (views/ar-mister), with live mist.
       g.add(realMister(def));
+      break;
+    }
+    case "innaffiatoio": {
+      // A pop-up rotary sprinkler flush in the ground (views/ar-sprinkler), with turning jets and a wet patch.
+      g.add(realSprinkler(def));
       break;
     }
     case "telo": {

@@ -6,10 +6,10 @@ import type { Specimen } from "@/models/plant-shape";
 
 /**
  * What «Prova» can put in the real world, at real size (metres): the piazza's tree, pergola, flower bed and misting
- * pole, the vineyard's shade cloth, windbreak and drip line. Each one also says which zone of the simulation it becomes
+ * pole and sprinkler, the vineyard's shade cloth, windbreak and drip line. Each one also says which zone of the simulation it becomes
  * when it is brought back to the map («Riporta sulla mappa»).
  */
-export type ArObjectId = "albero" | "pergolato" | "aiuola" | "nebulizzatore" | "telo" | "frangivento" | "irrigazione" | "pianta";
+export type ArObjectId = "albero" | "pergolato" | "aiuola" | "nebulizzatore" | "innaffiatoio" | "telo" | "frangivento" | "irrigazione" | "pianta";
 export type ArObjectDef = {
   id: ArObjectId;
   label: string;
@@ -29,6 +29,8 @@ export const AR_OBJECTS: Record<ArKind, readonly ArObjectDef[]> = {
     { id: "pergolato", label: "Pergolato", w: 4, d: 4, h: 3.2, zone: "ombra" },
     { id: "aiuola", label: "Aiuola", w: 3, d: 1.2, h: 0.25, zone: "prato" },
     { id: "nebulizzatore", label: "Nebulizzatore", w: 0.3, d: 0.3, h: 3, zone: "nebulizzatori" },
+    // A pop-up sprinkler: its footprint is the circle it waters (3 m round), brought back as green, permeable ground.
+    { id: "innaffiatoio", label: "Innaffiatoio", w: 6, d: 6, h: 0.15, zone: "prato" },
   ],
   vineyard: [
     { id: "telo", label: "Telo d’ombra", w: 4, d: 2, h: 2.2, zone: "teli" },
