@@ -6,11 +6,12 @@ import { realStonePine } from "@/views/ar-pine";
 import { realCypress } from "@/views/ar-cypress";
 import { realOlive } from "@/views/ar-olive";
 import { realLinden } from "@/views/ar-linden";
+import { realPlane } from "@/views/ar-plane";
 
 /**
  * Realistic plants for the AR view. A recognised plant is built from its shape (views/ar-plant on models/plant-shape:
- * the specimen as the AI saw it, its species' card, else its form); the stone pine, the Italian cypress, the olive and
- * the lime tree have models of their own (views/ar-pine, ar-cypress, ar-olive, ar-linden). The plain «Albero», with no species, is a procedural
+ * the specimen as the AI saw it, its species' card, else its form); the stone pine, the Italian cypress, the olive, the
+ * lime and the plane tree have models of their own (views/ar-pine, ar-cypress, ar-olive, ar-linden, ar-plane). The plain «Albero», with no species, is a procedural
  * oak (EZ-Tree, MIT, Daniel Greenheck). Each is grown to the object's real height with its foot at y = 0; while it
  * loads (or if it fails) the simple shape stays.
  */
@@ -36,6 +37,7 @@ export async function realTree(def: ArObjectDef): Promise<THREE.Object3D | null>
       if (custom === "cypress") return realCypress({ h: def.h, w: def.w }, seed);
       if (custom === "olive") return realOlive({ h: def.h, w: def.w }, seed);
       if (custom === "linden") return realLinden({ h: def.h, w: def.w }, seed);
+      if (custom === "plane") return realPlane({ h: def.h, w: def.w }, seed);
       const shape = shapeFor(plant.scientificName, plant.form, plant.evergreen, plant.specimen);
       // The crown's width: the specimen's own when the AI judged it, else the species' typical crown for its height.
       if (plant.specimen?.widthRatio === undefined && def.w > 0 && def.h > 0) shape.widthRatio = Math.max(0.15, Math.min(1.6, def.w / def.h));

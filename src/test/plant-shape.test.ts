@@ -3,6 +3,7 @@ import { cardOf, cleanSpecimen, crownDepth, crownRadius, CROWN_KINDS, customMode
 import { arRecognitionSchema, placePrompt, withPlantAlternatives } from "@/models/ar-recognition";
 import { cypressRadius } from "@/views/ar-cypress";
 import { lindenRadius } from "@/views/ar-linden";
+import { planeRadius } from "@/views/ar-plane";
 
 describe("plant cards", () => {
   it("reads genus and species, hybrid signs and authors aside", () => {
@@ -14,7 +15,7 @@ describe("plant cards", () => {
     expect(cardOf("Xyzzia nova")).toBeNull();
   });
 
-  it("gives the stone pine, the Italian cypress, the olive and the lime tree their own models", () => {
+  it("gives the stone pine, the Italian cypress, the olive, the lime and the plane tree their own models", () => {
     expect(customModel("Pinus pinea", "round")).toBe("stonePine");
     expect(customModel("Pinus halepensis", "umbrella")).toBe("stonePine");
     expect(customModel("Pinus nigra", "conical")).toBeNull();
@@ -23,6 +24,8 @@ describe("plant cards", () => {
     expect(customModel("Olea europaea", "round")).toBe("olive");
     expect(customModel("Tilia cordata", "round")).toBe("linden");
     expect(customModel("Tilia platyphyllos", "ovoid")).toBe("linden");
+    expect(customModel("Platanus × hispanica", "round")).toBe("plane");
+    expect(customModel("Platanus orientalis", "spreading")).toBe("plane");
     expect(customModel("Acer campestre", "round")).toBeNull();
   });
 });
@@ -85,6 +88,11 @@ describe("crown outlines", () => {
     expect(lindenRadius(0.1)).toBeLessThan(lindenRadius(0.42));
     expect(lindenRadius(0.8)).toBeLessThan(lindenRadius(0.42));
     expect(lindenRadius(1)).toBe(0);
+  });
+  it("makes the plane tree's crown a broad dome, widest about a third of the way up", () => {
+    expect(planeRadius(0.34)).toBeCloseTo(1);
+    expect(planeRadius(0.7)).toBeLessThan(planeRadius(0.34));
+    expect(planeRadius(1)).toBe(0);
   });
   it("makes the cypress a flame", () => {
     expect(cypressRadius(0)).toBeLessThan(cypressRadius(0.28));
