@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { ArObjectDef } from "@/models/ar-objects";
 import { plantProfile, presetName } from "@/models/plant-profile";
 import { realStonePine } from "@/views/ar-pine";
+import { realCypress } from "@/views/ar-cypress";
 
 /**
  * Realistic trees for the AR view (EZ-Tree, MIT, Daniel Greenheck): a procedural tree with branches, bark and leaf
@@ -59,8 +60,9 @@ export async function realTree(def: ArObjectDef): Promise<THREE.Object3D | null>
   try {
     const profile = def.id === "albero" && !def.plant ? { base: "Oak" as const } : plantProfile(def.plant?.scientificName, def.plant?.form, def.plant?.evergreen);
     const seed = 1000 + ((seedN++ * 7919) % 90000);
-    // The stone pine has a model of its own (the procedural presets cannot make its flat umbrella).
+    // The stone pine and the Italian cypress have models of their own (the procedural presets cannot make their shapes).
     if ("custom" in profile && profile.custom === "stonePine") return realStonePine({ h: def.h, w: def.w }, seed);
+    if ("custom" in profile && profile.custom === "cypress") return realCypress({ h: def.h, w: def.w }, seed);
     const ez = await loadLib();
     if (!ez) return null;
     const tree = new ez.Tree();

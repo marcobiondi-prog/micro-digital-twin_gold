@@ -21,8 +21,9 @@ export type PlantProfile = {
   leafShare?: number;
   /** Leaves drawn bigger (above 1) or smaller than the preset's. */
   leafSize?: number;
-  /** A model built on purpose instead of the procedural tree (views/ar-pine for the stone pine). */
-  custom?: "stonePine";
+  /** A model built on purpose instead of the procedural tree (views/ar-pine for the stone pine, views/ar-cypress
+   * for the Italian cypress). */
+  custom?: "stonePine" | "cypress";
 };
 
 type Form = "columnar" | "conical" | "round" | "umbrella" | "vine" | "shrub";
@@ -102,6 +103,8 @@ export function plantProfile(scientificName: string | undefined | null, form: Fo
     if (genus === "Quercus" && EVERGREEN_OAKS.has((scientificName ?? "").trim().split(/\s+/)[1]?.toLowerCase() ?? "")) {
       return { ...known, leafTint: DARK_EVERGREEN };
     }
+    // The Italian cypress (Cupressus sempervirens, or a cypress read as columnar) has its own model: a dense flame.
+    if (genus === "Cupressus" && (form === "columnar" || /\bsempervirens\b/i.test(scientificName ?? ""))) return { ...known, custom: "cypress" };
     // The stone pine (Pinus pinea, or a pine read as umbrella-shaped) has its own model: tall bare trunk, flat crown.
     if (genus === "Pinus" && (form === "umbrella" || /\bpinea\b/i.test(scientificName ?? ""))) return { base: "Ash", bark: "pine", leaves: "pine", squeeze: 1.4, custom: "stonePine" };
     return known;

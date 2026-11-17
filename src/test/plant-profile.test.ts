@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { genusOf, plantProfile, presetName } from "@/models/plant-profile";
+import { cypressRadius } from "@/views/ar-cypress";
 
 describe("plantProfile", () => {
   it("reads the genus from the scientific name", () => {
@@ -23,6 +24,13 @@ describe("plantProfile", () => {
     expect(plantProfile("Pinus halepensis", "umbrella", true).custom).toBe("stonePine");
     expect(plantProfile("Pinus nigra", "conical", true)).toMatchObject({ base: "Pine" });
     expect(plantProfile("Pinus nigra", "conical", true).custom).toBeUndefined();
+  });
+
+  it("gives the Italian cypress its own model, other cypresses the conifer one", () => {
+    expect(plantProfile("Cupressus sempervirens", "columnar", true).custom).toBe("cypress");
+    expect(plantProfile("Cupressus sempervirens", "conical", true).custom).toBe("cypress");
+    expect(plantProfile("Cupressus arizonica", "conical", true).custom).toBeUndefined();
+    expect(plantProfile("Juniperus communis", "columnar", true).custom).toBeUndefined();
   });
 
   it("falls back on the form for an unknown genus", () => {
@@ -53,5 +61,16 @@ describe("placePrompt", () => {
   it("says nothing without place nor month", () => {
     expect(placePrompt()).toBe("");
     expect(placePrompt(undefined, 4)).toContain("aprile");
+  });
+});
+
+describe("cypressRadius", () => {
+  it("is a flame: narrower at the foot, widest about a quarter up, a point at the top", () => {
+    const at = (f: number) => cypressRadius(f);
+    expect(at(0)).toBeLessThan(at(0.28));
+    expect(at(0.28)).toBeGreaterThan(at(0.6));
+    expect(at(0.6)).toBeGreaterThan(at(0.9));
+    expect(at(1)).toBe(0);
+    expect(Math.max(...[0.1, 0.2, 0.28, 0.35, 0.5].map(at))).toBeLessThan(1.1);
   });
 });
