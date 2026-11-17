@@ -11,6 +11,7 @@ import { realHolmOak } from "@/views/ar-holm";
 import { realCedar } from "@/views/ar-cedar";
 import { realPalm } from "@/views/ar-palm";
 import { realVine } from "@/views/ar-vine";
+import { realWillow } from "@/views/ar-willow";
 import { realSpecies, SPECIES, type SpeciesModel } from "@/views/ar-species";
 
 /**
@@ -49,6 +50,7 @@ export async function realTree(def: ArObjectDef): Promise<THREE.Object3D | null>
       if (custom === "cedar") return realCedar({ h: def.h, w: def.w }, seed);
       if (custom === "palm") return realPalm({ h: def.h, w: def.w }, seed);
       if (custom === "vine") return realVine({ h: def.h, w: def.w }, seed);
+      if (custom === "weepingWillow") return realWillow({ h: def.h, w: def.w }, seed);
       if (custom && custom in SPECIES) return realSpecies(custom as SpeciesModel, { h: def.h, w: def.w }, seed);
       const shape = shapeFor(plant.scientificName, plant.form, plant.evergreen, plant.specimen);
       // The crown's width: the specimen's own when the AI judged it, else the species' typical crown for its height.

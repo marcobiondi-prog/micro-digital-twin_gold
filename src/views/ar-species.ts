@@ -3,8 +3,8 @@ import { buildBroadleaf, dots, drawn, type BroadleafSpec } from "@/views/ar-broa
 
 /**
  * Broadleaved trees and shrubs with a model of their own, built by views/ar-broadleaf from a card each: hackberry,
- * southern magnolia, horse chestnut, maple, birch, deciduous oaks (pedunculate, downy…), weeping willow, Lombardy
- * poplar and oleander. Each card draws its own bark and leaves (canvas, nothing to download) and sets its crown's
+ * southern magnolia, horse chestnut, maple, birch, deciduous oaks (pedunculate, downy…), Lombardy poplar and oleander
+ * (the weeping willow has a model of its own, views/ar-willow). Each card draws its own bark and leaves (canvas, nothing to download) and sets its crown's
  * outline, proportions, trunk, branches, colours and flowers or fruits.
  */
 
@@ -22,7 +22,6 @@ export const OUTLINES = {
   maple: dome(0.45, 0.55, 0.58, 0.6),
   birch: (f: number) => (f <= 0 ? 0.45 : f >= 1 ? 0 : Math.sin(Math.PI * Math.pow(f, 0.8)) * 0.98 + 0.02),
   oak: dome(0.38, 0.5, 0.64, 0.7),
-  willow: dome(0.42, 0.55, 0.58, 0.6),
   poplar: (f: number) => (f <= 0 ? 0.5 : f >= 1 ? 0 : Math.min(1, 0.5 + 0.5 * Math.sqrt(f / 0.25)) * Math.pow(1 - f, 0.75) / Math.pow(0.75, 0.75)),
   oleander: dome(0.55, 0.6, 0.48, 0.75),
 };
@@ -168,14 +167,6 @@ export const SPECIES: Record<string, BroadleafSpec> = {
     body: { scale: 0.6, color: "#2b4220" }, surface: 0.38, leaves: { size: 1 },
     color: [0.24, 0.4, 0.3], alt: { color: [0.13, 0.35, 0.36], share: 0.06 },
     bark: ridged("oak-bark", "#4a4038", "rgba(25,20,16,0.6)", "rgba(110,100,90,0.3)", 34), leaf: twig("quercus-leaf", lobedOak, { leaves: 7, len: [24, 32] }),
-  },
-  /** Salice piangente (Salix babylonica): a rounded crown pouring long curtains of narrow leaves down to the ground. */
-  weepingWillow: {
-    radius: OUTLINES.willow, width: [0.85, 1.3, 1], clear: [0.3, 0.36],
-    trunk: { r: 0.035, lean: 0.06, stems: [1, 2], splay: 0.12 }, branches: { count: [8, 14], steep: 0.08, droop: 0.12 },
-    body: { scale: 0.36, color: "#5d7a32" }, surface: 0.45, leaves: { count: 1.1, size: 1.5, hanging: 0.32 },
-    color: [0.2, 0.5, 0.42],
-    bark: ridged("salix-bark", "#6a6152", "rgba(35,30,24,0.55)", "rgba(140,130,110,0.3)", 30), leaf: twig("salix-leaf", oval(0.16), { leaves: 14, len: [28, 38], spread: 0.55, stems: 3 }),
   },
   /** Pioppo cipressino (Populus nigra 'Italica'): a tall narrow column of upright branches, small diamond leaves. */
   lombardyPoplar: {
