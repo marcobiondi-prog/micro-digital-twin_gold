@@ -7,8 +7,11 @@ import { vineModel } from "./data";
  * average each, a few degrees right under it).
  */
 export const MISTER_COOLING = 0.15;
-export function piazzaEstimate(trees: number, depave: number, shade: number, misters = 0) {
-  const dT = Math.min(5.2, trees * 0.25 + depave * 0.04 + shade * 0.03 + misters * MISTER_COOLING);
+/** A sprinkler («innaffiatoio») wets the aiuole and the ground round it, which then cool the air a little as they dry
+ *  (0,05 °C on the piazza's average each, more on a hot dry afternoon right beside it). */
+export const SPRINKLER_COOLING = 0.05;
+export function piazzaEstimate(trees: number, depave: number, shade: number, misters = 0, sprinklers = 0) {
+  const dT = Math.min(5.2, trees * 0.25 + depave * 0.04 + shade * 0.03 + misters * MISTER_COOLING + sprinklers * SPRINKLER_COOLING);
   return { dT, lo: dT * 0.7, hi: Math.min(5.5, dT * 1.3) };
 }
 

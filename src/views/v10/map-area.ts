@@ -106,6 +106,11 @@ export function simFeatures(sim: SimLayout | null, withTreePoints: boolean) {
       if (withTreePoints) out.push({ type: "Feature", properties: { kind: "mister" }, geometry: { type: "Point", coordinates: [m[1], m[0]] } });
       else out.push(poly(crownRing(m, MIST_RADIUS_M, 20), { kind: "mist", color: "#7dd3fc", opacity: 0.3 }));
     }
+    // Sprinklers: in 2D a fixed-size teal dot; in the open 3D the wet circle they water (3 m round).
+    for (const m of sim.data.sprinklers ?? []) {
+      if (withTreePoints) out.push({ type: "Feature", properties: { kind: "sprinkler" }, geometry: { type: "Point", coordinates: [m[1], m[0]] } });
+      else out.push(poly(crownRing(m, 3, 20), { kind: "mist", color: "#2dd4bf", opacity: 0.22 }));
+    }
     if (withTreePoints) for (const t of sim.data.trees) out.push({ type: "Feature", properties: { kind: "tree" }, geometry: { type: "Point", coordinates: [t[1], t[0]] } });
     // What already stands there (existing trees, fountains, buildings, monuments): a thin dashed outline, kept clear.
     if (withTreePoints) for (const o of sim.real ?? []) out.push(lineF([...o.ring, o.ring[0]!], { kind: "realline", color: "#f8fafc", width: 1.5 }));
@@ -349,6 +354,7 @@ export function addSimLayers(map: MlMap, _lat: number, raised = false) {
     map.addSource(SIM_TREES_3D, { type: "geojson", data: fc([]) });
     map.addLayer({ id: "sim-trees-3d", type: "fill-extrusion", source: SIM_TREES_3D, paint: { "fill-extrusion-color": ["get", "color"], "fill-extrusion-base": ["get", "base"], "fill-extrusion-height": ["get", "height"], "fill-extrusion-opacity": 1, "fill-extrusion-vertical-gradient": true } });
   } else {
+    map.addLayer({ id: "sim-sprinklers", type: "circle", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "sprinkler"], paint: { "circle-color": "#2dd4bf", "circle-opacity": 0.9, "circle-radius": 5, "circle-stroke-color": "#f0fdfa", "circle-stroke-width": 1.5 } }, before);
     map.addLayer({ id: "sim-misters", type: "circle", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "mister"], paint: { "circle-color": "#7dd3fc", "circle-opacity": 0.85, "circle-radius": 6, "circle-stroke-color": "#e0f2fe", "circle-stroke-width": 2 } }, before);
     map.addLayer({ id: "sim-trees", type: "circle", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "tree"], paint: {
       "circle-color": SIM_COLORS.tree, "circle-opacity": 0.9, "circle-stroke-color": "#ffffff", "circle-stroke-width": 1.2,
@@ -389,6 +395,8 @@ export function setSimGhost(map: MlMap, ghost: boolean) {
   set("sim-trees", "circle-opacity", 0.9 * k);
   set("sim-misters", "circle-opacity", 0.85 * k);
   set("sim-misters", "circle-stroke-opacity", k);
+  set("sim-sprinklers", "circle-opacity", 0.9 * k);
+  set("sim-sprinklers", "circle-stroke-opacity", k);
   set("sim-trees", "circle-stroke-opacity", k);
 }
 

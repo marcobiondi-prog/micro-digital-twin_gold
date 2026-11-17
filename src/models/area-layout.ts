@@ -24,7 +24,7 @@ export type Line = { line: Ring; kind: "drip" | "main" | "wind" | "seam"; zone?:
  * (the lever's share of the usable surface), so the map can say when there is no room for all of it.
  */
 /** `misters`: every misting pole, those in the zones drawn for them first (`mistersInZones` of them), then the ones the app places. */
-export type PiazzaLayout = { misters: LatLng[]; mistersInZones: number; trees: LatLng[]; patches: Patch[]; lawnAt: LatLng; shadeAt: LatLng; cell: number; sunny?: number; lawnM2: number; shadeM2: number; lawnTarget: number; shadeTarget: number };
+export type PiazzaLayout = { misters: LatLng[]; mistersInZones: number; sprinklers: LatLng[]; trees: LatLng[]; patches: Patch[]; lawnAt: LatLng; shadeAt: LatLng; cell: number; sunny?: number; lawnM2: number; shadeM2: number; lawnTarget: number; shadeTarget: number };
 export type VineLayout = { patches: Patch[]; lines: Line[]; windAt: LatLng; zones: LatLng[] };
 
 /** The shade one tree gives in the simulation (m², models/project-summary) and so its crown on the map: about 6,2 m wide. */
@@ -145,7 +145,7 @@ const inZone = (f: Frame, zones: InnerZone[], kind: string) => {
 const exactRings = (zones: InnerZone[], kind: string, as: "lawn" | "shade"): Patch[] =>
   zones.filter((z) => z.kind === kind && z.ring.length >= 3).map((z) => ({ ring: z.ring, kind: as, exact: true }));
 
-export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: number, edits: LayoutEdits = {}, zones: InnerZone[] = [], misters = 0, real: Ring[] = []): PiazzaLayout | null {
+export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: number, edits: LayoutEdits = {}, zones: InnerZone[] = [], misters = 0, real: Ring[] = [], sprinklers = 0): PiazzaLayout | null {
   if (ring.length < 3) return null;
   const grid = cellsOf(ring), { f, c, minX, maxX, minY, maxY } = grid;
   const isFree = inZone(f, zones, "libera"), isLawn = inZone(f, zones, "prato"), isShade = inZone(f, zones, "ombra"), isTrees = inZone(f, zones, "alberi"), isMist = inZone(f, zones, "nebulizzatori");
@@ -260,8 +260,11 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
     ? misterSpots(f, c, trunks, mistCells, mistCells, inZones)
     : mistZones.slice(0, inZones).map((z) => { const xy = z.ring.map((p) => toXY(f, p)); return toLL(f, xy.reduce((s2, p) => s2 + p[0], 0) / xy.length, xy.reduce((s2, p) => s2 + p[1], 0) / xy.length); });
   const autoMisters = misterSpots(f, c, trunks, shadeCells.filter((x) => !isMist(x.x, x.y)), cells.filter((x) => !lawnCells.includes(x) && !isLawn(x.x, x.y) && !isMist(x.x, x.y)), nMist - zoneMisters.length);
+  // Sprinklers: spread evenly over the aiuole they water (never within 2 m of a trunk while there is room); with no
+  // aiuole, over the paving left free of pergolas.
+  const sprinklerSpots = misterSpots(f, c, trunks, lawnCells, lawnCells.length ? lawnCells : rest.filter((x) => !shadeCells.includes(x)), Math.max(0, Math.round(sprinklers)));
   return {
-    misters: [...zoneMisters, ...autoMisters], mistersInZones: zoneMisters.length,
+    misters: [...zoneMisters, ...autoMisters], mistersInZones: zoneMisters.length, sprinklers: sprinklerSpots,
     trees: placed, cell: c,
     lawnM2: Math.round((fixedLawn.length ? zoneM2("prato") : 0) + autoLawn * c * c), shadeM2: Math.round((fixedShade.length ? zoneM2("ombra") : 0) + autoShade * c * c),
     lawnTarget: Math.round(lawnTarget), shadeTarget: Math.round(shadeTarget),

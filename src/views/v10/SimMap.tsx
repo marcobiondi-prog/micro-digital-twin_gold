@@ -133,7 +133,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
     if (!saved) return null;
     const edits = saved.edits ?? {}, inner = zonesOfArea(saved);
     if (kind === "urban") {
-      const data = piazzaLayout(saved.ring, lab.urban.trees, lab.urban.permeable, lab.urban.shade, edits, inner, lab.urban.misters ?? 0, real.map((o) => o.ring));
+      const data = piazzaLayout(saved.ring, lab.urban.trees, lab.urban.permeable, lab.urban.shade, edits, inner, lab.urban.misters ?? 0, real.map((o) => o.ring), lab.urban.sprinklers ?? 0);
       if (!data) return null;
       // The shadows with the sun of the simulation's season and hour (its "when" chip), on the area's place.
       const when = getSimWhen("urban"), season = rSeason ?? when?.season, hour = rHour ?? when?.hour;
@@ -475,7 +475,7 @@ function MapReading({ kind, lat, lng }: { kind: SimKind; lat: number; lng: numbe
   }
   const gain = +(before - after).toFixed(1);
   // Something is in place but takes nothing off now (no heat at this hour or season): said, so the pill is not mute.
-  const placed = kind === "urban" ? lab.urban.trees + lab.urban.permeable + lab.urban.shade + (lab.urban.misters ?? 0) > 0 : true;
+  const placed = kind === "urban" ? lab.urban.trees + lab.urban.permeable + lab.urban.shade + (lab.urban.misters ?? 0) + (lab.urban.sprinklers ?? 0) > 0 : true;
   return (
     <div key={after} role="status" aria-live="polite" className="map-reading pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-full bg-black/20 px-2.5 py-1 text-white ring-1 ring-white/20 backdrop-blur-[2px] [text-shadow:0_1px_2px_rgb(0_0_0/0.8)]">
       <p className="flex items-center justify-center gap-1 whitespace-nowrap text-[13px] font-medium tabular-nums leading-tight">
@@ -565,7 +565,7 @@ function roomText(l: PiazzaLayout) {
 function SimBar({ sim, when, arranging, edited, best, only, canOnly, onArrange, onAuto, onBest, onOnly }: { sim: SimLayout; when?: string | undefined; arranging: boolean; edited: boolean; best: boolean; only: boolean; canOnly: boolean; onArrange: () => void; onAuto: () => void; onBest: () => void; onOnly: () => void }) {
   const m2 = (v: number) => `${Math.round(v).toLocaleString("it-IT")} m²`;
   const legend = sim.kind === "piazza"
-    ? [[dot(SIM_COLORS.tree), `Alberi ${sim.data.trees.length} · ${m2(sim.data.trees.length * TREE_SHADE_M2)} di chioma`], [dot(SIM_COLORS.lawn, false), `Aiuole e ciottoli ${m2(sim.data.lawnM2)}`], [dot(SIM_COLORS.shade, false), `Pergolati ${m2(sim.data.shadeM2)}`], [dot("#0b0f15", false), "Ombre"], ...(sim.data.misters.length ? [[dot("#7dd3fc"), `Nebulizzatori ${sim.data.misters.length}${sim.data.mistersInZones ? ` (${sim.data.mistersInZones} nelle tue zone)` : ""}`] as const] : [])] as const
+    ? [[dot(SIM_COLORS.tree), `Alberi ${sim.data.trees.length} · ${m2(sim.data.trees.length * TREE_SHADE_M2)} di chioma`], [dot(SIM_COLORS.lawn, false), `Aiuole e ciottoli ${m2(sim.data.lawnM2)}`], [dot(SIM_COLORS.shade, false), `Pergolati ${m2(sim.data.shadeM2)}`], [dot("#0b0f15", false), "Ombre"], ...(sim.data.misters.length ? [[dot("#7dd3fc"), `Nebulizzatori ${sim.data.misters.length}${sim.data.mistersInZones ? ` (${sim.data.mistersInZones} nelle tue zone)` : ""}`] as const] : []), ...(sim.data.sprinklers.length ? [[dot("#2dd4bf"), `Innaffiatoi ${sim.data.sprinklers.length}`] as const] : [])] as const
     : [[dot(thirstColor(10), false), "Zone (colore = bisogno di intervento)"], [dot(SIM_COLORS.drip, false), "Irrigazione · tubo e ali gocciolanti"], [dot(SIM_COLORS.cloth, false), "Teli d’ombra"], [dot(SIM_COLORS.wind, false), "Frangivento"]] as const;
   return (
     <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4">

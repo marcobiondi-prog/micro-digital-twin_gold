@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, typ
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { CloudDrizzle, CloudRain, Droplets, Info, Wind, Leaf, Minus, Plus, Ruler, Sprout, Sun, Thermometer, TreePine, Umbrella, Users, type LucideIcon } from "lucide-react";
-import { MISTER_COOLING, comparison, piazzaEstimate, type PrototypeId } from "@/models/scenarios";
+import { MISTER_COOLING, SPRINKLER_COOLING, comparison, piazzaEstimate, type PrototypeId } from "@/models/scenarios";
 import { setUrban, useLab, type RealWeather } from "@/models/lab-store";
 import { REFERENCE_M2, grouped } from "@/models/intervention-cost";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
@@ -312,7 +312,8 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
     return () => io.disconnect();
   }, []);
   const misters = urban.misters ?? 0;
-  const est = piazzaEstimate(urban.trees, urban.permeable, urban.shade, misters);
+  const sprinklers = urban.sprinklers ?? 0;
+  const est = piazzaEstimate(urban.trees, urban.permeable, urban.shade, misters, sprinklers);
   // Season and hour (device clock until chosen by hand) and the place's real year for them; without it, a plain estimate said as such.
   // With an area drawn on the map, the seasonal average and the real temperature are read at its middle (rounded to
   // about 10 m so redrawing a pin does not ask again); otherwise at the place's point.
@@ -361,7 +362,7 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
 
   // Levers set totals, so the squares are placed again from the default layout.
   // With "Solo quello disegnato" on the map, a lever moved by hand goes back to the automatic layout (said once).
-  const change = (patch: { trees?: number; permeable?: number; shade?: number; misters?: number }) => {
+  const change = (patch: { trees?: number; permeable?: number; shade?: number; misters?: number; sprinklers?: number }) => {
     const a = urban.area;
     if (a?.edits?.onlyDrawn) {
       const { onlyDrawn: _off, ...edits } = a.edits;
@@ -375,8 +376,8 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
   // Sliding the gauge asks for a temperature: the piazza walks the path empty → the three ready piazzas, so every
   // stop on the arc is exactly its level and the dot between two stops mixes them.
   const slideTo = (t: number) => {
-    // The misters stay as set: sliding moves trees, aiuole and shade for the rest of the cooling.
-    const next = mixFor(Math.max(0, (share > 0 ? (before - t) / share : 0) - misters * MISTER_COOLING));
+    // Misters and sprinklers stay as set: sliding moves trees, aiuole and shade for the rest of the cooling.
+    const next = mixFor(Math.max(0, (share > 0 ? (before - t) / share : 0) - misters * MISTER_COOLING - sprinklers * SPRINKLER_COOLING));
     if (next.trees === urban.trees && next.permeable === urban.permeable && next.shade === urban.shade) return;
     change(next);
   };
@@ -467,6 +468,7 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
         <Lever icon={Sprout} label="Superfici verdi e permeabili (% della piazza)" value={urban.permeable} step={10} max={100} color="text-radar-mild" swatch="bg-radar-mild" onChange={(v) => change({ permeable: v })} />
         <Lever icon={Umbrella} label="Coperture ombreggianti (% della piazza)" hint="Tende, pergole, pensiline." value={urban.shade} step={10} max={100} color="text-urban" swatch="bg-urban" onChange={(v) => change({ shade: v })} />
         <Lever icon={CloudDrizzle} label="Nebulizzatori" hint="Funzionano meglio con aria secca e poco vento; effetto locale, vicino agli ugelli." value={misters} step={1} max={20} color="text-sky-300" swatch="bg-sky-400" onChange={(v) => change({ misters: v })} />
+        <Lever icon={Droplets} label="Innaffiatoi" hint="Bagnano aiuole e terreno: asciugando rinfrescano un poco l’aria, soprattutto nelle ore calde." value={sprinklers} step={1} max={20} color="text-teal-300" swatch="bg-teal-400" onChange={(v) => change({ sprinklers: v })} />
       </div>
 
       {/* 4 · What the piazza gets: the degrees taken off, then the yearly benefits and the shade, always in view. */}
@@ -474,7 +476,7 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
         <p className="text-[15px] font-semibold">Cosa ottieni</p>
         <p className="text-sm text-muted-foreground">{gainNow > 0.05
           ? <>Il calore percepito scende di <b className="font-semibold tabular-nums text-foreground">{fmt(gainNow)}°</b> (da {fmt(before)}° a {fmt(after)}°). Livello: {feel.text.toLowerCase()}.</>
-          : urban.trees + urban.permeable + urban.shade + misters > 0 ? <>A quest’ora non c’è stress da caldo: l’effetto rinfrescante è trascurabile. Gli altri benefici restano validi.</> : <>Nessun intervento: muovi il punto sull’arco o le leve.</>}</p>
+          : urban.trees + urban.permeable + urban.shade + misters + sprinklers > 0 ? <>A quest’ora non c’è stress da caldo: l’effetto rinfrescante è trascurabile. Gli altri benefici restano validi.</> : <>Nessun intervento: muovi il punto sull’arco o le leve.</>}</p>
         <dl className="grid grid-cols-2 gap-2">
           {facts.map(({ icon: Icon, value, label }) => (
             <div key={label} className="flex min-w-0 items-center gap-2.5 rounded-2xl bg-foreground/[0.04] px-3 py-2.5">

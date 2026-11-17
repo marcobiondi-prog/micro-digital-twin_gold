@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { toast } from "sonner";
-import { Box, Check, Layers, Sprout, ChevronDown, ChevronLeft, RotateCw, Zap, ZapOff, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
+import { Box, Check, Layers, ChevronDown, ChevronLeft, RotateCw, Zap, ZapOff, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
 import type { ArKind } from "@/models/ar-focus";
 import {
   AR_OBJECTS, alignFromFix, placeHaptic, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, arObject, enToAr, metresText, objectsToZones, toEN,
@@ -1001,7 +1001,7 @@ type FanItem = { key: string; label: string; Icon: LucideIcon; on: boolean; plan
 type FanGroup = { key: string; label: string; Icon: LucideIcon; items: FanItem[] };
 
 const OBJECT_ICONS: Record<string, LucideIcon> = {
-  albero: TreeDeciduous, pergolato: Fence, aiuola: Flower2, nebulizzatore: CloudDrizzle, innaffiatoio: Sprout,
+  albero: TreeDeciduous, pergolato: Fence, aiuola: Flower2, nebulizzatore: CloudDrizzle, innaffiatoio: Droplets,
   telo: Umbrella, frangivento: Wind, irrigazione: Droplets,
 };
 function plantIcon(form?: string): LucideIcon {
