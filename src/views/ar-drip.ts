@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { pointsFollowScale } from "@/views/ar-points";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 /**
@@ -126,6 +127,6 @@ export function realDrip(pts: XZ[], main = false): THREE.Group {
   };
   place(0);
   drops.onBeforeRender = () => place(performance.now() / 1000);
-  g.add(drops);
+  g.add(pointsFollowScale(drops));
   return g;
 }

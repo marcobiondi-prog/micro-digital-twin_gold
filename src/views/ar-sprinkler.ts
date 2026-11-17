@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { pointsFollowScale } from "@/views/ar-points";
 
 /**
  * A garden sprinkler («Innaffiatoio») for the AR view, built in code: a pop-up rotary head set flush in the ground —
@@ -98,6 +99,6 @@ export function realSprinkler(def: { w: number }): THREE.Group {
     for (let i = 0; i < N; i++) { age[i]! += dt; if (age[i]! > fl[i]! + 0.05) spawn(i); }
     place();
   };
-  g.add(water);
+  g.add(pointsFollowScale(water));
   return g;
 }

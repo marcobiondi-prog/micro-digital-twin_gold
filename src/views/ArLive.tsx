@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { toast } from "sonner";
-import { Box, Check, Layers, ChevronDown, ChevronLeft, RotateCw, Zap, ZapOff, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
+import { Box, Check, Move, Layers, ChevronDown, ChevronLeft, RotateCw, Zap, ZapOff, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
 import type { ArKind } from "@/models/ar-focus";
 import {
-  AR_OBJECTS, alignFromFix, placeHaptic, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, arObject, enToAr, metresText, objectsToZones, toEN,
+  AR_OBJECTS, alignFromFix, modelScaleFor, nearestPlaced, placeHaptic, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, arObject, enToAr, metresText, objectsToZones, toEN,
   type Alignment, type ArObjectDef, type PlacedObject,
 } from "@/models/ar-objects";
 import { getLab, setUrban, setVineyard } from "@/models/lab-store";
@@ -77,7 +77,7 @@ export async function requestArSession(overlayRoot: HTMLElement): Promise<XRSess
   throw new Error(report.join(" · "));
 }
 
-type Tool = "place" | "align" | "measure";
+type Tool = "place" | "align" | "measure" | "move";
 type V = { x: number; y: number; z: number };
 
 /**
@@ -134,9 +134,15 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   zoomRef.current = zoom;
   const [found, setFound] = useState(false);
   const [placed, setPlaced] = useState<PlacedObject[]>([]);
-  // «Modellino»: everything at 1:10, to try indoors or see the whole piazza on a table (not sent to the map).
+  // «Modellino»: everything smaller, to try indoors or see the whole piazza on a table (not sent to the map). Its
+  // scale is fitted to the space round the phone when it is switched on (modelScaleFor: ARCore's depth when given).
   const [model, setModel] = useState(false);
-  const modelK = model ? MODEL_SCALE : 1;
+  const [modelScale, setModelScale] = useState(MODEL_SCALE);
+  const modelK = model ? modelScale : 1;
+  // «Sposta»: the object picked up follows the reticle (ARCore) until the next tap puts it down.
+  const [grabbed, setGrabbed] = useState<string | null>(null);
+  const grabRef = useRef<string | null>(null);
+  grabRef.current = grabbed;
   const modelRef = useRef(modelK);
   modelRef.current = modelK;
   // Two fingers resize the last object put down; taps around a pinch never put a new one.
@@ -268,7 +274,11 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         for (const l of fixed) l.visible = true;
       });
     }
-    const reticle = new THREE.Mesh(new THREE.RingGeometry(0.12, 0.16, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: "#00e5ff" }));
+    // The reticle: as wide as what a tap would put (fitReticle), drawn after the depth pass and without writing depth,
+    // so real furniture never makes it vanish and it never hides the objects.
+    const reticle = new THREE.Mesh(new THREE.RingGeometry(0.12, 0.16, 48).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: "#00e5ff", transparent: true, opacity: 0.85, depthTest: false, depthWrite: false }));
+    reticle.renderOrder = 998;
     reticle.matrixAutoUpdate = false;
     reticle.visible = false;
     scene.add(reticle);
@@ -317,6 +327,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         if (pose) {
           reticle.visible = true;
           reticle.matrix.fromArray(pose.transform.matrix);
+          fitReticle(reticle);
           const p = pose.transform.position;
           t.hit = { x: p.x, y: p.y, z: p.z };
           if (t.floorY === null) t.floorY = p.y;
@@ -332,6 +343,15 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         const had = occluder.live;
         occluder.update(frame, view, (session as XRSession & { depthDataFormat?: string }).depthDataFormat);
         if (had !== occluder.live) { setDepthLive(occluder.live); setDiag((d) => ({ ...d, depth: occluder.live })); }
+      }
+      // A picked-up object rides on the reticle while one aims where to put it.
+      const gid = grabRef.current, go = gid ? t.objects.get(gid) : undefined;
+      if (go && t.hit) go.position.set(t.hit.x + grabOff.current.x, t.hit.y, t.hit.z + grabOff.current.z);
+      // The reticle turns amber where ARCore's depth sees something standing in the object's way.
+      if (t.hit && ++obstacleTick.current % 8 === 0) {
+        const def = defOfRef.current(live.current.selected);
+        const blocked = live.current.tool === "place" && obstacleAt(def, t.hit.x, t.hit.y, t.hit.z, 0, modelRef.current * sizeRef.current);
+        (reticle.material as THREE.MeshBasicMaterial).color.set(blocked ? "#f59e0b" : "#00e5ff");
       }
       const estDir = est?.parent ? est.directionalLight?.position : null;
       shadows.update(t.objects.values(), t.floorY, estDir);
@@ -404,7 +424,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       const c = at(0.5, 0.62);
       if (t) t.hit = c;
       reticle.visible = !!c;
-      if (c) reticle.matrix.makeTranslation(c.x, 0.01, c.z);
+      if (c) { reticle.matrix.makeTranslation(c.x, 0.01, c.z); fitReticle(reticle); }
       if (t) shadowsRef.current?.update(t.objects.values(), t.floorY, null);
       renderer.render(scene, camera);
     });
@@ -431,6 +451,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       const t = three.current, hit = t?.hit;
       if (!t || !hit || performance.now() < pinchUntil.current) return;
       const { tool: tl } = live.current;
+      if (tl === "move") { moveAt(hit); return; }
       if (tl === "place") {
         const def = defOfRef.current(live.current.selected);
         const uid = `o${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
@@ -451,7 +472,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         // on the spot tapped, turned to face the phone, so its front posts stand right where one looks.
         let cx = hit.x, cz = hit.z, yaw = 0;
         if (def.id === "pergolato" || def.id === "telo") {
-          const eye = new THREE.Vector3().setFromMatrixPosition((t.renderer.xr.isPresenting ? t.renderer.xr.getCamera() : t.camera).matrixWorld);
+          const eye = eyeOf(t);
           let dx = hit.x - eye.x, dz = hit.z - eye.z;
           const len = Math.hypot(dx, dz);
           if (len > 0.05) {
@@ -462,15 +483,29 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
             yaw = -g.rotation.y;
           }
         }
-        g.position.set(cx, hit.y, cz);
         // A new object takes the size given last with two fingers, so what is put after it stays in proportion.
         const k = sizeRef.current;
+        // Obstacles (ARCore's depth): where something real stands in the object's way it is brought towards the phone,
+        // 15 cm at a time, until it is free; if no spot is free it stays where tapped and says so.
+        let moved = 0, stuck = false;
+        if (obstacleAt(def, cx, hit.y, cz, yaw, modelRef.current * k)) {
+          const eye = eyeOf(t);
+          const dx = eye.x - cx, dz = eye.z - cz, len = Math.hypot(dx, dz);
+          stuck = true;
+          for (let step = 0.15; len > 0.3 && step < Math.min(2, len - 0.3); step += 0.15) {
+            const nx = cx + (dx / len) * step, nz = cz + (dz / len) * step;
+            if (!obstacleAt(def, nx, hit.y, nz, yaw, modelRef.current * k)) { cx = nx; cz = nz; moved = step; stuck = false; break; }
+          }
+        }
+        g.position.set(cx, hit.y, cz);
         g.scale.setScalar(modelRef.current * k);
         castShadows(g);
         t.scene.add(g);
         t.objects.set(uid, g);
         setPlaced((l) => [...l, { uid, id: def.id, x: cx, z: cz, yaw, ...(k !== 1 ? { scale: k } : {}), ...(def.plant ? { def } : {}) }]);
-        if (k !== 1) setNotice({ text: `${def.label} · ${metresText(def.h * k)} di altezza, in scala come il precedente (${Math.round(k * 100)} %)`, tone: "ok" });
+        if (stuck) setNotice({ text: `${def.label}: qui c’è un ostacolo davanti. Usa «Sposta» o rimpiccioliscilo con due dita`, tone: "warn" });
+        else if (moved) setNotice({ text: `${def.label}: c’era un ostacolo, l’ho messo ${metresText(moved)} più vicino a te`, tone: "ok" });
+        else if (k !== 1) setNotice({ text: `${def.label} · ${metresText(def.h * k)} di altezza, in scala come il precedente (${Math.round(k * 100)} %)`, tone: "ok" });
         hapticTick(placeHaptic(def));
       } else if (tl === "align") {
         setAlignPts((pts) => (pts.length >= 2 ? [hit] : [...pts, hit]));
@@ -479,6 +514,134 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         setMeasure((pts) => (pts.length >= 2 ? [hit] : [...pts, hit]));
         hapticTick([30]);
       }
+  }
+
+  /** Where the phone's eye is, in the AR frame. */
+  function eyeOf(t: NonNullable<typeof three.current>): THREE.Vector3 {
+    return new THREE.Vector3().setFromMatrixPosition((t.renderer.xr.isPresenting ? t.renderer.xr.getCamera() : t.camera).matrixWorld);
+  }
+
+  /** The reticle as wide as what a tap would put: the chosen object's footprint at the size it would have (model and
+   *  pinch), a small ring for the other tools; rebuilt only when that size changes. */
+  const reticleR = useRef(0.14);
+  const obstacleTick = useRef(0);
+  function fitReticle(reticle: THREE.Object3D) {
+    const { tool: tl, selected: sel } = live.current;
+    const def = defOfRef.current(sel);
+    const r = tl === "place" ? Math.max(0.05, Math.min(4, (Math.max(def.w, def.d) / 2) * modelRef.current * sizeRef.current)) : 0.1;
+    if (Math.abs(r - reticleR.current) / reticleR.current > 0.06) {
+      reticleR.current = r;
+      const m = reticle as THREE.Mesh;
+      m.geometry.dispose();
+      const line = Math.max(0.012, Math.min(0.06, r * 0.12));
+      m.geometry = new THREE.RingGeometry(Math.max(0.005, r - line), r, 64).rotateX(-Math.PI / 2);
+    }
+  }
+
+  /**
+   * Does something real stand in the object's way? Points of its volume (round its footprint and in the middle, at a
+   * third and two thirds of its height, up to 2 m) are seen from the phone: where ARCore's depth map finds a real
+   * surface clearly nearer than such a point, something (a wall, a chair, a person) is in the way. False without depth.
+   */
+  function obstacleAt(def: ArObjectDef, cx: number, y: number, cz: number, yaw: number, k: number): boolean {
+    const occ = depthRef.current, t = three.current;
+    if (!occ?.live || !t || !t.renderer.xr.isPresenting) return false;
+    const xr = t.renderer.xr.getCamera();
+    const cam = xr.cameras[0] ?? xr;
+    const hw = (def.w / 2) * k, hd = (def.d / 2) * k, H = Math.min(def.h * k, 2);
+    const c = Math.cos(yaw), sn = Math.sin(yaw);
+    let seen = 0, hits = 0;
+    const p = new THREE.Vector3(), q = new THREE.Vector3();
+    for (const [a, b] of OBSTACLE_SAMPLES) for (const hy of [0.33, 0.66]) {
+      const lx = a * hw * 0.9, lz = b * hd * 0.9;
+      p.set(cx + lx * c + lz * sn, y + Math.max(0.1, H * hy), cz - lx * sn + lz * c);
+      const vz = -q.copy(p).applyMatrix4(cam.matrixWorldInverse).z;
+      if (vz < 0.25) continue;
+      q.copy(p).project(cam);
+      const u = (q.x + 1) / 2, v = (q.y + 1) / 2;
+      if (u < 0 || u > 1 || v < 0 || v > 1) continue;
+      const d = occ.depthAt(u, v);
+      if (d === null) continue;
+      seen++;
+      if (d < vz - (0.25 + 0.08 * vz)) hits++;
+    }
+    return seen >= 4 && hits / seen > 0.3;
+  }
+
+  /** The reach of a placed object on the floor: half its widest side at the size it is drawn, plus 30 cm. */
+  const reachOf = (o: PlacedObject) => {
+    const def = o.def ?? defOfRef.current(o.id);
+    return Math.max(0.6, (Math.max(def.w, def.d) / 2) * modelRef.current * (o.scale ?? 1) + 0.3);
+  };
+  const grabOff = useRef({ x: 0, z: 0 });
+  /** «Sposta»: the first tap picks the object nearest to it, the second puts it down where tapped (with ARCore it
+   *  follows the reticle meanwhile). The new spot is what «Riporta» brings back to the map. */
+  function moveAt(hit: V) {
+    const t = three.current;
+    if (!t) return;
+    const cur = grabRef.current;
+    if (!cur) {
+      const list = live.current.placed.map((o) => ({ o, x: o.x, z: o.z, reach: reachOf(o) }));
+      const near = nearestPlaced(list, hit);
+      if (!near) { setNotice({ text: "Tocca vicino a un oggetto per prenderlo", tone: "warn" }); hapticTick([60]); return; }
+      const g = t.objects.get(near.o.uid);
+      // With ARCore it keeps the offset from where it was picked, so it does not jump under the reticle.
+      grabOff.current = session && g ? { x: g.position.x - hit.x, z: g.position.z - hit.z } : { x: 0, z: 0 };
+      setGrabbed(near.o.uid);
+      hapticTick([20]);
+      return;
+    }
+    const o = live.current.placed.find((p) => p.uid === cur);
+    const g = t.objects.get(cur);
+    const x = hit.x + grabOff.current.x, z = hit.z + grabOff.current.z;
+    if (g) g.position.set(x, hit.y, z);
+    setPlaced((l) => l.map((p) => (p.uid === cur ? { ...p, x, z } : p)));
+    setGrabbed(null);
+    hapticTick([30, 40, 30]);
+    const def = o ? (o.def ?? defOfRef.current(o.id)) : null;
+    const blocked = def && o ? obstacleAt(def, x, hit.y, z, o.yaw, modelRef.current * (o.scale ?? 1)) : false;
+    setNotice(blocked ? { text: "Spostato, ma lì c’è un ostacolo davanti", tone: "warn" } : { text: "Spostato · tocca un altro oggetto per spostarlo", tone: "ok" });
+    window.setTimeout(() => setNotice((n) => (n?.text.startsWith("Spostato") ? null : n)), 2200);
+  }
+
+  // A ring under the object picked up.
+  useEffect(() => {
+    const t = three.current;
+    const g = grabbed ? t?.objects.get(grabbed) : undefined;
+    const o = grabbed ? placed.find((p) => p.uid === grabbed) : undefined;
+    if (!t || !g || !o) return;
+    const r = reachOf(o);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(Math.max(0.05, r - 0.3), Math.max(0.08, r - 0.24), 48).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: "#a78bfa", transparent: true, opacity: 0.9, depthTest: false, depthWrite: false }));
+    ring.renderOrder = 999;
+    ring.frustumCulled = false;
+    ring.onBeforeRender = () => { ring.position.set(g.position.x, g.position.y + 0.02, g.position.z); ring.updateMatrixWorld(); };
+    t.scene.add(ring);
+    return () => { t.scene.remove(ring); ring.geometry.dispose(); (ring.material as THREE.Material).dispose(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grabbed]);
+  // Leaving «Sposta» with an object in hand puts it back where it was.
+  useEffect(() => {
+    if (tool === "move" || !grabRef.current) return;
+    const o = placed.find((p) => p.uid === grabRef.current), g = o ? three.current?.objects.get(o.uid) : undefined;
+    if (o && g) { g.position.x = o.x; g.position.z = o.z; }
+    setGrabbed(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tool]);
+
+  /** The «Modellino»'s scale for the space round the phone, with ARCore's depth when the phone gives it. */
+  function fitModel(): { k: number; span: number | null } {
+    const t = three.current;
+    const defs = [...live.current.placed.map((o) => o.def ?? defOfRef.current(o.id)), defOfRef.current(live.current.selected)];
+    const size = Math.max(...defs.map((d) => Math.max(d.w, d.d))), tall = Math.max(...defs.map((d) => d.h));
+    let dist = 2, eyeH = 1.5;
+    if (t) {
+      const eye = eyeOf(t);
+      if (t.hit) dist = Math.hypot(t.hit.x - eye.x, t.hit.z - eye.z);
+      if (t.floorY !== null) eyeH = eye.y - t.floorY;
+    }
+    const span = depthRef.current?.span() ?? null;
+    return { k: modelScaleFor({ size, tall, dist, eyeH, span }), span };
   }
 
   // Two corners touched: the drawn area lines up with the real floor.
@@ -535,6 +698,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     if (!last) return;
     const t = three.current, o = t?.objects.get(last.uid);
     if (t && o) { t.scene.remove(o); t.objects.delete(last.uid); }
+    if (grabRef.current === last.uid) setGrabbed(null);
     setPlaced((l) => l.slice(0, -1));
   };
   const backToMap = () => {
@@ -573,6 +737,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       ? "Trascina la linea sulla base dei muri"
       : tool === "align"
         ? alignPts.length === 0 ? "Tocca il punto 1 dell’area" : "Tocca il punto 2 dell’area"
+        : tool === "move"
+          ? grabbed ? (session ? "Punta dove metterlo e tocca" : "Tocca dove metterlo") : "Tocca l’oggetto da spostare"
         : tool === "measure"
           ? dist !== null ? `Distanza ${metresText(dist)}` : measure.length === 1 ? "Tocca il secondo punto" : "Tocca il primo punto"
           : `Tocca il pavimento per posare: ${defOf(selected).label}`);
@@ -580,8 +746,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   // line on how it works. Messages open it by themselves while they last.
   const [barOpen, setBarOpen] = useState(false);
   const barShort = !found ? "Cerco il pavimento…" : adjusting ? "Regola pavimento"
-    : tool === "measure" ? (dist !== null ? metresText(dist) : "Misura") : tool === "align" ? `Punto ${alignPts.length + 1} dell’area` : defOf(selected).label;
+    : tool === "move" ? (grabbed ? "Mettilo giù" : "Sposta") : tool === "measure" ? (dist !== null ? metresText(dist) : "Misura") : tool === "align" ? `Punto ${alignPts.length + 1} dell’area` : defOf(selected).label;
   const barHelp = !found ? "Muovi piano il telefono verso il pavimento finché lo riconosco."
+    : tool === "move" ? "Tocca un oggetto posato per prenderlo, poi tocca il punto del pavimento dove vuoi rimetterlo."
     : tool === "measure" ? "Tocca due punti a terra: ti dico quanto distano."
     : tool === "align" ? "Tocca a terra i punti 1 e 2 dell’area disegnata sulla mappa: così gli oggetti tornano al posto giusto."
     : "Tocca il pavimento dove vuoi metterlo: compare a grandezza vera. Annulla toglie l’ultimo, il pulsante AI cambia oggetto.";
@@ -767,8 +934,16 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     ...(area && kind === "urban" && showPlan ? [{ key: "t:unisci", label: merge ? "Separa" : "Unisci", Icon: Fence, tool: true, on: merge,
       aria: merge ? "Mostra i pergolati della mappa uno per uno" : "Unisci in uno solo i pergolati vicini della mappa",
       onPick: () => { const on = !merge; setMerge(on); setMergePergolas(on); setTrayOpen(false); setNotice({ text: on ? "Pergolati vicini uniti in uno solo" : "Pergolati separati, come sulla mappa", tone: "ok" }); } }] : []),
-    { key: "t:modellino", label: model ? "Grandezza vera" : "Modellino", Icon: Box, tool: true, on: model, aria: model ? "Torna alla grandezza vera" : "Modellino in scala 1:10",
-      onPick: () => { setModel((m) => !m); setTrayOpen(false); setNotice({ text: model ? "Grandezza vera" : "Modellino 1:10 · per provare al chiuso o su un tavolo", tone: "ok" }); } },
+    ...(placed.length ? [{ key: "t:sposta", label: "Sposta", Icon: Move, tool: true, on: tool === "move", aria: "Sposta un oggetto già posato",
+      onPick: () => { setTool("move"); setGrabbed(null); setTrayOpen(false); } }] : []),
+    { key: "t:modellino", label: model ? "Grandezza vera" : "Modellino", Icon: Box, tool: true, on: model, aria: model ? "Torna alla grandezza vera" : "Modellino in scala adatta allo spazio intorno",
+      onPick: () => {
+        setTrayOpen(false);
+        if (model) { setModel(false); setNotice({ text: "Grandezza vera", tone: "ok" }); return; }
+        const { k, span } = fitModel();
+        setModelScale(k); setModel(true);
+        setNotice({ text: `Modellino 1:${Math.round(1 / k)} · adatto allo spazio ${span !== null ? `(profondità rilevata: circa ${metresText(span)})` : "davanti a te"}`, tone: "ok" });
+      } },
     // ARCore's depth as a test: switching it on or off restarts the session (it is asked when the session starts).
     ...(session && onRotate ? [{ key: "t:profondita", label: depthWanted() ? "Spegni profondità" : "Profondità", Icon: Layers, tool: true, on: depthWanted(),
       aria: depthWanted() ? "Spegni la prova della profondità e riavvia l’AR" : "Accendi la profondità: muri e mobili veri coprono gli oggetti (riavvia l’AR)",
@@ -786,7 +961,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     { key: "interventi", label: "Interventi", Icon: kind === "vineyard" ? Grape : TreeDeciduous, items: objectItems },
     { key: "strumenti", label: "Strumenti", Icon: Ruler, items: toolItems },
   ];
-  const fanStart = tool === "measure" ? "strumenti" : plantItems.some((i) => i.on) ? "piante" : objectItems.some((i) => i.on) ? "interventi" : plantItems.length ? "piante" : "interventi";
+  const fanStart = tool === "measure" || tool === "move" ? "strumenti" : plantItems.some((i) => i.on) ? "piante" : objectItems.some((i) => i.on) ? "interventi" : plantItems.length ? "piante" : "interventi";
   const chip = (key: string, o: ArObjectDef, icon: React.ReactNode) => {
     const on = tool === "place" && selected === key;
     return (
@@ -888,7 +1063,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
             <div className="relative shrink-0">
             {trayOpen && <AiFan groups={fanGroups} start={fanStart} />}
             <button type="button" onClick={() => setTrayOpen((o) => !o)} aria-expanded={trayOpen} aria-controls="ar-ai-tray"
-              aria-label={trayOpen ? "Chiudi le funzioni AI" : `Funzioni AI · ${tool === "measure" ? "Misura" : defOf(selected).label}`}
+              aria-label={trayOpen ? "Chiudi le funzioni AI" : `Funzioni AI · ${tool === "measure" ? "Misura" : tool === "move" ? "Sposta" : defOf(selected).label}`}
               className="relative grid size-12 shrink-0 place-items-center rounded-full p-[2px] shadow-[0_0_18px_rgba(0,229,255,0.45)] active:scale-95"
               style={{ background: "conic-gradient(from 200deg, #00e5ff, #8b5cf6, #22c55e, #00e5ff)" }}>
               <span className={`grid size-full place-items-center rounded-full ${trayOpen ? "bg-white text-black" : "bg-[#0b1118] text-white"}`}>
@@ -962,6 +1137,8 @@ function saveFloorOffset(v: number) {
 }
 
 const MODEL_SCALE = 0.1;
+/** Where the volume of an object is looked at for obstacles: its middle and round its footprint. */
+const OBSTACLE_SAMPLES: Array<[number, number]> = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [0.7, 0.7], [-0.7, 0.7], [0.7, -0.7], [-0.7, -0.7]];
 
 /** The AI camera's multiple shot, shared with the AR view. */
 export type ArBurst = {

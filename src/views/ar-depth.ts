@@ -66,7 +66,7 @@ void main() {
   float m = texture(depthTex, duv).r;
   if (m <= 0.0 || duv.x < 0.0 || duv.y < 0.0 || duv.x > 1.0 || duv.y > 1.0) { gl_FragDepth = 1.0; return; }
   // The depth map is coarse and noisy, more so far away: a margin growing with the distance keeps things on the floor.
-  vec4 c = proj * vec4(0.0, 0.0, -(m + bias + 0.05 * m), 1.0);
+  vec4 c = proj * vec4(0.0, 0.0, -(m + bias + 0.08 * m), 1.0);
   gl_FragDepth = clamp(c.z / c.w * 0.5 + 0.5, 0.0, 1.0);
 }`;
 
@@ -75,12 +75,14 @@ export class DepthOccluder {
   private mat: THREE.ShaderMaterial;
   private tex: THREE.DataTexture | null = null;
   private buf: Float32Array | null = null;
+  private bw = 0;
+  private bh = 0;
   private u = {
     depthTex: { value: null as THREE.Texture | null },
     uvT: { value: new THREE.Matrix4() },
     proj: { value: new THREE.Matrix4() },
     size: { value: new THREE.Vector2(1, 1) },
-    bias: { value: 0.12 },
+    bias: { value: 0.22 },
     flip: { value: depthFlip() },
   };
   setFlip(n: number) { this.u.flip.value = n; }
@@ -125,6 +127,7 @@ export class DepthOccluder {
     const n = d.width * d.height;
     const src = format === "float32" ? new Float32Array(d.data) : new Uint16Array(d.data);
     if (!this.buf || this.buf.length !== n) this.buf = new Float32Array(n);
+    this.bw = d.width; this.bh = d.height;
     const k = d.rawValueToMeters;
     for (let i = 0; i < n; i++) this.buf[i] = (src[i] ?? 0) * k;
     if (!this.tex || this.tex.image.width !== d.width || this.tex.image.height !== d.height) {
@@ -140,6 +143,37 @@ export class DepthOccluder {
     this.live = true;
     this.mesh.visible = this.enabled;
     return true;
+  }
+
+  /**
+   * The real distance (metres along the view, like a camera's depth) seen at a point of the screen, read from the last
+   * depth map exactly as the occluding pass reads it (same turn of the map). u, v from the bottom left, 0…1; null
+   * where the map says nothing.
+   */
+  depthAt(u: number, v: number): number | null {
+    const b = this.buf;
+    if (!this.live || !b || !this.bw) return null;
+    const f = this.u.flip.value;
+    let x = u, y = v;
+    if (f === 0 || f === 2) y = 1 - y;
+    if (f >= 2) x = 1 - x;
+    const p = new THREE.Vector4(x, y, 0, 1).applyMatrix4(this.u.uvT.value);
+    if (p.x < 0 || p.y < 0 || p.x > 1 || p.y > 1) return null;
+    const m = b[Math.min(this.bh - 1, Math.floor(p.y * this.bh)) * this.bw + Math.min(this.bw - 1, Math.floor(p.x * this.bw))] ?? 0;
+    return m > 0.05 ? m : null;
+  }
+
+  /** How deep the space seen is, from the last depth map: the median distance of the room's walls, furniture and
+   *  floor, metres (null without a map). Used to fit the «Modellino» to the room. */
+  span(): number | null {
+    const b = this.buf;
+    if (!this.live || !b) return null;
+    const v: number[] = [];
+    const step = Math.max(1, Math.floor(b.length / 4000));
+    for (let i = 0; i < b.length; i += step) { const m = b[i]!; if (m > 0.05 && m < 40) v.push(m); }
+    if (v.length < 20) return null;
+    v.sort((a, c) => a - c);
+    return v[Math.floor(v.length / 2)]!;
   }
 
   dispose() {

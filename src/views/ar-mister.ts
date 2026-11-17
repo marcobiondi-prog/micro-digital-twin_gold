@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { pointsFollowScale } from "@/views/ar-points";
 
 /**
  * A realistic misting pole for the AR view, planted in the ground, built in code: a concrete footing flush with the
@@ -134,6 +135,6 @@ export function realMister(def: { h: number }): THREE.Group {
     for (let i = 0; i < N; i++) { age[i]! += dt; if (age[i]! > life[i]!) spawn(i); }
     place();
   };
-  g.add(mist);
+  g.add(pointsFollowScale(mist));
   return g;
 }

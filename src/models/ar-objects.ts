@@ -189,3 +189,31 @@ export function placeHaptic(def: Pick<ArObjectDef, "w" | "d" | "h">): number[] {
   const first = Math.round(18 + 52 * k);
   return k > 0.55 ? [first, 45, Math.round(30 + 70 * k)] : [first];
 }
+
+/** The «Modellino» scales offered: 1:n, n one of these. */
+const MODEL_RATIOS = [2, 4, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200];
+
+/**
+ * The «Modellino»'s scale fitted to the space round the phone: the largest object (its widest side, its height) must
+ * fit in about half of the space seen ahead — ARCore's depth when the phone gives it (`span`, metres to walls and
+ * furniture), else twice the distance to the spot on the floor — and stand lower than the phone above that floor.
+ * Never above 1:2, rounded down to a plain ratio (1:5, 1:10, 1:20…). Returns the scale (1/n).
+ */
+export function modelScaleFor(o: { size: number; tall: number; dist: number; eyeH: number; span?: number | null }): number {
+  const room = Math.max(0.6, Math.min(30, o.span && o.span > 0 ? o.span : Math.max(0.3, o.dist) * 2));
+  const byRoom = (0.45 * room) / Math.max(0.1, o.size);
+  const byHeight = (0.8 * Math.max(0.3, o.eyeH)) / Math.max(0.1, o.tall);
+  const s = Math.min(0.5, byRoom, byHeight);
+  const n = MODEL_RATIOS.find((r) => 1 / r <= s) ?? MODEL_RATIOS[MODEL_RATIOS.length - 1]!;
+  return 1 / n;
+}
+
+/** The nearest placed object to a point on the floor, within reach of its footprint. */
+export function nearestPlaced<T extends { x: number; z: number; reach: number }>(list: T[], p: { x: number; z: number }): T | null {
+  let best: T | null = null, bd = Infinity;
+  for (const o of list) {
+    const d = Math.hypot(o.x - p.x, o.z - p.z);
+    if (d <= o.reach && d < bd) { bd = d; best = o; }
+  }
+  return best;
+}
