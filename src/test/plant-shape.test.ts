@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { cardOf, cleanSpecimen, crownDepth, crownRadius, CROWN_KINDS, customModel, genusOf, mixHex, shapeFor } from "@/models/plant-shape";
 import { arRecognitionSchema, placePrompt, withPlantAlternatives } from "@/models/ar-recognition";
 import { cypressRadius } from "@/views/ar-cypress";
+import { lindenRadius } from "@/views/ar-linden";
 
 describe("plant cards", () => {
   it("reads genus and species, hybrid signs and authors aside", () => {
@@ -13,14 +14,16 @@ describe("plant cards", () => {
     expect(cardOf("Xyzzia nova")).toBeNull();
   });
 
-  it("gives the stone pine, the Italian cypress and the olive their own models", () => {
+  it("gives the stone pine, the Italian cypress, the olive and the lime tree their own models", () => {
     expect(customModel("Pinus pinea", "round")).toBe("stonePine");
     expect(customModel("Pinus halepensis", "umbrella")).toBe("stonePine");
     expect(customModel("Pinus nigra", "conical")).toBeNull();
     expect(customModel("Cupressus sempervirens", "conical")).toBe("cypress");
     expect(customModel("Cupressus arizonica", "conical")).toBeNull();
     expect(customModel("Olea europaea", "round")).toBe("olive");
-    expect(customModel("Tilia cordata", "round")).toBeNull();
+    expect(customModel("Tilia cordata", "round")).toBe("linden");
+    expect(customModel("Tilia platyphyllos", "ovoid")).toBe("linden");
+    expect(customModel("Acer campestre", "round")).toBeNull();
   });
 });
 
@@ -76,6 +79,12 @@ describe("crown outlines", () => {
   it("is low for spreading and umbrella crowns", () => {
     expect(crownDepth("umbrella", 0.3)).toBeLessThan(crownDepth("round", 0.3));
     expect(crownDepth("round", 0.3)).toBeCloseTo(0.7);
+  });
+  it("makes the lime tree's crown an egg, broadest a little below the middle", () => {
+    expect(lindenRadius(0.42)).toBeCloseTo(1);
+    expect(lindenRadius(0.1)).toBeLessThan(lindenRadius(0.42));
+    expect(lindenRadius(0.8)).toBeLessThan(lindenRadius(0.42));
+    expect(lindenRadius(1)).toBe(0);
   });
   it("makes the cypress a flame", () => {
     expect(cypressRadius(0)).toBeLessThan(cypressRadius(0.28));
