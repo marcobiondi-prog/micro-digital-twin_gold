@@ -7,8 +7,9 @@
  * 2. the species' or genus' card below (about forty plants common in Italian squares and vineyards), for what a photo
  *    tells poorly (leaf kind, true colours),
  * 3. the plant's form, for any other species.
- * Six plants have a model of their own (customModel): the stone pine, the Italian cypress, the olive, the lime tree,
- * the plane tree and the holm oak.
+ * About twenty plants have a model of their own (customModel): stone pine, Italian cypress, olive, lime, plane tree,
+ * holm oak, cedar, palms, grapevine, hackberry, magnolia, horse chestnut, maple, birch, deciduous oaks, weeping willow,
+ * Lombardy poplar and oleander.
  */
 
 export type CrownKind = "columnar" | "conical" | "ovoid" | "round" | "spreading" | "umbrella" | "vase" | "weeping" | "irregular" | "shrub";
@@ -162,8 +163,12 @@ function binomial(scientificName: string | undefined | null): string {
   return w.length >= 2 ? `${genusOf(w[0])} ${w[1]!.toLowerCase()}` : genusOf(w[0]);
 }
 
-export type CustomModel = "stonePine" | "cypress" | "olive" | "linden" | "plane" | "holmOak";
-/** The plants built by models of their own (views/ar-pine, views/ar-cypress, views/ar-olive, views/ar-linden, views/ar-plane, views/ar-holm). */
+export type CustomModel =
+  | "stonePine" | "cypress" | "olive" | "linden" | "plane" | "holmOak" | "cedar" | "palm" | "vine"
+  | "celtis" | "magnolia" | "horseChestnut" | "maple" | "birch" | "oak" | "weepingWillow" | "lombardyPoplar" | "oleander";
+const PALMS = new Set(["Phoenix", "Washingtonia", "Trachycarpus", "Chamaerops", "Butia", "Syagrus", "Livistona", "Sabal"]);
+/** The plants built by models of their own (views/ar-pine, ar-cypress, ar-olive, ar-linden, ar-plane, ar-holm, ar-cedar,
+ * ar-palm, ar-vine, and the broadleaf cards of views/ar-species). */
 export function customModel(scientificName: string | undefined | null, form?: string): CustomModel | null {
   const genus = genusOf(scientificName), name = binomial(scientificName);
   if (genus === "Pinus" && (form === "umbrella" || name === "Pinus pinea")) return "stonePine";
@@ -172,6 +177,18 @@ export function customModel(scientificName: string | undefined | null, form?: st
   if (genus === "Tilia") return "linden";
   if (genus === "Platanus") return "plane";
   if (name === "Quercus ilex" || name === "Quercus rotundifolia") return "holmOak";
+  if (genus === "Quercus" && name !== "Quercus suber") return "oak";
+  if (genus === "Cedrus") return "cedar";
+  if (PALMS.has(genus)) return "palm";
+  if (genus === "Vitis") return "vine";
+  if (genus === "Celtis") return "celtis";
+  if (genus === "Magnolia") return "magnolia";
+  if (genus === "Aesculus") return "horseChestnut";
+  if (genus === "Acer" && name !== "Acer negundo") return "maple";
+  if (genus === "Betula") return "birch";
+  if (name === "Salix babylonica" || /sepulcralis|pendula/i.test(scientificName ?? "") && genus === "Salix") return "weepingWillow";
+  if (genus === "Populus" && (name === "Populus nigra" || form === "columnar")) return "lombardyPoplar";
+  if (genus === "Nerium") return "oleander";
   return null;
 }
 

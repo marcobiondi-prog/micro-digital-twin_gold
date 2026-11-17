@@ -8,12 +8,16 @@ import { realOlive } from "@/views/ar-olive";
 import { realLinden } from "@/views/ar-linden";
 import { realPlane } from "@/views/ar-plane";
 import { realHolmOak } from "@/views/ar-holm";
+import { realCedar } from "@/views/ar-cedar";
+import { realPalm } from "@/views/ar-palm";
+import { realVine } from "@/views/ar-vine";
+import { realSpecies, SPECIES, type SpeciesModel } from "@/views/ar-species";
 
 /**
  * Realistic plants for the AR view. A recognised plant is built from its shape (views/ar-plant on models/plant-shape:
- * the specimen as the AI saw it, its species' card, else its form); the stone pine, the Italian cypress, the olive, the
- * lime, the plane tree and the holm oak have models of their own (views/ar-pine, ar-cypress, ar-olive, ar-linden,
- * ar-plane, ar-holm). The plain «Albero», with no species, is a procedural
+ * the specimen as the AI saw it, its species' card, else its form); about twenty plants
+ * have models of their own (models/plant-shape customModel: views/ar-pine, ar-cypress, ar-olive, ar-linden, ar-plane,
+ * ar-holm, ar-cedar, ar-palm, ar-vine and the broadleaf cards of ar-species). The plain «Albero», with no species, is a procedural
  * oak (EZ-Tree, MIT, Daniel Greenheck). Each is grown to the object's real height with its foot at y = 0; while it
  * loads (or if it fails) the simple shape stays.
  */
@@ -25,7 +29,8 @@ const loadLib = () => (lib ??= import("ez-tree-src").catch(() => null));
 export function wantsRealTree(def: ArObjectDef): boolean {
   if (def.id === "albero") return true;
   if (def.id !== "pianta") return false;
-  return def.plant?.form !== "vine";
+  // Climbers keep the simple row, except the grapevine, which has a model of its own.
+  return def.plant?.form !== "vine" || customModel(def.plant.scientificName, def.plant.form) === "vine";
 }
 
 let seedN = 1;
@@ -41,6 +46,10 @@ export async function realTree(def: ArObjectDef): Promise<THREE.Object3D | null>
       if (custom === "linden") return realLinden({ h: def.h, w: def.w }, seed);
       if (custom === "plane") return realPlane({ h: def.h, w: def.w }, seed);
       if (custom === "holmOak") return realHolmOak({ h: def.h, w: def.w }, seed);
+      if (custom === "cedar") return realCedar({ h: def.h, w: def.w }, seed);
+      if (custom === "palm") return realPalm({ h: def.h, w: def.w }, seed);
+      if (custom === "vine") return realVine({ h: def.h, w: def.w }, seed);
+      if (custom && custom in SPECIES) return realSpecies(custom as SpeciesModel, { h: def.h, w: def.w }, seed);
       const shape = shapeFor(plant.scientificName, plant.form, plant.evergreen, plant.specimen);
       // The crown's width: the specimen's own when the AI judged it, else the species' typical crown for its height.
       if (plant.specimen?.widthRatio === undefined && def.w > 0 && def.h > 0) shape.widthRatio = Math.max(0.15, Math.min(1.6, def.w / def.h));

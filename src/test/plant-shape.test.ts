@@ -5,6 +5,8 @@ import { cypressRadius } from "@/views/ar-cypress";
 import { lindenRadius } from "@/views/ar-linden";
 import { planeRadius } from "@/views/ar-plane";
 import { holmRadius } from "@/views/ar-holm";
+import { OUTLINES, SPECIES } from "@/views/ar-species";
+import { cedarRadius } from "@/views/ar-cedar";
 
 describe("plant cards", () => {
   it("reads genus and species, hybrid signs and authors aside", () => {
@@ -16,7 +18,7 @@ describe("plant cards", () => {
     expect(cardOf("Xyzzia nova")).toBeNull();
   });
 
-  it("gives the stone pine, the Italian cypress, the olive, the lime, the plane tree and the holm oak their own models", () => {
+  it("gives the plants with a model of their own their model, the others none", () => {
     expect(customModel("Pinus pinea", "round")).toBe("stonePine");
     expect(customModel("Pinus halepensis", "umbrella")).toBe("stonePine");
     expect(customModel("Pinus nigra", "conical")).toBeNull();
@@ -28,8 +30,25 @@ describe("plant cards", () => {
     expect(customModel("Platanus × hispanica", "round")).toBe("plane");
     expect(customModel("Platanus orientalis", "spreading")).toBe("plane");
     expect(customModel("Quercus ilex", "round")).toBe("holmOak");
-    expect(customModel("Quercus robur", "spreading")).toBeNull();
-    expect(customModel("Acer campestre", "round")).toBeNull();
+    expect(customModel("Quercus robur", "spreading")).toBe("oak");
+    expect(customModel("Quercus suber", "spreading")).toBeNull();
+    expect(customModel("Cedrus atlantica", "conical")).toBe("cedar");
+    expect(customModel("Phoenix canariensis", "umbrella")).toBe("palm");
+    expect(customModel("Washingtonia robusta", "umbrella")).toBe("palm");
+    expect(customModel("Vitis vinifera", "vine")).toBe("vine");
+    expect(customModel("Celtis australis", "round")).toBe("celtis");
+    expect(customModel("Magnolia grandiflora", "conical")).toBe("magnolia");
+    expect(customModel("Aesculus hippocastanum", "round")).toBe("horseChestnut");
+    expect(customModel("Acer platanoides", "round")).toBe("maple");
+    expect(customModel("Acer negundo", "round")).toBeNull();
+    expect(customModel("Betula pendula", "round")).toBe("birch");
+    expect(customModel("Salix babylonica", "round")).toBe("weepingWillow");
+    expect(customModel("Salix alba", "round")).toBeNull();
+    expect(customModel("Populus nigra", "columnar")).toBe("lombardyPoplar");
+    expect(customModel("Populus alba", "round")).toBeNull();
+    expect(customModel("Nerium oleander", "shrub")).toBe("oleander");
+    expect(customModel("Acer campestre", "round")).toBe("maple");
+    expect(customModel("Robinia pseudoacacia", "round")).toBeNull();
   });
 });
 
@@ -101,6 +120,18 @@ describe("crown outlines", () => {
     expect(holmRadius(0.4)).toBeCloseTo(1);
     expect(holmRadius(0.05)).toBeGreaterThan(0.5);
     expect(holmRadius(1)).toBe(0);
+  });
+  it("closes every own broadleaf crown at the top and keeps it within 0…1", () => {
+    for (const [name, fn] of Object.entries(OUTLINES)) {
+      for (let f = 0; f <= 1.0001; f += 0.05) { const v = fn(f); expect(v, name).toBeGreaterThanOrEqual(0); expect(v, name).toBeLessThanOrEqual(1.05); }
+      expect(fn(1), name).toBe(0);
+    }
+    for (const spec of Object.values(SPECIES)) { expect(spec.width[0]).toBeLessThanOrEqual(spec.width[2]); expect(spec.width[2]).toBeLessThanOrEqual(spec.width[1]); }
+  });
+  it("makes the cedar a broad pyramid", () => {
+    expect(cedarRadius(0)).toBe(1);
+    expect(cedarRadius(0.5)).toBeLessThan(cedarRadius(0.2));
+    expect(cedarRadius(1)).toBe(0);
   });
   it("makes the cypress a flame", () => {
     expect(cypressRadius(0)).toBeLessThan(cypressRadius(0.28));
