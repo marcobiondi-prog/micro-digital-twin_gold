@@ -749,11 +749,11 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const objectItems: FanItem[] = objectChoices.map(({ key, def: o }) => ({ key, label: o.label, Icon: OBJECT_ICONS[o.id] ?? Sparkles, on: tool === "place" && selected === key, onPick: () => pick(key) }));
   const toolItems: FanItem[] = [
     { key: "t:misura", label: "Misura", Icon: Ruler, tool: true, on: tool === "measure", onPick: () => { setTool("measure"); setMeasure([]); setTrayOpen(false); } },
-    ...(area ? [{ key: "t:progetto", label: showPlan ? "Nascondi progetto" : "Mostra progetto", Icon: MapPinned, tool: true, on: showPlan,
+    ...(area ? [{ key: "t:progetto", label: "Progetto", Icon: MapPinned, tool: true, on: showPlan,
       aria: showPlan ? "Nascondi gli interventi della mappa" : "Mostra gli interventi della mappa nel loro punto",
       onPick: () => { setShowPlan((v) => !v); setTrayOpen(false); setNotice({ text: showPlan ? "Interventi della mappa nascosti" : "Interventi della mappa nel loro punto", tone: "ok" }); } }] : []),
     // The person decides whether the map's nearby pergolas stand as one structure or each on its own.
-    ...(area && kind === "urban" && showPlan ? [{ key: "t:unisci", label: merge ? "Pergolati separati" : "Unisci pergolati", Icon: Fence, tool: true, on: merge,
+    ...(area && kind === "urban" && showPlan ? [{ key: "t:unisci", label: merge ? "Separa" : "Unisci", Icon: Fence, tool: true, on: merge,
       aria: merge ? "Mostra i pergolati della mappa uno per uno" : "Unisci in uno solo i pergolati vicini della mappa",
       onPick: () => { const on = !merge; setMerge(on); setMergePergolas(on); setTrayOpen(false); setNotice({ text: on ? "Pergolati vicini uniti in uno solo" : "Pergolati separati, come sulla mappa", tone: "ok" }); } }] : []),
     { key: "t:modellino", label: model ? "Grandezza vera" : "Modellino", Icon: Box, tool: true, on: model, aria: model ? "Torna alla grandezza vera" : "Modellino in scala 1:10",

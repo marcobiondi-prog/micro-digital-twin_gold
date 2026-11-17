@@ -81,9 +81,9 @@ const FOCUS_LABELS = { auto: "Piante e suolo", tree: "Vegetazione", ground: "Suo
 const FOCUS_ICONS = { auto: ScanSearch, tree: TreeDeciduous, ground: Shovel, leaf: Leaf, canopy: Grape, interrow: Rows3 };
 
 const URBAN_TUTORIAL = [
-  { title: "1 · Scegli l’obiettivo", text: "In alto scegli «Alberi e ombra» per un albero della piazza o «Suolo e depavimentazione» per la pavimentazione." },
-  { title: "2 · Scansiona", text: "Inquadra chioma e tronco, oppure il suolo davanti a te, e avvia la scansione: specie, ombra e permeabilità." },
-  { title: "3 · AR", text: "In alto passa da «Rileva» ad «AR»: tocca il terreno per posare la pianta rilevata e vedere come sta nella piazza." },
+  { title: "1 · Inquadra", text: "Inquadra un albero della piazza, oppure il suolo davanti a te: la fotocamera capisce da sola cosa c’è." },
+  { title: "2 · Scansiona", text: "Avvia la scansione: della pianta trovi specie e ombra, del suolo permeabilità e depavimentazione." },
+  { title: "3 · AR", text: "In alto passa da «Rileva» ad «AR»: tocca il terreno per posare la pianta o un intervento; con l’area allineata vedi anche quelli della mappa al loro posto." },
   { title: "4 · Scatta", text: "Scatta foto o video: la griglia non compare e la stima va nel Lab e nei report della piazza." },
 ] as const;
 
