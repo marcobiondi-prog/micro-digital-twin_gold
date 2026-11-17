@@ -12,7 +12,7 @@ describe("plantProfile", () => {
   it("gives known genera their own bark and leaves", () => {
     expect(plantProfile("Betula pendula", "round", false)).toMatchObject({ base: "Aspen", bark: "birch" });
     expect(plantProfile("Cupressus sempervirens", "columnar", true)).toMatchObject({ base: "Pine", squeeze: 0.35 });
-    expect(plantProfile("Olea europaea", "round", true)).toMatchObject({ leaves: "ash", leafShare: 2.4 });
+    expect(plantProfile("Olea europaea", "round", true)).toMatchObject({ custom: "olive" });
     expect(plantProfile("Platanus × hispanica", "round", false).bark).toBe("birch");
   });
 

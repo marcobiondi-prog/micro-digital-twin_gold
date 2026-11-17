@@ -13,7 +13,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 let barkTex: THREE.Texture | null = null;
 let tuftTex: THREE.Texture | null = null;
 
-function rng(seed: number) {
+export function rng(seed: number) {
   let s = (Math.abs(Math.round(seed)) % 2147483646) + 1;
   return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
 }
@@ -84,9 +84,9 @@ function tuftTexture() {
 }
 
 /** A tube along points, radius tapering from r0 to r1. */
-function limb(points: THREE.Vector3[], r0: number, r1: number, segs = 10): THREE.BufferGeometry {
+export function limb(points: THREE.Vector3[], r0: number, r1: number, segs = 10, radial = 9): THREE.BufferGeometry {
   const curve = new THREE.CatmullRomCurve3(points);
-  const geo = new THREE.TubeGeometry(curve, segs, 1, 9, false);
+  const geo = new THREE.TubeGeometry(curve, segs, 1, radial, false);
   // Taper: scale each ring around its centre by the radius at its place along the tube.
   const pos = geo.attributes["position"]!;
   const rings = segs + 1, perRing = pos.count / rings;

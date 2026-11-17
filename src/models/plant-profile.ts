@@ -22,8 +22,8 @@ export type PlantProfile = {
   /** Leaves drawn bigger (above 1) or smaller than the preset's. */
   leafSize?: number;
   /** A model built on purpose instead of the procedural tree (views/ar-pine for the stone pine, views/ar-cypress
-   * for the Italian cypress). */
-  custom?: "stonePine" | "cypress";
+   * for the Italian cypress, views/ar-olive for the olive). */
+  custom?: "stonePine" | "cypress" | "olive";
 };
 
 type Form = "columnar" | "conical" | "round" | "umbrella" | "vine" | "shrub";
@@ -77,7 +77,7 @@ const GENERA: Record<string, PlantProfile> = {
   Pyrus: { base: "Oak", bark: "oak", leaves: "aspen", squeeze: 0.75 },
   Lagerstroemia: { base: "Aspen", bark: "birch", leaves: "aspen", barkTint: 0xc8b8a0 },
   // Mediterranean evergreens
-  Olea: { base: "Oak", bark: "oak", leaves: "ash", leafTint: SILVER, barkTint: 0x9a9488, leafShare: 2.4, leafSize: 1.3 },
+  Olea: { base: "Oak", bark: "oak", leaves: "ash", leafTint: SILVER, barkTint: 0x9a9488, leafShare: 2.4, leafSize: 1.3, custom: "olive" },
   Laurus: { base: "Oak", bark: "willow", leaves: "aspen", leafTint: DARK_EVERGREEN, squeeze: 0.75 },
   Ilex: { base: "Oak", bark: "willow", leaves: "aspen", leafTint: DARK_EVERGREEN },
   Magnolia: { base: "Oak", bark: "willow", leaves: "aspen", leafTint: DARK_EVERGREEN },
