@@ -63,6 +63,8 @@ function load() {
 // Changing place keeps what the place left had and brings back what the place reached had (models/place-memory); a
 // place never seen keeps the current interventions, without the area drawn elsewhere.
 export function setUrban(patch: Partial<LabState["urban"]>) {
+  if (unchanged(state.urban, patch)) return;
+  const quiet = onlyNearMove(state.urban.location, patch);
   let base = state.urban;
   const to = patch.location;
   if (to && !samePlace(base.location, to)) {
@@ -70,10 +72,13 @@ export function setUrban(patch: Partial<LabState["urban"]>) {
     const { places, back } = movePlace(base.places, base.location, { trees, permeable, shade, misters: misters ?? 0, sprinklers: sprinklers ?? 0, area: base.area ?? null }, to);
     base = { ...base, places, ...(back ? { trees: back.trees, permeable: back.permeable, shade: back.shade, misters: back.misters ?? 0, sprinklers: back.sprinklers ?? 0, area: reanchor(back.area, to), treeCells: null, permeableCells: null, shadeCells: null } : { area: null }) };
   }
-  state = { ...state, urban: { ...base, ...patch } }; emit("urban");
+  state = { ...state, urban: { ...base, ...patch } }; emit("urban", quiet);
 }
 export function setVineyard(patch: Partial<LabState["vineyard"]> | ((v: LabState["vineyard"]) => Partial<LabState["vineyard"]>)) {
   const p = typeof patch === "function" ? patch(state.vineyard) : patch;
+  if (unchanged(state.vineyard, p)) return;
+  // The season's air laid on the zones by the clock (climateKey) is not the person's work, nor a GPS step within the place.
+  const quiet = "climateKey" in p || onlyNearMove(state.vineyard.location, p);
   let base = state.vineyard;
   const to = p.location;
   if (to && !samePlace(base.location, to)) {
@@ -82,16 +87,29 @@ export function setVineyard(patch: Partial<LabState["vineyard"]> | ((v: LabState
     const { places, back } = movePlace(base.places, base.location, snap, to);
     base = { ...base, places, ...(back ? { ...back, area: reanchor(back.area, to) } : { area: null }) };
   }
-  state = { ...state, vineyard: { ...base, ...p } }; emit("vineyard");
+  state = { ...state, vineyard: { ...base, ...p } }; emit("vineyard", quiet);
 }
 /** Restore the default scenario (keeps the chosen location). */
 export function resetUrban() { const d = defaults().urban; state = { ...state, urban: { ...d, location: state.urban.location, realTemp: state.urban.realTemp ?? null, area: state.urban.area ?? null, places: state.urban.places ?? [] } }; emit("urban"); }
 export function resetVineyard() { const d = defaults().vineyard; state = { ...state, vineyard: { ...d, location: state.vineyard.location, area: state.vineyard.area ?? null, places: state.vineyard.places ?? [] } }; emit("vineyard"); }
 /** Urban edits refresh Urbana + Esecutivo; vineyard edits refresh Vitivinicola + Esecutivo. */
 const SYNC_TARGETS = { urban: ["Urbana", "Esecutivo"], vineyard: ["Vitivinicola", "Esecutivo"] } as const;
-function emit(target: keyof typeof SYNC_TARGETS) {
+/**
+ * Whether a patch changes nothing: the map turned, the phone rotated or a view mounted again write the very values
+ * already there, and each of those used to show "Salvataggio… Salvato".
+ */
+function unchanged<T extends object>(cur: T, patch: Partial<T>): boolean {
+  return (Object.keys(patch) as (keyof T)[]).every((k) => JSON.stringify(cur[k]) === JSON.stringify(patch[k]));
+}
+/** A patch that only moves the place within itself (the GPS settling a few metres): kept, but not said as a save. */
+function onlyNearMove(cur: Loc, patch: { location?: Loc }): boolean {
+  const keys = Object.keys(patch);
+  return keys.length === 1 && keys[0] === "location" && !!patch.location && samePlace(cur, patch.location);
+}
+/** quiet: kept on the device without the "Salvataggio… Salvato" notice (savedAt untouched). */
+function emit(target: keyof typeof SYNC_TARGETS, quiet = false) {
   const now = Date.now();
-  state = { ...state, savedAt: now, syncedAt: now, syncedTargets: [...SYNC_TARGETS[target]] };
+  state = quiet ? state : { ...state, savedAt: now, syncedAt: now, syncedTargets: [...SYNC_TARGETS[target]] };
   try { window.localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* ignore */ }
   listeners.forEach((l) => l());
 }
