@@ -52,8 +52,8 @@ export function Welcome() {
       <p className="text-[15px] leading-relaxed text-muted-foreground">Scegli da dove partire. Qui sotto trovi gli ultimi interventi che hai registrato.</p>
       <div className="flex gap-3">
         {/* Identified, the section the profile locks gives its place to the round profile button (the agronomist's where Piazza was, the officer's where Vigneto was). */}
-        {proId?.kind === "agronomo" ? <ProfileButton id={proId} /> : <Start to="/urbano" icon={Building2} title="Piazza" text="Prova gli interventi in città" who="Per i funzionari del Comune" />}
-        {proId?.kind === "funzionario" ? <ProfileButton id={proId} /> : <Start to="/vigneto" icon={Grape} title="Vigneto" text="Prova gli interventi in vigna" who="Per chi lavora nel settore agricolo" />}
+        {proId?.kind === "agronomo" ? <ProfileButton id={proId} /> : <Start to="/urbano" icon={Building2} title="Piazza" text="Simula gli interventi in città" who="Per i funzionari del Comune" />}
+        {proId?.kind === "funzionario" ? <ProfileButton id={proId} /> : <Start to="/vigneto" icon={Grape} title="Vigneto" text="Simula gli interventi in vigna" who="Per chi lavora nel settore agricolo" />}
       </div>
       <HistoryBlock compact />
     </div>
