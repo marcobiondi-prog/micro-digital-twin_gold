@@ -16,10 +16,9 @@ import { realTree } from "@/views/ar-tree";
  * is aligned with the map (the two corners of the drawn area touched, else the phone's GPS and compass), every tree,
  * aiuola, pergola, misting pole and sprinkler of the piazza — or the vineyard's shade cloth, drip lines and windbreak —
  * stands on the very spot where the simulation laid it (the same layout as the 2D and 3D maps, models/area-layout).
- * Light shapes, a few pergolas at most, so the phone keeps up.
+ * Every element of the project, with no cap: trees are a few grown trees cloned, so many stay light enough.
  */
 type XZ = { x: number; z: number };
-const MAX_PERGOLAS = 6, MAX_TREES = 30, MAX_BEDS = 8, MAX_NETS = 6;
 
 /** An oriented box of a patch in AR metres: its longest edge sets the direction. */
 function rectOf(pts: XZ[]): { cx: number; cz: number; w: number; d: number; yaw: number } {
@@ -63,19 +62,19 @@ export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: Drawn
     const u = lab.urban;
     const L = piazzaLayout(area.ring, u.trees, u.permeable, u.shade, edits, inner, u.misters ?? 0, [], u.sprinklers ?? 0);
     if (!L) return { group: g, count };
-    // Aiuole: the realistic bed (stones, pebbles, soil, grass, flowers) sized and turned to each patch; past a few,
-    // or a patch too thin for one, the plain green ground.
+    // Aiuole: the realistic bed (stones, pebbles, soil, grass, flowers) sized and turned to each patch; a patch too thin
+    // for one, the plain green ground.
     for (const p of L.patches) {
       if (p.kind !== "lawn") continue;
       const pts = p.ring.map(ar), r = rectOf(pts);
-      if (count.beds < MAX_BEDS && r.w >= 0.8 && r.d >= 0.8) {
+      if (r.w >= 0.8 && r.d >= 0.8) {
         const bed = realBed({ w: r.w, d: r.d });
         bed.rotation.y = r.yaw;
         put(bed, { x: r.cx, z: r.cz });
       } else g.add(flat(pts, "#4f8f3a", 0.72, 0.015));
       count.beds++;
     }
-    for (const p of L.patches.filter((q) => q.kind === "shade").slice(0, MAX_PERGOLAS)) {
+    for (const p of L.patches.filter((q) => q.kind === "shade")) {
       const r = rectOf(p.ring.map(ar));
       if (r.w < 1 || r.d < 1) continue;
       const pg = realPergola({ w: r.w, d: r.d, h: 3.2 });
@@ -85,7 +84,7 @@ export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: Drawn
     }
     const tree = arObject("urban", "albero");
     // Trees: the simple shape at once, the realistic tree in its place once grown (growPlan).
-    for (const t of L.trees.slice(0, MAX_TREES)) { const o = objectMesh(tree); o.userData["planTree"] = true; put(o, ar(t)); count.trees++; }
+    for (const t of L.trees) { const o = objectMesh(tree); o.userData["planTree"] = true; put(o, ar(t)); count.trees++; }
     const mister = arObject("urban", "nebulizzatore");
     for (const m of L.misters) { put(objectMesh(mister), ar(m)); count.misters++; }
     const spr = arObject("urban", "innaffiatoio");
@@ -94,11 +93,11 @@ export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: Drawn
     const v = lab.vineyard, fallback = vineMixOf(v);
     const L = vineLayout(area.ring, v.zones.map((z) => zoneMixOf(z, fallback)), edits, inner);
     if (!L) return { group: g, count };
-    // Shade cloth: the realistic net on posts, sized and turned to each patch (a few at most), else a plain dark sheet.
+    // Shade cloth: the realistic net on posts, sized and turned to each patch, else (too thin) a plain dark sheet.
     for (const p of L.patches) {
       if (p.kind !== "cloth") continue;
       const pts = p.ring.map(ar), r = rectOf(pts);
-      if (count.cloths < MAX_NETS && r.w >= 1 && r.d >= 1) {
+      if (r.w >= 1 && r.d >= 1) {
         const net = realShadeNet({ w: r.w, d: r.d, h: 2.2 });
         net.rotation.y = r.yaw;
         put(net, { x: r.cx, z: r.cz });
