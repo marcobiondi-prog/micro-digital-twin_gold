@@ -18,8 +18,11 @@ describe("plantProfile", () => {
   it("tells evergreen oaks and the umbrella pine apart", () => {
     expect(plantProfile("Quercus ilex", "round", true).leafTint).toBeDefined();
     expect(plantProfile("Quercus robur", "round", false).leafTint).toBeUndefined();
-    expect(plantProfile("Pinus pinea", "umbrella", true)).toMatchObject({ base: "Ash", bark: "pine" });
-    expect(plantProfile("Pinus nigra", "conical", true).base).toBe("Pine");
+    expect(plantProfile("Pinus pinea", "umbrella", true)).toMatchObject({ custom: "stonePine" });
+    expect(plantProfile("Pinus pinea", "round", true).custom).toBe("stonePine");
+    expect(plantProfile("Pinus halepensis", "umbrella", true).custom).toBe("stonePine");
+    expect(plantProfile("Pinus nigra", "conical", true)).toMatchObject({ base: "Pine" });
+    expect(plantProfile("Pinus nigra", "conical", true).custom).toBeUndefined();
   });
 
   it("falls back on the form for an unknown genus", () => {

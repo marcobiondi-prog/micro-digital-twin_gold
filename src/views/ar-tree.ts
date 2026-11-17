@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { ArObjectDef } from "@/models/ar-objects";
 import { plantProfile, presetName } from "@/models/plant-profile";
+import { realStonePine } from "@/views/ar-pine";
 
 /**
  * Realistic trees for the AR view (EZ-Tree, MIT, Daniel Greenheck): a procedural tree with branches, bark and leaf
@@ -55,12 +56,14 @@ function greenLeaves(root: THREE.Object3D) {
 
 let seedN = 1;
 export async function realTree(def: ArObjectDef): Promise<THREE.Object3D | null> {
-  const ez = await loadLib();
-  if (!ez) return null;
   try {
-    const tree = new ez.Tree();
     const profile = def.id === "albero" && !def.plant ? { base: "Oak" as const } : plantProfile(def.plant?.scientificName, def.plant?.form, def.plant?.evergreen);
     const seed = 1000 + ((seedN++ * 7919) % 90000);
+    // The stone pine has a model of its own (the procedural presets cannot make its flat umbrella).
+    if ("custom" in profile && profile.custom === "stonePine") return realStonePine({ h: def.h, w: def.w }, seed);
+    const ez = await loadLib();
+    if (!ez) return null;
+    const tree = new ez.Tree();
     tree.loadPreset(presetName(profile.base, def.h, seed));
     tree.options.seed = seed;
     if (profile.bark) tree.options.bark.type = profile.bark;
