@@ -12,7 +12,7 @@ import { drawnAreaFor, type DrawnArea } from "@/models/drawn-area";
 import { readFix } from "@/lib/find-position";
 import { hapticTick } from "@/lib/haptics";
 import { contactShadow, floorLoop, objectMesh } from "@/views/ar-object-meshes";
-import { buildPlan, growPlan, mergePergolas, planText, planTreeDefs, setMergePergolas } from "@/views/ar-plan";
+import { buildPlan, growPlan, mergeBeds, mergePergolas, planText, planTreeDefs, setMergeBeds, setMergePergolas } from "@/views/ar-plan";
 import { realTree, wantsRealTree } from "@/views/ar-tree";
 import { ArShadows, castShadows } from "@/views/ar-shadow";
 import { XREstimatedLight } from "three/examples/jsm/webxr/XREstimatedLight.js";
@@ -223,6 +223,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   // The project's interventions shown on their spots once aligned; a key so they follow the levers.
   const [showPlan, setShowPlan] = useState(true);
   const [merge, setMerge] = useState(mergePergolas);
+  const [joinBeds, setJoinBeds] = useState(mergeBeds);
   const planSaid = useRef("");
   const three = useRef<{ scene: THREE.Scene; reticle: THREE.Object3D; hit: V | null; objects: Map<string, THREE.Object3D>; overlay: THREE.Group; measure: THREE.Group; floorY: number | null; renderer: THREE.WebGLRenderer; camera: THREE.Camera } | null>(null);
 
@@ -668,7 +669,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     for (const z of area.zones ?? []) if (z.ring.length >= 3) loop(z.ring, "#4ade80");
     // The project's interventions from the map, each on its own spot (views/ar-plan).
     if (!showPlan) return;
-    const { group, count } = buildPlan(kind, getLab(), area, origin, alignment.a, merge);
+    const { group, count } = buildPlan(kind, getLab(), area, origin, alignment.a, merge, joinBeds);
     group.position.y = y;
     castShadows(group);
     t.overlay.add(group);
@@ -680,7 +681,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       planSaid.current = `${alignment.how}:${said}`;
       setNotice({ text: `Dal progetto: ${said}${alignment.how === "gps" ? " · posizione dal GPS, tocca i 2 angoli per allinearli bene" : ""}`, tone: "ok" });
     }
-  }, [alignment, area, origin, showPlan, kind, planKey, merge, plantKey]);
+  }, [alignment, area, origin, showPlan, kind, planKey, merge, joinBeds, plantKey]);
 
   // The measuring tape between the two points.
   useEffect(() => {
@@ -931,9 +932,12 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       aria: showPlan ? "Nascondi gli interventi della mappa" : "Mostra gli interventi della mappa nel loro punto",
       onPick: () => { setShowPlan((v) => !v); setTrayOpen(false); setNotice({ text: showPlan ? "Interventi della mappa nascosti" : "Interventi della mappa nel loro punto", tone: "ok" }); } }] : []),
     // The person decides whether the map's nearby pergolas stand as one structure or each on its own.
-    ...(area && kind === "urban" && showPlan ? [{ key: "t:unisci", label: merge ? "Separa" : "Unisci", Icon: Fence, tool: true, on: merge,
+    ...(area && kind === "urban" && showPlan ? [{ key: "t:unisci", label: merge ? "Pergolati uniti" : "Unisci pergolati", Icon: Fence, tool: true, on: merge,
       aria: merge ? "Mostra i pergolati della mappa uno per uno" : "Unisci in uno solo i pergolati vicini della mappa",
-      onPick: () => { const on = !merge; setMerge(on); setMergePergolas(on); setTrayOpen(false); setNotice({ text: on ? "Pergolati vicini uniti in uno solo" : "Pergolati separati, come sulla mappa", tone: "ok" }); } }] : []),
+      onPick: () => { const on = !merge; setMerge(on); setMergePergolas(on); setTrayOpen(false); setNotice({ text: on ? "Pergolati vicini uniti in uno solo" : "Pergolati separati, come sulla mappa", tone: "ok" }); } },
+      { key: "t:unisci-aiuole", label: joinBeds ? "Aiuole unite" : "Unisci aiuole", Icon: Flower2, tool: true, on: joinBeds,
+      aria: joinBeds ? "Mostra le aiuole della mappa una per una" : "Unisci in una sola le aiuole vicine della mappa",
+      onPick: () => { const on = !joinBeds; setJoinBeds(on); setMergeBeds(on); setTrayOpen(false); setNotice({ text: on ? "Aiuole vicine unite in una sola" : "Aiuole separate, come sulla mappa", tone: "ok" }); } }] : []),
     ...(placed.length ? [{ key: "t:sposta", label: "Sposta", Icon: Move, tool: true, on: tool === "move", aria: "Sposta un oggetto già posato",
       onPick: () => { setTool("move"); setGrabbed(null); setTrayOpen(false); } }] : []),
     { key: "t:modellino", label: model ? "Grandezza vera" : "Modellino", Icon: Box, tool: true, on: model, aria: model ? "Torna alla grandezza vera" : "Modellino in scala adatta allo spazio intorno",
@@ -1262,7 +1266,7 @@ function AiFan({ groups, start }: { groups: FanGroup[]; start: string }) {
               it.on ? "bg-[#00e5ff] text-black" : it.plant ? "bg-black/60 text-[#4ade80] ring-2 ring-[#4ade80]/80" : "bg-black/60 text-white ring-1 ring-white/25"}`}>
               <it.Icon className="size-[22px]" aria-hidden="true" />
             </span>
-            <span className="max-w-full truncate text-[10px] font-semibold leading-tight text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">{it.label}</span>
+            <span className="line-clamp-2 max-w-full text-center text-[10px] font-semibold leading-tight text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">{it.label}</span>
           </button>
         );
       })}

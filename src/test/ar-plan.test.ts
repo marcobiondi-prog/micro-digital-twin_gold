@@ -44,3 +44,13 @@ describe("pergola blocks", () => {
     expect(pergolaBlocks([box(0, 0, 4, 4), box(10, 0, 4, 4)])).toHaveLength(2);
   });
 });
+
+describe("aiuole joined in AR", () => {
+  it("makes the lawn strips of one block a single bed when asked", () => {
+    const urban = { trees: 0, permeable: 40, shade: 0, misters: 0, sprinklers: 0 } as LabState["urban"];
+    const apart = buildPlan("urban", { urban } as LabState, area, origin, a, false, false).count.beds;
+    const joined = buildPlan("urban", { urban } as LabState, area, origin, a, false, true).count.beds;
+    expect(apart).toBeGreaterThan(1);
+    expect(joined).toBeLessThan(apart);
+  });
+});

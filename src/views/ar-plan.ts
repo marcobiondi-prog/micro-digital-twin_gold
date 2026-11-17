@@ -85,13 +85,21 @@ export function mergePergolas(): boolean {
 export function setMergePergolas(on: boolean) {
   try { localStorage.setItem(MERGE_KEY, on ? "on" : "off"); } catch { /* private mode */ }
 }
+/** Whether nearby aiuole are joined into one bed, kept on this phone like the pergolas' choice (separate by default). */
+const MERGE_BEDS_KEY = "mdt-ar-merge-beds-v1";
+export function mergeBeds(): boolean {
+  try { return localStorage.getItem(MERGE_BEDS_KEY) === "on"; } catch { return false; }
+}
+export function setMergeBeds(on: boolean) {
+  try { localStorage.setItem(MERGE_BEDS_KEY, on ? "on" : "off"); } catch { /* private mode */ }
+}
 
-export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: DrawnArea, origin: { lat: number; lng: number }, a: Alignment, merge = false): { group: THREE.Group; count: PlanCount } {
+export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: DrawnArea, origin: { lat: number; lng: number }, a: Alignment, merge = false, joinBeds = false): { group: THREE.Group; count: PlanCount } {
   const ar = (p: LatLng): XZ => enToAr(toEN(p[0], p[1], origin), a);
   const edits = area.edits ?? {}, inner = zonesOfArea(area);
   if (kind === "urban") {
     const u = lab.urban;
-    return layoutPlan({ kind: "urban", L: piazzaLayout(area.ring, u.trees, u.permeable, u.shade, edits, inner, u.misters ?? 0, [], u.sprinklers ?? 0) }, ar, merge);
+    return layoutPlan({ kind: "urban", L: piazzaLayout(area.ring, u.trees, u.permeable, u.shade, edits, inner, u.misters ?? 0, [], u.sprinklers ?? 0) }, ar, merge, false, joinBeds);
   }
   const v = lab.vineyard, fallback = vineMixOf(v);
   return layoutPlan({ kind: "vineyard", L: vineLayout(area.ring, v.zones.map((z) => zoneMixOf(z, fallback)), edits, inner) }, ar, merge);
@@ -104,7 +112,7 @@ export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: Drawn
  */
 export function layoutPlan(
   plan: { kind: "urban"; L: PiazzaLayout | null } | { kind: "vineyard"; L: VineLayout | null },
-  ar: (p: LatLng) => XZ, merge = false, far = false,
+  ar: (p: LatLng) => XZ, merge = false, far = false, joinBeds = false,
 ): { group: THREE.Group; count: PlanCount } {
   const g = new THREE.Group();
   g.name = "plan";
@@ -115,14 +123,16 @@ export function layoutPlan(
     if (!L) return { group: g, count };
     // Aiuole: the realistic bed (stones, pebbles, soil, grass, flowers) sized and turned to each patch; a patch too thin
     // for one, the plain green ground.
-    for (const p of L.patches) {
-      if (p.kind !== "lawn") continue;
-      const pts = p.ring.map(ar), r = rectOf(pts);
+    // With «Unisci» for the aiuole, the beds that touch or nearly touch (the grid's row strips of one block, a zone and
+    // the strips round it) become one bed covering them all, like the pergolas.
+    const lawn = L.patches.filter((q) => q.kind === "lawn").map((q) => q.ring.map(ar));
+    const lawnPieces = joinBeds ? pergolaBlocks(lawn).map((r) => ({ r, pts: null as XZ[] | null })) : lawn.map((pts) => ({ r: rectOf(pts), pts }));
+    for (const { r, pts } of lawnPieces) {
       if (r.w >= 0.8 && r.d >= 0.8) {
         const bed = realBed({ w: r.w, d: r.d }, { far });
         bed.rotation.y = r.yaw;
         put(bed, { x: r.cx, z: r.cz });
-      } else g.add(flat(pts, "#4f8f3a", 0.72, 0.015));
+      } else if (pts) g.add(flat(pts, "#4f8f3a", 0.72, 0.015));
       count.beds++;
     }
     // Pergolas: the shade patches that touch or nearly touch (the grid's row strips of one block, a zone and the strips
