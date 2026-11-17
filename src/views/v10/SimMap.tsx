@@ -1,6 +1,7 @@
 import { VineZonePicker } from "@/views/v10/VineThirst";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { setPinFix, usePinFix } from "@/models/pin-fix";
+import { samePlace } from "@/models/place-memory";
 import { ringCentroid } from "@/models/place-area";
 import { loadPlaceArea } from "@/lib/place-area-client";
 import { useQuery } from "@tanstack/react-query";
@@ -53,7 +54,13 @@ function keepSeeded(seen: Set<string>) {
  */
 export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boolean }) {
   const lab = useLab();
-  const loc = kind === "urban" ? lab.urban.location : lab.vineyard.location;
+  const liveLoc = kind === "urban" ? lab.urban.location : lab.vineyard.location;
+  // The maps follow the place, not every metre of it: a GPS fix settling a few metres away, or the same place saved again
+  // under its street's name, rebuilt every map from scratch (each was keyed and built on the exact coordinates and
+  // label), so the map reloaded at each save. Kept until the place really changes (samePlace, about 30 m).
+  const anchor = useRef(liveLoc);
+  if (anchor.current !== liveLoc && (!samePlace(anchor.current, liveLoc) || !!anchor.current.pending !== !!liveLoc.pending)) anchor.current = liveLoc;
+  const loc = anchor.current;
   const [name, ...rest] = loc.label.split(" · ");
   const key = import.meta.env.VITE_GOOGLE_MAPS_BROWSER_KEY;
   const zoom = kind === "urban" ? 17 : 14;
