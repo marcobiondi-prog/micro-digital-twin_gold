@@ -7,6 +7,8 @@ import { vineMixOf, zoneMixOf } from "@/models/vine-interventions";
 import { objectMesh } from "@/views/ar-object-meshes";
 import { realPergola } from "@/views/ar-pergola";
 import { realBed } from "@/views/ar-bed";
+import { realShadeNet } from "@/views/ar-shadenet";
+import { realWindbreak } from "@/views/ar-windbreak";
 import { realTree } from "@/views/ar-tree";
 
 /**
@@ -17,7 +19,7 @@ import { realTree } from "@/views/ar-tree";
  * Light shapes, a few pergolas at most, so the phone keeps up.
  */
 type XZ = { x: number; z: number };
-const MAX_PERGOLAS = 6, MAX_TREES = 30, MAX_BEDS = 8;
+const MAX_PERGOLAS = 6, MAX_TREES = 30, MAX_BEDS = 8, MAX_NETS = 6;
 
 /** An oriented box of a patch in AR metres: its longest edge sets the direction. */
 function rectOf(pts: XZ[]): { cx: number; cz: number; w: number; d: number; yaw: number } {
@@ -92,13 +94,15 @@ export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: Drawn
     const v = lab.vineyard, fallback = vineMixOf(v);
     const L = vineLayout(area.ring, v.zones.map((z) => zoneMixOf(z, fallback)), edits, inner);
     if (!L) return { group: g, count };
+    // Shade cloth: the realistic net on posts, sized and turned to each patch (a few at most), else a plain dark sheet.
     for (const p of L.patches) {
       if (p.kind !== "cloth") continue;
-      const pts = p.ring.map(ar);
-      const sheet = flat(pts, "#1f2937", 0.55, 2.2);
-      g.add(sheet);
-      const post = new THREE.MeshStandardMaterial({ color: "#6b7280" });
-      for (const q of pts) { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.2, 6), post); m.position.set(q.x, 1.1, q.z); g.add(m); }
+      const pts = p.ring.map(ar), r = rectOf(pts);
+      if (count.cloths < MAX_NETS && r.w >= 1 && r.d >= 1) {
+        const net = realShadeNet({ w: r.w, d: r.d, h: 2.2 });
+        net.rotation.y = r.yaw;
+        put(net, { x: r.cx, z: r.cz });
+      } else g.add(flat(pts, "#1f2937", 0.55, 2.2));
       count.cloths++;
     }
     for (const l of L.lines) {
@@ -107,14 +111,14 @@ export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: Drawn
         const t = tube(pts, l.kind === "main" ? 0.035 : 0.012, l.kind === "main" ? "#1d4ed8" : "#2563eb", 0.04);
         if (t) { g.add(t); count.lines++; }
       } else if (l.kind === "wind") {
+        // The windbreak: the realistic hedge along each piece of its line.
+        const h = 1.8 + 2.2 * ((l.strength ?? 70) / 100);
         for (let i = 0; i + 1 < pts.length; i++) {
           const p0 = pts[i]!, p1 = pts[i + 1]!, len = Math.hypot(p1.x - p0.x, p1.z - p0.z);
-          if (len < 0.2) continue;
-          const h = 1.8 + 2.2 * ((l.strength ?? 70) / 100);
-          const hedge = new THREE.Mesh(new THREE.BoxGeometry(len, h, 1.6), new THREE.MeshStandardMaterial({ color: "#2f6b2a", roughness: 0.9 }));
-          hedge.position.set((p0.x + p1.x) / 2, h / 2, (p0.z + p1.z) / 2);
+          if (len < 0.5) continue;
+          const hedge = realWindbreak({ w: len, d: 1.6, h }, i + 1);
           hedge.rotation.y = -Math.atan2(p1.z - p0.z, p1.x - p0.x);
-          g.add(hedge);
+          put(hedge, { x: (p0.x + p1.x) / 2, z: (p0.z + p1.z) / 2 });
         }
         count.lines++;
       }

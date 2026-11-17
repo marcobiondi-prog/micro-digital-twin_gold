@@ -4,6 +4,8 @@ import { realPergola } from "@/views/ar-pergola";
 import { realBed } from "@/views/ar-bed";
 import { realMister } from "@/views/ar-mister";
 import { realSprinkler } from "@/views/ar-sprinkler";
+import { realShadeNet } from "@/views/ar-shadenet";
+import { realWindbreak } from "@/views/ar-windbreak";
 
 /**
  * The 3D shapes «Prova» puts in the real world, in metres, standing on y = 0 and centred on x = z = 0: the same simple
@@ -56,17 +58,13 @@ export function objectMesh(def: ArObjectDef): THREE.Group {
       break;
     }
     case "telo": {
-      const post = mat("#6b7280");
-      const hw = def.w / 2, hd = def.d / 2;
-      for (const [x, z] of [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]]) g.add(box(0.06, def.h, 0.06, post, x, 0, z));
-      const cloth = new THREE.Mesh(new THREE.PlaneGeometry(def.w, def.d), new THREE.MeshStandardMaterial({ color: "#1f2937", transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
-      cloth.rotation.x = -Math.PI / 2; cloth.position.y = def.h;
-      g.add(cloth);
+      // A realistic shade net on galvanised posts and cables (views/ar-shadenet).
+      g.add(realShadeNet(def));
       break;
     }
     case "frangivento": {
-      g.add(box(def.w, def.h * 0.85, def.d, mat("#2f6b2a")));
-      g.add(box(def.w, def.h * 0.15, def.d * 0.8, mat("#4b9140"), 0, def.h * 0.85, 0));
+      // A realistic living hedge of shrubs (views/ar-windbreak).
+      g.add(realWindbreak(def));
       break;
     }
     case "pianta": {
