@@ -262,7 +262,7 @@ export function Tutorial() {
               </span>
             </p>
             <h2 className="mt-[clamp(0.375rem,2dvh,1.5rem)] font-display text-[clamp(1.8rem,min(9vw,8dvh),3.75rem)] font-extralight leading-[1.02] tracking-tight text-foreground">Simula gli interventi di raffrescamento,<br />prima di implementarli.</h2>
-            <p className="mt-[clamp(0.25rem,1.2dvh,1rem)] text-[clamp(0.75rem,4.1dvh,0.9375rem)] text-foreground/60">Ecco come funziona, in quattro passi.</p>
+            <p data-intro-lead className="mt-[clamp(0.25rem,1.2dvh,1rem)] text-[clamp(0.75rem,4.1dvh,0.9375rem)] text-foreground/60">Ecco come funziona, in quattro passi.</p>
           </Reveal>
         </section>
         {STEPS.map((st, i) => (
