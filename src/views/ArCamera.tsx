@@ -346,6 +346,8 @@ export function ArCamera({
   const [liveAr, setLiveAr] = useState<{ session: XRSession | null; root: HTMLElement; n?: number; why?: string; torch?: boolean } | null>(null);
   const restartingRef = useRef(false);
   const [camEpoch, setCamEpoch] = useState(0);
+  // Restarts asked because the camera came back without frames (ARCore still releasing it): a few, then the error.
+  const stallRetriesRef = useRef(0);
   // Bumped when a camera stream arrives, so the AR view (which reads streamRef) gets the new stream and its torch.
   const [, setStreamN] = useState(0);
   const [onPhone, setOnPhone] = useState(false);
@@ -742,9 +744,9 @@ export function ArCamera({
       }).catch((e: unknown) => {
         const name = (e as { name?: string })?.name;
         if (left <= 0 || cancelled || name === "NotAllowedError" || name === "SecurityError") throw e;
-        return new Promise<MediaStream>((res, rej) => window.setTimeout(() => ask(left - 1).then(res, rej), 600));
+        return new Promise<MediaStream>((res, rej) => window.setTimeout(() => ask(left - 1).then(res, rej), 700));
       });
-      ask(camEpoch > 0 ? 4 : 0)
+      ask(camEpoch > 0 ? 8 : 0)
       .then((stream) => {
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
@@ -759,6 +761,17 @@ export function ArCamera({
         digitalZoomRef.current = 1; zoomRef.current = 1; setZoomState(1);
         v.srcObject = stream;
         void v.play().catch(() => {});
+        // After AR the phone can hand back a camera that gives no frames yet (ARCore still letting it go): the preview
+        // then stood still. If no frame has come after a moment, the camera is asked again, a few times.
+        if (camEpoch > 0) {
+          window.setTimeout(() => {
+            if (cancelled) return;
+            const live = v.readyState >= 2 && v.currentTime > 0 && stream.getVideoTracks().every((t) => t.readyState === "live");
+            if (live) { stallRetriesRef.current = 0; return; }
+            if (stallRetriesRef.current < 4) { stallRetriesRef.current += 1; setCamEpoch((n) => n + 1); }
+            else { stallRetriesRef.current = 0; setError("La fotocamera non è ripartita dopo l’AR. Tocca Riprova."); }
+          }, 2500);
+        }
         const paint = (showGrid: boolean, showObjects = true) => {
           const c = canvasRef.current;
           if (!c) return false;
@@ -1726,7 +1739,13 @@ export function ArCamera({
     const had = liveAr;
     setLiveAr(null);
     had?.root.remove();
-    if (had?.session) setCamEpoch((n) => n + 1);
+    // The camera is asked again only once ARCore has ended its session and let the phone's camera go: asked before,
+    // the phone answered with a camera that gave no frames and the picture stood still.
+    if (had?.session) {
+      void had.session.end().catch(() => undefined)
+        .then(() => new Promise((r) => window.setTimeout(r, 400)))
+        .then(() => setCamEpoch((n) => n + 1));
+    }
     setTorchOn(false); // the AR view switches the flash off as it closes
     // Back to the camera's fullscreen (and so to its landscape) if the AR session left it; the exit tap counts.
     arTransitionRef.current = true;
@@ -2307,7 +2326,10 @@ export function ArCamera({
             <p className="mb-1 font-semibold text-foreground">Realtà aumentata non disponibile</p>
             <p>{error}</p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button size="sm" onClick={() => mode && onFallback(mode)}>
+              <Button size="sm" onClick={() => { setError(null); stallRetriesRef.current = 0; setCamEpoch((n) => n + 1); }}>
+                Riprova
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => mode && onFallback(mode)}>
                 Usa la fotocamera di sistema
               </Button>
               <Button size="sm" variant="ghost" onClick={onClose}>
