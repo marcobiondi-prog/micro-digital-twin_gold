@@ -4,6 +4,7 @@ import { arRecognitionSchema, placePrompt, withPlantAlternatives } from "@/model
 import { cypressRadius } from "@/views/ar-cypress";
 import { lindenRadius } from "@/views/ar-linden";
 import { planeRadius } from "@/views/ar-plane";
+import { holmRadius } from "@/views/ar-holm";
 
 describe("plant cards", () => {
   it("reads genus and species, hybrid signs and authors aside", () => {
@@ -15,7 +16,7 @@ describe("plant cards", () => {
     expect(cardOf("Xyzzia nova")).toBeNull();
   });
 
-  it("gives the stone pine, the Italian cypress, the olive, the lime and the plane tree their own models", () => {
+  it("gives the stone pine, the Italian cypress, the olive, the lime, the plane tree and the holm oak their own models", () => {
     expect(customModel("Pinus pinea", "round")).toBe("stonePine");
     expect(customModel("Pinus halepensis", "umbrella")).toBe("stonePine");
     expect(customModel("Pinus nigra", "conical")).toBeNull();
@@ -26,6 +27,8 @@ describe("plant cards", () => {
     expect(customModel("Tilia platyphyllos", "ovoid")).toBe("linden");
     expect(customModel("Platanus × hispanica", "round")).toBe("plane");
     expect(customModel("Platanus orientalis", "spreading")).toBe("plane");
+    expect(customModel("Quercus ilex", "round")).toBe("holmOak");
+    expect(customModel("Quercus robur", "spreading")).toBeNull();
     expect(customModel("Acer campestre", "round")).toBeNull();
   });
 });
@@ -93,6 +96,11 @@ describe("crown outlines", () => {
     expect(planeRadius(0.34)).toBeCloseTo(1);
     expect(planeRadius(0.7)).toBeLessThan(planeRadius(0.34));
     expect(planeRadius(1)).toBe(0);
+  });
+  it("makes the holm oak's crown a round dome reaching low", () => {
+    expect(holmRadius(0.4)).toBeCloseTo(1);
+    expect(holmRadius(0.05)).toBeGreaterThan(0.5);
+    expect(holmRadius(1)).toBe(0);
   });
   it("makes the cypress a flame", () => {
     expect(cypressRadius(0)).toBeLessThan(cypressRadius(0.28));

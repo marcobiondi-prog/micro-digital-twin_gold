@@ -7,8 +7,8 @@
  * 2. the species' or genus' card below (about forty plants common in Italian squares and vineyards), for what a photo
  *    tells poorly (leaf kind, true colours),
  * 3. the plant's form, for any other species.
- * Five plants have a model of their own (customModel): the stone pine, the Italian cypress, the olive, the lime tree
- * and the plane tree.
+ * Six plants have a model of their own (customModel): the stone pine, the Italian cypress, the olive, the lime tree,
+ * the plane tree and the holm oak.
  */
 
 export type CrownKind = "columnar" | "conical" | "ovoid" | "round" | "spreading" | "umbrella" | "vase" | "weeping" | "irregular" | "shrub";
@@ -162,8 +162,8 @@ function binomial(scientificName: string | undefined | null): string {
   return w.length >= 2 ? `${genusOf(w[0])} ${w[1]!.toLowerCase()}` : genusOf(w[0]);
 }
 
-export type CustomModel = "stonePine" | "cypress" | "olive" | "linden" | "plane";
-/** The plants built by models of their own (views/ar-pine, views/ar-cypress, views/ar-olive, views/ar-linden, views/ar-plane). */
+export type CustomModel = "stonePine" | "cypress" | "olive" | "linden" | "plane" | "holmOak";
+/** The plants built by models of their own (views/ar-pine, views/ar-cypress, views/ar-olive, views/ar-linden, views/ar-plane, views/ar-holm). */
 export function customModel(scientificName: string | undefined | null, form?: string): CustomModel | null {
   const genus = genusOf(scientificName), name = binomial(scientificName);
   if (genus === "Pinus" && (form === "umbrella" || name === "Pinus pinea")) return "stonePine";
@@ -171,6 +171,7 @@ export function customModel(scientificName: string | undefined | null, form?: st
   if (genus === "Olea") return "olive";
   if (genus === "Tilia") return "linden";
   if (genus === "Platanus") return "plane";
+  if (name === "Quercus ilex" || name === "Quercus rotundifolia") return "holmOak";
   return null;
 }
 
