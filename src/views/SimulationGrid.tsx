@@ -79,6 +79,13 @@ const osmCache = new Map<string, OsmSuggestion[]>();
 
 /** Below this the phone has not really moved: the place stays as it is. */
 const GPS_STEP_M = 100;
+/**
+ * How precise the fix was that set each place (by its coordinates), kept for the whole session: before, each opening of
+ * the map started from "unknown" and the next fix, a little sharper, moved the place by some tens of metres — standing
+ * still, the GPS changed place again and again, each time saving and rebuilding the map.
+ */
+const placeAccuracy = new Map<string, number>();
+const accKey = (p: { lat: number; lng: number }) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`;
 const GPS_KEY = "mdt-gps-v1";
 // On by default: the map finds the phone's position as soon as it opens; "off" only once turned off (or refused).
 function readGps() { try { return typeof localStorage !== "undefined" && localStorage.getItem(GPS_KEY) !== "off"; } catch { return false; } }
@@ -187,14 +194,20 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
       // With no place chosen yet the first fix sets it, however near.
       // A coarse first fix (from the network, hundreds of metres off) is put right as soon as a sharper one comes:
       // a fix much more precise than the one the place came from moves it even within the 100 m step.
+      // Only a coarse place (set from a fix worse than 100 m) is put right by a sharper one, and only for a real
+      // distance; otherwise the place moves when the phone has gone well beyond the step and beyond the fix's own error,
+      // so a phone lying still (fixes wandering by tens of metres indoors) never changes place.
       const acc = coords.accuracy || 9999, moved = metresBetween(placeRef.current, here);
-      const sharper = acc < appliedAcc.current / 2 && moved > Math.max(15, acc);
-      if (pausedRef.current || busy || (!placeRef.current.pending && moved < GPS_STEP_M && !sharper)) return;
+      const placeAcc = placeAccuracy.get(accKey(placeRef.current)) ?? 0;
+      const sharper = placeAcc >= GPS_STEP_M && acc < placeAcc / 2 && moved > Math.max(30, acc * 2);
+      const away = moved >= Math.max(GPS_STEP_M, acc * 2);
+      if (pausedRef.current || busy || (!placeRef.current.pending && !away && !sharper)) return;
       appliedAcc.current = acc;
       busy = true;
       const fallback = { label: `La mia posizione (${here.lat.toFixed(4)}, ${here.lng.toFixed(4)})`, ...here };
-      try { const result = await reverseGoogle({ data: here }); if (live) selectRef.current(result.location ?? fallback); }
-      catch { if (live) selectRef.current(fallback); } finally { busy = false; }
+      const pick = (loc: SearchedLocation) => { placeAccuracy.set(accKey(loc), acc); selectRef.current(loc); };
+      try { const result = await reverseGoogle({ data: here }); if (live) pick(result.location ?? fallback); }
+      catch { if (live) pick(fallback); } finally { busy = false; }
     }, (geoError) => {
       setLocating(false);
       if (geoError.code === 1) { setGps(false); saveGps(false); setError("Permesso di posizione negato. Abilitalo nelle impostazioni del browser."); }
