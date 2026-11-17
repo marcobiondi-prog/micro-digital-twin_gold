@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Box, Check, Move, Layers, ChevronDown, ChevronLeft, RotateCw, Zap, ZapOff, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
 import type { ArKind } from "@/models/ar-focus";
 import {
-  AR_OBJECTS, alignFromFix, modelScaleFor, nearestPlaced, placeHaptic, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, arObject, enToAr, metresText, objectsToZones, toEN,
+  AR_OBJECTS, alignFromFix, modelScaleFor, nearestPlaced, JOINABLE, JOIN_GAP, footCorners, footGap, joinFeet, nearFeedback, type Foot, placeHaptic, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, arObject, enToAr, metresText, objectsToZones, toEN,
   type Alignment, type ArObjectDef, type PlacedObject,
 } from "@/models/ar-objects";
 import { getLab, setUrban, setVineyard } from "@/models/lab-store";
@@ -12,7 +12,7 @@ import { drawnAreaFor, type DrawnArea } from "@/models/drawn-area";
 import { readFix } from "@/lib/find-position";
 import { hapticTick } from "@/lib/haptics";
 import { contactShadow, floorLoop, objectMesh } from "@/views/ar-object-meshes";
-import { buildPlan, growPlan, mergeBeds, mergePergolas, planText, planTreeDefs, setMergeBeds, setMergePergolas } from "@/views/ar-plan";
+import { buildPlan, growPlan, planText, planTreeDefs } from "@/views/ar-plan";
 import { realTree, wantsRealTree } from "@/views/ar-tree";
 import { ArShadows, castShadows } from "@/views/ar-shadow";
 import { XREstimatedLight } from "three/examples/jsm/webxr/XREstimatedLight.js";
@@ -222,8 +222,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const shadowsRef = useRef<ArShadows | null>(null);
   // The project's interventions shown on their spots once aligned; a key so they follow the levers.
   const [showPlan, setShowPlan] = useState(true);
-  const [merge, setMerge] = useState(mergePergolas);
-  const [joinBeds, setJoinBeds] = useState(mergeBeds);
+  // The map's pergolas and aiuole that touch or nearly touch join by themselves, like the ones brought close by hand.
+  const merge = true, joinBeds = true;
   const planSaid = useRef("");
   const three = useRef<{ scene: THREE.Scene; reticle: THREE.Object3D; hit: V | null; objects: Map<string, THREE.Object3D>; overlay: THREE.Group; measure: THREE.Group; floorY: number | null; renderer: THREE.WebGLRenderer; camera: THREE.Camera } | null>(null);
 
@@ -345,15 +345,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         occluder.update(frame, view, (session as XRSession & { depthDataFormat?: string }).depthDataFormat);
         if (had !== occluder.live) { setDepthLive(occluder.live); setDiag((d) => ({ ...d, depth: occluder.live })); }
       }
-      // A picked-up object rides on the reticle while one aims where to put it.
-      const gid = grabRef.current, go = gid ? t.objects.get(gid) : undefined;
-      if (go && t.hit) go.position.set(t.hit.x + grabOff.current.x, t.hit.y, t.hit.z + grabOff.current.z);
-      // The reticle turns amber where ARCore's depth sees something standing in the object's way.
-      if (t.hit && ++obstacleTick.current % 8 === 0) {
-        const def = defOfRef.current(live.current.selected);
-        const blocked = live.current.tool === "place" && obstacleAt(def, t.hit.x, t.hit.y, t.hit.z, 0, modelRef.current * sizeRef.current);
-        (reticle.material as THREE.MeshBasicMaterial).color.set(blocked ? "#f59e0b" : "#00e5ff");
-      }
+      frameTick(t, reticle);
       const estDir = est?.parent ? est.directionalLight?.position : null;
       shadows.update(t.objects.values(), t.floorY, estDir);
       renderer.render(scene, camera);
@@ -426,11 +418,14 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       if (t) t.hit = c;
       reticle.visible = !!c;
       if (c) { reticle.matrix.makeTranslation(c.x, 0.01, c.z); fitReticle(reticle); }
+      if (t) frameTick(t, reticle);
       if (t) shadowsRef.current?.update(t.objects.values(), t.floorY, null);
       renderer.render(scene, camera);
     });
     const onTap = (e: PointerEvent) => {
       if (adjustingRef.current) return;
+      // An object in hand follows the reticle: a tap anywhere puts it down there.
+      if (live.current.tool === "move" && grabRef.current) { placeAtHit(); return; }
       const r = el.getBoundingClientRect();
       const p = at((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
       if (p && three.current) { three.current.hit = p; placeAtHit(); }
@@ -471,19 +466,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         // A pergola or a shade cloth stands on posts at its edges: put by its centre, its posts fell 2 m beyond the
         // tap, often behind a desk or a wall, and it looked afloat. It is put instead with the middle of its near side
         // on the spot tapped, turned to face the phone, so its front posts stand right where one looks.
-        let cx = hit.x, cz = hit.z, yaw = 0;
-        if (def.id === "pergolato" || def.id === "telo") {
-          const eye = eyeOf(t);
-          let dx = hit.x - eye.x, dz = hit.z - eye.z;
-          const len = Math.hypot(dx, dz);
-          if (len > 0.05) {
-            dx /= len; dz /= len;
-            const reach = (def.d / 2 - 0.12) * modelRef.current * sizeRef.current;
-            cx = hit.x + dx * reach; cz = hit.z + dz * reach;
-            g.rotation.y = Math.atan2(dx, dz);
-            yaw = -g.rotation.y;
-          }
-        }
+        let { cx, cz, yaw } = placementOf(def, hit, t);
+        g.rotation.y = -yaw;
         // A new object takes the size given last with two fingers, so what is put after it stays in proportion.
         const k = sizeRef.current;
         // Obstacles (ARCore's depth): where something real stands in the object's way it is brought towards the phone,
@@ -503,7 +487,10 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         castShadows(g);
         t.scene.add(g);
         t.objects.set(uid, g);
-        setPlaced((l) => [...l, { uid, id: def.id, x: cx, z: cz, yaw, ...(k !== 1 ? { scale: k } : {}), ...(def.plant ? { def } : {}) }]);
+        const fresh: PlacedObject = { uid, id: def.id, x: cx, z: cz, yaw, ...(k !== 1 ? { scale: k } : {}), ...(def.plant ? { def } : {}) };
+        setPlaced((l) => [...l, fresh]);
+        // Put down close to another of its kind (pergola, aiuola): the two become one.
+        if (tryJoin(fresh, hit.y)) return;
         if (stuck) setNotice({ text: `${def.label}: qui c’è un ostacolo davanti. Usa «Sposta» o rimpiccioliscilo con due dita`, tone: "warn" });
         else if (moved) setNotice({ text: `${def.label}: c’era un ostacolo, l’ho messo ${metresText(moved)} più vicino a te`, tone: "ok" });
         else if (k !== 1) setNotice({ text: `${def.label} · ${metresText(def.h * k)} di altezza, in scala come il precedente (${Math.round(k * 100)} %)`, tone: "ok" });
@@ -515,6 +502,142 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         setMeasure((pts) => (pts.length >= 2 ? [hit] : [...pts, hit]));
         hapticTick([30]);
       }
+  }
+
+  /** Where an object goes for a tap on the floor: on the spot, or — a pergola, a shade cloth — with the middle of its
+   *  near side there, turned to face the phone (put by its centre its posts fell 2 m beyond, behind desks and walls). */
+  function placementOf(def: ArObjectDef, hit: V, t: NonNullable<typeof three.current>): { cx: number; cz: number; yaw: number } {
+    if (def.id !== "pergolato" && def.id !== "telo") return { cx: hit.x, cz: hit.z, yaw: 0 };
+    const eye = eyeOf(t);
+    let dx = hit.x - eye.x, dz = hit.z - eye.z;
+    const len = Math.hypot(dx, dz);
+    if (len <= 0.05) return { cx: hit.x, cz: hit.z, yaw: 0 };
+    dx /= len; dz /= len;
+    const reach = (def.d / 2 - 0.12) * modelRef.current * sizeRef.current;
+    return { cx: hit.x + dx * reach, cz: hit.z + dz * reach, yaw: -Math.atan2(dx, dz) };
+  }
+
+  /** An object's footprint on the floor at the size it is drawn. */
+  function footOf(o: PlacedObject, x = o.x, z = o.z): Foot {
+    const def = o.def ?? defOfRef.current(o.id), k = modelRef.current * (o.scale ?? 1);
+    return { x, z, w: def.w * k, d: def.d * k, rot: -o.yaw };
+  }
+  /** The nearest placed object of the same kind (pergola with pergola, aiuola with aiuola) and the free gap to it. */
+  function nearestOfKind(id: string, foot: Foot, skip?: string): { o: PlacedObject; gap: number } | null {
+    let best: { o: PlacedObject; gap: number } | null = null;
+    for (const o of live.current.placed) {
+      if (o.id !== id || o.uid === skip) continue;
+      const gap = footGap(foot, footOf(o));
+      if (!best || gap < best.gap) best = { o, gap };
+    }
+    return best;
+  }
+
+  /** Every frame: the object in hand rides on the reticle, the reticle says obstacles, and bringing a pergola or an
+   *  aiuola close to another of its kind gives an adaptive feedback. */
+  function frameTick(t: NonNullable<typeof three.current>, reticle: THREE.Object3D) {
+    const gid = grabRef.current, go = gid ? t.objects.get(gid) : undefined;
+    if (go && t.hit) go.position.set(t.hit.x + grabOff.current.x, t.hit.y, t.hit.z + grabOff.current.z);
+    if (t.hit && ++obstacleTick.current % 8 === 0) {
+      const def = defOfRef.current(live.current.selected);
+      const blocked = live.current.tool === "place" && obstacleAt(def, t.hit.x, t.hit.y, t.hit.z, 0, modelRef.current * sizeRef.current);
+      ((reticle as THREE.Mesh).material as THREE.MeshBasicMaterial).color.set(blocked ? "#f59e0b" : "#00e5ff");
+    }
+    proximity(t);
+  }
+
+  /**
+   * The adaptive feedback while bringing a pergola or an aiuola close to another of its kind — the one in hand with
+   * «Sposta», or the one about to be put where the reticle is: the other one is outlined, yellow turning green as the
+   * gap closes; the phone ticks faster and stronger (nearFeedback); the line on top says how far it is; within
+   * JOIN_GAP it is green with a double pulse: put down there, the two become one.
+   */
+  const nearState = useRef<{ stage: string; last: number; said: string; saidAt: number; target: string }>({ stage: "far", last: 0, said: "", saidAt: 0, target: "" });
+  const nearRing = useRef<THREE.LineLoop | null>(null);
+  function proximity(t: NonNullable<typeof three.current>) {
+    const s = nearState.current, now = performance.now();
+    let cand: { id: string; foot: Foot; skip?: string } | null = null;
+    const gid = grabRef.current;
+    if (gid) {
+      const o = live.current.placed.find((p) => p.uid === gid), g = t.objects.get(gid);
+      if (o && g && JOINABLE.has(o.id)) cand = { id: o.id, foot: footOf(o, g.position.x, g.position.z), skip: gid };
+    } else if (live.current.tool === "place" && t.hit) {
+      const def = defOfRef.current(live.current.selected);
+      if (JOINABLE.has(def.id)) {
+        const p = placementOf(def, t.hit, t), k = modelRef.current * sizeRef.current;
+        cand = { id: def.id, foot: { x: p.cx, z: p.cz, w: def.w * k, d: def.d * k, rot: -p.yaw } };
+      }
+    }
+    const near = cand ? nearestOfKind(cand.id, cand.foot, cand.skip) : null;
+    const fb = near ? nearFeedback(near.gap) : nearFeedback(Infinity);
+    // The outline round the other one.
+    let ring = nearRing.current;
+    if (fb.stage === "far" || !near) { if (ring) ring.visible = false; }
+    else {
+      if (!ring) {
+        ring = new THREE.LineLoop(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: "#facc15", transparent: true, depthTest: false }));
+        ring.renderOrder = 999; ring.frustumCulled = false;
+        t.scene.add(ring); nearRing.current = ring;
+      }
+      if (s.target !== near.o.uid || !ring.visible) {
+        const y = (t.objects.get(near.o.uid)?.position.y ?? t.floorY ?? 0) + 0.04;
+        const f = footOf(near.o), grow = 0.08;
+        ring.geometry.dispose();
+        ring.geometry = new THREE.BufferGeometry().setFromPoints(footCorners({ ...f, w: f.w + grow, d: f.d + grow }).map((p) => new THREE.Vector3(p.x, y, p.z)));
+      }
+      const m = ring.material as THREE.LineBasicMaterial;
+      m.color.set(fb.stage === "join" ? "#22c55e" : "#facc15");
+      m.opacity = 0.45 + 0.55 * fb.t;
+      ring.visible = true;
+    }
+    // The phone: ticks coming faster and stronger, a double pulse on reaching the joining gap.
+    if (fb.stage === "join" && s.stage !== "join") hapticTick([30, 40, 30]);
+    else if (fb.stage === "near" && now - s.last > fb.every) { hapticTick([fb.pulse]); s.last = now; }
+    // The line on top.
+    if (near && fb.stage !== "far") {
+      const pg = near.o.id === "pergolato";
+      const what = pg ? "al pergolato" : "all’aiuola";
+      const text = fb.stage === "join"
+        ? `Si uniscono: ${gid ? "lascialo" : "posalo"} qui e ${pg ? "i due pergolati diventano uno solo" : "le due aiuole diventano una sola"}`
+        : `Vicino ${what}: ${metresText(Math.round(near.gap * 10) / 10)} · avvicina ancora per unirli`;
+      if (text !== s.said && now - s.saidAt > 180) { s.said = text; s.saidAt = now; setNotice({ text, tone: "ok" }); }
+    } else if (s.said) { const was = s.said; s.said = ""; setNotice((n) => (n?.text === was ? null : n)); }
+    s.stage = fb.stage; s.target = near && fb.stage !== "far" ? near.o.uid : "";
+  }
+
+  /** A mesh for a placed object, as put down. */
+  function meshFor(o: PlacedObject, y: number): THREE.Group {
+    const g = objectMesh(o.def ?? defOfRef.current(o.id));
+    g.rotation.y = -o.yaw;
+    g.position.set(o.x, y, o.z);
+    g.scale.setScalar(modelRef.current * (o.scale ?? 1));
+    castShadows(g);
+    return g;
+  }
+  /**
+   * Joins a pergola or an aiuola just put down (or moved) with the nearest of its kind when within JOIN_GAP: one object
+   * covering both (joinFeet, turned like the larger), the two kept inside it so «Annulla» brings them back.
+   */
+  function tryJoin(a: PlacedObject, y: number): boolean {
+    const t = three.current;
+    if (!t || !JOINABLE.has(a.id)) return false;
+    const near = nearestOfKind(a.id, footOf(a), a.uid);
+    if (!near || near.gap > JOIN_GAP) return false;
+    const b = near.o, U = joinFeet(footOf(a), footOf(b)), k = modelRef.current;
+    const base = defOfRef.current(a.id);
+    const def: ArObjectDef = { ...base, w: U.w / k, d: U.d / k };
+    const uid = `j${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+    const joined: PlacedObject = { uid, id: a.id, x: U.x, z: U.z, yaw: -U.rot, def, from: [b, a] };
+    for (const id of [a.uid, b.uid]) { const m = t.objects.get(id); if (m) t.scene.remove(m); t.objects.delete(id); }
+    const g = meshFor(joined, y);
+    t.scene.add(g);
+    t.objects.set(uid, g);
+    setPlaced((l) => [...l.filter((p) => p.uid !== a.uid && p.uid !== b.uid), joined]);
+    hapticTick([40, 60, 40]);
+    const pg = a.id === "pergolato";
+    setNotice({ text: `${pg ? "Pergolati uniti" : "Aiuole unite"}: ${metresText(def.w)} × ${metresText(def.d)} · Annulla li separa`, tone: "ok" });
+    window.setTimeout(() => setNotice((n) => (n?.text.includes("Annulla li separa") ? null : n)), 2600);
+    return true;
   }
 
   /** Where the phone's eye is, in the AR frame. */
@@ -598,6 +721,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     if (g) g.position.set(x, hit.y, z);
     setPlaced((l) => l.map((p) => (p.uid === cur ? { ...p, x, z } : p)));
     setGrabbed(null);
+    if (o && tryJoin({ ...o, x, z }, hit.y)) return;
     hapticTick([30, 40, 30]);
     const def = o ? (o.def ?? defOfRef.current(o.id)) : null;
     const blocked = def && o ? obstacleAt(def, x, hit.y, z, o.yaw, modelRef.current * (o.scale ?? 1)) : false;
@@ -700,6 +824,15 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     const t = three.current, o = t?.objects.get(last.uid);
     if (t && o) { t.scene.remove(o); t.objects.delete(last.uid); }
     if (grabRef.current === last.uid) setGrabbed(null);
+    // A joined pergola or aiuola: «Annulla» puts back the two it was made of.
+    if (last.from && t) {
+      const y = o?.position.y ?? t.floorY ?? 0;
+      for (const p of last.from) { const g = meshFor(p, y); t.scene.add(g); t.objects.set(p.uid, g); }
+      setPlaced((l) => [...l.slice(0, -1), ...last.from!]);
+      setNotice({ text: last.id === "pergolato" ? "Pergolati di nuovo separati" : "Aiuole di nuovo separate", tone: "ok" });
+      window.setTimeout(() => setNotice((n) => (n?.text.includes("di nuovo separat") ? null : n)), 1800);
+      return;
+    }
     setPlaced((l) => l.slice(0, -1));
   };
   const backToMap = () => {
@@ -739,7 +872,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       : tool === "align"
         ? alignPts.length === 0 ? "Tocca il punto 1 dell’area" : "Tocca il punto 2 dell’area"
         : tool === "move"
-          ? grabbed ? (session ? "Punta dove metterlo e tocca" : "Tocca dove metterlo") : "Tocca l’oggetto da spostare"
+          ? grabbed ? "Punta dove metterlo e tocca: vicino a un pergolato o a un’aiuola si uniscono" : "Tocca l’oggetto da spostare"
         : tool === "measure"
           ? dist !== null ? `Distanza ${metresText(dist)}` : measure.length === 1 ? "Tocca il secondo punto" : "Tocca il primo punto"
           : `Tocca il pavimento per posare: ${defOf(selected).label}`);
@@ -749,7 +882,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const barShort = !found ? "Cerco il pavimento…" : adjusting ? "Regola pavimento"
     : tool === "move" ? (grabbed ? "Mettilo giù" : "Sposta") : tool === "measure" ? (dist !== null ? metresText(dist) : "Misura") : tool === "align" ? `Punto ${alignPts.length + 1} dell’area` : defOf(selected).label;
   const barHelp = !found ? "Muovi piano il telefono verso il pavimento finché lo riconosco."
-    : tool === "move" ? "Tocca un oggetto posato per prenderlo, poi tocca il punto del pavimento dove vuoi rimetterlo."
+    : tool === "move" ? "Tocca un oggetto posato per prenderlo: segue il mirino, tocca di nuovo per posarlo. Avvicinato a un altro pergolato o a un’altra aiuola, il telefono vibra sempre più forte e il contorno diventa verde: posato lì, i due diventano uno solo (Annulla li separa)."
     : tool === "measure" ? "Tocca due punti a terra: ti dico quanto distano."
     : tool === "align" ? "Tocca a terra i punti 1 e 2 dell’area disegnata sulla mappa: così gli oggetti tornano al posto giusto."
     : "Tocca il pavimento dove vuoi metterlo: compare a grandezza vera. Annulla toglie l’ultimo, il pulsante AI cambia oggetto.";
@@ -931,16 +1064,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     ...(area ? [{ key: "t:progetto", label: "Progetto", Icon: MapPinned, tool: true, on: showPlan,
       aria: showPlan ? "Nascondi gli interventi della mappa" : "Mostra gli interventi della mappa nel loro punto",
       onPick: () => { setShowPlan((v) => !v); setTrayOpen(false); setNotice({ text: showPlan ? "Interventi della mappa nascosti" : "Interventi della mappa nel loro punto", tone: "ok" }); } }] : []),
-    // The person decides whether the map's nearby pergolas stand as one structure or each on its own.
-    ...(area && kind === "urban" && showPlan ? [{ key: "t:unisci", label: merge ? "Pergolati uniti" : "Unisci pergolati", Icon: Fence, tool: true, on: merge,
-      aria: merge ? "Mostra i pergolati della mappa uno per uno" : "Unisci in uno solo i pergolati vicini della mappa",
-      onPick: () => { const on = !merge; setMerge(on); setMergePergolas(on); setTrayOpen(false); setNotice({ text: on ? "Pergolati vicini uniti in uno solo" : "Pergolati separati, come sulla mappa", tone: "ok" }); } },
-      { key: "t:unisci-aiuole", label: joinBeds ? "Aiuole unite" : "Unisci aiuole", Icon: Flower2, tool: true, on: joinBeds,
-      aria: joinBeds ? "Mostra le aiuole della mappa una per una" : "Unisci in una sola le aiuole vicine della mappa",
-      onPick: () => { const on = !joinBeds; setJoinBeds(on); setMergeBeds(on); setTrayOpen(false); setNotice({ text: on ? "Aiuole vicine unite in una sola" : "Aiuole separate, come sulla mappa", tone: "ok" }); } }] : []),
     ...(placed.length ? [{ key: "t:sposta", label: "Sposta", Icon: Move, tool: true, on: tool === "move", aria: "Sposta un oggetto già posato",
       onPick: () => { setTool("move"); setGrabbed(null); setTrayOpen(false); } }] : []),
-    { key: "t:modellino", label: model ? "Grandezza vera" : "Modellino", Icon: Box, tool: true, on: model, aria: model ? "Torna alla grandezza vera" : "Modellino in scala adatta allo spazio intorno",
+    { key: "t:modellino", label: "Modellino", Icon: Box, tool: true, on: model, aria: model ? "Torna alla grandezza vera" : "Modellino in scala adatta allo spazio intorno",
       onPick: () => {
         setTrayOpen(false);
         if (model) { setModel(false); setNotice({ text: "Grandezza vera", tone: "ok" }); return; }
@@ -949,10 +1075,10 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         setNotice({ text: `Modellino 1:${Math.round(1 / k)} · adatto allo spazio ${span !== null ? `(profondità rilevata: circa ${metresText(span)})` : "davanti a te"}`, tone: "ok" });
       } },
     // ARCore's depth as a test: switching it on or off restarts the session (it is asked when the session starts).
-    ...(session && onRotate ? [{ key: "t:profondita", label: depthWanted() ? "Spegni profondità" : "Profondità", Icon: Layers, tool: true, on: depthWanted(),
+    ...(session && onRotate ? [{ key: "t:profondita", label: "Profondità", Icon: Layers, tool: true, on: depthWanted(),
       aria: depthWanted() ? "Spegni la prova della profondità e riavvia l’AR" : "Accendi la profondità: muri e mobili veri coprono gli oggetti (riavvia l’AR)",
       onPick: () => { const on = !depthWanted(); setDepthWanted(on); setTrayOpen(false); setNotice({ text: on ? "Riavvio l’AR con la profondità: muri e mobili coprono gli oggetti" : "Riavvio l’AR senza profondità", tone: "ok" }); onRotate(); } }] : []),
-    ...(session && depthLive ? [{ key: "t:mappa", label: `Gira mappa ${flip + 1}/${FLIP_MODES}`, Icon: RotateCw, tool: true, on: false,
+    ...(DEPTH_TOOLS && session && depthLive ? [{ key: "t:mappa", label: `Gira mappa ${flip + 1}/${FLIP_MODES}`, Icon: RotateCw, tool: true, on: false,
       aria: "Gira la mappa di profondità, se gli oggetti spariscono nei posti sbagliati",
       onPick: () => { const n = (flip + 1) % FLIP_MODES; setFlip(n); setDepthFlip(n); depthRef.current?.setFlip(n); setDepthOn(true); setTrayOpen(false); setNotice({ text: `Mappa di profondità ${n + 1} di ${FLIP_MODES}: guarda se i pali spariscono dietro persone e mobili`, tone: "ok" }); } },
       { key: "t:pausa", label: depthOn ? "Senza copertura" : "Con copertura", Icon: Layers, tool: true, on: !depthOn,
@@ -1123,6 +1249,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
 }
 
 const ARC_IN_PROVA = false;
+/** The depth map's test tools in the AI fan («Gira mappa», «Senza copertura»): off to keep the menu simple. */
+const DEPTH_TOOLS = false;
 
 /** The 3D camera's vertical view for a zoom: the 70° preview narrowed like the cropped picture. */
 function fovAt(zoom: number): number {
@@ -1245,7 +1373,7 @@ function AiFan({ groups, start }: { groups: FanGroup[]; start: string }) {
         const on = g.key === group?.key;
         return (
           <button key={g.key} type="button" role="menuitem" aria-expanded={on} aria-label={g.label} onClick={() => setOpen(g.key)}
-            className="ar-fan-item absolute left-0 top-0 flex w-16 flex-col items-center gap-1"
+            className="ar-fan-item absolute left-0 top-0 flex w-20 flex-col items-center gap-1"
             style={{ transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`, animationDelay: `${i * 40}ms` }}>
             <span className={`grid size-12 place-items-center rounded-full shadow-[0_6px_18px_rgba(0,0,0,0.45)] backdrop-blur-md transition-colors ${on ? "bg-white text-black" : "bg-black/60 text-white ring-1 ring-white/25"}`}>
               <g.Icon className="size-5" aria-hidden="true" />
@@ -1260,7 +1388,7 @@ function AiFan({ groups, start }: { groups: FanGroup[]; start: string }) {
         const { x, y } = at(arc(items.length, i, 90, 18), items.length > 4 ? (i % 2 ? 252 : 192) : 196);
         return (
           <button key={`${group!.key}-${it.key}`} type="button" role="menuitemradio" aria-checked={it.on} aria-label={it.aria ?? it.label} onClick={it.onPick}
-            className="ar-fan-item absolute left-0 top-0 flex w-16 flex-col items-center gap-1"
+            className="ar-fan-item absolute left-0 top-0 flex w-20 flex-col items-center gap-1"
             style={{ transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`, animationDelay: `${120 + i * 30}ms` }}>
             <span className={`grid size-12 place-items-center rounded-full shadow-[0_6px_18px_rgba(0,0,0,0.45)] backdrop-blur-md transition-colors ${
               it.on ? "bg-[#00e5ff] text-black" : it.plant ? "bg-black/60 text-[#4ade80] ring-2 ring-[#4ade80]/80" : "bg-black/60 text-white ring-1 ring-white/25"}`}>

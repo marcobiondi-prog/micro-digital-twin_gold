@@ -42,7 +42,7 @@ export const arObject = (kind: ArKind, id: ArObjectId) => AR_OBJECTS[kind].find(
 
 /** One object put in the AR scene: where on the floor (AR metres, x east-ish, z towards the viewer) and turned by yaw (rad). */
 /** scale: the size the person gave it with two fingers (1 = real size). */
-export type PlacedObject = { uid: string; id: ArObjectId; x: number; z: number; yaw: number; def?: ArObjectDef; scale?: number };
+export type PlacedObject = { uid: string; id: ArObjectId; x: number; z: number; yaw: number; def?: ArObjectDef; scale?: number; /** The objects joined into this one (Annulla brings them back). */ from?: PlacedObject[] };
 
 /** A point on the floor in a local metre frame: e = east, n = north. */
 export type EN = { e: number; n: number };
@@ -216,4 +216,77 @@ export function nearestPlaced<T extends { x: number; z: number; reach: number }>
     if (d <= o.reach && d < bd) { bd = d; best = o; }
   }
   return best;
+}
+
+/**
+ * Joining pergolas and aiuole by bringing them close (AR). A footprint on the floor in the AR frame: centre, size and
+ * the turn of the mesh (rot = its rotation.y; local x goes to (cos rot, −sin rot), local z to (sin rot, cos rot)).
+ */
+export type Foot = { x: number; z: number; w: number; d: number; rot: number };
+type P = { x: number; z: number };
+/** Objects of these kinds join with one of the same kind when brought within JOIN_GAP. */
+export const JOINABLE: ReadonlySet<ArObjectId> = new Set<ArObjectId>(["pergolato", "aiuola"]);
+/** Within this gap (metres) they join; within NEAR_GAP the feedback starts. */
+export const JOIN_GAP = 0.6;
+export const NEAR_GAP = 2.5;
+
+export function footCorners(f: Foot): P[] {
+  const c = Math.cos(f.rot), s = Math.sin(f.rot), hw = f.w / 2, hd = f.d / 2;
+  return [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([u, v]) => ({ x: f.x + u! * c + v! * s, z: f.z - u! * s + v! * c }));
+}
+function inside(p: P, poly: P[]): boolean {
+  let sign = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]!, b = poly[(i + 1) % poly.length]!;
+    const cr = (b.x - a.x) * (p.z - a.z) - (b.z - a.z) * (p.x - a.x);
+    if (Math.abs(cr) < 1e-12) continue;
+    const sg = Math.sign(cr);
+    if (sign && sg !== sign) return false;
+    sign = sg;
+  }
+  return true;
+}
+function segDist(p: P, a: P, b: P): number {
+  const dx = b.x - a.x, dz = b.z - a.z, l = dx * dx + dz * dz;
+  const t = l ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / l)) : 0;
+  return Math.hypot(p.x - (a.x + t * dx), p.z - (a.z + t * dz));
+}
+function cross(a: P, b: P, c: P, d: P): boolean {
+  const o = (p: P, q: P, r: P) => Math.sign((q.x - p.x) * (r.z - p.z) - (q.z - p.z) * (r.x - p.x));
+  return o(a, b, c) !== o(a, b, d) && o(c, d, a) !== o(c, d, b);
+}
+/** The free gap between two footprints on the floor, metres (0 when they touch or overlap). */
+export function footGap(a: Foot, b: Foot): number {
+  const A = footCorners(a), B = footCorners(b);
+  if (A.some((p) => inside(p, B)) || B.some((p) => inside(p, A))) return 0;
+  let best = Infinity;
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+    const a0 = A[i]!, a1 = A[(i + 1) % 4]!, b0 = B[j]!, b1 = B[(j + 1) % 4]!;
+    if (cross(a0, a1, b0, b1)) return 0;
+    best = Math.min(best, segDist(a0, b0, b1), segDist(b0, a0, a1));
+  }
+  return best;
+}
+/** One footprint covering both, turned like the larger one. */
+export function joinFeet(a: Foot, b: Foot): Foot {
+  const rot = a.w * a.d >= b.w * b.d ? a.rot : b.rot;
+  const c = Math.cos(rot), s = Math.sin(rot);
+  let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+  for (const p of [...footCorners(a), ...footCorners(b)]) {
+    const u = p.x * c - p.z * s, v = p.x * s + p.z * c;
+    u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v);
+  }
+  const um = (u0 + u1) / 2, vm = (v0 + v1) / 2;
+  return { x: um * c + vm * s, z: -um * s + vm * c, w: u1 - u0, d: v1 - v0, rot };
+}
+/**
+ * The adaptive feedback while bringing one close to another: nothing past NEAR_GAP; then a tick that comes faster and
+ * stronger as the gap closes (every 700 → 140 ms, 8 → 24 ms long) and a closeness 0…1 for the colour; joined within
+ * JOIN_GAP.
+ */
+export function nearFeedback(gap: number): { stage: "far" | "near" | "join"; every: number; pulse: number; t: number } {
+  if (gap <= JOIN_GAP) return { stage: "join", every: 0, pulse: 0, t: 1 };
+  if (gap >= NEAR_GAP) return { stage: "far", every: 0, pulse: 0, t: 0 };
+  const t = 1 - (gap - JOIN_GAP) / (NEAR_GAP - JOIN_GAP);
+  return { stage: "near", every: Math.round(700 - 560 * t), pulse: Math.round(8 + 16 * t), t };
 }
