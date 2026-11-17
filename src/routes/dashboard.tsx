@@ -1,6 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { z } from "zod";
 import { useTabSwipe } from "@/lib/use-tab-swipe";
 import { SectionLockCard, useGuestOnly, useSectionOpen } from "@/views/v10/ProfileGate";
 import { HistoryBlock } from "@/views/v10/HistoryBlock";
@@ -40,7 +39,8 @@ import climateTwinLogo from "@/assets/climate-twin-logo-final.png";
 import climateTwinLogoCompact from "@/assets/climate-twin-logo-compact.png";
 
 export const Route = createFileRoute("/dashboard")({
-  validateSearch: z.object({ tab: z.enum(["Piazza", "Vigneto"]).catch("Piazza") }).parse,
+  // A plain check, not zod: the route's settings load with every page, and zod with them (~85 kB) only for this.
+  validateSearch: (search: Record<string, unknown>): { tab: "Piazza" | "Vigneto" } => ({ tab: search["tab"] === "Vigneto" ? "Vigneto" : "Piazza" }),
   head: () => ({
     meta: [
       { title: "Dashboard operative — MICRO DIGITAL TWIN" },

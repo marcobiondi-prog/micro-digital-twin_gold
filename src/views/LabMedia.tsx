@@ -1,6 +1,7 @@
 import { VideoPlayer } from "@/views/v10/VideoPlayer";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 const ArCameraLazy = lazy(() => import("@/views/ArCameraLazy"));
+const GalleryReviewLazy = lazy(() => import("@/views/GalleryReviewLazy"));
 import { createPortal } from "react-dom";
 import {
   Camera,
@@ -22,7 +23,6 @@ import { AI_STANDBY } from "@/lib/ai-standby";
 import { PREVIEW_BUILD } from "@/lib/demo-login";
 import { galleryMultiple, openSystemCamera, prepareSystemCamera, supportsSystemCapture } from "@/lib/system-camera";
 import { SystemCamera } from "@/views/SystemCamera";
-import { GalleryReview } from "@/views/GalleryReview";
 import { guardUse } from "@/lib/app-permissions";
 import { useRegisteredEmail } from "@/lib/use-signed-in";
 import { useLab } from "@/models/lab-store";
@@ -347,6 +347,9 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
   const sendOne = (it: MediaItem) => void shareOne(kind, it);
   // Photos and videos picked from the gallery wait in the review sheet; "+" there adds more to the same pick.
   const [reviewing, setReviewing] = useState<File[] | null>(null);
+  // The review sheet's code comes with the first gallery pick, then stays mounted (it also follows the upload).
+  const [reviewLoaded, setReviewLoaded] = useState(false);
+  useEffect(() => { if (reviewing) setReviewLoaded(true); }, [reviewing]);
   const review = (list: FileList | File[] | null) => { const f = Array.from(list ?? []); if (f.length) setReviewing((p) => [...(p ?? []), ...f]); };
   const lab = useLab();
   const project = kind === "urban" ? lab.urban : lab.vineyard;
@@ -437,12 +440,12 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
       /></Suspense>}
       {input(cameraPhoto, "image/*", "environment")}
       <SystemCamera mode={systemCamera} onCapture={(files) => add(files)} onClose={closeSystemCamera} />
-      <GalleryReview kind={kind} files={reviewing} zones={zoneNames} onAddMore={() => void pickGallery()} onClose={() => setReviewing(null)}
+      {(reviewing || reviewLoaded) && <Suspense fallback={null}><GalleryReviewLazy kind={kind} files={reviewing} zones={zoneNames} onAddMore={() => void pickGallery()} onClose={() => setReviewing(null)}
         onConfirm={(files, zone) => {
           // The zone rides in the name ("Lotto A - foto.jpg"), so the list and the report show where it was taken.
           void add(zone ? files.map((f) => new File([f], `${zone} - ${f.name}`, { type: f.type, lastModified: f.lastModified })) : files);
           setReviewing(null);
-        }} />
+        }} /></Suspense>}
       {input(cameraVideo, "video/*", "environment")}
       {/* Su Android la selezione multipla apre il gestore file; con un file alla volta si apre
           la galleria di sistema (Google Foto). Altrove resta la scelta multipla. */}

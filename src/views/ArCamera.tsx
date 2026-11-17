@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal, flushSync } from "react-dom";
+import "@/styles/ar-camera.css";
 import { isTouchDevice } from "@/lib/touch-device";
 import { isTabletViewport } from "@/lib/tablet-camera";
 import { ArLive, requestArSession } from "@/views/ArLive";

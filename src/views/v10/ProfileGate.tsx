@@ -5,7 +5,9 @@ import { openSectorGate, useGuest, useProId } from "@/lib/use-pro-id";
 import { KIND_LABEL, KIND_SECTION, SECTION_KIND, SECTION_LABEL, proSummary, unlocks, type ProKind, type Section } from "@/models/professional-id";
 import { toast } from "sonner";
 import { Ambient, PageHero, TabRow, openSimTab } from "@/views/v8/console";
-import { IdentifyForm, profileIntro } from "@/views/v10/Identify";
+// The identification form loads only when a section is locked: an identified user never downloads it here.
+const IdentifyForm = lazy(() => import("@/views/v10/Identify").then((m) => ({ default: m.IdentifyForm })));
+const ProfileIntro = lazy(() => import("@/views/v10/Identify").then((m) => ({ default: ({ kind }: { kind: ProKind }) => <>{m.profileIntro(kind)}</> })));
 // The recognised profiles' carousel lives with the sector page: loaded only when a locked section shows it.
 const KnownProfiles = lazy(() => import("@/views/v10/SectorGate").then((m) => ({ default: m.KnownProfiles })));
 import { cn } from "@/lib/utils";
@@ -118,11 +120,11 @@ export function SectionGate({ section, children }: { section: Section; children:
       </div>
       <div className="fuse-canvas space-y-4 rounded-3xl px-4 pb-6 pt-5 sm:px-5">
         <p className="flex items-center gap-2 text-lg font-semibold"><Lock className="size-5" aria-hidden="true" />{WHO[section].who}</p>
-        <p className="text-[15px] leading-relaxed text-muted-foreground">{profileIntro(need)}</p>
+        <p className="text-[15px] leading-relaxed text-muted-foreground"><Suspense fallback={null}><ProfileIntro kind={need} /></Suspense></p>
         {id && <p className="rounded-2xl bg-foreground/[0.06] px-4 py-3 text-sm text-muted-foreground">Ora sei identificato come <span className="font-semibold text-foreground">{proSummary(id)}</span>: identificandoti qui, quel profilo viene sostituito e {section === "urban" ? "il vigneto" : "la piazza"} si blocca.</p>}
         {/* Who identified as this profile on this phone before continues with one tap (a list when there are more). */}
         <Suspense fallback={null}><KnownProfiles kind={need} /></Suspense>
-        <IdentifyForm kind={need} onDone={done} />
+        <Suspense fallback={<div className="h-64" />}><IdentifyForm kind={need} onDone={done} /></Suspense>
         <p className="px-1 text-xs text-muted-foreground">I dati restano su questo dispositivo e, se hai fatto l’accesso, nel tuo account. Puoi uscire dal profilo quando vuoi, da Profilo nella barra in basso.</p>
       </div>
     </div>

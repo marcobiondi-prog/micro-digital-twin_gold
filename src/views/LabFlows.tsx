@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { toast } from "sonner";
 import { LabSyncIndicator } from "@/views/LabSyncIndicator";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { SensorAdvisor } from "@/views/SensorAdvisor";
-import { MySensors } from "@/views/v10/MySensors";
+// The Sensori AI tab's content loads only when the tab is first opened (Panels mounts a panel on first open).
+const SensorAdvisor = lazy(() => import("@/views/SensorAdvisor").then((m) => ({ default: m.SensorAdvisor })));
+const MySensors = lazy(() => import("@/views/v10/MySensors").then((m) => ({ default: m.MySensors })));
 import { GuestLock, useGuestOnly } from "@/views/v10/ProfileGate";
 import { LabMedia } from "@/views/LabMedia";
 import { splitLocation } from "@/views/SimulationGrid";
@@ -88,5 +89,5 @@ export function VineyardFlow() {
 function GuestSensors({ kind }: { kind: "urban" | "vineyard" }) {
   const guest = useGuestOnly();
   if (guest) return <GuestLock kind={kind === "urban" ? "funzionario" : "agronomo"} title="Sensori AI" line="Dove mettere i sensori e i tuoi sensori si usano dopo esserti identificato." />;
-  return <div className="space-y-4"><SensorAdvisor embedded kind={kind} /><MySensors kind={kind} /></div>;
+  return <Suspense fallback={<div className="h-40" />}><div className="space-y-4"><SensorAdvisor embedded kind={kind} /><MySensors kind={kind} /></div></Suspense>;
 }

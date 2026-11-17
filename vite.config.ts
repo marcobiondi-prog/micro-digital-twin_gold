@@ -51,7 +51,7 @@ export default defineConfig(({ command }) => ({
   },
   // Hex hashes (2026-11-14): every page file got a new name once, so the 404s already cached for a year on phones
   // under the old names (see cacheOnlyFoundAssets) are never asked for again.
-  build: { rollupOptions: { output: { hashCharacters: "hex" } } },
+  build: { sourcemap: process.env["MDT_SOURCEMAP"] === "1", rollupOptions: { output: { hashCharacters: "hex" } } },
   plugins: [
     tailwindcss(),
     tsConfigPaths({ projects: ["./tsconfig.json"] }),

@@ -1,11 +1,14 @@
-import { useEffect, useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
-import { Camera, Images, Map as MapIcon, MapPin, EllipsisVertical, Radar, RotateCcw, Scale, Send, SlidersHorizontal, type LucideIcon } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { Map as MapIcon, MapPin, EllipsisVertical, Radar, Scale, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import { setCameraSheetOpen } from "@/lib/camera-dock";
 import { useTabSwipe } from "@/lib/use-tab-swipe";
 import { useAutoHistory } from "@/lib/use-auto-history";
 import { SimMap } from "@/views/v10/SimMap";
 import { Ambient, HeroButton, PageHero, Panels, TabRow, openSimTab, showSimMedia, startOnMap, simMediaId, useSimTab, type SimKind, type SimTab } from "./console";
+
+const loadMenu = () => import("@/views/v8/SimMenu");
+const SimMenu = lazy(loadMenu);
+const MENU_BUTTON = "grid size-11 place-items-center rounded-full bg-foreground/10 text-foreground outline-none backdrop-blur transition-colors hover:bg-foreground/[0.16] focus-visible:ring-2 focus-visible:ring-ring";
 
 const TABS: ReadonlyArray<{ id: SimTab; label: string; icon: LucideIcon }> = [
   { id: "mappa", label: "Mappa", icon: MapIcon },
@@ -61,10 +64,6 @@ function useHideOnScroll(bar: RefObject<HTMLDivElement | null>, root: RefObject<
   }, [bar, root]);
 }
 
-function Item({ icon: Icon, label, onSelect }: { icon: LucideIcon; label: string; onSelect: () => void }) {
-  return <DropdownMenuItem onSelect={onSelect} className="min-h-12 gap-3 rounded-xl px-3 text-[15px] font-medium focus:bg-accent focus:text-accent-foreground"><Icon className="size-5 text-muted-foreground" aria-hidden="true" />{label}</DropdownMenuItem>;
-}
-
 /**
  * v8 simulator page: ambient light, the place (touch to change it) above a big thin title, Confronta and
  * the ⋮ context menu on the right, then pill tabs (Mappa · Simula · Sensori AI) and one panel.
@@ -87,24 +86,25 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, medi
   // A sideways swipe drags the panel with the finger and turns to the neighbouring tab, like the tutorial's slides; sliders, maps and rows that scroll sideways keep their own moves.
   useAutoHistory(kind);
   const swipe = useTabSwipe(TABS.map((t) => t.id), tab, go);
+  const [menu, setMenu] = useState<"none" | "idle" | "open">("none");
+  useEffect(() => {
+    const idle = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+    const go2 = () => { void loadMenu().then(() => setMenu((m) => (m === "none" ? "idle" : m))); };
+    const id = idle ? idle(go2, { timeout: 4000 }) : window.setTimeout(go2, 2500);
+    return () => { if (!idle) window.clearTimeout(id); };
+  }, []);
   return (
     <div ref={rootRef} className="space-y-4">
       <Ambient tone={TONE[kind]} />
       <PageHero kicker={title} kickerIcon={MapPin} onKicker={toMap} title={kind === "urban" ? "Piazza" : "Vigneto"}
         actions={<>
           {onCompare && <HeroButton icon={Scale} label="Confronta" onClick={onCompare} showLabel />}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild><button type="button" aria-label="Altre azioni" className="grid size-11 place-items-center rounded-full bg-foreground/10 text-foreground outline-none backdrop-blur transition-colors hover:bg-foreground/[0.16] focus-visible:ring-2 focus-visible:ring-ring"><EllipsisVertical className="size-6" aria-hidden="true" /></button></DropdownMenuTrigger>
-            <DropdownMenuContent align="end" sideOffset={8} className="z-[999999999] w-64 rounded-2xl p-1.5 shadow-2xl">
-              <Item icon={Camera} label="Fotocamera" onSelect={() => setCameraSheetOpen(true)} />
-              <Item icon={Images} label="Foto e video salvati" onSelect={() => showSimMedia(kind)} />
-              <Item icon={Radar} label="Dove mettere i sensori" onSelect={() => go("sensori")} />
-              <Item icon={MapPin} label="Cambia luogo" onSelect={toMap} />
-              <DropdownMenuSeparator />
-              {onSend && <Item icon={Send} label="Invia all’agronomo" onSelect={onSend} />}
-              <Item icon={RotateCcw} label="Ricomincia" onSelect={onReset} />
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* The ⋮ menu's code comes on the first tap (it then opens at once) or when the page is idle. */}
+          {menu === "none"
+            ? <button type="button" aria-label="Altre azioni" aria-haspopup="menu" className={MENU_BUTTON} onClick={() => setMenu("open")}><EllipsisVertical className="size-6" aria-hidden="true" /></button>
+            : <Suspense fallback={<span className={MENU_BUTTON} aria-hidden="true"><EllipsisVertical className="size-6" /></span>}>
+                <SimMenu open={menu === "open"} onCamera={() => setCameraSheetOpen(true)} onMedia={() => showSimMedia(kind)} onSensors={() => go("sensori")} onMap={toMap} onSend={onSend} onReset={onReset} />
+              </Suspense>}
         </>} />
       <div ref={barRef} data-sim-tabs="" className="sticky top-[var(--nav-h)] z-[999999997] -mx-4 bg-transparent px-4 py-2 backdrop-blur-xl will-change-transform data-[hidden]:pointer-events-none">
         <TabRow label="Sezioni" items={TABS} value={tab} onChange={go} />
