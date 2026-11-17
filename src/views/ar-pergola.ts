@@ -5,8 +5,8 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
  * A realistic wooden pergola for the AR view, built in code (no files to download): larch-coloured timber with its
  * own grain (drawn once on a canvas, the grain running along each piece), posts on steel base plates over concrete
  * footings, double main beams clamping the posts, knee braces, rafters and thin top battens, a few
- * bolts, a shade cloth stretched over the battens with a scalloped valance, and ivy climbing the posts, running
- * along the beams and hanging in trailing strands. Stands on y = 0, centred, w along x and d along z, h tall (the object's real sizes).
+ * bolts, a shade cloth stretched over the battens with a scalloped valance, and climbing plants with lilac
+ * flowers over it. Stands on y = 0, centred, w along x and d along z, h tall (the object's real sizes).
  */
 
 let grainCache: { along: THREE.Texture; across: THREE.Texture; up: THREE.Texture } | null = null;
@@ -150,7 +150,7 @@ export function realPergola(def: { w: number; d: number; h: number }): THREE.Gro
   }
   const battenZs = Array.from({ length: nb + 1 }, (_, i) => -(D + 0.3) / 2 + ((D + 0.3) * i) / nb);
   out.add(shadeCloth(W, D, topY, battenZs));
-  out.add(ivy(W, D, H, xs, hd, beamY, topY));
+  out.add(climbers(W, D, H, xs, hd, topY));
   return out;
 }
 
@@ -235,105 +235,84 @@ function shadeCloth(W: number, D: number, topY: number, battenZs: number[]): THR
   return g;
 }
 
-/** An ivy twig picture: a few glossy dark leaves with three to five pointed lobes and pale veins, on transparency. */
-let ivyTex: THREE.Texture | null = null;
-function ivyLeaves(): THREE.Texture {
-  if (ivyTex) return ivyTex;
+/** A leaf cluster texture: a few overlapping leaves of different greens on transparency, drawn once. */
+let leafTex: THREE.Texture | null = null;
+function leaves(): THREE.Texture {
+  if (leafTex) return leafTex;
   const c = document.createElement("canvas");
   c.width = c.height = 128;
   const g = c.getContext("2d")!;
-  const rnd = seeded(17);
-  const greens = ["#1f4a1d", "#2a5a24", "#24521f", "#33652b", "#1b401a"];
-  // A thin woody stem across.
-  g.strokeStyle = "#5a4a32"; g.lineWidth = 2; g.lineCap = "round";
-  g.beginPath(); g.moveTo(6, 118); g.quadraticCurveTo(60, 70, 122, 12); g.stroke();
-  for (let i = 0; i < 7; i++) {
-    const t = 0.08 + (i / 7) * 0.86, x = 6 + t * 116 + (rnd() - 0.5) * 18, y = 118 - t * 106 + (rnd() - 0.5) * 18;
-    const s = 13 + rnd() * 9, a = rnd() * Math.PI * 2, lobes = rnd() < 0.6 ? 5 : 3;
+  const greens = ["#2f6b2a", "#3f7f32", "#4f9440", "#5f9e46", "#2a5d26"];
+  let seed = 11;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  for (let i = 0; i < 9; i++) {
+    const x = 28 + rnd() * 72, y = 28 + rnd() * 72, a = rnd() * Math.PI * 2, l = 22 + rnd() * 14;
     g.save(); g.translate(x, y); g.rotate(a);
     g.fillStyle = greens[i % greens.length]!;
-    g.beginPath();
-    // Lobed outline: points at each lobe tip, rounded sinuses between, the middle lobe longest.
-    const span = Math.PI * 1.25, n = lobes;
-    for (let k = 0; k <= n; k++) {
-      const ang = -Math.PI / 2 - span / 2 + (span * k) / n;
-      const len = s * (k === Math.floor(n / 2) ? 1 : 0.62 + 0.12 * Math.abs(k - n / 2) / n);
-      const tip = [Math.cos(ang) * len, Math.sin(ang) * len];
-      if (k === 0) g.moveTo(0, s * 0.25);
-      g.quadraticCurveTo(Math.cos(ang - span / n / 2) * s * 0.45, Math.sin(ang - span / n / 2) * s * 0.45, tip[0]!, tip[1]!);
-    }
-    g.quadraticCurveTo(s * 0.5, s * 0.35, 0, s * 0.25);
-    g.fill();
-    g.strokeStyle = "rgba(190,205,160,0.55)"; g.lineWidth = 1;
-    for (let k = 0; k <= n; k += 1) {
-      const ang = -Math.PI / 2 - span / 2 + (span * k) / n;
-      g.beginPath(); g.moveTo(0, s * 0.1); g.lineTo(Math.cos(ang) * s * 0.6, Math.sin(ang) * s * 0.6); g.stroke();
-    }
+    g.beginPath(); g.moveTo(0, -l); g.quadraticCurveTo(l * 0.55, 0, 0, l); g.quadraticCurveTo(-l * 0.55, 0, 0, -l); g.fill();
+    g.strokeStyle = "rgba(20,45,15,0.55)"; g.lineWidth = 1.2;
+    g.beginPath(); g.moveTo(0, -l * 0.9); g.lineTo(0, l * 0.9); g.stroke();
     g.restore();
   }
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
-  ivyTex = t;
+  leafTex = t;
   return t;
 }
 
 /**
- * Ivy (Hedera helix): it climbs every post, thick and close round it, runs along the main beams under the cloth and
- * spills over their ends, and hangs in long uneven trailing strands from the beams and the cloth's long edges.
- * Instanced: one draw for every leaf.
+ * Climbing plants (like a wisteria): leaf clusters spread over the roof (on top of the cloth), thicker along the beams, drooping in short
+ * curtains from the edges, wound up some of the posts, and a few hanging lilac flower bunches. Instanced: one draw for
+ * the leaves, one for the flowers.
  */
-function ivy(W: number, D: number, H: number, xs: number[], hd: number, beamY: number, topY: number): THREE.Group {
+function climbers(W: number, D: number, H: number, xs: number[], hd: number, topY: number): THREE.Group {
   const g = new THREE.Group();
-  const rnd = seeded(23);
-  // x, y, z, size, facing angle (y), tilt (0 vertical leaf facing out, 1 lying flat)
-  const spots: Array<[number, number, number, number, number, number]> = [];
-  // Up every post, denser below the beams, a few posts barely started.
-  for (const z of [-hd, hd]) for (const x of xs) {
-    const reach = rnd() < 0.2 ? 0.4 + rnd() * 0.5 : 1;
-    const top = 0.1 + (beamY + 0.2 - 0.1) * reach;
-    for (let y = 0.08; y < top; y += 0.05) {
-      for (let k = 0; k < 2; k++) {
-        const a = rnd() * Math.PI * 2;
-        const rr = 0.09 + rnd() * 0.07;
-        spots.push([x + Math.cos(a) * rr, y + rnd() * 0.05, z + Math.sin(a) * rr, 0.22 + rnd() * 0.12, -a + Math.PI / 2, 0.1]);
-      }
-    }
+  let seed = 23;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const spots: Array<[number, number, number, number]> = []; // x, y, z, size
+  // The roof: clusters over about two thirds of it, more along the two beams.
+  for (let i = 0; i < 520; i++) {
+    const nearBeam = rnd() < 0.45;
+    const x = (rnd() - 0.5) * (W + 0.2);
+    const z = nearBeam ? (rnd() < 0.5 ? -hd : hd) + (rnd() - 0.5) * 0.9 : (rnd() - 0.5) * (D + 0.2);
+    if (!nearBeam && rnd() < 0.35) continue; // gaps where the light comes through
+    spots.push([x, topY + 0.09 + rnd() * 0.1, z, 0.32 + rnd() * 0.28]); // over the cloth
   }
-  // Along the main beams (both faces and their underside), a thick garland.
-  for (const z of [-hd, hd]) for (let i = 0; i < Math.round(W * 34); i++) {
-    const x = (rnd() - 0.5) * (W + 0.1), face = rnd() < 0.5 ? -1 : 1;
-    spots.push([x, beamY + rnd() * 0.3 - 0.05, z + face * (0.14 + rnd() * 0.1), 0.24 + rnd() * 0.14, face > 0 ? 0 : Math.PI, 0.25 * rnd()]);
+  // Curtains drooping from the long edges.
+  for (const side of [-1, 1]) for (let i = 0; i < 70; i++) {
+    const x = (rnd() - 0.5) * W, drop = rnd() * rnd() * 0.9;
+    spots.push([x, topY - 0.1 - drop, side * (D / 2 + 0.2) + (rnd() - 0.5) * 0.12, 0.26 + rnd() * 0.18]);
   }
-  // Trailing strands hanging from the beams and the cloth's long edges.
-  for (const z of [-hd, hd, -(D / 2 + 0.2), D / 2 + 0.2]) {
-    const nStr = Math.round(W * 2.2);
-    for (let i = 0; i < nStr; i++) {
-      const x = (rnd() - 0.5) * W, len = 0.25 + rnd() * rnd() * Math.min(1.6, H * 0.5);
-      const from = Math.abs(z) > hd + 0.05 ? topY - 0.08 : beamY;
-      for (let y = 0; y < len; y += 0.07) {
-        const sway = Math.sin(y * 4 + i) * 0.04;
-        spots.push([x + sway, from - y, z + (rnd() - 0.5) * 0.06 + Math.sign(z) * 0.06, 0.2 + rnd() * 0.1, Math.sign(z) > 0 ? 0 : Math.PI, 0]);
-      }
-    }
-  }
-  // Tufts creeping over the beams' ends.
-  for (const z of [-hd, hd]) for (const sx of [-1, 1]) for (let i = 0; i < 14; i++) {
-    spots.push([sx * (W / 2 + 0.02 + rnd() * 0.08), beamY - rnd() * 0.5, z + (rnd() - 0.5) * 0.3, 0.17 + rnd() * 0.1, sx > 0 ? Math.PI / 2 : -Math.PI / 2, 0]);
+  // Stems wound up the corner posts and one more, leaves spiralling round them.
+  const wound: Array<[number, number]> = [[xs[0]!, -hd], [xs[xs.length - 1]!, hd], [xs[Math.floor(xs.length / 2)]!, -hd]];
+  for (const [px, pz] of wound) for (let y = 0.25; y < H - 0.5; y += 0.09) {
+    const a = y * 7 + rnd();
+    spots.push([px + Math.cos(a) * 0.14, y, pz + Math.sin(a) * 0.14, 0.18 + rnd() * 0.14]);
   }
   const geo = new THREE.PlaneGeometry(1, 1);
-  const mat = new THREE.MeshStandardMaterial({ map: ivyLeaves(), alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.45, metalness: 0.05 });
+  const mat = new THREE.MeshStandardMaterial({ map: leaves(), alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.75 });
   const im = new THREE.InstancedMesh(geo, mat, spots.length);
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(), pos = new THREE.Vector3();
   const tint = new THREE.Color();
-  spots.forEach(([x, y, z, s, face, flat], i) => {
-    e.set(-flat * Math.PI / 2 + (rnd() - 0.5) * 0.7, face + (rnd() - 0.5) * 0.9, (rnd() - 0.5) * Math.PI, "YXZ");
+  spots.forEach(([x, y, z, s], i) => {
+    e.set(-Math.PI / 2 + (rnd() - 0.5) * 1.6, rnd() * Math.PI * 2, (rnd() - 0.5) * 1.2);
     q.setFromEuler(e); sc.set(s, s, s); pos.set(x, y, z);
     im.setMatrixAt(i, m.compose(pos, q, sc));
-    // Dark glossy greens, a few younger lighter ones and a rare reddish one.
-    const red = rnd() < 0.04;
-    im.setColorAt(i, red ? tint.setHSL(0.03, 0.4, 0.55) : tint.setHSL(0.27 + rnd() * 0.05, 0.4, 0.7 + rnd() * 0.3));
+    im.setColorAt(i, tint.setHSL(0.27 + rnd() * 0.06, 0.45, 0.55 + rnd() * 0.25));
   });
-  im.frustumCulled = false;
   g.add(im);
+  // Hanging lilac flower bunches under the roof.
+  const fl = 46;
+  const fgeo = new THREE.ConeGeometry(0.07, 0.32, 7);
+  fgeo.rotateX(Math.PI); // point down
+  const fim = new THREE.InstancedMesh(fgeo, new THREE.MeshStandardMaterial({ color: "#b8a2e0", roughness: 0.7 }), fl);
+  for (let i = 0; i < fl; i++) {
+    pos.set((rnd() - 0.5) * (W - 0.3), topY - 0.28 - rnd() * 0.12, (rnd() - 0.5) * (D - 0.2));
+    q.setFromEuler(e.set((rnd() - 0.5) * 0.3, 0, (rnd() - 0.5) * 0.3));
+    const k = 0.8 + rnd() * 0.5; sc.set(k, k, k);
+    fim.setMatrixAt(i, m.compose(pos, q, sc));
+    fim.setColorAt(i, tint.setHSL(0.72 + rnd() * 0.05, 0.45, 0.72 + rnd() * 0.1));
+  }
+  g.add(fim);
   return g;
 }
