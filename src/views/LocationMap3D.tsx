@@ -29,7 +29,7 @@ type Shape = HTMLElement & { outerCoordinates?: unknown; coordinates?: unknown }
  * shade net one see-through sheet. Heights start from the photographed mesh and every shape is drawn through it, so
  * nothing ends up buried under the photographed ground.
  */
-function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: Array<[number, number]>, sim: SimLayout | null, adj: Adjust = NO_ADJUST, models = false): HTMLElement[] {
+function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: Array<[number, number]>, sim: SimLayout | null, adj: Adjust = NO_ADJUST, models = false, layer: "base" | "shadows" = "base"): HTMLElement[] {
   // models: the realistic models (views/v10/g3d-models) stand for the trees, pergolas, aiuole, misting poles, shade
   // nets and hedges, so their simple shapes are not drawn; the ground shapes (area, zones, shadows, mist veils, vine
   // zones and rows, lines) stay.
@@ -71,6 +71,12 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
     if (width > 0 && Polyline3DElement) out.push(absLine({ strokeColor: o["strokeColor"], strokeWidth: width }, [...ring, ring[0]!].map(([lat, lng]) => ({ lat, lng, h: h + 0.05 }))));
     return rawPoly(fill, tiles[tiles.length - 1]!, h);
   };
+  // The shadows alone, a layer of their own: they follow the simulation's clock (a new sun every minute), and laid with
+  // everything else they made the whole drawing and its models go and come back each time.
+  if (layer === "shadows") {
+    if (sim?.kind === "piazza") try { for (const r of sim.shadows ?? []) out.push(absPoly({ fillColor: "rgba(11,15,21,0.4)", strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 }, r, 0.74)); } catch { /* polygons not supported */ }
+    return out;
+  }
   // Ground shapes sit on the photographed mesh, 20 cm up, like the place's pin (RELATIVE_TO_MESH): clamped to the terrain
   // model, which in a town lies metres under the mesh, they were drawn below it and, seen tilted, looked shifted from
   // the pin and from the real piazza. An older build without that mode clamps them to the ground as before.
@@ -144,7 +150,7 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
         part(p, p.height, grass ? BEDS_3D.edge : "rgba(0,0,0,0)", grass ? 2 : 0);
       }
       // The shadows of the pergolas and the trees with the sun of the simulation's season and hour, over the lawn.
-      for (const r of sim.shadows ?? []) {
+      for (const r of flat ? [] : sim.shadows ?? []) {
         // Over the aiuole too (their sods lie 0,60–0,70 m up and hid a shadow laid at 0,25 m), a little darker.
         if (flat) out.push(absPoly({ fillColor: "rgba(11,15,21,0.4)", strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 }, r, 0.74));
         else ground(r, "rgba(11,15,21,0.4)");
@@ -319,51 +325,77 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
     }).catch(() => { if (!cancelled) setState("error"); });
     return () => { cancelled = true; mapRef.current = null; badges.current.clear(); el?.replaceChildren(); };
   }, [lat, lng, label, apiKey]);
-  const areaKey = JSON.stringify(area), simKey = JSON.stringify(sim);
+  // Three layers, each laid again only when its own content changes: the drawing (area, zones, ground shapes), the
+  // shadows (they move with the simulation's clock) and the realistic models (kept on the map and only added or taken
+  // away where they change). Before, any change — a minute of the clock, a save — took everything away and laid it again,
+  // and the 3D seemed to reload.
+  const baseSim = sim?.kind === "piazza" ? { ...sim, shadows: [] } : sim;
+  const areaKey = JSON.stringify(area), simKey = JSON.stringify(baseSim);
+  const shadowKey = sim?.kind === "piazza" ? JSON.stringify(sim.shadows ?? []) : "";
+  const modelPool = useRef(new Map<string, HTMLElement>());
   useEffect(() => {
     const map = mapRef.current, lib = libs.current;
     if (state !== "ready" || !map || !lib) return;
     if (!lib.Polygon3DElement || area.length < 3) { misterBadges(lib, map, badges.current, null); return; }
     const floor = adj;
     const added: HTMLElement[] = [];
-    let cancelled = false;
-    const Model = lib.Model3DElement;
     // Laid a moment after the levers stop, so a slide does not rebuild the shapes at every step.
     const timer = window.setTimeout(() => {
-      for (const node of build3DOverlay(lib, area, sim, floor, !!Model && !!sim)) { map.append(node); added.push(node); }
+      for (const node of build3DOverlay(lib, area, baseSim, floor, !!lib.Model3DElement && !!sim)) { map.append(node); added.push(node); }
       misterBadges(lib, map, badges.current, sim, floor);
-      // The realistic models of the AR on their spots (views/v10/g3d-models), each kind built once and then reused.
-      if (!Model || !sim) return;
+    }, 250);
+    return () => { window.clearTimeout(timer); added.forEach((node) => node.remove()); };
+  }, [state, areaKey, simKey, adjKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const map = mapRef.current, lib = libs.current;
+    if (state !== "ready" || !map || !lib?.Polygon3DElement || area.length < 3 || !shadowKey) return;
+    const added = build3DOverlay(lib, area, sim, adj, false, "shadows");
+    added.forEach((node) => map.append(node));
+    return () => added.forEach((node) => node.remove());
+  }, [state, areaKey, shadowKey, adjKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The realistic models (views/v10/g3d-models): each placed model is kept by what it is and where it stands, so a
+  // change lays only the ones that changed and leaves the others where they are.
+  useEffect(() => {
+    const map = mapRef.current, lib = libs.current, Model = lib?.Model3DElement;
+    const pool = modelPool.current;
+    if (state !== "ready" || !map || !Model || !sim || area.length < 3) { pool.forEach((n) => n.remove()); pool.clear(); return; }
+    let cancelled = false;
+    const floor = adj;
+    const timer = window.setTimeout(() => {
       void import("@/views/v10/g3d-models").then(({ modelSpots }) => {
         if (cancelled) return;
         const { spots, ensure } = modelSpots(sim, { lat, lng });
         const dLat = floor.n / 111_320, dLng = floor.e / (111_320 * Math.cos((lat * Math.PI) / 180));
-        const byKey = new Map<string, typeof spots>();
-        for (const sp of spots) byKey.set(sp.key, [...(byKey.get(sp.key) ?? []), sp]);
-        for (const [key, list] of byKey) {
-          void ensure(key).then((src) => {
-            if (cancelled || !src) return;
-            for (const sp of list) {
-              try {
-                const node = new Model({ src, position: { lat: sp.lat + dLat, lng: sp.lng + dLng, altitude: floor.h }, altitudeMode: "RELATIVE_TO_GROUND", orientation: { heading: sp.heading, tilt: 270, roll: 0 }, scale: 1 });
-                map.append(node); added.push(node);
-              } catch { /* an older build without models */ }
-            }
+        const want = new Map(spots.map((sp) => [`${sp.key}@${(sp.lat + dLat).toFixed(7)},${(sp.lng + dLng).toFixed(7)},${sp.heading.toFixed(1)},${floor.h}`, sp]));
+        for (const [id, node] of pool) if (!want.has(id)) { node.remove(); pool.delete(id); }
+        for (const [id, sp] of want) {
+          if (pool.has(id)) continue;
+          void ensure(sp.key).then((src) => {
+            if (cancelled || !src || pool.has(id)) return;
+            try {
+              const node = new Model({ src, position: { lat: sp.lat + dLat, lng: sp.lng + dLng, altitude: floor.h }, altitudeMode: "RELATIVE_TO_GROUND", orientation: { heading: sp.heading, tilt: 270, roll: 0 }, scale: 1 });
+              map.append(node); pool.set(id, node);
+            } catch { /* an older build without models */ }
           });
         }
       });
     }, 250);
-    return () => { cancelled = true; window.clearTimeout(timer); added.forEach((node) => node.remove()); };
-  }, [state, areaKey, simKey, adjKey]);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [state, areaKey, simKey, adjKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The models go with the map (a new place builds a new map).
+  useEffect(() => () => { modelPool.current.forEach((n) => n.remove()); modelPool.current.clear(); }, [lat, lng]);
   // The panel grows when 3D opens (and on rotation): re-frame the place once the size settles.
   useEffect(() => {
     const el = host.current;
     if (!el || typeof ResizeObserver === "undefined") return;
     let timer: number | undefined;
-    let last = el.clientHeight;
+    let last = el.clientHeight, lastW = el.clientWidth;
     const observer = new ResizeObserver(() => {
-      if (Math.abs(el.clientHeight - last) < 4) return;
-      last = el.clientHeight;
+      // Re-framed when the panel really changes (3D opening, the phone turned): not for the few pixels the page's bars
+      // take or give back while scrolling, which put the camera back and looked like a reload.
+      const w = el.clientWidth, h = el.clientHeight;
+      if (Math.abs(w - lastW) < 4 && Math.abs(h - last) < Math.max(40, last * 0.15)) return;
+      last = h; lastW = w;
       window.clearTimeout(timer);
       timer = window.setTimeout(() => recenter(false), 120);
     });
