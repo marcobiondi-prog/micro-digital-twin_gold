@@ -257,8 +257,8 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
     if ((action === "ai" || action === "burst") && !guardUse("fotocamera")) return;
     if (action === "ai") { if (aiReady) void prepareArOrientation().then(() => setAr("photo")); }
     else if (action === "gallery") void pickGallery();
-    // The app's own camera (the dock's Foto): Singolo or Multiplo without closing, and a held shutter shoots in a row,
-    // which the phone's own camera cannot do. It opens on Singolo.
+    // The app's own camera (the dock's Foto): a tap takes one photo, a held shutter shoots a series in a row,
+    // which the phone's own camera cannot do.
     else if (action === "burst") void prepareSystemCamera().then(() => setSystemCamera("photo"));
     else openCamera(action);
   };

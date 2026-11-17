@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Camera, Check, Star, Trash2, X, Zap, ZapOff } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Camera, X, Zap, ZapOff } from "lucide-react";
 import { probeCameraTorch, setCameraTorch, supportsCameraTorch } from "@/lib/camera-torch";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -12,101 +12,55 @@ import { hapticTick } from "@/lib/haptics";
 import { useHoldBurst } from "@/lib/hold-burst";
 import { createTrackZoomer, pinchZoom, splitZoom, trackZoomRange, zoomHaptic, ZOOM_MAX, ZOOM_MIN } from "@/lib/camera-zoom";
 import { ZoomDial } from "@/views/ZoomDial";
-import { useBurstDock } from "@/lib/use-burst-dock";
+import { BurstReviewSheet, BurstThumb } from "@/views/BurstReview";
 
 /**
- * Live capture for hosts without native HTML capture, such as Windows tablets, and for the multiple shot ("burst"):
- * the camera stays open, every tap on the shutter keeps one more photo, and "Fine" (or closing) adds them all at once.
+ * Live capture for hosts without native HTML capture, such as Windows tablets, and for the multiple shot:
+ * a tap takes one photo; holding the shutter shoots a series until the finger lifts (the camera stays open). The series
+ * shows as a thumbnail beside the shutter; a tap on it opens the same review sheet as the AI camera (a tap sets a photo
+ * aside, "Aggiungi n" hands the rest over). Closing the camera, or taking a single photo, hands the kept ones over too.
  */
 export function SystemCamera({ mode, onCapture, onClose: close }: {
   mode: "photo" | "video" | "burst" | null;
   onCapture: (files: File[]) => void;
   onClose: () => void;
 }) {
-  // Each shot of the multiple shot: the frame grabbed at the tap at once, swapped for the camera's full-resolution
-  // photo when that arrives (sharp = true).
+  // Each shot of the multiple shot: the frame grabbed at the tap, its JPEG encoded off the main thread.
   type Shot = { id: number; file: Promise<File | null>; thumb: string };
   const [shots, setShots] = useState<Shot[]>([]);
   const shotsRef = useRef(shots);
   shotsRef.current = shots;
-  const [bestShotId, setBestShotId] = useState<number | null>(null);
-  const bestShotIdRef = useRef(bestShotId);
-  bestShotIdRef.current = bestShotId;
+  // Review sheet of the series: shots tapped there are set aside and left out when the rest is added.
+  const [reviewing, setReviewing] = useState(false);
+  const [discarded, setDiscarded] = useState<Set<number>>(() => new Set());
+  const discardedRef = useRef(discarded);
+  discardedRef.current = discarded;
   const [flash, setFlash] = useState(0);
   const [pending, setPending] = useState(0);
-  const [asking, setAsking] = useState(false);
-  // The photo camera turns into the multiple shot without closing: the Singolo | Multiplo switch, or holding the shutter.
-  const [multi, setMulti] = useState(mode === "burst");
-  useEffect(() => { setMulti(mode === "burst"); }, [mode]);
-  const burst = mode !== "video" && mode !== null && multi;
+  // mode "burst" (asked by name) keeps every tap in the series; otherwise only a held shutter does.
+  const burstMode = mode === "burst";
 
-  const { carouselRef, updateDockEffect } = useBurstDock(Boolean(burst), shots.length, setBestShotId);
-
-  useEffect(() => {
-    if (burst && shots.length > 0) {
-      const el = carouselRef.current;
-      if (el) {
-        const lastItem = el.querySelector<HTMLElement>("[data-burst-item]:last-child");
-        if (lastItem) {
-          lastItem.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-        }
-      }
-    }
-  }, [burst, shots.length, carouselRef]);
-
-  const finish = useCallback((keep: boolean) => {
-    const taken = shotsRef.current;
-    // Shots still encoding are waited for, then handed over together: nothing shot is lost.
-    if (taken.length && keep) {
-      const bestId = bestShotIdRef.current;
-      const ordered = bestId
-        ? [...taken.filter((s) => s.id === bestId), ...taken.filter((s) => s.id !== bestId)]
-        : taken;
-      void Promise.all(ordered.map((s) => s.file)).then((files) => {
+  /** Hands the kept shots over (waiting for those still encoding: nothing shot is lost) and empties the series. */
+  const handOver = useCallback(() => {
+    const kept = shotsRef.current.filter((s) => !discardedRef.current.has(s.id));
+    if (kept.length) {
+      void Promise.all(kept.map((s) => s.file)).then((files) => {
         const ready = files.filter((f): f is File => !!f);
         if (ready.length) onCapture(ready);
       });
     }
     shotsRef.current = [];
     setShots([]);
-    setBestShotId(null);
-    setAsking(false);
-    close();
-  }, [close, onCapture]);
-  // Closing a multiple shot by Back or a swipe keeps what was taken: nothing shot is ever lost.
-  const onClose = useCallback(() => finish(true), [finish]);
-  // Back to Singolo at any time: the shots of the multiple shot go to the simulation at once (none is lost) and the
-  // camera stays open for single photos.
-  const backToSingle = () => {
-    const taken = shotsRef.current;
-    if (taken.length) {
-      const bestId = bestShotIdRef.current;
-      const ordered = bestId
-        ? [...taken.filter((s) => s.id === bestId), ...taken.filter((s) => s.id !== bestId)]
-        : taken;
-      void Promise.all(ordered.map((s) => s.file)).then((files) => { const ready = files.filter((f): f is File => !!f); if (ready.length) onCapture(ready); });
-      shotsRef.current = [];
-      setShots([]);
-      setBestShotId(null);
-    }
-    setMulti(false);
-  };
-  const dropShot = (id: number) => {
-    setShots((p) => {
-      const next = p.filter((s) => s.id !== id);
-      if (bestShotIdRef.current === id) {
-        setBestShotId(next.length > 0 ? next[next.length - 1].id : null);
-      }
-      return next;
-    });
-  };
-  const pickBestShot = (id: number, el?: HTMLElement | null) => {
-    setBestShotId(id);
-    hapticTick(25);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-      setTimeout(updateDockEffect, 200);
-    }
+    setDiscarded(new Set());
+    setReviewing(false);
+  }, [onCapture]);
+  // Closing the camera by ✕, Back or a swipe keeps the series: nothing shot is ever lost.
+  const onClose = useCallback(() => { handOver(); close(); }, [handOver, close]);
+  const discardAll = () => {
+    shotsRef.current = [];
+    setShots([]);
+    setDiscarded(new Set());
+    setReviewing(false);
   };
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -233,7 +187,7 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
     };
   }, [mode]);
 
-  const { holding, onHold } = useHoldBurst(() => capture(), () => setMulti(true));
+  const { holding, onHold } = useHoldBurst(() => capture());
   function capture() {
     const video = videoRef.current;
     const stream = streamRef.current;
@@ -249,8 +203,8 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
       if (!context || !canvas.width || !canvas.height) return;
       playCameraSound("shutter");
       context.drawImage(video, (video.videoWidth - sw) / 2, (video.videoHeight - sh) / 2, sw, sh, 0, 0, sw, sh);
-      if (burst || holding.current) {
-        // The multiple shot answers at once: flash, sound and tick first, a small preview in the strip right away,
+      if (burstMode || holding.current) {
+        // The multiple shot answers at once: flash, sound and tick first, its thumbnail beside the shutter right away,
         // while the full frame encodes off the main thread. No full-resolution photo per shot: on phones it pauses
         // the preview each time and made the shots lag.
         setFlash((n) => n + 1);
@@ -268,7 +222,6 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
           resolve(blob ? new File([blob], `multiplo-${Math.floor(id)}.jpg`, { type: "image/jpeg" }) : null);
         }, "image/jpeg", 0.9));
         setShots((p) => [...p, { id, file, thumb }]);
-        setBestShotId(id);
         return;
       }
       // A single photo: the camera's own full-resolution photo where the phone offers it, else the frame.
@@ -322,7 +275,6 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
   }
 
   const surfaceRef = useRef<HTMLDivElement>(null);
-  const [zoomRulerActive, setZoomRulerActive] = useState(false);
   const [landscape, setLandscape] = useState(false);
 
   useEffect(() => {
@@ -336,31 +288,6 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
     };
   }, []);
 
-  useLayoutEffect(() => {
-    const surface = surfaceRef.current;
-    if (!surface) return;
-    const measure = () => {
-      if (!landscape) {
-        const burstBar = surface.querySelector<HTMLElement>(".ar-burst-bar");
-        if (burstBar) {
-          const barRect = burstBar.getBoundingClientRect();
-          const surfaceRect = surface.getBoundingClientRect();
-          const bottomPx = Math.max(0, Math.round(surfaceRect.bottom - barRect.top + 6));
-          if (surface.style.getPropertyValue("--ar-burst-shelf-bottom") !== `${bottomPx}px`) {
-            surface.style.setProperty("--ar-burst-shelf-bottom", `${bottomPx}px`);
-          }
-        }
-      } else {
-        surface.style.removeProperty("--ar-burst-shelf-bottom");
-      }
-    };
-    measure();
-    const hud = surface.querySelector<HTMLElement>(".camera-bottom");
-    if (!hud || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(measure);
-    ro.observe(hud);
-    return () => ro.disconnect();
-  }, [burst, shots.length, zoomRulerActive, canZoom, ready, landscape]);
 
   return (
     <Dialog open={mode !== null} onOpenChange={(open) => { if (!open) onClose(); }} modal>
@@ -372,7 +299,7 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
         className="camera-hud inset-0 left-0 top-0 block h-dvh w-screen max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 bg-camera-surface p-0 text-camera-ink shadow-none duration-0 data-[state=open]:animate-none data-[state=closed]:animate-none sm:max-h-none sm:overflow-hidden sm:rounded-none [&>button]:hidden"
         aria-describedby={undefined}
       >
-        <DialogTitle className="sr-only">{mode === "video" ? "Registra video" : burst ? "Scatto multiplo" : "Scatta foto"}</DialogTitle>
+        <DialogTitle className="sr-only">{mode === "video" ? "Registra video" : burstMode ? "Scatto multiplo" : "Scatta foto"}</DialogTitle>
         <CameraCloseGestures onClose={onClose} onPinch={canZoom ? onPinch : undefined}>
         <div className="absolute inset-0">
           <video ref={videoRef} autoPlay muted playsInline className="h-full w-full object-cover" style={digital > 1 ? { transform: `scale(${digital})` } : undefined} />
@@ -383,162 +310,30 @@ export function SystemCamera({ mode, onCapture, onClose: close }: {
         {flash > 0 && <div key={flash} className="burst-flash pointer-events-none absolute inset-0 bg-white" aria-hidden="true" />}
         <CameraCenterCapture onCapture={capture} disabled={!ready || !!error} label={mode === "video" ? (recording ? "Termina e salva" : "Avvia registrazione") : "Scatta foto"} />
         <div className="camera-topbar">
-          <span className="camera-title"><Camera className="size-4" /> {burst ? "Scatto multiplo" : "Fotocamera"}</span>
+          <span className="camera-title"><Camera className="size-4" /> {burstMode ? "Scatto multiplo" : "Fotocamera"}</span>
           <span className="ml-auto flex items-center gap-2">
-            {burst && shots.length > 0 && (
-              <button type="button" onClick={() => finish(true)} className="inline-flex h-10 items-center gap-1.5 rounded-full bg-white px-4 text-sm font-semibold text-black disabled:opacity-80">
-                <Check className="size-4" aria-hidden="true" /> Fine · {shots.length} foto
-              </button>
-            )}
             {/* The same flash button as the AI camera's: a round glass tool, lit like a pressed tool while on. */}
             {torch !== "none" && <Button variant="ghost" size="icon" className="camera-tool size-11 aria-pressed:border-camera-ink aria-pressed:bg-camera-surface" aria-pressed={torch === "on"} aria-label={torch === "on" ? "Disattiva flash" : "Attiva flash"} title={torch === "on" ? "Disattiva flash" : "Attiva flash"} onClick={() => void toggleTorch()}>{torch === "on" ? <Zap className="size-4" /> : <ZapOff className="size-4" />}</Button>}
-            <Button variant="ghost" size="icon" onClick={() => (burst && shots.length ? setAsking(true) : onClose())} aria-label="Chiudi fotocamera" title="Chiudi fotocamera" className="camera-tool size-11"><X className="size-4" /></Button>
+            <Button variant="ghost" size="icon" onClick={onClose} aria-label="Chiudi fotocamera" title="Chiudi fotocamera" className="camera-tool size-11"><X className="size-4" /></Button>
           </span>
         </div>
         {torchNote && <p role="status" className="absolute inset-x-6 top-20 z-10 mx-auto max-w-sm rounded-full bg-black/70 px-4 py-2 text-center text-sm text-white">{torchNote}</p>}
-        {asking && (
-          <div className="absolute inset-0 z-20 grid place-items-center bg-black/60 p-6 backdrop-blur-sm" role="alertdialog" aria-labelledby="burst-ask">
-            <div className="w-full max-w-xs rounded-3xl bg-[oklch(0.25_0.016_258)] p-5 text-white shadow-2xl ring-1 ring-white/15">
-              <p id="burst-ask" className="text-lg font-semibold">Hai scattato {shots.length} foto</p>
-              <p className="mt-1 text-sm text-white/70">Le aggiungo alla simulazione o le scarto?</p>
-              <div className="mt-4 grid gap-2">
-                <button type="button" onClick={() => finish(true)} className="h-11 rounded-full bg-white font-semibold text-black">Aggiungi {shots.length}</button>
-                <button type="button" onClick={() => setAsking(false)} className="h-11 rounded-full bg-white/10 font-semibold">Continua a scattare</button>
-                <button type="button" onClick={() => finish(false)} className="h-11 rounded-full font-semibold text-red-400">Scarta tutte</button>
-              </div>
-            </div>
-          </div>
-        )}
-        {burst && shots.length > 0 && (
-          <aside className="ar-burst-shelf" data-camera-controls>
-            <div className="ar-burst-header flex w-full max-w-[min(26rem,92vw)] items-center justify-between px-2 text-[10.5px] font-semibold text-white/90 [text-shadow:0_1px_2px_black]">
-              <span>
-                {shots.length}{" "}
-                <span className="ar-burst-header-long">{shots.length === 1 ? "foto scattata" : "foto scattate"}</span>
-                <span className="ar-burst-header-short">foto</span>
-              </span>
-              <span className="flex items-center gap-1 font-bold text-[#00d296]">
-                <Star className="size-2.5 fill-current" />
-                <span className="ar-burst-header-long">Scatto al centro selezionato</span>
-                <span className="ar-burst-header-short">Al centro</span>
-              </span>
-            </div>
-            <div className="ar-burst-track-wrap relative w-full max-w-full flex flex-col items-center overflow-visible">
-              {/* Selettore verde fisso al centro: non scorre con le foto, indica sempre lo scatto centrale attivo */}
-              <div
-                className="ar-burst-center-selector pointer-events-none absolute left-1/2 -translate-x-1/2 top-0.5 z-30 flex flex-col items-center"
-                aria-hidden="true"
-              >
-                <span className="flex items-center gap-1 rounded-full bg-[#00d296] px-2 py-0.5 text-[9px] font-extrabold text-[#042017] shadow-[0_2px_10px_rgba(0,210,150,0.7)] whitespace-nowrap">
-                  <Star className="size-2.5 fill-current" /> Migliore
-                </span>
-                <span className="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-[#00d296] -mt-[0.5px]" />
-              </div>
-              <div
-                ref={carouselRef}
-                onScroll={updateDockEffect}
-                data-map-gestures
-                className="ar-burst-carousel w-full max-w-full"
-              >
-                {shots.map((s, i) => {
-                  const isBest = s.id === (bestShotId ?? shots[shots.length - 1]?.id);
-                  return (
-                    <div
-                      key={s.id}
-                      data-burst-item
-                      data-burst-id={s.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={(e) => pickBestShot(s.id, e.currentTarget)}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickBestShot(s.id, e.currentTarget as HTMLElement); } }}
-                      aria-label={`Foto ${i + 1}${isBest ? " (Scatto migliore selezionato al centro)" : " (Tocca per portare al centro)"}`}
-                      className={`relative shrink-0 snap-center rounded-lg p-0.5 cursor-pointer transition-opacity duration-150 ${
-                        isBest
-                          ? "ring-2 ring-[#00d296] shadow-[0_0_16px_rgba(0,210,150,0.85)] opacity-100"
-                          : "ring-1 ring-white/35 hover:ring-white/70 opacity-65 hover:opacity-95"
-                      }`}
-                    >
-                      <img
-                        src={s.thumb}
-                        alt={`Foto ${i + 1}`}
-                        className="size-12 rounded-md object-cover"
-                      />
-                      <span className="absolute bottom-1 left-1.5 rounded-full bg-black/75 px-1 text-[8.5px] font-bold text-white [text-shadow:0_1px_2px_black]">
-                        {i + 1}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          dropShot(s.id);
-                        }}
-                        aria-label={`Togli la foto ${i + 1}`}
-                        className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-black/85 text-white ring-1 ring-white/40 hover:bg-destructive hover:scale-110 transition-transform"
-                      >
-                        <X className="size-3" />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </aside>
+        {reviewing && shots.length > 0 && (
+          <BurstReviewSheet shots={shots} discarded={discarded} onClose={() => setReviewing(false)} onAdd={handOver} onDiscardAll={discardAll}
+            onToggleShot={(id) => setDiscarded((d) => { const n = new Set(d); if (n.has(id)) n.delete(id); else n.add(id); return n; })} />
         )}
         <div className={`camera-bottom absolute z-20 flex flex-col items-center ${landscape ? "gap-1.5" : "gap-2"}`}>
-          {!error && mode !== "video" && (
-            <div
-              className={`ar-burst-bar${zoomRulerActive ? " is-zoom-active" : ""}`}
-              data-camera-controls
-            >
-              <div className="relative flex items-center justify-center">
-                <div
-                  role="radiogroup"
-                  aria-label="Tipo di scatto"
-                  className="flex rounded-full bg-black/55 p-0.5 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur"
-                >
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={!burst}
-                    onClick={backToSingle}
-                    disabled={burst && shots.length > 0}
-                    title={burst && shots.length > 0 ? "Prima tocca Fine per tenere gli scatti" : undefined}
-                    className={`h-8 rounded-full px-3 ${!burst ? "bg-white text-black" : ""} disabled:opacity-40`}
-                  >
-                    Singolo
-                  </button>
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={burst}
-                    onClick={() => setMulti(true)}
-                    className={`h-8 rounded-full px-3 ${burst ? "bg-white text-black" : ""}`}
-                  >
-                    Multiplo
-                  </button>
-                </div>
-                {burst && shots.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => finish(true)}
-                    className="absolute left-[calc(100%+0.5rem)] top-1/2 -translate-y-1/2 inline-flex h-8 items-center gap-1 rounded-full bg-white px-3.5 text-xs font-semibold text-black shadow-md whitespace-nowrap"
-                  >
-                    <Check className="size-3.5" aria-hidden="true" />Fine · {shots.length}
-                  </button>
-                )}
-              </div>
-              <span className="sr-only" role="status" aria-live="polite">{burst ? `${shots.length} foto scattate` : ""}</span>
-            </div>
-          )}
+          <span className="sr-only" role="status" aria-live="polite">{shots.length ? `${shots.length} foto nel multiplo` : ""}</span>
           {canZoom && ready && (
             <ZoomDial
               zoom={zoom}
               max={mode === "video" && zoomRangeRef.current ? zoomRangeRef.current.max / zoomRangeRef.current.min : ZOOM_MAX}
               onZoom={setZoom}
-              onRulerChange={setZoomRulerActive}
             />
           )}
-          <CameraCaptureControl mode={mode === "video" ? "video" : "photo"} recording={recording} disabled={!ready || !!error || (!burst && pending > 0)} onCapture={capture} {...(mode !== "video" ? { onHold } : {})} />
+          <CameraCaptureControl mode={mode === "video" ? "video" : "photo"} recording={recording} disabled={!ready || !!error || (!burstMode && !shots.length && pending > 0)} onCapture={capture}
+            {...(mode !== "video" ? { onHold } : {})}
+            left={mode !== "video" && shots.length > 0 ? <BurstThumb shots={shots} open={reviewing} onToggle={() => setReviewing((r) => !r)} /> : undefined} />
         </div>
         </CameraCloseGestures>
       </DialogContent>

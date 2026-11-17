@@ -2,6 +2,8 @@ import { Check, X } from "lucide-react";
 
 /** src: where it was shot — "ar" in the AR view, "ai" in Rileva (shown as a tag on each photo). */
 export type BurstShot = { id: number; file: File; thumb: string; src?: "ar" | "ai" };
+/** What the thumbnail and the sheet need of a shot (the in-app camera's file is still a promise while it encodes). */
+export type BurstPreview = Pick<BurstShot, "id" | "thumb" | "src">;
 
 /**
  * The multiple shot's thumbnail (its last photo, the count in a turquoise badge) and its review sheet — shared by the
@@ -9,7 +11,7 @@ export type BurstShot = { id: number; file: File; thumb: string; src?: "ar" | "a
  * scrolling in its own box (3 columns upright, 6 sideways), a tap sets one aside (greyed with ✕) and another keeps it,
  * "Scarta tutte" in red and the white "Aggiungi n", which hands the kept ones over.
  */
-export function BurstThumb({ shots, open, onToggle }: { shots: readonly BurstShot[]; open: boolean; onToggle: () => void }) {
+export function BurstThumb({ shots, open, onToggle }: { shots: readonly BurstPreview[]; open: boolean; onToggle: () => void }) {
   const last = shots[shots.length - 1];
   if (!last) return null;
   return (
@@ -23,7 +25,7 @@ export function BurstThumb({ shots, open, onToggle }: { shots: readonly BurstSho
 }
 
 export function BurstReviewSheet({ shots, discarded, onToggleShot, onClose, onAdd, onDiscardAll, fixed = false }: {
-  shots: readonly BurstShot[]; discarded: ReadonlySet<number>; onToggleShot: (id: number) => void;
+  shots: readonly BurstPreview[]; discarded: ReadonlySet<number>; onToggleShot: (id: number) => void;
   onClose: () => void; onAdd: () => void; onDiscardAll: () => void; fixed?: boolean;
 }) {
   const kept = shots.filter((s) => !discarded.has(s.id)).length;
