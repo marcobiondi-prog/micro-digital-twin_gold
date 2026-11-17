@@ -12,6 +12,7 @@ import { drawnAreaFor, type DrawnArea } from "@/models/drawn-area";
 import { readFix } from "@/lib/find-position";
 import { hapticTick } from "@/lib/haptics";
 import { contactShadow, floorLoop, objectMesh } from "@/views/ar-object-meshes";
+import { buildPlan, planText } from "@/views/ar-plan";
 import { realTree, wantsRealTree } from "@/views/ar-tree";
 import { ArShadows, castShadows } from "@/views/ar-shadow";
 import { XREstimatedLight } from "three/examples/jsm/webxr/XREstimatedLight.js";
@@ -213,11 +214,16 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const live = useRef({ selected, tool, placed, alignPts, measure });
   live.current = { selected, tool, placed, alignPts, measure };
   const shadowsRef = useRef<ArShadows | null>(null);
+  // The project's interventions shown on their spots once aligned; a key so they follow the levers.
+  const [showPlan, setShowPlan] = useState(true);
+  const planSaid = useRef("");
   const three = useRef<{ scene: THREE.Scene; reticle: THREE.Object3D; hit: V | null; objects: Map<string, THREE.Object3D>; overlay: THREE.Group; measure: THREE.Group; floorY: number | null; renderer: THREE.WebGLRenderer; camera: THREE.Camera } | null>(null);
 
   const lab = getLab();
   const loc = kind === "urban" ? lab.urban.location : lab.vineyard.location;
   const area: DrawnArea | null = drawnAreaFor(kind === "urban" ? lab.urban.area : lab.vineyard.area, loc);
+  const u = lab.urban, vz = lab.vineyard.zones;
+  const planKey = kind === "urban" ? `${u.trees}|${u.permeable}|${u.shade}|${u.misters ?? 0}|${u.sprinklers ?? 0}` : JSON.stringify(vz.map((z) => [z.irrigation, z.shade, z.windbreak]));
   // The metre frame of the map: the area's middle (else the place).
   const origin = useMemo(() => {
     if (!area) return { lat: loc.lat, lng: loc.lng };
@@ -490,7 +496,18 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     };
     loop(area.ring, "#ffffff");
     for (const z of area.zones ?? []) if (z.ring.length >= 3) loop(z.ring, "#4ade80");
-  }, [alignment, area, origin]);
+    // The project's interventions from the map, each on its own spot (views/ar-plan).
+    if (!showPlan) return;
+    const { group, count } = buildPlan(kind, getLab(), area, origin, alignment.a);
+    group.position.y = y;
+    castShadows(group);
+    t.overlay.add(group);
+    const said = planText(count);
+    if (said && planSaid.current !== `${alignment.how}:${said}`) {
+      planSaid.current = `${alignment.how}:${said}`;
+      setNotice({ text: `Dal progetto: ${said}${alignment.how === "gps" ? " · posizione dal GPS, tocca i 2 angoli per allinearli bene" : ""}`, tone: "ok" });
+    }
+  }, [alignment, area, origin, showPlan, kind, planKey]);
 
   // The measuring tape between the two points.
   useEffect(() => {
@@ -524,7 +541,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     const { kept: zones, out } = zonesInside(objectsToZones(kind, placed, alignment.a, origin), area.ring);
     if (!zones.length) { setNotice({ text: "Sono tutti fuori dall’area disegnata", tone: "warn" }); return; }
     const next: DrawnArea = { ...area, zones: [...(area.zones ?? []), ...zones] };
-    if (kind === "urban") setUrban({ area: next }); else setVineyard({ area: next });
+    // Sprinklers put in AR also count on their lever (their zone is green ground; the heads are the lever's).
+    const heads = placed.filter((o) => o.id === "innaffiatoio").length;
+    if (kind === "urban") setUrban({ area: next, ...(heads ? { sprinklers: Math.min(20, (getLab().urban.sprinklers ?? 0) + heads) } : {}) }); else setVineyard({ area: next });
     hapticTick([20, 40, 20]);
     setNotice({ text: `${zones.length} sulla mappa${out ? ` · ${out} fuori dall’area` : ""}`, tone: "ok" });
     window.setTimeout(end, 2200);
@@ -728,6 +747,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const objectItems: FanItem[] = objectChoices.map(({ key, def: o }) => ({ key, label: o.label, Icon: OBJECT_ICONS[o.id] ?? Sparkles, on: tool === "place" && selected === key, onPick: () => pick(key) }));
   const toolItems: FanItem[] = [
     { key: "t:misura", label: "Misura", Icon: Ruler, tool: true, on: tool === "measure", onPick: () => { setTool("measure"); setMeasure([]); setTrayOpen(false); } },
+    ...(area ? [{ key: "t:progetto", label: showPlan ? "Nascondi progetto" : "Mostra progetto", Icon: MapPinned, tool: true, on: showPlan,
+      aria: showPlan ? "Nascondi gli interventi della mappa" : "Mostra gli interventi della mappa nel loro punto",
+      onPick: () => { setShowPlan((v) => !v); setTrayOpen(false); setNotice({ text: showPlan ? "Interventi della mappa nascosti" : "Interventi della mappa nel loro punto", tone: "ok" }); } }] : []),
     { key: "t:modellino", label: model ? "Grandezza vera" : "Modellino", Icon: Box, tool: true, on: model, aria: model ? "Torna alla grandezza vera" : "Modellino in scala 1:10",
       onPick: () => { setModel((m) => !m); setTrayOpen(false); setNotice({ text: model ? "Grandezza vera" : "Modellino 1:10 · per provare al chiuso o su un tavolo", tone: "ok" }); } },
     // ARCore's depth as a test: switching it on or off restarts the session (it is asked when the session starts).
