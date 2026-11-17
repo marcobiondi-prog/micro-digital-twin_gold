@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// The realistic tree generator loads in the browser only.
+vi.mock("@/views/ar-tree", () => ({ realTree: async () => null }));
 import { buildPlan } from "@/views/ar-plan";
 import { piazzaLayout } from "@/models/area-layout";
 import { enToAr, toEN } from "@/models/ar-objects";

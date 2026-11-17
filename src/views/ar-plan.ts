@@ -6,6 +6,8 @@ import { arObject, enToAr, toEN, type Alignment } from "@/models/ar-objects";
 import { vineMixOf, zoneMixOf } from "@/models/vine-interventions";
 import { objectMesh } from "@/views/ar-object-meshes";
 import { realPergola } from "@/views/ar-pergola";
+import { realBed } from "@/views/ar-bed";
+import { realTree } from "@/views/ar-tree";
 
 /**
  * The project's interventions as they stand on the map, put back in the real world in the AR view: once the AR floor
@@ -15,7 +17,7 @@ import { realPergola } from "@/views/ar-pergola";
  * Light shapes, a few pergolas at most, so the phone keeps up.
  */
 type XZ = { x: number; z: number };
-const MAX_PERGOLAS = 6, MAX_TREES = 30;
+const MAX_PERGOLAS = 6, MAX_TREES = 30, MAX_BEDS = 8;
 
 /** An oriented box of a patch in AR metres: its longest edge sets the direction. */
 function rectOf(pts: XZ[]): { cx: number; cz: number; w: number; d: number; yaw: number } {
@@ -59,9 +61,17 @@ export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: Drawn
     const u = lab.urban;
     const L = piazzaLayout(area.ring, u.trees, u.permeable, u.shade, edits, inner, u.misters ?? 0, [], u.sprinklers ?? 0);
     if (!L) return { group: g, count };
+    // Aiuole: the realistic bed (stones, pebbles, soil, grass, flowers) sized and turned to each patch; past a few,
+    // or a patch too thin for one, the plain green ground.
     for (const p of L.patches) {
-      const pts = p.ring.map(ar);
-      if (p.kind === "lawn") { g.add(flat(pts, "#4f8f3a", 0.72, 0.015)); count.beds++; }
+      if (p.kind !== "lawn") continue;
+      const pts = p.ring.map(ar), r = rectOf(pts);
+      if (count.beds < MAX_BEDS && r.w >= 0.8 && r.d >= 0.8) {
+        const bed = realBed({ w: r.w, d: r.d });
+        bed.rotation.y = r.yaw;
+        put(bed, { x: r.cx, z: r.cz });
+      } else g.add(flat(pts, "#4f8f3a", 0.72, 0.015));
+      count.beds++;
     }
     for (const p of L.patches.filter((q) => q.kind === "shade").slice(0, MAX_PERGOLAS)) {
       const r = rectOf(p.ring.map(ar));
@@ -72,7 +82,8 @@ export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: Drawn
       count.pergolas++;
     }
     const tree = arObject("urban", "albero");
-    for (const t of L.trees.slice(0, MAX_TREES)) { put(objectMesh(tree), ar(t)); count.trees++; }
+    // Trees: the simple shape at once, the realistic tree in its place once grown (growPlan).
+    for (const t of L.trees.slice(0, MAX_TREES)) { const o = objectMesh(tree); o.userData["planTree"] = true; put(o, ar(t)); count.trees++; }
     const mister = arObject("urban", "nebulizzatore");
     for (const m of L.misters) { put(objectMesh(mister), ar(m)); count.misters++; }
     const spr = arObject("urban", "innaffiatoio");
@@ -110,6 +121,32 @@ export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: Drawn
     }
   }
   return { group: g, count };
+}
+
+/**
+ * Grows the realistic trees (EZ-Tree, the same as «Albero» put by hand) and swaps them for the simple shapes: a few
+ * grown once and cloned, each turned and sized a little differently, so thirty trees stay light. alive() says
+ * whether the plan is still on screen (the levers may have rebuilt it meanwhile).
+ */
+export async function growPlan(group: THREE.Group, alive: () => boolean, onTree?: (o: THREE.Object3D) => void): Promise<void> {
+  const spots = group.children.filter((c) => c.userData["planTree"]);
+  if (!spots.length) return;
+  const def = arObject("urban", "albero");
+  const variants: THREE.Object3D[] = [];
+  for (let i = 0; i < Math.min(3, spots.length); i++) {
+    const t = await realTree(def);
+    if (!alive()) return;
+    if (t) variants.push(t);
+  }
+  if (!variants.length) return;
+  spots.forEach((spot, i) => {
+    const tree = variants[i % variants.length]!.clone(true);
+    tree.rotation.y = (i * 2.399) % (Math.PI * 2);
+    tree.scale.multiplyScalar(0.9 + ((i * 0.37) % 0.2));
+    (spot as THREE.Group).clear();
+    spot.add(tree);
+    onTree?.(tree);
+  });
 }
 
 export function planText(c: PlanCount): string {

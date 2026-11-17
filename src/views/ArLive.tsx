@@ -12,7 +12,7 @@ import { drawnAreaFor, type DrawnArea } from "@/models/drawn-area";
 import { readFix } from "@/lib/find-position";
 import { hapticTick } from "@/lib/haptics";
 import { contactShadow, floorLoop, objectMesh } from "@/views/ar-object-meshes";
-import { buildPlan, planText } from "@/views/ar-plan";
+import { buildPlan, growPlan, planText } from "@/views/ar-plan";
 import { realTree, wantsRealTree } from "@/views/ar-tree";
 import { ArShadows, castShadows } from "@/views/ar-shadow";
 import { XREstimatedLight } from "three/examples/jsm/webxr/XREstimatedLight.js";
@@ -502,6 +502,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     group.position.y = y;
     castShadows(group);
     t.overlay.add(group);
+    void growPlan(group, () => group.parent === t.overlay, castShadows);
     const said = planText(count);
     if (said && planSaid.current !== `${alignment.how}:${said}`) {
       planSaid.current = `${alignment.how}:${said}`;
