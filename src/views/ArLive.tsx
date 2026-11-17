@@ -453,18 +453,21 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
           const len = Math.hypot(dx, dz);
           if (len > 0.05) {
             dx /= len; dz /= len;
-            const reach = (def.d / 2 - 0.12) * modelRef.current;
+            const reach = (def.d / 2 - 0.12) * modelRef.current * sizeRef.current;
             cx = hit.x + dx * reach; cz = hit.z + dz * reach;
             g.rotation.y = Math.atan2(dx, dz);
             yaw = -g.rotation.y;
           }
         }
         g.position.set(cx, hit.y, cz);
-        g.scale.setScalar(modelRef.current);
+        // A new object takes the size given last with two fingers, so what is put after it stays in proportion.
+        const k = sizeRef.current;
+        g.scale.setScalar(modelRef.current * k);
         castShadows(g);
         t.scene.add(g);
         t.objects.set(uid, g);
-        setPlaced((l) => [...l, { uid, id: def.id, x: cx, z: cz, yaw, ...(def.plant ? { def } : {}) }]);
+        setPlaced((l) => [...l, { uid, id: def.id, x: cx, z: cz, yaw, ...(k !== 1 ? { scale: k } : {}), ...(def.plant ? { def } : {}) }]);
+        if (k !== 1) setNotice({ text: `${def.label} · ${metresText(def.h * k)} di altezza, in scala come il precedente (${Math.round(k * 100)} %)`, tone: "ok" });
         hapticTick(placeHaptic(def));
       } else if (tl === "align") {
         setAlignPts((pts) => (pts.length >= 2 ? [hit] : [...pts, hit]));
@@ -659,6 +662,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelK]);
   // Two fingers on the screen resize the last object put down (0,1×…3× its real size), its height said as it changes.
+  // The size of the last pinch (1 = real size): every object put afterwards takes it.
+  const sizeRef = useRef(1);
   const placedRef = useRef(placed);
   placedRef.current = placed;
   useEffect(() => {
@@ -691,6 +696,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       uid = ""; d0 = 0;
       pinchUntil.current = performance.now() + 400;
       setPlaced((l) => l.map((p) => (p.uid === id ? { ...p, scale: k } : p)));
+      sizeRef.current = k;
       hapticTick([20]);
       window.setTimeout(() => setNotice((n) => (n?.text.includes("di altezza") ? null : n)), 1800);
     };
