@@ -10,7 +10,7 @@ interface ImportMetaEnv {
 declare module "ez-tree-src" {
   import type { Group } from "three";
   export class Tree extends Group {
-    options: { seed: number; leaves: { count: number; tint: number }; bark: { tint: number } } & Record<string, unknown>;
+    options: { seed: number; leaves: { count: number; tint: number; type: string; size: number }; bark: { tint: number; type: string } } & Record<string, unknown>;
     loadPreset(name: string): void;
     generate(): void;
   }

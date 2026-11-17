@@ -66,3 +66,12 @@ export function recognitionCanPlace(result: z.infer<typeof arRecognitionSchema>)
 export function canEstimateRecognizedPlant(result: z.infer<typeof arRecognitionSchema>) {
   return result.found && result.type !== "object" && result.plant !== null && result.identification !== null && result.identification.level !== "uncertain";
 }
+
+const MONTHS = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
+/** Where and when the photo was taken, as a prior among look-alikes: about 1 km of precision, never a reason on its own. */
+export function placePrompt(place?: { lat: number; lng: number; label?: string | undefined }, month?: number): string {
+  if (!place && !month) return "";
+  const where = place ? `${place.label ? `${place.label.slice(0, 80)} ` : ""}(${place.lat.toFixed(2)}, ${place.lng.toFixed(2)})` : "";
+  const when = month ? `mese di ${MONTHS[month - 1]}` : "";
+  return `\nLuogo e periodo dello scatto: ${[where, when].filter(Boolean).join(", ")}. Tra specie simili privilegia quelle coltivate o spontanee in quell’area e coerenti con la stagione (foglie caduche o assenti, fioritura, frutti), ma solo come criterio di spareggio: decidono i caratteri visibili, non forzare una specie per la sola località.`;
+}

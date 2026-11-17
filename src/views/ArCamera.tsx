@@ -924,7 +924,10 @@ export function ArCamera({
       detail.height = Math.max(1, Math.round(h * small.height * scale));
       detail.getContext("2d")?.drawImage(small, x * small.width, y * small.height, w * small.width, h * small.height, 0, 0, detail.width, detail.height);
       const detailImage = detail.toDataURL("image/jpeg", 0.82);
-      const request = { kind, target: arFocusOption(kind, target).id, ...(subjectLocked ? { focus: subjectRef.current } : {}), ...(satellite ? { satellite } : {}) };
+      // Where and when, as a prior among look-alike species (the place only once one is chosen).
+      const at = kind === "urban" ? getLab().urban.location : getLab().vineyard.location;
+      const request = { kind, target: arFocusOption(kind, target).id, ...(subjectLocked ? { focus: subjectRef.current } : {}), ...(satellite ? { satellite } : {}),
+        ...(at.pending ? {} : { place: { lat: at.lat, lng: at.lng, label: at.label.slice(0, 120) } }), month: new Date().getMonth() + 1 };
       let r: Awaited<ReturnType<typeof detectArObject>>;
       try {
         r = await detectArObject({ data: { ...request, image, ...(detailImage.length <= 1_000_000 ? { detailImage } : {}) } });
