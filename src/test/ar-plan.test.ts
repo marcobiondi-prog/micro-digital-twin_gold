@@ -30,3 +30,17 @@ describe("project in AR", () => {
     for (const w of want) expect(got.some((g) => Math.hypot(g.x - w.x, g.z - w.z) < 1e-6)).toBe(true);
   });
 });
+
+describe("pergola blocks", () => {
+  const box = (x0: number, z0: number, w: number, d: number) => [{ x: x0, z: z0 }, { x: x0 + w, z: z0 }, { x: x0 + w, z: z0 + d }, { x: x0, z: z0 + d }];
+  it("joins strips side by side into one pergola covering them all", async () => {
+    const { pergolaBlocks } = await import("@/views/ar-plan");
+    const b = pergolaBlocks([box(0, 0, 8, 3), box(0, 3, 8, 3), box(0, 6.3, 6, 3)]);
+    expect(b).toHaveLength(1);
+    expect(b[0]!.w).toBeCloseTo(8); expect(b[0]!.d).toBeCloseTo(9.3);
+  });
+  it("keeps apart blocks that are far", async () => {
+    const { pergolaBlocks } = await import("@/views/ar-plan");
+    expect(pergolaBlocks([box(0, 0, 4, 4), box(10, 0, 4, 4)])).toHaveLength(2);
+  });
+});

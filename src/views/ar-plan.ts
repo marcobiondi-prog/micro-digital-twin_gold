@@ -34,6 +34,37 @@ function rectOf(pts: XZ[]): { cx: number; cz: number; w: number; d: number; yaw:
   return { cx: um * c - vm * s, cz: um * s + vm * c, w: u1 - u0, d: v1 - v0, yaw: -ang };
 }
 
+/** The extent of some points in a frame turned by yaw (the frame's u axis at angle −yaw). */
+function extent(pts: XZ[], yaw: number) {
+  const c = Math.cos(-yaw), s = Math.sin(-yaw);
+  let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+  for (const p of pts) { const u = p.x * c + p.z * s, v = -p.x * s + p.z * c; u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v); }
+  return { u0, u1, v0, v1, c, s };
+}
+
+/**
+ * Shade patches joined into blocks: two patches belong together when, in the larger one's direction, their boxes
+ * overlap or lie within 0,6 m; each block becomes one box turned like its largest patch.
+ */
+export function pergolaBlocks(patches: XZ[][], gap = 0.6): Array<{ cx: number; cz: number; w: number; d: number; yaw: number }> {
+  const rects = patches.map((p) => ({ pts: p, r: rectOf(p) }));
+  const parent = rects.map((_, i) => i);
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i]!)));
+  for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) {
+    const big = rects[i]!.r.w * rects[i]!.r.d >= rects[j]!.r.w * rects[j]!.r.d ? rects[i]! : rects[j]!;
+    const A = extent(rects[i]!.pts, big.r.yaw), B = extent(rects[j]!.pts, big.r.yaw);
+    if (A.u0 - gap <= B.u1 && B.u0 - gap <= A.u1 && A.v0 - gap <= B.v1 && B.v0 - gap <= A.v1) parent[find(i)] = find(j);
+  }
+  const groups = new Map<number, typeof rects>();
+  rects.forEach((r, i) => { const k = find(i); groups.set(k, [...(groups.get(k) ?? []), r]); });
+  return [...groups.values()].map((list) => {
+    const yaw = list.reduce((b, x) => (x.r.w * x.r.d > b.r.w * b.r.d ? x : b), list[0]!).r.yaw;
+    const e = extent(list.flatMap((x) => x.pts), yaw);
+    const um = (e.u0 + e.u1) / 2, vm = (e.v0 + e.v1) / 2;
+    return { cx: um * e.c - vm * e.s, cz: um * e.s + vm * e.c, w: e.u1 - e.u0, d: e.v1 - e.v0, yaw };
+  });
+}
+
 function flat(pts: XZ[], color: string, opacity: number, y: number): THREE.Mesh {
   const shape = new THREE.Shape(pts.map((p) => new THREE.Vector2(p.x, -p.z)));
   const geo = new THREE.ShapeGeometry(shape).rotateX(-Math.PI / 2);
@@ -74,8 +105,9 @@ export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: Drawn
       } else g.add(flat(pts, "#4f8f3a", 0.72, 0.015));
       count.beds++;
     }
-    for (const p of L.patches.filter((q) => q.kind === "shade")) {
-      const r = rectOf(p.ring.map(ar));
+    // Pergolas: the shade patches that touch or nearly touch (the grid's row strips of one block, a zone and the strips
+    // round it) are joined into one pergola covering them all, so a block of shade is one structure, not a row of them.
+    for (const r of pergolaBlocks(L.patches.filter((q) => q.kind === "shade").map((q) => q.ring.map(ar)))) {
       if (r.w < 1 || r.d < 1) continue;
       const pg = realPergola({ w: r.w, d: r.d, h: 3.2 });
       pg.rotation.y = r.yaw;

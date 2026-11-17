@@ -91,7 +91,10 @@ export function realPergola(def: { w: number; d: number; h: number }): THREE.Gro
   // Posts: every 3 m or less along the two long sides.
   const n = Math.max(1, Math.ceil((2 * hw) / 3));
   const xs = Array.from({ length: n + 1 }, (_, i) => -hw + (2 * hw * i) / n);
-  for (const z of [-hd, hd]) for (const x of xs) {
+  // Lines of posts and beams: the two long sides, plus middle lines every 4,5 m or less on a deep pergola.
+  const nl = Math.max(1, Math.ceil((2 * hd) / 4.5));
+  const zRows = Array.from({ length: nl + 1 }, (_, i) => -hd + (2 * hd * i) / nl);
+  for (const z of zRows) for (const x of xs) {
     const foot = new THREE.Mesh(new THREE.CircleGeometry(0.32, 20), shadowMat);
     foot.rotation.x = -Math.PI / 2; foot.position.set(x, 0.004, z);
     g.add(foot);
@@ -118,7 +121,7 @@ export function realPergola(def: { w: number; d: number; h: number }): THREE.Gro
     }
   }
   // Main beams: a pair clamping each line of posts, running past the end posts.
-  for (const z of [-hd, hd]) for (const sz of [-1, 1]) {
+  for (const z of zRows) for (const sz of [-1, 1]) {
     const bz = z + sz * (post / 2 + beamT / 2);
     g.add(piece(W, beamH, beamT, beamMat, 0, beamY + beamH / 2, bz));
   }
@@ -150,7 +153,7 @@ export function realPergola(def: { w: number; d: number; h: number }): THREE.Gro
   }
   const battenZs = Array.from({ length: nb + 1 }, (_, i) => -(D + 0.3) / 2 + ((D + 0.3) * i) / nb);
   out.add(shadeCloth(W, D, topY, battenZs));
-  out.add(ivy(W, D, H, xs, hd, beamY, topY));
+  out.add(ivy(W, D, H, xs, hd, beamY, topY, zRows));
   return out;
 }
 
@@ -282,13 +285,13 @@ function ivyLeaves(): THREE.Texture {
  * spills over their ends, and hangs in long uneven trailing strands from the beams and the cloth's long edges.
  * Instanced: one draw for every leaf.
  */
-function ivy(W: number, D: number, H: number, xs: number[], hd: number, beamY: number, topY: number): THREE.Group {
+function ivy(W: number, D: number, H: number, xs: number[], hd: number, beamY: number, topY: number, zRows: number[] = [-hd, hd]): THREE.Group {
   const g = new THREE.Group();
   const rnd = seeded(23);
   // x, y, z, size, facing angle (y), tilt (0 vertical leaf facing out, 1 lying flat)
   const spots: Array<[number, number, number, number, number, number]> = [];
   // Up every post, denser below the beams, a few posts barely started.
-  for (const z of [-hd, hd]) for (const x of xs) {
+  for (const z of zRows) for (const x of xs) {
     const reach = rnd() < 0.2 ? 0.4 + rnd() * 0.5 : 1;
     const top = 0.1 + (beamY + 0.2 - 0.1) * reach;
     for (let y = 0.08; y < top; y += 0.05) {
@@ -300,7 +303,7 @@ function ivy(W: number, D: number, H: number, xs: number[], hd: number, beamY: n
     }
   }
   // Along the main beams (both faces and their underside), a thick garland.
-  for (const z of [-hd, hd]) for (let i = 0; i < Math.round(W * 34); i++) {
+  for (const z of zRows) for (let i = 0; i < Math.round(W * 34); i++) {
     const x = (rnd() - 0.5) * (W + 0.1), face = rnd() < 0.5 ? -1 : 1;
     spots.push([x, beamY + rnd() * 0.3 - 0.05, z + face * (0.14 + rnd() * 0.1), 0.24 + rnd() * 0.14, face > 0 ? 0 : Math.PI, 0.25 * rnd()]);
   }
