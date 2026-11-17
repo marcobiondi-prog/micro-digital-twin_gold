@@ -57,7 +57,8 @@ function soilTexture() {
 const dummy = new THREE.Object3D();
 const col = new THREE.Color();
 
-export function realBed(def: { w: number; d: number }): THREE.Group {
+/** far: seen from afar (the map's 3D), with coarser pebbles and fewer of them. */
+export function realBed(def: { w: number; d: number }, opts: { far?: boolean } = {}): THREE.Group {
   seed = 11;
   const g = new THREE.Group();
   const W = def.w, D = def.d, hw = W / 2, hd = D / 2;
@@ -87,7 +88,10 @@ export function realBed(def: { w: number; d: number }): THREE.Group {
   const soilT = soilTexture().clone();
   soilT.repeat.set(iw / 0.6, id / 0.6);
   soilT.needsUpdate = true;
-  const soil = new THREE.Mesh(new THREE.PlaneGeometry(iw, id), new THREE.MeshStandardMaterial({ map: soilT, roughness: 1 }));
+  // From afar the grass tufts are too few to hide the soil, so the bed's ground is drawn as the grass it carries.
+  const soil = new THREE.Mesh(new THREE.PlaneGeometry(iw, id), opts.far
+    ? new THREE.MeshStandardMaterial({ color: "#5d8c3a", roughness: 1 })
+    : new THREE.MeshStandardMaterial({ map: soilT, roughness: 1 }));
   soil.rotation.x = -Math.PI / 2; soil.position.y = 0.008;
   soil.receiveShadow = true;
   g.add(soil);
@@ -95,16 +99,21 @@ export function realBed(def: { w: number; d: number }): THREE.Group {
   // A band of round pebbles inside the border, half sunk.
   const band = 0.14, pebbles: Array<[number, number]> = [];
   const ph = hw - 0.1, pd = hd - 0.1;
-  for (let x = -ph; x <= ph; x += 0.045) for (let k = 0; k < 3; k++) {
+  // A long bed would take thousands of pebbles: past a cap they are spaced wider and made bigger, so a 40 m strip of
+  // beds stays light (it took half a million triangles); from afar fewer still, and coarser.
+  const cap = opts.far ? 300 : 1200;
+  const step = Math.max(0.045, (12 * (ph + pd)) / cap);
+  const grow = Math.min(2.5, step / 0.045);
+  for (let x = -ph; x <= ph; x += step) for (let k = 0; k < 3; k++) {
     pebbles.push([x + (rnd() - 0.5) * 0.03, -pd + rnd() * band], [x + (rnd() - 0.5) * 0.03, pd - rnd() * band]);
   }
-  for (let z = -pd + band; z <= pd - band; z += 0.045) for (let k = 0; k < 3; k++) {
+  for (let z = -pd + band; z <= pd - band; z += step) for (let k = 0; k < 3; k++) {
     pebbles.push([-ph + rnd() * band, z + (rnd() - 0.5) * 0.03], [ph - rnd() * band, z + (rnd() - 0.5) * 0.03]);
   }
-  const peb = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.6 }), pebbles.length);
+  const peb = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, opts.far ? 0 : 1), new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.6 }), pebbles.length);
   const pebColors = ["#e7e2d7", "#cfc5b2", "#a39a8a", "#8c7b66", "#d9cdb4", "#b7b3ac"];
   pebbles.forEach(([x, z], i) => {
-    const r = 0.016 + rnd() * 0.014;
+    const r = (0.016 + rnd() * 0.014) * grow;
     dummy.position.set(x, r * 0.25, z);
     dummy.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3);
     dummy.scale.set(r * (1 + rnd() * 0.4), r * 0.6, r);

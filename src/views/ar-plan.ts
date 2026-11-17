@@ -1,15 +1,15 @@
 import * as THREE from "three";
 import type { LabState } from "@/models/lab-store";
 import { zonesOfArea, type DrawnArea } from "@/models/drawn-area";
-import { piazzaLayout, vineLayout, type LatLng } from "@/models/area-layout";
-import { arObject, enToAr, toEN, type Alignment } from "@/models/ar-objects";
+import { piazzaLayout, vineLayout, TREE_RADIUS_M, type LatLng, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
+import { arObject, enToAr, toEN, type Alignment, type ArObjectDef } from "@/models/ar-objects";
 import { vineMixOf, zoneMixOf } from "@/models/vine-interventions";
 import { objectMesh } from "@/views/ar-object-meshes";
 import { realPergola } from "@/views/ar-pergola";
 import { realBed } from "@/views/ar-bed";
 import { realShadeNet } from "@/views/ar-shadenet";
 import { realWindbreak } from "@/views/ar-windbreak";
-import { realTree } from "@/views/ar-tree";
+import { realTree, wantsRealTree } from "@/views/ar-tree";
 import { realDrip } from "@/views/ar-drip";
 
 /**
@@ -87,15 +87,31 @@ export function setMergePergolas(on: boolean) {
 }
 
 export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: DrawnArea, origin: { lat: number; lng: number }, a: Alignment, merge = false): { group: THREE.Group; count: PlanCount } {
-  const g = new THREE.Group();
-  g.name = "plan";
-  const count: PlanCount = { trees: 0, pergolas: 0, beds: 0, misters: 0, sprinklers: 0, cloths: 0, lines: 0 };
   const ar = (p: LatLng): XZ => enToAr(toEN(p[0], p[1], origin), a);
-  const put = (o: THREE.Object3D, p: XZ) => { o.position.set(p.x, 0, p.z); g.add(o); };
   const edits = area.edits ?? {}, inner = zonesOfArea(area);
   if (kind === "urban") {
     const u = lab.urban;
-    const L = piazzaLayout(area.ring, u.trees, u.permeable, u.shade, edits, inner, u.misters ?? 0, [], u.sprinklers ?? 0);
+    return layoutPlan({ kind: "urban", L: piazzaLayout(area.ring, u.trees, u.permeable, u.shade, edits, inner, u.misters ?? 0, [], u.sprinklers ?? 0) }, ar, merge);
+  }
+  const v = lab.vineyard, fallback = vineMixOf(v);
+  return layoutPlan({ kind: "vineyard", L: vineLayout(area.ring, v.zones.map((z) => zoneMixOf(z, fallback)), edits, inner) }, ar, merge);
+}
+
+/**
+ * The realistic objects of a layout already worked out (the map's own), placed through `at` — the AR's alignment, or
+ * the open 3D map's local metres (x east, z south). Shared by the AR view and the map's 3D, so both show the same
+ * pergolas, aiuole, misting poles, sprinklers, shade nets, hedges and drip lines.
+ */
+export function layoutPlan(
+  plan: { kind: "urban"; L: PiazzaLayout | null } | { kind: "vineyard"; L: VineLayout | null },
+  ar: (p: LatLng) => XZ, merge = false, far = false,
+): { group: THREE.Group; count: PlanCount } {
+  const g = new THREE.Group();
+  g.name = "plan";
+  const count: PlanCount = { trees: 0, pergolas: 0, beds: 0, misters: 0, sprinklers: 0, cloths: 0, lines: 0 };
+  const put = (o: THREE.Object3D, p: XZ) => { o.position.set(p.x, 0, p.z); g.add(o); };
+  if (plan.kind === "urban") {
+    const L = plan.L;
     if (!L) return { group: g, count };
     // Aiuole: the realistic bed (stones, pebbles, soil, grass, flowers) sized and turned to each patch; a patch too thin
     // for one, the plain green ground.
@@ -103,7 +119,7 @@ export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: Drawn
       if (p.kind !== "lawn") continue;
       const pts = p.ring.map(ar), r = rectOf(pts);
       if (r.w >= 0.8 && r.d >= 0.8) {
-        const bed = realBed({ w: r.w, d: r.d });
+        const bed = realBed({ w: r.w, d: r.d }, { far });
         bed.rotation.y = r.yaw;
         put(bed, { x: r.cx, z: r.cz });
       } else g.add(flat(pts, "#4f8f3a", 0.72, 0.015));
@@ -128,15 +144,14 @@ export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: Drawn
     const spr = arObject("urban", "innaffiatoio");
     for (const s of L.sprinklers) { put(objectMesh(spr), ar(s)); count.sprinklers++; }
   } else {
-    const v = lab.vineyard, fallback = vineMixOf(v);
-    const L = vineLayout(area.ring, v.zones.map((z) => zoneMixOf(z, fallback)), edits, inner);
+    const L = plan.L;
     if (!L) return { group: g, count };
     // Shade cloth: the realistic net on posts, sized and turned to each patch, else (too thin) a plain dark sheet.
     for (const p of L.patches) {
       if (p.kind !== "cloth") continue;
       const pts = p.ring.map(ar), r = rectOf(pts);
       if (r.w >= 1 && r.d >= 1) {
-        const net = realShadeNet({ w: r.w, d: r.d, h: 2.2 });
+        const net = realShadeNet({ w: r.w, d: r.d, h: 2.2 }, { far });
         net.rotation.y = r.yaw;
         put(net, { x: r.cx, z: r.cz });
       } else g.add(flat(pts, "#1f2937", 0.55, 2.2));
@@ -166,17 +181,30 @@ export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: Drawn
 }
 
 /**
- * Grows the realistic trees (EZ-Tree, the same as «Albero» put by hand) and swaps them for the simple shapes: a few
- * grown once and cloned, each turned and sized a little differently, so thirty trees stay light. alive() says
- * whether the plan is still on screen (the levers may have rebuilt it meanwhile).
+ * The trees the project's trees are drawn as: the species recognised with the AI camera in this flow (trees only, not
+ * shrubs nor climbers), each at the size of a tree on the map — its crown about as wide as the 30 m² the simulation
+ * counts, its height in the species' own proportion —, else the realistic oak of «Albero».
  */
-export async function growPlan(group: THREE.Group, alive: () => boolean, onTree?: (o: THREE.Object3D) => void): Promise<void> {
+export function planTreeDefs(plants: ReadonlyArray<ArObjectDef> = []): ArObjectDef[] {
+  const w = TREE_RADIUS_M * 2;
+  const trees = plants.filter((p) => p.plant && p.plant.form !== "shrub" && p.plant.form !== "vine" && wantsRealTree(p))
+    .map((p) => ({ ...p, w, d: w, h: Math.max(4, Math.min(16, (p.h / Math.max(0.4, p.w)) * w)) }));
+  return trees.length ? trees : [arObject("urban", "albero")];
+}
+
+/**
+ * Grows the realistic trees and swaps them for the simple shapes: one grown per species recognised (else up to three
+ * oaks, the same as «Albero» put by hand), taken in turn and cloned, each turned and sized a little differently, so
+ * many trees stay light. alive() says whether the plan is still on screen (the levers may have rebuilt it meanwhile).
+ */
+export async function growPlan(group: THREE.Group, alive: () => boolean, onTree?: (o: THREE.Object3D) => void, plants: ReadonlyArray<ArObjectDef> = []): Promise<void> {
   const spots = group.children.filter((c) => c.userData["planTree"]);
   if (!spots.length) return;
-  const def = arObject("urban", "albero");
+  const defs = planTreeDefs(plants);
   const variants: THREE.Object3D[] = [];
-  for (let i = 0; i < Math.min(3, spots.length); i++) {
-    const t = await realTree(def);
+  const n = defs.length > 1 ? Math.min(defs.length, spots.length) : Math.min(3, spots.length);
+  for (let i = 0; i < n; i++) {
+    const t = await realTree(defs[i % defs.length]!);
     if (!alive()) return;
     if (t) variants.push(t);
   }

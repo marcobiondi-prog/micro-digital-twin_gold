@@ -22,7 +22,9 @@ const netTex = drawn("shade-net2", 128, 128, (g, r) => {
   for (let x = 0; x < 128; x += 32) { g.beginPath(); g.moveTo(x + r() * 0.5, 0); g.lineTo(x, 128); g.stroke(); }
 }, true);
 
-export function realShadeNet(def: { w: number; d: number; h: number }): THREE.Group {
+/** far: seen from afar (the map's 3D), where the weave's holes vanish in the texture's mipmaps and the net read as a
+ * solid slab: drawn see-through instead, so the vines show under it as they do through a real net. */
+export function realShadeNet(def: { w: number; d: number; h: number }, opts: { far?: boolean } = {}): THREE.Group {
   const g = new THREE.Group();
   const W = Math.max(1, def.w), D = Math.max(1, def.d), H = Math.max(1.6, def.h);
   const galv = new THREE.MeshStandardMaterial({ color: "#a9b0b6", roughness: 0.4, metalness: 0.7 });
@@ -76,7 +78,9 @@ export function realShadeNet(def: { w: number; d: number; h: number }): THREE.Gr
   }
   geo.computeVertexNormals();
   const tex = netTex().clone(); tex.needsUpdate = true; tex.repeat.set(W / 0.35, D / 0.35); tex.anisotropy = 8;
-  g.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.35, side: THREE.DoubleSide, roughness: 0.85, color: "#ffffff" })));
+  g.add(new THREE.Mesh(geo, opts.far
+    ? new THREE.MeshStandardMaterial({ color: "#1f3a2a", transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide, roughness: 0.85 })
+    : new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.35, side: THREE.DoubleSide, roughness: 0.85, color: "#ffffff" })));
   // Edging tape round the net.
   const tape = new THREE.MeshStandardMaterial({ color: "#3d5a40", roughness: 0.8 });
   for (const z of [-hd, hd]) g.add(new THREE.Mesh(new THREE.BoxGeometry(W, 0.012, 0.05).translate(0, H, z), tape));

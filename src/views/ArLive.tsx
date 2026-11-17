@@ -12,7 +12,7 @@ import { drawnAreaFor, type DrawnArea } from "@/models/drawn-area";
 import { readFix } from "@/lib/find-position";
 import { hapticTick } from "@/lib/haptics";
 import { contactShadow, floorLoop, objectMesh } from "@/views/ar-object-meshes";
-import { buildPlan, growPlan, mergePergolas, planText, setMergePergolas } from "@/views/ar-plan";
+import { buildPlan, growPlan, mergePergolas, planText, planTreeDefs, setMergePergolas } from "@/views/ar-plan";
 import { realTree, wantsRealTree } from "@/views/ar-tree";
 import { ArShadows, castShadows } from "@/views/ar-shadow";
 import { XREstimatedLight } from "three/examples/jsm/webxr/XREstimatedLight.js";
@@ -224,6 +224,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const loc = kind === "urban" ? lab.urban.location : lab.vineyard.location;
   const area: DrawnArea | null = drawnAreaFor(kind === "urban" ? lab.urban.area : lab.vineyard.area, loc);
   const u = lab.urban, vz = lab.vineyard.zones;
+  const plantsRef = useRef(plants);
+  plantsRef.current = plants;
+  const plantKey = plants.map((p) => p.plant?.scientificName ?? p.id).join("|");
   const planKey = kind === "urban" ? `${u.trees}|${u.permeable}|${u.shade}|${u.misters ?? 0}|${u.sprinklers ?? 0}` : JSON.stringify(vz.map((z) => [z.irrigation, z.shade, z.windbreak]));
   // The metre frame of the map: the area's middle (else the place).
   const origin = useMemo(() => {
@@ -506,13 +509,15 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     group.position.y = y;
     castShadows(group);
     t.overlay.add(group);
-    void growPlan(group, () => group.parent === t.overlay, castShadows);
-    const said = planText(count);
+    // The map's trees grow as the species recognised with the AI camera in this flow (else the realistic oak).
+    void growPlan(group, () => group.parent === t.overlay, castShadows, plantsRef.current);
+    const kinds = count.trees ? planTreeDefs(plantsRef.current).filter((d) => d.plant).map((d) => d.label) : [];
+    const said = planText(count) + (kinds.length ? ` (${kinds.join(", ")})` : "");
     if (said && planSaid.current !== `${alignment.how}:${said}`) {
       planSaid.current = `${alignment.how}:${said}`;
       setNotice({ text: `Dal progetto: ${said}${alignment.how === "gps" ? " · posizione dal GPS, tocca i 2 angoli per allinearli bene" : ""}`, tone: "ok" });
     }
-  }, [alignment, area, origin, showPlan, kind, planKey, merge]);
+  }, [alignment, area, origin, showPlan, kind, planKey, merge, plantKey]);
 
   // The measuring tape between the two points.
   useEffect(() => {
