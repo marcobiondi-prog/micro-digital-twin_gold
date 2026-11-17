@@ -36,6 +36,14 @@ export const arRecognitionSchema = z.object({
     heightM: z.number(), crownM: z.number(), evergreen: z.boolean(), density: z.number(),
     /** Up to two look-alike species the model also considered, tried in order when the first name fails the catalogue. */
     alternatives: z.array(z.object({ scientificName: z.string(), commonName: z.string() }).strict()).max(3).nullable(),
+    /** The photographed specimen as seen (not the species' typical shape), each value null when it cannot be judged. */
+    specimen: z.object({
+      crown: z.enum(["columnar", "conical", "ovoid", "round", "spreading", "umbrella", "vase", "weeping", "irregular", "shrub"]).nullable(),
+      widthRatio: z.number().nullable(), density: z.number().nullable(), clearTrunk: z.number().nullable(),
+      stems: z.number().nullable(), leanDeg: z.number().nullable(),
+      leaf: z.enum(["needle", "scale", "broad", "compound", "narrow"]).nullable(),
+      leafColor: z.string().nullable(), barkColor: z.string().nullable(),
+    }).strict().nullable(),
   }).nullable(),
   soil: z.object({
     kind: z.enum(["artificiale", "argilloso", "sabbioso", "limoso", "franco", "ghiaioso", "roccioso", "prato", "pacciamato"]),
@@ -44,10 +52,11 @@ export const arRecognitionSchema = z.object({
   }).nullable(),
 }).strict();
 
-/** A reply from the plain-JSON fallback (or an older model) may omit plant.alternatives: read it as none. */
+/** A reply from the plain-JSON fallback (or an older model) may omit plant.alternatives or plant.specimen: read them as none. */
 export function withPlantAlternatives(raw: unknown): unknown {
   const plant = (raw as { plant?: Record<string, unknown> | null } | null)?.plant;
   if (plant && typeof plant === "object" && !("alternatives" in plant)) plant["alternatives"] = null;
+  if (plant && typeof plant === "object" && !("specimen" in plant)) plant["specimen"] = null;
   return raw;
 }
 

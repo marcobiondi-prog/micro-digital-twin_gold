@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import type { Specimen } from "@/models/plant-shape";
 import type { ArKind } from "@/models/ar-focus";
 import { coolingLabel } from "@/models/ar-placement";
 import type { ReferencePhoto } from "@/models/ar-reference-photo";
@@ -16,6 +17,8 @@ export type ScanSpecies = {
   photo?: ReferencePhoto | null;
   /** The plant's shape and typical size for the simulation (absent on older records): «Prova» draws it in 3D. */
   form?: PlantForm; heightM?: number; crownM?: number; evergreen?: boolean;
+  /** How the photographed specimen looks, for its 3D model in «AR» (absent on older records and when not judged). */
+  specimen?: Specimen | null;
 };
 export type PlantForm = "columnar" | "conical" | "round" | "umbrella" | "vine" | "shrub";
 export type ScanSoil = { label: string; permeability: string; plantable: boolean; note: string };

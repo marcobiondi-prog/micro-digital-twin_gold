@@ -57,7 +57,7 @@ function barkTexture() {
 }
 
 /** A tuft of needles: pairs of long thin needles fanning out of a twig, white so each instance tints it. */
-function tuftTexture() {
+export function tuftTexture() {
   if (tuftTex) return tuftTex;
   const c = document.createElement("canvas");
   c.width = c.height = 128;

@@ -5,7 +5,7 @@ import { plantPhotoBounds } from "@/models/ar-plant-photo";
 
 describe("AR recognition rules", () => {
   it("estimates leaf-identified plants without requiring a contour, never an uncertain guess", () => {
-    const result = arRecognitionSchema.parse({ identification: {level:"species",leafVisible:true,evidence:"Foglia palmata a cinque lobi"}, survey:null, found:true, outline:null, label:"Acero", type:"tree", box:{x:0.1,y:0.1,w:0.5,h:0.8}, soil:null, plant:{scientificName:"Acer campestre",commonName:"Acero campestre",form:"round",heightM:6,crownM:4,evergreen:false,density:0.6,alternatives:null} });
+    const result = arRecognitionSchema.parse({ identification: {level:"species",leafVisible:true,evidence:"Foglia palmata a cinque lobi"}, survey:null, found:true, outline:null, label:"Acero", type:"tree", box:{x:0.1,y:0.1,w:0.5,h:0.8}, soil:null, plant:{scientificName:"Acer campestre",commonName:"Acero campestre",form:"round",heightM:6,crownM:4,evergreen:false,density:0.6,alternatives:null,specimen:null} });
     expect(canEstimateRecognizedPlant(result)).toBe(true);
     expect(canEstimateRecognizedPlant({...result, identification:{level:"uncertain",leafVisible:false,evidence:"Foglie non distinguibili"}})).toBe(false);
     expect(canEstimateRecognizedPlant({...result, type:"object"})).toBe(false);

@@ -44,7 +44,7 @@ function barkTexture() {
 }
 
 /** A spray of scale-leaves: a short twig branching into many small flat fronds, pointing up, white so instances tint it. */
-function sprayTexture() {
+export function sprayTexture() {
   if (sprayTex) return sprayTex;
   const c = document.createElement("canvas");
   c.width = c.height = 128;

@@ -44,7 +44,7 @@ function barkTexture() {
 }
 
 /** A twig of narrow lance-shaped leaves in pairs, darker above and lighter (silvery) edges; white-ish so instances tint it. */
-function leafTexture() {
+export function leafTexture() {
   if (leafTex) return leafTex;
   const c = document.createElement("canvas");
   c.width = c.height = 128;

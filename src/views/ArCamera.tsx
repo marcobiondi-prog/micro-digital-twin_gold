@@ -877,7 +877,7 @@ export function ArCamera({
         commonName: sp.commonName, scientificName: sp.scientificName, family: sp.family ?? null,
         level: sp.identification?.level === "species" ? "Specie probabile" : sp.identification?.level === "genus" ? "Genere probabile" : "Identificazione incerta",
         cooling: sp.cooling?.deltaT ?? null, shade: sp.cooling?.shadeM2 ?? null, photo: sp.photo,
-        form: sp.form, heightM: sp.heightM, crownM: sp.crownM, evergreen: sp.evergreen,
+        form: sp.form, heightM: sp.heightM, crownM: sp.crownM, evergreen: sp.evergreen, specimen: sp.specimen ?? null,
       } : null,
       soil: ground ? { label: ground.label, permeability: ground.permeability, plantable: ground.plantable, note: ground.note } : null,
       count: 0, totalCooling: sp?.cooling ? 0 : null, totalShade: sp?.cooling ? 0 : null, satellite: satelliteText,
@@ -1113,6 +1113,7 @@ export function ArCamera({
         crownM: 8,
         evergreen: true,
         density: 0.8,
+        specimen: null,
         cooling: { deltaT: 0.4, shadeM2: 18, note: "Stima per esemplare adulto di Leccio" },
         identification: { level: "species", leafVisible: false, evidence: "Modello 3D ARCore posizionato sul terreno con calcolo ombra in tempo reale." },
       };

@@ -2,6 +2,7 @@ import type { ArKind } from "@/models/ar-focus";
 import type { SubArea, ZoneKind } from "@/models/drawn-area";
 import type { Ring } from "@/models/place-area";
 import type { PlantForm, ScanSpecies } from "@/models/ar-scan-log";
+import type { Specimen } from "@/models/plant-shape";
 
 /**
  * What «Prova» can put in the real world, at real size (metres): the piazza's tree, pergola, flower bed and misting
@@ -19,7 +20,7 @@ export type ArObjectDef = {
   h: number;
   zone: ZoneKind;
   /** A plant recognised by «Rileva»: its shape and leaves, drawn like the species (id "pianta"). */
-  plant?: { form: PlantForm; evergreen: boolean; scientificName: string };
+  plant?: { form: PlantForm; evergreen: boolean; scientificName: string; specimen?: Specimen | null };
 };
 
 export const AR_OBJECTS: Record<ArKind, readonly ArObjectDef[]> = {
@@ -161,7 +162,7 @@ export function plantObject(kind: ArKind, sp: ScanSpecies): ArObjectDef | null {
   const zone: ZoneKind = kind === "vineyard" ? (vine ? "lotto" : "frangivento") : sp.form === "shrub" ? "prato" : "alberi";
   return {
     id: "pianta", label: sp.commonName, w: vine ? 4 : crown, d: crown, h: vine ? clamp(h, 1.2, 2.2) : h, zone,
-    plant: { form: sp.form, evergreen: sp.evergreen ?? true, scientificName: sp.scientificName },
+    plant: { form: sp.form, evergreen: sp.evergreen ?? true, scientificName: sp.scientificName, specimen: sp.specimen ?? null },
   };
 }
 /** The species recognised in a flow's scans, once each, newest first (at most `max`). */

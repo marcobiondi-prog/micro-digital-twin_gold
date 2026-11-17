@@ -9,6 +9,7 @@ import { arFocusOption } from "@/models/ar-focus";
 import { satellitePrompt } from "@/models/copernicus";
 import { sameBotanicalName, usableBotanicalMatch } from "@/models/ar-botanical-match";
 import { gbifPhotoSearchUrl, pickGbifPhoto, pickPowoPhoto, type ReferencePhoto } from "@/models/ar-reference-photo";
+import { cleanSpecimen, type Specimen } from "@/models/plant-shape";
 
 export type GrowthForm = "columnar" | "conical" | "round" | "umbrella" | "vine" | "shrub";
 
@@ -54,6 +55,8 @@ export type Detection = {
     crownM: number;
     evergreen: boolean;
     density: number;
+    /** How the photographed specimen looks (crown, density, bare trunk, stems, lean, leaves, bark), for its 3D model. */
+    specimen: Specimen | null;
   } | null;
   cooling: { deltaT: number; shadeM2: number; note: string } | null;
 } | null;
@@ -66,7 +69,8 @@ Aggiungi outline al livello principale del JSON anche quando plant:null: un poli
 Rispondi SOLO con JSON:
 type: "tree" per alberi, arbusti, siepi, piante erbacee e in vaso; "vine" per la vite e i rampicanti; "object" SOLO se non è una pianta.
 {"found":true,"label":"nome comune italiano","type":"tree|vine|object","box":{"x":0-1,"y":0-1,"w":0-1,"h":0-1},
-"plant":{"scientificName":"Genere specie","commonName":"nome comune italiano","form":"columnar|conical|round|umbrella|vine|shrub","heightM":numero,"crownM":diametro chioma tipica indicativa in metri,"evergreen":true|false,"density":0-1 densità fogliare,"alternatives":[fino a 2 {"scientificName","commonName"} di specie simili che hai considerato, dalla più probabile; [] se nessuna]}}
+"plant":{"scientificName":"Genere specie","commonName":"nome comune italiano","form":"columnar|conical|round|umbrella|vine|shrub","heightM":numero,"crownM":diametro chioma tipica indicativa in metri,"evergreen":true|false,"density":0-1 densità fogliare,"alternatives":[fino a 2 {"scientificName","commonName"} di specie simili che hai considerato, dalla più probabile; [] se nessuna],"specimen":{…}}}
+In plant.specimen descrivi L’ESEMPLARE FOTOGRAFATO così come appare (non la forma tipica della specie), per costruirne il modello 3D; metti null a ogni valore che dalla foto non si giudica: crown "columnar|conical|ovoid|round|spreading|umbrella|vase|weeping|irregular|shrub" (sagoma della chioma), widthRatio larghezza della chioma / altezza della pianta, density 0-1 (0 rada e trasparente, 1 compatta), clearTrunk quota di altezza di tronco nudo sotto la chioma (0 per un arbusto), stems numero di fusti dalla base, leanDeg inclinazione del tronco in gradi (0 dritto), leaf "needle|scale|broad|compound|narrow" (aghi, squame, foglia larga, composta, stretta), leafColor e barkColor colori dominanti in #rrggbb, corretti per la luce della foto. Usa specimen:null se la pianta non si vede intera.
 Aggiungi SEMPRE (anche con found:false) la superficie del terreno visibile:
 "soil":{"kind":"artificiale|argilloso|sabbioso|limoso|franco|ghiaioso|roccioso|prato|pacciamato","label":"descrizione breve italiana (es. asfalto, terra argillosa compatta)","permeability":"bassa|media|alta","plantable":true|false,"note":"consiglio breve per piantare"} oppure "soil":null se il terreno non è visibile.
 "artificiale" = asfalto, cemento, pavimentazione, erba sintetica.
@@ -257,6 +261,7 @@ async function recognize(data: z.infer<typeof detectInput>): Promise<DetectResul
       crownM,
       evergreen,
       density,
+      specimen: cleanSpecimen(pl.specimen),
     };
     const est = estimateCooling(crownM, density, evergreen);
     cooling = {
