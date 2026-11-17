@@ -10,6 +10,7 @@ import { realBed } from "@/views/ar-bed";
 import { realShadeNet } from "@/views/ar-shadenet";
 import { realWindbreak } from "@/views/ar-windbreak";
 import { realTree } from "@/views/ar-tree";
+import { realDrip } from "@/views/ar-drip";
 
 /**
  * The project's interventions as they stand on the map, put back in the real world in the AR view: once the AR floor
@@ -73,16 +74,19 @@ function flat(pts: XZ[], color: string, opacity: number, y: number): THREE.Mesh 
   return m;
 }
 
-function tube(pts: XZ[], radius: number, color: string, y: number): THREE.Mesh | null {
-  if (pts.length < 2) return null;
-  const curve = new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(p.x, y, p.z)), false, "catmullrom", 0);
-  return new THREE.Mesh(new THREE.TubeGeometry(curve, Math.max(2, pts.length * 4), radius, 6, false), new THREE.MeshStandardMaterial({ color, roughness: 0.6 }));
-}
-
 /** How many elements of the project went in, said in the status line. */
 export type PlanCount = { trees: number; pergolas: number; beds: number; misters: number; sprinklers: number; cloths: number; lines: number };
 
-export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: DrawnArea, origin: { lat: number; lng: number }, a: Alignment): { group: THREE.Group; count: PlanCount } {
+/** Whether nearby pergolas are joined into one, the person's choice kept on this phone (on unless turned off). */
+const MERGE_KEY = "mdt-ar-merge-pergola-v1";
+export function mergePergolas(): boolean {
+  try { return localStorage.getItem(MERGE_KEY) !== "off"; } catch { return true; }
+}
+export function setMergePergolas(on: boolean) {
+  try { localStorage.setItem(MERGE_KEY, on ? "on" : "off"); } catch { /* private mode */ }
+}
+
+export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: DrawnArea, origin: { lat: number; lng: number }, a: Alignment, merge = true): { group: THREE.Group; count: PlanCount } {
   const g = new THREE.Group();
   g.name = "plan";
   const count: PlanCount = { trees: 0, pergolas: 0, beds: 0, misters: 0, sprinklers: 0, cloths: 0, lines: 0 };
@@ -107,7 +111,9 @@ export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: Drawn
     }
     // Pergolas: the shade patches that touch or nearly touch (the grid's row strips of one block, a zone and the strips
     // round it) are joined into one pergola covering them all, so a block of shade is one structure, not a row of them.
-    for (const r of pergolaBlocks(L.patches.filter((q) => q.kind === "shade").map((q) => q.ring.map(ar)))) {
+    // With «Pergolati separati» chosen, each shade patch is its own pergola as on the map.
+    const shade = L.patches.filter((q) => q.kind === "shade").map((q) => q.ring.map(ar));
+    for (const r of merge ? pergolaBlocks(shade) : shade.map(rectOf)) {
       if (r.w < 1 || r.d < 1) continue;
       const pg = realPergola({ w: r.w, d: r.d, h: 3.2 });
       pg.rotation.y = r.yaw;
@@ -139,8 +145,9 @@ export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: Drawn
     for (const l of L.lines) {
       const pts = l.line.map(ar);
       if (l.kind === "drip" || l.kind === "main") {
-        const t = tube(pts, l.kind === "main" ? 0.035 : 0.012, l.kind === "main" ? "#1d4ed8" : "#2563eb", 0.04);
-        if (t) { g.add(t); count.lines++; }
+        // The realistic drip line or main pipe, lying on the soil (views/ar-drip).
+        g.add(realDrip(pts, l.kind === "main"));
+        count.lines++;
       } else if (l.kind === "wind") {
         // The windbreak: the realistic hedge along each piece of its line.
         const h = 1.8 + 2.2 * ((l.strength ?? 70) / 100);

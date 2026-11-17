@@ -6,6 +6,7 @@ import { realMister } from "@/views/ar-mister";
 import { realSprinkler } from "@/views/ar-sprinkler";
 import { realShadeNet } from "@/views/ar-shadenet";
 import { realWindbreak } from "@/views/ar-windbreak";
+import { realDrip } from "@/views/ar-drip";
 
 /**
  * The 3D shapes «Prova» puts in the real world, in metres, standing on y = 0 and centred on x = z = 0: the same simple
@@ -72,14 +73,10 @@ export function objectMesh(def: ArObjectDef): THREE.Group {
       break;
     }
     case "irrigazione": {
-      const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, def.w, 8), mat("#1d4ed8"));
-      pipe.rotation.z = Math.PI / 2; pipe.position.y = 0.05;
-      g.add(pipe);
-      for (let x = -def.w / 2 + 0.3; x < def.w / 2; x += 0.6) {
-        const drop = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), mat("#e0f2fe"));
-        drop.position.set(x, 0.09, 0);
-        g.add(drop);
-      }
+      // A realistic drip line on the soil (views/ar-drip): a main pipe across its start feeding a drip line along it.
+      const hw = def.w / 2;
+      g.add(realDrip([{ x: -hw, z: -0.6 }, { x: -hw, z: 0.6 }], true));
+      g.add(realDrip([{ x: -hw, z: 0 }, { x: hw, z: 0 }]));
       break;
     }
   }

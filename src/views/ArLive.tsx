@@ -12,7 +12,7 @@ import { drawnAreaFor, type DrawnArea } from "@/models/drawn-area";
 import { readFix } from "@/lib/find-position";
 import { hapticTick } from "@/lib/haptics";
 import { contactShadow, floorLoop, objectMesh } from "@/views/ar-object-meshes";
-import { buildPlan, growPlan, planText } from "@/views/ar-plan";
+import { buildPlan, growPlan, mergePergolas, planText, setMergePergolas } from "@/views/ar-plan";
 import { realTree, wantsRealTree } from "@/views/ar-tree";
 import { ArShadows, castShadows } from "@/views/ar-shadow";
 import { XREstimatedLight } from "three/examples/jsm/webxr/XREstimatedLight.js";
@@ -216,6 +216,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const shadowsRef = useRef<ArShadows | null>(null);
   // The project's interventions shown on their spots once aligned; a key so they follow the levers.
   const [showPlan, setShowPlan] = useState(true);
+  const [merge, setMerge] = useState(mergePergolas);
   const planSaid = useRef("");
   const three = useRef<{ scene: THREE.Scene; reticle: THREE.Object3D; hit: V | null; objects: Map<string, THREE.Object3D>; overlay: THREE.Group; measure: THREE.Group; floorY: number | null; renderer: THREE.WebGLRenderer; camera: THREE.Camera } | null>(null);
 
@@ -498,7 +499,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     for (const z of area.zones ?? []) if (z.ring.length >= 3) loop(z.ring, "#4ade80");
     // The project's interventions from the map, each on its own spot (views/ar-plan).
     if (!showPlan) return;
-    const { group, count } = buildPlan(kind, getLab(), area, origin, alignment.a);
+    const { group, count } = buildPlan(kind, getLab(), area, origin, alignment.a, merge);
     group.position.y = y;
     castShadows(group);
     t.overlay.add(group);
@@ -508,7 +509,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       planSaid.current = `${alignment.how}:${said}`;
       setNotice({ text: `Dal progetto: ${said}${alignment.how === "gps" ? " · posizione dal GPS, tocca i 2 angoli per allinearli bene" : ""}`, tone: "ok" });
     }
-  }, [alignment, area, origin, showPlan, kind, planKey]);
+  }, [alignment, area, origin, showPlan, kind, planKey, merge]);
 
   // The measuring tape between the two points.
   useEffect(() => {
@@ -751,6 +752,10 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     ...(area ? [{ key: "t:progetto", label: showPlan ? "Nascondi progetto" : "Mostra progetto", Icon: MapPinned, tool: true, on: showPlan,
       aria: showPlan ? "Nascondi gli interventi della mappa" : "Mostra gli interventi della mappa nel loro punto",
       onPick: () => { setShowPlan((v) => !v); setTrayOpen(false); setNotice({ text: showPlan ? "Interventi della mappa nascosti" : "Interventi della mappa nel loro punto", tone: "ok" }); } }] : []),
+    // The person decides whether the map's nearby pergolas stand as one structure or each on its own.
+    ...(area && kind === "urban" && showPlan ? [{ key: "t:unisci", label: merge ? "Pergolati separati" : "Unisci pergolati", Icon: Fence, tool: true, on: merge,
+      aria: merge ? "Mostra i pergolati della mappa uno per uno" : "Unisci in uno solo i pergolati vicini della mappa",
+      onPick: () => { const on = !merge; setMerge(on); setMergePergolas(on); setTrayOpen(false); setNotice({ text: on ? "Pergolati vicini uniti in uno solo" : "Pergolati separati, come sulla mappa", tone: "ok" }); } }] : []),
     { key: "t:modellino", label: model ? "Grandezza vera" : "Modellino", Icon: Box, tool: true, on: model, aria: model ? "Torna alla grandezza vera" : "Modellino in scala 1:10",
       onPick: () => { setModel((m) => !m); setTrayOpen(false); setNotice({ text: model ? "Grandezza vera" : "Modellino 1:10 · per provare al chiuso o su un tavolo", tone: "ok" }); } },
     // ARCore's depth as a test: switching it on or off restarts the session (it is asked when the session starts).
