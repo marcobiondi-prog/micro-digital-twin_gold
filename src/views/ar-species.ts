@@ -2,9 +2,9 @@ import * as THREE from "three";
 import { buildBroadleaf, dots, drawn, type BroadleafSpec } from "@/views/ar-broadleaf";
 
 /**
- * Broadleaved trees and shrubs with a model of their own, built by views/ar-broadleaf from a card each: hackberry,
+ * Broadleaved trees and shrubs with a model of their own, built by views/ar-broadleaf from a card each:
  * southern magnolia, horse chestnut, maple, birch, deciduous oaks (pedunculate, downy…), Lombardy poplar and oleander
- * (the weeping willow has a model of its own, views/ar-willow). Each card draws its own bark and leaves (canvas, nothing to download) and sets its crown's
+ * (the weeping willow and the hackberry have models of their own, views/ar-willow and views/ar-celtis). Each card draws its own bark and leaves (canvas, nothing to download) and sets its crown's
  * outline, proportions, trunk, branches, colours and flowers or fruits.
  */
 
@@ -16,7 +16,6 @@ const dome = (m: number, below: number, _above: number, foot = 0.5) => (f: numbe
   return Math.max(f < m ? foot : 0, Math.sqrt(Math.max(0, 1 - d * d)));
 };
 export const OUTLINES = {
-  celtis: dome(0.42, 0.55, 0.6, 0.6),
   magnolia: (f: number) => (f <= 0 ? 0.7 : f >= 1 ? 0 : Math.min(1, 0.7 + 0.3 * Math.sqrt(f / 0.3)) * Math.pow(1 - f, 0.6) / Math.pow(0.7, 0.6)),
   horseChestnut: dome(0.45, 0.6, 0.57, 0.62),
   maple: dome(0.45, 0.55, 0.58, 0.6),
@@ -112,14 +111,6 @@ const triangular: LeafPath = (g, len) => { const w = len * 0.42; g.moveTo(0, 0);
 
 // ── The cards ────────────────────────────────────────────────────────────────────────────────────────────────────
 export const SPECIES: Record<string, BroadleafSpec> = {
-  /** Bagolaro (Celtis australis): smooth elephant-grey bark, broad round crown, toothed pointed leaves, a long-lived street tree. */
-  celtis: {
-    radius: OUTLINES.celtis, width: [0.7, 1.1, 0.9], clear: [0.24, 0.32],
-    trunk: { r: 0.034, lean: 0.03 }, branches: { count: [9, 16], steep: 0.07 },
-    body: { scale: 0.66, color: "#30472a" }, surface: 0.45, leaves: { size: 0.9 },
-    color: [0.24, 0.42, 0.33], alt: { color: [0.2, 0.25, 0.5], share: 0.1 },
-    bark: smooth("celtis-bark", "#8f8c85", "rgba(60,58,54,0.45)"), leaf: twig("celtis-leaf", oval(0.3, true), { leaves: 9, len: [20, 28] }),
-  },
   /** Magnolia (Magnolia grandiflora): dense dark glossy pyramid down low, big leathery leaves, big white flowers. */
   magnolia: {
     radius: OUTLINES.magnolia, width: [0.5, 0.85, 0.65], clear: [0.06, 0.12],

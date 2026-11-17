@@ -7,6 +7,7 @@ import { planeRadius } from "@/views/ar-plane";
 import { holmRadius } from "@/views/ar-holm";
 import { OUTLINES, SPECIES } from "@/views/ar-species";
 import { cedarRadius } from "@/views/ar-cedar";
+import { celtisRadius } from "@/views/ar-celtis";
 
 describe("plant cards", () => {
   it("reads genus and species, hybrid signs and authors aside", () => {
@@ -127,6 +128,11 @@ describe("crown outlines", () => {
       expect(fn(1), name).toBe(0);
     }
     for (const spec of Object.values(SPECIES)) { expect(spec.width[0]).toBeLessThanOrEqual(spec.width[2]); expect(spec.width[2]).toBeLessThanOrEqual(spec.width[1]); }
+  });
+  it("makes the hackberry's crown broad and closed at the top", () => {
+    expect(celtisRadius(0.42)).toBeCloseTo(1);
+    expect(celtisRadius(0.8)).toBeLessThan(1);
+    expect(celtisRadius(1)).toBe(0);
   });
   it("makes the cedar a broad pyramid", () => {
     expect(cedarRadius(0)).toBe(1);
