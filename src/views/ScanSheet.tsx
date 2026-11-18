@@ -28,8 +28,9 @@ export function ScanSheet({ records, failed, showCard, specimens, detail, onShow
   const toggle = (id: string) => setChosen((c) => { const n = new Set(c); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const stopSelecting = () => { setSelecting(false); setChosen(new Set()); setAsking(false); };
   const n = chosen.size;
-  // The second page: a result's full card, sliding in from the right (the list leaving to the left). Back is a swipe
-  // from right to left (or ‹): the card leaves to the left and the list comes in from the right, under the finger.
+  // The second page: a result's full card, sliding in from the right (the list leaving to the left). Back (‹, or the
+  // finger moved from right to left, as asked) is drawn as a going back: the card slides away to the right and the
+  // list comes back from the left, following how far the finger has gone.
   const [openId, setOpenId] = useState<string | null>(null);
   const [pos, setPos] = useState({ list: 0, detail: 100, anim: false });
   const [drag, setDrag] = useState(0);
@@ -43,18 +44,17 @@ export function ScanSheet({ records, failed, showCard, specimens, detail, onShow
     window.clearTimeout(timer.current);
     setOpenId(id); setDrag(0);
     setPos({ list: -100, detail: 0, anim: true });
-    // Once off screen, the list waits on the right, where the back swipe brings it from.
-    timer.current = window.setTimeout(() => setPos({ list: 100, detail: 0, anim: false }), SLIDE);
   };
   const back = () => {
     window.clearTimeout(timer.current);
     setDrag(0);
-    setPos({ list: 0, detail: -100, anim: true });
-    timer.current = window.setTimeout(() => { setOpenId(null); setPos({ list: 0, detail: 100, anim: false }); }, SLIDE);
+    setPos({ list: 0, detail: 100, anim: true });
+    timer.current = window.setTimeout(() => setOpenId(null), SLIDE);
   };
+  // The finger's way to the left, shown as the back move (both pages shifted to the right by as much).
   const paneStyle = (x: number) => ({
     gridArea: "1 / 1",
-    transform: `translate3d(calc(${x}% + ${drag}px), 0, 0)`,
+    transform: `translate3d(calc(${x}% + ${-drag}px), 0, 0)`,
     transition: pos.anim && !drag && !reduce ? `transform ${SLIDE}ms cubic-bezier(0.22, 1, 0.36, 1)` : "none",
   });
   const swipeStart = (x: number, y: number, mouse: boolean) => { swipe.current = { x, y, on: false, mouse }; };
@@ -72,8 +72,13 @@ export function ScanSheet({ records, failed, showCard, specimens, detail, onShow
     const sw = swipe.current;
     swipe.current = null;
     if (!sw?.on) return;
-    if (drag < -70) { setPos({ list: 100 + (drag / (typeof window !== "undefined" ? Math.min(window.innerWidth, 512) : 400)) * 100, detail: (drag / (typeof window !== "undefined" ? Math.min(window.innerWidth, 512) : 400)) * 100, anim: false }); setDrag(0); requestAnimationFrame(() => requestAnimationFrame(back)); }
-    else { setPos((p) => ({ ...p, anim: true })); setDrag(0); }
+    if (drag < -70) {
+      // Finish from where the finger left it.
+      const w = typeof window !== "undefined" ? Math.min(window.innerWidth, 512) : 400;
+      const k = (-drag / w) * 100;
+      setPos({ list: -100 + k, detail: k, anim: false }); setDrag(0);
+      requestAnimationFrame(() => requestAnimationFrame(back));
+    } else { setPos((p) => ({ ...p, anim: true })); setDrag(0); }
   };
     return (
     <div role="dialog" aria-label="Scansioni" className="ar-sheet pointer-events-auto fixed inset-x-0 bottom-0 z-40 mx-auto flex max-h-[78dvh] w-full max-w-lg flex-col rounded-t-[28px] border-t border-white/15 text-white shadow-[0_-20px_60px_rgba(0,0,0,0.55)] landscape:max-h-[92dvh]"
