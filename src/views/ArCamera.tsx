@@ -83,7 +83,7 @@ const FOCUS_ICONS = { auto: ScanSearch, tree: TreeDeciduous, ground: Shovel, lea
 
 const URBAN_TUTORIAL = [
   { title: "1 · Inquadra", text: "Inquadra un albero della piazza, oppure il suolo davanti a te: la fotocamera capisce da sola cosa c’è." },
-  { title: "2 · Scansiona", text: "Avvia la scansione: della pianta trovi specie e ombra, del suolo permeabilità e depavimentazione: l’esito si apre da solo, «Aggiungi al progetto» lo porta sulla mappa e il pulsante a destra dello scatto riapre le scansioni fatte." },
+  { title: "2 · Scansiona", text: "Avvia la scansione: della pianta trovi specie e ombra, del suolo permeabilità e depavimentazione: l’esito si apre da solo, «Aggiungi al progetto» lo porta sulla mappa e, dalla prima scansione, a destra dello scatto compare il pulsante che le riapre." },
   { title: "3 · AR", text: "In alto passa da «Rileva» ad «AR». Il pulsante AI apre «Cosa vuoi fare?»: scegli un intervento o una pianta riconosciuta e tocca il pavimento per posarla a grandezza vera." },
   { title: "4 · Sposta e ruota", text: "Trascina un oggetto con un dito; con due dita lo ruoti e lo ingrandisci. Con «Sposta» segue il mirino e gira con il telefono. Il telefono vibra a ogni mezzo metro e ogni 15°, più forte davanti a un ostacolo." },
   { title: "5 · Unisci e riporta", text: "Avvicina due pergolati o due aiuole: il contorno diventa verde e si uniscono. «Modellino» prova tutto in piccolo, «Riporta» li manda sulla mappa; con l’area allineata vedi anche gli interventi della mappa al loro posto." },
@@ -92,7 +92,7 @@ const URBAN_TUTORIAL = [
 
 const TUTORIAL = [
   { title: "1 · Inquadra", text: "Avvicinati a 20–30 cm da una foglia o dalla chioma: il mirino si aggancia da solo alla vegetazione." },
-  { title: "2 · Scansiona", text: "Avvia la scansione: prima la forma della foglia, poi il confronto botanico e la stima del terreno. L’esito si apre da solo; il pulsante a destra dello scatto riapre le scansioni fatte." },
+  { title: "2 · Scansiona", text: "Avvia la scansione: prima la forma della foglia, poi il confronto botanico e la stima del terreno. L’esito si apre da solo; dalla prima scansione, a destra dello scatto compare il pulsante che le riapre." },
   { title: "3 · AR", text: "In alto passa da «Rileva» ad «AR». Il pulsante AI apre «Cosa vuoi fare?»: scegli irrigazione, teli d’ombra, frangivento o una pianta riconosciuta e tocca il pavimento per posarla." },
   { title: "4 · Sposta e ruota", text: "Trascina un oggetto con un dito; con due dita lo ruoti e lo ingrandisci. Con «Sposta» segue il mirino e gira con il telefono. Il telefono vibra a ogni mezzo metro e ogni 15°, più forte davanti a un ostacolo." },
   { title: "5 · Riporta", text: "«Modellino» prova tutto in piccolo, «Riporta» manda gli oggetti sulla mappa del vigneto; con l’area allineata vedi anche gli interventi della mappa al loro posto." },
@@ -1670,6 +1670,8 @@ export function ArCamera({
     ...(count > 0 ? [{ key: "annulla", label: "Togli l’ultimo esemplare", Icon: Undo2, on: false, tool: true, hint: `${count} ${count === 1 ? "esemplare contato" : "esemplari contati"}`, onPick: () => { removeLast(); setScanSheet(false); } }] : []),
     ...(count > 1 || scanRecords.length ? [{ key: "elimina", label: "Elimina tutto", Icon: Trash2, on: false, tool: true, hint: "Toglie gli esemplari e tutte le scansioni registrate (chiede conferma)", onPick: () => { setScanSheet(false); removeAll(); } }] : []),
   ] }];
+  const hasScans = scanGroups[0]!.items.length > 0;
+  useEffect(() => { if (!hasScans) setScanSheet(false); }, [hasScans]);
   // Fase 2: «Aggiungi al progetto». Lo scansionato diventa un punto sulla mappa (GPS + bussola + distanza tipica),
   // con quello che ha detto la scansione; gli alberi poi contano come «già nell'area» nella simulazione.
   const shownRecord = viewedRecord ?? (liveRecord >= 0 ? scanRecords[liveRecord] ?? null : null);
@@ -2284,22 +2286,24 @@ export function ArCamera({
       )}
       right={
         <div className="flex items-center justify-center">
-          <Button
+          {/* Shown only once there is something to see: with no scan the sheet had nothing to offer. */}
+          {hasScans && <Button
             variant="ghost"
             type="button"
             onClick={() => setScanSheet((o) => !o)}
             aria-expanded={scanSheet}
             aria-controls="ar-ai-tray"
-            aria-label="Scansioni: esito, scansioni fatte, elimina"
+            aria-label={`Scansioni (${scanRecords.length}): esito, scansioni fatte, elimina`}
             title="Scansioni"
             className={
               landscape
-                ? "ar-landscape-pill-btn is-icon"
-                : "camera-tool ar-tools-btn is-icon"
+                ? "ar-landscape-pill-btn is-icon relative"
+                : "camera-tool ar-tools-btn is-icon relative"
             }
           >
             <ClipboardList className="size-6 shrink-0" aria-hidden="true" />
-          </Button>
+            {scanRecords.length > 0 && <span aria-hidden="true" className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-bold leading-none text-primary-foreground">{scanRecords.length}</span>}
+          </Button>}
         </div>
       }
     />
@@ -2415,9 +2419,7 @@ export function ArCamera({
             {burstFlash > 0 && <div key={burstFlash} onAnimationEnd={() => setBurstFlash(0)} className="burst-flash pointer-events-none fixed inset-0 bg-white" aria-hidden="true" />}
             {burstSheetElement}
             {scanSheet && <button type="button" tabIndex={-1} aria-label="Chiudi" data-camera-controls onClick={() => setScanSheet(false)} className="fixed inset-0 z-30 cursor-default bg-black/35" />}
-            {scanSheet && (scanGroups[0]!.items.length
-              ? <div data-camera-controls><ArSheet groups={scanGroups} onClose={() => setScanSheet(false)} /></div>
-              : <div data-camera-controls><ArSheet groups={[{ key: "vuoto", label: "Nessuna scansione ancora", Icon: ClipboardList, items: [{ key: "x", label: "Avvia una scansione", hint: "Inquadra una pianta o il suolo e tocca il pulsante a sinistra dello scatto", Icon: ScanSearch, on: false, tool: true, onPick: () => setScanSheet(false) }] }]} onClose={() => setScanSheet(false)} /></div>)}
+            {scanSheet && hasScans && <div data-camera-controls><ArSheet groups={scanGroups} onClose={() => setScanSheet(false)} /></div>}
             {landscape && burstThumb && (
               // Landscape: the series' thumbnail in the bottom right corner, under the shutter and the tools.
               <div className="absolute z-30" data-camera-controls style={{ right: "calc(env(safe-area-inset-right) + 1.6rem)", bottom: "calc(env(safe-area-inset-bottom) + 0.9rem)" }}>{burstThumb}</div>
