@@ -18,7 +18,7 @@ if (typeof window !== "undefined") {
     const orig = console[level].bind(console);
     console[level] = (...args: unknown[]) => {
       const text = args.map((x) => (typeof x === "string" ? x : x instanceof Error ? x.message : "")).join(" ");
-      const m = /(?:Google Maps JavaScript API|maps)\b[^:]*(?:error|warning):\s*(\w+)/i.exec(text) ?? /\b(\w+MapError)\b/.exec(text);
+      const m = /Demo Key limit reached/i.test(text) ? ["", "DemoKeyLimitMapError"] : /(?:Google Maps JavaScript API|maps)\b[^:]*(?:error|warning):\s*(\w+)/i.exec(text) ?? /\b(\w+MapError)\b/.exec(text);
       if (m && /Error$/.test(m[1]!) && !rejectReason) { rejectReason = m[1]!; rejectedSubs.forEach((f) => f()); }
       orig(...args);
     };
@@ -34,6 +34,7 @@ export function rejectText(code: string | null): string | null {
     ApiTargetBlockedMapError: "la chiave non può usare questo servizio",
     BillingNotEnabledMapError: "la fatturazione del progetto Google non è attiva",
     OverQuotaMapError: "limite di uso raggiunto",
+    DemoKeyLimitMapError: "la chiave è di prova (Maps Demo Key) e ha finito il limite di oggi",
     ExpiredKeyMapError: "chiave scaduta",
     InvalidKeyMapError: "chiave non valida",
     MissingKeyMapError: "chiave mancante",
