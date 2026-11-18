@@ -83,16 +83,20 @@ const FOCUS_ICONS = { auto: ScanSearch, tree: TreeDeciduous, ground: Shovel, lea
 
 const URBAN_TUTORIAL = [
   { title: "1 · Inquadra", text: "Inquadra un albero della piazza, oppure il suolo davanti a te: la fotocamera capisce da sola cosa c’è." },
-  { title: "2 · Scansiona", text: "Avvia la scansione: della pianta trovi specie e ombra, del suolo permeabilità e depavimentazione." },
-  { title: "3 · AR", text: "In alto passa da «Rileva» ad «AR»: tocca il terreno per posare la pianta o un intervento; con l’area allineata vedi anche quelli della mappa al loro posto." },
-  { title: "4 · Scatta", text: "Scatta foto o video: la griglia non compare e la stima va nel Lab e nei report della piazza." },
+  { title: "2 · Scansiona", text: "Avvia la scansione: della pianta trovi specie e ombra, del suolo permeabilità e depavimentazione. «Aggiungi al progetto» la porta sulla mappa." },
+  { title: "3 · AR", text: "In alto passa da «Rileva» ad «AR». Il pulsante AI apre «Cosa vuoi fare?»: scegli un intervento o una pianta riconosciuta e tocca il pavimento per posarla a grandezza vera." },
+  { title: "4 · Sposta e ruota", text: "Trascina un oggetto con un dito; con due dita lo ruoti e lo ingrandisci. Con «Sposta» segue il mirino e gira con il telefono. Il telefono vibra a ogni mezzo metro e ogni 15°, più forte davanti a un ostacolo." },
+  { title: "5 · Unisci e riporta", text: "Avvicina due pergolati o due aiuole: il contorno diventa verde e si uniscono. «Modellino» prova tutto in piccolo, «Riporta» li manda sulla mappa; con l’area allineata vedi anche gli interventi della mappa al loro posto." },
+  { title: "6 · Scatta", text: "Tocca per una foto, tieni premuto per uno scatto multiplo: foto e video vanno nel progetto e nei report della piazza." },
 ] as const;
 
 const TUTORIAL = [
   { title: "1 · Inquadra", text: "Avvicinati a 20–30 cm da una foglia o dalla chioma: il mirino si aggancia da solo alla vegetazione." },
   { title: "2 · Scansiona", text: "Avvia la scansione: prima la forma della foglia, poi il confronto botanico e la stima del terreno." },
-  { title: "3 · AR", text: "In alto passa da «Rileva» ad «AR»: tocca il terreno per posare la pianta e vederla sul posto." },
-  { title: "4 · Scatta", text: "Scatta foto o video: la griglia non compare e la stima botanico-termica va nel Lab e nei report." },
+  { title: "3 · AR", text: "In alto passa da «Rileva» ad «AR». Il pulsante AI apre «Cosa vuoi fare?»: scegli irrigazione, teli d’ombra, frangivento o una pianta riconosciuta e tocca il pavimento per posarla." },
+  { title: "4 · Sposta e ruota", text: "Trascina un oggetto con un dito; con due dita lo ruoti e lo ingrandisci. Con «Sposta» segue il mirino e gira con il telefono. Il telefono vibra a ogni mezzo metro e ogni 15°, più forte davanti a un ostacolo." },
+  { title: "5 · Riporta", text: "«Modellino» prova tutto in piccolo, «Riporta» manda gli oggetti sulla mappa del vigneto; con l’area allineata vedi anche gli interventi della mappa al loro posto." },
+  { title: "6 · Scatta", text: "Tocca per una foto, tieni premuto per uno scatto multiplo: foto e video vanno nel progetto e nei report del vigneto." },
 ] as const;
 
 /**
@@ -441,11 +445,11 @@ export function ArCamera({
   const guideSwipe = useRef<{ id: number; x: number; y: number; rotation: number } | null>(null);
   const closeGuide = () => {
     setGuideOpen(false); setGuideStep(0);
-    try { localStorage.setItem((kind === "urban" ? "ar-tutorial-seen-urban" : "ar-tutorial-seen-v2"), "1"); } catch { /* storage non disponibile */ }
+    try { localStorage.setItem((kind === "urban" ? "ar-tutorial-seen-urban-v3" : "ar-tutorial-seen-v3"), "1"); } catch { /* storage non disponibile */ }
   };
   useEffect(() => {
     if (!mode || !ready) return;
-    try { if (!localStorage.getItem((kind === "urban" ? "ar-tutorial-seen-urban" : "ar-tutorial-seen-v2"))) { setGuideStep(0); setGuideOpen(true); } } catch { setGuideOpen(true); }
+    try { if (!localStorage.getItem((kind === "urban" ? "ar-tutorial-seen-urban-v3" : "ar-tutorial-seen-v3"))) { setGuideStep(0); setGuideOpen(true); } } catch { setGuideOpen(true); }
   }, [mode, ready]);
   const [scanPhase, setScanPhase] = useState<"leaf" | "catalogue">("leaf");
   useEffect(() => {
@@ -2484,7 +2488,7 @@ export function ArCamera({
               </>
             )}
             {/* Modal veils & alert dialogs: render over all camera controls and burst bar */}
-            {guideOpen && <div className="ar-tutorial-veil" data-camera-controls aria-hidden="true" />}
+            {guideOpen && <div className="ar-tutorial-veil" data-camera-controls aria-hidden="true" onClick={(e) => { e.stopPropagation(); closeGuide(); }} />}
             {confirmClear && <div className="ar-confirm-veil" data-camera-controls onClick={() => { if (!emptying) setConfirmClear(false); }}>
               <div className="ar-confirm" role="alertdialog" aria-modal="true" aria-labelledby="ar-confirm-title" aria-describedby="ar-confirm-text"
                 onClick={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === "Escape") setConfirmClear(false); }}>

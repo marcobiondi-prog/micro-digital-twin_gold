@@ -290,3 +290,23 @@ export function nearFeedback(gap: number): { stage: "far" | "near" | "join"; eve
   const t = 1 - (gap - JOIN_GAP) / (NEAR_GAP - JOIN_GAP);
   return { stage: "near", every: Math.round(700 - 560 * t), pulse: Math.round(8 + 16 * t), t };
 }
+
+/**
+ * Detents while turning an object by hand (AR): how many 15° steps the turn crossed going from one angle to the
+ * other (degrees, relative to where the turn began), and whether one of them is a quarter turn — a light tick per
+ * step, a firmer one on 90°, 180°, 270°.
+ */
+export function turnDetents(prevDeg: number, nextDeg: number, step = 15): { steps: number; quarter: boolean } {
+  const a = Math.floor(prevDeg / step), b = Math.floor(nextDeg / step);
+  if (a === b) return { steps: 0, quarter: false };
+  const lo = Math.min(a, b) + 1, hi = Math.max(a, b);
+  let quarter = false;
+  for (let k = lo; k <= hi; k++) if ((k * step) % 90 === 0 && k !== 0) quarter = true;
+  return { steps: hi - lo + 1, quarter };
+}
+
+/** The tick felt while dragging an object by hand, every half metre: longer for a heavier object (8–22 ms). */
+export function dragTick(def: Pick<ArObjectDef, "w" | "d" | "h">): number {
+  const v = Math.max(0.01, def.w * def.d * Math.max(0.2, def.h));
+  return Math.round(Math.max(8, Math.min(22, 8 + 3.2 * Math.log10(v * 10))));
+}

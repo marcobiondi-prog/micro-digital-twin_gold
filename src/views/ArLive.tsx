@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Box, Check, Move, Layers, ChevronDown, ChevronLeft, RotateCw, Zap, ZapOff, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
 import type { ArKind } from "@/models/ar-focus";
 import {
-  AR_OBJECTS, alignFromFix, modelScaleFor, nearestPlaced, JOINABLE, JOIN_GAP, footCorners, footGap, joinFeet, nearFeedback, type Foot, placeHaptic, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, arObject, enToAr, metresText, objectsToZones, toEN,
+  AR_OBJECTS, alignFromFix, modelScaleFor, nearestPlaced, turnDetents, dragTick, JOINABLE, JOIN_GAP, footCorners, footGap, joinFeet, nearFeedback, type Foot, placeHaptic, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, arObject, enToAr, metresText, objectsToZones, toEN,
   type Alignment, type ArObjectDef, type PlacedObject,
 } from "@/models/ar-objects";
 import { getLab, setUrban, setVineyard } from "@/models/lab-store";
@@ -143,6 +143,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const [grabbed, setGrabbed] = useState<string | null>(null);
   const grabRef = useRef<string | null>(null);
   grabRef.current = grabbed;
+  /** The object moved by a finger right now (for the ring under it and the join feedback). */
+  const touchHeldRef = useRef<string | null>(null);
+  const [touchHeld, setTouchHeld] = useState<string | null>(null);
   const modelRef = useRef(modelK);
   modelRef.current = modelK;
   // Two fingers resize the last object put down; taps around a pinch never put a new one.
@@ -538,6 +541,14 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   function frameTick(t: NonNullable<typeof three.current>, reticle: THREE.Object3D) {
     const gid = grabRef.current, go = gid ? t.objects.get(gid) : undefined;
     if (go && t.hit) go.position.set(t.hit.x + grabOff.current.x, t.hit.y, t.hit.z + grabOff.current.z);
+    // …and turns as the phone turns (with ARCore; the preview's camera never turns sideways), a tick every 15°.
+    if (go && grabTurn.current) {
+      const turn = camYaw(t) - grabTurn.current.cam0;
+      go.rotation.y = grabTurn.current.rot0 + turn;
+      const deg = (turn * 180) / Math.PI, det = turnDetents(grabTurn.current.lastDeg, deg);
+      if (det.quarter) hapticTick([25, 30, 25]); else if (det.steps) hapticTick([8]);
+      grabTurn.current.lastDeg = deg;
+    }
     if (t.hit && ++obstacleTick.current % 8 === 0) {
       const def = defOfRef.current(live.current.selected);
       const blocked = live.current.tool === "place" && obstacleAt(def, t.hit.x, t.hit.y, t.hit.z, 0, modelRef.current * sizeRef.current);
@@ -557,7 +568,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   function proximity(t: NonNullable<typeof three.current>) {
     const s = nearState.current, now = performance.now();
     let cand: { id: string; foot: Foot; skip?: string } | null = null;
-    const gid = grabRef.current;
+    const gid = grabRef.current ?? touchHeldRef.current;
     if (gid) {
       const o = live.current.placed.find((p) => p.uid === gid), g = t.objects.get(gid);
       if (o && g && JOINABLE.has(o.id)) cand = { id: o.id, foot: footOf(o, g.position.x, g.position.z), skip: gid };
@@ -640,6 +651,35 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     return true;
   }
 
+  /** The ray from the phone's eye through a point of the screen. */
+  function screenRay(cx: number, cy: number): THREE.Raycaster | null {
+    const t = three.current;
+    if (!t) return null;
+    const xr = t.renderer.xr;
+    const cam = (xr.isPresenting ? (xr.getCamera().cameras[0] ?? xr.getCamera()) : t.camera) as THREE.PerspectiveCamera;
+    const r = xr.isPresenting ? { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight } : t.renderer.domElement.getBoundingClientRect();
+    if (!r.width || !r.height) return null;
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2(((cx - r.left) / r.width) * 2 - 1, -(((cy - r.top) / r.height) * 2 - 1)), cam);
+    return ray;
+  }
+  /** The spot on the floor under a point of the screen (the floor ARCore found, else the preview's guessed one). */
+  function screenToFloor(cx: number, cy: number): V | null {
+    const t = three.current;
+    if (!t || t.floorY === null) return null;
+    const ray = screenRay(cx, cy);
+    if (!ray) return null;
+    const p = new THREE.Vector3();
+    if (!ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -t.floorY), p) || p.distanceTo(ray.ray.origin) > 60) return null;
+    return { x: p.x, y: t.floorY, z: p.z };
+  }
+
+  /** The phone's heading in the AR frame (radians round the vertical), to turn an object as the phone turns. */
+  function camYaw(t: NonNullable<typeof three.current>): number {
+    const cam = t.renderer.xr.isPresenting ? t.renderer.xr.getCamera() : t.camera;
+    return new THREE.Euler().setFromQuaternion(new THREE.Quaternion().setFromRotationMatrix(cam.matrixWorld), "YXZ").y;
+  }
+
   /** Where the phone's eye is, in the AR frame. */
   function eyeOf(t: NonNullable<typeof three.current>): THREE.Vector3 {
     return new THREE.Vector3().setFromMatrixPosition((t.renderer.xr.isPresenting ? t.renderer.xr.getCamera() : t.camera).matrixWorld);
@@ -698,6 +738,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     return Math.max(0.6, (Math.max(def.w, def.d) / 2) * modelRef.current * (o.scale ?? 1) + 0.3);
   };
   const grabOff = useRef({ x: 0, z: 0 });
+  const grabTurn = useRef<{ rot0: number; cam0: number; lastDeg: number } | null>(null);
   /** «Sposta»: the first tap picks the object nearest to it, the second puts it down where tapped (with ARCore it
    *  follows the reticle meanwhile). The new spot is what «Riporta» brings back to the map. */
   function moveAt(hit: V) {
@@ -711,6 +752,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       const g = t.objects.get(near.o.uid);
       // With ARCore it keeps the offset from where it was picked, so it does not jump under the reticle.
       grabOff.current = session && g ? { x: g.position.x - hit.x, z: g.position.z - hit.z } : { x: 0, z: 0 };
+      grabTurn.current = g ? { rot0: g.rotation.y, cam0: camYaw(t), lastDeg: 0 } : null;
       setGrabbed(near.o.uid);
       hapticTick([20]);
       return;
@@ -719,9 +761,11 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     const g = t.objects.get(cur);
     const x = hit.x + grabOff.current.x, z = hit.z + grabOff.current.z;
     if (g) g.position.set(x, hit.y, z);
-    setPlaced((l) => l.map((p) => (p.uid === cur ? { ...p, x, z } : p)));
+    const yaw = g ? -g.rotation.y : o?.yaw ?? 0;
+    grabTurn.current = null;
+    setPlaced((l) => l.map((p) => (p.uid === cur ? { ...p, x, z, yaw } : p)));
     setGrabbed(null);
-    if (o && tryJoin({ ...o, x, z }, hit.y)) return;
+    if (o && tryJoin({ ...o, x, z, yaw }, hit.y)) return;
     hapticTick([30, 40, 30]);
     const def = o ? (o.def ?? defOfRef.current(o.id)) : null;
     const blocked = def && o ? obstacleAt(def, x, hit.y, z, o.yaw, modelRef.current * (o.scale ?? 1)) : false;
@@ -732,8 +776,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   // A ring under the object picked up.
   useEffect(() => {
     const t = three.current;
-    const g = grabbed ? t?.objects.get(grabbed) : undefined;
-    const o = grabbed ? placed.find((p) => p.uid === grabbed) : undefined;
+    const held = grabbed ?? touchHeld;
+    const g = held ? t?.objects.get(held) : undefined;
+    const o = held ? placed.find((p) => p.uid === held) : undefined;
     if (!t || !g || !o) return;
     const r = reachOf(o);
     const ring = new THREE.Mesh(new THREE.RingGeometry(Math.max(0.05, r - 0.3), Math.max(0.08, r - 0.24), 48).rotateX(-Math.PI / 2),
@@ -744,12 +789,13 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     t.scene.add(ring);
     return () => { t.scene.remove(ring); ring.geometry.dispose(); (ring.material as THREE.Material).dispose(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grabbed]);
+  }, [grabbed, touchHeld]);
   // Leaving «Sposta» with an object in hand puts it back where it was.
   useEffect(() => {
     if (tool === "move" || !grabRef.current) return;
     const o = placed.find((p) => p.uid === grabRef.current), g = o ? three.current?.objects.get(o.uid) : undefined;
-    if (o && g) { g.position.x = o.x; g.position.z = o.z; }
+    if (o && g) { g.position.x = o.x; g.position.z = o.z; g.rotation.y = -o.yaw; }
+    grabTurn.current = null;
     setGrabbed(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool]);
@@ -882,10 +928,10 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const barShort = !found ? "Cerco il pavimento…" : adjusting ? "Regola pavimento"
     : tool === "move" ? (grabbed ? "Mettilo giù" : "Sposta") : tool === "measure" ? (dist !== null ? metresText(dist) : "Misura") : tool === "align" ? `Punto ${alignPts.length + 1} dell’area` : defOf(selected).label;
   const barHelp = !found ? "Muovi piano il telefono verso il pavimento finché lo riconosco."
-    : tool === "move" ? "Tocca un oggetto posato per prenderlo: segue il mirino, tocca di nuovo per posarlo. Avvicinato a un altro pergolato o a un’altra aiuola, il telefono vibra sempre più forte e il contorno diventa verde: posato lì, i due diventano uno solo (Annulla li separa)."
+    : tool === "move" ? "Tocca un oggetto posato per prenderlo: segue il mirino e gira con il telefono, tocca di nuovo per posarlo. Avvicinato a un altro pergolato o a un’altra aiuola, il telefono vibra sempre più forte e il contorno diventa verde: posato lì, i due diventano uno solo (Annulla li separa)."
     : tool === "measure" ? "Tocca due punti a terra: ti dico quanto distano."
     : tool === "align" ? "Tocca a terra i punti 1 e 2 dell’area disegnata sulla mappa: così gli oggetti tornano al posto giusto."
-    : "Tocca il pavimento dove vuoi metterlo: compare a grandezza vera. Annulla toglie l’ultimo, il pulsante AI cambia oggetto.";
+    : "Tocca il pavimento dove vuoi metterlo: compare a grandezza vera. Un oggetto già posato si trascina con un dito; con due dita lo ruoti e lo ingrandisci. Annulla toglie l’ultimo, il pulsante AI cambia oggetto.";
   const barExpanded = barOpen || !!notice || adjusting;
   const statusTone = notice ? (notice.tone === "ok" ? "bg-[#22c55e] text-black" : "bg-[#facc15] text-black") : "bg-black/55 text-white backdrop-blur";
 
@@ -967,44 +1013,156 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     for (const o of placed) t.objects.get(o.uid)?.scale.setScalar(modelK * (o.scale ?? 1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelK]);
-  // Two fingers on the screen resize the last object put down (0,1×…3× its real size), its height said as it changes.
+  // Touch on the objects themselves (as well as the reticle's «Sposta»): one finger on an object drags it along the
+  // floor, two fingers on it turn it (twist) and resize it (pinch, 0,1×…3× its real size); two fingers elsewhere act on
+  // the last object put down. Adaptive feedback all along (touchMoveFeedback, the join outline of proximity).
   // The size of the last pinch (1 = real size): every object put afterwards takes it.
   const sizeRef = useRef(1);
   const placedRef = useRef(placed);
   placedRef.current = placed;
   useEffect(() => {
-    let d0 = 0, base = 1, uid = "", cur = 1, lastSaid = 0;
+    type Drag = { uid: string; x0: number; y0: number; off: { x: number; z: number }; moved: boolean; from: { x: number; z: number }; y: number; lastTick: { x: number; z: number }; blocked: boolean; saidAt: number };
+    type Twist = { uid: string; d0: number; a0: number; base: number; cur: number; rot0: number; lastDeg: number; saidAt: number };
+    let drag: Drag | null = null, twist: Twist | null = null;
     const dist = (e: TouchEvent) => Math.hypot(e.touches[0]!.clientX - e.touches[1]!.clientX, e.touches[0]!.clientY - e.touches[1]!.clientY);
-    const start = (e: TouchEvent) => {
-      if (e.touches.length !== 2) return;
-      const last = placedRef.current[placedRef.current.length - 1];
-      if (!last) return;
-      d0 = dist(e); uid = last.uid; base = last.scale ?? 1; cur = base;
-      pinchUntil.current = performance.now() + 600;
+    const angle = (e: TouchEvent) => Math.atan2(e.touches[1]!.clientY - e.touches[0]!.clientY, e.touches[1]!.clientX - e.touches[0]!.clientX);
+    const onControl = (e: TouchEvent) => !!(e.target as Element | null)?.closest?.("button, a, input, [role=slider], [role=dialog], .ar-sheet");
+    // The object under a finger: its 3D shape first (a tree is taken by its crown too), else the one whose footprint
+    // is near the spot of floor under the finger.
+    const objectAt = (x: number, y: number) => {
+      const p = screenToFloor(x, y);
+      const t = three.current;
+      const ray = screenRay(x, y);
+      if (t && ray && p) {
+        let best: { uid: string; d: number } | null = null;
+        for (const o of placedRef.current) {
+          const g = t.objects.get(o.uid);
+          if (!g) continue;
+          const hit = ray.intersectObject(g, true)[0];
+          if (hit && (!best || hit.distance < best.d)) best = { uid: o.uid, d: hit.distance };
+        }
+        const o = best ? placedRef.current.find((q) => q.uid === best!.uid) : undefined;
+        if (o) return { o, p };
+      }
+      if (!p) return null;
+      const list = placedRef.current.map((o) => ({ o, x: o.x, z: o.z, reach: reachOf(o) }));
+      const near = nearestPlaced(list, p);
+      return near ? { o: near.o, p } : null;
     };
-    const move = (e: TouchEvent) => {
-      if (!uid || e.touches.length !== 2 || !d0) return;
-      e.preventDefault();
-      pinchUntil.current = performance.now() + 600;
-      cur = Math.max(0.1, Math.min(3, base * (dist(e) / d0)));
-      three.current?.objects.get(uid)?.scale.setScalar(modelRef.current * cur);
-      const now = performance.now();
-      if (now - lastSaid > 120) {
-        lastSaid = now;
-        const o = placedRef.current.find((p) => p.uid === uid);
-        const def = o ? (o.def ?? defOfRef.current(o.id)) : null;
-        if (def) setNotice({ text: `${def.label} · ${metresText(def.h * cur)} di altezza${cur !== 1 ? ` (vero: ${metresText(def.h)})` : ""}`, tone: "ok" });
+    const say = (text: string, tone: "ok" | "warn" = "ok") => setNotice({ text, tone });
+    const start = (e: TouchEvent) => {
+      if (onControl(e) || adjustingRef.current) return;
+      const tl = live.current.tool;
+      if (tl === "measure" || tl === "align" || grabRef.current) return;
+      const t = three.current;
+      if (!t) return;
+      if (e.touches.length === 1) {
+        const hitO = objectAt(e.touches[0]!.clientX, e.touches[0]!.clientY);
+        if (!hitO) { drag = null; return; }
+        const g = t.objects.get(hitO.o.uid);
+        if (!g) return;
+        drag = { uid: hitO.o.uid, x0: e.touches[0]!.clientX, y0: e.touches[0]!.clientY, off: { x: g.position.x - hitO.p.x, z: g.position.z - hitO.p.z }, moved: false, from: { x: g.position.x, z: g.position.z }, y: g.position.y, lastTick: { x: g.position.x, z: g.position.z }, blocked: false, saidAt: 0 };
+      } else if (e.touches.length === 2) {
+        // Two fingers: the object under them (else the one being dragged, else the last put down).
+        const mx = (e.touches[0]!.clientX + e.touches[1]!.clientX) / 2, my = (e.touches[0]!.clientY + e.touches[1]!.clientY) / 2;
+        const under = objectAt(mx, my)?.o ?? (drag ? placedRef.current.find((p) => p.uid === drag!.uid) : undefined) ?? placedRef.current[placedRef.current.length - 1];
+        if (drag?.moved) endDrag(false);
+        drag = null;
+        if (!under) return;
+        const g = t.objects.get(under.uid);
+        if (!g) return;
+        twist = { uid: under.uid, d0: dist(e), a0: angle(e), base: under.scale ?? 1, cur: under.scale ?? 1, rot0: g.rotation.y, lastDeg: 0, saidAt: 0 };
+        touchHeldRef.current = under.uid; setTouchHeld(under.uid);
+        pinchUntil.current = performance.now() + 600;
+        hapticTick([12]);
       }
     };
+    const move = (e: TouchEvent) => {
+      const t = three.current;
+      if (!t) return;
+      const now = performance.now();
+      if (twist && e.touches.length === 2) {
+        e.preventDefault();
+        pinchUntil.current = now + 600;
+        const g = t.objects.get(twist.uid);
+        if (!g) return;
+        twist.cur = Math.max(0.1, Math.min(3, twist.base * (dist(e) / twist.d0)));
+        g.scale.setScalar(modelRef.current * twist.cur);
+        // Turning the fingers clockwise on screen turns the object clockwise seen from above.
+        const turnDeg = ((angle(e) - twist.a0) * 180) / Math.PI;
+        g.rotation.y = twist.rot0 - (turnDeg * Math.PI) / 180;
+        const det = turnDetents(twist.lastDeg, turnDeg);
+        if (det.quarter) hapticTick([25, 30, 25]); else if (det.steps) hapticTick([8]);
+        twist.lastDeg = turnDeg;
+        if (now - twist.saidAt > 120) {
+          twist.saidAt = now;
+          const o = placedRef.current.find((p) => p.uid === twist!.uid);
+          const def = o ? (o.def ?? defOfRef.current(o.id)) : null;
+          const deg = Math.round(turnDeg);
+          if (def) say(`${def.label} · ${metresText(def.h * twist.cur)} di altezza${twist.cur !== 1 ? ` (vero: ${metresText(def.h)})` : ""}${Math.abs(deg) >= 3 ? ` · ruotato di ${Math.abs(deg)}°` : ""}`);
+        }
+        return;
+      }
+      if (!drag || e.touches.length !== 1) return;
+      const tx = e.touches[0]!.clientX, ty = e.touches[0]!.clientY;
+      if (!drag.moved) {
+        if (Math.hypot(tx - drag.x0, ty - drag.y0) < 8) return;
+        drag.moved = true;
+        touchHeldRef.current = drag.uid; setTouchHeld(drag.uid);
+        hapticTick([15]);
+      }
+      e.preventDefault();
+      pinchUntil.current = now + 600;
+      const p = screenToFloor(tx, ty), g = t.objects.get(drag.uid);
+      if (!p || !g) return;
+      const x = p.x + drag.off.x, z = p.z + drag.off.z;
+      g.position.set(x, drag.y, z);
+      const o = placedRef.current.find((q) => q.uid === drag!.uid);
+      const def = o ? (o.def ?? defOfRef.current(o.id)) : null;
+      if (!o || !def) return;
+      // A tick every half metre, longer for a heavier object.
+      if (Math.hypot(x - drag.lastTick.x, z - drag.lastTick.z) >= 0.5) { drag.lastTick = { x, z }; hapticTick([dragTick(def)]); }
+      // Something real in the way (ARCore's depth): a firm buzz when it starts, said in the line on top.
+      if (now - drag.saidAt > 160) {
+        drag.saidAt = now;
+        const blocked = obstacleAt(def, x, drag.y, z, o.yaw, modelRef.current * (o.scale ?? 1));
+        if (blocked && !drag.blocked) hapticTick([70]);
+        drag.blocked = blocked;
+        // The join feedback (proximity) speaks for itself when a pergola or an aiuola is near one of its kind.
+        if (!nearState.current.said || nearState.current.stage === "far") {
+          const moved = Math.hypot(x - drag.from.x, z - drag.from.z);
+          say(blocked ? `${def.label}: qui c’è un ostacolo davanti` : `Sposto ${def.label.toLowerCase()} · ${metresText(Math.round(moved * 10) / 10)}`, blocked ? "warn" : "ok");
+        }
+      }
+    };
+    function endDrag(final = true) {
+      const d = drag, t = three.current;
+      drag = null;
+      touchHeldRef.current = null; setTouchHeld(null);
+      if (!d?.moved || !t) return;
+      pinchUntil.current = performance.now() + 450;
+      const g = t.objects.get(d.uid), o = placedRef.current.find((q) => q.uid === d.uid);
+      if (!g || !o) return;
+      const x = g.position.x, z = g.position.z;
+      setPlaced((l) => l.map((q) => (q.uid === d.uid ? { ...q, x, z } : q)));
+      if (final && tryJoin({ ...o, x, z }, d.y)) return;
+      hapticTick([20, 30, 20]);
+      window.setTimeout(() => setNotice((n) => (n?.text.startsWith("Sposto") || n?.text.includes("ostacolo") ? null : n)), 1600);
+    }
     const end = (e: TouchEvent) => {
-      if (!uid || e.touches.length >= 2) return;
-      const id = uid, k = Math.round(cur * 100) / 100;
-      uid = ""; d0 = 0;
-      pinchUntil.current = performance.now() + 400;
-      setPlaced((l) => l.map((p) => (p.uid === id ? { ...p, scale: k } : p)));
-      sizeRef.current = k;
-      hapticTick([20]);
-      window.setTimeout(() => setNotice((n) => (n?.text.includes("di altezza") ? null : n)), 1800);
+      if (twist && e.touches.length < 2) {
+        const tw = twist, g = three.current?.objects.get(tw.uid);
+        twist = null;
+        touchHeldRef.current = null; setTouchHeld(null);
+        const k = Math.round(tw.cur * 100) / 100;
+        pinchUntil.current = performance.now() + 400;
+        setPlaced((l) => l.map((p) => (p.uid === tw.uid ? { ...p, scale: k, ...(g ? { yaw: -g.rotation.y } : {}) } : p)));
+        sizeRef.current = k;
+        hapticTick([20]);
+        window.setTimeout(() => setNotice((n) => (n?.text.includes("di altezza") ? null : n)), 1800);
+        return;
+      }
+      if (drag && e.touches.length === 0) endDrag(true);
     };
     window.addEventListener("touchstart", start, { passive: true });
     window.addEventListener("touchmove", move, { passive: false });
@@ -1016,6 +1174,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       window.removeEventListener("touchend", end);
       window.removeEventListener("touchcancel", end);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Without the camera's image (a phone giving ARCore no "camera-access") there is no shutter, only its room.

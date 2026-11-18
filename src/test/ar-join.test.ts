@@ -28,3 +28,18 @@ describe("joining in AR", () => {
     expect(nearFeedback(JOIN_GAP).stage).toBe("join");
   });
 });
+
+import { turnDetents, dragTick } from "@/models/ar-objects";
+describe("touch feedback in AR", () => {
+  it("ticks every 15° and marks the quarter turns", () => {
+    expect(turnDetents(2, 10)).toEqual({ steps: 0, quarter: false });
+    expect(turnDetents(10, 20)).toEqual({ steps: 1, quarter: false });
+    expect(turnDetents(80, 95)).toEqual({ steps: 1, quarter: true });
+    expect(turnDetents(-5, -20).quarter).toBe(false);
+    expect(turnDetents(-80, -95).quarter).toBe(true);
+  });
+  it("gives a heavier object a longer tick", () => {
+    expect(dragTick({ w: 0.5, d: 0.5, h: 3 })).toBeLessThan(dragTick({ w: 8, d: 8, h: 12 }));
+    expect(dragTick({ w: 8, d: 8, h: 12 })).toBeLessThanOrEqual(22);
+  });
+});

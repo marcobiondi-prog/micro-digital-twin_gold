@@ -9,7 +9,7 @@ import type { LatLng } from "@/models/area-layout";
 
 /** Something moved by hand on the map: a tree (its index) or the lawn's, the shade's or the windbreak's handle. */
 export type MovedPart = { part: "tree"; index: number; at: LatLng } | { part: "lawn" | "shade" | "wind"; at: LatLng } | { part: "zones"; ids: string[]; from: LatLng; at: LatLng };
-import { Crosshair, LoaderCircle } from "lucide-react";
+import { Crosshair, LoaderCircle, Navigation2 } from "lucide-react";
 import { isKeyRejected, loadGoogleMaps, onKeyRejected } from "@/lib/google-maps-js";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { StyleSpecification } from "maplibre-gl";
@@ -76,10 +76,14 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
   live.current = { area, drawing, onAreaChange, outline, onOutside };
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [googleOn, setGoogleOn] = useState(false);
+  // The map turned away from north (Google's own credits are then outside the box: said in a corner instead).
+  const [turnedOn, setTurnedOn] = useState(false);
+  const [bearingNow, setBearingNow] = useState(0);
   const camera: Camera = { center: [lng, lat], zoom, bearing: 0 };
   useEffect(() => {
     let cancelled = false, remove: (() => void) | undefined, offKey: (() => void) | undefined;
     setState("loading");
+    setTurnedOn(false);
     // With the browser key the base is Google's own map (satellite with names, the same imagery as the 3D view), drawn
     // under a see-through maplibre that keeps the area, the zones and the simulation and leads the camera; without
     // it, or with the key refused, the open imagery of the style.
@@ -88,6 +92,19 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
       : Promise.resolve(null);
     void Promise.all([import("maplibre-gl"), google]).then(([{ default: maplibregl }, gmaps]) => {
       if (cancelled || !host.current) return;
+      // While the map is turned, Google's layer is a square as wide as the box's diagonal, centred on it, so it can be
+      // turned with the map (Google's satellite map does not turn by itself) and still cover every corner; with the map
+      // facing north it is the box itself, so Google's logo and credits stay in its corners.
+      let turned = false;
+      const sizeUnder = () => {
+        const el = under.current, h0 = host.current;
+        if (!el || !h0) return;
+        const w = h0.clientWidth, h = h0.clientHeight, d = turned ? Math.ceil(Math.hypot(w, h)) : 0;
+        Object.assign(el.style, turned
+          ? { width: `${d}px`, height: `${d}px`, left: `${(w - d) / 2}px`, top: `${(h - d) / 2}px` }
+          : { width: "100%", height: "100%", left: "0px", top: "0px" });
+      };
+      sizeUnder();
       const base = gmaps && under.current ? new gmaps.Map(under.current, {
         center: { lat, lng }, zoom: Math.min(zoom + 1, GOOGLE_SAFE), mapTypeId: "hybrid", disableDefaultUI: true, gestureHandling: "none", keyboardShortcuts: false,
         clickableIcons: false, isFractionalZoomEnabled: true, tilt: 0, backgroundColor: "#1d2129",
@@ -96,9 +113,9 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
       const map = new maplibregl.Map({ container: host.current, style: STYLE, locale: MAP_LOCALE, ...camera, maxZoom: base ? 23 : 22, pitchWithRotate: false, cooperativeGestures: false, attributionControl: false });
       map.touchPitch.disable();
       if (base) {
-        // Google's satellite map does not turn: the map moves and zooms only, and Google's camera follows every frame
-        // (its zoom is one more: its tiles are 256 px, maplibre's 512).
-        map.dragRotate.disable(); map.touchZoomRotate.disableRotation();
+        // Google's camera follows every frame (its zoom is one more: its tiles are 256 px, maplibre's 512). Its satellite
+        // map does not turn, so the map turns with two fingers (or right-drag) like the 3D and Google's layer is turned
+        // on screen by the same angle round the box's centre, the very point both maps are centred on.
         // Past Google's own closest imagery (GOOGLE_MAX) its map stays there and is enlarged on screen around the centre,
         // so one can zoom in further and the drawing stays on the photo.
         // Where Google's photos stop sooner (outside town centres) its own grey "no imagery" tiles came up and the map
@@ -110,10 +127,14 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
         const follow = () => {
           const c = map.getCenter(), z = map.getZoom() + 1, gz = Math.min(z, cap);
           base.moveCamera({ center: { lat: c.lat, lng: c.lng }, zoom: gz });
-          const k = 2 ** (z - gz);
-          el.style.transform = k > 1.001 ? `scale(${k})` : "";
+          const k = 2 ** (z - gz), b = map.getBearing();
+          const t = Math.abs(b) > 0.01;
+          if (t !== turned) { turned = t; sizeUnder(); setTurnedOn(t); }
+          if (t) setBearingNow(Math.round(b));
+          el.style.transform = `${Math.abs(b) > 0.01 ? `rotate(${-b}deg) ` : ""}${k > 1.001 ? `scale(${k})` : ""}`.trim();
         };
         map.on("move", follow);
+        map.on("resize", () => { sizeUnder(); follow(); });
         follow();
         // The open imagery stays on until Google's own photos have actually arrived (its first "tilesloaded"): a Google map
         // that draws nothing (a refused service, a blocked request, a place without photos) no longer leaves the map empty.
@@ -252,10 +273,13 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
   return (
     <div data-map-gestures="" className="relative h-full w-full touch-none overflow-hidden bg-card">
       {/* Google's map under, maplibre (see-through) over it with everything drawn and the gestures. */}
-      <div ref={under} className={`pointer-events-none absolute inset-0 ${googleOn ? "" : "invisible"}`} aria-hidden="true" />
+      <div ref={under} className={`pointer-events-none absolute left-0 top-0 h-full w-full ${googleOn ? "" : "invisible"}`} aria-hidden="true" />
       <div ref={host} className="relative h-full w-full" role="img" aria-label={`Mappa di ${label}`} />
       {state === "ready" && !still && <button type="button" onClick={recenter} aria-label="Ricentra la mappa sul punto" className="absolute left-2 top-2 grid size-9 place-items-center rounded-full border border-border/60 bg-background/90 text-foreground shadow-sm backdrop-blur"><Crosshair className="size-4" aria-hidden="true" /></button>}
-      {/* Google's tiles carry its name on the map, as in the 3D view. */}
+      {/* Turned away from north: a compass under the recenter button, its arrow pointing north, a tap turns the map back. */}
+      {state === "ready" && !still && turnedOn && <button type="button" onClick={() => mapRef.current?.easeTo({ bearing: 0, duration: 400 })} aria-label="Riporta la mappa con il nord in alto" title="Nord in alto" className="absolute left-2 top-12 grid size-9 place-items-center rounded-full border border-border/60 bg-background/90 text-foreground shadow-sm backdrop-blur"><Navigation2 className="size-4 fill-red-500 text-red-500" aria-hidden="true" style={{ transform: `rotate(${-bearingNow}deg)` }} /></button>}
+      {/* Google's tiles carry its name on the map, as in the 3D view; turned, its corners leave the box, so it is said here. */}
+      {googleOn && turnedOn && <span className="pointer-events-none absolute bottom-1 left-2 text-[10px] font-medium text-white/85 [text-shadow:0_1px_2px_rgba(0,0,0,0.8)]">Google · Immagini e dati mappa</span>}
       {state === "loading" && <div className="pointer-events-none absolute inset-0 grid place-items-center text-muted-foreground"><LoaderCircle className="size-5 animate-spin" aria-label="Caricamento mappa" /></div>}
       {state === "error" && <p role="status" className="absolute inset-0 grid place-items-center px-4 text-center text-sm text-muted-foreground">Mappa non disponibile in questo momento.</p>}
     </div>
