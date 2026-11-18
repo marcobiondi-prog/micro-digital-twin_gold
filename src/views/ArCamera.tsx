@@ -3,10 +3,10 @@ import { createPortal, flushSync } from "react-dom";
 import "@/styles/ar-camera.css";
 import { isTouchDevice } from "@/lib/touch-device";
 import { isTabletViewport } from "@/lib/tablet-camera";
-import { ArLive, requestArSession } from "@/views/ArLive";
+import { ArLive, ArSheet, requestArSession, type FanGroup } from "@/views/ArLive";
 import { recognisedPlants } from "@/models/ar-objects";
 import { toast } from "sonner";
-import { Activity, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grape, Leaf, Minus, Rows3, Shovel, TreeDeciduous, Snowflake, Umbrella, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Star, TreePine, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
+import { Activity, Check, ClipboardList, History, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grape, Leaf, Minus, Rows3, Shovel, TreeDeciduous, Snowflake, Umbrella, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Star, TreePine, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
 import { supportsCameraTorch, setCameraTorch, probeCameraTorch } from "@/lib/camera-torch";
 import { detectArObject, getReferencePhoto, type Detection, type Soil } from "@/controllers/ar-detect.functions";
 import { gbifPhotoSearchUrl, pickGbifPhoto, type ReferencePhoto } from "@/models/ar-reference-photo";
@@ -83,7 +83,7 @@ const FOCUS_ICONS = { auto: ScanSearch, tree: TreeDeciduous, ground: Shovel, lea
 
 const URBAN_TUTORIAL = [
   { title: "1 · Inquadra", text: "Inquadra un albero della piazza, oppure il suolo davanti a te: la fotocamera capisce da sola cosa c’è." },
-  { title: "2 · Scansiona", text: "Avvia la scansione: della pianta trovi specie e ombra, del suolo permeabilità e depavimentazione. «Aggiungi al progetto» la porta sulla mappa." },
+  { title: "2 · Scansiona", text: "Avvia la scansione: della pianta trovi specie e ombra, del suolo permeabilità e depavimentazione: l’esito si apre da solo, «Aggiungi al progetto» lo porta sulla mappa e il pulsante a destra dello scatto riapre le scansioni fatte." },
   { title: "3 · AR", text: "In alto passa da «Rileva» ad «AR». Il pulsante AI apre «Cosa vuoi fare?»: scegli un intervento o una pianta riconosciuta e tocca il pavimento per posarla a grandezza vera." },
   { title: "4 · Sposta e ruota", text: "Trascina un oggetto con un dito; con due dita lo ruoti e lo ingrandisci. Con «Sposta» segue il mirino e gira con il telefono. Il telefono vibra a ogni mezzo metro e ogni 15°, più forte davanti a un ostacolo." },
   { title: "5 · Unisci e riporta", text: "Avvicina due pergolati o due aiuole: il contorno diventa verde e si uniscono. «Modellino» prova tutto in piccolo, «Riporta» li manda sulla mappa; con l’area allineata vedi anche gli interventi della mappa al loro posto." },
@@ -92,7 +92,7 @@ const URBAN_TUTORIAL = [
 
 const TUTORIAL = [
   { title: "1 · Inquadra", text: "Avvicinati a 20–30 cm da una foglia o dalla chioma: il mirino si aggancia da solo alla vegetazione." },
-  { title: "2 · Scansiona", text: "Avvia la scansione: prima la forma della foglia, poi il confronto botanico e la stima del terreno." },
+  { title: "2 · Scansiona", text: "Avvia la scansione: prima la forma della foglia, poi il confronto botanico e la stima del terreno. L’esito si apre da solo; il pulsante a destra dello scatto riapre le scansioni fatte." },
   { title: "3 · AR", text: "In alto passa da «Rileva» ad «AR». Il pulsante AI apre «Cosa vuoi fare?»: scegli irrigazione, teli d’ombra, frangivento o una pianta riconosciuta e tocca il pavimento per posarla." },
   { title: "4 · Sposta e ruota", text: "Trascina un oggetto con un dito; con due dita lo ruoti e lo ingrandisci. Con «Sposta» segue il mirino e gira con il telefono. Il telefono vibra a ogni mezzo metro e ogni 15°, più forte davanti a un ostacolo." },
   { title: "5 · Riporta", text: "«Modellino» prova tutto in piccolo, «Riporta» manda gli oggetti sulla mappa del vigneto; con l’area allineata vedi anche gli interventi della mappa al loro posto." },
@@ -290,6 +290,9 @@ export function ArCamera({
   // L'esito dell'analisi si può chiudere senza perdere i dati: si riapre con un tocco.
   const [panelOpen, setPanelOpen] = useState(true);
   const [toolsOpen, setToolsOpen] = useState(false);
+  // «Scansioni» (the button bottom right in Rileva): the AR's own sheet with the last result, the scans made and
+  // Elimina tutto. Analisi, Livelli and the simulated heat map are gone (2026-11-18).
+  const [scanSheet, setScanSheet] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   // The flash the person turned on, kept when the camera restarts by itself (the watchdog): put back on the new one.
@@ -1648,6 +1651,25 @@ export function ArCamera({
   };
 
   const hasAnalysisContent = Boolean(species || soil || found || survey || viewedRecord);
+  // The result opens by itself once a scan has found something (it can be folded to a line or closed).
+  const wasScanning = useRef(false);
+  useEffect(() => {
+    if (wasScanning.current && !scanning && (species || soil || survey)) {
+      setBrowse(null); setToolsOpen(true); setActiveTool("analysis"); setPanelOpen(true); setPanelMin(false);
+    }
+    wasScanning.current = scanning;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanning]);
+  const openEsito = (page: number | null) => { setBrowse(page); setToolsOpen(true); setActiveTool("analysis"); setPanelOpen(true); setPanelMin(false); setScanSheet(false); };
+  const scanGroups: FanGroup[] = [{ key: "scansioni", label: "Scansioni", Icon: ClipboardList, items: [
+    ...(species || soil || survey || found ? [{ key: "esito", label: "Esito dell’ultima scansione", Icon: Info, on: false, tool: true,
+      hint: species ? `${species.commonName}${species.cooling ? ` · ombra ≈ ${species.cooling.shadeM2} m²` : ""}` : soil ? `Terreno ${soil.label}` : "Riapri la scheda con specie, suolo e fonti",
+      onPick: () => openEsito(null) }] : []),
+    ...(scanRecords.length ? [{ key: "fatte", label: `Scansioni fatte · ${scanRecords.length}`, Icon: History, on: false, tool: true,
+      hint: "Sfogliale una per una: specie, suolo, foto ed esemplari", onPick: () => openEsito(Math.max(0, scanRecords.length - 1)) }] : []),
+    ...(count > 0 ? [{ key: "annulla", label: "Togli l’ultimo esemplare", Icon: Undo2, on: false, tool: true, hint: `${count} ${count === 1 ? "esemplare contato" : "esemplari contati"}`, onPick: () => { removeLast(); setScanSheet(false); } }] : []),
+    ...(count > 1 || scanRecords.length ? [{ key: "elimina", label: "Elimina tutto", Icon: Trash2, on: false, tool: true, hint: "Toglie gli esemplari e tutte le scansioni registrate (chiede conferma)", onPick: () => { setScanSheet(false); removeAll(); } }] : []),
+  ] }];
   // Fase 2: «Aggiungi al progetto». Lo scansionato diventa un punto sulla mappa (GPS + bussola + distanza tipica),
   // con quello che ha detto la scansione; gli alberi poi contano come «già nell'area» nella simulazione.
   const shownRecord = viewedRecord ?? (liveRecord >= 0 ? scanRecords[liveRecord] ?? null : null);
@@ -2105,16 +2127,6 @@ export function ArCamera({
     <div id="ar-camera-tools" hidden={!toolsOpen} className="w-full">
       {toolsOpen && (
         <div className="ar-tools-panel flex w-full flex-col items-center gap-2">
-          <div className="ar-tool-options" data-camera-controls>
-            <Button variant="ghost" size="sm" className="camera-tool" title="Analisi" aria-label="Analisi" aria-pressed={activeTool === "analysis"} onClick={() => { setActiveTool(v => v === "analysis" ? null : "analysis"); setPanelOpen(true); }}><Info className="size-4" />Analisi</Button>
-            <Button variant="ghost" size="sm" className="camera-tool" title="Livelli" aria-label="Livelli" aria-pressed={activeTool === "manage"} onClick={() => { setActiveTool(v => v === "manage" ? null : "manage"); }}><SlidersHorizontal className="size-4" />Livelli</Button>
-            
-            {activeTool === "manage" && (
-              <div className="flex flex-wrap items-center justify-center gap-1.5" data-camera-controls>
-                <Button variant="ghost" size="icon" className="camera-tool" aria-label="Mappa termica simulata" title="Calore simulato" aria-pressed={layers.has("heat")} onClick={() => { if (!layers.has("heat")) setThermalInfoOpen(true); toggle("heat"); }}><Flame className="size-4" /></Button>
-              </div>
-            )}
-          </div>
           {!torchSupported && <p className="text-xs text-muted-foreground">Flash non supportato su questa fotocamera.</p>}
           {(species || soil || found || survey || viewedRecord) && activeTool === "analysis" && panelOpen && panelMin && (
             <Button variant="ghost" type="button" data-camera-controls
@@ -2142,7 +2154,7 @@ export function ArCamera({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  onClick={() => { setPanelOpen(false); setActiveTool(null); }}
+                  onClick={() => { setPanelOpen(false); setActiveTool(null); setToolsOpen(false); }}
                   aria-label="Chiudi esito analisi"
                   title="Chiudi esito analisi"
                   className="grid size-7 place-items-center rounded-full bg-background/80 backdrop-blur-md"
@@ -2155,6 +2167,7 @@ export function ArCamera({
                 className="max-h-[32dvh] overflow-y-auto rounded-lg bg-background/95 px-3.5 py-3 pr-20 text-xs leading-relaxed backdrop-blur-md"
                 aria-live="polite"
               >
+                {summaryPager && <div className="mb-2">{summaryPager}</div>}
                 {viewedRecord ? recordEsito(viewedRecord) : (
                   <>
                     <EsitoPhoto scan={realPhoto} reference={species?.photo ?? null} name={species?.commonName ?? null} />
@@ -2204,12 +2217,6 @@ export function ArCamera({
                   </>
                 )}
               </div>
-            </div>
-          )}
-          {activeTool === "manage" && (count > 0 || scanRecords.length > 0) && (
-            <div className="flex flex-wrap items-center justify-center gap-2" data-camera-controls>
-              {count > 0 && <Button variant="ghost" size="sm" className="camera-tool" onClick={removeLast} title="Elimina ultimo elemento"><Undo2 className="size-4" />Annulla</Button>}
-              {(count > 1 || scanRecords.length > 0) && <Button variant="ghost" size="sm" className="camera-tool text-destructive" onClick={removeAll} title="Elimina esemplari e tutte le scansioni registrate"><Trash2 className="size-4" />Elimina tutti</Button>}
             </div>
           )}
         </div>
@@ -2280,18 +2287,18 @@ export function ArCamera({
           <Button
             variant="ghost"
             type="button"
-            onClick={() => { setToolsOpen((open) => !open); setActiveTool("analysis"); setPanelOpen(true); }}
-            aria-expanded={toolsOpen}
-            aria-controls="ar-camera-tools"
-            aria-label={toolsOpen ? "Nascondi strumenti" : "Mostra strumenti"}
-            title={toolsOpen ? "Nascondi strumenti" : "Mostra strumenti"}
+            onClick={() => setScanSheet((o) => !o)}
+            aria-expanded={scanSheet}
+            aria-controls="ar-ai-tray"
+            aria-label="Scansioni: esito, scansioni fatte, elimina"
+            title="Scansioni"
             className={
               landscape
                 ? "ar-landscape-pill-btn is-icon"
                 : "camera-tool ar-tools-btn is-icon"
             }
           >
-            <SlidersHorizontal className="size-6 shrink-0" aria-hidden="true" />
+            <ClipboardList className="size-6 shrink-0" aria-hidden="true" />
           </Button>
         </div>
       }
@@ -2405,15 +2412,12 @@ export function ArCamera({
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-background/60 to-transparent" />
             {topBarElement}
             {torchError && <p className="ar-flash-error" role="status" data-camera-controls>{torchError}</p>}
-            {toolsOpen && activeTool === "manage" && layers.has("heat") && (
-              <div role="button" tabIndex={0} data-camera-controls aria-label="Come leggere la mappa termica simulata" onClick={() => setThermalInfoOpen(true)} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setThermalInfoOpen(true); } }} className="ar-heat-legend">
-                <span>Simulata</span><span>Caldo</span>
-                <span className="h-24 w-2 rounded-full bg-[image:var(--ar-thermal-scale)]" />
-                <span>Fresco</span>
-              </div>
-            )}
             {burstFlash > 0 && <div key={burstFlash} onAnimationEnd={() => setBurstFlash(0)} className="burst-flash pointer-events-none fixed inset-0 bg-white" aria-hidden="true" />}
             {burstSheetElement}
+            {scanSheet && <button type="button" tabIndex={-1} aria-label="Chiudi" data-camera-controls onClick={() => setScanSheet(false)} className="fixed inset-0 z-30 cursor-default bg-black/35" />}
+            {scanSheet && (scanGroups[0]!.items.length
+              ? <div data-camera-controls><ArSheet groups={scanGroups} onClose={() => setScanSheet(false)} /></div>
+              : <div data-camera-controls><ArSheet groups={[{ key: "vuoto", label: "Nessuna scansione ancora", Icon: ClipboardList, items: [{ key: "x", label: "Avvia una scansione", hint: "Inquadra una pianta o il suolo e tocca il pulsante a sinistra dello scatto", Icon: ScanSearch, on: false, tool: true, onPick: () => setScanSheet(false) }] }]} onClose={() => setScanSheet(false)} /></div>)}
             {landscape && burstThumb && (
               // Landscape: the series' thumbnail in the bottom right corner, under the shutter and the tools.
               <div className="absolute z-30" data-camera-controls style={{ right: "calc(env(safe-area-inset-right) + 1.6rem)", bottom: "calc(env(safe-area-inset-bottom) + 0.9rem)" }}>{burstThumb}</div>
