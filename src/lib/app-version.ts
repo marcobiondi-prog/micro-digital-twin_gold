@@ -1,3 +1,5 @@
+import { PREVIEW_BUILD } from "@/lib/demo-login";
+
 declare const __BUILD_TIME__: string | undefined;
 
 /**
@@ -11,9 +13,11 @@ export function buildNumber(iso: string | null = BUILD_TIME): number | null {
   const t = new Date(iso).getTime();
   return Number.isFinite(t) ? Math.max(0, Math.floor((t - BUILD_EPOCH) / 60000)) : null;
 }
-export function buildLabel(iso: string | null = BUILD_TIME): string {
+/** The test branch's builds (Vercel previews) read "Build test …", production "Build …". */
+export function buildLabel(iso: string | null = BUILD_TIME, test: boolean = PREVIEW_BUILD): string {
   const n = buildNumber(iso);
-  return n === null ? "sviluppo" : `Build MDTW-${n.toString(36).toUpperCase()}`;
+  if (n === null) return test ? "test · sviluppo" : "sviluppo";
+  return `Build ${test ? "test " : ""}MDTW-${n.toString(36).toUpperCase()}`;
 }
 
 /** The version online now (its build time, from /version.json), or null without a connection. */

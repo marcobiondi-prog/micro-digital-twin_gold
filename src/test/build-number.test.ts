@@ -7,6 +7,7 @@ describe("build number", () => {
     expect(buildNumber("2026-01-02T00:01:30.000Z")).toBe(1441);
     expect(buildLabel("2026-01-02T00:01:30.000Z")).toBe("Build MDTW-141");
     expect(buildLabel(null)).toBe("sviluppo");
+    expect(buildLabel("2026-01-02T00:01:30.000Z", true)).toBe("Build test MDTW-141");
   });
   it("grows with every later build", () => {
     expect(buildNumber("2026-11-07T05:09:00Z")!).toBeGreaterThan(buildNumber("2026-11-07T05:08:00Z")!);
