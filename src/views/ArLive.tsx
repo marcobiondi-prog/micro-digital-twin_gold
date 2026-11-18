@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { toast } from "sonner";
-import { Box, Check, Move, Layers, ChevronDown, ChevronLeft, RotateCw, Zap, ZapOff, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
+import { Box, Check, Move, Layers, ChevronDown, ChevronLeft, RotateCw, RotateCcw, Zap, ZapOff, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
 import type { ArKind } from "@/models/ar-focus";
 import {
-  AR_OBJECTS, alignFromFix, modelScaleFor, nearestPlaced, turnDetents, dragTick, JOINABLE, JOIN_GAP, footCorners, footGap, joinFeet, nearFeedback, type Foot, placeHaptic, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, enToAr, metresText, objectsToZones, toEN,
+  AR_OBJECTS, joinFitsZone, type JoinFit, alignFromFix, modelScaleFor, nearestPlaced, turnDetents, dragTick, JOINABLE, JOIN_GAP, footCorners, footGap, joinFeet, nearFeedback, type Foot, placeHaptic, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, enToAr, metresText, objectsToZones, toEN,
   type Alignment, type ArObjectDef, type PlacedObject,
 } from "@/models/ar-objects";
 import { getLab, setUrban, setVineyard } from "@/models/lab-store";
 import { drawnAreaFor, type DrawnArea } from "@/models/drawn-area";
 import { readFix } from "@/lib/find-position";
 import { hapticTick } from "@/lib/haptics";
+import { easeTo, FloorTracker, placementFor, RAISED_M, surfaceKind, type SurfaceHit } from "@/models/ar-floor";
 import { contactShadow, floorLoop, objectMesh } from "@/views/ar-object-meshes";
 import { buildPlan, growPlan, planText, planTreeDefs } from "@/views/ar-plan";
 import { realTree, wantsRealTree } from "@/views/ar-tree";
@@ -21,7 +22,7 @@ import { ArcZoomDial } from "@/views/ArcZoomDial";
 import { ZOOM_MAX } from "@/lib/camera-zoom";
 import { probeCameraTorch, setCameraTorch, supportsCameraTorch } from "@/lib/camera-torch";
 import { HOLD_MS, useHoldBurst } from "@/lib/hold-burst";
-import { DEPTH_INIT, DepthOccluder, FLIP_MODES, depthFlip, depthWanted, patchGpuDepthQuery, setDepthFlip, setDepthWanted } from "@/views/ar-depth";
+import { DEPTH_INIT, DepthOccluder, FLIP_MODES, depthFlip, depthWanted, patchGpuDepthQuery, setDepthFlip, setDepthWanted, markDepthRefused } from "@/views/ar-depth";
 import { BurstReviewSheet, BurstThumb, burstThumbOf, type BurstShot } from "@/views/BurstReview";
 
 /**
@@ -38,25 +39,42 @@ export async function arLiveSupported(): Promise<boolean> {
   } catch { return false; }
 }
 
-/** Asks for the AR session; call it straight from a tap (the browser wants a user gesture). The HUD overlay is
- *  required in every try — without it the AR view would have no ✕ nor tools, and only the phone's Back would get
- *  out —, hit-test first required, then optional. The camera's fullscreen (which keeps the landscape: outside it
- *  the app is locked portrait) is left only as a last try, when the phone refused both while in fullscreen, and
- *  taken back if that fails too, so a refusal falls back to the preview in the same orientation. */
+/** Asks for the AR session; call it straight from a tap (the browser wants a user gesture). */
 export async function requestArSession(overlayRoot: HTMLElement): Promise<XRSession> {
-  // Chrome on the user's Xperia refuses every immersive-ar session while the page is in fullscreen
-  // ("NotSupportedError" for each configuration, the bare one too), and starts it once out of it, as the first AR
-  // version did: so the camera's fullscreen is left first. Out of it the app's portrait lock comes back, so the
-  // orientation the phone is held in is asked to stay (it may be refused; then the AR opens portrait).
+  // The session is first asked while the page stays in the camera's fullscreen, so the AR view covers Android's bars
+  // like the AI camera. On the user's Xperia every try was once refused in fullscreen, but the cause then turned out to
+  // be the site's AR permission being blocked; if a phone still refuses every try in fullscreen, it is remembered
+  // (AR_IN_FS_KEY "fail") and from then on the fullscreen is left first, as before. A refusal can spend the tap, so
+  // the retry out of fullscreen may answer SecurityError: «Riprova ARCore» then starts it with a fresh tap.
+  const report: string[] = [];
+  const inFs = typeof document !== "undefined" && !!document.fullscreenElement;
+  let fsFail = false;
+  try { fsFail = localStorage.getItem(AR_IN_FS_KEY) === "fail"; } catch { /* storage off */ }
+  if (inFs && !fsFail) {
+    const got = await tryArConfigs(overlayRoot, report, false);
+    if (got.session) { try { localStorage.setItem(AR_IN_FS_KEY, "ok"); } catch { /* storage off */ } return got.session; }
+    if (!got.allUnsupported) throw new Error(report.join(" · "));
+    try { localStorage.setItem(AR_IN_FS_KEY, "fail"); } catch { /* storage off */ }
+    report.push("(a schermo intero rifiutata: riprovo fuori)");
+  }
+  // Out of fullscreen the app's portrait lock comes back, so the orientation the phone is held in is asked to stay
+  // (it may be refused; then the AR opens portrait).
   if (typeof document !== "undefined" && document.fullscreenElement) {
     const held = screen.orientation?.type;
     await document.exitFullscreen().catch(() => undefined);
     const o = screen.orientation as ScreenOrientation & { lock?: (v: string) => Promise<void> };
     if (held?.startsWith("landscape")) await o.lock?.(held).catch(() => undefined);
   }
-  // Then tried in turn, each moving on only on NotSupportedError: with the HUD overlay first, then without it (Chrome
-  // shows its own close button; a tap on the floor still puts the chosen object), then the bare session. Every
-  // refusal is reported together when none starts.
+  const got = await tryArConfigs(overlayRoot, report, true);
+  if (got.session) return got.session;
+  throw new Error(report.join(" · "));
+}
+
+const AR_IN_FS_KEY = "mdt-ar-in-fullscreen-v1";
+
+/** Tried in turn, each moving on only on NotSupportedError: with the HUD overlay first, then without it (Chrome shows
+ *  its own close button; a tap on the floor still puts the chosen object), then the bare session. */
+async function tryArConfigs(overlayRoot: HTMLElement, report: string[], markDepth: boolean): Promise<{ session?: XRSession; allUnsupported: boolean }> {
   const tries: Array<[string, XRSessionInit]> = [
     // ARCore's depth first (real walls and furniture hide the objects), on unless switched off by hand. Optional, so a
     // phone without it still starts.
@@ -66,15 +84,46 @@ export async function requestArSession(overlayRoot: HTMLElement): Promise<XRSess
     ["pavimento", { requiredFeatures: ["hit-test"], optionalFeatures: ["local-floor", "camera-access", "light-estimation"] }],
     ["base", {}],
   ];
-  const report: string[] = [];
   for (const [name, init] of tries) {
-    try { return await navigator.xr!.requestSession("immersive-ar", init); }
+    try { return { session: await navigator.xr!.requestSession("immersive-ar", init), allUnsupported: false }; }
     catch (e) {
       report.push(`${name}: ${e instanceof DOMException ? e.name : e instanceof Error ? e.message : String(e)}`);
-      if (!(e instanceof DOMException) || e.name !== "NotSupportedError") break;
+      // In fullscreen a refusal may come from the fullscreen itself, so the depth is blamed only out of it.
+      if (markDepth && e instanceof DOMException && e.name === "NotSupportedError" && name.includes("profondità")) markDepthRefused();
+      if (!(e instanceof DOMException) || e.name !== "NotSupportedError") return { allUnsupported: false };
     }
   }
-  throw new Error(report.join(" · "));
+  return { allUnsupported: true };
+}
+
+/**
+ * The ARCore view in fullscreen like the AI camera: the session is asked out of fullscreen (the user's Xperia refuses
+ * it inside), so once it runs the overlay root asks fullscreen again, with the tap's activation still valid. If the
+ * phone ends the session because of it (within 2,5 s), this phone is remembered and never asked again.
+ */
+const AR_FS_KEY = "mdt-ar-fullscreen-v1";
+export function arFullscreen(session: XRSession, root: HTMLElement) {
+  if (typeof document === "undefined") return;
+  try { if (localStorage.getItem(AR_FS_KEY) === "fail") return; } catch { /* storage off */ }
+  const el = root as HTMLElement & { requestFullscreen?: (o?: FullscreenOptions) => Promise<void> };
+  if (!el.requestFullscreen) return;
+  let ended = false;
+  const ask = () => {
+    if (ended) return;
+    const asked = performance.now();
+    const onEnd = () => { if (performance.now() - asked < 2500) { try { localStorage.setItem(AR_FS_KEY, "fail"); } catch { /* storage off */ } } };
+    session.addEventListener("end", onEnd, { once: true });
+    window.setTimeout(() => session.removeEventListener("end", onEnd), 2600);
+    // Asked even when the overlay already counts as fullscreen: Chrome's AR overlay leaves Android's navigation bar
+    // on screen, and "hide" asks it away.
+    void el.requestFullscreen!({ navigationUI: "hide" }).catch(() => undefined);
+  };
+  ask();
+  // The tap that started AR is often spent by the session itself, so the request is made again on the first tap
+  // inside the AR view, which carries a fresh activation.
+  const onTap = () => { window.removeEventListener("pointerup", onTap, true); ask(); };
+  window.addEventListener("pointerup", onTap, true);
+  session.addEventListener("end", () => { ended = true; window.removeEventListener("pointerup", onTap, true); }, { once: true });
 }
 
 type Tool = "place" | "align" | "measure" | "move";
@@ -88,7 +137,7 @@ type V = { x: number; y: number; z: number };
 /** The "Tocca per ruotare la vista AR" notice when the phone is turned during an ARCore session. */
 const ROTATE_PROMPT = false;
 
-export function ArLive({ kind, session, stream = null, plants = [], onShot, onEnd, onRotate, why, burst, torch = false, onFlashPreview, carry }: { burst: ArBurst; torch?: boolean; onFlashPreview?: (carry: PlacedObject[]) => void; carry?: PlacedObject[] | undefined; why?: string | undefined; kind: ArKind; session: XRSession | null; stream?: MediaStream | null; plants?: ArObjectDef[]; onShot?: (file: File) => void; onEnd: () => void; onRotate?: () => void }) {
+export function ArLive({ kind, session, stream = null, plants = [], onShot, onEnd, onRotate, why, burst, torch = false, onFlashPreview, carry, rotation = 0, onRetry }: { onRetry?: () => void; rotation?: number; burst: ArBurst; torch?: boolean; onFlashPreview?: (carry: PlacedObject[]) => void; carry?: PlacedObject[] | undefined; why?: string | undefined; kind: ArKind; session: XRSession | null; stream?: MediaStream | null; plants?: ArObjectDef[]; onShot?: (file: File) => void; onEnd: () => void; onRotate?: () => void }) {
   // Chrome locks the screen to the orientation the AR session started in, and a web page cannot unlock it. When the
   // phone is held the other way for a moment, a tap restarts the session in the new orientation (onRotate).
   // Off at the user's word ("non mi deve uscire questo avviso quando ruoto"): the AR stays in the orientation it
@@ -112,6 +161,39 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     window.addEventListener("devicemotion", onMotion);
     return () => window.removeEventListener("devicemotion", onMotion);
   }, [session, onRotate]);
+  // With ARCore Chrome keeps the screen in the orientation the session started in (a page cannot unlock it), so the
+  // HUD would stay sideways when the phone is turned. Gravity says how the phone is held; the HUD is turned by CSS to
+  // read upright (the camera's world tracking needs no turn), after 0,35 s held the new way.
+  const [hudTurn, setHudTurn] = useState(0);
+  const [, setVp] = useState(0);
+  useEffect(() => {
+    if (!session) { setHudTurn(0); return; }
+    let want = 0, since = 0;
+    const onMotion = (e: DeviceMotionEvent) => {
+      const g = e.accelerationIncludingGravity;
+      if (!g || g.x == null || g.y == null) return;
+      const ax = Math.abs(g.x), ay = Math.abs(g.y);
+      if (Math.max(ax, ay) < 4) return; // flat: keep the last
+      let held: number | null = null;
+      if (ay > ax * 1.3) held = g.y > 0 ? 0 : 180;
+      else if (ax > ay * 1.3) held = g.x > 0 ? 90 : 270;
+      if (held === null || held === 180) return;
+      const screenAngle = (screen.orientation?.angle ?? 0) % 360;
+      let turn = (held - screenAngle + 360) % 360;
+      if (turn === 270) turn = -90;
+      if (turn === 180) return;
+      const now = performance.now();
+      if (turn !== want) { want = turn; since = now; return; }
+      if (now - since > 350) setHudTurn((t) => (t === turn ? t : turn));
+    };
+    const onResize = () => setVp((n) => n + 1);
+    window.addEventListener("devicemotion", onMotion);
+    window.addEventListener("resize", onResize);
+    return () => { window.removeEventListener("devicemotion", onMotion); window.removeEventListener("resize", onResize); };
+  }, [session]);
+  const hudTurnStyle: React.CSSProperties = hudTurn && session && typeof window !== "undefined"
+    ? { inset: "auto", left: "50%", top: "50%", width: `${window.innerHeight}px`, height: `${window.innerWidth}px`, transform: `translate(-50%, -50%) rotate(${hudTurn}deg)`, transition: "transform 250ms ease", paddingLeft: "1.75rem", paddingRight: "1.75rem" }
+    : {};
   // The plants recognised by «Rileva» come first (key "p:<i>"), then the flow's own objects (key = their id).
   const choices = useMemo(() => [
     ...plants.map((d, i) => ({ key: `p:${i}`, def: d })),
@@ -129,7 +211,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const [glLost, setGlLost] = useState(0);
   const adjustingRef = useRef(false);
   adjustingRef.current = adjusting;
-  const floorRef = useRef({ tilt: -14, offset: readFloorOffset() });
+  const floorRef = useRef({ tilt: -14, offset: readFloorOffset(), yaw: 0 });
   const horizonLine = useRef<HTMLDivElement>(null);
   // Zoom of the preview (the camera's own dial, in landscape): the picture is cropped from its middle and the 3D
   // camera narrows its view by the same amount, so the objects stay on the floor they were put on.
@@ -137,6 +219,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const zoomRef = useRef(1);
   zoomRef.current = zoom;
   const [found, setFound] = useState(false);
+  // What the reticle stands on: the floor, a raised flat surface (a model on a table) or the floor under a wall or table.
+  const surfaceRef = useRef<"floor" | "raised" | "floor-under">("floor");
+  const [surface, setSurface] = useState<"floor" | "raised" | "floor-under">("floor");
   const [placed, setPlaced] = useState<PlacedObject[]>([]);
   // «Modellino»: everything smaller, to try indoors or see the whole piazza on a table (not sent to the map). Its
   // scale is fitted to the space round the phone when it is switched on (modelScaleFor: ARCore's depth when given).
@@ -179,9 +264,13 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const [flip, setFlip] = useState(depthFlip);
   useEffect(() => { if (depthRef.current) depthRef.current.enabled = depthOn; }, [depthOn]);
   const framesRef = useRef(0);
+  const barOpenRef = useRef(false);
+  const rotRef = useRef(rotation);
+  rotRef.current = rotation;
   useEffect(() => {
     if (!session) return;
-    const id = window.setInterval(() => setDiag((d) => (d.frames === framesRef.current ? d : { ...d, frames: framesRef.current })), 1000);
+    // Only while the bar is open (the line is shown there): a re-render of the whole view every second slowed the phone.
+    const id = window.setInterval(() => { if (barOpenRef.current) setDiag((d) => (d.frames === framesRef.current ? d : { ...d, frames: framesRef.current })); }, 1000);
     return () => window.clearInterval(id);
   }, [session]);
   // Flash: the camera's own torch, in the preview only (with ARCore the browser owns the camera and gives the page
@@ -250,12 +339,23 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     const r = area.ring;
     return { lat: r.reduce((s, p) => s + p[0], 0) / r.length, lng: r.reduce((s, p) => s + p[1], 0) / r.length };
   }, [area, loc.lat, loc.lng]);
+  // What a join needs to know where the zones lie on the floor (read in the render loop).
+  const joinCtx = useRef({ a: null as Alignment | null, origin, zones: area?.zones });
+  joinCtx.current = { a: alignment?.a ?? null, origin, zones: area?.zones };
+  // In the «Modellino» the spots are not the real ones, so there the zones are not asked.
+  const fitOf = (id: string, u: Foot): JoinFit => modelRef.current < 1 ? "fits" : joinFitsZone(u, id === "pergolato" ? "ombra" : "prato", joinCtx.current.zones, joinCtx.current.a, joinCtx.current.origin);
+  const fitWhy = (fit: JoinFit, pg: boolean) => fit === "noalign" ? "allinea prima l’AR alla mappa (Riporta, i 2 punti)"
+    : fit === "nozone" ? `disegna sulla mappa una zona ${pg ? "Pergolato" : "Aiuole"}`
+    : `uniti uscirebbero dalla zona ${pg ? "Pergolato" : "Aiuole"}`;
 
   // The session: three.js on WebXR, the hit test from the screen's centre, a reticle on the floor.
   useEffect(() => {
     let disposed = false;
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-    renderer.setPixelRatio(window.devicePixelRatio);
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: "high-performance" });
+    // Lighter on the phone: the preview drawn at most at 1,5× the screen's pixels (the camera's picture behind it is
+    // its own video, untouched), ARCore's frame at 80 % of its size; the objects themselves are unchanged.
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    renderer.xr.setFramebufferScaleFactor(0.8);
     renderer.xr.enabled = true;
     renderer.xr.setReferenceSpaceType("local");
     const scene = new THREE.Scene();
@@ -331,6 +431,12 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
 
     let sawFloor = false;
     let lostAt = 0;
+    // The floor, gathered from every flat hit (the lowest level seen again and again), the reticle eased on it, and the
+    // last good spot held a moment so one frame without an answer does not make it blink.
+    const tracker = new FloorTracker();
+    let shown: V | null = null;
+    let lastGood = 0;
+    const reticleMat = reticle.material as THREE.MeshBasicMaterial;
     renderer.setAnimationLoop((_t, frame?: XRFrame) => {
       if (frame) framesRef.current += 1;
       // The estimated reflections arrive a little after the light: used as soon as they do.
@@ -339,26 +445,65 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       if (!t) return;
       if (frame && hitSource) {
         const ref = renderer.xr.getReferenceSpace();
+        const now = performance.now();
         const hits = ref ? frame.getHitTestResults(hitSource) : [];
-        const pose = hits[0] && ref ? hits[0].getPose(ref) : null;
-        if (pose) {
+        // The first hit that is a surface at all, with how much it faces up (the pose's Y axis is its normal).
+        let hit: SurfaceHit | null = null;
+        for (const h of hits) {
+          const pose = ref ? h.getPose(ref) : null;
+          if (!pose) continue;
+          const m = pose.transform.matrix, p = pose.transform.position;
+          const cand = { x: p.x, y: p.y, z: p.z, up: m[5] ?? 1 };
+          if (!hit) hit = cand;
+          if (surfaceKind(cand.up) === "flat") { hit = cand; break; }
+        }
+        if (hit && surfaceKind(hit.up) === "flat") tracker.add(hit.y, now);
+        const floor = tracker.floorY() ?? (hit && surfaceKind(hit.up) === "flat" ? hit.y : t.floorY);
+        // The floor moved (found lower, or refined): objects standing on the old floor follow it.
+        if (floor !== null && t.floorY !== null && Math.abs(floor - t.floorY) > 0.03) {
+          for (const g of t.objects.values()) if (Math.abs(g.position.y - t.floorY) < RAISED_M) g.position.y = floor;
+        }
+        if (floor !== null) t.floorY = floor;
+        const place = placementFor(hit, t.floorY, modelRef.current < 1);
+        let target: V | null = null;
+        if (place && hit && place.kind !== "floor-under") target = { x: hit.x, y: place.y, z: hit.z };
+        else if (place && ref) {
+          // A wall, a slope or a table at real size: the spot on the floor straight under the screen's centre.
+          const vp = frame.getViewerPose(ref);
+          if (vp) {
+            const o = vp.transform.position, q = vp.transform.orientation;
+            const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(new THREE.Quaternion(q.x, q.y, q.z, q.w));
+            if (dir.y < -0.05) {
+              const k = (place.y - o.y) / dir.y;
+              if (k > 0 && k < 40) target = { x: o.x + dir.x * k, y: place.y, z: o.z + dir.z * k };
+            }
+          }
+        }
+        if (target) {
+          shown = easeTo(shown, target);
+          lastGood = now;
           reticle.visible = true;
-          reticle.matrix.fromArray(pose.transform.matrix);
+          reticle.matrix.makeTranslation(shown.x, shown.y + 0.005, shown.z);
+          reticleMat.opacity = place?.kind === "floor-under" ? 0.5 : 0.85;
           fitReticle(reticle);
-          const p = pose.transform.position;
-          t.hit = { x: p.x, y: p.y, z: p.z };
-          if (t.floorY === null) t.floorY = p.y;
+          t.hit = { ...shown };
+          const sk = place?.kind ?? "floor";
+          if (surfaceRef.current !== sk) { surfaceRef.current = sk; setSurface(sk); }
           // The floor found: a clear double pulse the first time, a short one when it is found again after losing it.
-          if (!sawFloor) { sawFloor = true; setFound(true); hapticTick([40, 60, 40]); }
-          else if (lostAt && performance.now() - lostAt > 1500) hapticTick([30]);
+          if (!sawFloor && tracker.count > 0) { sawFloor = true; setFound(true); hapticTick([40, 60, 40]); }
+          else if (lostAt && now - lostAt > 1500) hapticTick([30]);
           lostAt = 0;
-        } else { reticle.visible = false; t.hit = null; if (sawFloor && !lostAt) lostAt = performance.now(); }
+        } else if (now - lastGood > 400) {
+          reticle.visible = false; t.hit = null; shown = null;
+          if (sawFloor && !lostAt) lostAt = now;
+        }
       }
       if (frame && occluder) {
         const ref = renderer.xr.getReferenceSpace();
         const view = ref ? frame.getViewerPose(ref)?.views[0] : undefined;
         const had = occluder.live;
-        occluder.update(frame, view, (session as XRSession & { depthDataFormat?: string }).depthDataFormat);
+        // The depth map every other frame: it changes slowly and reading it is the heaviest part of a frame.
+        if (framesRef.current % 2 === 0) occluder.update(frame, view, (session as XRSession & { depthDataFormat?: string }).depthDataFormat);
         if (had !== occluder.live) { setDepthLive(occluder.live); setDiag((d) => ({ ...d, depth: occluder.live })); }
       }
       frameTick(t, reticle);
@@ -400,7 +545,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     if (!host) return;
     renderer.xr.enabled = false;
     const el = renderer.domElement;
-    el.style.cssText = "position:absolute;inset:0;width:100%;height:100%";
+    // Above the camera's video always: coming from ARCore's flash the video arrives after the canvas and React put it
+    // last, over the 3D, so the objects carried over and the reticle were hidden behind the picture.
+    el.style.cssText = "position:absolute;inset:0;width:100%;height:100%;z-index:1";
     host.appendChild(el);
     const size = () => {
       const w = host.clientWidth || window.innerWidth, h = host.clientHeight || window.innerHeight;
@@ -409,7 +556,36 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     };
     size();
     const fl = floorRef.current;
-    const onTilt = (e: DeviceOrientationEvent) => { if (e.beta !== null) fl.tilt = Math.max(-80, Math.min(-8, e.beta - 90)); };
+    // How far the camera looks up or down, whichever way the phone is held: the elevation of the back camera's axis
+    // (−z of the device) from beta and gamma. Read as beta − 90 alone it was right only upright: turned sideways the
+    // floor was guessed far off and taps on it put nothing.
+    const devQ = new THREE.Quaternion(), scrQ = new THREE.Quaternion(), devE = new THREE.Euler();
+    const Q_BACK = new THREE.Quaternion(-Math.SQRT1_2, 0, 0, Math.SQRT1_2), Z_AXIS = new THREE.Vector3(0, 0, 1);
+    let yaw0: number | null = null;
+    fl.yaw = 0;
+    const onTilt = (e: DeviceOrientationEvent) => {
+      if (e.beta === null) return;
+      const b = (e.beta * Math.PI) / 180, g = ((e.gamma ?? 0) * Math.PI) / 180;
+      const elev = (Math.asin(Math.max(-1, Math.min(1, -Math.cos(b) * Math.cos(g)))) * 180) / Math.PI;
+      fl.tilt = Math.max(-80, Math.min(-8, elev));
+      // Where the phone points round the vertical, so turning it leaves the objects where they stand instead of
+      // carrying them along (the preview has no tracking: only the turn is known, not a step). The camera's −z axis
+      // from alpha, beta, gamma and the screen's angle, as three's device-orientation controls do; the first reading
+      // is "straight ahead", the direction the objects were put or carried in.
+      if (e.alpha === null) return;
+      devQ.setFromEuler(devE.set(b, (e.alpha * Math.PI) / 180, -g, "YXZ")).multiply(Q_BACK)
+        .multiply(scrQ.setFromAxisAngle(Z_AXIS, -(((screen.orientation?.angle ?? 0) * Math.PI) / 180)));
+      const y = new THREE.Euler().setFromQuaternion(devQ, "YXZ").y;
+      if (yaw0 === null) yaw0 = y;
+      let d = y - yaw0;
+      while (d > Math.PI) d -= 2 * Math.PI;
+      while (d < -Math.PI) d += 2 * Math.PI;
+      // A little smoothing against the sensor's jitter, the short way round.
+      let step = d - fl.yaw;
+      while (step > Math.PI) step -= 2 * Math.PI;
+      while (step < -Math.PI) step += 2 * Math.PI;
+      fl.yaw += step * 0.5;
+    };
     window.addEventListener("deviceorientation", onTilt);
     window.addEventListener("resize", size);
     camera.position.set(0, 1.5, 0);
@@ -423,11 +599,15 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     };
     if (three.current) three.current.floorY = 0;
     setFound(true);
-    renderer.setAnimationLoop(() => {
+    // The preview at 30 frames a second: the camera's picture is its own video, the 3D over it needs no more.
+    let lastDraw = 0;
+    renderer.setAnimationLoop((now: number) => {
+      if (now - lastDraw < 30) return;
+      lastDraw = now;
       const fov = fovAt(zoomRef.current);
       if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
       const pitch = Math.max(-80, Math.min(10, fl.tilt + fl.offset));
-      camera.rotation.set((pitch * Math.PI) / 180, 0, 0, "YXZ");
+      camera.rotation.set((pitch * Math.PI) / 180, fl.yaw, 0, "YXZ");
       if (horizonLine.current) horizonLine.current.style.top = `${(horizonAt(pitch, camera.fov) * 100).toFixed(2)}%`;
       camera.updateMatrixWorld();
       const t = three.current;
@@ -452,9 +632,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       if (adjustingRef.current) return;
       // An object in hand follows the reticle: a tap anywhere puts it down there.
       if (live.current.tool === "move" && grabRef.current) { placeAtHit(); return; }
-      const r = el.getBoundingClientRect();
-      const w = r.width || window.innerWidth, h = r.height || window.innerHeight;
-      const p = at((e.clientX - r.left) / w, (e.clientY - r.top) / h);
+      const n = toCanvas(e.clientX, e.clientY);
+      const p = n ? at(n.nx, n.ny) : null;
       if (p && three.current) { three.current.hit = p; placeAtHit(); }
     };
     window.addEventListener("pointerdown", onDown, true);
@@ -611,7 +790,10 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       }
     }
     const near = cand ? nearestOfKind(cand.id, cand.foot, cand.skip) : null;
-    const fb = near ? nearFeedback(near.gap) : nearFeedback(Infinity);
+    const fb0 = near ? nearFeedback(near.gap) : nearFeedback(Infinity);
+    // Joined they must fit whole in a zone of their own kind on the map: else no green, no pulse, and the line says why.
+    const fit: JoinFit = near && cand && fb0.stage !== "far" ? fitOf(cand.id, joinFeet(cand.foot, footOf(near.o))) : "fits";
+    const fb = fit === "fits" || fb0.stage !== "join" ? fb0 : { ...fb0, stage: "near" as const };
     // The outline round the other one.
     let ring = nearRing.current;
     if (fb.stage === "far" || !near) { if (ring) ring.visible = false; }
@@ -639,7 +821,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     if (near && fb.stage !== "far") {
       const pg = near.o.id === "pergolato";
       const what = pg ? "al pergolato" : "all’aiuola";
-      const text = fb.stage === "join"
+      const text = fit !== "fits"
+        ? `Non si uniscono: ${fitWhy(fit, pg)}`
+        : fb.stage === "join"
         ? `Si uniscono: ${gid ? "lascialo" : "posalo"} qui e ${pg ? "i due pergolati diventano uno solo" : "le due aiuole diventano una sola"}`
         : `Vicino ${what}: ${metresText(Math.round(near.gap * 10) / 10)} · avvicina ancora per unirli`;
       if (text !== s.said && now - s.saidAt > 180) { s.said = text; s.saidAt = now; setNotice({ text, tone: "ok" }); }
@@ -693,6 +877,13 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     const near = nearestOfKind(a.id, footOf(a), a.uid);
     if (!near || near.gap > JOIN_GAP) return false;
     const b = near.o, U = joinFeet(footOf(a), footOf(b)), k = modelRef.current;
+    const fit = fitOf(a.id, U);
+    if (fit !== "fits") {
+      const text = `Non uniti: ${fitWhy(fit, a.id === "pergolato")}`;
+      setNotice({ text, tone: "warn" });
+      window.setTimeout(() => setNotice((n) => (n?.text === text ? null : n)), 3500);
+      return false;
+    }
     const base = defOfRef.current(a.id);
     const def: ArObjectDef = { ...base, w: U.w / k, d: U.d / k };
     const uid = `j${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
@@ -709,16 +900,29 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     return true;
   }
 
+  /** A point of the screen in the preview canvas, 0–1 each way. When the AI camera turns its view by CSS (the page
+   *  locked upright, the phone held sideways) the AR view is turned the same way, so the point is turned back. */
+  function toCanvas(cx: number, cy: number): { nx: number; ny: number } | null {
+    const el = three.current?.renderer.domElement;
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    const rot = rotRef.current;
+    if (!rot) return r.width && r.height ? { nx: (cx - r.left) / r.width, ny: (cy - r.top) / r.height } : null;
+    const w = el.clientWidth, h = el.clientHeight;
+    if (!w || !h) return null;
+    const a = (rot * Math.PI) / 180, dx = cx - (r.left + r.width / 2), dy = cy - (r.top + r.height / 2);
+    return { nx: (dx * Math.cos(a) + dy * Math.sin(a)) / w + 0.5, ny: (-dx * Math.sin(a) + dy * Math.cos(a)) / h + 0.5 };
+  }
   /** The ray from the phone's eye through a point of the screen. */
   function screenRay(cx: number, cy: number): THREE.Raycaster | null {
     const t = three.current;
     if (!t) return null;
     const xr = t.renderer.xr;
     const cam = (xr.isPresenting ? (xr.getCamera().cameras[0] ?? xr.getCamera()) : t.camera) as THREE.PerspectiveCamera;
-    const r = xr.isPresenting ? { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight } : t.renderer.domElement.getBoundingClientRect();
-    if (!r.width || !r.height) return null;
+    const n = xr.isPresenting ? { nx: cx / window.innerWidth, ny: cy / window.innerHeight } : toCanvas(cx, cy);
+    if (!n || !Number.isFinite(n.nx) || !Number.isFinite(n.ny)) return null;
     const ray = new THREE.Raycaster();
-    ray.setFromCamera(new THREE.Vector2(((cx - r.left) / r.width) * 2 - 1, -(((cy - r.top) / r.height) * 2 - 1)), cam);
+    ray.setFromCamera(new THREE.Vector2(n.nx * 2 - 1, -(n.ny * 2 - 1)), cam);
     return ray;
   }
   /** The spot on the floor under a point of the screen (the floor ARCore found, else the preview's guessed one). */
@@ -983,17 +1187,20 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
           ? grabbed ? "Punta dove metterlo e tocca: vicino a un pergolato o a un’aiuola si uniscono" : "Tocca l’oggetto da spostare"
         : tool === "measure"
           ? dist !== null ? `Distanza ${metresText(dist)}` : measure.length === 1 ? "Tocca il secondo punto" : "Tocca il primo punto"
+          : session && surface === "raised" ? `Tocca per posare sul piano: ${defOf(selected).label}`
+          : session && surface === "floor-under" ? `Il mirino è sul pavimento sotto il punto inquadrato · tocca per posare: ${defOf(selected).label}`
           : `Tocca il pavimento per posare: ${defOf(selected).label}`);
   // The bar on top stays a small pill (what a tap does, in two words); a tap opens it to the whole sentence and a
   // line on how it works. Messages open it by themselves while they last.
   const [barOpen, setBarOpen] = useState(false);
+  barOpenRef.current = barOpen;
   const barShort = !found ? "Cerco il pavimento…" : adjusting ? "Regola pavimento"
     : tool === "move" ? (grabbed ? "Mettilo giù" : "Sposta") : tool === "measure" ? (dist !== null ? metresText(dist) : "Misura") : tool === "align" ? `Punto ${alignPts.length + 1} dell’area` : defOf(selected).label;
-  const barHelp = !found ? "Muovi piano il telefono verso il pavimento finché lo riconosco."
+  const barHelp = !found ? "Inquadra il pavimento a un paio di metri e muovi piano il telefono di lato finché lo riconosco: aiutano una buona luce e un pavimento con disegni o venature; quello lucido o tutto di un colore si trova a fatica."
     : tool === "move" ? "Tocca un oggetto posato per prenderlo: segue il mirino e gira con il telefono, tocca di nuovo per posarlo. Avvicinato a un altro pergolato o a un’altra aiuola, il telefono vibra sempre più forte e il contorno diventa verde: posato lì, i due diventano uno solo (Annulla li separa)."
     : tool === "measure" ? "Tocca due punti a terra: ti dico quanto distano."
     : tool === "align" ? "Tocca a terra i punti 1 e 2 dell’area disegnata sulla mappa: così gli oggetti tornano al posto giusto."
-    : "Tocca il pavimento dove vuoi metterlo: compare a grandezza vera. Un oggetto già posato si trascina con un dito; con due dita lo ruoti e lo ingrandisci. Annulla toglie l’ultimo, il pulsante AI cambia oggetto.";
+    : "Tocca il pavimento dove vuoi metterlo: compare a grandezza vera. Il pavimento è il piano più basso che riconosco: un tavolo o un muro non lo ingannano (il mirino scende a terra, più tenue), solo il Modellino si posa anche su un tavolo. Un oggetto già posato si trascina con un dito; con due dita lo ruoti e lo ingrandisci. Annulla toglie l’ultimo, il pulsante AI cambia oggetto.";
   const barExpanded = barOpen || !!notice || adjusting;
   const statusTone = notice ? (notice.tone === "ok" ? "bg-[#22c55e] text-black" : "bg-[#facc15] text-black") : "bg-black/55 text-white backdrop-blur";
 
@@ -1261,7 +1468,11 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     </button>
   );
   // The zoom ruler is the preview's only: with ARCore the browser drives the camera.
-  const dialOn = !session && !adjusting;
+  // No zoom with the flash on (the preview opened by ARCore's flash, or the flash lit in the preview): it stands in for
+  // the AR view, which has none.
+  const dialOn = !session && !adjusting && !torch && !torchOn;
+  // With the zoom gone the picture goes back to 1×, not left magnified.
+  useEffect(() => { if ((torch || torchOn) && zoomRef.current !== 1) setZoom(1); }, [torch, torchOn]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
   // Every choice sits behind one AI button: the tray opens over the camera only when asked.
@@ -1348,10 +1559,16 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       </div>
     )}
     {flash > 0 && <div key={flash} className="pointer-events-none fixed inset-0 z-[60] animate-out fade-out-0 bg-white duration-300 fill-mode-forwards" aria-hidden="true" />}
-    <div ref={hudRef} className="ar-live-hud pointer-events-none fixed inset-0 z-50 flex select-none flex-col justify-between text-white [-webkit-touch-callout:none]" style={{ padding: `${session ? "max(env(safe-area-inset-top), 1.5rem)" : "env(safe-area-inset-top)"} env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)` }}>
+    <div ref={hudRef} className="ar-live-hud pointer-events-none fixed inset-0 z-50 flex select-none flex-col justify-between text-white [-webkit-touch-callout:none]" style={{ padding: `${session ? "max(env(safe-area-inset-top), 1.5rem)" : "env(safe-area-inset-top)"} env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)`, ...hudTurnStyle }}>
       {burst.open && burst.shots.length > 0 && (
       <BurstReviewSheet fixed shots={burst.shots} discarded={burst.discarded} onClose={() => burst.setOpen(false)} onAdd={burst.add} onDiscardAll={burst.discardAll} onToggleShot={burst.toggle} />
     )}
+      {!session && onRetry && (
+        // ARCore did not start (a refusal spends the tap's permission): one more tap asks it again with what works here.
+        <button type="button" onClick={onRetry} className="pointer-events-auto absolute left-1/2 top-[calc(env(safe-area-inset-top)+5.5rem)] z-10 inline-flex h-11 -translate-x-1/2 items-center gap-2 rounded-full bg-white px-5 text-sm font-semibold text-black shadow-lg">
+          <RotateCcw className="size-4" aria-hidden="true" />Riprova ARCore
+        </button>
+      )}
       <div className={`pointer-events-auto flex items-center gap-2 p-3 ${arcOn ? "landscape:pr-[250px]" : ""}`}>
         <button type="button" onClick={end} aria-label="Esci dalla realtà aumentata e torna alla fotocamera AI"
           className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-black/55 pl-2.5 pr-3.5 text-sm font-semibold backdrop-blur">
@@ -1395,7 +1612,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
 
       </div>
       {trayOpen && <button type="button" tabIndex={-1} aria-label="Chiudi le funzioni AI" onClick={() => setTrayOpen(false)} className="pointer-events-auto fixed inset-0 z-30 cursor-default bg-black/35" />}
-      {trayOpen && <ArSheet groups={fanGroups} onClose={() => setTrayOpen(false)} />}
+      {trayOpen && <ArSheet groups={fanGroups} turn={session ? hudTurn : rotation === 270 ? -90 : rotation === -270 ? 90 : rotation === 90 || rotation === -90 ? rotation : 0} onClose={() => setTrayOpen(false)} />}
       {!adjusting && (
         <div className={`pointer-events-auto relative z-10 flex flex-col items-start gap-2 p-3`}>
           {dialOn && !trayOpen && (
@@ -1577,12 +1794,37 @@ const OBJECT_HINT: Record<string, string> = {
  * round tile, the whole name and one line on what it does; the current choice turquoise with a check. A tap picks and
  * closes it; a tap outside or ✕ closes it.
  */
-export function ArSheet({ groups, onClose }: { groups: FanGroup[]; onClose: () => void }) {
+export function ArSheet({ groups, onClose, turn = 0 }: { groups: FanGroup[]; onClose: () => void; turn?: number }) {
+  // Turned with the HUD (ARCore held sideways), the sheet's height follows the turned box (the screen's width), and
+  // its list is scrolled by hand along the turned axis, as the browser scrolls in the screen's own axes.
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el || !turn) return;
+    let last: { x: number; y: number } | null = null;
+    // The finger's move along the turned list's own vertical: +90° (clockwise) maps local down onto the screen's left.
+    const along = (dx: number) => (turn === 90 ? -dx : dx);
+    const onStart = (e: TouchEvent) => { const t = e.touches[0]; last = t && e.touches.length === 1 ? { x: t.clientX, y: t.clientY } : null; };
+    const onMove = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (!last || !t) return;
+      const d = along(t.clientX - last.x);
+      last = { x: t.clientX, y: t.clientY };
+      el.scrollTop -= d;
+      if (e.cancelable) e.preventDefault();
+    };
+    const onEnd = () => { last = null; };
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd);
+    el.addEventListener("touchcancel", onEnd);
+    return () => { el.removeEventListener("touchstart", onStart); el.removeEventListener("touchmove", onMove); el.removeEventListener("touchend", onEnd); el.removeEventListener("touchcancel", onEnd); };
+  }, [turn]);
   const shown = groups.filter((g) => g.items.length > 0);
   const TITLES: Record<string, string> = { piante: "Piante riconosciute dall’AI", interventi: "Interventi", strumenti: "Strumenti" };
   return (
     <div id="ar-ai-tray" role="dialog" aria-label="Funzioni AI" className="ar-sheet pointer-events-auto fixed inset-x-0 bottom-0 z-40 mx-auto flex max-h-[78dvh] w-full max-w-lg flex-col rounded-t-[28px] border-t border-white/15 text-white shadow-[0_-20px_60px_rgba(0,0,0,0.55)] landscape:max-h-[92dvh]"
-      style={{ background: "oklch(0.25 0.02 255 / 0.97)", paddingBottom: "max(env(safe-area-inset-bottom), 0.75rem)" }}>
+      style={{ background: "oklch(0.25 0.02 255 / 0.97)", paddingBottom: "max(env(safe-area-inset-bottom), 0.75rem)", ...(turn && typeof window !== "undefined" ? { maxHeight: `${Math.round(window.innerWidth * 0.92)}px` } : {}) }}>
       <div className="flex items-center justify-between px-5 pb-1 pt-2">
         <span className="mx-auto h-1.5 w-10 rounded-full bg-white/25" aria-hidden="true" />
       </div>
@@ -1590,7 +1832,7 @@ export function ArSheet({ groups, onClose }: { groups: FanGroup[]; onClose: () =
         <h2 className="text-lg font-semibold">Cosa vuoi fare?</h2>
         <button type="button" onClick={onClose} aria-label="Chiudi" className="grid size-10 place-items-center rounded-full bg-white/10"><X className="size-5" /></button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-2">
+      <div ref={listRef} className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-2 ${turn ? "touch-none" : ""}`}>
         {shown.map((g) => (
           <section key={g.key} aria-label={TITLES[g.key] ?? g.label} className="mb-3">
             <h3 className="px-2 pb-1.5 pt-1 text-[11px] font-bold uppercase tracking-[0.14em] text-white/55">{TITLES[g.key] ?? g.label}</h3>

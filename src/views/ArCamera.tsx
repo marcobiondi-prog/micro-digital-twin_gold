@@ -3,7 +3,7 @@ import { createPortal, flushSync } from "react-dom";
 import "@/styles/ar-camera.css";
 import { isTouchDevice } from "@/lib/touch-device";
 import { isTabletViewport } from "@/lib/tablet-camera";
-import { ArLive, requestArSession, type FanGroup } from "@/views/ArLive";
+import { ArLive, arFullscreen, requestArSession, type FanGroup } from "@/views/ArLive";
 import { ScanSheet } from "@/views/ScanSheet";
 import { recognisedPlants, type PlacedObject } from "@/models/ar-objects";
 import { toast } from "sonner";
@@ -289,7 +289,7 @@ export function ArCamera({
   const [, setArCoreActive] = useState(false);
   const arCoreRef = useRef<ArCoreManager | null>(null);
   // «Prova» live: the WebXR session (null = the preview without ARCore) and the element its overlay lives in.
-  const [liveAr, setLiveAr] = useState<{ session: XRSession | null; root: HTMLElement; n?: number; why?: string; torch?: boolean; carry?: PlacedObject[] } | null>(null);
+  const [liveAr, setLiveAr] = useState<{ session: XRSession | null; root: HTMLElement; n?: number; why?: string; torch?: boolean; carry?: PlacedObject[]; retry?: boolean } | null>(null);
   const restartingRef = useRef(false);
   const [camEpoch, setCamEpoch] = useState(0);
   // Restarts asked because the camera came back without frames (ARCore still releasing it): a few, then the error.
@@ -1246,38 +1246,47 @@ export function ArCamera({
   // «Prova» mostra sul posto l'intervento (oggi: la griglia e la posa della pianta, ARCore vero nella fase 3).
   // The old «Prova» on a grid (a tree put at random on a guessed floor) is gone: Prova is ArLive only.
   const proving = !!liveAr;
+  // ARCore: the live view takes the camera, so ours is stopped first; the session is asked inside the tap (the switch
+  // to AR, or «Riprova ARCore» from the preview when a first try was refused).
+  const startArCore = () => {
+      const root = liveRootEl();
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
+      // The AR session leaves the camera's fullscreen: that exit is not a Back, so the camera stays open.
+      arTransitionRef.current = true;
+      // ARCore opens the phone's camera itself: asked while ours is still being released, the phone refuses the
+      // session ("The specified session configuration is not supported"). A short wait lets the camera go; the
+      // tap's activation lasts long enough (Chrome keeps it about 5 s).
+      new Promise((r) => window.setTimeout(r, 450))
+        .then(() => requestArSession(root))
+        .then((session) => { setLiveAr({ session, root }); void resetAppOrientation(); arFullscreen(session, root); })
+        .finally(() => { window.setTimeout(() => { arTransitionRef.current = false; }, 1500); })
+        .catch((err: unknown) => {
+          root.remove();
+          setCamEpoch((n) => n + 1);
+          toast.error("ARCore non è partito", { description: `${err instanceof Error ? err.message : String(err)} · Uso l’anteprima.` });
+          regainFullscreen(); // AR left the camera's fullscreen to ask the session: the preview takes it back
+          // Every configuration refused while the phone says it supports AR: Chrome has blocked augmented reality for
+          // this site (its own permission, kept per site). Said plainly, with where to turn it back on.
+          const msg = err instanceof Error ? err.message : String(err);
+          const blocked = msg.split(" · ").filter((p) => !p.trim().startsWith("(")).every((p) => p.trim().endsWith("NotSupportedError"));
+          // A refused configuration spends the tap's permission and the next ones read "SecurityError".
+          const spent = msg.includes("SecurityError");
+          setLiveAr({ session: null, root: liveRootEl(), why: blocked
+            ? "Chrome ha bloccato la realtà aumentata per questo sito. In Chrome tocca l’icona a sinistra dell’indirizzo → Autorizzazioni (o Impostazioni sito) → Realtà aumentata → Consenti, poi riprova. Intanto uso l’anteprima."
+            : spent
+            ? `ARCore non è partito al primo tentativo (${msg}). Tocca «Riprova ARCore»: ripartirà con le impostazioni che questo telefono accetta. Intanto uso l’anteprima.`
+            : `ARCore non è partito (${msg}): uso l’anteprima.`, retry: true });
+        });
+  };
   const setCamMode = (next: "rileva" | "prova", e?: React.MouseEvent) => {
     if (next === "prova" && !liveAr) {
       e?.stopPropagation();
       e?.preventDefault();
       // ARCore: the live view takes the camera, so ours is stopped first; the session is asked inside this tap.
       if (arCoreSupported && navigator.xr) {
-        const root = liveRootEl();
-        streamRef.current?.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-        if (videoRef.current) videoRef.current.srcObject = null;
-        // The AR session leaves the camera's fullscreen: that exit is not a Back, so the camera stays open.
-        arTransitionRef.current = true;
-        // ARCore opens the phone's camera itself: asked while ours is still being released, the phone refuses the
-        // session ("The specified session configuration is not supported"). A short wait lets the camera go; the
-        // tap's activation lasts long enough (Chrome keeps it about 5 s).
-        new Promise((r) => window.setTimeout(r, 450))
-          .then(() => requestArSession(root))
-          .then((session) => { setLiveAr({ session, root }); void resetAppOrientation(); })
-          .finally(() => { window.setTimeout(() => { arTransitionRef.current = false; }, 1500); })
-          .catch((err: unknown) => {
-            root.remove();
-            setCamEpoch((n) => n + 1);
-            toast.error("ARCore non è partito", { description: `${err instanceof Error ? err.message : String(err)} · Uso l’anteprima.` });
-            regainFullscreen(); // AR left the camera's fullscreen to ask the session: the preview takes it back
-            // Every configuration refused while the phone says it supports AR: Chrome has blocked augmented reality for
-            // this site (its own permission, kept per site). Said plainly, with where to turn it back on.
-            const msg = err instanceof Error ? err.message : String(err);
-            const blocked = msg.split(" · ").every((p) => p.trim().endsWith("NotSupportedError"));
-            setLiveAr({ session: null, root: liveRootEl(), why: blocked
-              ? "Chrome ha bloccato la realtà aumentata per questo sito. In Chrome tocca l’icona a sinistra dell’indirizzo → Autorizzazioni (o Impostazioni sito) → Realtà aumentata → Consenti, poi riprova. Intanto uso l’anteprima."
-              : `ARCore non è partito (${msg}): uso l’anteprima.` });
-          });
+        startArCore();
       } else {
         // Why there is no ARCore, said over the camera (toasts sit under it).
         const why = !navigator.xr
@@ -1301,7 +1310,7 @@ export function ArCamera({
       .then(() => wait(600))
       .then(() => { void resetAppOrientation(); return wait(500); })
       .then(() => requestArSession(had.root))
-      .then((session) => { setLiveAr({ session, root: had.root, n: (had.n ?? 0) + 1 }); void resetAppOrientation(); })
+      .then((session) => { setLiveAr({ session, root: had.root, n: (had.n ?? 0) + 1 }); void resetAppOrientation(); arFullscreen(session, had.root); })
       .catch((err: unknown) => {
         toast.error("Non riesco a riavviare l’AR", { description: `${err instanceof Error ? err.message : String(err)} · Uso l’anteprima.` });
         had.root.remove();
@@ -1326,8 +1335,22 @@ export function ArCamera({
         setCamEpoch((n) => n + 1);
         setLiveAr({ session: null, root: liveRootEl(), n: (had.n ?? 0) + 1, torch: true, carry });
         regainFullscreen();
+        // ARCore held the screen's orientation and Chrome put back the app's upright lock when it ended: asked again,
+        // as when leaving AR, so the preview turns with the phone (it stayed upright, its controls too).
+        void resetAppOrientation();
+        window.setTimeout(() => { void resetAppOrientation().then(() => window.dispatchEvent(new Event("ar-orientation-change"))); }, 600);
       })
       .finally(() => { restartingRef.current = false; window.setTimeout(() => { arTransitionRef.current = false; }, 1500); });
+  };
+  // «Riprova ARCore» from the preview: the preview is closed (its camera too) and ARCore asked again inside this tap.
+  const retryArCore = () => {
+    const had = liveArRef.current;
+    if (!had || had.session) return;
+    setTorchOn(false);
+    torchKeepRef.current = false;
+    had.root.remove();
+    setLiveAr(null);
+    startArCore();
   };
   const endLive = () => {
     if (restartingRef.current) return;
@@ -1357,11 +1380,22 @@ export function ArCamera({
   const liveView = liveAr ? createPortal(
     // The camera's own gestures (close swipe, tap to place) must not see the live view's taps.
     <div onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()} onPointerMove={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
-      <ArLive key={liveAr.n ?? 0} kind={kind} session={liveAr.session} why={liveAr.why} stream={liveAr.session ? null : streamRef.current} plants={arPlants} onShot={(f) => onCapture([f])} onEnd={endLive} onRotate={rotateLive} torch={liveAr.torch ?? false} carry={liveAr.carry} onFlashPreview={flashPreview}
+      <ArLive key={liveAr.n ?? 0} kind={kind} session={liveAr.session} why={liveAr.why} stream={liveAr.session ? null : streamRef.current} plants={arPlants} onShot={(f) => onCapture([f])} onEnd={endLive} onRotate={rotateLive} torch={liveAr.torch ?? false} carry={liveAr.carry} rotation={liveAr.session ? 0 : viewport.rotation} onFlashPreview={flashPreview}
+        {...(!liveAr.session && liveAr.retry && arCoreSupported ? { onRetry: retryArCore } : {})}
         burst={{ shots: burstShots, open: burst, setOpen: setBurst, discarded, add: () => burstActs.current.add(), discardAll: () => burstActs.current.discardAll(),
           push: (shot) => setBurstShots((p) => [...p, shot]),
           toggle: (id) => setDiscarded((d) => { const n = new Set(d); if (n.has(id)) n.delete(id); else n.add(id); return n; }) }} />
     </div>, liveAr.root) : null;
+  // The preview without ARCore turns with the camera: when the page stays upright and the camera's surface is turned
+  // by CSS (the phone held sideways without fullscreen), the AR view and its controls are turned the same way.
+  useEffect(() => {
+    const root = liveAr?.root;
+    if (!root) return;
+    const rot = liveAr.session ? 0 : viewport.rotation;
+    root.style.cssText = rot && viewport.width && viewport.height
+      ? `position:fixed;left:50%;top:50%;width:${viewport.width}px;height:${viewport.height}px;transform:translate(-50%,-50%) rotate(${rot}deg);z-index:2147483000`
+      : "position:fixed;inset:0;z-index:2147483000";
+  }, [liveAr, viewport.rotation, viewport.width, viewport.height]);
   // «Prova» is for phones only: on tablets and computers the camera stays on «Rileva» and the switch is not shown.
   const modeSwitch = !onPhone ? null : (
     <div role="radiogroup" aria-label="Modalità della fotocamera AI" className="flex rounded-full bg-[rgba(20,26,34,0.78)] p-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur-md shadow-lg">

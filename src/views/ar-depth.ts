@@ -12,8 +12,18 @@ import * as THREE from "three";
 /** Whether the depth is asked with the session, kept on this phone. */
 const WANT_KEY = "mdt-ar-depth-v1", FLIP_KEY = "mdt-ar-depth-flip-v2";
 // On by default (the objects must see the room around them); «Spegni profondità» keeps it off on this phone.
-export function depthWanted(): boolean { try { return localStorage.getItem(WANT_KEY) !== "off"; } catch { return true; } }
-export function setDepthWanted(on: boolean) { try { localStorage.setItem(WANT_KEY, on ? "on" : "off"); } catch { /* private mode */ } }
+/** ARCore's depth asked only when wanted and not refused on this phone in the last day: a refused configuration spends
+ *  the tap's activation, and the next one is then refused too ("SecurityError"), so ARCore did not start at all. */
+const NA_KEY = "mdt-ar-depth-na-v1";
+export function depthWanted(): boolean {
+  try {
+    if (localStorage.getItem(WANT_KEY) === "off") return false;
+    const na = Number(localStorage.getItem(NA_KEY) ?? 0);
+    return !(na && Date.now() - na < 86_400_000);
+  } catch { return true; }
+}
+export function markDepthRefused() { try { localStorage.setItem(NA_KEY, String(Date.now())); } catch { /* private mode */ } }
+export function setDepthWanted(on: boolean) { try { localStorage.setItem(WANT_KEY, on ? "on" : "off"); if (on) localStorage.removeItem(NA_KEY); } catch { /* private mode */ } }
 /** How the depth map is turned against the screen, to find the right one by trying: 0…3. */
 export const FLIP_MODES = 4;
 // Default 1 (the framebuffer's own y): with the spec's top-left reading (0) on the user's Xperia the far part of the

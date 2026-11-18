@@ -49,8 +49,21 @@ describe("aiuole joined in AR", () => {
   it("makes the lawn strips of one block a single bed when asked", () => {
     const urban = { trees: 0, permeable: 40, shade: 0, misters: 0, sprinklers: 0 } as LabState["urban"];
     const apart = buildPlan("urban", { urban } as LabState, area, origin, a, false, false).count.beds;
-    const joined = buildPlan("urban", { urban } as LabState, area, origin, a, false, true).count.beds;
+    const loose = buildPlan("urban", { urban } as LabState, area, origin, a, false, true).count.beds;
+    const zoned = { ...area, zones: [{ id: "z", kind: "prato" as const, ring: area.ring }] };
+    const joined = buildPlan("urban", { urban } as LabState, zoned, origin, a, false, true).count.beds;
     expect(apart).toBeGreaterThan(1);
+    // Without an Aiuole zone they stay apart; inside one they join.
+    expect(loose).toBe(apart);
     expect(joined).toBeLessThan(apart);
+  });
+});
+
+describe("pergolaBlocks inside zones", () => {
+  const box = (x: number, z: number, w: number, d: number) => [{ x, z }, { x: x + w, z }, { x: x + w, z: z + d }, { x, z: z + d }];
+  it("joins touching patches only when the joined block fits", async () => {
+    const { pergolaBlocks } = await import("@/views/ar-plan");
+    expect(pergolaBlocks([box(0, 0, 4, 4), box(0, 4, 4, 4)], 0.6, () => true)).toHaveLength(1);
+    expect(pergolaBlocks([box(0, 0, 4, 4), box(0, 4, 4, 4)], 0.6, () => false)).toHaveLength(2);
   });
 });
