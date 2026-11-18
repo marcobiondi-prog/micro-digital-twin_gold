@@ -1456,10 +1456,10 @@ export function ArCamera({
     </>
   );
   // Esito follows the summary pager: a swiped-back scan shows its own reference photo and result, not the live one.
-  const recordEsito = (r: ScanRecord) => {
+  const recordEsito = (r: ScanRecord, at?: number) => {
     return (
       <>
-        <p className="ar-esito-page">Scansione {viewPage + 1} di {pageCount} · {r.target} · {new Date(r.at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}</p>
+        <p className="ar-esito-page">Scansione {(at ?? viewPage) + 1} di {at !== undefined ? scanRecords.length : pageCount} · {r.target} · {new Date(r.at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}</p>
         <EsitoPhoto scan={scanPhoto(r.id)} reference={r.species?.photo ?? null} name={r.species?.commonName ?? null} />
         {r.species ? (
           <p>
@@ -2425,7 +2425,7 @@ export function ArCamera({
             {burstSheetElement}
             {scanSheet && <button type="button" tabIndex={-1} aria-label="Chiudi" data-camera-controls onClick={() => setScanSheet(false)} className="fixed inset-0 z-30 cursor-default bg-black/35" />}
             {scanSheet && hasScans && <div data-camera-controls><ScanSheet records={scanRecords} failed={failedScan} showCard={infoBannerDismissed && cardHasContent && !liveAr} specimens={count}
-              onOpen={(i) => openEsito(i)} onShowCard={() => { setInfoBannerDismissed(false); setScanSheet(false); }} onUndoSpecimen={() => { removeLast(); setScanSheet(false); }}
+              detail={(r, i) => recordEsito(r, i)} onShowCard={() => { setInfoBannerDismissed(false); setScanSheet(false); }} onUndoSpecimen={() => { removeLast(); setScanSheet(false); }}
               onDelete={(ids) => { const all = ids.length >= scanRecords.length; removeScans(kind, ids); setBrowse(null); setPanelOpen(false); if (all) resetResults(); }}
               onDeleteAll={() => { setScanSheet(false); removeAll(); }} onClose={() => setScanSheet(false)} /></div>}
             {failNote && !scanSheet && <button type="button" data-camera-controls onClick={() => { setFailNote(null); setScanSheet(true); }}
