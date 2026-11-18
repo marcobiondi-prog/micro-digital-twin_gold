@@ -122,7 +122,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const [tool, setTool] = useState<Tool>("place");
   // «Regola pavimento» (preview only): an offset added to the phone's tilt so the guessed floor meets the real one.
   // The first time on this phone the preview opens on it, so the floor is set before anything is put.
-  const [adjusting, setAdjusting] = useState(() => !session && !hasFloorOffset());
+  // The first preview on a phone opens on «Regola pavimento» (taps then adjust the horizon, they put nothing), but not
+  // when it comes from ARCore's flash: there it looked as if objects could no longer be put.
+  const [adjusting, setAdjusting] = useState(() => !session && !torch && !hasFloorOffset());
   const adjustingRef = useRef(false);
   adjustingRef.current = adjusting;
   const floorRef = useRef({ tilt: -14, offset: readFloorOffset() });
@@ -164,6 +166,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const [notice, setNotice] = useState<{ text: string; tone: "ok" | "warn" } | null>(null);
   // Why the preview runs instead of ARCore: written in the status line once, at the start.
   useEffect(() => { if (why) setNotice({ text: why, tone: "warn" }); }, [why]);
+  // Come from ARCore's flash: said that this is the preview and that a tap on the floor puts the object.
+  useEffect(() => { if (torch && !session && !why) setNotice({ text: "Flash acceso: sei nell’anteprima senza ARCore. Tocca il pavimento per posare gli oggetti; le misure sono indicative.", tone: "warn" }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // What the AR session really got (shown in the open status bar): to tell, on a phone, why it does not work.
   const [diag, setDiag] = useState<{ hit?: boolean; overlay?: boolean; feats?: string; frames: number; error?: string; depth?: boolean }>({ frames: 0 });
   // ARCore's depth: real walls and furniture hide the objects behind them. «Profondità» in the fan turns it off.
