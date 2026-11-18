@@ -310,3 +310,18 @@ export function dragTick(def: Pick<ArObjectDef, "w" | "d" | "h">): number {
   const v = Math.max(0.01, def.w * def.d * Math.max(0.2, def.h));
   return Math.round(Math.max(8, Math.min(22, 8 + 3.2 * Math.log10(v * 10))));
 }
+
+/**
+ * Whether a joined pergola or aiuola (its footprint in AR metres) lies whole inside one zone of its own kind drawn on
+ * the map — a Pergolato zone for pergolas, an Aiuole zone for aiuole —: two of them join only then. "noalign" when the
+ * AR is not aligned with the map (so the zones cannot be found on the floor), "nozone" when the area has no zone of that
+ * kind, "out" when the joined one would reach past every such zone.
+ */
+export type JoinFit = "fits" | "out" | "nozone" | "noalign";
+export function joinFitsZone(u: Foot, zoneKind: ZoneKind, zones: readonly SubArea[] | undefined, a: Alignment | null, origin: { lat: number; lng: number } | null): JoinFit {
+  if (!a || !origin) return "noalign";
+  const own = (zones ?? []).filter((z) => z.kind === zoneKind && z.ring.length >= 3);
+  if (!own.length) return "nozone";
+  const pts = footCorners(u).map((p) => fromEN(arToEn(p, a), origin));
+  return own.some((z) => pts.every(([lat, lng]) => insideRing(lat, lng, z.ring))) ? "fits" : "out";
+}

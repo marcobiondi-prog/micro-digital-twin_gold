@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Box, Check, Move, Layers, ChevronDown, ChevronLeft, RotateCw, RotateCcw, Zap, ZapOff, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
 import type { ArKind } from "@/models/ar-focus";
 import {
-  AR_OBJECTS, alignFromFix, modelScaleFor, nearestPlaced, turnDetents, dragTick, JOINABLE, JOIN_GAP, footCorners, footGap, joinFeet, nearFeedback, type Foot, placeHaptic, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, enToAr, metresText, objectsToZones, toEN,
+  AR_OBJECTS, joinFitsZone, type JoinFit, alignFromFix, modelScaleFor, nearestPlaced, turnDetents, dragTick, JOINABLE, JOIN_GAP, footCorners, footGap, joinFeet, nearFeedback, type Foot, placeHaptic, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, enToAr, metresText, objectsToZones, toEN,
   type Alignment, type ArObjectDef, type PlacedObject,
 } from "@/models/ar-objects";
 import { getLab, setUrban, setVineyard } from "@/models/lab-store";
@@ -339,6 +339,14 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     const r = area.ring;
     return { lat: r.reduce((s, p) => s + p[0], 0) / r.length, lng: r.reduce((s, p) => s + p[1], 0) / r.length };
   }, [area, loc.lat, loc.lng]);
+  // What a join needs to know where the zones lie on the floor (read in the render loop).
+  const joinCtx = useRef({ a: null as Alignment | null, origin, zones: area?.zones });
+  joinCtx.current = { a: alignment?.a ?? null, origin, zones: area?.zones };
+  // In the «Modellino» the spots are not the real ones, so there the zones are not asked.
+  const fitOf = (id: string, u: Foot): JoinFit => modelRef.current < 1 ? "fits" : joinFitsZone(u, id === "pergolato" ? "ombra" : "prato", joinCtx.current.zones, joinCtx.current.a, joinCtx.current.origin);
+  const fitWhy = (fit: JoinFit, pg: boolean) => fit === "noalign" ? "allinea prima l’AR alla mappa (Riporta, i 2 punti)"
+    : fit === "nozone" ? `disegna sulla mappa una zona ${pg ? "Pergolato" : "Aiuole"}`
+    : `uniti uscirebbero dalla zona ${pg ? "Pergolato" : "Aiuole"}`;
 
   // The session: three.js on WebXR, the hit test from the screen's centre, a reticle on the floor.
   useEffect(() => {
@@ -759,7 +767,10 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       }
     }
     const near = cand ? nearestOfKind(cand.id, cand.foot, cand.skip) : null;
-    const fb = near ? nearFeedback(near.gap) : nearFeedback(Infinity);
+    const fb0 = near ? nearFeedback(near.gap) : nearFeedback(Infinity);
+    // Joined they must fit whole in a zone of their own kind on the map: else no green, no pulse, and the line says why.
+    const fit: JoinFit = near && cand && fb0.stage !== "far" ? fitOf(cand.id, joinFeet(cand.foot, footOf(near.o))) : "fits";
+    const fb = fit === "fits" || fb0.stage !== "join" ? fb0 : { ...fb0, stage: "near" as const };
     // The outline round the other one.
     let ring = nearRing.current;
     if (fb.stage === "far" || !near) { if (ring) ring.visible = false; }
@@ -787,7 +798,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     if (near && fb.stage !== "far") {
       const pg = near.o.id === "pergolato";
       const what = pg ? "al pergolato" : "all’aiuola";
-      const text = fb.stage === "join"
+      const text = fit !== "fits"
+        ? `Non si uniscono: ${fitWhy(fit, pg)}`
+        : fb.stage === "join"
         ? `Si uniscono: ${gid ? "lascialo" : "posalo"} qui e ${pg ? "i due pergolati diventano uno solo" : "le due aiuole diventano una sola"}`
         : `Vicino ${what}: ${metresText(Math.round(near.gap * 10) / 10)} · avvicina ancora per unirli`;
       if (text !== s.said && now - s.saidAt > 180) { s.said = text; s.saidAt = now; setNotice({ text, tone: "ok" }); }
@@ -841,6 +854,11 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     const near = nearestOfKind(a.id, footOf(a), a.uid);
     if (!near || near.gap > JOIN_GAP) return false;
     const b = near.o, U = joinFeet(footOf(a), footOf(b)), k = modelRef.current;
+    const fit = fitOf(a.id, U);
+    if (fit !== "fits") {
+      setNotice({ text: `Non uniti: ${fitWhy(fit, a.id === "pergolato")}`, tone: "warn" });
+      return false;
+    }
     const base = defOfRef.current(a.id);
     const def: ArObjectDef = { ...base, w: U.w / k, d: U.d / k };
     const uid = `j${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
