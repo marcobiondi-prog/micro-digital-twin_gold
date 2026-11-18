@@ -1026,7 +1026,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     let drag: Drag | null = null, twist: Twist | null = null;
     const dist = (e: TouchEvent) => Math.hypot(e.touches[0]!.clientX - e.touches[1]!.clientX, e.touches[0]!.clientY - e.touches[1]!.clientY);
     const angle = (e: TouchEvent) => Math.atan2(e.touches[1]!.clientY - e.touches[0]!.clientY, e.touches[1]!.clientX - e.touches[0]!.clientX);
-    const onControl = (e: TouchEvent) => !!(e.target as Element | null)?.closest?.("button, a, input, [role=slider], [role=dialog], .ar-sheet");
+    // Not "[role=dialog]": the whole AI camera is a dialog, so every touch read as a control and nothing moved.
+    const onControl = (e: TouchEvent) => !!(e.target as Element | null)?.closest?.("button, a, input, [role=slider], .ar-sheet, .ar-tutorial, [aria-label='Scatti del multiplo']");
     // The object under a finger: its 3D shape first (a tree is taken by its crown too), else the one whose footprint
     // is near the spot of floor under the finger.
     const objectAt = (x: number, y: number) => {
@@ -1164,15 +1165,18 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       }
       if (drag && e.touches.length === 0) endDrag(true);
     };
-    window.addEventListener("touchstart", start, { passive: true });
-    window.addEventListener("touchmove", move, { passive: false });
-    window.addEventListener("touchend", end);
-    window.addEventListener("touchcancel", end);
+    // Captured on the way down: the camera's own gesture layer stops touchstart before it reaches the window, so
+    // listened to while bubbling the gesture never began and objects could no longer be resized nor turned.
+    const cap = { capture: true } as const;
+    window.addEventListener("touchstart", start, { passive: true, capture: true });
+    window.addEventListener("touchmove", move, { passive: false, capture: true });
+    window.addEventListener("touchend", end, cap);
+    window.addEventListener("touchcancel", end, cap);
     return () => {
-      window.removeEventListener("touchstart", start);
-      window.removeEventListener("touchmove", move);
-      window.removeEventListener("touchend", end);
-      window.removeEventListener("touchcancel", end);
+      window.removeEventListener("touchstart", start, cap);
+      window.removeEventListener("touchmove", move, cap);
+      window.removeEventListener("touchend", end, cap);
+      window.removeEventListener("touchcancel", end, cap);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
