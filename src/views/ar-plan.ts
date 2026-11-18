@@ -2,7 +2,7 @@ import * as THREE from "three";
 import type { LabState } from "@/models/lab-store";
 import { zonesOfArea, type DrawnArea } from "@/models/drawn-area";
 import { piazzaLayout, vineLayout, TREE_RADIUS_M, type LatLng, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
-import { arObject, enToAr, toEN, type Alignment, type ArObjectDef } from "@/models/ar-objects";
+import { arObject, arToEn, enToAr, fromEN, insideRing, toEN, type Alignment, type ArObjectDef } from "@/models/ar-objects";
 import { vineMixOf, zoneMixOf } from "@/models/vine-interventions";
 import { objectMesh } from "@/views/ar-object-meshes";
 import { realPergola } from "@/views/ar-pergola";
@@ -47,7 +47,7 @@ function extent(pts: XZ[], yaw: number) {
  * Shade patches joined into blocks: two patches belong together when, in the larger one's direction, their boxes
  * overlap or lie within 0,6 m; each block becomes one box turned like its largest patch.
  */
-export function pergolaBlocks(patches: XZ[][], gap = 0.6): Array<{ cx: number; cz: number; w: number; d: number; yaw: number }> {
+export function pergolaBlocks(patches: XZ[][], gap = 0.6, fits?: (corners: XZ[]) => boolean): Array<{ cx: number; cz: number; w: number; d: number; yaw: number }> {
   const rects = patches.map((p) => ({ pts: p, r: rectOf(p) }));
   const parent = rects.map((_, i) => i);
   const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i]!)));
@@ -58,11 +58,14 @@ export function pergolaBlocks(patches: XZ[][], gap = 0.6): Array<{ cx: number; c
   }
   const groups = new Map<number, typeof rects>();
   rects.forEach((r, i) => { const k = find(i); groups.set(k, [...(groups.get(k) ?? []), r]); });
-  return [...groups.values()].map((list) => {
+  return [...groups.values()].flatMap((list) => {
     const yaw = list.reduce((b, x) => (x.r.w * x.r.d > b.r.w * b.r.d ? x : b), list[0]!).r.yaw;
     const e = extent(list.flatMap((x) => x.pts), yaw);
+    const back = (u: number, v: number): XZ => ({ x: u * e.c - v * e.s, z: u * e.s + v * e.c });
+    // Joined only when the block fits where it may stand (its own zone on the map); else each patch stays its own.
+    if (list.length > 1 && fits && !fits([back(e.u0, e.v0), back(e.u1, e.v0), back(e.u1, e.v1), back(e.u0, e.v1)])) return list.map((x) => x.r);
     const um = (e.u0 + e.u1) / 2, vm = (e.v0 + e.v1) / 2;
-    return { cx: um * e.c - vm * e.s, cz: um * e.s + vm * e.c, w: e.u1 - e.u0, d: e.v1 - e.v0, yaw };
+    return [{ cx: um * e.c - vm * e.s, cz: um * e.s + vm * e.c, w: e.u1 - e.u0, d: e.v1 - e.v0, yaw }];
   });
 }
 
@@ -99,7 +102,12 @@ export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: Drawn
   const edits = area.edits ?? {}, inner = zonesOfArea(area);
   if (kind === "urban") {
     const u = lab.urban;
-    return layoutPlan({ kind: "urban", L: piazzaLayout(area.ring, u.trees, u.permeable, u.shade, edits, inner, u.misters ?? 0, [], u.sprinklers ?? 0) }, ar, merge, false, joinBeds);
+    // Pergolas and aiuole are joined only when the joined one lies whole in a zone of its kind drawn on the map.
+    const inZone = (zk: "ombra" | "prato") => (corners: XZ[]) => {
+      const pts = corners.map((c) => fromEN(arToEn(c, a), origin));
+      return (area.zones ?? []).some((z) => z.kind === zk && z.ring.length >= 3 && pts.every(([lat, lng]) => insideRing(lat, lng, z.ring)));
+    };
+    return layoutPlan({ kind: "urban", L: piazzaLayout(area.ring, u.trees, u.permeable, u.shade, edits, inner, u.misters ?? 0, [], u.sprinklers ?? 0) }, ar, merge, false, joinBeds, { shade: inZone("ombra"), lawn: inZone("prato") });
   }
   const v = lab.vineyard, fallback = vineMixOf(v);
   return layoutPlan({ kind: "vineyard", L: vineLayout(area.ring, v.zones.map((z) => zoneMixOf(z, fallback)), edits, inner) }, ar, merge);
@@ -113,6 +121,7 @@ export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: Drawn
 export function layoutPlan(
   plan: { kind: "urban"; L: PiazzaLayout | null } | { kind: "vineyard"; L: VineLayout | null },
   ar: (p: LatLng) => XZ, merge = false, far = false, joinBeds = false,
+  fits?: { shade?: (corners: XZ[]) => boolean; lawn?: (corners: XZ[]) => boolean },
 ): { group: THREE.Group; count: PlanCount } {
   const g = new THREE.Group();
   g.name = "plan";
@@ -126,7 +135,7 @@ export function layoutPlan(
     // With «Unisci» for the aiuole, the beds that touch or nearly touch (the grid's row strips of one block, a zone and
     // the strips round it) become one bed covering them all, like the pergolas.
     const lawn = L.patches.filter((q) => q.kind === "lawn").map((q) => q.ring.map(ar));
-    const lawnPieces = joinBeds ? pergolaBlocks(lawn).map((r) => ({ r, pts: null as XZ[] | null })) : lawn.map((pts) => ({ r: rectOf(pts), pts }));
+    const lawnPieces = joinBeds ? pergolaBlocks(lawn, 0.6, fits?.lawn).map((r) => ({ r, pts: null as XZ[] | null })) : lawn.map((pts) => ({ r: rectOf(pts), pts }));
     for (const { r, pts } of lawnPieces) {
       if (r.w >= 0.8 && r.d >= 0.8) {
         const bed = realBed({ w: r.w, d: r.d }, { far });
@@ -139,7 +148,7 @@ export function layoutPlan(
     // round it) are joined into one pergola covering them all, so a block of shade is one structure, not a row of them.
     // With «Pergolati separati» chosen, each shade patch is its own pergola as on the map.
     const shade = L.patches.filter((q) => q.kind === "shade").map((q) => q.ring.map(ar));
-    for (const r of merge ? pergolaBlocks(shade) : shade.map(rectOf)) {
+    for (const r of merge ? pergolaBlocks(shade, 0.6, fits?.shade) : shade.map(rectOf)) {
       if (r.w < 1 || r.d < 1) continue;
       const pg = realPergola({ w: r.w, d: r.d, h: 3.2 });
       pg.rotation.y = r.yaw;

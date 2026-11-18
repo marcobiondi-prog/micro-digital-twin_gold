@@ -856,7 +856,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     const b = near.o, U = joinFeet(footOf(a), footOf(b)), k = modelRef.current;
     const fit = fitOf(a.id, U);
     if (fit !== "fits") {
-      setNotice({ text: `Non uniti: ${fitWhy(fit, a.id === "pergolato")}`, tone: "warn" });
+      const text = `Non uniti: ${fitWhy(fit, a.id === "pergolato")}`;
+      setNotice({ text, tone: "warn" });
+      window.setTimeout(() => setNotice((n) => (n?.text === text ? null : n)), 3500);
       return false;
     }
     const base = defOfRef.current(a.id);
