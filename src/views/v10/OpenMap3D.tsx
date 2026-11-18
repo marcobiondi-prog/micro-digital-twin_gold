@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { isIOS } from "@/lib/ios";
 import { Crosshair, LoaderCircle } from "lucide-react";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Ring } from "@/models/place-area";
@@ -45,6 +46,8 @@ export function OpenMap3D({ lat, lng, label, zoom, area = [], sim = null }: { la
         // The simulation inside it: lawn, shade, zones and lines on the ground, the trees raised as crowns.
         addSimLayers(map, lat, true);
         let three: SimThreeLayer | null = null;
+        // iPhone and iPad: the light extruded shapes, not three.js's realistic models (they froze the 3D on a change).
+        if (isIOS()) { engine.current = { map, three: null }; setState("ready"); return; }
         void import("@/views/v10/three-layer").then(({ simThreeLayer }) => {
           if (cancelled) return;
           three = simThreeLayer(maplibregl, [lng, lat]);

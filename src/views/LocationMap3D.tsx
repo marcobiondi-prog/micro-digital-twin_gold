@@ -1,10 +1,13 @@
 import { isKeyRejected, loadGoogleMaps, onKeyRejected } from "@/lib/google-maps-js";
+import { isIOS } from "@/lib/ios";
 import { densify, tileRing } from "@/models/drape";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { bedParts, BEDS_3D, crownRing, hedgeParts, netParts, vineRowParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts } from "@/models/area-layout";
 import { MIST_RADIUS_M, SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, LoaderCircle, Minus, Move, Plus, RotateCcw, X } from "lucide-react";
 import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camera";
+// iPhone and iPad: the light shapes instead of the realistic models (Safari's WebGL memory froze the 3D on a change).
+const LITE_3D = isIOS();
 
 /**
  * Photorealistic 3D view of the selected place (Google Maps JavaScript API, `maps3d`
@@ -341,7 +344,7 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
     const added: HTMLElement[] = [];
     // Laid a moment after the levers stop, so a slide does not rebuild the shapes at every step.
     const timer = window.setTimeout(() => {
-      for (const node of build3DOverlay(lib, area, baseSim, floor, !!lib.Model3DElement && !!sim)) { map.append(node); added.push(node); }
+      for (const node of build3DOverlay(lib, area, baseSim, floor, !LITE_3D && !!lib.Model3DElement && !!sim)) { map.append(node); added.push(node); }
       misterBadges(lib, map, badges.current, sim, floor);
     }, 250);
     return () => { window.clearTimeout(timer); added.forEach((node) => node.remove()); };
@@ -356,7 +359,7 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
   // The realistic models (views/v10/g3d-models): each placed model is kept by what it is and where it stands, so a
   // change lays only the ones that changed and leaves the others where they are.
   useEffect(() => {
-    const map = mapRef.current, lib = libs.current, Model = lib?.Model3DElement;
+    const map = mapRef.current, lib = libs.current, Model = LITE_3D ? undefined : lib?.Model3DElement;
     const pool = modelPool.current;
     if (state !== "ready" || !map || !Model || !sim || area.length < 3) { pool.forEach((n) => n.remove()); pool.clear(); return; }
     let cancelled = false;
