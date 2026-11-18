@@ -749,6 +749,7 @@
   overflow: hidden !important;
 }
 .ar-portrait-specimen-card {
+  position: relative;
   width: min(92%, 24rem);
   margin-inline: auto;
   padding: 0.875rem 1.125rem;

@@ -28,7 +28,11 @@ export type ModelSpot = { key: string; lat: number; lng: number; heading: number
 
 const cache = new Map<string, Promise<string | null>>();
 
-function bake(root: THREE.Object3D) {
+/** The light version (an iPhone that turned the realistic models on): at most this many copies of each instanced part
+ *  (leaves, pebbles, flowers), the ones kept a little bigger to cover the gaps, and pictures at most 256 px. */
+const LITE_INSTANCES = 220;
+
+function bake(root: THREE.Object3D, lite = false) {
   const repl: Array<[THREE.Object3D, THREE.Object3D]> = [];
   root.updateMatrixWorld(true);
   root.traverse((o) => {
@@ -36,8 +40,12 @@ function bake(root: THREE.Object3D) {
     if (im.isInstancedMesh) {
       const geos: THREE.BufferGeometry[] = [];
       const m = new THREE.Matrix4(), col = new THREE.Color();
-      for (let i = 0; i < im.count; i++) {
+      const step = lite ? Math.max(1, Math.ceil(im.count / LITE_INSTANCES)) : 1;
+      const grow = new THREE.Matrix4().makeScale(1, 1, 1);
+      if (step > 1) { const k = Math.min(1.6, 1 + (step - 1) * 0.12); grow.makeScale(k, k, k); }
+      for (let i = 0; i < im.count; i += step) {
         im.getMatrixAt(i, m);
+        if (step > 1) m.multiply(grow);
         const g = im.geometry.clone().applyMatrix4(m);
         if (im.instanceColor) {
           im.getColorAt(i, col);
@@ -143,12 +151,12 @@ function flatten(root: THREE.Object3D): THREE.Group {
   return out;
 }
 
-async function toDataUrl(obj: THREE.Object3D, glow: number): Promise<string> {
+async function toDataUrl(obj: THREE.Object3D, glow: number, lite = false): Promise<string> {
   await waitTextures(obj);
   trimMaps(obj);
   brighten(obj, glow);
-  bake(obj);
-  const buf = (await new GLTFExporter().parseAsync(flatten(obj), { binary: true, maxTextureSize: 512 })) as ArrayBuffer;
+  bake(obj, lite);
+  const buf = (await new GLTFExporter().parseAsync(flatten(obj), { binary: true, maxTextureSize: lite ? 256 : 512 })) as ArrayBuffer;
   const bytes = new Uint8Array(buf);
   let bin = "";
   for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
@@ -156,11 +164,18 @@ async function toDataUrl(obj: THREE.Object3D, glow: number): Promise<string> {
 }
 
 /** A model's data URL, built once per key for the session. */
-export function modelUrl(key: string, build: () => THREE.Object3D | Promise<THREE.Object3D | null> | null, glow = 0.15): Promise<string | null> {
-  let p = cache.get(key);
+// The light version builds one model at a time, with a pause between, so the page keeps answering.
+let liteQueue: Promise<unknown> = Promise.resolve();
+export function modelUrl(key: string, build: () => THREE.Object3D | Promise<THREE.Object3D | null> | null, glow = 0.15, lite = false): Promise<string | null> {
+  const id = lite ? `lite:${key}` : key;
+  let p = cache.get(id);
   if (!p) {
-    p = Promise.resolve().then(build).then((o) => (o ? toDataUrl(o, glow) : null)).catch(() => null);
-    cache.set(key, p);
+    const make = () => Promise.resolve().then(build).then((o) => (o ? toDataUrl(o, glow, lite) : null)).catch(() => null);
+    if (lite) {
+      p = liteQueue.then(() => new Promise((r) => setTimeout(r, 60))).then(make);
+      liteQueue = p.catch(() => null);
+    } else p = make();
+    cache.set(id, p);
   }
   return p;
 }
@@ -172,7 +187,7 @@ const deg = (yaw: number) => ((-yaw * 180) / Math.PI + 360) % 360;
  * What to place for a simulation: every object of its layout with its model key, spot and heading, the models built
  * on demand by `ensure`. Trees are the species recognised in that flow (else the realistic oak, three variants).
  */
-export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number }): { spots: ModelSpot[]; ensure: (key: string) => Promise<string | null> } {
+export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number }, lite = false): { spots: ModelSpot[]; ensure: (key: string) => Promise<string | null> } {
   const kx = 111_320 * Math.cos((origin.lat * Math.PI) / 180);
   const xz = ([lat, lng]: LatLng) => ({ x: (lng - origin.lng) * kx, z: -(lat - origin.lat) * 111_320 });
   const ll = (x: number, z: number) => ({ lat: origin.lat - z / 111_320, lng: origin.lng + x / kx });
@@ -197,7 +212,7 @@ export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number })
     }
     const kind = "urban" as const;
     const defs = planTreeDefs(recognisedPlants(kind, currentScans(kind).map((s) => s.species)));
-    const variants = defs.length > 1 ? defs.length : 3;
+    const variants = defs.length > 1 ? defs.length : lite ? 1 : 3;
     L.trees.forEach((t, i) => {
       const def = defs[i % defs.length]!, v = i % variants;
       const p = xz(t);
@@ -227,5 +242,5 @@ export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number })
       }
     }
   }
-  return { spots, ensure: (key) => modelUrl(key, builders.get(key) ?? (() => null), glows.get(key) ?? 0.15) };
+  return { spots, ensure: (key) => modelUrl(key, builders.get(key) ?? (() => null), glows.get(key) ?? 0.15, lite) };
 }
