@@ -39,25 +39,42 @@ export async function arLiveSupported(): Promise<boolean> {
   } catch { return false; }
 }
 
-/** Asks for the AR session; call it straight from a tap (the browser wants a user gesture). The HUD overlay is
- *  required in every try — without it the AR view would have no ✕ nor tools, and only the phone's Back would get
- *  out —, hit-test first required, then optional. The camera's fullscreen (which keeps the landscape: outside it
- *  the app is locked portrait) is left only as a last try, when the phone refused both while in fullscreen, and
- *  taken back if that fails too, so a refusal falls back to the preview in the same orientation. */
+/** Asks for the AR session; call it straight from a tap (the browser wants a user gesture). */
 export async function requestArSession(overlayRoot: HTMLElement): Promise<XRSession> {
-  // Chrome on the user's Xperia refuses every immersive-ar session while the page is in fullscreen
-  // ("NotSupportedError" for each configuration, the bare one too), and starts it once out of it, as the first AR
-  // version did: so the camera's fullscreen is left first. Out of it the app's portrait lock comes back, so the
-  // orientation the phone is held in is asked to stay (it may be refused; then the AR opens portrait).
+  // The session is first asked while the page stays in the camera's fullscreen, so the AR view covers Android's bars
+  // like the AI camera. On the user's Xperia every try was once refused in fullscreen, but the cause then turned out to
+  // be the site's AR permission being blocked; if a phone still refuses every try in fullscreen, it is remembered
+  // (AR_IN_FS_KEY "fail") and from then on the fullscreen is left first, as before. A refusal can spend the tap, so
+  // the retry out of fullscreen may answer SecurityError: «Riprova ARCore» then starts it with a fresh tap.
+  const report: string[] = [];
+  const inFs = typeof document !== "undefined" && !!document.fullscreenElement;
+  let fsFail = false;
+  try { fsFail = localStorage.getItem(AR_IN_FS_KEY) === "fail"; } catch { /* storage off */ }
+  if (inFs && !fsFail) {
+    const got = await tryArConfigs(overlayRoot, report, false);
+    if (got.session) { try { localStorage.setItem(AR_IN_FS_KEY, "ok"); } catch { /* storage off */ } return got.session; }
+    if (!got.allUnsupported) throw new Error(report.join(" · "));
+    try { localStorage.setItem(AR_IN_FS_KEY, "fail"); } catch { /* storage off */ }
+    report.push("(a schermo intero rifiutata: riprovo fuori)");
+  }
+  // Out of fullscreen the app's portrait lock comes back, so the orientation the phone is held in is asked to stay
+  // (it may be refused; then the AR opens portrait).
   if (typeof document !== "undefined" && document.fullscreenElement) {
     const held = screen.orientation?.type;
     await document.exitFullscreen().catch(() => undefined);
     const o = screen.orientation as ScreenOrientation & { lock?: (v: string) => Promise<void> };
     if (held?.startsWith("landscape")) await o.lock?.(held).catch(() => undefined);
   }
-  // Then tried in turn, each moving on only on NotSupportedError: with the HUD overlay first, then without it (Chrome
-  // shows its own close button; a tap on the floor still puts the chosen object), then the bare session. Every
-  // refusal is reported together when none starts.
+  const got = await tryArConfigs(overlayRoot, report, true);
+  if (got.session) return got.session;
+  throw new Error(report.join(" · "));
+}
+
+const AR_IN_FS_KEY = "mdt-ar-in-fullscreen-v1";
+
+/** Tried in turn, each moving on only on NotSupportedError: with the HUD overlay first, then without it (Chrome shows
+ *  its own close button; a tap on the floor still puts the chosen object), then the bare session. */
+async function tryArConfigs(overlayRoot: HTMLElement, report: string[], markDepth: boolean): Promise<{ session?: XRSession; allUnsupported: boolean }> {
   const tries: Array<[string, XRSessionInit]> = [
     // ARCore's depth first (real walls and furniture hide the objects), on unless switched off by hand. Optional, so a
     // phone without it still starts.
@@ -67,16 +84,16 @@ export async function requestArSession(overlayRoot: HTMLElement): Promise<XRSess
     ["pavimento", { requiredFeatures: ["hit-test"], optionalFeatures: ["local-floor", "camera-access", "light-estimation"] }],
     ["base", {}],
   ];
-  const report: string[] = [];
   for (const [name, init] of tries) {
-    try { return await navigator.xr!.requestSession("immersive-ar", init); }
+    try { return { session: await navigator.xr!.requestSession("immersive-ar", init), allUnsupported: false }; }
     catch (e) {
       report.push(`${name}: ${e instanceof DOMException ? e.name : e instanceof Error ? e.message : String(e)}`);
-      if (e instanceof DOMException && e.name === "NotSupportedError" && name.includes("profondità")) markDepthRefused();
-      if (!(e instanceof DOMException) || e.name !== "NotSupportedError") break;
+      // In fullscreen a refusal may come from the fullscreen itself, so the depth is blamed only out of it.
+      if (markDepth && e instanceof DOMException && e.name === "NotSupportedError" && name.includes("profondità")) markDepthRefused();
+      if (!(e instanceof DOMException) || e.name !== "NotSupportedError") return { allUnsupported: false };
     }
   }
-  throw new Error(report.join(" · "));
+  return { allUnsupported: true };
 }
 
 /**

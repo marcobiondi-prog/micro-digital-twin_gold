@@ -1270,7 +1270,7 @@ export function ArCamera({
           // Every configuration refused while the phone says it supports AR: Chrome has blocked augmented reality for
           // this site (its own permission, kept per site). Said plainly, with where to turn it back on.
           const msg = err instanceof Error ? err.message : String(err);
-          const blocked = msg.split(" · ").every((p) => p.trim().endsWith("NotSupportedError"));
+          const blocked = msg.split(" · ").filter((p) => !p.trim().startsWith("(")).every((p) => p.trim().endsWith("NotSupportedError"));
           // A refused configuration spends the tap's permission and the next ones read "SecurityError".
           const spent = msg.includes("SecurityError");
           setLiveAr({ session: null, root: liveRootEl(), why: blocked
