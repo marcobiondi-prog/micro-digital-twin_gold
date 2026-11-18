@@ -17,7 +17,8 @@ if (typeof window !== "undefined") {
   for (const level of ["error", "warn"] as const) {
     const orig = console[level].bind(console);
     console[level] = (...args: unknown[]) => {
-      const m = typeof args[0] === "string" ? /Google Maps JavaScript API (?:error|warning): (\w+)/.exec(args[0]) : null;
+      const text = args.map((x) => (typeof x === "string" ? x : x instanceof Error ? x.message : "")).join(" ");
+      const m = /(?:Google Maps JavaScript API|maps)\b[^:]*(?:error|warning):\s*(\w+)/i.exec(text) ?? /\b(\w+MapError)\b/.exec(text);
       if (m && /Error$/.test(m[1]!) && !rejectReason) { rejectReason = m[1]!; rejectedSubs.forEach((f) => f()); }
       orig(...args);
     };

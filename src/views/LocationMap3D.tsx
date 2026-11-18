@@ -1,3 +1,4 @@
+import { buildLabel } from "@/lib/app-version";
 import { isKeyRejected, keyRejectReason, loadGoogleMaps, onKeyRejected, rejectText } from "@/lib/google-maps-js";
 import { useModels3D } from "@/lib/use-ios-3d";
 import { densify, tileRing } from "@/models/drape";
@@ -413,7 +414,7 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
       {fallback}
       <p role="status" className="pointer-events-none absolute inset-x-0 bottom-3 z-[3] mx-auto w-fit max-w-[92%] rounded-full bg-black/60 px-3 py-1.5 text-center text-[12px] font-semibold text-white ring-1 ring-white/15 backdrop-blur-sm">
         Vista 3D fotografica non disponibile ora: mostro la mappa semplificata
-        {rejectText(reason) && <span className="block text-[11px] font-normal opacity-80">Motivo: {rejectText(reason)}</span>}
+        <span className="block text-[11px] font-normal opacity-80">Motivo: {rejectText(reason) ?? "Google non ha detto quale"} · {buildLabel()}</span>
       </p>
     </div>
   ) : <p role="status" className="grid h-full w-full place-items-center bg-lab-surface px-3 text-center text-xs text-muted-foreground">Vista 3D non disponibile in questo momento.</p>;
