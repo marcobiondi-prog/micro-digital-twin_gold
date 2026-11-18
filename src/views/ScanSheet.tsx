@@ -51,10 +51,10 @@ export function ScanSheet({ records, failed, showCard, specimens, detail, onShow
     setPos({ list: 0, detail: 100, anim: true });
     timer.current = window.setTimeout(() => setOpenId(null), SLIDE);
   };
-  // The finger's way to the left, shown as the back move (both pages shifted to the right by as much).
+  // The finger moving right drags both pages right: the card leaves, the list comes back from the left.
   const paneStyle = (x: number) => ({
     gridArea: "1 / 1",
-    transform: `translate3d(calc(${x}% + ${-drag}px), 0, 0)`,
+    transform: `translate3d(calc(${x}% + ${drag}px), 0, 0)`,
     transition: pos.anim && !drag && !reduce ? `transform ${SLIDE}ms cubic-bezier(0.22, 1, 0.36, 1)` : "none",
   });
   const swipeStart = (x: number, y: number, mouse: boolean) => { swipe.current = { x, y, on: false, mouse }; };
@@ -63,19 +63,19 @@ export function ScanSheet({ records, failed, showCard, specimens, detail, onShow
     if (!sw) return;
     const dx = x - sw.x, dy = y - sw.y;
     if (!sw.on) {
-      if (dx < -10 && -dx > Math.abs(dy) * 1.2) sw.on = true;
-      else if (Math.abs(dy) > 10 || dx > 10) { swipe.current = null; return; } else return;
+      if (dx > 10 && dx > Math.abs(dy) * 1.2) sw.on = true;
+      else if (Math.abs(dy) > 10 || dx < -10) { swipe.current = null; return; } else return;
     }
-    setDrag(Math.min(0, dx));
+    setDrag(Math.max(0, dx));
   };
   const swipeEnd = () => {
     const sw = swipe.current;
     swipe.current = null;
     if (!sw?.on) return;
-    if (drag < -70) {
+    if (drag > 70) {
       // Finish from where the finger left it.
       const w = typeof window !== "undefined" ? Math.min(window.innerWidth, 512) : 400;
-      const k = (-drag / w) * 100;
+      const k = (drag / w) * 100;
       setPos({ list: -100 + k, detail: k, anim: false }); setDrag(0);
       requestAnimationFrame(() => requestAnimationFrame(back));
     } else { setPos((p) => ({ ...p, anim: true })); setDrag(0); }
@@ -181,7 +181,7 @@ export function ScanSheet({ records, failed, showCard, specimens, detail, onShow
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
               {opened && <div className="rounded-2xl bg-background px-3.5 py-3 text-xs leading-relaxed text-foreground">{detail(opened, openIndex)}</div>}
-              {opened && <p className="mt-2 text-center text-[11px] text-white/45">Scorri verso sinistra per tornare alle scansioni</p>}
+              {opened && <p className="mt-2 text-center text-[11px] text-white/45">Scorri verso destra per tornare alle scansioni</p>}
             </div>
           </div>
         </div>
