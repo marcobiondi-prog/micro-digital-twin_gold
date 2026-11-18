@@ -211,7 +211,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const [glLost, setGlLost] = useState(0);
   const adjustingRef = useRef(false);
   adjustingRef.current = adjusting;
-  const floorRef = useRef({ tilt: -14, offset: readFloorOffset() });
+  const floorRef = useRef({ tilt: -14, offset: readFloorOffset(), yaw: 0 });
   const horizonLine = useRef<HTMLDivElement>(null);
   // Zoom of the preview (the camera's own dial, in landscape): the picture is cropped from its middle and the 3D
   // camera narrows its view by the same amount, so the objects stay on the floor they were put on.
@@ -559,11 +559,32 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     // How far the camera looks up or down, whichever way the phone is held: the elevation of the back camera's axis
     // (−z of the device) from beta and gamma. Read as beta − 90 alone it was right only upright: turned sideways the
     // floor was guessed far off and taps on it put nothing.
+    const devQ = new THREE.Quaternion(), scrQ = new THREE.Quaternion(), devE = new THREE.Euler();
+    const Q_BACK = new THREE.Quaternion(-Math.SQRT1_2, 0, 0, Math.SQRT1_2), Z_AXIS = new THREE.Vector3(0, 0, 1);
+    let yaw0: number | null = null;
+    fl.yaw = 0;
     const onTilt = (e: DeviceOrientationEvent) => {
       if (e.beta === null) return;
       const b = (e.beta * Math.PI) / 180, g = ((e.gamma ?? 0) * Math.PI) / 180;
       const elev = (Math.asin(Math.max(-1, Math.min(1, -Math.cos(b) * Math.cos(g)))) * 180) / Math.PI;
       fl.tilt = Math.max(-80, Math.min(-8, elev));
+      // Where the phone points round the vertical, so turning it leaves the objects where they stand instead of
+      // carrying them along (the preview has no tracking: only the turn is known, not a step). The camera's −z axis
+      // from alpha, beta, gamma and the screen's angle, as three's device-orientation controls do; the first reading
+      // is "straight ahead", the direction the objects were put or carried in.
+      if (e.alpha === null) return;
+      devQ.setFromEuler(devE.set(b, (e.alpha * Math.PI) / 180, -g, "YXZ")).multiply(Q_BACK)
+        .multiply(scrQ.setFromAxisAngle(Z_AXIS, -(((screen.orientation?.angle ?? 0) * Math.PI) / 180)));
+      const y = new THREE.Euler().setFromQuaternion(devQ, "YXZ").y;
+      if (yaw0 === null) yaw0 = y;
+      let d = y - yaw0;
+      while (d > Math.PI) d -= 2 * Math.PI;
+      while (d < -Math.PI) d += 2 * Math.PI;
+      // A little smoothing against the sensor's jitter, the short way round.
+      let step = d - fl.yaw;
+      while (step > Math.PI) step -= 2 * Math.PI;
+      while (step < -Math.PI) step += 2 * Math.PI;
+      fl.yaw += step * 0.5;
     };
     window.addEventListener("deviceorientation", onTilt);
     window.addEventListener("resize", size);
@@ -586,7 +607,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       const fov = fovAt(zoomRef.current);
       if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
       const pitch = Math.max(-80, Math.min(10, fl.tilt + fl.offset));
-      camera.rotation.set((pitch * Math.PI) / 180, 0, 0, "YXZ");
+      camera.rotation.set((pitch * Math.PI) / 180, fl.yaw, 0, "YXZ");
       if (horizonLine.current) horizonLine.current.style.top = `${(horizonAt(pitch, camera.fov) * 100).toFixed(2)}%`;
       camera.updateMatrixWorld();
       const t = three.current;
