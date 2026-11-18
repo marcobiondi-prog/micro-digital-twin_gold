@@ -17,6 +17,7 @@ export function aiResponses(body: Record<string, unknown>): Promise<Response> {
   const model = process.env["OPENAI_MODEL"] ?? "gpt-6-astra";
   return fetch(`${baseUrl}/responses`, {
     method: "POST",
+    signal: AbortSignal.timeout(BUDGET_MS),
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({ model, ...body }),
   });
@@ -41,6 +42,11 @@ const sse = (events: Record<string, unknown>[], status = 200) =>
 const failure = (status: number, message: string) =>
   new Response(JSON.stringify({ error: { message } }), { status, headers: { "Content-Type": "application/json" } });
 
+/** The whole AI call must end well inside the host's 60 s limit for a server function. */
+const BUDGET_MS = 46_000;
+const FIRST_MS = 30_000;
+const isTimeout = (e: unknown) => e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
+
 async function geminiResponses(body: Record<string, unknown>): Promise<Response> {
   const model = process.env["GEMINI_MODEL"] ?? "gemini-flash-latest";
   const fallbackModels = (process.env["GEMINI_FALLBACK_MODELS"] ?? "gemini-flash-lite-latest,gemini-2.5-flash").split(",").map((m) => m.trim()).filter((m) => m && m !== model);
@@ -52,40 +58,59 @@ async function geminiResponses(body: Record<string, unknown>): Promise<Response>
   const format = (body["text"] as { format?: { type?: string; schema?: unknown } } | undefined)?.format;
   const schema = format?.type === "json_schema" && format.schema && typeof format.schema === "object" ? (({ $schema: _, ...rest }) => rest)(format.schema as Record<string, unknown>) : null;
   const system = [body["instructions"], schema ? `Rispondi solo con JSON valido conforme a questo JSON Schema:\n${JSON.stringify(schema)}` : null].filter((t): t is string => typeof t === "string" && t.length > 0);
-  const request = (enforceSchema: boolean, name = model) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(name)}:generateContent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": process.env["GEMINI_API_KEY"] ?? "" },
-    body: JSON.stringify({
-      contents,
-      ...(system.length ? { systemInstruction: { parts: [{ text: system.join("\n\n") }] } } : {}),
-      ...(schema ? { generationConfig: { responseMimeType: "application/json", ...(enforceSchema ? { responseJsonSchema: schema } : {}) } } : {}),
-    }),
-  });
-  let res: Response;
-  try {
-    res = await request(Boolean(schema));
-    // A model or schema the structured-output mode rejects falls back to plain JSON mode.
-    if (schema && res.status === 400) {
-      const reason = await res.clone().json().catch(() => null) as { error?: { message?: string } } | null;
-      if (!/API key/i.test(reason?.error?.message ?? "")) res = await request(false);
-    }
-    // An overloaded (503/500) or rate-limited (429) model is retried once on each fallback model,
-    // in order: each Gemini model has its own quota.
-    for (const fallback of fallbackModels) {
-      if (res.status !== 503 && res.status !== 500 && res.status !== 429) break;
-      console.error("Gemini", res.status, "- retrying on", fallback);
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      res = await request(Boolean(schema), fallback);
-    }
-  } catch (error) {
-    console.error("Gemini request", error);
-    return failure(502, "Servizio AI non raggiungibile.");
-  }
-  const payload = await res.json().catch(() => null) as {
+  // Every call has a time limit: a slow model left the server function running past the host's 60 s and the camera
+  // only saw "Analisi interrotta". The first model gets FIRST_MS; if it does not answer in time, the first fallback
+  // (a lighter, quicker model) gets what is left of the budget.
+  const started = Date.now();
+  const left = () => BUDGET_MS - (Date.now() - started);
+  type Payload = {
     error?: { message?: string; status?: string };
     promptFeedback?: { blockReason?: string };
     candidates?: { finishReason?: string; content?: { parts?: { text?: string; thought?: boolean }[] } }[];
   } | null;
+  const request = async (enforceSchema: boolean, name = model, ms = Math.min(FIRST_MS, left())): Promise<{ res: Response; payload: Payload }> => {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(name)}:generateContent`, {
+      method: "POST",
+      signal: AbortSignal.timeout(Math.max(1000, ms)),
+      headers: { "Content-Type": "application/json", "x-goog-api-key": process.env["GEMINI_API_KEY"] ?? "" },
+      body: JSON.stringify({
+        contents,
+        ...(system.length ? { systemInstruction: { parts: [{ text: system.join("\n\n") }] } } : {}),
+        ...(schema ? { generationConfig: { responseMimeType: "application/json", ...(enforceSchema ? { responseJsonSchema: schema } : {}) } } : {}),
+      }),
+    });
+    const payload = await res.json().catch((e: unknown) => { if (isTimeout(e)) throw e; return null; }) as Payload;
+    return { res, payload };
+  };
+  let res: Response;
+  let payload: Payload;
+  try {
+    let out: { res: Response; payload: Payload };
+    try {
+      out = await request(Boolean(schema));
+    } catch (error) {
+      const quick = fallbackModels[0];
+      if (!isTimeout(error) || !quick || left() < 8000) throw error;
+      console.error("Gemini", model, "too slow - retrying on", quick);
+      out = await request(Boolean(schema), quick, left() - 1500);
+    }
+    // A model or schema the structured-output mode rejects falls back to plain JSON mode.
+    if (schema && out.res.status === 400 && !/API key/i.test(out.payload?.error?.message ?? "") && left() > 6000) out = await request(false, model, left() - 1500);
+    // An overloaded (503/500) or rate-limited (429) model is retried once on each fallback model,
+    // in order: each Gemini model has its own quota.
+    for (const fallback of fallbackModels) {
+      if (out.res.status !== 503 && out.res.status !== 500 && out.res.status !== 429) break;
+      if (left() < 6000) break;
+      console.error("Gemini", out.res.status, "- retrying on", fallback);
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      out = await request(Boolean(schema), fallback, left() - 1500);
+    }
+    res = out.res; payload = out.payload;
+  } catch (error) {
+    console.error("Gemini request", error);
+    if (isTimeout(error)) return failure(504, "Il servizio AI ha impiegato troppo: riprova la scansione.");
+    return failure(502, "Servizio AI non raggiungibile.");
+  }
   if (!res.ok) {
     console.error("Gemini", res.status, payload?.error?.status, payload?.error?.message);
     // An invalid key comes back as 400: report it as a permission problem like OpenAI's 403.

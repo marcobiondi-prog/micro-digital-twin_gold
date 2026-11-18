@@ -118,6 +118,13 @@ export function setScanSpeciesPhoto(k: ArKind, id: string, photo: ReferencePhoto
 
 export function clearScans(k: ArKind) { hydrate(k); commit(k, []); }
 
+/** Deletes the chosen scans (their photos with them). */
+export function removeScans(k: ArKind, ids: readonly string[]) {
+  hydrate(k);
+  const drop = new Set(ids);
+  commit(k, state[k].filter((r) => !drop.has(r.id)));
+}
+
 export function useArScans(k: ArKind): ScanRecord[] {
   return useSyncExternalStore((f) => { subs.add(f); return () => subs.delete(f); }, () => currentScans(k), () => EMPTY);
 }

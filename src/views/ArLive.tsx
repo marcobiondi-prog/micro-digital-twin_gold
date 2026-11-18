@@ -125,6 +125,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   // The first preview on a phone opens on «Regola pavimento» (taps then adjust the horizon, they put nothing), but not
   // when it comes from ARCore's flash: there it looked as if objects could no longer be put.
   const [adjusting, setAdjusting] = useState(() => !session && !torch && !hasFloorOffset());
+  // Bumped when the preview's WebGL context is lost, to build the 3D again.
+  const [glLost, setGlLost] = useState(0);
   const adjustingRef = useRef(false);
   adjustingRef.current = adjusting;
   const floorRef = useRef({ tilt: -14, offset: readFloorOffset() });
@@ -378,11 +380,12 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       occluder?.dispose();
       depthRef.current = null;
       renderer.dispose();
+      renderer.forceContextLoss();
       three.current = null;
     };
     // The session is fixed for this component's life.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  }, [session, glLost]);
 
   /** The preview without ARCore: a transparent canvas over the camera, a floor 1,5 m under the eyes. */
   function startPreview(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera, reticle: THREE.Mesh, stop: () => void) {
@@ -429,22 +432,39 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       if (t) shadowsRef.current?.update(t.objects.values(), t.floorY, null);
       renderer.render(scene, camera);
     });
+    // Taps are read on the window, on the way down: a tap on the canvas alone was lost on the phone once the preview
+    // came from ARCore's flash (nothing could be put). Controls, sheets and drags are left out.
+    let down: { x: number; y: number; id: number } | null = null;
+    const SKIP = "button, a, input, [role=slider], .ar-sheet, .ar-tutorial, [aria-label='Scatti del multiplo']";
+    const onDown = (e: PointerEvent) => { down = { x: e.clientX, y: e.clientY, id: e.pointerId }; };
     const onTap = (e: PointerEvent) => {
+      const d = down;
+      down = null;
+      if (!d || d.id !== e.pointerId || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 12) return;
+      if ((e.target as Element | null)?.closest?.(SKIP)) return;
       if (adjustingRef.current) return;
       // An object in hand follows the reticle: a tap anywhere puts it down there.
       if (live.current.tool === "move" && grabRef.current) { placeAtHit(); return; }
       const r = el.getBoundingClientRect();
-      const p = at((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+      const w = r.width || window.innerWidth, h = r.height || window.innerHeight;
+      const p = at((e.clientX - r.left) / w, (e.clientY - r.top) / h);
       if (p && three.current) { three.current.hit = p; placeAtHit(); }
     };
-    el.addEventListener("pointerup", onTap);
+    window.addEventListener("pointerdown", onDown, true);
+    window.addEventListener("pointerup", onTap, true);
+    // A WebGL context the phone takes back (too many after an ARCore session) is built again.
+    const onLost = (ev: Event) => { ev.preventDefault(); setGlLost((n) => n + 1); };
+    el.addEventListener("webglcontextlost", onLost);
     return () => {
       stop();
-      el.removeEventListener("pointerup", onTap);
+      window.removeEventListener("pointerdown", onDown, true);
+      window.removeEventListener("pointerup", onTap, true);
+      el.removeEventListener("webglcontextlost", onLost);
       window.removeEventListener("deviceorientation", onTilt);
       window.removeEventListener("resize", size);
       renderer.setAnimationLoop(null);
       renderer.dispose();
+      renderer.forceContextLoss();
       el.remove();
       three.current = null;
     };
