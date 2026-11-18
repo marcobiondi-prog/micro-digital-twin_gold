@@ -289,7 +289,7 @@ export function ArCamera({
   const [, setArCoreActive] = useState(false);
   const arCoreRef = useRef<ArCoreManager | null>(null);
   // «Prova» live: the WebXR session (null = the preview without ARCore) and the element its overlay lives in.
-  const [liveAr, setLiveAr] = useState<{ session: XRSession | null; root: HTMLElement; n?: number; why?: string; torch?: boolean; carry?: PlacedObject[] } | null>(null);
+  const [liveAr, setLiveAr] = useState<{ session: XRSession | null; root: HTMLElement; n?: number; why?: string; torch?: boolean; carry?: PlacedObject[]; retry?: boolean } | null>(null);
   const restartingRef = useRef(false);
   const [camEpoch, setCamEpoch] = useState(0);
   // Restarts asked because the camera came back without frames (ARCore still releasing it): a few, then the error.
@@ -1246,38 +1246,47 @@ export function ArCamera({
   // «Prova» mostra sul posto l'intervento (oggi: la griglia e la posa della pianta, ARCore vero nella fase 3).
   // The old «Prova» on a grid (a tree put at random on a guessed floor) is gone: Prova is ArLive only.
   const proving = !!liveAr;
+  // ARCore: the live view takes the camera, so ours is stopped first; the session is asked inside the tap (the switch
+  // to AR, or «Riprova ARCore» from the preview when a first try was refused).
+  const startArCore = () => {
+      const root = liveRootEl();
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
+      // The AR session leaves the camera's fullscreen: that exit is not a Back, so the camera stays open.
+      arTransitionRef.current = true;
+      // ARCore opens the phone's camera itself: asked while ours is still being released, the phone refuses the
+      // session ("The specified session configuration is not supported"). A short wait lets the camera go; the
+      // tap's activation lasts long enough (Chrome keeps it about 5 s).
+      new Promise((r) => window.setTimeout(r, 450))
+        .then(() => requestArSession(root))
+        .then((session) => { setLiveAr({ session, root }); void resetAppOrientation(); })
+        .finally(() => { window.setTimeout(() => { arTransitionRef.current = false; }, 1500); })
+        .catch((err: unknown) => {
+          root.remove();
+          setCamEpoch((n) => n + 1);
+          toast.error("ARCore non è partito", { description: `${err instanceof Error ? err.message : String(err)} · Uso l’anteprima.` });
+          regainFullscreen(); // AR left the camera's fullscreen to ask the session: the preview takes it back
+          // Every configuration refused while the phone says it supports AR: Chrome has blocked augmented reality for
+          // this site (its own permission, kept per site). Said plainly, with where to turn it back on.
+          const msg = err instanceof Error ? err.message : String(err);
+          const blocked = msg.split(" · ").every((p) => p.trim().endsWith("NotSupportedError"));
+          // A refused configuration spends the tap's permission and the next ones read "SecurityError".
+          const spent = msg.includes("SecurityError");
+          setLiveAr({ session: null, root: liveRootEl(), why: blocked
+            ? "Chrome ha bloccato la realtà aumentata per questo sito. In Chrome tocca l’icona a sinistra dell’indirizzo → Autorizzazioni (o Impostazioni sito) → Realtà aumentata → Consenti, poi riprova. Intanto uso l’anteprima."
+            : spent
+            ? `ARCore non è partito al primo tentativo (${msg}). Tocca «Riprova ARCore»: ripartirà con le impostazioni che questo telefono accetta. Intanto uso l’anteprima.`
+            : `ARCore non è partito (${msg}): uso l’anteprima.`, retry: true });
+        });
+  };
   const setCamMode = (next: "rileva" | "prova", e?: React.MouseEvent) => {
     if (next === "prova" && !liveAr) {
       e?.stopPropagation();
       e?.preventDefault();
       // ARCore: the live view takes the camera, so ours is stopped first; the session is asked inside this tap.
       if (arCoreSupported && navigator.xr) {
-        const root = liveRootEl();
-        streamRef.current?.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-        if (videoRef.current) videoRef.current.srcObject = null;
-        // The AR session leaves the camera's fullscreen: that exit is not a Back, so the camera stays open.
-        arTransitionRef.current = true;
-        // ARCore opens the phone's camera itself: asked while ours is still being released, the phone refuses the
-        // session ("The specified session configuration is not supported"). A short wait lets the camera go; the
-        // tap's activation lasts long enough (Chrome keeps it about 5 s).
-        new Promise((r) => window.setTimeout(r, 450))
-          .then(() => requestArSession(root))
-          .then((session) => { setLiveAr({ session, root }); void resetAppOrientation(); })
-          .finally(() => { window.setTimeout(() => { arTransitionRef.current = false; }, 1500); })
-          .catch((err: unknown) => {
-            root.remove();
-            setCamEpoch((n) => n + 1);
-            toast.error("ARCore non è partito", { description: `${err instanceof Error ? err.message : String(err)} · Uso l’anteprima.` });
-            regainFullscreen(); // AR left the camera's fullscreen to ask the session: the preview takes it back
-            // Every configuration refused while the phone says it supports AR: Chrome has blocked augmented reality for
-            // this site (its own permission, kept per site). Said plainly, with where to turn it back on.
-            const msg = err instanceof Error ? err.message : String(err);
-            const blocked = msg.split(" · ").every((p) => p.trim().endsWith("NotSupportedError"));
-            setLiveAr({ session: null, root: liveRootEl(), why: blocked
-              ? "Chrome ha bloccato la realtà aumentata per questo sito. In Chrome tocca l’icona a sinistra dell’indirizzo → Autorizzazioni (o Impostazioni sito) → Realtà aumentata → Consenti, poi riprova. Intanto uso l’anteprima."
-              : `ARCore non è partito (${msg}): uso l’anteprima.` });
-          });
+        startArCore();
       } else {
         // Why there is no ARCore, said over the camera (toasts sit under it).
         const why = !navigator.xr
@@ -1333,6 +1342,16 @@ export function ArCamera({
       })
       .finally(() => { restartingRef.current = false; window.setTimeout(() => { arTransitionRef.current = false; }, 1500); });
   };
+  // «Riprova ARCore» from the preview: the preview is closed (its camera too) and ARCore asked again inside this tap.
+  const retryArCore = () => {
+    const had = liveArRef.current;
+    if (!had || had.session) return;
+    setTorchOn(false);
+    torchKeepRef.current = false;
+    had.root.remove();
+    setLiveAr(null);
+    startArCore();
+  };
   const endLive = () => {
     if (restartingRef.current) return;
     const had = liveAr;
@@ -1362,6 +1381,7 @@ export function ArCamera({
     // The camera's own gestures (close swipe, tap to place) must not see the live view's taps.
     <div onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()} onPointerMove={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
       <ArLive key={liveAr.n ?? 0} kind={kind} session={liveAr.session} why={liveAr.why} stream={liveAr.session ? null : streamRef.current} plants={arPlants} onShot={(f) => onCapture([f])} onEnd={endLive} onRotate={rotateLive} torch={liveAr.torch ?? false} carry={liveAr.carry} rotation={liveAr.session ? 0 : viewport.rotation} onFlashPreview={flashPreview}
+        {...(!liveAr.session && liveAr.retry && arCoreSupported ? { onRetry: retryArCore } : {})}
         burst={{ shots: burstShots, open: burst, setOpen: setBurst, discarded, add: () => burstActs.current.add(), discardAll: () => burstActs.current.discardAll(),
           push: (shot) => setBurstShots((p) => [...p, shot]),
           toggle: (id) => setDiscarded((d) => { const n = new Set(d); if (n.has(id)) n.delete(id); else n.add(id); return n; }) }} />

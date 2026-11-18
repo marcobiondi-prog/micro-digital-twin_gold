@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { toast } from "sonner";
-import { Box, Check, Move, Layers, ChevronDown, ChevronLeft, RotateCw, Zap, ZapOff, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
+import { Box, Check, Move, Layers, ChevronDown, ChevronLeft, RotateCw, RotateCcw, Zap, ZapOff, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
 import type { ArKind } from "@/models/ar-focus";
 import {
   AR_OBJECTS, alignFromFix, modelScaleFor, nearestPlaced, turnDetents, dragTick, JOINABLE, JOIN_GAP, footCorners, footGap, joinFeet, nearFeedback, type Foot, placeHaptic, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, enToAr, metresText, objectsToZones, toEN,
@@ -22,7 +22,7 @@ import { ArcZoomDial } from "@/views/ArcZoomDial";
 import { ZOOM_MAX } from "@/lib/camera-zoom";
 import { probeCameraTorch, setCameraTorch, supportsCameraTorch } from "@/lib/camera-torch";
 import { HOLD_MS, useHoldBurst } from "@/lib/hold-burst";
-import { DEPTH_INIT, DepthOccluder, FLIP_MODES, depthFlip, depthWanted, patchGpuDepthQuery, setDepthFlip, setDepthWanted } from "@/views/ar-depth";
+import { DEPTH_INIT, DepthOccluder, FLIP_MODES, depthFlip, depthWanted, patchGpuDepthQuery, setDepthFlip, setDepthWanted, markDepthRefused } from "@/views/ar-depth";
 import { BurstReviewSheet, BurstThumb, burstThumbOf, type BurstShot } from "@/views/BurstReview";
 
 /**
@@ -72,6 +72,7 @@ export async function requestArSession(overlayRoot: HTMLElement): Promise<XRSess
     try { return await navigator.xr!.requestSession("immersive-ar", init); }
     catch (e) {
       report.push(`${name}: ${e instanceof DOMException ? e.name : e instanceof Error ? e.message : String(e)}`);
+      if (e instanceof DOMException && e.name === "NotSupportedError" && name.includes("profondità")) markDepthRefused();
       if (!(e instanceof DOMException) || e.name !== "NotSupportedError") break;
     }
   }
@@ -89,7 +90,7 @@ type V = { x: number; y: number; z: number };
 /** The "Tocca per ruotare la vista AR" notice when the phone is turned during an ARCore session. */
 const ROTATE_PROMPT = false;
 
-export function ArLive({ kind, session, stream = null, plants = [], onShot, onEnd, onRotate, why, burst, torch = false, onFlashPreview, carry, rotation = 0 }: { rotation?: number; burst: ArBurst; torch?: boolean; onFlashPreview?: (carry: PlacedObject[]) => void; carry?: PlacedObject[] | undefined; why?: string | undefined; kind: ArKind; session: XRSession | null; stream?: MediaStream | null; plants?: ArObjectDef[]; onShot?: (file: File) => void; onEnd: () => void; onRotate?: () => void }) {
+export function ArLive({ kind, session, stream = null, plants = [], onShot, onEnd, onRotate, why, burst, torch = false, onFlashPreview, carry, rotation = 0, onRetry }: { onRetry?: () => void; rotation?: number; burst: ArBurst; torch?: boolean; onFlashPreview?: (carry: PlacedObject[]) => void; carry?: PlacedObject[] | undefined; why?: string | undefined; kind: ArKind; session: XRSession | null; stream?: MediaStream | null; plants?: ArObjectDef[]; onShot?: (file: File) => void; onEnd: () => void; onRotate?: () => void }) {
   // Chrome locks the screen to the orientation the AR session started in, and a web page cannot unlock it. When the
   // phone is held the other way for a moment, a tap restarts the session in the new orientation (onRotate).
   // Off at the user's word ("non mi deve uscire questo avviso quando ruoto"): the AR stays in the orientation it
@@ -1435,6 +1436,12 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       {burst.open && burst.shots.length > 0 && (
       <BurstReviewSheet fixed shots={burst.shots} discarded={burst.discarded} onClose={() => burst.setOpen(false)} onAdd={burst.add} onDiscardAll={burst.discardAll} onToggleShot={burst.toggle} />
     )}
+      {!session && onRetry && (
+        // ARCore did not start (a refusal spends the tap's permission): one more tap asks it again with what works here.
+        <button type="button" onClick={onRetry} className="pointer-events-auto absolute left-1/2 top-[calc(env(safe-area-inset-top)+5.5rem)] z-10 inline-flex h-11 -translate-x-1/2 items-center gap-2 rounded-full bg-white px-5 text-sm font-semibold text-black shadow-lg">
+          <RotateCcw className="size-4" aria-hidden="true" />Riprova ARCore
+        </button>
+      )}
       <div className={`pointer-events-auto flex items-center gap-2 p-3 ${arcOn ? "landscape:pr-[250px]" : ""}`}>
         <button type="button" onClick={end} aria-label="Esci dalla realtà aumentata e torna alla fotocamera AI"
           className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-black/55 pl-2.5 pr-3.5 text-sm font-semibold backdrop-blur">
