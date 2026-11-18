@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Box, Check, Move, Layers, ChevronDown, ChevronLeft, RotateCw, Zap, ZapOff, CloudDrizzle, Leaf, Droplets, Fence, Flower2, Grape, Shrub, Sparkles, MapPinned, MoveVertical, Ruler, TreeDeciduous, TreePine, Umbrella, Undo2, Wind, X, type LucideIcon } from "lucide-react";
 import type { ArKind } from "@/models/ar-focus";
 import {
-  AR_OBJECTS, alignFromFix, modelScaleFor, nearestPlaced, turnDetents, dragTick, JOINABLE, JOIN_GAP, footCorners, footGap, joinFeet, nearFeedback, type Foot, placeHaptic, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, arObject, enToAr, metresText, objectsToZones, toEN,
+  AR_OBJECTS, alignFromFix, modelScaleFor, nearestPlaced, turnDetents, dragTick, JOINABLE, JOIN_GAP, footCorners, footGap, joinFeet, nearFeedback, type Foot, placeHaptic, zonesInside, horizonAt, pitchForHorizon, alignTwoPoints, arDistance, enToAr, metresText, objectsToZones, toEN,
   type Alignment, type ArObjectDef, type PlacedObject,
 } from "@/models/ar-objects";
 import { getLab, setUrban, setVineyard } from "@/models/lab-store";
@@ -1318,16 +1318,6 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     { key: "interventi", label: "Interventi", Icon: kind === "vineyard" ? Grape : TreeDeciduous, items: objectItems },
     { key: "strumenti", label: "Strumenti", Icon: Ruler, items: toolItems },
   ];
-  const chip = (key: string, o: ArObjectDef, icon: React.ReactNode) => {
-    const on = tool === "place" && selected === key;
-    return (
-      <button key={key} type="button" role="radio" aria-checked={on} onClick={() => { setSelected(key); setTool("place"); setTrayOpen(false); }}
-        aria-label={o.plant ? `${o.label}, riconosciuto: ${o.plant.scientificName}, alto circa ${Math.round(o.h)} m` : undefined}
-        className={`inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold ${on ? "bg-[#00e5ff] text-black" : "bg-white/10"}`}>
-        {icon}{o.label}
-      </button>
-    );
-  };
 
   const round = "grid size-11 shrink-0 place-items-center rounded-full bg-black/55 backdrop-blur";
   return (
