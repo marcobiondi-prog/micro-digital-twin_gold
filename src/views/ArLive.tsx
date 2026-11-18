@@ -11,6 +11,7 @@ import { getLab, setUrban, setVineyard } from "@/models/lab-store";
 import { drawnAreaFor, type DrawnArea } from "@/models/drawn-area";
 import { readFix } from "@/lib/find-position";
 import { hapticTick } from "@/lib/haptics";
+import { easeTo, FloorTracker, placementFor, RAISED_M, surfaceKind, type SurfaceHit } from "@/models/ar-floor";
 import { contactShadow, floorLoop, objectMesh } from "@/views/ar-object-meshes";
 import { buildPlan, growPlan, planText, planTreeDefs } from "@/views/ar-plan";
 import { realTree, wantsRealTree } from "@/views/ar-tree";
@@ -137,6 +138,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const zoomRef = useRef(1);
   zoomRef.current = zoom;
   const [found, setFound] = useState(false);
+  // What the reticle stands on: the floor, a raised flat surface (a model on a table) or the floor under a wall or table.
+  const surfaceRef = useRef<"floor" | "raised" | "floor-under">("floor");
+  const [surface, setSurface] = useState<"floor" | "raised" | "floor-under">("floor");
   const [placed, setPlaced] = useState<PlacedObject[]>([]);
   // «Modellino»: everything smaller, to try indoors or see the whole piazza on a table (not sent to the map). Its
   // scale is fitted to the space round the phone when it is switched on (modelScaleFor: ARCore's depth when given).
@@ -331,6 +335,12 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
 
     let sawFloor = false;
     let lostAt = 0;
+    // The floor, gathered from every flat hit (the lowest level seen again and again), the reticle eased on it, and the
+    // last good spot held a moment so one frame without an answer does not make it blink.
+    const tracker = new FloorTracker();
+    let shown: V | null = null;
+    let lastGood = 0;
+    const reticleMat = reticle.material as THREE.MeshBasicMaterial;
     renderer.setAnimationLoop((_t, frame?: XRFrame) => {
       if (frame) framesRef.current += 1;
       // The estimated reflections arrive a little after the light: used as soon as they do.
@@ -339,20 +349,58 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       if (!t) return;
       if (frame && hitSource) {
         const ref = renderer.xr.getReferenceSpace();
+        const now = performance.now();
         const hits = ref ? frame.getHitTestResults(hitSource) : [];
-        const pose = hits[0] && ref ? hits[0].getPose(ref) : null;
-        if (pose) {
+        // The first hit that is a surface at all, with how much it faces up (the pose's Y axis is its normal).
+        let hit: SurfaceHit | null = null;
+        for (const h of hits) {
+          const pose = ref ? h.getPose(ref) : null;
+          if (!pose) continue;
+          const m = pose.transform.matrix, p = pose.transform.position;
+          const cand = { x: p.x, y: p.y, z: p.z, up: m[5] ?? 1 };
+          if (!hit) hit = cand;
+          if (surfaceKind(cand.up) === "flat") { hit = cand; break; }
+        }
+        if (hit && surfaceKind(hit.up) === "flat") tracker.add(hit.y, now);
+        const floor = tracker.floorY() ?? (hit && surfaceKind(hit.up) === "flat" ? hit.y : t.floorY);
+        // The floor moved (found lower, or refined): objects standing on the old floor follow it.
+        if (floor !== null && t.floorY !== null && Math.abs(floor - t.floorY) > 0.03) {
+          for (const g of t.objects.values()) if (Math.abs(g.position.y - t.floorY) < RAISED_M) g.position.y = floor;
+        }
+        if (floor !== null) t.floorY = floor;
+        const place = placementFor(hit, t.floorY, modelRef.current < 1);
+        let target: V | null = null;
+        if (place && hit && place.kind !== "floor-under") target = { x: hit.x, y: place.y, z: hit.z };
+        else if (place && ref) {
+          // A wall, a slope or a table at real size: the spot on the floor straight under the screen's centre.
+          const vp = frame.getViewerPose(ref);
+          if (vp) {
+            const o = vp.transform.position, q = vp.transform.orientation;
+            const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(new THREE.Quaternion(q.x, q.y, q.z, q.w));
+            if (dir.y < -0.05) {
+              const k = (place.y - o.y) / dir.y;
+              if (k > 0 && k < 40) target = { x: o.x + dir.x * k, y: place.y, z: o.z + dir.z * k };
+            }
+          }
+        }
+        if (target) {
+          shown = easeTo(shown, target);
+          lastGood = now;
           reticle.visible = true;
-          reticle.matrix.fromArray(pose.transform.matrix);
+          reticle.matrix.makeTranslation(shown.x, shown.y + 0.005, shown.z);
+          reticleMat.opacity = place?.kind === "floor-under" ? 0.5 : 0.85;
           fitReticle(reticle);
-          const p = pose.transform.position;
-          t.hit = { x: p.x, y: p.y, z: p.z };
-          if (t.floorY === null) t.floorY = p.y;
+          t.hit = { ...shown };
+          const sk = place?.kind ?? "floor";
+          if (surfaceRef.current !== sk) { surfaceRef.current = sk; setSurface(sk); }
           // The floor found: a clear double pulse the first time, a short one when it is found again after losing it.
-          if (!sawFloor) { sawFloor = true; setFound(true); hapticTick([40, 60, 40]); }
-          else if (lostAt && performance.now() - lostAt > 1500) hapticTick([30]);
+          if (!sawFloor && tracker.count > 0) { sawFloor = true; setFound(true); hapticTick([40, 60, 40]); }
+          else if (lostAt && now - lostAt > 1500) hapticTick([30]);
           lostAt = 0;
-        } else { reticle.visible = false; t.hit = null; if (sawFloor && !lostAt) lostAt = performance.now(); }
+        } else if (now - lastGood > 400) {
+          reticle.visible = false; t.hit = null; shown = null;
+          if (sawFloor && !lostAt) lostAt = now;
+        }
       }
       if (frame && occluder) {
         const ref = renderer.xr.getReferenceSpace();
@@ -983,17 +1031,19 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
           ? grabbed ? "Punta dove metterlo e tocca: vicino a un pergolato o a un’aiuola si uniscono" : "Tocca l’oggetto da spostare"
         : tool === "measure"
           ? dist !== null ? `Distanza ${metresText(dist)}` : measure.length === 1 ? "Tocca il secondo punto" : "Tocca il primo punto"
+          : session && surface === "raised" ? `Tocca per posare sul piano: ${defOf(selected).label}`
+          : session && surface === "floor-under" ? `Il mirino è sul pavimento sotto il punto inquadrato · tocca per posare: ${defOf(selected).label}`
           : `Tocca il pavimento per posare: ${defOf(selected).label}`);
   // The bar on top stays a small pill (what a tap does, in two words); a tap opens it to the whole sentence and a
   // line on how it works. Messages open it by themselves while they last.
   const [barOpen, setBarOpen] = useState(false);
   const barShort = !found ? "Cerco il pavimento…" : adjusting ? "Regola pavimento"
     : tool === "move" ? (grabbed ? "Mettilo giù" : "Sposta") : tool === "measure" ? (dist !== null ? metresText(dist) : "Misura") : tool === "align" ? `Punto ${alignPts.length + 1} dell’area` : defOf(selected).label;
-  const barHelp = !found ? "Muovi piano il telefono verso il pavimento finché lo riconosco."
+  const barHelp = !found ? "Inquadra il pavimento a un paio di metri e muovi piano il telefono di lato finché lo riconosco: aiutano una buona luce e un pavimento con disegni o venature; quello lucido o tutto di un colore si trova a fatica."
     : tool === "move" ? "Tocca un oggetto posato per prenderlo: segue il mirino e gira con il telefono, tocca di nuovo per posarlo. Avvicinato a un altro pergolato o a un’altra aiuola, il telefono vibra sempre più forte e il contorno diventa verde: posato lì, i due diventano uno solo (Annulla li separa)."
     : tool === "measure" ? "Tocca due punti a terra: ti dico quanto distano."
     : tool === "align" ? "Tocca a terra i punti 1 e 2 dell’area disegnata sulla mappa: così gli oggetti tornano al posto giusto."
-    : "Tocca il pavimento dove vuoi metterlo: compare a grandezza vera. Un oggetto già posato si trascina con un dito; con due dita lo ruoti e lo ingrandisci. Annulla toglie l’ultimo, il pulsante AI cambia oggetto.";
+    : "Tocca il pavimento dove vuoi metterlo: compare a grandezza vera. Il pavimento è il piano più basso che riconosco: un tavolo o un muro non lo ingannano (il mirino scende a terra, più tenue), solo il Modellino si posa anche su un tavolo. Un oggetto già posato si trascina con un dito; con due dita lo ruoti e lo ingrandisci. Annulla toglie l’ultimo, il pulsante AI cambia oggetto.";
   const barExpanded = barOpen || !!notice || adjusting;
   const statusTone = notice ? (notice.tone === "ok" ? "bg-[#22c55e] text-black" : "bg-[#facc15] text-black") : "bg-black/55 text-white backdrop-blur";
 
