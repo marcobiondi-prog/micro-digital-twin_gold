@@ -1475,7 +1475,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
           <RotateCcw className="size-4" aria-hidden="true" />Riprova ARCore
         </button>
       )}
-      <div className={`pointer-events-auto flex items-center gap-2 p-3 ${arcOn ? "landscape:pr-[250px]" : ""}`}>
+      <div className={`pointer-events-auto flex items-center gap-2 p-3 landscape:justify-center ${session && hudTurn ? "justify-center" : ""} ${arcOn ? "landscape:pr-[250px]" : ""}`}>
         <button type="button" onClick={end} aria-label="Esci dalla realtà aumentata e torna alla fotocamera AI"
           className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-black/55 pl-2.5 pr-3.5 text-sm font-semibold backdrop-blur">
           <ChevronLeft className="size-5" aria-hidden="true" />Esci da AR
@@ -1504,21 +1504,21 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
           // it is in the preview, dimmed, and a tap says why.
           <button type="button" aria-label="Accendi il flash: passa all’anteprima senza ARCore" title="Flash (passa all’anteprima)"
             onClick={() => onFlashPreview ? onFlashPreview(carryOver()) : setNotice({ text: "Con ARCore il flash non si può accendere: Chrome dà la fotocamera solo ad ARCore. Accendi una luce, aiuta anche a trovare il pavimento.", tone: "warn" })}
-            className={`ml-auto ${round}`}>
+            className={`${session && hudTurn ? "" : "ml-auto"} landscape:ml-0 ${round}`}>
             <ZapOff className="size-5" />
           </button>
         )}
         {torchOk && (
           <button type="button" onClick={() => void toggleTorch()} aria-pressed={torchOn}
             aria-label={torchOn ? "Disattiva flash" : "Attiva flash"} title={torchOn ? "Disattiva flash" : "Attiva flash"}
-            className={`ml-auto ${round} ${torchOn ? "bg-white/90 text-black" : ""}`}>
+            className={`ml-auto landscape:ml-0 ${round} ${torchOn ? "bg-white/90 text-black" : ""}`}>
             {torchOn ? <Zap className="size-5 fill-yellow-400 text-yellow-500" /> : <ZapOff className="size-5" />}
           </button>
         )}
 
       </div>
       {trayOpen && <button type="button" tabIndex={-1} aria-label="Chiudi le funzioni AI" onClick={() => setTrayOpen(false)} className="pointer-events-auto fixed inset-0 z-30 cursor-default bg-black/35" />}
-      {trayOpen && <ArSheet groups={fanGroups} onClose={() => setTrayOpen(false)} />}
+      {trayOpen && <ArSheet groups={fanGroups} turn={session ? hudTurn : rotation === 270 ? -90 : rotation === -270 ? 90 : rotation === 90 || rotation === -90 ? rotation : 0} onClose={() => setTrayOpen(false)} />}
       {!adjusting && (
         <div className={`pointer-events-auto relative z-10 flex flex-col items-start gap-2 p-3`}>
           {dialOn && !trayOpen && (
@@ -1700,12 +1700,37 @@ const OBJECT_HINT: Record<string, string> = {
  * round tile, the whole name and one line on what it does; the current choice turquoise with a check. A tap picks and
  * closes it; a tap outside or ✕ closes it.
  */
-export function ArSheet({ groups, onClose }: { groups: FanGroup[]; onClose: () => void }) {
+export function ArSheet({ groups, onClose, turn = 0 }: { groups: FanGroup[]; onClose: () => void; turn?: number }) {
+  // Turned with the HUD (ARCore held sideways), the sheet's height follows the turned box (the screen's width), and
+  // its list is scrolled by hand along the turned axis, as the browser scrolls in the screen's own axes.
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el || !turn) return;
+    let last: { x: number; y: number } | null = null;
+    // The finger's move along the turned list's own vertical: +90° (clockwise) maps local down onto the screen's left.
+    const along = (dx: number) => (turn === 90 ? -dx : dx);
+    const onStart = (e: TouchEvent) => { const t = e.touches[0]; last = t && e.touches.length === 1 ? { x: t.clientX, y: t.clientY } : null; };
+    const onMove = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (!last || !t) return;
+      const d = along(t.clientX - last.x);
+      last = { x: t.clientX, y: t.clientY };
+      el.scrollTop -= d;
+      if (e.cancelable) e.preventDefault();
+    };
+    const onEnd = () => { last = null; };
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd);
+    el.addEventListener("touchcancel", onEnd);
+    return () => { el.removeEventListener("touchstart", onStart); el.removeEventListener("touchmove", onMove); el.removeEventListener("touchend", onEnd); el.removeEventListener("touchcancel", onEnd); };
+  }, [turn]);
   const shown = groups.filter((g) => g.items.length > 0);
   const TITLES: Record<string, string> = { piante: "Piante riconosciute dall’AI", interventi: "Interventi", strumenti: "Strumenti" };
   return (
     <div id="ar-ai-tray" role="dialog" aria-label="Funzioni AI" className="ar-sheet pointer-events-auto fixed inset-x-0 bottom-0 z-40 mx-auto flex max-h-[78dvh] w-full max-w-lg flex-col rounded-t-[28px] border-t border-white/15 text-white shadow-[0_-20px_60px_rgba(0,0,0,0.55)] landscape:max-h-[92dvh]"
-      style={{ background: "oklch(0.25 0.02 255 / 0.97)", paddingBottom: "max(env(safe-area-inset-bottom), 0.75rem)" }}>
+      style={{ background: "oklch(0.25 0.02 255 / 0.97)", paddingBottom: "max(env(safe-area-inset-bottom), 0.75rem)", ...(turn && typeof window !== "undefined" ? { maxHeight: `${Math.round(window.innerWidth * 0.92)}px` } : {}) }}>
       <div className="flex items-center justify-between px-5 pb-1 pt-2">
         <span className="mx-auto h-1.5 w-10 rounded-full bg-white/25" aria-hidden="true" />
       </div>
@@ -1713,7 +1738,7 @@ export function ArSheet({ groups, onClose }: { groups: FanGroup[]; onClose: () =
         <h2 className="text-lg font-semibold">Cosa vuoi fare?</h2>
         <button type="button" onClick={onClose} aria-label="Chiudi" className="grid size-10 place-items-center rounded-full bg-white/10"><X className="size-5" /></button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-2">
+      <div ref={listRef} className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-2 ${turn ? "touch-none" : ""}`}>
         {shown.map((g) => (
           <section key={g.key} aria-label={TITLES[g.key] ?? g.label} className="mb-3">
             <h3 className="px-2 pb-1.5 pt-1 text-[11px] font-bold uppercase tracking-[0.14em] text-white/55">{TITLES[g.key] ?? g.label}</h3>
