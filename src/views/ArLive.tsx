@@ -79,6 +79,23 @@ export async function requestArSession(overlayRoot: HTMLElement): Promise<XRSess
   throw new Error(report.join(" · "));
 }
 
+/**
+ * The ARCore view in fullscreen like the AI camera: the session is asked out of fullscreen (the user's Xperia refuses
+ * it inside), so once it runs the overlay root asks fullscreen again, with the tap's activation still valid. If the
+ * phone ends the session because of it (within 2,5 s), this phone is remembered and never asked again.
+ */
+const AR_FS_KEY = "mdt-ar-fullscreen-v1";
+export function arFullscreen(session: XRSession, root: HTMLElement) {
+  if (typeof document === "undefined" || document.fullscreenElement) return;
+  try { if (localStorage.getItem(AR_FS_KEY) === "fail") return; } catch { /* storage off */ }
+  const asked = performance.now();
+  const onEnd = () => { if (performance.now() - asked < 2500) { try { localStorage.setItem(AR_FS_KEY, "fail"); } catch { /* storage off */ } } };
+  session.addEventListener("end", onEnd, { once: true });
+  window.setTimeout(() => session.removeEventListener("end", onEnd), 2600);
+  const el = root as HTMLElement & { requestFullscreen?: (o?: FullscreenOptions) => Promise<void> };
+  void el.requestFullscreen?.({ navigationUI: "hide" }).catch(() => undefined);
+}
+
 type Tool = "place" | "align" | "measure" | "move";
 type V = { x: number; y: number; z: number };
 

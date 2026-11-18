@@ -3,7 +3,7 @@ import { createPortal, flushSync } from "react-dom";
 import "@/styles/ar-camera.css";
 import { isTouchDevice } from "@/lib/touch-device";
 import { isTabletViewport } from "@/lib/tablet-camera";
-import { ArLive, requestArSession, type FanGroup } from "@/views/ArLive";
+import { ArLive, arFullscreen, requestArSession, type FanGroup } from "@/views/ArLive";
 import { ScanSheet } from "@/views/ScanSheet";
 import { recognisedPlants, type PlacedObject } from "@/models/ar-objects";
 import { toast } from "sonner";
@@ -1260,7 +1260,7 @@ export function ArCamera({
       // tap's activation lasts long enough (Chrome keeps it about 5 s).
       new Promise((r) => window.setTimeout(r, 450))
         .then(() => requestArSession(root))
-        .then((session) => { setLiveAr({ session, root }); void resetAppOrientation(); })
+        .then((session) => { setLiveAr({ session, root }); void resetAppOrientation(); arFullscreen(session, root); })
         .finally(() => { window.setTimeout(() => { arTransitionRef.current = false; }, 1500); })
         .catch((err: unknown) => {
           root.remove();
@@ -1310,7 +1310,7 @@ export function ArCamera({
       .then(() => wait(600))
       .then(() => { void resetAppOrientation(); return wait(500); })
       .then(() => requestArSession(had.root))
-      .then((session) => { setLiveAr({ session, root: had.root, n: (had.n ?? 0) + 1 }); void resetAppOrientation(); })
+      .then((session) => { setLiveAr({ session, root: had.root, n: (had.n ?? 0) + 1 }); void resetAppOrientation(); arFullscreen(session, had.root); })
       .catch((err: unknown) => {
         toast.error("Non riesco a riavviare l’AR", { description: `${err instanceof Error ? err.message : String(err)} · Uso l’anteprima.` });
         had.root.remove();
