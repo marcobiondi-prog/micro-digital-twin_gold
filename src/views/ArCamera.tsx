@@ -288,6 +288,8 @@ export function ArCamera({
   const [toolsOpen, setToolsOpen] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
+  // The flash the person turned on, kept when the camera restarts by itself (the watchdog): put back on the new one.
+  const torchKeepRef = useRef(false);
   const [torchBusy, setTorchBusy] = useState(false);
   const [torchError, setTorchError] = useState<string | null>(null);
 
@@ -469,8 +471,10 @@ export function ArCamera({
     setTorchBusy(true); setTorchError(null);
     const next = !torchOn;
     const enabled = await setCameraTorch(streamRef.current?.getVideoTracks()[0], next, true);
-    if (enabled) setTorchOn(next);
+    if (enabled) { setTorchOn(next); torchKeepRef.current = next; }
     else setTorchError("Impossibile attivare il flash su questo dispositivo.");
+    // Some phones pause the picture while the torch switches: it is asked to play again (the watchdog does the rest).
+    void videoRef.current?.play().catch(() => undefined);
     setTorchBusy(false);
   };
   // The reticle follows greens and bark browns (trunks); the scan gate for vine leaf/canopy
@@ -757,6 +761,10 @@ export function ArCamera({
         setStreamN((n) => n + 1);
         setTorchSupported(supportsCameraTorch(stream.getVideoTracks()[0]));
         void probeCameraTorch(stream.getVideoTracks()[0]).then((ok) => { if (!cancelled && ok) setTorchSupported(true); });
+        if (torchKeepRef.current) window.setTimeout(() => {
+          if (cancelled) return;
+          void setCameraTorch(stream.getVideoTracks()[0], true, true).then((ok) => { if (!cancelled && ok) setTorchOn(true); });
+        }, 600);
         zoomRangeRef.current = trackZoomRange(stream.getVideoTracks()[0]);
         zoomerRef.current = zoomRangeRef.current ? createTrackZoomer(stream.getVideoTracks()[0]) : null;
         digitalZoomRef.current = 1; zoomRef.current = 1; setZoomState(1);
@@ -774,11 +782,11 @@ export function ArCamera({
           else { stallRetriesRef.current = 0; setError("La fotocamera non è ripartita. Tocca Riprova."); }
         };
         const track = stream.getVideoTracks()[0];
-        const onEnded = () => { if (!liveArRef.current) restart(); };
+        const onEnded = () => { if (!liveArRef.current?.session) restart(); };
         track?.addEventListener("ended", onEnded);
         const watch = window.setInterval(() => {
           if (cancelled) { window.clearInterval(watch); return; }
-          if (document.hidden || scanningRef.current || liveArRef.current) { stillSince = performance.now(); lastTime = v.currentTime; return; }
+          if (document.hidden || scanningRef.current || liveArRef.current?.session) { stillSince = performance.now(); lastTime = v.currentTime; return; }
           if (v.currentTime !== lastTime) { lastTime = v.currentTime; stillSince = performance.now(); nudged = false; if (v.currentTime > 1) stallRetriesRef.current = 0; return; }
           const still = performance.now() - stillSince;
           if (still > 2500 && !nudged) { nudged = true; void v.play().catch(() => undefined); return; }
@@ -1740,8 +1748,11 @@ export function ArCamera({
     restartingRef.current = true;
     arTransitionRef.current = true;
     void had.session.end().catch(() => undefined)
+      // As on leaving AR: the camera is asked again only once ARCore has let it go.
+      .then(() => new Promise((r) => window.setTimeout(r, 900)))
       .then(() => {
         had.root.remove();
+        stallRetriesRef.current = 0;
         setCamEpoch((n) => n + 1);
         setLiveAr({ session: null, root: liveRootEl(), n: (had.n ?? 0) + 1, torch: true });
         regainFullscreen();
@@ -1761,6 +1772,7 @@ export function ArCamera({
         .then(() => { stallRetriesRef.current = 0; setCamEpoch((n) => n + 1); });
     }
     setTorchOn(false); // the AR view switches the flash off as it closes
+    torchKeepRef.current = false;
     // Back to the camera's fullscreen (and so to its landscape) if the AR session left it; the exit tap counts.
     arTransitionRef.current = true;
     void resetAppOrientation();

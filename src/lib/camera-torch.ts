@@ -30,7 +30,10 @@ export async function setCameraTorch(track: MediaStreamTrack | undefined, enable
     await track.applyConstraints({ advanced: [{ torch: enabled } as MediaTrackConstraintSet] });
     return true;
   } catch {
-    try { await track.applyConstraints({ torch: enabled } as MediaTrackConstraints); return true; }
+    // The plain form replaces every constraint the track has: given alone it dropped the camera's size and frame
+    // rate, and some Android phones then restarted the camera and the picture stood still. The track's own
+    // constraints are kept, the torch added to them.
+    try { await track.applyConstraints({ ...track.getConstraints(), torch: enabled } as MediaTrackConstraints); return true; }
     catch { return false; }
   }
 }
