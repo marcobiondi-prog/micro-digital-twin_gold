@@ -661,6 +661,7 @@ export function ArCamera({
     if (!mode) return;
     let cancelled = false;
     let stopFrameLoop: (() => void) | undefined;
+    let stopWatch: (() => void) | null = null;
     let previewReady = false;
     scanVersion.current += 1;
     scanBusy.current = false;
@@ -761,17 +762,29 @@ export function ArCamera({
         digitalZoomRef.current = 1; zoomRef.current = 1; setZoomState(1);
         v.srcObject = stream;
         void v.play().catch(() => {});
-        // After AR the phone can hand back a camera that gives no frames yet (ARCore still letting it go): the preview
-        // then stood still. If no frame has come after a moment, the camera is asked again, a few times.
-        if (camEpoch > 0) {
-          window.setTimeout(() => {
-            if (cancelled) return;
-            const live = v.readyState >= 2 && v.currentTime > 0 && stream.getVideoTracks().every((t) => t.readyState === "live");
-            if (live) { stallRetriesRef.current = 0; return; }
-            if (stallRetriesRef.current < 4) { stallRetriesRef.current += 1; setCamEpoch((n) => n + 1); }
-            else { stallRetriesRef.current = 0; setError("La fotocamera non è ripartita dopo l’AR. Tocca Riprova."); }
-          }, 2500);
-        }
+        // The picture must keep moving. After AR the phone can hand back a camera that gives no frames (ARCore still
+        // letting it go), or gives a few and then stops, or ends the track: the preview stood still. A watchdog runs
+        // as long as this camera is open — while it is in front, not scanning and not in the AR view — and when the
+        // video's time has not moved for 2,5 s it first asks the video to play, then asks the camera again (a few
+        // times, silently), then says so with «Riprova». An ended track restarts the camera at once.
+        let lastTime = -1, stillSince = performance.now(), nudged = false;
+        const restart = () => {
+          if (cancelled) return;
+          if (stallRetriesRef.current < 5) { stallRetriesRef.current += 1; setCamEpoch((n) => n + 1); }
+          else { stallRetriesRef.current = 0; setError("La fotocamera non è ripartita. Tocca Riprova."); }
+        };
+        const track = stream.getVideoTracks()[0];
+        const onEnded = () => { if (!liveArRef.current) restart(); };
+        track?.addEventListener("ended", onEnded);
+        const watch = window.setInterval(() => {
+          if (cancelled) { window.clearInterval(watch); return; }
+          if (document.hidden || scanningRef.current || liveArRef.current) { stillSince = performance.now(); lastTime = v.currentTime; return; }
+          if (v.currentTime !== lastTime) { lastTime = v.currentTime; stillSince = performance.now(); nudged = false; if (v.currentTime > 1) stallRetriesRef.current = 0; return; }
+          const still = performance.now() - stillSince;
+          if (still > 2500 && !nudged) { nudged = true; void v.play().catch(() => undefined); return; }
+          if (still > 4000) { window.clearInterval(watch); restart(); }
+        }, 500);
+        stopWatch = () => { window.clearInterval(watch); track?.removeEventListener("ended", onEnded); };
         const paint = (showGrid: boolean, showObjects = true) => {
           const c = canvasRef.current;
           if (!c) return false;
@@ -824,6 +837,7 @@ export function ArCamera({
       window.removeEventListener("deviceorientation", onTilt);
       window.removeEventListener("deviceorientationabsolute", onTilt as EventListener);
       stopFrameLoop?.();
+      stopWatch?.();
       paintRef.current = null;
       if (recRef.current?.state === "recording") recRef.current.stop();
       streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -1743,8 +1757,8 @@ export function ArCamera({
     // the phone answered with a camera that gave no frames and the picture stood still.
     if (had?.session) {
       void had.session.end().catch(() => undefined)
-        .then(() => new Promise((r) => window.setTimeout(r, 400)))
-        .then(() => setCamEpoch((n) => n + 1));
+        .then(() => new Promise((r) => window.setTimeout(r, 900)))
+        .then(() => { stallRetriesRef.current = 0; setCamEpoch((n) => n + 1); });
     }
     setTorchOn(false); // the AR view switches the flash off as it closes
     // Back to the camera's fullscreen (and so to its landscape) if the AR session left it; the exit tap counts.
