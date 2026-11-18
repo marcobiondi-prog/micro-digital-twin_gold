@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useTabSwipe } from "@/lib/use-tab-swipe";
 import { SectionLockCard, useGuestOnly, useSectionOpen } from "@/views/v10/ProfileGate";
 import { HistoryBlock } from "@/views/v10/HistoryBlock";
@@ -26,7 +26,7 @@ import { LabSyncIndicator } from "@/views/LabSyncIndicator";
 import { Fold, FoldTabs } from "@/views/Fold";
 import { Ambient, PageHero, TabRow } from "@/views/v8/console";
 import { FieldAI } from "@/views/FieldAI";
-import { ExportSheet } from "@/views/v10/ExportSheet";
+const ExportSheetLazy = lazy(() => import("@/views/v10/ExportSheetLazy"));
 import { SEND_PROJECT_EVENT } from "@/lib/send-project";
 import { DashCard, DashSection, PiazzaDashboard, PremiumPart, SendProject, URBAN_LOCKED, VINE_LOCKED, VineDashboard, getDashSeason, piazzaDash } from "@/views/v10/Dashboard";
 import { getPiazzaReading } from "@/models/sim-reading";
@@ -855,6 +855,9 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
     try { window.print(); } catch { cleanup(); toast.error("Stampa non disponibile: scarica il PDF"); return; }
     setTimeout(cleanup, 120000);
   };
+  // The sheet is loaded on its first opening and kept mounted (its background pill lives in it).
+  const [sheetUsed, setSheetUsed] = useState(false);
+  useEffect(() => { if (open) setSheetUsed(true); }, [open]);
   const reportBlob = (light: boolean) => getDoc(light).then((d) => d.output("blob") as Blob);
   const flowKey = ctx === "Urbano" ? "urban" : "vineyard";
   const tableText = useCallback(() => scenarioCsv(labState, flowKey, new Date().toISOString()), [labState, flowKey]);
@@ -862,9 +865,9 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   return (
     <>
       <button onClick={startExport} className="inline-flex min-w-0 items-center justify-center gap-2 h-11 rounded-full bg-foreground px-4 text-sm font-semibold text-background transition-colors hover:bg-foreground/90 active:bg-foreground/80"><Download className="size-4 shrink-0" /><span className="truncate">Esporta report</span></button>
-      <ExportSheet open={open} onOpenChange={setOpen} flow={ctx === "Urbano" ? "piazza" : "vigneto"} place={(ctx === "Urbano" ? u : v).location.label}
+      {sheetUsed && <Suspense fallback={null}><ExportSheetLazy open={open} onOpenChange={setOpen} flow={ctx === "Urbano" ? "piazza" : "vigneto"} place={(ctx === "Urbano" ? u : v).location.label}
         author={author} media={reportMedia} progress={progress} report={reportBlob} table={tableText} map={mapText} text={text}
-        onPrint={() => void openPreview("print")} onOpenReport={() => void openPreview("save")} />
+        onPrint={() => void openPreview("print")} onOpenReport={() => void openPreview("save")} /></Suspense>}
       <Dialog open={preview !== null} onOpenChange={(o) => { if (!o) setPreview(null); }}>
         <DialogContent className="flex max-h-[90vh] flex-col gap-3">
           <DialogHeader><DialogTitle>{mode === "save" ? "Anteprima PDF" : "Anteprima di stampa"} — {ctx}</DialogTitle></DialogHeader>

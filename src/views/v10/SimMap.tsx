@@ -1,5 +1,5 @@
-import { VineZonePicker } from "@/views/v10/VineThirst";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+const VineZonePicker = lazy(() => import("@/views/v10/VineThirst").then((m) => ({ default: m.VineZonePicker })));
 import { setPinFix, usePinFix } from "@/models/pin-fix";
 import { samePlace } from "@/models/place-memory";
 import { ringCentroid } from "@/models/place-area";
@@ -279,7 +279,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
           <Suspense fallback={<div className="h-full w-full" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} sim={sim} still /></Suspense>
         </ParallaxLayer>
       </div>
-      {kind === "vineyard" && <div className="absolute inset-x-0 top-12 z-[3] flex justify-center px-3"><VineZonePicker /></div>}
+      {kind === "vineyard" && <div className="absolute inset-x-0 top-12 z-[3] flex justify-center px-3"><Suspense fallback={null}><VineZonePicker /></Suspense></div>}
       <button type="button" onClick={(e) => { e.stopPropagation(); openSimTab(kind, "mappa"); }} aria-label="Apri la mappa: disegna l’area e sposta gli elementi"
         className="absolute bottom-3 right-3 z-[3] inline-flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-[13px] font-semibold text-white outline-none ring-1 ring-white/15 backdrop-blur-sm focus-visible:ring-2 focus-visible:ring-white">
         <MapIcon className="size-4" aria-hidden="true" />Apri la mappa

@@ -1,6 +1,5 @@
 import { keepProIdInAccount, openSectorGate, saveProId, useProId } from "@/lib/use-pro-id";
 import { DeviceCacheCard } from "@/views/v10/DeviceCache";
-import { AccountDevices } from "@/views/v10/AccountDevices";
 import { biometricOn } from "@/lib/biometric";
 import { BiometricSignIn, leaveProfile, ProfileBioSwitch, proBioKey } from "@/views/v10/Biometric";
 import { getKnownProIds } from "@/lib/use-pro-id";
@@ -13,6 +12,7 @@ import { CLOUD_QUOTA, bytesText, usageTone, useCloudUsage } from "@/lib/use-clou
 import { ProfileIcon } from "@/views/ProfileIcon";
 import { proSummary } from "@/models/professional-id";
 import { lazy, Suspense, useCallback, useContext, useEffect, useRef, useState, type ChangeEvent, type ComponentType, type FormEvent } from "react";
+const AccountDevices = lazy(() => import("@/views/v10/AccountDevices").then((m) => ({ default: m.AccountDevices })));
 import { LogOut, UserRound, Mail, LockKeyhole, Camera, ShieldCheck, ChevronRight, LoaderCircle, Trash2, RefreshCw } from "lucide-react";
 import { useUpdateProgress } from "@/lib/update-progress";
 import { buildLabel, checkForUpdate } from "@/lib/app-version";
@@ -595,7 +595,7 @@ export function AccountControl() {
                 <p className="mt-1 text-xs text-muted-foreground">{account.guest ? "Accesso di base su questo dispositivo. Non è un account e non salva dati online." : "Accesso effettuato"}</p>
               </div>
               {cloudAccount && <StorageBar used={usage.used} share={usage.share} files={usage.files} google={usage.google} />}
-              {cloudAccount && <AccountDevices />}
+              {cloudAccount && <Suspense fallback={null}><AccountDevices /></Suspense>}
               <DeviceCacheCard />
               {account.guest && <Button variant="outline" className="w-full" onClick={() => { sessionStorage.removeItem(guestKey); setAccount(null); changeMode("signup"); }}>Crea un account</Button>}
               {account && notice && <p role="status" className="text-sm text-muted-foreground">{notice}</p>}
