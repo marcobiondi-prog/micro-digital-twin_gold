@@ -114,6 +114,39 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     window.addEventListener("devicemotion", onMotion);
     return () => window.removeEventListener("devicemotion", onMotion);
   }, [session, onRotate]);
+  // With ARCore Chrome keeps the screen in the orientation the session started in (a page cannot unlock it), so the
+  // HUD would stay sideways when the phone is turned. Gravity says how the phone is held; the HUD is turned by CSS to
+  // read upright (the camera's world tracking needs no turn), after 0,35 s held the new way.
+  const [hudTurn, setHudTurn] = useState(0);
+  const [, setVp] = useState(0);
+  useEffect(() => {
+    if (!session) { setHudTurn(0); return; }
+    let want = 0, since = 0;
+    const onMotion = (e: DeviceMotionEvent) => {
+      const g = e.accelerationIncludingGravity;
+      if (!g || g.x == null || g.y == null) return;
+      const ax = Math.abs(g.x), ay = Math.abs(g.y);
+      if (Math.max(ax, ay) < 4) return; // flat: keep the last
+      let held: number | null = null;
+      if (ay > ax * 1.3) held = g.y > 0 ? 0 : 180;
+      else if (ax > ay * 1.3) held = g.x > 0 ? 90 : 270;
+      if (held === null || held === 180) return;
+      const screenAngle = (screen.orientation?.angle ?? 0) % 360;
+      let turn = (held - screenAngle + 360) % 360;
+      if (turn === 270) turn = -90;
+      if (turn === 180) return;
+      const now = performance.now();
+      if (turn !== want) { want = turn; since = now; return; }
+      if (now - since > 350) setHudTurn((t) => (t === turn ? t : turn));
+    };
+    const onResize = () => setVp((n) => n + 1);
+    window.addEventListener("devicemotion", onMotion);
+    window.addEventListener("resize", onResize);
+    return () => { window.removeEventListener("devicemotion", onMotion); window.removeEventListener("resize", onResize); };
+  }, [session]);
+  const hudTurnStyle: React.CSSProperties = hudTurn && session && typeof window !== "undefined"
+    ? { inset: "auto", left: "50%", top: "50%", width: `${window.innerHeight}px`, height: `${window.innerWidth}px`, transform: `translate(-50%, -50%) rotate(${hudTurn}deg)`, transition: "transform 250ms ease" }
+    : {};
   // The plants recognised by «Rileva» come first (key "p:<i>"), then the flow's own objects (key = their id).
   const choices = useMemo(() => [
     ...plants.map((d, i) => ({ key: `p:${i}`, def: d })),
@@ -1432,7 +1465,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       </div>
     )}
     {flash > 0 && <div key={flash} className="pointer-events-none fixed inset-0 z-[60] animate-out fade-out-0 bg-white duration-300 fill-mode-forwards" aria-hidden="true" />}
-    <div ref={hudRef} className="ar-live-hud pointer-events-none fixed inset-0 z-50 flex select-none flex-col justify-between text-white [-webkit-touch-callout:none]" style={{ padding: `${session ? "max(env(safe-area-inset-top), 1.5rem)" : "env(safe-area-inset-top)"} env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)` }}>
+    <div ref={hudRef} className="ar-live-hud pointer-events-none fixed inset-0 z-50 flex select-none flex-col justify-between text-white [-webkit-touch-callout:none]" style={{ padding: `${session ? "max(env(safe-area-inset-top), 1.5rem)" : "env(safe-area-inset-top)"} env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)`, ...hudTurnStyle }}>
       {burst.open && burst.shots.length > 0 && (
       <BurstReviewSheet fixed shots={burst.shots} discarded={burst.discarded} onClose={() => burst.setOpen(false)} onAdd={burst.add} onDiscardAll={burst.discardAll} onToggleShot={burst.toggle} />
     )}
