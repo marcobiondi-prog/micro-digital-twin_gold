@@ -2488,7 +2488,7 @@ export function ArCamera({
               </>
             )}
             {/* Modal veils & alert dialogs: render over all camera controls and burst bar */}
-            {guideOpen && <div className="ar-tutorial-veil" data-camera-controls aria-hidden="true" />}
+            {guideOpen && <div className="ar-tutorial-veil" data-camera-controls aria-hidden="true" onClick={(e) => { e.stopPropagation(); closeGuide(); }} />}
             {confirmClear && <div className="ar-confirm-veil" data-camera-controls onClick={() => { if (!emptying) setConfirmClear(false); }}>
               <div className="ar-confirm" role="alertdialog" aria-modal="true" aria-labelledby="ar-confirm-title" aria-describedby="ar-confirm-text"
                 onClick={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === "Escape") setConfirmClear(false); }}>
