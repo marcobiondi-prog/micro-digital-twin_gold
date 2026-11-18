@@ -1,13 +1,11 @@
 import { isKeyRejected, loadGoogleMaps, onKeyRejected } from "@/lib/google-maps-js";
-import { isIOS } from "@/lib/ios";
+import { useModels3D } from "@/lib/use-ios-3d";
 import { densify, tileRing } from "@/models/drape";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { bedParts, BEDS_3D, crownRing, hedgeParts, netParts, vineRowParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts } from "@/models/area-layout";
 import { MIST_RADIUS_M, SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, LoaderCircle, Minus, Move, Plus, RotateCcw, X } from "lucide-react";
 import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camera";
-// iPhone and iPad: the light shapes instead of the realistic models (Safari's WebGL memory froze the 3D on a change).
-const LITE_3D = isIOS();
 
 /**
  * Photorealistic 3D view of the selected place (Google Maps JavaScript API, `maps3d`
@@ -336,6 +334,8 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
   const areaKey = JSON.stringify(area), simKey = JSON.stringify(baseSim);
   const shadowKey = sim?.kind === "piazza" ? JSON.stringify(sim.shadows ?? []) : "";
   const modelPool = useRef(new Map<string, HTMLElement>());
+  // iPhone and iPad: plain shapes, or the light realistic models once turned on (Safari froze on the full ones).
+  const models = useModels3D();
   useEffect(() => {
     const map = mapRef.current, lib = libs.current;
     if (state !== "ready" || !map || !lib) return;
@@ -344,11 +344,11 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
     const added: HTMLElement[] = [];
     // Laid a moment after the levers stop, so a slide does not rebuild the shapes at every step.
     const timer = window.setTimeout(() => {
-      for (const node of build3DOverlay(lib, area, baseSim, floor, !LITE_3D && !!lib.Model3DElement && !!sim)) { map.append(node); added.push(node); }
+      for (const node of build3DOverlay(lib, area, baseSim, floor, models !== "shapes" && !!lib.Model3DElement && !!sim)) { map.append(node); added.push(node); }
       misterBadges(lib, map, badges.current, sim, floor);
     }, 250);
     return () => { window.clearTimeout(timer); added.forEach((node) => node.remove()); };
-  }, [state, areaKey, simKey, adjKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state, areaKey, simKey, adjKey, models]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const map = mapRef.current, lib = libs.current;
     if (state !== "ready" || !map || !lib?.Polygon3DElement || area.length < 3 || !shadowKey) return;
@@ -359,7 +359,7 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
   // The realistic models (views/v10/g3d-models): each placed model is kept by what it is and where it stands, so a
   // change lays only the ones that changed and leaves the others where they are.
   useEffect(() => {
-    const map = mapRef.current, lib = libs.current, Model = LITE_3D ? undefined : lib?.Model3DElement;
+    const map = mapRef.current, lib = libs.current, Model = models === "shapes" ? undefined : lib?.Model3DElement;
     const pool = modelPool.current;
     if (state !== "ready" || !map || !Model || !sim || area.length < 3) { pool.forEach((n) => n.remove()); pool.clear(); return; }
     let cancelled = false;
@@ -367,7 +367,7 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
     const timer = window.setTimeout(() => {
       void import("@/views/v10/g3d-models").then(({ modelSpots }) => {
         if (cancelled) return;
-        const { spots, ensure } = modelSpots(sim, { lat, lng });
+        const { spots, ensure } = modelSpots(sim, { lat, lng }, models === "lite");
         const dLat = floor.n / 111_320, dLng = floor.e / (111_320 * Math.cos((lat * Math.PI) / 180));
         const want = new Map(spots.map((sp) => [`${sp.key}@${(sp.lat + dLat).toFixed(7)},${(sp.lng + dLng).toFixed(7)},${sp.heading.toFixed(1)},${floor.h}`, sp]));
         for (const [id, node] of pool) if (!want.has(id)) { node.remove(); pool.delete(id); }
@@ -384,7 +384,7 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
       });
     }, 250);
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [state, areaKey, simKey, adjKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state, areaKey, simKey, adjKey, models]); // eslint-disable-line react-hooks/exhaustive-deps
   // The models go with the map (a new place builds a new map).
   useEffect(() => () => { modelPool.current.forEach((n) => n.remove()); modelPool.current.clear(); }, [lat, lng]);
   // The panel grows when 3D opens (and on rotation): re-frame the place once the size settles.

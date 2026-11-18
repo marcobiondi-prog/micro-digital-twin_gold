@@ -21,7 +21,7 @@ export type SimThreeLayer = CustomLayerInterface & { update: (sim: SimLayout | n
 
 const MAX_VINES = 24_000, VINE_STEP = 1.1;
 
-export function simThreeLayer(maplibregl: typeof import("maplibre-gl"), origin: [number, number]): SimThreeLayer {
+export function simThreeLayer(maplibregl: typeof import("maplibre-gl"), origin: [number, number], lite = false): SimThreeLayer {
   const [lng0, lat0] = origin;
   const merc = maplibregl.MercatorCoordinate.fromLngLat({ lng: lng0, lat: lat0 }, 0);
   const s = merc.meterInMercatorCoordinateUnits();
@@ -35,7 +35,8 @@ export function simThreeLayer(maplibregl: typeof import("maplibre-gl"), origin: 
   const hemi = new THREE.HemisphereLight(0xdfe9ff, 0x4d5a3a, 0.9);
   const sunLight = new THREE.DirectionalLight(0xffffff, 1.8);
   sunLight.castShadow = true;
-  sunLight.shadow.mapSize.set(2048, 2048);
+  // The light version (an iPhone that turned the realistic models on): a smaller shadow map, a slower redraw.
+  sunLight.shadow.mapSize.set(lite ? 1024 : 2048, lite ? 1024 : 2048);
   sunLight.shadow.bias = -0.0005;
   sunLight.shadow.normalBias = 0.04;
   scene.add(hemi, sunLight, sunLight.target);
@@ -84,7 +85,7 @@ export function simThreeLayer(maplibregl: typeof import("maplibre-gl"), origin: 
   const tick = () => {
     window.clearInterval(ticker);
     if (!animated) return;
-    ticker = window.setInterval(() => { if (!document.hidden) map?.triggerRepaint(); }, 50);
+    ticker = window.setInterval(() => { if (!document.hidden) map?.triggerRepaint(); }, lite ? 200 : 50);
   };
 
   const clear = () => {

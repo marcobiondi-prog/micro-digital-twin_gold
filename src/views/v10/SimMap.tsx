@@ -1,4 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { isIOS, setIosRealModels } from "@/lib/ios";
+import { useModels3D } from "@/lib/use-ios-3d";
 const VineZonePicker = lazy(() => import("@/views/v10/VineThirst").then((m) => ({ default: m.VineZonePicker })));
 import { setPinFix, usePinFix } from "@/models/pin-fix";
 import { samePlace } from "@/models/place-memory";
@@ -74,6 +76,8 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   useEffect(() => { if (!signedIn) setView("2d"); else setHint(false); }, [signedIn]);
   // Always both: with the browser key 3D is the photorealistic view, without it an open map with the buildings raised.
   const show3d = view === "3d" && signedIn;
+  const [iosDevice, setIosDevice] = useState(false);
+  useEffect(() => { setIosDevice(isIOS()); }, []);
   const zoom3d = kind === "urban" ? 17 : 15;
   // The area drawn with pins for this place (kept with the simulation), and the pins being placed while drawing.
   const saved = drawnAreaFor(kind === "urban" ? lab.urban.area : lab.vineyard.area, loc);
@@ -341,6 +345,8 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
             onAreaChange={drawingZone ? setZoneDraft : setDraft} sim={editingZone && sim ? { ...sim, inner: (sim.inner ?? []).filter((z) => z.id !== editingZone) } : sim} arranging={arranging} onMove={moved}
             outline={drawingZone ? saved?.ring ?? null : null} onOutside={() => toast("La zona va dentro l’area disegnata")} onPinMove={arranging ? undefined : movePin} /></Suspense>}
       </div>
+      {/* iPhone and iPad only: the 3D shows plain shapes unless the light realistic models are turned on by hand. */}
+      {show3d && iosDevice && <IosModelsSwitch />}
       {/* The pin can be put right by hand on the 2D map; a pin moved by hand can go back to the automatic one. */}
       {!drawing && !drawingZone && !arranging && (
         <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 px-2 text-center text-xs text-muted-foreground">
@@ -696,5 +702,23 @@ function ZonesBar({ area, flow, onAdd, onEdit, onRemove }: { area: DrawnArea; fl
         <button type="button" onClick={() => setChoosing(true)} className={cn(barBtn, "bg-foreground/[0.08]")}><PenLine className="size-4" aria-hidden="true" />Aggiungi zona</button>
       )}
     </div>
+  );
+}
+
+/** iPhone and iPad: the 3D's realistic models in their light version, off by default (the full ones froze Safari). */
+function IosModelsSwitch() {
+  const on = useModels3D() === "lite";
+  return (
+    <label className="mx-auto flex w-fit max-w-full cursor-pointer items-center gap-3 rounded-full bg-card px-3 py-1.5 text-xs ring-1 ring-border">
+      <span className="min-w-0">
+        <span className="font-semibold text-foreground">Modelli realistici</span>
+        <span className="text-muted-foreground"> · {on ? "versione leggera per iPhone" : "spenti: forme semplici"}</span>
+      </span>
+      <button type="button" role="switch" aria-checked={on} aria-label="Modelli realistici nel 3D"
+        onClick={() => { setIosRealModels(!on); toast(on ? "Modelli realistici spenti" : "Modelli realistici accesi", { description: on ? "Il 3D torna alle forme semplici." : "Versione leggera per iPhone: se il 3D si blocca, spegnili di nuovo." }); }}
+        className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${on ? "bg-teal-400" : "bg-foreground/25"}`}>
+        <span className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition-[left] ${on ? "left-[1.125rem]" : "left-0.5"}`} />
+      </button>
+    </label>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { isIOS } from "@/lib/ios";
+import { useModels3D } from "@/lib/use-ios-3d";
 import { Crosshair, LoaderCircle } from "lucide-react";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Ring } from "@/models/place-area";
@@ -21,6 +21,8 @@ export function OpenMap3D({ lat, lng, label, zoom, area = [], sim = null }: { la
   const host = useRef<HTMLDivElement>(null);
   const mapRef = useRef<{ easeTo: (c: Camera & { duration: number }) => void } | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  // iPhone and iPad: plain shapes, or the light realistic models once turned on (Safari froze on the full ones).
+  const models = useModels3D();
   // The simulation's objects are drawn by three.js inside the map (views/v10/three-layer): real models lit by the
   // simulation's sun, with shadows. The map is built once per place; the objects and the light follow the levers.
   const engine = useRef<{ map: MlMap; three: SimThreeLayer | null } | null>(null);
@@ -46,11 +48,12 @@ export function OpenMap3D({ lat, lng, label, zoom, area = [], sim = null }: { la
         // The simulation inside it: lawn, shade, zones and lines on the ground, the trees raised as crowns.
         addSimLayers(map, lat, true);
         let three: SimThreeLayer | null = null;
-        // iPhone and iPad: the light extruded shapes, not three.js's realistic models (they froze the 3D on a change).
-        if (isIOS()) { engine.current = { map, three: null }; setState("ready"); return; }
+        // iPhone and iPad: the light extruded shapes, unless the light realistic models were turned on (the full ones
+        // froze the 3D on a change).
+        if (models === "shapes") { engine.current = { map, three: null }; setState("ready"); return; }
         void import("@/views/v10/three-layer").then(({ simThreeLayer }) => {
           if (cancelled) return;
-          three = simThreeLayer(maplibregl, [lng, lat]);
+          three = simThreeLayer(maplibregl, [lng, lat], models === "lite");
           map.addLayer(three);
           engine.current = { map, three };
           setState("ready");
@@ -64,7 +67,7 @@ export function OpenMap3D({ lat, lng, label, zoom, area = [], sim = null }: { la
     }).catch(() => { if (!cancelled) setState("error"); });
     return () => { cancelled = true; mapRef.current = null; engine.current = null; remove?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lat, lng, zoom, label, JSON.stringify(area)]);
+  }, [lat, lng, zoom, label, JSON.stringify(area), models]);
   // The levers and the clock: the ground shapes on the map's own layers, the objects (and, without three.js, the old
   // extruded slabs) and the sun in the three.js layer — no rebuilding of the map.
   useEffect(() => {
