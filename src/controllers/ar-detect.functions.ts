@@ -84,6 +84,7 @@ async function gbif(name: string) {
   try {
     const r = await fetch(
       `https://api.gbif.org/v1/species/match?name=${encodeURIComponent(name)}&kingdom=Plantae&strict=true`,
+      { signal: AbortSignal.timeout(5000) },
     );
     if (!r.ok) return null;
     const j = (await r.json()) as {
@@ -105,7 +106,7 @@ type ColUsage = { id?: string; name?: string; rank?: string; status?: string; ac
 /** Catalogue of Life (database botanico mondiale): nome accettato e famiglia. */
 async function catalogueOfLife(name: string) {
   try {
-    const r = await fetch(`https://api.checklistbank.org/dataset/3LR/match/nameusage?scientificName=${encodeURIComponent(name)}&kingdom=Plantae`);
+    const r = await fetch(`https://api.checklistbank.org/dataset/3LR/match/nameusage?scientificName=${encodeURIComponent(name)}&kingdom=Plantae`, { signal: AbortSignal.timeout(5000) });
     if (!r.ok) return null;
     const j = (await r.json()) as { usage?: ColUsage; match?: boolean; type?: string };
     if (!j.match || !usableBotanicalMatch(name, {name:j.usage?.name,rank:j.usage?.rank,kingdom:j.usage?.classification?.find(c => c.rank === "kingdom")?.name,type:j.type})) return null;
@@ -156,7 +157,10 @@ export const detectArObject = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<DetectResult> => {
     // Unexpected server failures come back as a readable error instead of a thrown request.
     try {
-      return await recognize(data);
+      // Never past the host's 60 s: past 55 s the camera gets a readable answer instead of a cut request.
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const late = new Promise<DetectResult>((resolve) => { timer = setTimeout(() => resolve({ detection: null, error: "L’analisi ha impiegato troppo: riprova la scansione." }), 55_000); });
+      try { return await Promise.race([recognize(data), late]); } finally { clearTimeout(timer); }
     } catch (error) {
       console.error("AR recognition", error);
       const missingKey = error instanceof Error && /SUPABASE_SERVICE_ROLE_KEY/.test(error.message);
