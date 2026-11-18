@@ -192,7 +192,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     return () => { window.removeEventListener("devicemotion", onMotion); window.removeEventListener("resize", onResize); };
   }, [session]);
   const hudTurnStyle: React.CSSProperties = hudTurn && session && typeof window !== "undefined"
-    ? { inset: "auto", left: "50%", top: "50%", width: `${window.innerHeight}px`, height: `${window.innerWidth}px`, transform: `translate(-50%, -50%) rotate(${hudTurn}deg)`, transition: "transform 250ms ease" }
+    ? { inset: "auto", left: "50%", top: "50%", width: `${window.innerHeight}px`, height: `${window.innerWidth}px`, transform: `translate(-50%, -50%) rotate(${hudTurn}deg)`, transition: "transform 250ms ease", paddingLeft: "1.75rem", paddingRight: "1.75rem" }
     : {};
   // The plants recognised by «Rileva» come first (key "p:<i>"), then the flow's own objects (key = their id).
   const choices = useMemo(() => [
