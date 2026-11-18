@@ -545,7 +545,9 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     if (!host) return;
     renderer.xr.enabled = false;
     const el = renderer.domElement;
-    el.style.cssText = "position:absolute;inset:0;width:100%;height:100%";
+    // Above the camera's video always: coming from ARCore's flash the video arrives after the canvas and React put it
+    // last, over the 3D, so the objects carried over and the reticle were hidden behind the picture.
+    el.style.cssText = "position:absolute;inset:0;width:100%;height:100%;z-index:1";
     host.appendChild(el);
     const size = () => {
       const w = host.clientWidth || window.innerWidth, h = host.clientHeight || window.innerHeight;
