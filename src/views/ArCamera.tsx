@@ -1,19 +1,18 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal, flushSync } from "react-dom";
 import "@/styles/ar-camera.css";
 import { isTouchDevice } from "@/lib/touch-device";
 import { isTabletViewport } from "@/lib/tablet-camera";
 import { ArLive, requestArSession, type FanGroup } from "@/views/ArLive";
 import { ScanSheet } from "@/views/ScanSheet";
-import { recognisedPlants } from "@/models/ar-objects";
+import { recognisedPlants, type PlacedObject } from "@/models/ar-objects";
 import { toast } from "sonner";
-import { Activity, Check, ClipboardList, PanelBottomOpen, History, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grape, Leaf, Minus, Rows3, Shovel, TreeDeciduous, Snowflake, Umbrella, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Star, TreePine, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
+import { Check, ClipboardList, PanelBottomOpen, History, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grape, Leaf, Rows3, Shovel, TreeDeciduous, Snowflake, Umbrella, Plus, ScanSearch, Square, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
 import { supportsCameraTorch, setCameraTorch, probeCameraTorch } from "@/lib/camera-torch";
 import { detectArObject, getReferencePhoto, type Detection, type Soil } from "@/controllers/ar-detect.functions";
 import { gbifPhotoSearchUrl, pickGbifPhoto, type ReferencePhoto } from "@/models/ar-reference-photo";
 import { findSubject, frameUsable, SEARCH_BOX, smoothBox, type SubjectBox } from "@/lib/ar-subject-tracker";
 import { extractPlantPhoto } from "@/views/ar-plant-photo";
-import { useBurstDock } from "@/lib/use-burst-dock";
 
 type D = NonNullable<Detection>;
 const BIN_EMPTY_MS = 1100;
@@ -54,7 +53,7 @@ import { addFind, findFromScan, placedText, useFieldFinds, type FindKind } from 
 import { readFix, smallThumb } from "@/lib/find-position";
 import { getLab } from "@/models/lab-store";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { cameraViewport, groundTilt, isGroundPoint, resetAppOrientation, setArOrientationActive, shortestRotationDelta } from "@/lib/ar-orientation";
+import { cameraViewport, groundTilt, resetAppOrientation, setArOrientationActive, shortestRotationDelta } from "@/lib/ar-orientation";
 import { CameraCloseGestures } from "@/views/CameraCloseGestures";
 import { tutorialSwipeStep } from "@/lib/ar-tutorial-swipe";
 import { CameraCenterCapture } from "@/views/CameraCenterCapture";
@@ -69,13 +68,12 @@ import { createTrackZoomer, pinchZoom, splitZoom, trackZoomRange, zoomHaptic, ZO
 import { hapticTick } from "@/lib/haptics";
 import { satelliteContext, satelliteLine, type SatelliteContext } from "@/models/copernicus";
 import { loadCopernicus } from "@/views/copernicus-client";
-import { coolingAmount, coolingLabel, coolingReadout, scannedSpecimenThermal, scannedSpecimenCount, MAX_SCANNED_SPECIMENS, type PlacementCooling } from "@/models/ar-placement";
-import { loadAirTemperature } from "@/views/air-temp-client";
+import { coolingLabel, scannedSpecimenThermal, scannedSpecimenCount, type PlacementCooling } from "@/models/ar-placement";
 import { clearScans, recordScan, removeScans, scanPhoto, setScanSpeciesPhoto, updateScan, useArScans, type ScanRecord } from "@/models/ar-scan-log";
 import { cameraRotatesNatively, enterCameraChrome, exitCameraChrome, fullscreenExitIsBack, regainFullscreen } from "@/lib/camera-chrome";
 
 type Mode = "photo" | "video";
-type Layer = "heat" | "objects" | "grid";
+type Layer = "objects";
 /** How long the scan runs visibly before stopping when the frame has nothing to analyse. */
 const PRECHECK_SCAN_MS = 1200;
 const FOCUS_LABELS = { auto: "Piante e suolo", tree: "Vegetazione", ground: "Suolo", leaf: "Foglia", canopy: "Chioma", interrow: "Interfila" };
@@ -159,51 +157,6 @@ export function ArCamera({
     closeCamera();
   }, [closeCamera, onCapture]);
 
-  // Torna a Singolo: consegna gli scatti (con il migliore in testa) e mantiene aperta la fotocamera.
-  const backToSingle = () => {
-    const ordered = getOrderedShots();
-    if (ordered.length) {
-      onCapture(ordered.map((s) => s.file));
-      burstRef.current = [];
-      setBurstShots([]);
-      setBestShotId(null);
-    }
-    setBurst(false);
-  };
-
-  const dropBurstShot = (id: number) => {
-    setBurstShots((p) => {
-      const next = p.filter((s) => s.id !== id);
-      if (bestShotIdRef.current === id) {
-        setBestShotId(next.length > 0 ? next[next.length - 1].id : null);
-      }
-      return next;
-    });
-  };
-
-  const { carouselRef, updateDockEffect } = useBurstDock(burst, burstShots.length, setBestShotId);
-
-  // Scorrimento fluido alla nuova foto scattata portandola al centro fisso tipo Netflix
-  useEffect(() => {
-    if (burst && burstShots.length > 0) {
-      const el = carouselRef.current;
-      if (el) {
-        const lastItem = el.querySelector<HTMLElement>("[data-burst-item]:last-child");
-        if (lastItem) {
-          lastItem.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-        }
-      }
-    }
-  }, [burst, burstShots.length, carouselRef]);
-
-  const pickBestShot = (id: number, el?: HTMLElement | null) => {
-    setBestShotId(id);
-    hapticTick(25);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-      setTimeout(updateDockEffect, 200);
-    }
-  };
   // Copernicus area context (signed-in camera): read once per place, shared with the Lab panel.
   const lab = useLab();
   const place = kind === "urban" ? lab.urban.location : lab.vineyard.location;
@@ -215,15 +168,6 @@ export function ArCamera({
     return () => { alive = false; };
   }, [mode, place.lat, place.lng]);
   const satelliteText = satelliteLine(satellite);
-  // Base air temperature for the balance readout: the Lab's imported weather, else the place's current Open-Meteo value.
-  const [airTemp, setAirTemp] = useState<number | null>(null);
-  useEffect(() => {
-    if (!mode) return;
-    let alive = true;
-    loadAirTemperature(place.lat, place.lng).then((t) => { if (alive) setAirTemp(t); });
-    return () => { alive = false; };
-  }, [mode, place.lat, place.lng]);
-  const baseTemp = (kind === "urban" ? lab.urban.realTemp : null) ?? airTemp;
   // Zoom: pinch on the preview or − / + buttons; hardware where the camera allows it, the rest digital.
   const [zoom, setZoomState] = useState(1);
   const zoomRef = useRef(1);
@@ -286,7 +230,6 @@ export function ArCamera({
   const countRef = useRef(0);
   // La stima termica si può minimizzare in una barra compatta riapribile.
   const [thermalMin, setThermalMin] = useState(false);
-  const [thermalInfoOpen, setThermalInfoOpen] = useState(false);
   const [panelMin, setPanelMin] = useState(false);
   // L'esito dell'analisi si può chiudere senza perdere i dati: si riapre con un tocco.
   const [panelOpen, setPanelOpen] = useState(true);
@@ -313,13 +256,6 @@ export function ArCamera({
     }
   }, [species, soil, survey]);
 
-  const handleClearSearch = (e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    resetResults();
-    tabMemory.current.clear();
-    setInfoBannerDismissed(false);
-    toast("Ricerche cancellate", { description: "Tutte le scansioni ed esemplari attivi sono stati azzerati." });
-  };
 
   const onBannerPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     infoBannerStartRef.current = { id: e.pointerId, y: e.clientY, x: e.clientX };
@@ -350,10 +286,10 @@ export function ArCamera({
   const last = useRef<Parameters<ArScene["place"]> | null>(null);
   // Integrazione ARCore / WebXR per tracciamento superfici reali
   const [arCoreSupported, setArCoreSupported] = useState(false);
-  const [arCoreActive, setArCoreActive] = useState(false);
+  const [, setArCoreActive] = useState(false);
   const arCoreRef = useRef<ArCoreManager | null>(null);
   // «Prova» live: the WebXR session (null = the preview without ARCore) and the element its overlay lives in.
-  const [liveAr, setLiveAr] = useState<{ session: XRSession | null; root: HTMLElement; n?: number; why?: string; torch?: boolean } | null>(null);
+  const [liveAr, setLiveAr] = useState<{ session: XRSession | null; root: HTMLElement; n?: number; why?: string; torch?: boolean; carry?: PlacedObject[] } | null>(null);
   const restartingRef = useRef(false);
   const [camEpoch, setCamEpoch] = useState(0);
   // Restarts asked because the camera came back without frames (ARCore still releasing it): a few, then the error.
@@ -406,37 +342,12 @@ export function ArCamera({
 
   const arTransitionRef = useRef(false);
 
-  const toggleAr = (e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    e?.preventDefault();
-    arTransitionRef.current = true;
-    const willEnable = !layers.has("grid");
-    if (willEnable) {
-      setLayers((s) => new Set(s).add("grid").add("objects"));
-      setArCoreActive(true);
-      toast.success("Prova · Tocca il terreno per posare la pianta. È un’anteprima: non è ancora ancorata al suolo.");
-    } else {
-      setLayers((s) => {
-        const n = new Set(s);
-        n.delete("grid");
-        n.delete("objects");
-        return n;
-      });
-      sceneRef.current?.hideTarget?.();
-      setArCoreActive(false);
-      toast.info("Rileva · Inquadra e avvia la scansione.");
-    }
-    window.setTimeout(() => {
-      arTransitionRef.current = false;
-    }, 300);
-  };
 
   const xrActive = false;
   // Eye tracking del soggetto: il mirino cerca e segue la pianta dal primo fotogramma.
   const subjectRef = useRef<SubjectBox>(SEARCH_BOX);
   const viewfinderRef = useRef<HTMLDivElement>(null);
   const [subjectLocked, setSubjectLocked] = useState(false);
-  const [framingHint, setFramingHint] = useState(false);
   const [swipeHint, setSwipeHint] = useState(false);
   useEffect(() => {
     if (!mode || !ready) { setSwipeHint(false); return; }
@@ -457,15 +368,6 @@ export function ArCamera({
   }, [mode, ready]);
   const [scanPhase, setScanPhase] = useState<"leaf" | "catalogue">("leaf");
   useEffect(() => {
-    if (!mode || !ready) { setFramingHint(false); return; }
-    setFramingHint(true);
-    const timer = window.setTimeout(() => setFramingHint(false), 2500);
-    return () => window.clearTimeout(timer);
-  }, [mode, ready]);
-  useEffect(() => {
-    if (subjectLocked || scanning) setFramingHint(false);
-  }, [subjectLocked, scanning]);
-  useEffect(() => {
     if (!scanning) { setScanPhase("leaf"); return; }
     const timer = window.setTimeout(() => setScanPhase("catalogue"), 400);
     return () => window.clearTimeout(timer);
@@ -473,7 +375,6 @@ export function ArCamera({
   // Each section names its own scan steps (urban trees/ground, vineyard leaf/canopy/interrow).
   const phaseText = arFocusOption(kind, target).phases[scanPhase === "leaf" ? 0 : 1];
   const scanStatus = phaseText.status;
-  const summaryText = arFocusOption(kind, target).summary;
   const toggleTorch = async () => {
     if (torchBusy || !torchSupported || scanning) return;
     setTorchBusy(true); setTorchError(null);
@@ -811,7 +712,6 @@ export function ArCamera({
               rotation: -rotationRef.current,
               zoom: digitalZoomRef.current,
               scene: sceneRef.current,
-              heat: layersRef.current.has("heat") ? (g, w, h) => thermal(g, w, h, taps.current, plantedCooling.current) : undefined,
               showObjects,
             },
             showGrid,
@@ -824,13 +724,8 @@ export function ArCamera({
           // Same full-resolution composition, capped at 30 fps and paused while hidden.
           // Durante la scansione il fotogramma resta congelato: il video non viene ridipinto.
           if (!scanningRef.current) {
-            const isArActive = layersRef.current.has("grid");
-            if (isArActive) {
-              sceneRef.current?.target(0.5, 0.65);
-            } else {
-              sceneRef.current?.hideTarget?.();
-            }
-            paint(isArActive, layersRef.current.has("objects"));
+            sceneRef.current?.hideTarget?.();
+            paint(false, layersRef.current.has("objects"));
           }
         }, {
           request: callback => requestAnimationFrame(callback),
@@ -863,17 +758,6 @@ export function ArCamera({
     };
   }, [mode, kind, camEpoch]);
 
-  const toggle = (l: Layer) =>
-    setLayers((s) => {
-      const n = new Set(s);
-      if (n.has(l)) {
-        n.delete(l);
-        if (l === "grid") sceneRef.current?.hideTarget?.();
-      } else {
-        n.add(l);
-      }
-      return n;
-    });
 
   // Scan loop sound: runs only while an analysis is in progress in an open camera, and always stops.
   useEffect(() => (scanning && mode ? startScanLoop(1.8) : undefined), [scanning, mode]);
@@ -1111,71 +995,10 @@ export function ArCamera({
     plantedCooling.current = Array.from({length:next}, () => coolingData);
     setCount(next);
   };
-  const addGreen = () => changeGreen(countRef.current + 1);
   const removeGreen = () => changeGreen(countRef.current - 1);
   const removeLast = () => {
     sceneRef.current?.removeLast();
     removeGreen();
-  };
-
-  /** Posiziona il modello 3D del Leccio (Quercus ilex) con ombra reale e card termica galleggiante sul terreno */
-  const handlePlace3DTree = (nx = 0.5, ny = 0.65) => {
-    if (!ready || scanningRef.current || !sceneRef.current || !layersRef.current.has("grid")) return;
-    const commonName = species?.commonName || "Leccio";
-    const scientificName = species?.scientificName || "Quercus ilex";
-    const shadeM2 = species?.cooling?.shadeM2 ?? 18;
-    const deltaT = species?.cooling?.deltaT ?? 0.4;
-
-    const placed = sceneRef.current.place3DTree?.(nx, ny, {
-      speciesName: commonName,
-      scientificName,
-      shadeM2,
-      cooling: deltaT,
-      is3D: true,
-    }) || sceneRef.current.add("tree", nx, ny, 1, {
-      speciesName: commonName,
-      scientificName,
-      shadeM2,
-      cooling: deltaT,
-      is3D: true,
-    });
-
-    if (placed) {
-      hapticTick([30]);
-      playCameraSound("scan-done", 1.8); hapticTick([40, 60, 40]);
-
-      const effectiveSpecies: SpeciesInfo = species ?? {
-        commonName: "Leccio",
-        scientificName: "Quercus ilex",
-        family: "Fagaceae",
-        gbifKey: 2878688,
-        gbifUrl: "https://www.gbif.org/species/2878688",
-        colUrl: "https://www.catalogueoflife.org/data/taxon/4R5C9",
-        photo: null,
-        form: "tree",
-        heightM: 15,
-        crownM: 8,
-        evergreen: true,
-        density: 0.8,
-        specimen: null,
-        cooling: { deltaT: 0.4, shadeM2: 18, note: "Stima per esemplare adulto di Leccio" },
-        identification: { level: "species", leafVisible: false, evidence: "Modello 3D ARCore posizionato sul terreno con calcolo ombra in tempo reale." },
-      };
-      if (!species) {
-        setSpecies(effectiveSpecies);
-        setFound("Leccio (Quercus ilex) · modello 3D posizionato");
-        logScan("Leccio (Quercus ilex) · modello 3D ARCore", effectiveSpecies, null, null);
-      }
-
-      const nextCount = Math.max(1, countRef.current + 1);
-      countRef.current = nextCount;
-      taps.current = Array.from({ length: nextCount }, (_, i) => ({
-        x: 0.2 + (i % 3) * 0.3,
-        y: 0.65 + Math.floor(i / 3) * 0.1,
-      }));
-      plantedCooling.current = Array.from({ length: nextCount }, () => effectiveSpecies.cooling);
-      setCount(nextCount);
-    }
   };
 
   // "Elimina tutti" also empties this flow's scan records (report log and every section's result), after a confirm.
@@ -1200,95 +1023,14 @@ export function ArCamera({
   // Summary pager over this flow's recorded scans, swiped like the tutorial; the scan badge follows it.
   // Pages are the records, plus the scan on screen when it is not recorded (e.g. a failed scan's message).
   const [browse, setBrowse] = useState<number | null>(null);
-  const summarySwipe = useRef<{ id: number; x: number; y: number; rotation: number } | null>(null);
   useEffect(() => { setBrowse(null); }, [scanRecords.length, target]);
   const removeAll = () => { if (scanRecords.length) setConfirmClear(true); else clearEverything(); };
   const thermalEstimate = scannedSpecimenThermal(count, species?.cooling ?? null);
   const coolingNow = thermalEstimate.deltaT;
   const shadeNow = thermalEstimate.shadeM2;
-  const MAX_GREEN = MAX_SCANNED_SPECIMENS;
-  const readout = coolingReadout(baseTemp, coolingNow);
   useEffect(() => {
     if (scanRecordId.current) updateScan(kind, scanRecordId.current, { count, totalCooling: species?.cooling ? coolingNow : null, totalShade: species?.cooling ? shadeNow : null });
   }, [kind, count, coolingNow, shadeNow, species]);
-  // Each change of specimens flashes its own step (e.g. "−0,4 °C") next to the before → after readout.
-  const [stepFlash, setStepFlash] = useState<{ key: number; delta: number; up: boolean } | null>(null);
-  const [balanceMin, setBalanceMin] = useState(false);
-  // Room between the thermal summary and the bottom HUD (balance, zoom, capture), so the expanded summary
-  // stops above the balance in portrait and scrolls the rest. Measured on screen; only portrait CSS uses it.
-  const hudObserver = useRef<{ el: Element; ro: ResizeObserver } | null>(null);
-  useLayoutEffect(() => {
-    const surface = surfaceRef.current?.querySelector<HTMLElement>(".ar-camera-surface");
-    const hud = surface?.querySelector<HTMLElement>(".camera-bottom");
-    if (!surface || !hud) return;
-    const measure = () => {
-      const summary = surface.querySelector(".ar-thermal-summary");
-      if (summary) {
-        const room = Math.max(96, Math.round(hud.getBoundingClientRect().top - summary.getBoundingClientRect().top - 12));
-        if (surface.style.getPropertyValue("--ar-summary-room") !== `${room}px`) surface.style.setProperty("--ar-summary-room", `${room}px`);
-      }
-      if (!landscape) {
-        const burstBar = hud.querySelector<HTMLElement>(".ar-burst-bar");
-        if (burstBar) {
-          const barRect = burstBar.getBoundingClientRect();
-          const surfaceRect = surface.getBoundingClientRect();
-          const bottomPx = Math.max(0, Math.round(surfaceRect.bottom - barRect.top + 6));
-          if (surface.style.getPropertyValue("--ar-burst-shelf-bottom") !== `${bottomPx}px`) {
-            surface.style.setProperty("--ar-burst-shelf-bottom", `${bottomPx}px`);
-          }
-        }
-      } else {
-        surface.style.removeProperty("--ar-burst-shelf-bottom");
-      }
-    };
-    measure();
-    if (hudObserver.current?.el !== hud && typeof ResizeObserver !== "undefined") {
-      hudObserver.current?.ro.disconnect();
-      const ro = new ResizeObserver(measure);
-      ro.observe(hud);
-      hudObserver.current = { el: hud, ro };
-    }
-  });
-  useEffect(() => () => hudObserver.current?.ro.disconnect(), []);
-  useEffect(() => {
-    const surface = surfaceRef.current?.querySelector<HTMLElement>(".ar-camera-surface");
-    const hud = surface?.querySelector<HTMLElement>(".camera-bottom");
-    if (!surface || !hud) return;
-    const measure = () => {
-      if (!landscape) {
-        const burstBar = hud.querySelector<HTMLElement>(".ar-burst-bar");
-        if (burstBar) {
-          const barRect = burstBar.getBoundingClientRect();
-          const surfaceRect = surface.getBoundingClientRect();
-          const bottomPx = Math.max(0, Math.round(surfaceRect.bottom - barRect.top + 6));
-          if (surface.style.getPropertyValue("--ar-burst-shelf-bottom") !== `${bottomPx}px`) {
-            surface.style.setProperty("--ar-burst-shelf-bottom", `${bottomPx}px`);
-          }
-        }
-      }
-    };
-    measure();
-    const t1 = setTimeout(measure, 100);
-    const t2 = setTimeout(measure, 260);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, [balanceMin, landscape]);
-  // Every specimen added or removed flashes, even when a small plant changes only hundredths of a degree.
-  const lastStep = useRef({ count, cooling: coolingNow });
-  useEffect(() => {
-    const prev = lastStep.current;
-    lastStep.current = { count, cooling: coolingNow };
-    if (count === prev.count && coolingNow === prev.cooling) return;
-    const delta = Math.round((coolingNow - prev.cooling) * 1000) / 1000;
-    setStepFlash({ key: Date.now(), delta, up: count < prev.count || delta < 0 });
-    const timer = window.setTimeout(() => setStepFlash(null), 1400);
-    return () => window.clearTimeout(timer);
-  }, [count, coolingNow]);
-  // "−0,03 °C" for a step, "< 0,01 °C" when it is too small to print, "±0,0 °C" at the 3 °C cap.
-  const flashText = (f: { delta: number; up: boolean }) => {
-    const amount = coolingAmount(f.delta);
-    return amount.startsWith("<") ? `${amount} °C` : `${f.delta ? (f.up ? "+" : "−") : "±"}${amount} °C`;
-  };
-  const fmtC = (v: number, digits = 1) => v.toLocaleString("it-IT", { minimumFractionDigits: digits, maximumFractionDigits: digits });
   // Ogni esemplare in più mostra subito i gradi numerici accanto al conteggio.
   const hasLive = Boolean(found || survey || species || count > 0);
   const liveRecord = scanRecordId.current ? scanRecords.findIndex((r) => r.id === scanRecordId.current) : -1;
@@ -1296,84 +1038,6 @@ export function ArCamera({
   const pageCount = scanRecords.length + (hasLive && liveRecord < 0 ? 1 : 0);
   const viewPage = Math.min(pageCount - 1, browse ?? (livePage >= 0 ? livePage : scanRecords.length - 1));
   const viewedRecord = viewPage !== livePage ? scanRecords[viewPage] ?? null : null;
-  // The balance follows the summary page too: a swiped-back scan shows and edits its own specimens and cooling
-  // (in the report record; the AR copies on screen stay the live scan's); a past scan without a cooling estimate
-  // hides it.
-  const dockRecord = viewedRecord?.species && viewedRecord.species.cooling !== null ? viewedRecord : null;
-  const dockCount = dockRecord ? dockRecord.count : count;
-  const dockCooling = dockRecord ? dockRecord.totalCooling ?? 0 : coolingNow;
-  const dockReadout = dockRecord ? coolingReadout(baseTemp, dockCooling) : readout;
-  const dockHasCooling = Boolean(dockRecord) || Boolean(species?.cooling);
-  const dockEditable = dockRecord ? ready : Boolean(species?.cooling);
-  const changeDock = (requested: number) => {
-    if (!dockRecord?.species || dockRecord.species.cooling === null) { changeGreen(requested); return; }
-    if (!ready || scanningRef.current) return;
-    const next = scannedSpecimenCount(requested);
-    const thermal = scannedSpecimenThermal(next, { deltaT: dockRecord.species.cooling, shadeM2: dockRecord.species.shade ?? 0 });
-    updateScan(kind, dockRecord.id, { count: next, totalCooling: thermal.deltaT, totalShade: thermal.shadeM2 });
-  };
-  const countDegrees = dockHasCooling ? ` · ${coolingLabel(dockCooling)}` : "";
-  const greenControls = !scanning && (
-    <div className="ar-green-controls" data-camera-controls>
-      <Button variant="ghost" size="icon" className="camera-tool" aria-label="Riduci verde" title="Riduci verde" disabled={!dockEditable || dockCount <= 0} onClick={() => changeDock(dockCount - 1)}><Minus className="size-4" /></Button>
-      <span className="ar-green-count" aria-live="polite">Esemplari · {dockCount}{countDegrees}</span>
-      <Button variant="ghost" size="icon" className="camera-tool" aria-label="Aggiungi pianta scansionata" title={dockEditable ? "Aggiungi esemplare alla stima" : "Scansiona prima una pianta"} disabled={!dockEditable || dockCount >= MAX_GREEN} onClick={() => changeDock(dockCount + 1)}><Plus className="size-4" /></Button>
-    </div>
-  );
-  const balanceDrag = (event: React.PointerEvent<HTMLSpanElement>) => {
-    event.stopPropagation();
-    if (scanningRef.current || !ready || !dockEditable) return;
-    const track = event.currentTarget;
-    track.setPointerCapture(event.pointerId);
-    const apply = (clientX: number) => {
-      const rect = track.getBoundingClientRect();
-      if (!rect.width) return;
-      changeDock(Math.round(Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)) * MAX_GREEN));
-    };
-    apply(event.clientX);
-    const move = (ev: PointerEvent) => { ev.stopPropagation(); apply(ev.clientX); };
-    const up = () => {
-      track.removeEventListener("pointermove", move);
-      track.removeEventListener("pointerup", up);
-      track.removeEventListener("pointercancel", up);
-      track.removeEventListener("lostpointercapture", up);
-    };
-    track.addEventListener("pointermove", move);
-    track.addEventListener("pointerup", up);
-    track.addEventListener("pointercancel", up);
-    track.addEventListener("lostpointercapture", up);
-  };
-  const hasDock = Boolean(!scanning && (viewedRecord ? dockRecord : species?.cooling));
-  const specimenDock = hasDock && (
-    <div className={`ar-specimen-dock${zoomRulerActive ? " is-zoom-active" : ""}`} data-camera-controls data-collapsed={balanceMin || undefined} aria-label="Esemplari e raffrescamento stimato">
-      {/* Smartphones only (CSS hides it on tablets): fold the balance like an accordion, keeping a one-line summary;
-          the header stays put at the bottom and the body unfolds from bottom to top. */}
-      <button type="button" className="ar-dock-toggle" aria-expanded={!balanceMin} aria-controls="ar-balance-body" onClick={() => setBalanceMin((v) => !v)}>
-        <span>Bilancia termica{dockRecord ? ` · scansione ${viewPage + 1} di ${pageCount}` : ""}{balanceMin ? ` · ${dockCount} esemplari · ${dockReadout.after !== null ? `${fmtC(dockReadout.after, dockReadout.digits)} °C` : coolingLabel(dockCooling)}` : ""}</span>
-        {balanceMin ? <ChevronUp className="size-3.5 shrink-0" aria-hidden="true" /> : <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" />}
-      </button>
-      <div id="ar-balance-body" className="ar-dock-body" inert={balanceMin || undefined}>
-      {greenControls}
-      <div className="ar-thermal-balance" data-camera-controls role="slider" tabIndex={0} aria-disabled={!dockEditable || scanning} onKeyDown={e => { if (dockEditable && ["ArrowRight", "ArrowUp", "ArrowLeft", "ArrowDown", "Home", "End"].includes(e.key)) { e.preventDefault(); changeDock(e.key === "Home" ? 0 : e.key === "End" ? MAX_GREEN : dockCount + (["ArrowRight","ArrowUp"].includes(e.key) ? 1 : -1)); } }} aria-valuemin={0} aria-valuemax={MAX_GREEN} aria-valuenow={dockCount}
-        aria-valuetext={`${dockCount} esemplari, riduzione stimata ${coolingAmount(dockCooling)} gradi`} aria-label="Bilancia termica simulata">
-        <span className="ar-thermal-balance-labels"><span>Caldo</span><span>Fresco</span></span>
-        <span className={`ar-thermal-balance-track${dockEditable ? " is-draggable" : ""}`} onPointerDown={balanceDrag}>
-          <span className="ar-thermal-balance-marker" style={{ left: `${Math.min(100, Math.max(0, (dockCount / MAX_GREEN) * 100))}%` }} />
-          {dockHasCooling && <span className="ar-thermal-balance-value" style={{ left: `clamp(2.5rem, ${(dockCount / MAX_GREEN) * 100}%, calc(100% - 2.5rem))` }} aria-live="polite">{coolingLabel(dockCooling)}</span>}
-        </span>
-      </div>
-      {/* Estimated perceived temperature: the place's air temperature before and after the cooling of the counted specimens. */}
-      <p className="ar-cooling-readout" aria-live="polite">
-        {dockReadout.before !== null && dockReadout.after !== null
-          ? <><span>Percepita stimata</span><span className="ar-cooling-temps">{fmtC(dockReadout.before, dockReadout.digits)} °C <span aria-hidden="true">→</span><span className="sr-only"> diventa </span> <strong>{fmtC(dockReadout.after, dockReadout.digits)} °C</strong></span></>
-          : <><span>Raffrescamento stimato</span><strong>{coolingLabel(dockCooling)}</strong></>}
-        {stepFlash && !dockRecord && <span key={stepFlash.key} className="ar-cooling-step" data-up={stepFlash.up || undefined}>{flashText(stepFlash)}</span>}
-      </p>
-      {/* Copernicus stays alongside: the satellite surface temperature of the area, as a reference. */}
-      {satellite?.surfaceTemp !== undefined && <p className="ar-cooling-satellite">Superficie dell’area (satellite) · {fmtC(satellite.surfaceTemp)} °C</p>}
-      </div>
-    </div>
-  );
   const identificationBadge = species?.identification ? (
     <p className="ar-identification-badge">
       {species.identification.level === "species" ? "Specie probabile" : species.identification.level === "genus" ? "Genere probabile" : "Identificazione incerta"}
@@ -1383,77 +1047,12 @@ export function ArCamera({
   ) : null;
   // Wraps like the tutorial: after the last scan back to the first, before the first to the last.
   const goToPage = (page: number) => setBrowse(pageCount ? (page + pageCount) % pageCount : null);
-  const summarySwipeProps = {
-    onPointerDown: (event: React.PointerEvent<HTMLElement>) => {
-      if (!event.isPrimary || event.pointerType === "mouse" || pageCount < 2 || (event.target instanceof Element && event.target.closest("button, .ar-thermal-heading"))) return;
-      summarySwipe.current = { id: event.pointerId, x: event.clientX, y: event.clientY, rotation: rotationRef.current };
-    },
-    onPointerUp: (event: React.PointerEvent<HTMLElement>) => {
-      const start = summarySwipe.current;
-      summarySwipe.current = null;
-      if (!start || start.id !== event.pointerId) return;
-      const next = tutorialSwipeStep(viewPage, pageCount, event.clientX - start.x, event.clientY - start.y, start.rotation);
-      if (next !== viewPage) goToPage(next);
-    },
-    onPointerCancel: () => { summarySwipe.current = null; },
-  };
   const summaryPager = pageCount > 1 && (
     <div className="ar-summary-pager">
       <button type="button" aria-label="Scansione precedente" onClick={() => goToPage(viewPage - 1)}><ChevronLeft className="size-3.5" /></button>
       <span>Scansione {viewPage + 1} di {pageCount} · scorri per le altre</span>
       <button type="button" aria-label="Scansione successiva" onClick={() => goToPage(viewPage + 1)}><ChevronRight className="size-3.5" /></button>
     </div>
-  );
-  const minimizeSummary = (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      onClick={(e) => {
-        e.stopPropagation();
-        setThermalMin(true);
-      }}
-      aria-label="Minimizza stima termica"
-      title="Minimizza stima termica"
-      className="ml-auto grid size-7 shrink-0 place-items-center rounded-full"
-    >
-      <ChevronDown className="size-3.5" />
-    </Button>
-  );
-  const recordView = (r: ScanRecord) => (
-    <>
-      <div
-        className="ar-thermal-heading"
-        onClick={() => setThermalMin(true)}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            setThermalMin(true);
-          }
-        }}
-        title="Comprimi stima termica"
-      >
-        <span className="ar-thermal-info-btn" aria-hidden="true"><Flame className="size-4 shrink-0" /></span>
-        <span>{r.target}{r.species ? ` · ${r.species.commonName}` : r.soil ? ` · ${r.soil.label}` : ""}{r.count > 0 ? ` · ×${r.count}` : ""}</span>
-        {minimizeSummary}
-      </div>
-      {r.species && <dl className="ar-thermal-values">
-        <div><dt>Specie</dt><dd>{r.species.commonName}<span className="block text-xs italic text-muted-foreground">{r.species.scientificName}{r.species.family ? ` · ${r.species.family}` : ""}</span></dd></div>
-        <div><dt>Per esemplare</dt><dd>{r.species.cooling !== null ? coolingLabel(r.species.cooling) : "n.d."}</dd></div>
-        <div><dt>Ombreggiatura</dt><dd>{r.species.shade !== null ? `≈ ${Math.round(r.species.shade)} m²` : "n.d."}</dd></div>
-      </dl>}
-      {r.species && <p className="ar-identification-badge">{r.species.level}</p>}
-      {r.count > 0 && r.totalCooling !== null && <dl className="ar-thermal-values">
-        <div><dt>Riduzione temperatura</dt><dd>{coolingLabel(r.totalCooling)}</dd></div>
-        <div><dt>Ombra teorica</dt><dd>≈ {Math.round(r.totalShade ?? 0)} m²</dd></div>
-      </dl>}
-      {r.soil && <p className="ar-thermal-exposure">Suolo {r.soil.label} · permeabilità {r.soil.permeability} · {r.soil.plantable ? "piantabile" : "non piantabile"}{r.soil.note ? ` · ${r.soil.note}` : ""}</p>}
-      {!r.species && !r.soil && <p className="ar-thermal-note">{r.result}</p>}
-      {r.satellite && <p className="ar-thermal-note">{r.satellite} · dati dell’area, non della foto</p>}
-      <p className="ar-thermal-note">Scansione registrata · {new Date(r.at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}{r.context ? ` · ${r.context}` : ""}</p>
-    </>
   );
   // Esito follows the summary pager: a swiped-back scan shows its own reference photo and result, not the live one.
   const recordEsito = (r: ScanRecord, at?: number) => {
@@ -1484,67 +1083,6 @@ export function ArCamera({
       </>
     );
   };
-  const thermalSummary = !scanning && (hasLive || scanRecords.length > 0) && (
-    thermalMin ? (
-      <Button type="button" variant="ghost" data-camera-controls className="ar-thermal-summary ar-thermal-summary-min"
-        onClick={() => setThermalMin(false)} aria-label="Espandi stima termica" title="Espandi stima termica">
-        <Flame className="size-4 shrink-0" /><span>{summaryText.title}{species ? ` · ${species.commonName}` : ` · ${summaryText.empty.toLowerCase()}`}{count > 0 && species?.cooling ? ` · ${coolingLabel(coolingNow)}` : ""}</span><ChevronUp className="size-3.5" />
-      </Button>
-    ) : (
-    <section className={`ar-thermal-summary ${Math.abs(viewport.rotation) === 90 ? "touch-pan-x" : "touch-pan-y"}`} data-camera-controls aria-label="Risultati termici della scansione" aria-live="polite" {...summarySwipeProps}>
-      <div className="ar-summary-slide" key={viewPage}>
-      {viewedRecord ? recordView(viewedRecord) : <>
-      <div
-        className="ar-thermal-heading"
-        onClick={() => setThermalMin(true)}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            setThermalMin(true);
-          }
-        }}
-        title="Comprimi stima termica"
-      >
-        <button
-          type="button"
-          className="ar-thermal-info-btn"
-          onClick={(e) => {
-            e.stopPropagation();
-            setThermalInfoOpen(true);
-          }}
-          aria-label="Come leggere la stima termica"
-          title="Come leggere la stima termica"
-        >
-          <Flame className="size-4 shrink-0" />
-        </button>
-        <span>{summaryText.title}{species ? ` · ${species.commonName}` : ""}{count > 0 ? ` · ×${count}` : ""}</span>
-        {minimizeSummary}
-      </div>
-      {species && <dl className="ar-thermal-values">
-        <div><dt>Specie</dt><dd>{species.commonName}<span className="block text-xs italic text-muted-foreground">{species.scientificName}{species.family ? ` · ${species.family}` : ""}</span></dd></div>
-        <div><dt>Per esemplare</dt><dd>{species.cooling ? coolingLabel(species.cooling.deltaT) : "n.d."}</dd></div>
-        <div><dt>Ombreggiatura</dt><dd>{species.cooling ? `≈ ${Math.round(species.cooling.shadeM2)} m²` : "n.d."}</dd></div>
-      </dl>}
-      {!species && <div className="ar-thermal-note"><p className="font-semibold">{summaryText.empty}</p><p>{found ?? summaryText.idle}</p></div>}
-      {identificationBadge}
-      {(species?.cooling || count > thermalEstimate.unknown) && <dl className="ar-thermal-values">
-        <div><dt>{"Riduzione temperatura"}</dt><dd>{coolingLabel(coolingNow)}</dd></div>
-        <div><dt>Ombra teorica</dt><dd>≈ {Math.round(shadeNow)} m²</dd></div>
-      </dl>}
-      {thermalEstimate.unknown > 0 && <p className="ar-thermal-note">{thermalEstimate.unknown} senza stima di specie</p>}
-      {survey && <p className="ar-thermal-exposure">{survey.heatNote}</p>}
-      {satelliteText && <p className="ar-thermal-note">{satelliteText} · dati dell’area, non della foto</p>}
-      <p className="ar-thermal-note">{summaryText.note}</p>
-      </>}
-      </div>
-      {summaryPager}
-    </section>
-    )
-  );
-
-
   // Lo scatto porta nel nome il contesto (scenario urbano o zona/fase vitivinicola).
   const slug = (context ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   const tag = slug ? `-${slug}` : "";
@@ -1651,7 +1189,6 @@ export function ArCamera({
     setRecording(true);
   };
 
-  const hasAnalysisContent = Boolean(species || soil || found || survey || viewedRecord);
   // The result no longer opens over the camera: it goes in the «Scansioni» drawer (a short line says when a scan fails).
   const failedScan = found && !species && !soil && !survey ? found : null;
   const [failNote, setFailNote] = useState<string | null>(null);
@@ -1775,7 +1312,7 @@ export function ArCamera({
   };
   // The flash with ARCore: ARCore holds the camera and Chrome gives the page no torch, so a tap on the flash leaves
   // ARCore for the preview (the app's own camera) with the torch on.
-  const flashPreview = () => {
+  const flashPreview = (carry: PlacedObject[] = []) => {
     const had = liveArRef.current;
     if (!had?.session) return;
     restartingRef.current = true;
@@ -1787,7 +1324,7 @@ export function ArCamera({
         had.root.remove();
         stallRetriesRef.current = 0;
         setCamEpoch((n) => n + 1);
-        setLiveAr({ session: null, root: liveRootEl(), n: (had.n ?? 0) + 1, torch: true });
+        setLiveAr({ session: null, root: liveRootEl(), n: (had.n ?? 0) + 1, torch: true, carry });
         regainFullscreen();
       })
       .finally(() => { restartingRef.current = false; window.setTimeout(() => { arTransitionRef.current = false; }, 1500); });
@@ -1820,7 +1357,7 @@ export function ArCamera({
   const liveView = liveAr ? createPortal(
     // The camera's own gestures (close swipe, tap to place) must not see the live view's taps.
     <div onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()} onPointerMove={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
-      <ArLive key={liveAr.n ?? 0} kind={kind} session={liveAr.session} why={liveAr.why} stream={liveAr.session ? null : streamRef.current} plants={arPlants} onShot={(f) => onCapture([f])} onEnd={endLive} onRotate={rotateLive} torch={liveAr.torch ?? false} onFlashPreview={flashPreview}
+      <ArLive key={liveAr.n ?? 0} kind={kind} session={liveAr.session} why={liveAr.why} stream={liveAr.session ? null : streamRef.current} plants={arPlants} onShot={(f) => onCapture([f])} onEnd={endLive} onRotate={rotateLive} torch={liveAr.torch ?? false} carry={liveAr.carry} onFlashPreview={flashPreview}
         burst={{ shots: burstShots, open: burst, setOpen: setBurst, discarded, add: () => burstActs.current.add(), discardAll: () => burstActs.current.discardAll(),
           push: (shot) => setBurstShots((p) => [...p, shot]),
           toggle: (id) => setDiscarded((d) => { const n = new Set(d); if (n.has(id)) n.delete(id); else n.add(id); return n; }) }} />
@@ -1840,15 +1377,6 @@ export function ArCamera({
       })}
     </div>
   );
-  const isAnalysisCardExpanded = Boolean(toolsOpen && activeTool === "analysis" && panelOpen && !panelMin && hasAnalysisContent);
-  const isAnalysisCardMinimized = Boolean(toolsOpen && activeTool === "analysis" && panelOpen && panelMin && hasAnalysisContent);
-  const burstShelfStateClass = !toolsOpen
-    ? "is-tools-closed"
-    : isAnalysisCardExpanded
-    ? "is-tools-open is-analysis-expanded"
-    : isAnalysisCardMinimized
-    ? "is-tools-open is-analysis-min"
-    : "is-tools-open is-tools-compact";
 
   const topBarElement = (
     <div
@@ -1995,84 +1523,6 @@ export function ArCamera({
     </div>
   );
 
-  const burstShelfElement = burstShots.length > 0 && (
-    <aside
-      className={`ar-burst-shelf ${burstShelfStateClass}`}
-      data-camera-controls
-      aria-hidden={Boolean(thermalInfoOpen || confirmClear || guideOpen)}
-    >
-      <div className="ar-burst-header flex w-full max-w-[min(26rem,92vw)] items-center justify-between px-2 text-[10.5px] font-semibold text-white/90 [text-shadow:0_1px_2px_black]">
-        <span>
-          {burstShots.length}{" "}
-          <span className="ar-burst-header-long">{burstShots.length === 1 ? "foto scattata" : "foto scattate"}</span>
-          <span className="ar-burst-header-short">foto</span>
-        </span>
-        <button type="button" onClick={backToSingle}
-          className="inline-flex h-7 items-center gap-1 rounded-full bg-white px-3 text-[11px] font-bold text-black shadow-md [text-shadow:none]">
-          <Check className="size-3.5" aria-hidden="true" />Aggiungi {burstShots.length}
-        </button>
-      </div>
-      <div className="ar-burst-track-wrap relative w-full max-w-full flex flex-col items-center overflow-visible">
-        <div
-          className="ar-burst-center-selector pointer-events-none absolute left-1/2 -translate-x-1/2 top-0.5 z-30 flex flex-col items-center"
-          aria-hidden="true"
-        >
-          <span className="flex items-center gap-1 rounded-full bg-[#00d296] px-2 py-0.5 text-[9px] font-extrabold text-[#042017] shadow-[0_2px_10px_rgba(0,210,150,0.7)] whitespace-nowrap">
-            <Star className="size-2.5 fill-current" /> Migliore
-          </span>
-          <span className="w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-[#00d296] -mt-[0.5px]" />
-        </div>
-        <div
-          ref={carouselRef}
-          onScroll={updateDockEffect}
-          data-map-gestures
-          className="ar-burst-carousel w-full max-w-full"
-        >
-          {burstShots.map((s, i) => {
-            const isBest = s.id === (bestShotId ?? burstShots[burstShots.length - 1]?.id);
-            return (
-              <div
-                key={s.id}
-                data-burst-item
-                data-burst-id={s.id}
-                role="button"
-                tabIndex={0}
-                onClick={(e) => pickBestShot(s.id, e.currentTarget)}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickBestShot(s.id, e.currentTarget as HTMLElement); } }}
-                aria-label={`Foto ${i + 1}${isBest ? " (Scatto migliore selezionato al centro)" : " (Tocca per portare al centro)"}`}
-                className={`relative shrink-0 snap-center rounded-lg p-0.5 cursor-pointer transition-opacity duration-150 ${
-                  isBest
-                    ? "ring-2 ring-[#00d296] shadow-[0_0_16px_rgba(0,210,150,0.85)] opacity-100"
-                    : "ring-1 ring-white/35 hover:ring-white/70 opacity-65 hover:opacity-95"
-                }`}
-              >
-                <img
-                  src={s.thumb}
-                  alt={`Foto ${i + 1}`}
-                  className="size-12 rounded-md object-cover"
-                />
-                <span className="absolute bottom-1 left-1.5 rounded-full bg-black/75 px-1 text-[8.5px] font-bold text-white [text-shadow:0_1px_2px_black]">
-                  {i + 1}
-                </span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    dropBurstShot(s.id);
-                  }}
-                  aria-label={`Togli la foto ${i + 1}`}
-                  className="absolute -right-1.5 -top-1.5 grid size-5 place-items-center rounded-full bg-black/85 text-white ring-1 ring-white/40 hover:bg-destructive hover:scale-110 transition-transform"
-                >
-                  <X className="size-3" aria-hidden="true" />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </aside>
-  );
-
   const burstThumb = burstShots.length > 0 && (
             // The multiple shot taken by holding the shutter: its last photo with the count; a tap opens the strip
             // to drop some and add them, closing the camera adds them anyway.
@@ -2109,26 +1559,6 @@ export function ArCamera({
       onToggleShot={(id) => setDiscarded((d) => { const n = new Set(d); if (n.has(id)) n.delete(id); else n.add(id); return n; })} />
   );
 
-  const burstBarElement = !error && mode === "photo" && (
-    <div
-      className={`ar-burst-bar ${burstShelfStateClass}${zoomRulerActive && !hasDock ? " is-zoom-active" : ""}`}
-      data-camera-controls
-      aria-hidden={Boolean(thermalInfoOpen || confirmClear || guideOpen)}
-    >
-      <div className="relative flex items-center justify-center gap-2">
-        {burst && burstShots.length > 0 && (
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute left-[calc(100%+0.5rem)] top-1/2 -translate-y-1/2 inline-flex h-8 items-center gap-1 rounded-full bg-white px-3.5 text-xs font-semibold text-black shadow-md whitespace-nowrap"
-          >
-            <Check className="size-3.5" aria-hidden="true" />Fine · {burstShots.length}
-          </button>
-        )}
-      </div>
-      <span className="sr-only" role="status" aria-live="polite">{burst ? `${burstShots.length} foto scattate` : ""}</span>
-    </div>
-  );
 
   const toolsPanelElement = (
     <div id="ar-camera-tools" hidden={!toolsOpen} className="w-full">
@@ -2240,22 +1670,7 @@ export function ArCamera({
       disabled={!ready || scanning || xrActive}
       onCapture={mode === "photo" ? shoot : record}
       {...(mode !== "video" ? { onHold: arHold } : {})}
-      left={proving ? (
-        <div className="flex items-center justify-center">
-          <Button
-            variant="ghost"
-            type="button"
-            onClick={() => handlePlace3DTree(0.5, 0.65)}
-            disabled={!ready || recording}
-            aria-label="Posa la pianta al centro dell’inquadratura"
-            title="Posa la pianta al centro dell’inquadratura"
-            className={landscape ? "ar-landscape-pill-btn disabled:opacity-40" : "camera-tool ar-scan-btn disabled:opacity-40"}
-          >
-            {!landscape && <TreePine className="size-4 shrink-0 text-[#00f0ff]" />}
-            <span>Posa pianta</span>
-          </Button>
-        </div>
-      ) : (
+      left={proving ? null : (
         <div className="flex items-center justify-center gap-2">
           {!landscape && burstThumb}
           <Button
@@ -2387,18 +1802,8 @@ export function ArCamera({
           <div className="relative h-full w-full">
             <canvas
               ref={canvasRef}
-              onClick={(e) => {
-                if (!ready || scanning || !layers.has("grid")) return;
-                const rect = e.currentTarget.getBoundingClientRect();
-                if (!rect.width || !rect.height) return;
-                const nx = (e.clientX - rect.left) / rect.width;
-                const ny = (e.clientY - rect.top) / rect.height;
-                if (isGroundPoint(ny)) {
-                  handlePlace3DTree(nx, ny);
-                }
-              }}
-              className={`absolute inset-0 h-full w-full touch-none bg-muted ${layers.has("grid") ? "cursor-pointer" : ""}`}
-              aria-label={layers.has("grid") ? "Anteprima in realtà aumentata: tocca il terreno per posizionare l'albero 3D" : "Anteprima fotocamera"}
+              className="absolute inset-0 h-full w-full touch-none bg-muted"
+              aria-label="Anteprima fotocamera"
             />
             {ready && <div ref={viewfinderRef} className={`ar-viewfinder${subjectLocked ? " is-locked" : ""}${scanning ? " is-locking" : ""}`} aria-hidden="true"
               style={{ left: `${(subjectRef.current.x * 100).toFixed(2)}%`, top: `${(subjectRef.current.y * 100).toFixed(2)}%`, width: `${(subjectRef.current.w * 100).toFixed(2)}%`, height: `${(subjectRef.current.h * 100).toFixed(2)}%` }}>
@@ -2567,17 +1972,6 @@ export function ArCamera({
                   : <Button size="sm" className="ar-tutorial-next" onClick={closeGuide}>Inizia</Button>}
               </div>
             </div>}
-            {thermalInfoOpen && <>
-              <div className="ar-thermal-info-veil" data-camera-controls aria-hidden="true" onPointerDown={() => setThermalInfoOpen(false)} />
-              <div className="ar-thermal-info" data-camera-controls role="dialog" aria-label="Come leggere la stima termica">
-                <button type="button" className="ar-tutorial-close" onClick={() => setThermalInfoOpen(false)} aria-label="Chiudi spiegazione"><X className="size-4" /></button>
-                <div className="ar-thermal-info-icon" aria-hidden="true"><Flame className="size-5" /></div>
-                <p className="ar-tutorial-title">Come leggere la stima termica</p>
-                <p className="ar-thermal-info-text">È una <strong>stima microclimatica modellata</strong> su chioma e dati meteo locali: lo smartphone non dispone di un sensore termico, quindi il rilevamento <strong>non è radiometrico</strong> e non misura la temperatura reale.</p>
-                <p className="ar-thermal-info-text">Per il valore reale puoi collegare al dispositivo un <strong>sensore termico USB-C</strong> (per esempio telecamere termiche o sonde per il suolo): l’app rimane il supporto di sopralluogo, la misura spetta allo strumento.</p>
-                <Button size="sm" className="ar-thermal-info-close" onClick={() => setThermalInfoOpen(false)}>Ho capito</Button>
-              </div>
-            </>}
           </div>
         )}
         </CameraCloseGestures>
@@ -2586,53 +1980,6 @@ export function ArCamera({
       </DialogContent>
     </Dialog>
   );
-}
-
-/** Palette termica (blu → ciano → giallo → arancio → rosso) */
-const PAL: [number, number, number][] = [
-  [30, 64, 175], [6, 182, 212], [250, 204, 21], [249, 115, 22], [220, 38, 38],
-];
-const LUT = (() => {
-  const t = new Uint8ClampedArray(256 * 3);
-  for (let i = 0; i < 256; i++) {
-    const f = (i / 255) * (PAL.length - 1), k = Math.min(PAL.length - 2, Math.floor(f)), u = f - k;
-    for (let c = 0; c < 3; c++) t[i * 3 + c] = (PAL[k]?.[c] ?? 0) + ((PAL[k + 1]?.[c] ?? 0) - (PAL[k]?.[c] ?? 0)) * u;
-  }
-  return t;
-})();
-let tmp: HTMLCanvasElement | null = null;
-
-/**
- * Visore termico simulato: luminosità e saturazione del fotogramma stimano l'irraggiamento
- * (superfici chiare/esposte = più calde, verde = più fresco); ogni albero piantato raffresca l'area attorno.
- */
-function thermal(g: CanvasRenderingContext2D, w: number, h: number, taps: { x: number; y: number }[], cooling: PlacementCooling[]) {
-  const W = 64, H = Math.round((64 * h) / w);
-  tmp ??= document.createElement("canvas");
-  if (tmp.width !== W || tmp.height !== H) { tmp.width = W; tmp.height = H; }
-  const t = tmp.getContext("2d", { willReadFrequently: true });
-  if (!t) return;
-  t.drawImage(g.canvas, 0, 0, W, H);
-  const img = t.getImageData(0, 0, W, H), d = img.data;
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W; x++) {
-      const i = (y * W + x) * 4, r = d[i] ?? 0, gr = d[i + 1] ?? 0, b = d[i + 2] ?? 0;
-      let v = (0.45 * r + 0.35 * gr + 0.2 * b) / 255;
-      if (gr > r && gr > b) v -= 0.25; // vegetazione più fresca
-      v += (y / H) * 0.15; // suolo in basso più caldo
-      for (const [index, p] of taps.entries()) {
-        const dx = x / W - p.x, dy = (y / H - p.y) * 1.6, q = dx * dx + dy * dy;
-        v -= Math.min(3, cooling[index]?.deltaT ?? 0) / 3 * 0.55 * Math.exp(-q / 0.012);
-      }
-      const k = Math.max(0, Math.min(255, Math.round(v * 255))) * 3;
-      d[i] = LUT[k] ?? 0; d[i + 1] = LUT[k + 1] ?? 0; d[i + 2] = LUT[k + 2] ?? 0;
-    }
-  t.putImageData(img, 0, 0);
-  g.save();
-  g.imageSmoothingEnabled = true;
-  g.globalAlpha = 0.85;
-  g.drawImage(tmp, 0, 0, w, h);
-  g.restore();
 }
 
 /**
