@@ -1447,7 +1447,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     </button>
   );
   // The zoom ruler is the preview's only: with ARCore the browser drives the camera.
-  const dialOn = !session && !adjusting;
+  // No zoom in the preview opened by ARCore's flash (torch): it stands in for the AR view, which has none.
+  const dialOn = !session && !adjusting && !torch;
 
 
   // Every choice sits behind one AI button: the tray opens over the camera only when asked.
