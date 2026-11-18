@@ -86,14 +86,27 @@ export async function requestArSession(overlayRoot: HTMLElement): Promise<XRSess
  */
 const AR_FS_KEY = "mdt-ar-fullscreen-v1";
 export function arFullscreen(session: XRSession, root: HTMLElement) {
-  if (typeof document === "undefined" || document.fullscreenElement) return;
+  if (typeof document === "undefined") return;
   try { if (localStorage.getItem(AR_FS_KEY) === "fail") return; } catch { /* storage off */ }
-  const asked = performance.now();
-  const onEnd = () => { if (performance.now() - asked < 2500) { try { localStorage.setItem(AR_FS_KEY, "fail"); } catch { /* storage off */ } } };
-  session.addEventListener("end", onEnd, { once: true });
-  window.setTimeout(() => session.removeEventListener("end", onEnd), 2600);
   const el = root as HTMLElement & { requestFullscreen?: (o?: FullscreenOptions) => Promise<void> };
-  void el.requestFullscreen?.({ navigationUI: "hide" }).catch(() => undefined);
+  if (!el.requestFullscreen) return;
+  let ended = false;
+  const ask = () => {
+    if (ended) return;
+    const asked = performance.now();
+    const onEnd = () => { if (performance.now() - asked < 2500) { try { localStorage.setItem(AR_FS_KEY, "fail"); } catch { /* storage off */ } } };
+    session.addEventListener("end", onEnd, { once: true });
+    window.setTimeout(() => session.removeEventListener("end", onEnd), 2600);
+    // Asked even when the overlay already counts as fullscreen: Chrome's AR overlay leaves Android's navigation bar
+    // on screen, and "hide" asks it away.
+    void el.requestFullscreen!({ navigationUI: "hide" }).catch(() => undefined);
+  };
+  ask();
+  // The tap that started AR is often spent by the session itself, so the request is made again on the first tap
+  // inside the AR view, which carries a fresh activation.
+  const onTap = () => { window.removeEventListener("pointerup", onTap, true); ask(); };
+  window.addEventListener("pointerup", onTap, true);
+  session.addEventListener("end", () => { ended = true; window.removeEventListener("pointerup", onTap, true); }, { once: true });
 }
 
 type Tool = "place" | "align" | "measure" | "move";
