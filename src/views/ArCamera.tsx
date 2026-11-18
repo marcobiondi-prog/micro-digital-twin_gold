@@ -5,7 +5,7 @@ import { isTouchDevice } from "@/lib/touch-device";
 import { isTabletViewport } from "@/lib/tablet-camera";
 import { ArLive, requestArSession, type FanGroup } from "@/views/ArLive";
 import { ScanSheet } from "@/views/ScanSheet";
-import { recognisedPlants } from "@/models/ar-objects";
+import { recognisedPlants, type PlacedObject } from "@/models/ar-objects";
 import { toast } from "sonner";
 import { Activity, Check, ClipboardList, PanelBottomOpen, History, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grape, Leaf, Minus, Rows3, Shovel, TreeDeciduous, Snowflake, Umbrella, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Star, TreePine, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
 import { supportsCameraTorch, setCameraTorch, probeCameraTorch } from "@/lib/camera-torch";
@@ -353,7 +353,7 @@ export function ArCamera({
   const [arCoreActive, setArCoreActive] = useState(false);
   const arCoreRef = useRef<ArCoreManager | null>(null);
   // «Prova» live: the WebXR session (null = the preview without ARCore) and the element its overlay lives in.
-  const [liveAr, setLiveAr] = useState<{ session: XRSession | null; root: HTMLElement; n?: number; why?: string; torch?: boolean } | null>(null);
+  const [liveAr, setLiveAr] = useState<{ session: XRSession | null; root: HTMLElement; n?: number; why?: string; torch?: boolean; carry?: PlacedObject[] } | null>(null);
   const restartingRef = useRef(false);
   const [camEpoch, setCamEpoch] = useState(0);
   // Restarts asked because the camera came back without frames (ARCore still releasing it): a few, then the error.
@@ -1775,7 +1775,7 @@ export function ArCamera({
   };
   // The flash with ARCore: ARCore holds the camera and Chrome gives the page no torch, so a tap on the flash leaves
   // ARCore for the preview (the app's own camera) with the torch on.
-  const flashPreview = () => {
+  const flashPreview = (carry: PlacedObject[] = []) => {
     const had = liveArRef.current;
     if (!had?.session) return;
     restartingRef.current = true;
@@ -1787,7 +1787,7 @@ export function ArCamera({
         had.root.remove();
         stallRetriesRef.current = 0;
         setCamEpoch((n) => n + 1);
-        setLiveAr({ session: null, root: liveRootEl(), n: (had.n ?? 0) + 1, torch: true });
+        setLiveAr({ session: null, root: liveRootEl(), n: (had.n ?? 0) + 1, torch: true, carry });
         regainFullscreen();
       })
       .finally(() => { restartingRef.current = false; window.setTimeout(() => { arTransitionRef.current = false; }, 1500); });
@@ -1820,7 +1820,7 @@ export function ArCamera({
   const liveView = liveAr ? createPortal(
     // The camera's own gestures (close swipe, tap to place) must not see the live view's taps.
     <div onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()} onPointerMove={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
-      <ArLive key={liveAr.n ?? 0} kind={kind} session={liveAr.session} why={liveAr.why} stream={liveAr.session ? null : streamRef.current} plants={arPlants} onShot={(f) => onCapture([f])} onEnd={endLive} onRotate={rotateLive} torch={liveAr.torch ?? false} onFlashPreview={flashPreview}
+      <ArLive key={liveAr.n ?? 0} kind={kind} session={liveAr.session} why={liveAr.why} stream={liveAr.session ? null : streamRef.current} plants={arPlants} onShot={(f) => onCapture([f])} onEnd={endLive} onRotate={rotateLive} torch={liveAr.torch ?? false} carry={liveAr.carry} onFlashPreview={flashPreview}
         burst={{ shots: burstShots, open: burst, setOpen: setBurst, discarded, add: () => burstActs.current.add(), discardAll: () => burstActs.current.discardAll(),
           push: (shot) => setBurstShots((p) => [...p, shot]),
           toggle: (id) => setDiscarded((d) => { const n = new Set(d); if (n.has(id)) n.delete(id); else n.add(id); return n; }) }} />

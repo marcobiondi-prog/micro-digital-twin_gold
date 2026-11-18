@@ -88,7 +88,7 @@ type V = { x: number; y: number; z: number };
 /** The "Tocca per ruotare la vista AR" notice when the phone is turned during an ARCore session. */
 const ROTATE_PROMPT = false;
 
-export function ArLive({ kind, session, stream = null, plants = [], onShot, onEnd, onRotate, why, burst, torch = false, onFlashPreview }: { burst: ArBurst; torch?: boolean; onFlashPreview?: () => void; why?: string | undefined; kind: ArKind; session: XRSession | null; stream?: MediaStream | null; plants?: ArObjectDef[]; onShot?: (file: File) => void; onEnd: () => void; onRotate?: () => void }) {
+export function ArLive({ kind, session, stream = null, plants = [], onShot, onEnd, onRotate, why, burst, torch = false, onFlashPreview, carry }: { burst: ArBurst; torch?: boolean; onFlashPreview?: (carry: PlacedObject[]) => void; carry?: PlacedObject[] | undefined; why?: string | undefined; kind: ArKind; session: XRSession | null; stream?: MediaStream | null; plants?: ArObjectDef[]; onShot?: (file: File) => void; onEnd: () => void; onRotate?: () => void }) {
   // Chrome locks the screen to the orientation the AR session started in, and a web page cannot unlock it. When the
   // phone is held the other way for a moment, a tap restarts the session in the new orientation (onRotate).
   // Off at the user's word ("non mi deve uscire questo avviso quando ruoto"): the AR stays in the orientation it
@@ -169,7 +169,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   // Why the preview runs instead of ARCore: written in the status line once, at the start.
   useEffect(() => { if (why) setNotice({ text: why, tone: "warn" }); }, [why]);
   // Come from ARCore's flash: said that this is the preview and that a tap on the floor puts the object.
-  useEffect(() => { if (torch && !session && !why) setNotice({ text: "Flash acceso: sei nell’anteprima senza ARCore. Tocca il pavimento per posare gli oggetti; le misure sono indicative.", tone: "warn" }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (torch && !session && !why) setNotice({ text: carry?.length ? `Flash acceso: sei nell’anteprima senza ARCore. I tuoi ${carry.length === 1 ? "oggetto resta" : `${carry.length} oggetti restano`} davanti a te, dove li avevi messi; le misure sono indicative.` : "Flash acceso: sei nell’anteprima senza ARCore. Tocca il pavimento per posare gli oggetti; le misure sono indicative.", tone: "warn" }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // What the AR session really got (shown in the open status bar): to tell, on a phone, why it does not work.
   const [diag, setDiag] = useState<{ hit?: boolean; overlay?: boolean; feats?: string; frames: number; error?: string; depth?: boolean }>({ frames: 0 });
   // ARCore's depth: real walls and furniture hide the objects behind them. «Profondità» in the fan turns it off.
@@ -304,7 +304,14 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     let hitSource: XRHitTestSource | null = null;
     const occluder = session && depthWanted() ? new DepthOccluder() : null;
     if (occluder) { occluder.enabled = depthOn; scene.add(occluder.mesh); depthRef.current = occluder; patchGpuDepthQuery(); }
-    if (!session) return startPreview(renderer, scene, camera, reticle, () => { disposed = true; });
+    if (!session) {
+      // The objects already put stay: after a lost WebGL context the list is drawn again, and coming from ARCore's
+      // flash the ones put there (carried over, set relative to the phone) stand where they were.
+      const keep = placedRef.current.length ? placedRef.current : (carry ?? []);
+      for (const o of keep) addPlacedMesh(three.current, o, 0);
+      if (!placedRef.current.length && carry?.length) setPlaced(carry);
+      return startPreview(renderer, scene, camera, reticle, () => { disposed = true; });
+    }
     void (async () => {
       try {
         await renderer.xr.setSession(session as unknown as Parameters<THREE.WebXRManager["setSession"]>[0]);
@@ -640,6 +647,33 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     s.stage = fb.stage; s.target = near && fb.stage !== "far" ? near.o.uid : "";
   }
 
+  /** A placed object drawn again (preview rebuilt, or carried from ARCore): its mesh, round shadow and grown tree. */
+  function addPlacedMesh(t: NonNullable<typeof three.current>, o: PlacedObject, y: number) {
+    const def = o.def ?? defOfRef.current(o.id);
+    const g = meshFor(o, y);
+    const shadow = !o.from && def.id !== "pergolato" && def.id !== "aiuola" && def.id !== "nebulizzatore" && def.id !== "innaffiatoio" ? contactShadow(def) : null;
+    if (shadow) g.add(shadow);
+    if (!o.from && wantsRealTree(def)) void realTree(def).then((tree) => {
+      if (!tree || three.current?.objects.get(o.uid) !== g) return;
+      for (const c of [...g.children]) if (c !== shadow) g.remove(c);
+      castShadows(tree);
+      g.add(tree);
+    });
+    t.scene.add(g);
+    t.objects.set(o.uid, g);
+  }
+  /** The objects put with ARCore, set relative to where the phone is and looks (the preview's camera stands at the
+   *  origin looking along −z), so the preview opened by the flash shows them where they were. */
+  function carryOver(): PlacedObject[] {
+    const t = three.current;
+    if (!t) return placedRef.current;
+    const eye = eyeOf(t), a = camYaw(t), c = Math.cos(-a), sn = Math.sin(-a);
+    const conv = (o: PlacedObject): PlacedObject => {
+      const dx = o.x - eye.x, dz = o.z - eye.z;
+      return { ...o, x: dx * c + dz * sn, z: -dx * sn + dz * c, yaw: o.yaw + a, ...(o.from ? { from: o.from.map(conv) } : {}) };
+    };
+    return placedRef.current.map(conv);
+  }
   /** A mesh for a placed object, as put down. */
   function meshFor(o: PlacedObject, y: number): THREE.Group {
     const g = objectMesh(o.def ?? defOfRef.current(o.id));
@@ -715,13 +749,17 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const obstacleTick = useRef(0);
   function fitReticle(reticle: THREE.Object3D) {
     const { tool: tl, selected: sel } = live.current;
-    const def = defOfRef.current(sel);
-    const r = tl === "place" ? Math.max(0.05, Math.min(4, (Math.max(def.w, def.d) / 2) * modelRef.current * sizeRef.current)) : 0.1;
+    // In scale at every size: the chosen object's footprint at real size (or the model's, or the size given with two
+    // fingers); in «Sposta» the footprint of the object in hand; a small ring only for measuring and aligning.
+    const held = tl === "move" && grabRef.current ? placedRef.current.find((p) => p.uid === grabRef.current) : undefined;
+    const footR = (d: ArObjectDef, k: number) => Math.max(0.05, Math.min(30, (Math.max(d.w, d.d) / 2) * modelRef.current * k));
+    const r = held ? footR(held.def ?? defOfRef.current(held.id), held.scale ?? 1)
+      : tl === "place" ? footR(defOfRef.current(sel), sizeRef.current) : 0.1;
     if (Math.abs(r - reticleR.current) / reticleR.current > 0.06) {
       reticleR.current = r;
       const m = reticle as THREE.Mesh;
       m.geometry.dispose();
-      const line = Math.max(0.012, Math.min(0.06, r * 0.12));
+      const line = Math.max(0.012, Math.min(0.25, r * 0.06));
       m.geometry = new THREE.RingGeometry(Math.max(0.005, r - line), r, 64).rotateX(-Math.PI / 2);
     }
   }
@@ -1352,7 +1390,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
           // With ARCore the phone's camera belongs to ARCore and Chrome gives the page no flash: the button stays where
           // it is in the preview, dimmed, and a tap says why.
           <button type="button" aria-label="Accendi il flash: passa all’anteprima senza ARCore" title="Flash (passa all’anteprima)"
-            onClick={() => onFlashPreview ? onFlashPreview() : setNotice({ text: "Con ARCore il flash non si può accendere: Chrome dà la fotocamera solo ad ARCore. Accendi una luce, aiuta anche a trovare il pavimento.", tone: "warn" })}
+            onClick={() => onFlashPreview ? onFlashPreview(carryOver()) : setNotice({ text: "Con ARCore il flash non si può accendere: Chrome dà la fotocamera solo ad ARCore. Accendi una luce, aiuta anche a trovare il pavimento.", tone: "warn" })}
             className={`ml-auto ${round}`}>
             <ZapOff className="size-5" />
           </button>
