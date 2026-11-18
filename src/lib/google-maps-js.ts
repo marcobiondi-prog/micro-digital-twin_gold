@@ -10,6 +10,35 @@ const rejectedSubs = new Set<() => void>();
 if (typeof window !== "undefined") {
   (window as typeof window & { gm_authFailure?: () => void }).gm_authFailure = () => { keyRejected = true; rejectedSubs.forEach((f) => f()); };
 }
+// Google says why in the console ("Google Maps JavaScript API error: RefererNotAllowedMapError …"): the code is kept
+// so the 3D's fallback line can show it on the phone, where the console cannot be read.
+let rejectReason: string | null = null;
+if (typeof window !== "undefined") {
+  for (const level of ["error", "warn"] as const) {
+    const orig = console[level].bind(console);
+    console[level] = (...args: unknown[]) => {
+      const m = typeof args[0] === "string" ? /Google Maps JavaScript API (?:error|warning): (\w+)/.exec(args[0]) : null;
+      if (m && /Error$/.test(m[1]!) && !rejectReason) { rejectReason = m[1]!; rejectedSubs.forEach((f) => f()); }
+      orig(...args);
+    };
+  }
+}
+export const keyRejectReason = () => rejectReason;
+/** The plain words for Google's refusal codes. */
+export function rejectText(code: string | null): string | null {
+  if (!code) return null;
+  const words: Record<string, string> = {
+    RefererNotAllowedMapError: "la chiave non vale per questo indirizzo",
+    ApiNotActivatedMapError: "un servizio delle mappe non è attivo per la chiave",
+    ApiTargetBlockedMapError: "la chiave non può usare questo servizio",
+    BillingNotEnabledMapError: "la fatturazione del progetto Google non è attiva",
+    OverQuotaMapError: "limite di uso raggiunto",
+    ExpiredKeyMapError: "chiave scaduta",
+    InvalidKeyMapError: "chiave non valida",
+    MissingKeyMapError: "chiave mancante",
+  };
+  return `${words[code] ?? "rifiutata da Google"} (${code})`;
+}
 export const isKeyRejected = () => keyRejected;
 export function onKeyRejected(f: () => void): () => void { rejectedSubs.add(f); return () => { rejectedSubs.delete(f); }; }
 

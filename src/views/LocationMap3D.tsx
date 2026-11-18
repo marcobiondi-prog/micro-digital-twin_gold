@@ -1,4 +1,4 @@
-import { isKeyRejected, loadGoogleMaps, onKeyRejected } from "@/lib/google-maps-js";
+import { isKeyRejected, keyRejectReason, loadGoogleMaps, onKeyRejected, rejectText } from "@/lib/google-maps-js";
 import { useModels3D } from "@/lib/use-ios-3d";
 import { densify, tileRing } from "@/models/drape";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
@@ -18,6 +18,7 @@ type Map3D = HTMLElement & Partial<Camera> & { gestureHandling?: string; flyCame
 // The browser key can be refused for this address (its allowed sites do not include it): the API then calls
 // window.gm_authFailure (lib/google-maps-js). From then on the 3D view hands over to its fallback instead of showing the provider's error.
 const useKeyRejected = () => useSyncExternalStore(onKeyRejected, isKeyRejected, () => false);
+const useRejectReason = () => useSyncExternalStore(onKeyRejected, keyRejectReason, () => null);
 
 function loadMaps3D(key: string): Promise<Maps3D> {
   return loadGoogleMaps(key).then((g) => g.maps.importLibrary("maps3d") as Promise<Maps3D>);
@@ -279,6 +280,7 @@ function applyCamera(map: Map3D, camera: Camera, animate: boolean) {
 
 export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], sim = null }: { lat: number; lng: number; label: string; apiKey: string; fallback?: ReactNode; area?: Array<[number, number]>; sim?: SimLayout | null }) {
   const rejected = useKeyRejected();
+  const reason = useRejectReason();
   const host = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map3D | null>(null);
   const altitude = useRef(0);
@@ -411,6 +413,7 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
       {fallback}
       <p role="status" className="pointer-events-none absolute inset-x-0 bottom-3 z-[3] mx-auto w-fit max-w-[92%] rounded-full bg-black/60 px-3 py-1.5 text-center text-[12px] font-semibold text-white ring-1 ring-white/15 backdrop-blur-sm">
         Vista 3D fotografica non disponibile ora: mostro la mappa semplificata
+        {rejectText(reason) && <span className="block text-[11px] font-normal opacity-80">Motivo: {rejectText(reason)}</span>}
       </p>
     </div>
   ) : <p role="status" className="grid h-full w-full place-items-center bg-lab-surface px-3 text-center text-xs text-muted-foreground">Vista 3D non disponibile in questo momento.</p>;
