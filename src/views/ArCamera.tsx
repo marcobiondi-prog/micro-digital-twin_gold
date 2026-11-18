@@ -6,7 +6,7 @@ import { isTabletViewport } from "@/lib/tablet-camera";
 import { ArLive, ArSheet, requestArSession, type FanGroup } from "@/views/ArLive";
 import { recognisedPlants } from "@/models/ar-objects";
 import { toast } from "sonner";
-import { Activity, Check, ClipboardList, History, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grape, Leaf, Minus, Rows3, Shovel, TreeDeciduous, Snowflake, Umbrella, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Star, TreePine, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
+import { Activity, Check, ClipboardList, PanelBottomOpen, History, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grape, Leaf, Minus, Rows3, Shovel, TreeDeciduous, Snowflake, Umbrella, Plus, Scan, ScanSearch, SlidersHorizontal, Square, Star, TreePine, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
 import { supportsCameraTorch, setCameraTorch, probeCameraTorch } from "@/lib/camera-torch";
 import { detectArObject, getReferencePhoto, type Detection, type Soil } from "@/controllers/ar-detect.functions";
 import { gbifPhotoSearchUrl, pickGbifPhoto, type ReferencePhoto } from "@/models/ar-reference-photo";
@@ -1661,7 +1661,12 @@ export function ArCamera({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scanning]);
   const openEsito = (page: number | null) => { setBrowse(page); setToolsOpen(true); setActiveTool("analysis"); setPanelOpen(true); setPanelMin(false); setScanSheet(false); };
+  const shownRecord = viewedRecord ?? (liveRecord >= 0 ? scanRecords[liveRecord] ?? null : null);
+  // The card above the shutter («Aggiungi al progetto»): taken away with its ✕ or a swipe, called back from the sheet.
+  const cardHasContent = Boolean(shownRecord?.species || shownRecord?.soil || species || liveAr);
   const scanGroups: FanGroup[] = [{ key: "scansioni", label: "Scansioni", Icon: ClipboardList, items: [
+    ...(infoBannerDismissed && cardHasContent && !liveAr ? [{ key: "scheda", label: "Mostra la scheda", Icon: PanelBottomOpen, on: false, tool: true,
+      hint: "Rimette sullo schermo la scheda della scansione con «Aggiungi al progetto»", onPick: () => { setInfoBannerDismissed(false); setScanSheet(false); } }] : []),
     ...(species || soil || survey || found ? [{ key: "esito", label: "Esito dell’ultima scansione", Icon: Info, on: false, tool: true,
       hint: species ? `${species.commonName}${species.cooling ? ` · ombra ≈ ${species.cooling.shadeM2} m²` : ""}` : soil ? `Terreno ${soil.label}` : "Riapri la scheda con specie, suolo e fonti",
       onPick: () => openEsito(null) }] : []),
@@ -1674,7 +1679,6 @@ export function ArCamera({
   useEffect(() => { if (!hasScans) setScanSheet(false); }, [hasScans]);
   // Fase 2: «Aggiungi al progetto». Lo scansionato diventa un punto sulla mappa (GPS + bussola + distanza tipica),
   // con quello che ha detto la scansione; gli alberi poi contano come «già nell'area» nella simulazione.
-  const shownRecord = viewedRecord ?? (liveRecord >= 0 ? scanRecords[liveRecord] ?? null : null);
   const finds = useFieldFinds(kind);
   const shownAdded = Boolean(shownRecord && finds.some((f) => f.scanId === shownRecord.id));
   const [adding, setAdding] = useState(false);
@@ -2456,7 +2460,7 @@ export function ArCamera({
                   className="camera-bottom absolute z-20 flex flex-col items-center gap-2.5 w-full"
                 >
                   {/* Card informativo specie / raffrescamento */}
-                  {!infoBannerDismissed && !burst && (shownRecord?.species || shownRecord?.soil || species || proving) && (
+                  {!infoBannerDismissed && !burst && cardHasContent && (
                     <div
                       className={`ar-portrait-specimen-card cursor-grab${zoomRulerActive ? " is-zoom-active" : ""}`}
                       data-camera-controls
@@ -2471,7 +2475,11 @@ export function ArCamera({
                       onPointerCancel={onBannerPointerUp}
                       title="Fai uno swipe verso il basso per togliere la Tab info"
                     >
-                      <p className="ar-portrait-specimen-title truncate">
+                      {!proving && <button type="button" aria-label="Chiudi la scheda (la riapri da Scansioni)"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => { e.stopPropagation(); setInfoBannerDismissed(true); hapticTick(); toast("Scheda nascosta", { id: "ar-card", description: "La richiami dal pulsante «Scansioni», a destra dello scatto." }); }}
+                        className="absolute right-2 top-2 grid size-8 place-items-center rounded-full text-white/70 hover:bg-white/10 hover:text-white"><X className="size-4" aria-hidden="true" /></button>}
+                      <p className={`ar-portrait-specimen-title truncate${proving ? "" : " pr-7"}`}>
                         {shownRecord?.species ? `${shownRecord.species.commonName} (${shownRecord.species.scientificName})` : shownRecord?.soil ? `Suolo: ${shownRecord.soil.label}` : species?.commonName ? `${species.commonName} (${species.scientificName})` : proving ? "AR" : arFocusOption(kind, target).label}
                       </p>
                       <p className="ar-portrait-specimen-desc">
