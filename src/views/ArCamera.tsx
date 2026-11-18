@@ -1326,6 +1326,10 @@ export function ArCamera({
         setCamEpoch((n) => n + 1);
         setLiveAr({ session: null, root: liveRootEl(), n: (had.n ?? 0) + 1, torch: true, carry });
         regainFullscreen();
+        // ARCore held the screen's orientation and Chrome put back the app's upright lock when it ended: asked again,
+        // as when leaving AR, so the preview turns with the phone (it stayed upright, its controls too).
+        void resetAppOrientation();
+        window.setTimeout(() => { void resetAppOrientation().then(() => window.dispatchEvent(new Event("ar-orientation-change"))); }, 600);
       })
       .finally(() => { restartingRef.current = false; window.setTimeout(() => { arTransitionRef.current = false; }, 1500); });
   };
@@ -1357,11 +1361,21 @@ export function ArCamera({
   const liveView = liveAr ? createPortal(
     // The camera's own gestures (close swipe, tap to place) must not see the live view's taps.
     <div onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()} onPointerMove={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
-      <ArLive key={liveAr.n ?? 0} kind={kind} session={liveAr.session} why={liveAr.why} stream={liveAr.session ? null : streamRef.current} plants={arPlants} onShot={(f) => onCapture([f])} onEnd={endLive} onRotate={rotateLive} torch={liveAr.torch ?? false} carry={liveAr.carry} onFlashPreview={flashPreview}
+      <ArLive key={liveAr.n ?? 0} kind={kind} session={liveAr.session} why={liveAr.why} stream={liveAr.session ? null : streamRef.current} plants={arPlants} onShot={(f) => onCapture([f])} onEnd={endLive} onRotate={rotateLive} torch={liveAr.torch ?? false} carry={liveAr.carry} rotation={liveAr.session ? 0 : viewport.rotation} onFlashPreview={flashPreview}
         burst={{ shots: burstShots, open: burst, setOpen: setBurst, discarded, add: () => burstActs.current.add(), discardAll: () => burstActs.current.discardAll(),
           push: (shot) => setBurstShots((p) => [...p, shot]),
           toggle: (id) => setDiscarded((d) => { const n = new Set(d); if (n.has(id)) n.delete(id); else n.add(id); return n; }) }} />
     </div>, liveAr.root) : null;
+  // The preview without ARCore turns with the camera: when the page stays upright and the camera's surface is turned
+  // by CSS (the phone held sideways without fullscreen), the AR view and its controls are turned the same way.
+  useEffect(() => {
+    const root = liveAr?.root;
+    if (!root) return;
+    const rot = liveAr.session ? 0 : viewport.rotation;
+    root.style.cssText = rot && viewport.width && viewport.height
+      ? `position:fixed;left:50%;top:50%;width:${viewport.width}px;height:${viewport.height}px;transform:translate(-50%,-50%) rotate(${rot}deg);z-index:2147483000`
+      : "position:fixed;inset:0;z-index:2147483000";
+  }, [liveAr, viewport.rotation, viewport.width, viewport.height]);
   // «Prova» is for phones only: on tablets and computers the camera stays on «Rileva» and the switch is not shown.
   const modeSwitch = !onPhone ? null : (
     <div role="radiogroup" aria-label="Modalità della fotocamera AI" className="flex rounded-full bg-[rgba(20,26,34,0.78)] p-1 text-xs font-semibold text-white ring-1 ring-white/20 backdrop-blur-md shadow-lg">

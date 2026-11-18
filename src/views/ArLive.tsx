@@ -89,7 +89,7 @@ type V = { x: number; y: number; z: number };
 /** The "Tocca per ruotare la vista AR" notice when the phone is turned during an ARCore session. */
 const ROTATE_PROMPT = false;
 
-export function ArLive({ kind, session, stream = null, plants = [], onShot, onEnd, onRotate, why, burst, torch = false, onFlashPreview, carry }: { burst: ArBurst; torch?: boolean; onFlashPreview?: (carry: PlacedObject[]) => void; carry?: PlacedObject[] | undefined; why?: string | undefined; kind: ArKind; session: XRSession | null; stream?: MediaStream | null; plants?: ArObjectDef[]; onShot?: (file: File) => void; onEnd: () => void; onRotate?: () => void }) {
+export function ArLive({ kind, session, stream = null, plants = [], onShot, onEnd, onRotate, why, burst, torch = false, onFlashPreview, carry, rotation = 0 }: { rotation?: number; burst: ArBurst; torch?: boolean; onFlashPreview?: (carry: PlacedObject[]) => void; carry?: PlacedObject[] | undefined; why?: string | undefined; kind: ArKind; session: XRSession | null; stream?: MediaStream | null; plants?: ArObjectDef[]; onShot?: (file: File) => void; onEnd: () => void; onRotate?: () => void }) {
   // Chrome locks the screen to the orientation the AR session started in, and a web page cannot unlock it. When the
   // phone is held the other way for a moment, a tap restarts the session in the new orientation (onRotate).
   // Off at the user's word ("non mi deve uscire questo avviso quando ruoto"): the AR stays in the orientation it
@@ -183,9 +183,13 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const [flip, setFlip] = useState(depthFlip);
   useEffect(() => { if (depthRef.current) depthRef.current.enabled = depthOn; }, [depthOn]);
   const framesRef = useRef(0);
+  const barOpenRef = useRef(false);
+  const rotRef = useRef(rotation);
+  rotRef.current = rotation;
   useEffect(() => {
     if (!session) return;
-    const id = window.setInterval(() => setDiag((d) => (d.frames === framesRef.current ? d : { ...d, frames: framesRef.current })), 1000);
+    // Only while the bar is open (the line is shown there): a re-render of the whole view every second slowed the phone.
+    const id = window.setInterval(() => { if (barOpenRef.current) setDiag((d) => (d.frames === framesRef.current ? d : { ...d, frames: framesRef.current })); }, 1000);
     return () => window.clearInterval(id);
   }, [session]);
   // Flash: the camera's own torch, in the preview only (with ARCore the browser owns the camera and gives the page
@@ -258,8 +262,11 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   // The session: three.js on WebXR, the hit test from the screen's centre, a reticle on the floor.
   useEffect(() => {
     let disposed = false;
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-    renderer.setPixelRatio(window.devicePixelRatio);
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: "high-performance" });
+    // Lighter on the phone: the preview drawn at most at 1,5× the screen's pixels (the camera's picture behind it is
+    // its own video, untouched), ARCore's frame at 80 % of its size; the objects themselves are unchanged.
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    renderer.xr.setFramebufferScaleFactor(0.8);
     renderer.xr.enabled = true;
     renderer.xr.setReferenceSpaceType("local");
     const scene = new THREE.Scene();
@@ -406,7 +413,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         const ref = renderer.xr.getReferenceSpace();
         const view = ref ? frame.getViewerPose(ref)?.views[0] : undefined;
         const had = occluder.live;
-        occluder.update(frame, view, (session as XRSession & { depthDataFormat?: string }).depthDataFormat);
+        // The depth map every other frame: it changes slowly and reading it is the heaviest part of a frame.
+        if (framesRef.current % 2 === 0) occluder.update(frame, view, (session as XRSession & { depthDataFormat?: string }).depthDataFormat);
         if (had !== occluder.live) { setDepthLive(occluder.live); setDiag((d) => ({ ...d, depth: occluder.live })); }
       }
       frameTick(t, reticle);
@@ -457,7 +465,15 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     };
     size();
     const fl = floorRef.current;
-    const onTilt = (e: DeviceOrientationEvent) => { if (e.beta !== null) fl.tilt = Math.max(-80, Math.min(-8, e.beta - 90)); };
+    // How far the camera looks up or down, whichever way the phone is held: the elevation of the back camera's axis
+    // (−z of the device) from beta and gamma. Read as beta − 90 alone it was right only upright: turned sideways the
+    // floor was guessed far off and taps on it put nothing.
+    const onTilt = (e: DeviceOrientationEvent) => {
+      if (e.beta === null) return;
+      const b = (e.beta * Math.PI) / 180, g = ((e.gamma ?? 0) * Math.PI) / 180;
+      const elev = (Math.asin(Math.max(-1, Math.min(1, -Math.cos(b) * Math.cos(g)))) * 180) / Math.PI;
+      fl.tilt = Math.max(-80, Math.min(-8, elev));
+    };
     window.addEventListener("deviceorientation", onTilt);
     window.addEventListener("resize", size);
     camera.position.set(0, 1.5, 0);
@@ -471,7 +487,11 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     };
     if (three.current) three.current.floorY = 0;
     setFound(true);
-    renderer.setAnimationLoop(() => {
+    // The preview at 30 frames a second: the camera's picture is its own video, the 3D over it needs no more.
+    let lastDraw = 0;
+    renderer.setAnimationLoop((now: number) => {
+      if (now - lastDraw < 30) return;
+      lastDraw = now;
       const fov = fovAt(zoomRef.current);
       if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
       const pitch = Math.max(-80, Math.min(10, fl.tilt + fl.offset));
@@ -500,9 +520,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       if (adjustingRef.current) return;
       // An object in hand follows the reticle: a tap anywhere puts it down there.
       if (live.current.tool === "move" && grabRef.current) { placeAtHit(); return; }
-      const r = el.getBoundingClientRect();
-      const w = r.width || window.innerWidth, h = r.height || window.innerHeight;
-      const p = at((e.clientX - r.left) / w, (e.clientY - r.top) / h);
+      const n = toCanvas(e.clientX, e.clientY);
+      const p = n ? at(n.nx, n.ny) : null;
       if (p && three.current) { three.current.hit = p; placeAtHit(); }
     };
     window.addEventListener("pointerdown", onDown, true);
@@ -757,16 +776,29 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     return true;
   }
 
+  /** A point of the screen in the preview canvas, 0–1 each way. When the AI camera turns its view by CSS (the page
+   *  locked upright, the phone held sideways) the AR view is turned the same way, so the point is turned back. */
+  function toCanvas(cx: number, cy: number): { nx: number; ny: number } | null {
+    const el = three.current?.renderer.domElement;
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    const rot = rotRef.current;
+    if (!rot) return r.width && r.height ? { nx: (cx - r.left) / r.width, ny: (cy - r.top) / r.height } : null;
+    const w = el.clientWidth, h = el.clientHeight;
+    if (!w || !h) return null;
+    const a = (rot * Math.PI) / 180, dx = cx - (r.left + r.width / 2), dy = cy - (r.top + r.height / 2);
+    return { nx: (dx * Math.cos(a) + dy * Math.sin(a)) / w + 0.5, ny: (-dx * Math.sin(a) + dy * Math.cos(a)) / h + 0.5 };
+  }
   /** The ray from the phone's eye through a point of the screen. */
   function screenRay(cx: number, cy: number): THREE.Raycaster | null {
     const t = three.current;
     if (!t) return null;
     const xr = t.renderer.xr;
     const cam = (xr.isPresenting ? (xr.getCamera().cameras[0] ?? xr.getCamera()) : t.camera) as THREE.PerspectiveCamera;
-    const r = xr.isPresenting ? { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight } : t.renderer.domElement.getBoundingClientRect();
-    if (!r.width || !r.height) return null;
+    const n = xr.isPresenting ? { nx: cx / window.innerWidth, ny: cy / window.innerHeight } : toCanvas(cx, cy);
+    if (!n || !Number.isFinite(n.nx) || !Number.isFinite(n.ny)) return null;
     const ray = new THREE.Raycaster();
-    ray.setFromCamera(new THREE.Vector2(((cx - r.left) / r.width) * 2 - 1, -(((cy - r.top) / r.height) * 2 - 1)), cam);
+    ray.setFromCamera(new THREE.Vector2(n.nx * 2 - 1, -(n.ny * 2 - 1)), cam);
     return ray;
   }
   /** The spot on the floor under a point of the screen (the floor ARCore found, else the preview's guessed one). */
@@ -1037,6 +1069,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   // The bar on top stays a small pill (what a tap does, in two words); a tap opens it to the whole sentence and a
   // line on how it works. Messages open it by themselves while they last.
   const [barOpen, setBarOpen] = useState(false);
+  barOpenRef.current = barOpen;
   const barShort = !found ? "Cerco il pavimento…" : adjusting ? "Regola pavimento"
     : tool === "move" ? (grabbed ? "Mettilo giù" : "Sposta") : tool === "measure" ? (dist !== null ? metresText(dist) : "Misura") : tool === "align" ? `Punto ${alignPts.length + 1} dell’area` : defOf(selected).label;
   const barHelp = !found ? "Inquadra il pavimento a un paio di metri e muovi piano il telefono di lato finché lo riconosco: aiutano una buona luce e un pavimento con disegni o venature; quello lucido o tutto di un colore si trova a fatica."

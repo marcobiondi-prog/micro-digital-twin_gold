@@ -13,9 +13,16 @@ export class ArShadows {
   private ground: THREE.Mesh;
   private dir = DEFAULT_DIR.clone();
   private center = new THREE.Vector3();
+  private renderer: THREE.WebGLRenderer;
+  private sig = "";
+  private drawnAt = 0;
 
   constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene) {
+    this.renderer = renderer;
     renderer.shadowMap.enabled = true;
+    // The shadow map is drawn again only when something moved, turned, grew or the light changed (and once a second
+    // for what changes inside an object, like a tree grown in place of its simple shape), not at every frame.
+    renderer.shadowMap.autoUpdate = false;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.light = new THREE.DirectionalLight("#ffffff", 0);
     this.light.castShadow = true;
@@ -43,8 +50,15 @@ export class ArShadows {
     for (const o of objects) { this.center.add(o.position); list.push(o); n++; }
     const on = n > 0 && floorY !== null;
     this.ground.visible = on;
-    this.light.castShadow = on;
+    if (this.light.castShadow !== on) { this.light.castShadow = on; this.renderer.shadowMap.needsUpdate = true; }
     if (!on) return;
+    let sig = `${n}|${floorY!.toFixed(2)}|${lightDir ? `${lightDir.x.toFixed(1)},${lightDir.y.toFixed(1)},${lightDir.z.toFixed(1)}` : "-"}`;
+    for (const o of list) sig += `|${o.position.x.toFixed(2)},${o.position.y.toFixed(2)},${o.position.z.toFixed(2)},${o.rotation.y.toFixed(2)},${o.scale.x.toFixed(2)},${o.children.length}`;
+    const now = performance.now();
+    if (sig === this.sig && now - this.drawnAt < 1000) return;
+    this.sig = sig;
+    this.drawnAt = now;
+    this.renderer.shadowMap.needsUpdate = true;
     this.center.divideScalar(n);
     this.center.y = floorY!;
     let reach = 4;
