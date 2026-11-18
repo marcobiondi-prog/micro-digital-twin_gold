@@ -11,7 +11,7 @@ import { unhide, useSimHidden } from "@/models/sim-hidden";
 import { SHOT_KINDS, kindCountText, shotKind, shotLabel, type ShotKind } from "@/models/shot-kind";
 import { TabRow } from "@/views/v8/console";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { forShare, zoneOfName } from "@/views/v10/ExportSheet";
+import { forShare, zoneOfName } from "@/lib/share-files";
 import { useLab } from "@/models/lab-store";
 import { VideoPlayer } from "@/views/v10/VideoPlayer";
 import { useSignedIn } from "@/lib/use-signed-in";

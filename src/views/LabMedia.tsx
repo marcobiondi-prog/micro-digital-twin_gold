@@ -2,6 +2,7 @@ import { VideoPlayer } from "@/views/v10/VideoPlayer";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 const ArCameraLazy = lazy(() => import("@/views/ArCameraLazy"));
 const GalleryReviewLazy = lazy(() => import("@/views/GalleryReviewLazy"));
+const SystemCameraLazy = lazy(() => import("@/views/SystemCameraLazy"));
 import { createPortal } from "react-dom";
 import {
   Camera,
@@ -22,7 +23,6 @@ import { registerCaptureHandler, registerFilesHandler, type Delivery } from "@/l
 import { AI_STANDBY } from "@/lib/ai-standby";
 import { PREVIEW_BUILD } from "@/lib/demo-login";
 import { galleryMultiple, openSystemCamera, prepareSystemCamera, supportsSystemCapture } from "@/lib/system-camera";
-import { SystemCamera } from "@/views/SystemCamera";
 import { guardUse } from "@/lib/app-permissions";
 import { useRegisteredEmail } from "@/lib/use-signed-in";
 import { useLab } from "@/models/lab-store";
@@ -162,6 +162,9 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
   const [systemCamera, setSystemCamera] = useState<"photo" | "video" | "burst" | null>(null);
   const bodyId = `lab-media-body-${kind}`;
   const closeSystemCamera = useCallback(() => setSystemCamera(null), []);
+  // Loaded on its first opening (kept mounted afterwards).
+  const [camUsed, setCamUsed] = useState(false);
+  useEffect(() => { if (systemCamera) setCamUsed(true); }, [systemCamera]);
   /** Fotocamera di sistema diretta: un input per tipo con capture, perché capture con foto+video insieme non apre nulla su molti Android. */
   const openCamera = (m: "photo" | "video") => {
     // Revoked inside the app (Account → Autorizzazioni): no camera, the phone's own included.
@@ -439,7 +442,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
         }}
       /></Suspense>}
       {input(cameraPhoto, "image/*", "environment")}
-      <SystemCamera mode={systemCamera} onCapture={(files) => add(files)} onClose={closeSystemCamera} />
+      {camUsed && <Suspense fallback={null}><SystemCameraLazy mode={systemCamera} onCapture={(files) => add(files)} onClose={closeSystemCamera} /></Suspense>}
       {(reviewing || reviewLoaded) && <Suspense fallback={null}><GalleryReviewLazy kind={kind} files={reviewing} zones={zoneNames} onAddMore={() => void pickGallery()} onClose={() => setReviewing(null)}
         onConfirm={(files, zone) => {
           // The zone rides in the name ("Lotto A - foto.jpg"), so the list and the report show where it was taken.

@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 // The Sensori AI tab's content loads only when the tab is first opened (Panels mounts a panel on first open).
 const SensorAdvisor = lazy(() => import("@/views/SensorAdvisor").then((m) => ({ default: m.SensorAdvisor })));
+const UrbanThermometer = lazy(() => import("@/views/v9c/UrbanThermometer").then((m) => ({ default: m.UrbanThermometer })));
+const VineThirst = lazy(() => import("@/views/v10/VineThirst").then((m) => ({ default: m.VineThirst })));
 const MySensors = lazy(() => import("@/views/v10/MySensors").then((m) => ({ default: m.MySensors })));
 import { GuestLock, useGuestOnly } from "@/views/v10/ProfileGate";
 import { LabMedia } from "@/views/LabMedia";
 import { splitLocation } from "@/views/SimulationGrid";
-import { UrbanThermometer } from "@/views/v9c/UrbanThermometer";
-import { VineThirst } from "@/views/v10/VineThirst";
 import { SimShell } from "@/views/v8/SimShell";
 import { resetUrban, resetVineyard, setUrban, setVineyard, useLab } from "@/models/lab-store";
 import { useServerFn } from "@tanstack/react-start";
@@ -40,7 +40,7 @@ export function UrbanFlow() {
       <LabSyncIndicator />
       {/* No Confronta here: the three levels are compared inside the thermometer itself. */}
       <SimShell kind="urban" place={location.label} onReset={resetUrban}
-        simula={<UrbanThermometer onImportWeather={importRealWeather} />}
+        simula={<Suspense fallback={<div className="h-[28rem]" />}><UrbanThermometer onImportWeather={importRealWeather} /></Suspense>}
         media={<LabMedia embedded kind="urban" context={`Alberi ${trees} · aiuole e ciottoli ${permeable}% · ombra ${shade}%`} />}
         sensori={<GuestSensors kind="urban" />} />
     </div>
@@ -75,7 +75,7 @@ export function VineyardFlow() {
       <LabSyncIndicator />
       {/* v10: built like the piazza (the arc of the vines' thirst with the three levels on it), so no Confronta here either. */}
       <SimShell kind="vineyard" place={place} onReset={resetVineyard} onSend={() => setSend(true)}
-        simula={<VineThirst onImportWeather={importRealWeather} />}
+        simula={<Suspense fallback={<div className="h-[28rem]" />}><VineThirst onImportWeather={importRealWeather} /></Suspense>}
         media={<LabMedia embedded kind="vineyard" context={`${vineyard.allZones ? "Tutte le zone" : `Zona ${vineyard.selected + 1}`} · ${vineyard.phase}`} />}
         sensori={<GuestSensors kind="vineyard" />} />
       <Dialog open={send} onOpenChange={setSend}>
