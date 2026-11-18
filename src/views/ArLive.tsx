@@ -1475,7 +1475,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
           <RotateCcw className="size-4" aria-hidden="true" />Riprova ARCore
         </button>
       )}
-      <div className={`pointer-events-auto flex items-center gap-2 p-3 landscape:justify-center ${session && hudTurn ? "justify-center" : ""} ${arcOn ? "landscape:pr-[250px]" : ""}`}>
+      <div className={`pointer-events-auto flex items-center gap-2 p-3 ${arcOn ? "landscape:pr-[250px]" : ""}`}>
         <button type="button" onClick={end} aria-label="Esci dalla realtà aumentata e torna alla fotocamera AI"
           className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-black/55 pl-2.5 pr-3.5 text-sm font-semibold backdrop-blur">
           <ChevronLeft className="size-5" aria-hidden="true" />Esci da AR
@@ -1504,14 +1504,14 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
           // it is in the preview, dimmed, and a tap says why.
           <button type="button" aria-label="Accendi il flash: passa all’anteprima senza ARCore" title="Flash (passa all’anteprima)"
             onClick={() => onFlashPreview ? onFlashPreview(carryOver()) : setNotice({ text: "Con ARCore il flash non si può accendere: Chrome dà la fotocamera solo ad ARCore. Accendi una luce, aiuta anche a trovare il pavimento.", tone: "warn" })}
-            className={`${session && hudTurn ? "" : "ml-auto"} landscape:ml-0 ${round}`}>
+            className={`ml-auto ${round}`}>
             <ZapOff className="size-5" />
           </button>
         )}
         {torchOk && (
           <button type="button" onClick={() => void toggleTorch()} aria-pressed={torchOn}
             aria-label={torchOn ? "Disattiva flash" : "Attiva flash"} title={torchOn ? "Disattiva flash" : "Attiva flash"}
-            className={`ml-auto landscape:ml-0 ${round} ${torchOn ? "bg-white/90 text-black" : ""}`}>
+            className={`ml-auto ${round} ${torchOn ? "bg-white/90 text-black" : ""}`}>
             {torchOn ? <Zap className="size-5 fill-yellow-400 text-yellow-500" /> : <ZapOff className="size-5" />}
           </button>
         )}
