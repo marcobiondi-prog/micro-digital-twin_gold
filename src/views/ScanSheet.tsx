@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { AlertTriangle, Check, ChevronRight, Leaf, PanelBottomOpen, Shovel, Trash2, Undo2, X } from "lucide-react";
+import { useRef, useState, type ReactNode } from "react";
+import { AlertTriangle, Check, ChevronLeft, ChevronRight, Leaf, PanelBottomOpen, Shovel, Trash2, Undo2, X } from "lucide-react";
 import { scanPhoto, type ScanRecord } from "@/models/ar-scan-log";
 
 /**
@@ -7,13 +7,14 @@ import { scanPhoto, type ScanRecord } from "@/models/ar-scan-log";
  * a tap opening its full result; «Seleziona» picks several to delete at once, asked in place. Over the list, the last
  * analysis' message when it did not get through, and the camera's other actions (the card, the last specimen, all).
  */
-export function ScanSheet({ records, failed, showCard, specimens, onOpen, onShowCard, onUndoSpecimen, onDelete, onDeleteAll, onClose }: {
+export function ScanSheet({ records, failed, showCard, specimens, detail, onShowCard, onUndoSpecimen, onDelete, onDeleteAll, onClose }: {
   records: readonly ScanRecord[];
+  /** A result's full card, shown on the drawer's second page. */
+  detail: (r: ScanRecord, index: number) => ReactNode;
   /** The last analysis' message when it found nothing or stopped (e.g. "Analisi interrotta…"). */
   failed: string | null;
   showCard: boolean;
   specimens: number;
-  onOpen: (index: number) => void;
   onShowCard: () => void;
   onUndoSpecimen: () => void;
   onDelete: (ids: string[]) => void;
@@ -27,10 +28,21 @@ export function ScanSheet({ records, failed, showCard, specimens, onOpen, onShow
   const toggle = (id: string) => setChosen((c) => { const n = new Set(c); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const stopSelecting = () => { setSelecting(false); setChosen(new Set()); setAsking(false); };
   const n = chosen.size;
-  return (
+  // The second page: a result's full card, sliding in from the right; a swipe to the right (or ‹) goes back.
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [drag, setDrag] = useState(0);
+  const swipe = useRef<{ x: number; y: number; id: number; on: boolean } | null>(null);
+  const openIndex = openId ? records.findIndex((r) => r.id === openId) : -1;
+  const opened = openIndex >= 0 ? records[openIndex]! : null;
+  const back = () => { setOpenId(null); setDrag(0); };
+  const reduce = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    return (
     <div role="dialog" aria-label="Scansioni" className="ar-sheet pointer-events-auto fixed inset-x-0 bottom-0 z-40 mx-auto flex max-h-[78dvh] w-full max-w-lg flex-col rounded-t-[28px] border-t border-white/15 text-white shadow-[0_-20px_60px_rgba(0,0,0,0.55)] landscape:max-h-[92dvh]"
       style={{ background: "oklch(0.25 0.02 255 / 0.97)", paddingBottom: "max(env(safe-area-inset-bottom), 0.75rem)" }}>
       <div className="flex justify-center pb-1 pt-2"><span className="h-1.5 w-10 rounded-full bg-white/25" aria-hidden="true" /></div>
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
+        <div className="flex min-h-0 w-full flex-1" style={{ transform: `translate3d(calc(${opened ? "-100%" : "0%"} + ${drag}px), 0, 0)`, transition: drag || reduce ? "none" : "transform 320ms cubic-bezier(0.22, 1, 0.36, 1)" }}>
+          <div className="flex min-h-0 min-w-full flex-col" aria-hidden={opened ? true : undefined}>
       <div className="flex items-center gap-2 px-5 pb-2">
         <h2 className="min-w-0 flex-1 text-lg font-semibold">{selecting ? (n ? `${n} ${n === 1 ? "esito scelto" : "esiti scelti"}` : "Scegli gli esiti") : `Scansioni · ${records.length}`}</h2>
         {records.length > 0 && (selecting
@@ -57,7 +69,7 @@ export function ScanSheet({ records, failed, showCard, specimens, onOpen, onShow
               const Icon = r.species ? Leaf : Shovel;
               return (
                 <li key={r.id} className={k ? "border-t border-white/[0.07]" : ""}>
-                  <button type="button" onClick={() => (selecting ? toggle(r.id) : onOpen(i))} aria-pressed={selecting ? on : undefined}
+                  <button type="button" onClick={() => (selecting ? toggle(r.id) : setOpenId(r.id))} aria-pressed={selecting ? on : undefined}
                     className="flex w-full items-center gap-3 px-3 py-2.5 text-left active:bg-white/10">
                     {selecting && (
                       <span className={`grid size-6 shrink-0 place-items-center rounded-full ring-2 ${on ? "bg-[#00e5ff] text-black ring-[#00e5ff]" : "ring-white/40"}`} aria-hidden="true">
@@ -109,6 +121,30 @@ export function ScanSheet({ records, failed, showCard, specimens, onOpen, onShow
           )}
         </div>
       )}
+          </div>
+          <div className="flex min-h-0 min-w-full touch-pan-y flex-col" aria-hidden={opened ? undefined : true}
+            onPointerDown={(e) => { swipe.current = { x: e.clientX, y: e.clientY, id: e.pointerId, on: false }; }}
+            onPointerMove={(e) => {
+              const sw = swipe.current;
+              if (!sw || sw.id !== e.pointerId) return;
+              const dx = e.clientX - sw.x, dy = e.clientY - sw.y;
+              if (!sw.on) { if (dx > 10 && dx > Math.abs(dy) * 1.2) { sw.on = true; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } else if (Math.abs(dy) > 10) { swipe.current = null; return; } else return; }
+              setDrag(Math.max(0, dx));
+            }}
+            onPointerUp={() => { const sw = swipe.current; swipe.current = null; if (!sw?.on) return; if (drag > 70) back(); else setDrag(0); }}
+            onPointerCancel={() => { swipe.current = null; setDrag(0); }}>
+            <div className="flex items-center gap-2 px-3 pb-2">
+              <button type="button" onClick={back} aria-label="Torna alle scansioni" className="flex h-10 items-center gap-1 rounded-full bg-white/10 pl-2 pr-3 text-sm font-semibold"><ChevronLeft className="size-5" />Scansioni</button>
+              <h2 className="min-w-0 flex-1 truncate text-right text-base font-semibold">{opened ? (opened.species?.commonName ?? (opened.soil ? `Suolo: ${opened.soil.label}` : opened.target)) : ""}</h2>
+              <button type="button" onClick={onClose} aria-label="Chiudi" className="grid size-10 shrink-0 place-items-center rounded-full bg-white/10"><X className="size-5" /></button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
+              {opened && <div className="rounded-2xl bg-background px-3.5 py-3 text-xs leading-relaxed text-foreground">{detail(opened, openIndex)}</div>}
+              {opened && <p className="mt-2 text-center text-[11px] text-white/45">Scorri verso destra per tornare alle scansioni</p>}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
