@@ -1447,8 +1447,11 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     </button>
   );
   // The zoom ruler is the preview's only: with ARCore the browser drives the camera.
-  // No zoom in the preview opened by ARCore's flash (torch): it stands in for the AR view, which has none.
-  const dialOn = !session && !adjusting && !torch;
+  // No zoom with the flash on (the preview opened by ARCore's flash, or the flash lit in the preview): it stands in for
+  // the AR view, which has none.
+  const dialOn = !session && !adjusting && !torch && !torchOn;
+  // With the zoom gone the picture goes back to 1×, not left magnified.
+  useEffect(() => { if ((torch || torchOn) && zoomRef.current !== 1) setZoom(1); }, [torch, torchOn]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
   // Every choice sits behind one AI button: the tray opens over the camera only when asked.
