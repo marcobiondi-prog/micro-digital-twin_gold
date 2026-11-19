@@ -133,7 +133,7 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 const nav: ReadonlyArray<{ to: "/benvenuto" | "/urbano" | "/vigneto" | "/dashboard" | "/profilo"; l: string }> = [
-  { to: "/benvenuto", l: "Benvenuto" },
+  { to: "/benvenuto", l: "Cronologia" },
   { to: "/urbano", l: "Simulazione urbana" },
   { to: "/vigneto", l: "Simulazione vigneto" },
   { to: "/dashboard", l: "Dashboard" },
