@@ -428,7 +428,7 @@ function SmartNav() {
                   aria-current={pathname === n.to || (n.to === "/profilo" && isProfilePath(pathname)) ? "page" : undefined}
                   replace={pathname !== "/"}
                   onClick={(e) => { if (goHomeBack(e, n.to, pathname)) return; centerTapped(e.currentTarget, pathname === n.to); }}
-                  className={`nav-glass nav-glass-gloss relative shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring ${pathname === n.to ? "nav-glass-on bg-nav-accent text-nav-accent-foreground" : "text-muted-foreground dark:text-nav-accent-foreground"}`}>
+                  className={`relative shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none ${pathname === n.to ? "bg-secondary text-secondary-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]" : "text-foreground/85 hover:bg-foreground/[0.06]"}`}>
                   {n.l}{!guest && (n.to === "/urbano" || n.to === "/vigneto") && proId !== undefined && !unlocks(proId, n.to === "/urbano" ? "urban" : "vineyard") && <Lock className="ml-1 inline size-3.5 align-[-2px]" aria-label="bloccato" />}
                 </Link>
               ))}
