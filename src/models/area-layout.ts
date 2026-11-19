@@ -536,6 +536,8 @@ export function pergolaParts(strip: Ring, lite = false, open = 1): TreePart[] {
   const parts: TreePart[] = [];
   for (const u of papillonUnits(R.w, R.d)) {
     const sq = (r: number): Ring => [[-r, -r], [r, -r], [r, r], [-r, r]].map(([a, b]) => ll(u.x + a!, u.z + b!));
+    const circle = (r: number, n = 16): Ring => Array.from({ length: n }, (_, i) => ll(u.x + Math.sin((2 * Math.PI * i) / n) * r, u.z + Math.cos((2 * Math.PI * i) / n) * r));
+    parts.push({ ring: circle(Math.max(1.1, Math.min(1.7, u.r * 0.55)), lite ? 10 : 16), base: 0, height: 0.12, color: "#a8784c" });
     parts.push({ ring: sq(0.08), base: 0, height: 3.2, color: PERGOLA_COLORS.post });
     parts.push({ ring: papillonFan(u, open, lite ? 12 : 20).map(([x, z]) => ll(x, z)), base: 3, height: 3.08, color: lite ? `${PERGOLA_COLORS.slat}d9` : PERGOLA_COLORS.slat });
   }

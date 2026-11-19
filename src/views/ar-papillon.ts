@@ -3,8 +3,11 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { canopyReach, papillonUnits, type PapillonUnit } from "@/models/area-layout";
 
 /**
- * Round shades on a central pole for the AR view and the 3D maps, built in code with a designer's look: a slim round
- * anthracite pole tapering upwards on a flat round base, a thin satin ring near its foot, a sleek hub with a small
+ * Round shades on a leaning trunk over a round platform where one can stop and eat (after the side-pole shades the
+ * user pointed to), for the AR view and the 3D maps, built in code: a low stone disc with a wooden deck, a round
+ * bench along its edge and a round table in the middle; a slim round anthracite trunk tapering upwards rises from
+ * a steel plate between the table and the bench, leaning so its top stands over the platform's middle, a satin
+ * ring near its foot, a sleek hub with a small
  * finial on top and a warm LED ring under it, and a round canopy all round the pole — taut warm-white fabric sloping
  * gently down from the hub like a shallow dome (never a funnel), its edge cut in soft scallops between eight slim
  * round ribs and finished with a thin dark piping, each rib ending in a small satin cap. In a w×d rectangle centred
@@ -17,7 +20,7 @@ const RIBS = 8;          // ribs round the canopy
 const SCALLOP = 0.07;    // the edge cut in between two ribs, share of the reach
 const DROP = 0.16;       // the canopy's fall from hub to edge, share of the radius (a shallow dome)
 
-type Mats = { pole: THREE.Material; satin: THREE.Material; fabric: THREE.Material; trim: THREE.Material; led: THREE.Material; shadow: THREE.Material };
+type Mats = { pole: THREE.Material; satin: THREE.Material; wood: THREE.Material; stone: THREE.Material; fabric: THREE.Material; trim: THREE.Material; led: THREE.Material; shadow: THREE.Material };
 
 function tube(points: THREE.Vector3[], r: number, radial = 6, closed = false): THREE.BufferGeometry {
   const curve = new THREE.CatmullRomCurve3(points, closed);
@@ -56,39 +59,87 @@ function canopy(hub: THREE.Vector3, reach: number, drop: number) {
   return { geo, ribs, edge };
 }
 
+/** A round rod (tapering r0 → r1) from a to b. */
+function rodBetween(a: THREE.Vector3, b: THREE.Vector3, r0: number, r1: number, radial = 20): THREE.BufferGeometry {
+  const len = a.distanceTo(b);
+  const geo = new THREE.CylinderGeometry(r1, r0, len, radial);
+  geo.translate(0, len / 2, 0);
+  geo.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize()));
+  geo.translate(a.x, a.y, a.z);
+  return geo;
+}
+
+/** A solid ring (bench seat, table rim) between radii ri and ro, from y0 to y1. */
+function ringSolid(x: number, z: number, ri: number, ro: number, y0: number, y1: number, seg = 48): THREE.BufferGeometry {
+  const pts = [new THREE.Vector2(ri, y0), new THREE.Vector2(ro, y0), new THREE.Vector2(ro, y1), new THREE.Vector2(ri, y1), new THREE.Vector2(ri, y0)];
+  const geo = new THREE.LatheGeometry(pts, seg);
+  geo.translate(x, 0, z);
+  return geo;
+}
+
+/** The round seating platform under a canopy: radius for a canopy of reach r. */
+export function platformRadius(r: number): number {
+  return Math.max(1.1, Math.min(1.7, r * 0.55));
+}
+
 function unit(u: PapillonUnit, h: number, open: number, mats: Mats, out: THREE.Group, put: (m: THREE.Material, g: THREE.BufferGeometry) => void) {
   const H = h, x = u.x, z = u.z;
-  // Base: a flat round plate; the pole, round and tapering upwards, with a satin ring near its foot.
-  const base = new THREE.CylinderGeometry(0.26, 0.28, 0.035, 32); base.translate(x, 0.0175, z); put(mats.pole, base);
-  const pole = new THREE.CylinderGeometry(0.045, 0.065, H, 24); pole.translate(x, H / 2 + 0.035, z); put(mats.pole, pole);
-  const ring = new THREE.CylinderGeometry(0.068, 0.068, 0.04, 24); ring.translate(x, 0.3, z); put(mats.satin, ring);
-  const disc = new THREE.Mesh(new THREE.CircleGeometry(0.42, 28), mats.shadow); disc.rotation.x = -Math.PI / 2; disc.position.set(x, 0.004, z); out.add(disc);
+  // The round platform where one can stop and eat: a low stone disc with a wooden deck, a round bench along its
+  // edge on slim legs and a round table in the middle on one pedestal.
+  const rp = platformRadius(u.r);
+  put(mats.stone, (() => { const g = new THREE.CylinderGeometry(rp + 0.06, rp + 0.1, 0.08, 48); g.translate(x, 0.04, z); return g; })());
+  put(mats.wood, (() => { const g = new THREE.CylinderGeometry(rp, rp, 0.03, 48); g.translate(x, 0.095, z); return g; })());
+  const bi = rp - 0.48, bo = rp - 0.08;
+  put(mats.wood, ringSolid(x, z, bi, bo, 0.43, 0.48));
+  for (let k = 0; k < 10; k++) {
+    const a = (2 * Math.PI * k) / 10, rr = (bi + bo) / 2;
+    const leg = new THREE.BoxGeometry(0.035, 0.33, 0.2); leg.rotateY(a); leg.translate(x + Math.sin(a) * rr, 0.11 + 0.165, z + Math.cos(a) * rr);
+    put(mats.pole, leg);
+  }
+  const tableR = Math.max(0.45, Math.min(0.6, bi - 0.5));
+  put(mats.wood, (() => { const g = new THREE.CylinderGeometry(tableR, tableR, 0.04, 40); g.translate(x, 0.74, z); return g; })());
+  put(mats.satin, ringSolid(x, z, tableR - 0.005, tableR + 0.006, 0.718, 0.762));
+  put(mats.pole, (() => { const g = new THREE.CylinderGeometry(0.045, 0.055, 0.62, 16); g.translate(x, 0.41, z); return g; })());
+  put(mats.pole, (() => { const g = new THREE.CylinderGeometry(0.26, 0.28, 0.02, 32); g.translate(x, 0.12, z); return g; })());
+  // The trunk: from a foot between the table and the bench it leans so the canopy stands over the platform's middle.
+  const footR = Math.max(tableR + 0.25, bi - 0.14), fa = u.yaw + Math.PI;
+  const foot = new THREE.Vector3(x + Math.sin(fa) * footR, 0.11, z + Math.cos(fa) * footR);
   const hubY = H + 0.035;
+  const top = new THREE.Vector3(x, hubY - 0.06, z);
+  put(mats.pole, rodBetween(foot, top, 0.07, 0.048));
+  const plate = new THREE.CylinderGeometry(0.15, 0.16, 0.025, 24); plate.translate(foot.x, 0.123, foot.z); put(mats.pole, plate);
+  const ring = new THREE.CylinderGeometry(0.075, 0.075, 0.045, 24);
+  ring.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), top.clone().sub(foot).normalize()));
+  const ringAt = foot.clone().lerp(top, 0.09); ring.translate(ringAt.x, ringAt.y, ringAt.z); put(mats.satin, ring);
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(rp + 0.35, 40), mats.shadow); disc.rotation.x = -Math.PI / 2; disc.position.set(x, 0.004, z); out.add(disc);
+  const along = (yy: number) => foot.clone().lerp(top, (yy - foot.y) / (top.y - foot.y));
   const o = Math.max(0, Math.min(1, open));
   if (o < 0.08) {
-    // Closed: the canopy furled into a slim sleeve round the top of the pole, a satin band holding it.
+    // Closed: the canopy furled into a slim sleeve round the top of the trunk, a satin band holding it.
     const len = Math.max(0.6, u.r * 0.9);
-    const sleeve = new THREE.CylinderGeometry(0.07, 0.15, len, 16); sleeve.translate(x, hubY - len / 2, z); put(mats.fabric, sleeve);
-    const band = new THREE.CylinderGeometry(0.12, 0.12, 0.035, 16); band.translate(x, hubY - len * 0.55, z); put(mats.satin, band);
-    const top = new THREE.SphereGeometry(0.05, 12, 8); top.translate(x, hubY + 0.04, z); put(mats.satin, top);
+    const lo = along(hubY - len);
+    put(mats.fabric, rodBetween(lo, top.clone().setY(hubY), 0.15, 0.07, 16));
+    const band = along(hubY - len * 0.55);
+    const b = new THREE.SphereGeometry(0.13, 16, 8); b.scale(1, 0.18, 1); b.translate(band.x, band.y, band.z); put(mats.satin, b);
+    const tip = new THREE.SphereGeometry(0.05, 12, 8); tip.translate(x, hubY + 0.04, z); put(mats.satin, tip);
     return;
   }
   // Open: the hub with its finial and LED ring, the canopy, its ribs with caps and the piping round the edge.
   const reach = canopyReach(u.r, o);
-  const drop = DROP * u.r + (1 - o) * 0.55 * u.r;          // folding down towards the pole as it closes
+  const drop = DROP * u.r + (1 - o) * 0.55 * u.r;          // folding down towards the trunk as it closes
   const hub = new THREE.CylinderGeometry(0.075, 0.09, 0.12, 24); hub.translate(x, hubY, z); put(mats.pole, hub);
   const finial = new THREE.SphereGeometry(0.045, 16, 10); finial.translate(x, hubY + 0.09, z); put(mats.satin, finial);
   const led = new THREE.TorusGeometry(0.11, 0.012, 8, 32); led.rotateX(Math.PI / 2); led.translate(x, hubY - 0.08, z); put(mats.led, led);
   const fabricHub = new THREE.Vector3(x, hubY + 0.05, z);
   const c = canopy(fabricHub, reach, drop);
   put(mats.fabric, c.geo);
+  const strutFrom = along(hubY - 0.55 - (1 - o) * 0.3);
   for (const line of c.ribs) {
     put(mats.pole, tube([fabricHub.clone().setY(fabricHub.y - 0.03), ...line], 0.011, 5));
     const tip = line[line.length - 1]!;
     const cap = new THREE.SphereGeometry(0.02, 10, 6); cap.translate(tip.x, tip.y, tip.z); put(mats.satin, cap);
-    // A slim strut from the pole to the rib's middle, as a real canopy is held.
-    const mid = line[Math.floor(line.length * 0.45)]!;
-    put(mats.pole, tube([new THREE.Vector3(x, hubY - 0.55 - (1 - o) * 0.3, z), mid], 0.008, 4));
+    // A slim strut from the trunk to the rib's middle, as a real canopy is held.
+    put(mats.pole, tube([strutFrom, line[Math.floor(line.length * 0.45)]!], 0.008, 4));
   }
   put(mats.trim, tube(c.edge, 0.009, 4, true));
 }
@@ -98,6 +149,8 @@ export function realPapillons(def: { w: number; d: number; h?: number; open?: nu
   const mats: Mats = {
     pole: new THREE.MeshStandardMaterial({ color: "#2b2f34", roughness: 0.42, metalness: 0.55 }),
     satin: new THREE.MeshStandardMaterial({ color: "#c9ced3", roughness: 0.28, metalness: 0.85 }),
+    wood: new THREE.MeshStandardMaterial({ color: "#a8784c", roughness: 0.62 }),
+    stone: new THREE.MeshStandardMaterial({ color: "#cfc8bb", roughness: 0.9 }),
     // emissive: daylight showing through the fabric from below.
     fabric: new THREE.MeshStandardMaterial({ color: "#f4efe6", emissive: "#8f8778", emissiveIntensity: 0.6, roughness: 0.82, metalness: 0, side: THREE.DoubleSide }),
     trim: new THREE.MeshStandardMaterial({ color: "#3a3d42", roughness: 0.6 }),
