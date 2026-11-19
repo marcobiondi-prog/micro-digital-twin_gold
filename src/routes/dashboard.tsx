@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { drawnAreaFor } from "@/models/drawn-area";
 import { constraintRows, crowdEstimate, crowdRows, siteCenter, siteConstraints } from "@/models/site-context";
 import { useSiteContext } from "@/views/v10/SiteContext";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
@@ -470,7 +471,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   // People at the simulation's season and hour, and the place's constraints: the same reading as the dashboard's cards.
   const siteLoc = ctx === "Urbano" ? u : v;
   const [sLat, sLng] = siteCenter(siteLoc.location, siteLoc.area);
-  const site = useSiteContext(sLat, sLng, !!siteLoc.location.pending).data;
+  const site = useSiteContext(sLat, sLng, !drawnAreaFor(siteLoc.area, siteLoc.location)).data;
   const crowdR: [string, string][] = ctx === "Urbano" && site ? crowdRows(crowdEstimate(site.draws, pd.sum.m2, getPiazzaReading()?.season ?? season, pd.sum.hour), getPiazzaReading()?.season ?? season, pd.sum.hour, Math.floor(pd.sum.shadeM2 / 2)) : [];
   const constraintR: [string, string][] = site ? constraintRows(siteConstraints(site, siteLoc.location.label ?? ""), ctx === "Urbano" ? "piazza" : "vigneto") : [];
   const notes = useNotes();

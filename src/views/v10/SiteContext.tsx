@@ -6,6 +6,17 @@ import { crowdEstimate, interventionAdvice, siteConstraints, siteKey, type Const
 import { SEASON_LABEL, type Season } from "@/models/season-climate";
 import { grouped } from "@/models/intervention-cost";
 import { cn } from "@/lib/utils";
+import { openSimTab } from "@/views/v8/console";
+
+/** Before an area is circled on the map nothing is searched: the search starts from the area. */
+function DrawFirst({ sim }: { sim: "urban" | "vineyard" }) {
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-muted-foreground">Circoscrivi l’area sulla mappa: la ricerca parte da lì.</p>
+      <button type="button" onClick={() => openSimTab(sim, "mappa")} className="inline-flex h-9 items-center rounded-full bg-foreground/[0.08] px-3.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">Disegna l’area</button>
+    </div>
+  );
+}
 
 /** What is around the place (one query per place, kept for the session). */
 export function useSiteContext(lat: number, lng: number, pending = false) {
@@ -56,7 +67,7 @@ export function CrowdCard({ lat, lng, pending, m2, season, hour, shadePlaces }: 
   return (
     <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4" aria-label="Persone nella piazza">
       <div className="flex items-center gap-2"><Users className="size-5 text-brand-turquoise" aria-hidden="true" /><p className="text-[15px] font-semibold">Persone nella piazza</p><span className="ml-auto rounded-full bg-foreground/[0.08] px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">stima</span></div>
-      {pending ? <p className="text-sm text-muted-foreground">Scegli prima il luogo sulla mappa.</p>
+      {pending ? <DrawFirst sim="urban" />
         : ctx.isPending ? <p className="inline-flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />Guardo cosa c’è intorno alla piazza…</p>
         : !crowd ? <Unreadable reason={ctx.error?.message} retry={() => void ctx.refetch()} busy={ctx.isFetching} />
         : <>
@@ -89,7 +100,7 @@ export function ConstraintsCard({ lat, lng, pending, placeName, kind }: { lat: n
   return (
     <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4" aria-label="Vincoli dell'area">
       <div className="flex items-center gap-2">{cs && cs.length ? <ShieldAlert className="size-5 text-amber-500" aria-hidden="true" /> : <ShieldCheck className="size-5 text-brand-turquoise" aria-hidden="true" />}<p className="text-[15px] font-semibold">Vincoli dell’area</p><span className="ml-auto rounded-full bg-foreground/[0.08] px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">indicativo</span></div>
-      {pending ? <p className="text-sm text-muted-foreground">Scegli prima il luogo sulla mappa.</p>
+      {pending ? <DrawFirst sim={kind === "piazza" ? "urban" : "vineyard"} />
         : ctx.isPending ? <p className="inline-flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />Cerco beni tutelati e aree vincolate intorno…</p>
         : !cs ? <Unreadable reason={ctx.error?.message} retry={() => void ctx.refetch()} busy={ctx.isFetching} />
         : <>
@@ -125,9 +136,16 @@ export function ConstraintsCard({ lat, lng, pending, placeName, kind }: { lat: n
  * At the top of Simula, before the levers: the area's feasibility in one line (the constraints found, or none), with a
  * tap down to the "Vincoli dell'area" card. Nothing while no place is chosen or the surroundings are being read.
  */
-export function FeasibilityStrip({ lat, lng, pending, placeName }: { lat: number; lng: number; pending?: boolean; placeName: string }) {
+export function FeasibilityStrip({ lat, lng, pending, placeName, sim }: { lat: number; lng: number; pending?: boolean; placeName: string; sim: "urban" | "vineyard" }) {
   const ctx = useSiteContext(lat, lng, pending);
   const cs = useMemo(() => (ctx.data && ctx.data.constraintsOk !== false ? siteConstraints(ctx.data, placeName) : null), [ctx.data, placeName]);
+  if (pending) return (
+    <button type="button" onClick={() => openSimTab(sim, "mappa")} className="flex w-full items-center gap-2.5 rounded-2xl bg-foreground/[0.05] px-3.5 py-2.5 text-left ring-1 ring-foreground/10 outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <ShieldCheck className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+      <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">Fattibilità dell’area</span><span className="block text-xs text-muted-foreground">Circoscrivi l’area sulla mappa: la ricerca di vincoli e persone parte da lì.</span></span>
+      <ChevronDown className="size-4 shrink-0 -rotate-90 text-muted-foreground" aria-hidden="true" />
+    </button>
+  );
   if (pending || !cs) return null;
   const probable = cs.some((c) => c.level === "probabile");
   const go = () => document.querySelector('[aria-label="Vincoli dell\'area"]')?.scrollIntoView({ behavior: "smooth", block: "start" });
