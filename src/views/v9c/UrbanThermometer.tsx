@@ -12,7 +12,7 @@ import { setUrban, useLab, type RealWeather } from "@/models/lab-store";
 import { REFERENCE_M2, grouped } from "@/models/intervention-cost";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { useSeasonClock, WhenPicker } from "@/views/v10/when";
-import { ConstraintsCard, CrowdCard } from "@/views/v10/SiteContext";
+import { ConstraintsCard, CrowdCard, FeasibilityStrip } from "@/views/v10/SiteContext";
 import { coolingShare, estimatedTemp, SEASON_LABEL } from "@/models/season-climate";
 import { setPiazzaReading } from "@/models/sim-reading";
 import { loadAirTemperature } from "@/views/air-temp-client";
@@ -407,6 +407,8 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">{share > 0.01 ? "Trascina il punto bianco o tocca un livello" : "Modifica gli interventi"}</p>
       </div>
+      {/* Feasibility first: the area's constraints in one line, before any intervention. */}
+      <FeasibilityStrip lat={cLat} lng={cLng} pending={!!urban.location.pending} placeName={urban.location.label ?? ""} />
 
       {/* The simulation stays the focus: once the gauge scrolls away, its reading rides under the tabs. */}
       <div aria-hidden={gaugeSeen} className={cn("pointer-events-none sticky top-[calc(var(--nav-h)+3.75rem)] z-[999999996] -mb-5 flex h-0 translate-y-[var(--sim-tabs-shift,0px)] justify-center transition-opacity duration-200 motion-reduce:transition-none", gaugeSeen ? "opacity-0" : "opacity-100")}>

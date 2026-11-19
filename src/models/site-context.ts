@@ -13,24 +13,37 @@ import { ringCentroid } from "./place-area";
 export const DRAW_M = 300; // radius for what draws people
 export type SiteEl = { type: string; id?: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> };
 
-/** One query: the places around (with their centre), the buildings' count, and what can bring a constraint. */
-export function siteContextQuery(lat: number, lng: number): string {
+/**
+ * Two light queries (asked one after the other: the map servers turn away too many at once). What draws people
+ * within 300 m with the buildings' count…
+ */
+export function siteDrawsQuery(lat: number, lng: number): string {
   const p = `${lat.toFixed(6)},${lng.toFixed(6)}`;
-  return `[out:json][timeout:25];(`
+  return `[out:json][timeout:20];(`
     + `nwr["amenity"~"^(cafe|restaurant|bar|pub|fast_food|ice_cream|school|kindergarten|college|university|place_of_worship|marketplace|bus_station|townhall|library|theatre|cinema|pharmacy|hospital|clinic)$"](around:${DRAW_M},${p});`
     + `nwr["shop"](around:${DRAW_M},${p});`
     + `nwr["tourism"~"^(hotel|guest_house|hostel|apartment|attraction|museum|gallery|viewpoint)$"](around:${DRAW_M},${p});`
-    + `node["highway"="bus_stop"](around:${DRAW_M},${p});nwr["railway"~"^(station|halt)$"](around:${DRAW_M},${p});`
-    + `nwr["heritage"](around:250,${p});nwr["historic"](around:300,${p});`
-    + `nwr["boundary"="protected_area"](around:50,${p});nwr["leisure"="nature_reserve"](around:50,${p});`
-    + `way["waterway"~"^(river|stream|canal)$"](around:160,${p});way["natural"="coastline"](around:320,${p});`
-    + `nwr["natural"="water"]["water"~"^(lake|reservoir)$"](around:320,${p});`
-    + `nwr["landuse"="forest"](around:60,${p});nwr["natural"="wood"](around:60,${p});`
+    + `node["highway"="bus_stop"](around:${DRAW_M},${p});node["railway"~"^(station|halt)$"](around:${DRAW_M},${p});`
     + `);out tags center 900;way["building"](around:${DRAW_M},${p});out count;`;
 }
+/**
+ * …and what can bring a constraint: the parks, reserves and woods the point lies in (is_in, cheap even for huge areas),
+ * and the cultural goods, rivers, coast, lakes and woods close by.
+ */
+export function siteConstraintsQuery(lat: number, lng: number): string {
+  const p = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+  return `[out:json][timeout:20];is_in(${p})->.a;`
+    + `(area.a["boundary"="protected_area"];area.a["leisure"="nature_reserve"];area.a["landuse"="forest"];area.a["natural"="wood"];)->.in;.in out tags;`
+    + `(nwr["heritage"](around:250,${p});nwr["historic"](around:300,${p});`
+    + `way["waterway"~"^(river|stream|canal)$"](around:160,${p});way["natural"="coastline"](around:320,${p});`
+    + `way["natural"="water"]["water"~"^(lake|reservoir)$"](around:320,${p});`
+    + `way["landuse"="forest"](around:60,${p});way["natural"="wood"](around:60,${p}););out tags center 300;`;
+}
+/** Both queries (kept for the tests and for reading them together). */
+export const siteContextQuery = (lat: number, lng: number) => `${siteDrawsQuery(lat, lng)}\n${siteConstraintsQuery(lat, lng)}`;
 
 export type Draws = { food: number; shops: number; schools: number; worship: number; transport: number; attractions: number; hotels: number; markets: number; services: number; buildings: number };
-export type SiteContext = { draws: Draws; els: SiteEl[]; lat: number; lng: number; elevation: number | null };
+export type SiteContext = { draws: Draws; els: SiteEl[]; lat: number; lng: number; elevation: number | null; drawsOk?: boolean; constraintsOk?: boolean };
 
 const posOf = (e: SiteEl): [number, number] | null => (e.lat != null && e.lon != null ? [e.lat, e.lon] : e.center ? [e.center.lat, e.center.lon] : null);
 export const distM = (a: [number, number], b: [number, number]) => {

@@ -209,9 +209,9 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         return { ...z, ...next };
       });
       if (!changed) return;
-      setVineyard({ zones });
+      // Never put by itself: the zone is offered, so the area's feasibility (Vincoli dell'area in Simula) is seen first.
       const names = [...new Set(zonesOfArea(saved).filter((z) => fresh.has(z.id)).map((z) => ZONE_LABEL[z.kind]))].join(" · ");
-      toast.success("Interventi messi nelle zone", { description: `${names}: li vedi sulla mappa 2D e 3D e contano nella simulazione.` });
+      toast("Zona disegnata: interventi non ancora messi", { description: `${names}. Prima guarda i vincoli dell’area in Simula, poi mettili con un tocco.`, duration: 15000, action: { label: "Mettili", onClick: () => setVineyard({ zones }) } });
       return;
     }
     if (kind !== "urban") return;
@@ -228,9 +228,9 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
     for (const z of zonesOfArea(saved)) if (fresh.has(z.id)) seen.add(`${z.id}:${z.kind}`);
     keepSeeded(seen);
     if (!next) return;
-    setUrban(next);
+    // Never put by itself: the zone is offered, so the area's feasibility (Vincoli dell'area in Simula) is seen first.
     const said = [next.trees !== u.trees && `Alberi ${next.trees}`, next.permeable !== u.permeable && `Aiuole ${next.permeable} %`, next.shade !== u.shade && `Ombra ${next.shade} %`, next.misters !== (u.misters ?? 0) && `Nebulizzatori ${next.misters}`].filter(Boolean).join(" · ");
-    toast.success("Interventi messi nelle zone", { description: `${said}: li vedi sulla mappa 2D e 3D.` });
+    toast("Zona disegnata: interventi non ancora messi", { description: `Proposta: ${said}. Prima guarda i vincoli dell’area in Simula, poi mettili con un tocco.`, duration: 15000, action: { label: "Mettili", onClick: () => setUrban(next) } });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind, zoneSig, !!saved?.edits?.onlyDrawn]);
   const setEdits = (edits: LayoutEdits) => {

@@ -10,7 +10,8 @@ describe("changing place keeps each place’s simulation", () => {
     setUrban({ location: A, trees: 12, permeable: 40, shade: 30, area: area(A) });
     setUrban({ location: B });
     expect(getLab().urban.area).toBeNull();
-    expect(getLab().urban.trees).toBe(12);
+    // A place never seen starts with no interventions, so its feasibility is seen first.
+    expect([getLab().urban.trees, getLab().urban.permeable, getLab().urban.shade]).toEqual([0, 0, 0]);
     setUrban({ trees: 3, permeable: 10, shade: 0, area: area(B) });
     setUrban({ location: { ...A, lat: A.lat + 1e-4 } });
     const u = getLab().urban;
@@ -25,6 +26,7 @@ describe("changing place keeps each place’s simulation", () => {
     setVineyard({ location: A });
     setVineyard((v) => ({ zones: v.zones.map((z) => ({ ...z, irrigation: 12 })), area: area(A) }));
     setVineyard({ location: B });
+    expect(getLab().vineyard.zones.every((z) => z.irrigation === undefined)).toBe(true);
     setVineyard((v) => ({ zones: v.zones.map((z) => ({ ...z, irrigation: 2 })) }));
     setVineyard({ location: A });
     expect(getLab().vineyard.zones.every((z) => z.irrigation === 12)).toBe(true);

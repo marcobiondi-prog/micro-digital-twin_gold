@@ -15,8 +15,20 @@ export function useSiteContext(lat: number, lng: number, pending = false) {
     enabled: !pending,
     staleTime: Infinity,
     gcTime: 60 * 60_000,
-    retry: 1,
+    retry: 0,
   });
+}
+
+/** The surroundings could not be read: why, and a button to ask again. */
+function Unreadable({ reason, retry, busy }: { reason?: string | undefined; retry: () => void; busy: boolean }) {
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-muted-foreground">Non riesco a leggere i dintorni ora{reason ? ` (${reason})` : ""}.</p>
+      <button type="button" onClick={retry} disabled={busy} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-foreground/[0.08] px-3.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">
+        {busy ? <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" /> : null}{busy ? "Riprovo…" : "Riprova"}
+      </button>
+    </div>
+  );
 }
 
 const plural = (n: number, one: string, many: string) => `${grouped(n)} ${n === 1 ? one : many}`;
@@ -27,7 +39,7 @@ const plural = (n: number, one: string, many: string) => `${grouped(n)} ${n === 
  */
 export function CrowdCard({ lat, lng, pending, m2, season, hour, shadePlaces }: { lat: number; lng: number; pending?: boolean; m2: number; season: Season; hour: number; shadePlaces: number }) {
   const ctx = useSiteContext(lat, lng, pending);
-  const crowd = useMemo(() => (ctx.data ? crowdEstimate(ctx.data.draws, m2, season, hour) : null), [ctx.data, m2, season, hour]);
+  const crowd = useMemo(() => (ctx.data && ctx.data.drawsOk !== false ? crowdEstimate(ctx.data.draws, m2, season, hour) : null), [ctx.data, m2, season, hour]);
   const d = ctx.data?.draws;
   const parts = d ? [
     d.food && plural(d.food, "bar o ristorante", "bar e ristoranti"),
@@ -46,7 +58,7 @@ export function CrowdCard({ lat, lng, pending, m2, season, hour, shadePlaces }: 
       <div className="flex items-center gap-2"><Users className="size-5 text-brand-turquoise" aria-hidden="true" /><p className="text-[15px] font-semibold">Persone nella piazza</p><span className="ml-auto rounded-full bg-foreground/[0.08] px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">stima</span></div>
       {pending ? <p className="text-sm text-muted-foreground">Scegli prima il luogo sulla mappa.</p>
         : ctx.isPending ? <p className="inline-flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />Guardo cosa c’è intorno alla piazza…</p>
-        : !crowd ? <p className="text-sm text-muted-foreground">Non riesco a leggere i dintorni ora: riprova più tardi.</p>
+        : !crowd ? <Unreadable reason={ctx.error?.message} retry={() => void ctx.refetch()} busy={ctx.isFetching} />
         : <>
           <p className="text-sm text-muted-foreground">{SEASON_LABEL[season]}, ore {String(Math.floor(hour)).padStart(2, "0")}:00</p>
           <p className="font-display text-3xl font-light tabular-nums">≈ {grouped(crowd.low)}–{grouped(crowd.high)} <span className="text-base text-muted-foreground">persone</span></p>
@@ -71,7 +83,7 @@ const LEVEL_TONE: Record<Constraint["level"], string> = { probabile: "bg-amber-4
 /** "Vincoli dell'area": the constraints the open map data point to, what they mean for the interventions, and where to check them. */
 export function ConstraintsCard({ lat, lng, pending, placeName, kind }: { lat: number; lng: number; pending?: boolean; placeName: string; kind: "piazza" | "vigneto" }) {
   const ctx = useSiteContext(lat, lng, pending);
-  const cs = useMemo(() => (ctx.data ? siteConstraints(ctx.data, placeName) : null), [ctx.data, placeName]);
+  const cs = useMemo(() => (ctx.data && ctx.data.constraintsOk !== false ? siteConstraints(ctx.data, placeName) : null), [ctx.data, placeName]);
   const [open, setOpen] = useState<string | null>(null);
   const probable = cs?.some((c) => c.level === "probabile");
   return (
@@ -79,7 +91,7 @@ export function ConstraintsCard({ lat, lng, pending, placeName, kind }: { lat: n
       <div className="flex items-center gap-2">{cs && cs.length ? <ShieldAlert className="size-5 text-amber-500" aria-hidden="true" /> : <ShieldCheck className="size-5 text-brand-turquoise" aria-hidden="true" />}<p className="text-[15px] font-semibold">Vincoli dell’area</p><span className="ml-auto rounded-full bg-foreground/[0.08] px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">indicativo</span></div>
       {pending ? <p className="text-sm text-muted-foreground">Scegli prima il luogo sulla mappa.</p>
         : ctx.isPending ? <p className="inline-flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />Cerco beni tutelati e aree vincolate intorno…</p>
-        : !cs ? <p className="text-sm text-muted-foreground">Non riesco a leggere i dintorni ora: riprova più tardi.</p>
+        : !cs ? <Unreadable reason={ctx.error?.message} retry={() => void ctx.refetch()} busy={ctx.isFetching} />
         : <>
           <p className="text-sm">{cs.length === 0 ? "Nelle mappe non risultano beni tutelati né aree vincolate vicine." : probable ? `Probabile tutela: ${cs.length === 1 ? "un vincolo" : `${cs.length} vincoli`} da verificare prima degli interventi.` : `Possibili vincoli: ${cs.length === 1 ? "uno" : cs.length} da verificare.`}</p>
           {cs.length > 0 && <ul className="space-y-2">
@@ -106,5 +118,28 @@ export function ConstraintsCard({ lat, lng, pending, placeName, kind }: { lat: n
           <p className="text-[11px] leading-snug text-muted-foreground">Indicazione dalle mappe aperte, non un parere: i decreti di notevole interesse pubblico (art. 136) e i piani paesaggistici regionali qui non si leggono. Il vincolo certo lo dicono l’Ufficio tecnico del Comune e la Soprintendenza.</p>
         </>}
     </div>
+  );
+}
+
+/**
+ * At the top of Simula, before the levers: the area's feasibility in one line (the constraints found, or none), with a
+ * tap down to the "Vincoli dell'area" card. Nothing while no place is chosen or the surroundings are being read.
+ */
+export function FeasibilityStrip({ lat, lng, pending, placeName }: { lat: number; lng: number; pending?: boolean; placeName: string }) {
+  const ctx = useSiteContext(lat, lng, pending);
+  const cs = useMemo(() => (ctx.data && ctx.data.constraintsOk !== false ? siteConstraints(ctx.data, placeName) : null), [ctx.data, placeName]);
+  if (pending || !cs) return null;
+  const probable = cs.some((c) => c.level === "probabile");
+  const go = () => document.querySelector('[aria-label="Vincoli dell\'area"]')?.scrollIntoView({ behavior: "smooth", block: "start" });
+  return (
+    <button type="button" onClick={go} className={cn("flex w-full items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-left ring-1 outline-none focus-visible:ring-2 focus-visible:ring-ring",
+      cs.length ? "bg-amber-400/10 ring-amber-500/30" : "bg-brand-turquoise/10 ring-brand-turquoise/30")}>
+      {cs.length ? <ShieldAlert className="size-5 shrink-0 text-amber-500" aria-hidden="true" /> : <ShieldCheck className="size-5 shrink-0 text-brand-turquoise" aria-hidden="true" />}
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">Fattibilità dell’area</span>
+        <span className="block text-xs text-muted-foreground">{cs.length ? `${probable ? "Probabile tutela" : "Possibili vincoli"}: ${cs.map((c) => c.title.toLowerCase()).join(", ")}. Guarda prima cosa si può fare.` : "Nelle mappe non risultano vincoli vicini (da confermare con il Comune)."}</span>
+      </span>
+      <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+    </button>
   );
 }
