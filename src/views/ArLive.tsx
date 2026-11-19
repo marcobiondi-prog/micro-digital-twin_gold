@@ -1783,7 +1783,7 @@ export type FanGroup = { key: string; label: string; Icon: LucideIcon; items: Fa
 
 /** One line on what each object is for, in the AR sheet. */
 const OBJECT_HINT: Record<string, string> = {
-  albero: "Fa ombra e rinfresca l’aria", pergolato: "Palo laterale, ali di tessuto che si aprono e si chiudono", aiuola: "Verde permeabile tra i ciottoli",
+  albero: "Fa ombra e rinfresca l’aria", pergolato: "Palo centrale, falda tonda di tessuto che si apre e si chiude", aiuola: "Verde permeabile tra i ciottoli",
   nebulizzatore: "Nebbia d’acqua che rinfresca vicino agli ugelli", innaffiatoio: "Bagna aiuole e terreno",
   telo: "Rete ombreggiante sopra le viti", frangivento: "Siepe che ferma il vento", irrigazione: "Ala gocciolante lungo il filare",
 };
