@@ -8,9 +8,12 @@ describe("cloud space", () => {
     expect(bytesText(1.5 * 1024 ** 2)).toBe("1,5 MB");
     expect(bytesText(12 * 1024 ** 3)).toBe("12 GB");
   });
-  it("turns amber past 80 % and red past 95 %", () => {
-    expect(usageTone(0.5)).toContain("turquoise");
-    expect(usageTone(0.85)).toBe("#f59e0b");
-    expect(usageTone(0.97)).toContain("danger");
+  it("blends from turquoise to red as the space fills", () => {
+    expect(usageTone(0)).toBe("rgb(45, 212, 191)");
+    expect(usageTone(0.72)).toBe("rgb(250, 204, 21)");
+    expect(usageTone(1)).toBe("rgb(239, 68, 68)");
+    expect(usageTone(2)).toBe("rgb(239, 68, 68)");
+    const red = (s: number) => Number(/rgb\((\d+)/.exec(usageTone(s))![1]);
+    expect(red(0.95)).toBeGreaterThan(red(0.6));
   });
 });

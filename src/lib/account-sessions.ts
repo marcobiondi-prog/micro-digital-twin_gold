@@ -81,6 +81,8 @@ export function leaveAccount(opts: { openPanel?: boolean; to?: string; replace?:
     supabase.auth.stopAutoRefresh();
     const key = (supabase.auth as unknown as { storageKey?: string }).storageKey;
     if (key) { window.localStorage.removeItem(key); window.localStorage.removeItem(`${key}-code-verifier`); window.localStorage.removeItem(`${key}-user`); }
+    // Signed out on this phone: the app no longer reads as signed in (Premium) under that email.
+    window.localStorage.removeItem("mdt-registered-email");
     if (opts.openPanel !== false) sessionStorage.setItem(OPEN_AFTER, "1");
     // Left on purpose: the recognition is not asked again by itself on the reload that follows.
     sessionStorage.setItem("mdt-bio-skip", "1");
