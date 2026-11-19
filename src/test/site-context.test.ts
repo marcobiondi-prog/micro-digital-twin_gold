@@ -83,3 +83,19 @@ describe("site context", () => {
     expect(siteCenter({ lat: LAT, lng: LNG }, null)).toEqual([LAT, LNG]);
   });
 });
+
+import { distToPlace, siteKey } from "@/models/site-context";
+describe("reading the drawn area", () => {
+  const ring: [number, number][] = [[41.5605, 14.6620], [41.5605, 14.6630], [41.5612, 14.6630], [41.5612, 14.6620]];
+  it("measures from the area's edge, 0 inside", () => {
+    expect(distToPlace([41.5608, 14.6625], 0, 0, ring)).toBe(0);
+    const d = distToPlace([41.5608, 14.6640], 41.5608, 14.6625, ring);
+    expect(d).toBeGreaterThan(70); expect(d).toBeLessThan(95);
+  });
+  it("asks round the outline and inside it, and a redrawn area is read again", () => {
+    const q = siteContextQuery(41.5608, 14.6625, ring);
+    expect(q).toContain("poly:\"41.560500 14.662000");
+    expect(q).toMatch(/around:250,41\.560500,14\.662000,.*41\.560500,14\.662000\)/);
+    expect(siteKey(1, 2, ring)[3]).not.toBe(siteKey(1, 2, ring.map(([a, b]) => [a + 0.0002, b] as [number, number]))[3]);
+  });
+});

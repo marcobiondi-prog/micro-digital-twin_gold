@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ExternalLink, Landmark, LoaderCircle, ShieldAlert, ShieldCheck, Users } from "lucide-react";
 import { loadSiteContext } from "@/lib/site-context-client";
+import type { Ring } from "@/models/place-area";
 import { crowdEstimate, interventionAdvice, siteConstraints, siteKey, type Constraint, type SiteContext } from "@/models/site-context";
 import { SEASON_LABEL, type Season } from "@/models/season-climate";
 import { grouped } from "@/models/intervention-cost";
@@ -19,10 +20,13 @@ function DrawFirst({ sim }: { sim: "urban" | "vineyard" }) {
 }
 
 /** What is around the place (one query per place, kept for the session). */
-export function useSiteContext(lat: number, lng: number, pending = false) {
+export function useSiteContext(lat: number, lng: number, pending = false, ring?: Ring | null) {
   return useQuery<SiteContext>({
-    queryKey: siteKey(lat, lng),
-    queryFn: () => loadSiteContext(lat, lng),
+    queryKey: siteKey(lat, lng, ring),
+    // Never longer than 45 s, whatever the servers or the phone do: the card then says why, with Riprova.
+    queryFn: () => Promise.race([loadSiteContext(lat, lng, ring), new Promise<never>((_, no) => setTimeout(() => no(new Error("tempo scaduto")), 45_000))]),
+    // Asked even when the phone believes it is offline (a paused query kept the spinner turning for ever).
+    networkMode: "always",
     enabled: !pending,
     staleTime: Infinity,
     gcTime: 60 * 60_000,
@@ -48,8 +52,8 @@ const plural = (n: number, one: string, many: string) => `${grouped(n)} ${n === 
  * "Persone nella piazza": how many people are probably in the place at the simulation's season and hour, the day
  * through the hours (the chosen one lit), what draws them, and how many of them the shade of the interventions covers.
  */
-export function CrowdCard({ lat, lng, pending, m2, season, hour, shadePlaces }: { lat: number; lng: number; pending?: boolean; m2: number; season: Season; hour: number; shadePlaces: number }) {
-  const ctx = useSiteContext(lat, lng, pending);
+export function CrowdCard({ lat, lng, pending, ring, m2, season, hour, shadePlaces }: { lat: number; lng: number; pending?: boolean; ring?: Ring | null | undefined; m2: number; season: Season; hour: number; shadePlaces: number }) {
+  const ctx = useSiteContext(lat, lng, pending, ring);
   const crowd = useMemo(() => (ctx.data && ctx.data.drawsOk !== false ? crowdEstimate(ctx.data.draws, m2, season, hour) : null), [ctx.data, m2, season, hour]);
   const d = ctx.data?.draws;
   const parts = d ? [
@@ -94,8 +98,8 @@ export function CrowdCard({ lat, lng, pending, m2, season, hour, shadePlaces }: 
 const LEVEL_TONE: Record<Constraint["level"], string> = { probabile: "bg-amber-400/15 text-amber-700 ring-amber-500/40 dark:text-amber-300", possibile: "bg-foreground/[0.06] text-muted-foreground ring-foreground/15" };
 
 /** "Vincoli dell'area": the constraints the open map data point to, what they mean for the interventions, and where to check them. */
-export function ConstraintsCard({ lat, lng, pending, placeName, kind }: { lat: number; lng: number; pending?: boolean; placeName: string; kind: "piazza" | "vigneto" }) {
-  const ctx = useSiteContext(lat, lng, pending);
+export function ConstraintsCard({ lat, lng, pending, ring, placeName, kind }: { lat: number; lng: number; pending?: boolean; ring?: Ring | null | undefined; placeName: string; kind: "piazza" | "vigneto" }) {
+  const ctx = useSiteContext(lat, lng, pending, ring);
   const cs = useMemo(() => (ctx.data && ctx.data.constraintsOk !== false ? siteConstraints(ctx.data, placeName) : null), [ctx.data, placeName]);
   const [open, setOpen] = useState<string | null>(null);
   const probable = cs?.some((c) => c.level === "probabile");
@@ -138,8 +142,8 @@ export function ConstraintsCard({ lat, lng, pending, placeName, kind }: { lat: n
  * At the top of Simula, before the levers: the area's feasibility in one line (the constraints found, or none), with a
  * tap down to the "Vincoli dell'area" card. Nothing while no place is chosen or the surroundings are being read.
  */
-export function FeasibilityStrip({ lat, lng, pending, placeName, sim }: { lat: number; lng: number; pending?: boolean; placeName: string; sim: "urban" | "vineyard" }) {
-  const ctx = useSiteContext(lat, lng, pending);
+export function FeasibilityStrip({ lat, lng, pending, ring, placeName, sim }: { lat: number; lng: number; pending?: boolean; ring?: Ring | null | undefined; placeName: string; sim: "urban" | "vineyard" }) {
+  const ctx = useSiteContext(lat, lng, pending, ring);
   const cs = useMemo(() => (ctx.data && ctx.data.constraintsOk !== false ? siteConstraints(ctx.data, placeName) : null), [ctx.data, placeName]);
   if (pending) return (
     <button type="button" onClick={() => openSimTab(sim, "mappa")} className="flex w-full items-center gap-2.5 rounded-2xl bg-foreground/[0.05] px-3.5 py-2.5 text-left ring-1 ring-foreground/10 outline-none focus-visible:ring-2 focus-visible:ring-ring">

@@ -338,8 +338,8 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
       <ZoneRows rows={zoneSummaryRows(urban.area, urban.location, sum.cost, empty, euroRange)} />
 
       {/* Who is there at the simulation's season and hour, and what may protect the place (as in the simulation). */}
-      <CrowdCard lat={site[0]} lng={site[1]} pending={!drawnAreaFor(urban.area, urban.location)} m2={m2} season={season} hour={sum.hour} shadePlaces={Math.floor(sum.shadeM2 / 2)} />
-      <ConstraintsCard lat={site[0]} lng={site[1]} pending={!drawnAreaFor(urban.area, urban.location)} placeName={urban.location.label ?? ""} kind="piazza" />
+      <CrowdCard lat={site[0]} lng={site[1]} pending={!drawnAreaFor(urban.area, urban.location)} ring={drawnAreaFor(urban.area, urban.location)?.ring} m2={m2} season={season} hour={sum.hour} shadePlaces={Math.floor(sum.shadeM2 / 2)} />
+      <ConstraintsCard lat={site[0]} lng={site[1]} pending={!drawnAreaFor(urban.area, urban.location)} ring={drawnAreaFor(urban.area, urban.location)?.ring} placeName={urban.location.label ?? ""} kind="piazza" />
 
       {records}
     </div>
@@ -401,7 +401,7 @@ export function VineDashboard({ records }: { records: ReactNode }) {
       <ZoneRows rows={zoneSummaryRows(vine.area, vine.location, sum.cost, empty, euroRange)} />
 
       {/* What may protect the vineyard's landscape (as in the simulation). */}
-      <ConstraintsCard lat={vSite[0]} lng={vSite[1]} pending={!drawnAreaFor(vine.area, vine.location)} placeName={vine.location.label ?? ""} kind="vigneto" />
+      <ConstraintsCard lat={vSite[0]} lng={vSite[1]} pending={!drawnAreaFor(vine.area, vine.location)} ring={drawnAreaFor(vine.area, vine.location)?.ring} placeName={vine.location.label ?? ""} kind="vigneto" />
 
       {records}
     </div>

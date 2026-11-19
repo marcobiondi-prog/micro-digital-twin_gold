@@ -408,7 +408,7 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
         <p className="text-sm text-muted-foreground">{share > 0.01 ? "Trascina il punto bianco o tocca un livello" : "Modifica gli interventi"}</p>
       </div>
       {/* Feasibility first: the area's constraints in one line, before any intervention. */}
-      <FeasibilityStrip sim="urban" lat={cLat} lng={cLng} pending={!areaHere} placeName={urban.location.label ?? ""} />
+      <FeasibilityStrip sim="urban" lat={cLat} lng={cLng} pending={!areaHere} ring={areaHere?.ring} placeName={urban.location.label ?? ""} />
 
       {/* The simulation stays the focus: once the gauge scrolls away, its reading rides under the tabs. */}
       <div aria-hidden={gaugeSeen} className={cn("pointer-events-none sticky top-[calc(var(--nav-h)+3.75rem)] z-[999999996] -mb-5 flex h-0 translate-y-[var(--sim-tabs-shift,0px)] justify-center transition-opacity duration-200 motion-reduce:transition-none", gaugeSeen ? "opacity-0" : "opacity-100")}>
@@ -493,8 +493,8 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
       </div>
 
       {/* 5 · Who is there at this season and hour, and what may protect the place (indicative, from the open map data). */}
-      <CrowdCard lat={cLat} lng={cLng} pending={!areaHere} m2={m2} season={season} hour={hour} shadePlaces={Math.floor(shadeM2 / 2)} />
-      <ConstraintsCard lat={cLat} lng={cLng} pending={!areaHere} placeName={urban.location.label ?? ""} kind="piazza" />
+      <CrowdCard lat={cLat} lng={cLng} pending={!areaHere} ring={areaHere?.ring} m2={m2} season={season} hour={hour} shadePlaces={Math.floor(shadeM2 / 2)} />
+      <ConstraintsCard lat={cLat} lng={cLng} pending={!areaHere} ring={areaHere?.ring} placeName={urban.location.label ?? ""} kind="piazza" />
     </section>
   );
 }

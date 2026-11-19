@@ -1,6 +1,6 @@
 import { SEASON_LABEL, type Season } from "./season-climate";
 import { drawnAreaFor, type DrawnArea } from "./drawn-area";
-import { ringCentroid } from "./place-area";
+import { ringCentroid, ringContains, type Ring } from "./place-area";
 
 /**
  * What is around the chosen place, read from the open map data by the phone (one query): what draws people (bars,
@@ -13,26 +13,54 @@ import { ringCentroid } from "./place-area";
 export const DRAW_M = 300; // radius for what draws people
 export type SiteEl = { type: string; id?: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> };
 
+/** At most 40 points of the drawn outline (enough for the map servers' filters, short enough for the query). */
+export function outline(ring?: Ring | null): Ring | null {
+  if (!ring || ring.length < 3) return null;
+  const open = ring.length > 3 && ring[0]![0] === ring[ring.length - 1]![0] && ring[0]![1] === ring[ring.length - 1]![1] ? ring.slice(0, -1) : ring;
+  const step = Math.max(1, Math.ceil(open.length / 40));
+  return open.filter((_, i) => i % step === 0);
+}
+/** The area's half-size in metres (its farthest corner from its middle). */
+export function areaRadius(ring?: Ring | null): number {
+  const o = outline(ring); if (!o) return 0;
+  const c = ringCentroid(o);
+  return Math.max(...o.map((p) => distM(p, c)));
+}
 /**
- * Two light queries (asked one after the other: the map servers turn away too many at once). What draws people
- * within 300 m with the buildings' count…
+ * The map servers' filters for "within r metres of the place": around the drawn outline (its edge, closed) plus what
+ * lies inside it — so a large area is read all over and every distance counts from its edge, as the law measures it —,
+ * else around the point.
  */
-export function siteDrawsQuery(lat: number, lng: number): string {
-  const a = `(around:${DRAW_M},${lat.toFixed(6)},${lng.toFixed(6)})`;
+export function zoneFilters(lat: number, lng: number, r: number, ring?: Ring | null): string[] {
+  const o = outline(ring);
+  if (!o) return [`(around:${r},${lat.toFixed(6)},${lng.toFixed(6)})`];
+  const pts = [...o, o[0]!];
+  return [`(around:${r},${pts.map(([a, b]) => `${a.toFixed(6)},${b.toFixed(6)}`).join(",")})`, `(poly:"${o.map(([a, b]) => `${a.toFixed(6)} ${b.toFixed(6)}`).join(" ")}")`];
+}
+const union = (sels: string[], zs: string[]) => `(${sels.flatMap((s) => zs.map((z) => `${s}${z};`)).join("")})`;
+
+/**
+ * Two light queries (asked together). What draws people within 300 m of the place with the buildings' count — round a
+ * drawn area, within 300 m less its half-size of its edge (at least 150 m) and inside it, so a small piazza reads the
+ * same as before and a large area is not counted twice by crowdEstimate's size factor…
+ */
+export function siteDrawsQuery(lat: number, lng: number, ring?: Ring | null): string {
+  const z = zoneFilters(lat, lng, ring && outline(ring) ? Math.max(150, Math.round(DRAW_M - areaRadius(ring))) : DRAW_M, ring);
+  const c = (...sels: string[]) => `${union(sels, z)};out count;`;
   // Only counts come back (one per kind, in DRAW_ORDER): a few hundred bytes, however busy the place.
   return `[out:json][timeout:15];`
-    + `nwr["amenity"~"^(cafe|restaurant|bar|pub|fast_food|ice_cream)$"]${a};out count;`
-    + `nwr["shop"]${a};out count;`
-    + `nwr["amenity"~"^(school|kindergarten|college|university)$"]${a};out count;`
-    + `nwr["amenity"="place_of_worship"]${a};out count;`
-    + `(nwr["amenity"="bus_station"]${a};node["highway"="bus_stop"]${a};node["railway"~"^(station|halt)$"]${a};);out count;`
-    + `nwr["tourism"~"^(attraction|museum|gallery|viewpoint)$"]${a};out count;`
-    + `nwr["tourism"~"^(hotel|guest_house|hostel|apartment)$"]${a};out count;`
-    + `nwr["amenity"="marketplace"]${a};out count;`
-    + `nwr["amenity"~"^(townhall|library|theatre|cinema|pharmacy|hospital|clinic)$"]${a};out count;`
-    + `way["building"]${a};out count;`
-    + `nwr["office"]${a};out count;`
-    + `nwr["leisure"~"^(park|playground|garden|pitch|sports_centre)$"]${a};out count;`;
+    + c(`nwr["amenity"~"^(cafe|restaurant|bar|pub|fast_food|ice_cream)$"]`)
+    + c(`nwr["shop"]`)
+    + c(`nwr["amenity"~"^(school|kindergarten|college|university)$"]`)
+    + c(`nwr["amenity"="place_of_worship"]`)
+    + c(`nwr["amenity"="bus_station"]`, `node["highway"="bus_stop"]`, `node["railway"~"^(station|halt)$"]`)
+    + c(`nwr["tourism"~"^(attraction|museum|gallery|viewpoint)$"]`)
+    + c(`nwr["tourism"~"^(hotel|guest_house|hostel|apartment)$"]`)
+    + c(`nwr["amenity"="marketplace"]`)
+    + c(`nwr["amenity"~"^(townhall|library|theatre|cinema|pharmacy|hospital|clinic)$"]`)
+    + c(`way["building"]`)
+    + c(`nwr["office"]`)
+    + c(`nwr["leisure"~"^(park|playground|garden|pitch|sports_centre)$"]`);
 }
 /** The kinds counted by siteDrawsQuery, in its order. */
 export const DRAW_ORDER = ["food", "shops", "schools", "worship", "transport", "attractions", "hotels", "markets", "services", "buildings", "offices", "leisure"] as const;
@@ -43,33 +71,58 @@ export function drawsFromCounts(els: SiteEl[]): Draws {
   return d;
 }
 /**
- * …and what can bring a constraint: the parks, reserves and woods the point lies in (is_in, cheap even for huge areas),
- * and the cultural goods, rivers, coast, lakes and woods close by.
+ * …and what can bring a constraint close to the place — round a drawn area, measured from its edge and inside it, as
+ * the law's distances are: cultural goods, rivers, coast, lakes and woods.
  */
-export function siteConstraintsQuery(lat: number, lng: number): string {
-  const p = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+export function siteConstraintsQuery(lat: number, lng: number, ring?: Ring | null): string {
+  const z = (r: number) => zoneFilters(lat, lng, r, ring);
   return `[out:json][timeout:15];(`
-    + `nwr["heritage"](around:250,${p});nwr["historic"](around:300,${p});`
-    + `way["waterway"~"^(river|stream|canal)$"](around:160,${p});way["natural"="coastline"](around:320,${p});`
-    + `way["natural"="water"]["water"~"^(lake|reservoir)$"](around:320,${p});`
-    + `way["landuse"="forest"](around:60,${p});way["natural"="wood"](around:60,${p}););out tags center 300;`;
+    + union([`nwr["heritage"]`], z(250)).slice(1, -1) + union([`nwr["historic"]`], z(300)).slice(1, -1)
+    + union([`way["waterway"~"^(river|stream|canal)$"]`], z(160)).slice(1, -1) + union([`way["natural"="coastline"]`], z(320)).slice(1, -1)
+    + union([`way["natural"="water"]["water"~"^(lake|reservoir)$"]`], z(320)).slice(1, -1)
+    + union([`way["landuse"="forest"]`, `way["natural"="wood"]`], z(60)).slice(1, -1) + `);out tags center 300;`;
 }
-/** The parks, reserves and woods the point lies in (is_in): asked apart, as not every map server answers it. */
-export function siteParksQuery(lat: number, lng: number): string {
-  return `[out:json][timeout:15];is_in(${lat.toFixed(6)},${lng.toFixed(6)})->.a;`
+/** Points where the place is read for is_in: its middle and, with a drawn area, four of its corners spread round it. */
+export function probePoints(lat: number, lng: number, ring?: Ring | null): Ring {
+  const o = outline(ring);
+  if (!o) return [[lat, lng]];
+  const n = o.length, picks = n <= 4 ? o : [0, 1, 2, 3].map((k) => o[Math.floor((k * n) / 4)]!);
+  return [ringCentroid(o), ...picks];
+}
+/** The parks, reserves and woods the place lies in or touches (is_in at its points): asked apart, as not every map server answers it. */
+export function siteParksQuery(lat: number, lng: number, ring?: Ring | null): string {
+  const pts = probePoints(lat, lng, ring);
+  const sets = pts.map((_, i) => `.p${i}`);
+  return `[out:json][timeout:15];${pts.map(([a, b], i) => `is_in(${a.toFixed(6)},${b.toFixed(6)})->.p${i};`).join("")}(${sets.map((x) => `${x};`).join("")})->.a;`
     + `(area.a["boundary"="protected_area"];area.a["leisure"="nature_reserve"];area.a["landuse"="forest"];area.a["natural"="wood"];);out tags;`;
 }
 /** Both queries (kept for the tests and for reading them together). */
-export const siteContextQuery = (lat: number, lng: number) => `${siteDrawsQuery(lat, lng)}\n${siteConstraintsQuery(lat, lng)}\n${siteParksQuery(lat, lng)}`;
+export const siteContextQuery = (lat: number, lng: number, ring?: Ring | null) => `${siteDrawsQuery(lat, lng, ring)}\n${siteConstraintsQuery(lat, lng, ring)}\n${siteParksQuery(lat, lng, ring)}`;
 
 export type Draws = { food: number; shops: number; schools: number; worship: number; transport: number; attractions: number; hotels: number; markets: number; services: number; buildings: number; offices?: number; leisure?: number };
-export type SiteContext = { draws: Draws; els: SiteEl[]; lat: number; lng: number; elevation: number | null; drawsOk?: boolean; constraintsOk?: boolean; why?: string };
+export type SiteContext = { draws: Draws; els: SiteEl[]; lat: number; lng: number; ring?: Ring | undefined; elevation: number | null; drawsOk?: boolean; constraintsOk?: boolean; why?: string };
 
 const posOf = (e: SiteEl): [number, number] | null => (e.lat != null && e.lon != null ? [e.lat, e.lon] : e.center ? [e.center.lat, e.center.lon] : null);
 export const distM = (a: [number, number], b: [number, number]) => {
   const k = Math.cos((a[0] * Math.PI) / 180);
   return Math.hypot((a[0] - b[0]) * 111_320, (a[1] - b[1]) * 111_320 * k);
 };
+
+/** How far a point is from the place: 0 inside the drawn area, else from its edge; from the point without an area. */
+export function distToPlace(p: [number, number], lat: number, lng: number, ring?: Ring | null): number {
+  const o = outline(ring);
+  if (!o) return distM(p, [lat, lng]);
+  if (ringContains(o, p[0], p[1])) return 0;
+  const k = Math.cos((p[0] * Math.PI) / 180), xy = (q: [number, number]) => [(q[1] - p[1]) * 111_320 * k, (q[0] - p[0]) * 111_320] as const;
+  let best = Infinity;
+  for (let i = 0; i < o.length; i++) {
+    const [ax, ay] = xy(o[i]!), [bx, by] = xy(o[(i + 1) % o.length]!);
+    const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy;
+    const t = L ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / L)) : 0;
+    best = Math.min(best, Math.hypot(ax + t * dx, ay + t * dy));
+  }
+  return best;
+}
 
 /** Counts of what draws people, from the query's answer (each place once). */
 export function drawsFrom(els: SiteEl[], lat: number, lng: number): Draws {
@@ -167,10 +220,9 @@ const nameOf = (e: SiteEl) => e.tags?.["name"] ?? null;
  * interest (art. 136) or a regional plan cannot be read here and is always left to check.
  */
 export function siteConstraints(ctx: SiteContext, placeName: string): Constraint[] {
-  const here: [number, number] = [ctx.lat, ctx.lng];
   const out: Constraint[] = [];
   const near = (f: (t: Record<string, string>) => boolean) => ctx.els.filter((e) => e.type !== "count" && f(e.tags ?? {}))
-    .map((e) => ({ e, d: (() => { const p = posOf(e); return p ? distM(p, here) : null; })() }))
+    .map((e) => ({ e, d: (() => { const p = posOf(e); return p ? distToPlace(p, ctx.lat, ctx.lng, ctx.ring) : null; })() }))
     .sort((a, b) => (a.d ?? 1e9) - (b.d ?? 1e9));
   const listed = (xs: Array<{ e: SiteEl; d: number | null }>) => xs.slice(0, 3).map(({ e, d }) => `${nameOf(e) ?? "bene storico"}${d != null ? ` (${Math.round(d / 10) * 10} m)` : ""}`).join(", ");
 
@@ -233,7 +285,14 @@ export function siteCenter(location: { lat: number; lng: number }, area: DrawnAr
   return a ? ringCentroid(a.ring).map((v) => Math.round(v * 1e4) / 1e4) as [number, number] : [location.lat, location.lng];
 }
 /** The query key of a place's surroundings (kept for the session, so the dashboard and the report reuse it). */
-export const siteKey = (lat: number, lng: number) => ["site-context", lat.toFixed(4), lng.toFixed(4)] as const;
+export const siteKey = (lat: number, lng: number, ring?: Ring | null) => ["site-context", lat.toFixed(4), lng.toFixed(4), ringTag(ring)] as const;
+/** A short tag of the drawn outline (corners to about 1 m), so a redrawn area is read again. */
+export function ringTag(ring?: Ring | null): string {
+  const o = outline(ring); if (!o) return "";
+  let h = 0;
+  for (const [a, b] of o) for (const v of [Math.round(a * 1e5), Math.round(b * 1e5)]) h = (Math.imul(h, 31) + v) | 0;
+  return `${o.length}:${(h >>> 0).toString(36)}`;
+}
 
 const it = (n: number) => Math.round(n).toLocaleString("it-IT");
 
