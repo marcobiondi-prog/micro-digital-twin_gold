@@ -116,7 +116,15 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   const startDrawing = () => { setView("2d"); setDraft(saved?.ring ?? []); setDrawing(true); };
   const finish = () => {
     if (draft.length < 3) { toast("Servono almeno 3 pin per chiudere l’area"); return; }
+    const fresh = !saved;
     save(draft); setDrawing(false);
+    if (fresh) {
+      // A new area starts free of interventions: its feasibility is looked at first (Simula), the interventions chosen after.
+      if (kind === "urban") setUrban({ trees: 0, permeable: 0, shade: 0, misters: 0, sprinklers: 0, treeCells: null, permeableCells: null, shadeCells: null });
+      else setVineyard((v) => ({ zones: v.zones.map((z) => ({ ...z, irrigation: 0, shade: 0, windbreak: 0 })) }));
+      toast.success("Area salvata · libera da interventi", { description: `${surfaceText(pinsM2(draft))}. Prima guarda la fattibilità dell’area in Simula, poi scegli gli interventi.`, duration: 9000, action: { label: "Fattibilità", onClick: () => openSimTab(kind, "simula") } });
+      return;
+    }
     toast.success("Area salvata", { description: `${surfaceText(pinsM2(draft))}: la usano i costi e i benefici.` });
   };
   const remove = () => { save(null); setDrawing(false); setDraft([]); toast("Area cancellata", { description: "Torna la superficie misurata o di riferimento." }); };
