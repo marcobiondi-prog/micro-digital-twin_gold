@@ -72,6 +72,26 @@ export async function switchToAccount(email: string, opts: { skipBio?: boolean }
 }
 
 /**
+ * Signs this page out of the current account without ending its session on the server: the session stays kept on
+ * this phone (mdt-account-sessions-v1), so its recognised profile — or the fingerprint — enters it again later. No reload.
+ */
+export async function forgetHere(): Promise<void> {
+  leaving = true;
+  try {
+    supabase.auth.stopAutoRefresh();
+    const key = (supabase.auth as unknown as { storageKey?: string }).storageKey;
+    if (key) { window.localStorage.removeItem(key); window.localStorage.removeItem(`${key}-code-verifier`); window.localStorage.removeItem(`${key}-user`); }
+    window.localStorage.removeItem("mdt-registered-email");
+    // The client's own way to drop the session from memory and tell every listener (SIGNED_OUT), with no server call.
+    const auth = supabase.auth as unknown as { _removeSession?: () => Promise<void> };
+    if (auth._removeSession) await auth._removeSession();
+  } catch { /* none */ }
+  current = null;
+  setTimeout(() => { leaving = false; }, 1500);
+  try { supabase.auth.startAutoRefresh(); } catch { /* none */ }
+}
+
+/**
  * Leaves the signed-in account without ending its session (it stays kept here for the way back) and reloads the page
  * signed out, with the account panel open to sign in with another one.
  */

@@ -399,7 +399,6 @@ export async function saveProId(id: ProId | null): Promise<boolean> {
   }
   pickedAt = Date.now();
   set(id);
-  if (id && (id as any).email) setRegisteredEmail((id as any).email);
   if (!data.session) return true;
   // Every kind the account registered stays owned (a sector switched back finds its profile again).
   const own = withKind(ownOf(meta) ?? [], id);
