@@ -5,6 +5,9 @@ import { useDemoSignedIn } from "@/lib/demo-login";
 export const REGISTERED_EMAIL_KEY = "mdt-registered-email";
 
 const subs = new Set<() => void>();
+/** Called whenever notifyAuthChange runs (the remembered account changed); returns the unsubscribe. */
+export function subscribeAuthChange(f: () => void): () => void { subs.add(f); return () => { subs.delete(f); }; }
+
 export function notifyAuthChange() {
   subs.forEach((f) => {
     try { f(); } catch {}

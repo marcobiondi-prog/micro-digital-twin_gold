@@ -110,15 +110,14 @@ export function KnownProfiles({ kind, onPicked }: { kind: ProKind; onPicked?: ()
         onPicked?.();
         return;
       }
-      // Even if the remote session token expired, activate the registered profile immediately and go to Mappa
-      setRegisteredEmail(target);
+      // Its session on this phone is missing or expired: the profile goes in use and its account is signed in for real
+      // (Google's sign-in for that address, else the panel with the email written), never pretended.
       setProIdOnDevice(k);
-      notifyAuthChange();
       clearSectorGate();
       openSimTab(section, "mappa");
-      toast.success(`Bentornato, ${k.name}`, { description: `Ritrovi la cronologia ${flow}.` });
-      goInApp(to);
       onPicked?.();
+      toast.message(`Accedo con ${target}`, { description: `Collego il tuo account a ${k.name}: poi ritrovi la cronologia ${flow}.` });
+      await signInAs(target, { provider: k.acct?.provider ?? "google", back: to });
       return;
     }
     if (!(await saveProId(k))) return;
