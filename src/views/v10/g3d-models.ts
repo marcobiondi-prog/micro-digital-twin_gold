@@ -5,7 +5,7 @@ import type { LatLng } from "@/models/area-layout";
 import { arObject, recognisedPlants } from "@/models/ar-objects";
 import { currentScans } from "@/models/ar-scan-log";
 import { planTreeDefs, rectOf } from "@/views/ar-plan";
-import { realPergola } from "@/views/ar-pergola";
+import { realSail } from "@/views/ar-sail";
 import { realBed } from "@/views/ar-bed";
 import { realMister } from "@/views/ar-mister";
 import { realSprinkler } from "@/views/ar-sprinkler";
@@ -207,7 +207,7 @@ export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number },
         add(`bed:${w}x${d}`, r.cx, r.cz, r.yaw, () => realBed({ w, d }, { far: true }), 0.1);
       } else if (p.kind === "shade" && r.w >= 1 && r.d >= 1) {
         const w = half(r.w), d = half(r.d);
-        add(`pergola:${w}x${d}`, r.cx, r.cz, r.yaw, () => realPergola({ w, d, h: 3.2 }), 0.12);
+        add(`sail:${w}x${d}`, r.cx, r.cz, r.yaw, () => realSail({ w, d, h: 3.2 }), 0.12);
       }
     }
     const kind = "urban" as const;

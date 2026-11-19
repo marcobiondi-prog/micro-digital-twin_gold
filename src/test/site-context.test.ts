@@ -104,19 +104,19 @@ describe("reading the drawn area", () => {
   });
 });
 
-import { feasibleInterventions } from "@/models/site-context";
+import { feasibleInterventions, type Constraint } from "@/models/site-context";
 describe("interventions possible", () => {
-  const c = (id: string) => ({ id, level: "probabile" as const, title: "", law: "", why: "", means: "" });
+  const c = (id: string) => ({ id, level: "probabile" as const, title: "", law: "", why: "", means: "" }) as unknown as Constraint;
   it("with nothing found everything is free and the mix is sized to the area", () => {
     const r = feasibleInterventions([], "piazza", 3000);
     expect(r.hints.every((h) => h.status === "libero")).toBe(true);
     expect(r.piazza).toMatchObject({ trees: 25 > 20 ? 20 : 25, shade: 30, misters: 6 });
   });
-  it("a protected square leaves the fixed pergolas out and asks for permission for trees", () => {
+  it("a protected square asks for permission for shade sails and trees, keeping the sails light", () => {
     const r = feasibleInterventions([c("culturali")], "piazza", 3000);
-    expect(r.hints.find((h) => h.id === "pergolati")?.status).toBe("sconsigliato");
+    expect(r.hints.find((h) => h.id === "vele")?.status).toBe("autorizzazione");
     expect(r.hints.find((h) => h.id === "alberi")?.status).toBe("autorizzazione");
-    expect(r.piazza?.shade).toBe(0); expect(r.piazza?.misters).toBe(0);
+    expect(r.piazza?.shade).toBe(10); expect(r.piazza?.misters).toBe(0);
   });
   it("archaeology makes digging need a check", () => {
     expect(feasibleInterventions([c("archeologia")], "piazza", 1000).hints.find((h) => h.id === "aiuole")?.status).toBe("autorizzazione");

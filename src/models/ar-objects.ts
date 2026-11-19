@@ -26,7 +26,7 @@ export type ArObjectDef = {
 export const AR_OBJECTS: Record<ArKind, readonly ArObjectDef[]> = {
   urban: [
     { id: "albero", label: "Albero", w: 6.2, d: 6.2, h: 9, zone: "alberi" },
-    { id: "pergolato", label: "Pergolato", w: 4, d: 4, h: 3.2, zone: "ombra" },
+    { id: "pergolato", label: "Vela ombreggiante", w: 4, d: 4, h: 3.2, zone: "ombra" },
     { id: "aiuola", label: "Aiuola", w: 3, d: 1.2, h: 0.25, zone: "prato" },
     { id: "nebulizzatore", label: "Nebulizzatore", w: 0.3, d: 0.3, h: 3, zone: "nebulizzatori" },
     // A pop-up sprinkler: its footprint is the circle it waters (3 m round), brought back as green, permeable ground.

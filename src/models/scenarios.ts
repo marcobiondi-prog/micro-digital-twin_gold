@@ -105,7 +105,7 @@ export type AreaKind = "albero" | "permeabile" | "ombra" | "parcella";
 export type Pt = { lat: number; lng: number };
 export type Area = { id: string; kind: AreaKind; name: string; pts: Pt[]; m2: number };
 
-export const kindLabel: Record<AreaKind, string> = { albero: "Albero", permeabile: "Suolo permeabile", ombra: "Pergola / ombra", parcella: "Sotto-parcella vigneto" };
+export const kindLabel: Record<AreaKind, string> = { albero: "Albero", permeabile: "Suolo permeabile", ombra: "Vele / ombra", parcella: "Sotto-parcella vigneto" };
 export const kindColor: Record<AreaKind, string> = { albero: "#197651", permeabile: "#007D88", ombra: "#BB5B21", parcella: "#7A2E8E" };
 
 /** Area in m² with the shoelace formula on a local equirectangular projection. */

@@ -85,7 +85,7 @@ const URBAN_TUTORIAL = [
   { title: "2 · Scansiona", text: "Avvia la scansione: della pianta trovi specie e ombra, del suolo permeabilità e depavimentazione: sopra lo scatto compare la scheda con «Aggiungi al progetto», e gli esiti completi finiscono nel cassetto «Scansioni», a destra dello scatto, dove puoi riaprirli o eliminarne più insieme." },
   { title: "3 · AR", text: "In alto passa da «Rileva» ad «AR». Il pulsante AI apre «Cosa vuoi fare?»: scegli un intervento o una pianta riconosciuta e tocca il pavimento per posarla a grandezza vera." },
   { title: "4 · Sposta e ruota", text: "Trascina un oggetto con un dito; con due dita lo ruoti e lo ingrandisci. Con «Sposta» segue il mirino e gira con il telefono. Il telefono vibra a ogni mezzo metro e ogni 15°, più forte davanti a un ostacolo." },
-  { title: "5 · Unisci e riporta", text: "Avvicina due pergolati o due aiuole: il contorno diventa verde e si uniscono. «Modellino» prova tutto in piccolo, «Riporta» li manda sulla mappa; con l’area allineata vedi anche gli interventi della mappa al loro posto." },
+  { title: "5 · Unisci e riporta", text: "Avvicina due vele o due aiuole: il contorno diventa verde e si uniscono. «Modellino» prova tutto in piccolo, «Riporta» li manda sulla mappa; con l’area allineata vedi anche gli interventi della mappa al loro posto." },
   { title: "6 · Scatta", text: "Tocca per una foto, tieni premuto per uno scatto multiplo: foto e video vanno nel progetto e nei report della piazza." },
 ] as const;
 

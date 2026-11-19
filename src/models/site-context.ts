@@ -260,7 +260,7 @@ export function siteConstraints(ctx: SiteContext, placeName: string): Constraint
     out.push({ id: "spazio-storico", level: historicAround >= 4 ? "probabile" : "possibile",
       title: "Spazio pubblico storico", law: "D.Lgs. 42/2004, art. 10 c. 4 lett. g",
       why: `È uno spazio pubblico urbano con ${historicAround} beni storici nel raggio di 300 m: piazze e strade pubbliche di interesse storico, di proprietà pubblica e con più di 70 anni, sono tutelate per legge finché non se ne verifica l’interesse.`,
-      means: "Pavimentazioni, arredi, pergolati e alberature nuove vanno sottoposti alla Soprintendenza." });
+      means: "Pavimentazioni, arredi, vele ombreggianti e alberature nuove vanno sottoposti alla Soprintendenza." });
   }
   const arch = near((t) => t["historic"] === "archaeological_site").filter((x) => x.d == null || x.d <= 300);
   if (arch.length) out.push({ id: "archeologia", level: "possibile", title: "Area archeologica vicina", law: "D.Lgs. 42/2004, art. 10; D.Lgs. 36/2023, art. 41",
@@ -288,7 +288,7 @@ export function interventionAdvice(cs: Constraint[], kind: "piazza" | "vigneto")
   const landscape = cs.some((c) => !["culturali", "spazio-storico", "archeologia"].includes(c.id));
   const tips: string[] = [];
   if (kind === "piazza") {
-    if (cultural) tips.push("Pergolati, coperture e nebulizzatori fissi cambiano l’aspetto della piazza: servono progetto e parere della Soprintendenza. Meglio elementi leggeri e rimovibili.");
+    if (cultural) tips.push("Vele, coperture e nebulizzatori fissi cambiano l’aspetto della piazza: servono progetto e parere della Soprintendenza. Meglio vele leggere e smontabili.");
     if (cultural || landscape) tips.push("Alberi di specie del luogo e aiuole sono di solito i più facili da far approvare; alcune piantumazioni sono escluse dall’autorizzazione paesaggistica (DPR 31/2017, allegato A).");
     if (cs.some((c) => c.id === "archeologia")) tips.push("Prima di scavare per alberi o tubazioni, chiedi se serve la verifica archeologica.");
   } else {
@@ -365,13 +365,15 @@ export function feasibleInterventions(cs: Constraint[], kind: "piazza" | "vignet
   if (kind === "piazza") {
     const trees: Feasible = dig(cultural ? "autorizzazione" : "libero");
     const beds: Feasible = dig("libero");
-    const pergola: Feasible = cultural ? "sconsigliato" : landscape ? "autorizzazione" : "libero";
+    // Shade sails: fabric on steel posts, taken down at the end of the season — lighter than any fixed structure, yet
+    // near protected goods or in a landscape area they still need the authorisation.
+    const pergola: Feasible = cultural || landscape ? "autorizzazione" : "libero";
     const misters: Feasible = cultural || landscape ? "autorizzazione" : "libero";
     const sprink: Feasible = dig("libero");
     const hints: InterventionHint[] = [
       { id: "alberi", label: "Alberi", status: trees, why: (cultural ? "Specie del luogo, con il parere della Soprintendenza: cambiano poco l’aspetto della piazza." : "Specie del luogo: tra gli interventi più facili da far approvare (DPR 31/2017, all. A).") + digWhy },
       { id: "aiuole", label: "Aiuole e ciottoli", status: beds, why: "Superfici verdi a raso: intervento leggero, di solito senza autorizzazione paesaggistica." + digWhy },
-      { id: "pergolati", label: "Pergolati e coperture", status: pergola, why: cultural ? "Strutture fisse che cambiano l’aspetto di uno spazio tutelato: meglio tende leggere e rimovibili, con progetto e parere." : landscape ? "Strutture fisse in area di paesaggio tutelato: serve l’autorizzazione paesaggistica." : "Nessun vincolo trovato: bastano i permessi ordinari del Comune." },
+      { id: "vele", label: "Vele ombreggianti", status: pergola, why: cultural ? "Tessuto teso su pali, smontabile: cambia poco l’aspetto della piazza, ma vicino a beni tutelati serve il parere della Soprintendenza." : landscape ? "Tessuto teso su pali in area di paesaggio tutelato: serve l’autorizzazione paesaggistica, spesso semplificata se le vele sono stagionali." : "Nessun vincolo trovato: bastano i permessi ordinari del Comune." },
       { id: "nebulizzatori", label: "Nebulizzatori", status: misters, why: cultural || landscape ? "Pali fissi: vanno autorizzati; quelli mobili o stagionali sono più semplici." : "Nessun vincolo trovato: permessi ordinari." },
       { id: "innaffiatoi", label: "Innaffiatoi", status: sprink, why: "Impianto interrato sotto le aiuole: non si vede." + digWhy },
     ];

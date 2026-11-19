@@ -368,7 +368,7 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
     if (a?.edits?.onlyDrawn) {
       const { onlyDrawn: _off, ...edits } = a.edits;
       setUrban({ ...patch, treeCells: null, permeableCells: null, shadeCells: null, area: { ...a, edits } });
-      toast("Torna la disposizione automatica", { description: "Hai cambiato una leva: aiuole, pergolati e alberi vanno anche fuori dalle zone disegnate." });
+      toast("Torna la disposizione automatica", { description: "Hai cambiato una leva: aiuole, vele e alberi vanno anche fuori dalle zone disegnate." });
       return;
     }
     setUrban({ ...patch, treeCells: null, permeableCells: null, shadeCells: null });
@@ -469,7 +469,7 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
       <div className="space-y-3" role="group" aria-label="Modifica gli interventi">
         <Lever icon={TreePine} label="Alberi" value={urban.trees} step={1} max={30} color="text-ok" swatch="bg-ok" onChange={(v) => change({ trees: v })} />
         <Lever icon={Sprout} label="Superfici verdi e permeabili (% della piazza)" value={urban.permeable} step={10} max={100} color="text-radar-mild" swatch="bg-radar-mild" onChange={(v) => change({ permeable: v })} />
-        <Lever icon={Umbrella} label="Coperture ombreggianti (% della piazza)" hint="Tende, pergole, pensiline." value={urban.shade} step={10} max={100} color="text-urban" swatch="bg-urban" onChange={(v) => change({ shade: v })} />
+        <Lever icon={Umbrella} label="Coperture ombreggianti (% della piazza)" hint="Vele in tessuto tese su pali, tende." value={urban.shade} step={10} max={100} color="text-urban" swatch="bg-urban" onChange={(v) => change({ shade: v })} />
         <Lever icon={CloudDrizzle} label="Nebulizzatori" hint="Funzionano meglio con aria secca e poco vento; effetto locale, vicino agli ugelli." value={misters} step={1} max={20} color="text-sky-300" swatch="bg-sky-400" onChange={(v) => change({ misters: v })} />
         <Lever icon={Droplets} label="Innaffiatoi" hint="Bagnano aiuole e terreno: asciugando rinfrescano un poco l’aria, soprattutto nelle ore calde." value={sprinklers} step={1} max={20} color="text-teal-300" swatch="bg-teal-400" onChange={(v) => change({ sprinklers: v })} />
       </div>

@@ -187,7 +187,7 @@ export function MySensors({ kind }: { kind: "urban" | "vineyard" }) {
       {form && (
         <form className="space-y-3 rounded-xl bg-muted p-3" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
           <label className="block text-xs font-semibold">Nome
-            <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder={kind === "urban" ? "Termometro sotto il pergolato" : "Sonda filare 3"} className="mt-1 h-10 w-full rounded-full border border-input bg-background px-3 text-sm font-normal" />
+            <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder={kind === "urban" ? "Termometro sotto le vele" : "Sonda filare 3"} className="mt-1 h-10 w-full rounded-full border border-input bg-background px-3 text-sm font-normal" />
           </label>
           <fieldset className="min-w-0">
             <legend className="text-xs font-semibold">Cosa misura</legend>

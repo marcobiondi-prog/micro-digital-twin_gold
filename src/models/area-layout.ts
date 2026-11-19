@@ -519,7 +519,8 @@ function tint(hex: string, f: number): string {
 }
 
 /** Pergola wood: posts and beams darker, the slats of the roof lighter. */
-export const PERGOLA_COLORS = { post: "#7a4a22", beam: "#6b4019", slat: "#c99a63" } as const;
+/** The shade sails' colours (the names stay from the pergolas they replaced): steel posts, dark hem, off-white fabric. */
+export const PERGOLA_COLORS = { post: "#9aa3ab", beam: "#3b4148", slat: "#ece3cf" } as const;
 
 /**
  * A pergola over a shade strip (a row rectangle from piazzaLayout) for the 3D views: posts about every 4 m along both
@@ -537,15 +538,14 @@ export function pergolaParts(strip: Ring, lite = false): TreePart[] {
   const at = (s: number, t: number): [number, number] => [a![0] + ux[0]! * s + vy[0]! * t, a![1] + ux[1]! * s + vy[1]! * t];
   const box = (s0: number, s1: number, t0: number, t1: number): Ring => [at(s0, t0), at(s1, t0), at(s1, t1), at(s0, t1)].map(([x, y]) => toLL(f, x, y));
   const inset = 0.3, parts: TreePart[] = [];
-  // Lite (the photorealistic 3D, where every shape costs): posts about every 8 m and one see-through roof instead of slats.
-  const posts = Math.max(2, Math.round(len / (lite ? 8 : 4)) + 1);
+  // Shade sails in their simple shape: thin steel posts at the corners of sails of at most 6 m (8 m when lite) and the
+  // fabric over them as one sheet, 3–3,1 m up (the realistic sails are views/ar-sail).
+  const posts = Math.max(2, Math.ceil(len / (lite ? 8 : 6)) + 1);
   for (let i = 0; i < posts; i++) {
     const s = inset + ((len - 2 * inset) * i) / (posts - 1);
-    for (const t of [inset, dep - inset]) parts.push({ ring: box(s - 0.12, s + 0.12, t - 0.12, t + 0.12), base: 0, height: 2.9, color: PERGOLA_COLORS.post });
+    for (const t of [inset, dep - inset]) parts.push({ ring: box(s - 0.06, s + 0.06, t - 0.06, t + 0.06), base: 0, height: 3.15, color: PERGOLA_COLORS.post });
   }
-  for (const t of [inset, dep - inset]) parts.push({ ring: box(0, len, t - 0.14, t + 0.14), base: 2.8, height: 3.1, color: PERGOLA_COLORS.beam });
-  if (lite) { parts.push({ ring: box(0, len, 0, dep), base: 3.1, height: 3.25, color: `${PERGOLA_COLORS.slat}b3` }); return parts; }
-  for (let s = 0.35; s < len - 0.2; s += 0.7) parts.push({ ring: box(s - 0.12, s + 0.12, 0, dep), base: 3.1, height: 3.25, color: PERGOLA_COLORS.slat });
+  parts.push({ ring: box(0.15, len - 0.15, 0.15, dep - 0.15), base: 3, height: 3.08, color: lite ? `${PERGOLA_COLORS.slat}d9` : PERGOLA_COLORS.slat });
   return parts;
 }
 
@@ -561,17 +561,14 @@ export function pergolaRingParts(ring: Ring, lite = false): TreePart[] {
   const square = (x: number, y: number, r: number): Ring => [[x - r, y - r], [x + r, y - r], [x + r, y + r], [x - r, y + r]].map(([a, b]) => toLL(f, a!, b!));
   pts.forEach((a, i) => {
     const b = pts[(i + 1) % pts.length]!, len = dist(a, b);
-    const n = Math.max(1, Math.round(len / (lite ? 8 : 4)));
+    const n = Math.max(1, Math.round(len / (lite ? 8 : 6)));
     for (let k = 0; k < n; k++) {
       const t = k / n;
-      parts.push({ ring: square(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, 0.12), base: 0, height: 2.9, color: PERGOLA_COLORS.post });
-    }
-    if (!lite && len > 0.5) {
-      const nx = (-(b[1] - a[1]) / len) * 0.14, ny = ((b[0] - a[0]) / len) * 0.14;
-      parts.push({ ring: [[a[0] + nx, a[1] + ny], [b[0] + nx, b[1] + ny], [b[0] - nx, b[1] - ny], [a[0] - nx, a[1] - ny]].map(([x, y]) => toLL(f, x!, y!)), base: 2.8, height: 3.1, color: PERGOLA_COLORS.beam });
+      parts.push({ ring: square(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, 0.06), base: 0, height: 3.15, color: PERGOLA_COLORS.post });
     }
   });
-  parts.push({ ring, base: 3.1, height: 3.25, color: `${PERGOLA_COLORS.slat}b3` });
+  // The fabric of the zone's own shape, as one sheet.
+  parts.push({ ring, base: 3, height: 3.08, color: lite ? `${PERGOLA_COLORS.slat}d9` : PERGOLA_COLORS.slat });
   return parts;
 }
 

@@ -402,7 +402,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         only={!!saved?.edits?.onlyDrawn} canOnly={!!saved && zonesOfArea(saved).some((z) => (kind === "urban" ? ["alberi", "prato", "ombra", "nebulizzatori"] : [...VINE_ZONE_KINDS] as string[]).includes(z.kind))}
         onOnly={() => {
           if (!saved) return;
-          if (saved.edits?.onlyDrawn) { setEdits({}); toast("Torna la disposizione automatica", { description: kind === "urban" ? "Le leve tornano a mettere aiuole, pergolati e alberi anche fuori dalle zone." : "Le leve tornano a mettere irrigazione, teli e frangivento anche fuori dalle zone." }); return; }
+          if (saved.edits?.onlyDrawn) { setEdits({}); toast("Torna la disposizione automatica", { description: kind === "urban" ? "Le leve tornano a mettere aiuole, vele e alberi anche fuori dalle zone." : "Le leve tornano a mettere irrigazione, teli e frangivento anche fuori dalle zone." }); return; }
           if (kind === "vineyard") {
             const next = vineLeversOfZones(saved);
             setVineyard((v) => ({ zones: v.zones.map((z) => ({ ...z, ...next })), area: { ...saved, edits: { onlyDrawn: true } } }));
@@ -419,7 +419,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         onBest={() => {
           setEdits({ best: true });
           setArranging(false);
-          toast.success("Elementi nella posizione migliore", { description: kind === "urban" ? "Pergolati, aiuole e alberi dove d’estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno all’area." : "I teli d’ombra sulle parti di ogni zona dove d’estate batte più sole (ore 10–18)." });
+          toast.success("Elementi nella posizione migliore", { description: kind === "urban" ? "Vele, aiuole e alberi dove d’estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno all’area." : "I teli d’ombra sulle parti di ogni zona dove d’estate batte più sole (ore 10–18)." });
         }} />}
       {saved && !drawing && (() => {
         // After the area's surroundings are read: the interventions the constraints allow, put in with one tap.
@@ -610,8 +610,8 @@ function shadowText(sim: Extract<SimLayout, { kind: "piazza" }>, when?: string) 
 /** Says when the area has no room for all the m² the simulation counts. */
 function roomText(l: PiazzaLayout) {
   const short = (got: number, want: number) => want > 0 && got < want * 0.95 - 10;
-  const parts = [short(l.lawnM2, l.lawnTarget) && `aiuole ${l.lawnTarget.toLocaleString("it-IT")} m²`, short(l.shadeM2, l.shadeTarget) && `pergolati ${l.shadeTarget.toLocaleString("it-IT")} m²`].filter(Boolean);
-  return parts.length ? `La simulazione conta ${parts.join(" e ")}: nell’area disegnata c’è posto per meno.` : "Aiuole e pergolati hanno sulla mappa gli stessi m² contati dalla simulazione.";
+  const parts = [short(l.lawnM2, l.lawnTarget) && `aiuole ${l.lawnTarget.toLocaleString("it-IT")} m²`, short(l.shadeM2, l.shadeTarget) && `vele ${l.shadeTarget.toLocaleString("it-IT")} m²`].filter(Boolean);
+  return parts.length ? `La simulazione conta ${parts.join(" e ")}: nell’area disegnata c’è posto per meno.` : "Aiuole e vele hanno sulla mappa gli stessi m² contati dalla simulazione.";
 }
 
 /**
@@ -621,7 +621,7 @@ function roomText(l: PiazzaLayout) {
 function SimBar({ sim, when, arranging, edited, best, only, canOnly, onArrange, onAuto, onBest, onOnly }: { sim: SimLayout; when?: string | undefined; arranging: boolean; edited: boolean; best: boolean; only: boolean; canOnly: boolean; onArrange: () => void; onAuto: () => void; onBest: () => void; onOnly: () => void }) {
   const m2 = (v: number) => `${Math.round(v).toLocaleString("it-IT")} m²`;
   const legend = sim.kind === "piazza"
-    ? [[dot(SIM_COLORS.tree), `Alberi ${sim.data.trees.length} · ${m2(sim.data.trees.length * TREE_SHADE_M2)} di chioma`], [dot(SIM_COLORS.lawn, false), `Aiuole e ciottoli ${m2(sim.data.lawnM2)}`], [dot(SIM_COLORS.shade, false), `Pergolati ${m2(sim.data.shadeM2)}`], [dot("#0b0f15", false), "Ombre"], ...(sim.data.misters.length ? [[dot("#7dd3fc"), `Nebulizzatori ${sim.data.misters.length}${sim.data.mistersInZones ? ` (${sim.data.mistersInZones} nelle tue zone)` : ""}`] as const] : []), ...(sim.data.sprinklers.length ? [[dot("#2dd4bf"), `Innaffiatoi ${sim.data.sprinklers.length}`] as const] : [])] as const
+    ? [[dot(SIM_COLORS.tree), `Alberi ${sim.data.trees.length} · ${m2(sim.data.trees.length * TREE_SHADE_M2)} di chioma`], [dot(SIM_COLORS.lawn, false), `Aiuole e ciottoli ${m2(sim.data.lawnM2)}`], [dot(SIM_COLORS.shade, false), `Vele ombreggianti ${m2(sim.data.shadeM2)}`], [dot("#0b0f15", false), "Ombre"], ...(sim.data.misters.length ? [[dot("#7dd3fc"), `Nebulizzatori ${sim.data.misters.length}${sim.data.mistersInZones ? ` (${sim.data.mistersInZones} nelle tue zone)` : ""}`] as const] : []), ...(sim.data.sprinklers.length ? [[dot("#2dd4bf"), `Innaffiatoi ${sim.data.sprinklers.length}`] as const] : [])] as const
     : [[dot(thirstColor(10), false), "Zone (colore = bisogno di intervento)"], [dot(SIM_COLORS.drip, false), "Irrigazione · tubo e ali gocciolanti"], [dot(SIM_COLORS.cloth, false), "Teli d’ombra"], [dot(SIM_COLORS.wind, false), "Frangivento"]] as const;
   return (
     <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4">
@@ -635,11 +635,11 @@ function SimBar({ sim, when, arranging, edited, best, only, canOnly, onArrange, 
       <p className="text-sm text-muted-foreground">{arranging
         ? sim.kind === "piazza" ? `Trascina gli alberi, o le etichette Aiuole e Ombra.${(sim.inner ?? []).length ? " Le etichette con ✥ spostano le tue zone con tutto quello che contengono; \"✥ Tutte le zone\" le sposta insieme." : ""}` : `Trascina l’etichetta Frangivento verso il lato dove lo vuoi.${(sim.inner ?? []).length ? " Le etichette con ✥ spostano le tue zone; \"✥ Tutte le zone\" le sposta insieme." : ""}`
         : only
-          ? sim.kind === "piazza" ? "Solo quello disegnato da te: aiuole e pergolati sono le tue zone, gli alberi stanno nelle zone Alberi. Le leve della simulazione seguono le zone; se ne cambi una torna la disposizione automatica." : "Solo quello disegnato da te: irrigazione, teli e frangivento stanno nelle tue zone. Le leve della simulazione seguono le zone; se ne cambi una torna la disposizione automatica."
+          ? sim.kind === "piazza" ? "Solo quello disegnato da te: aiuole e vele sono le tue zone, gli alberi stanno nelle zone Alberi. Le leve della simulazione seguono le zone; se ne cambi una torna la disposizione automatica." : "Solo quello disegnato da te: irrigazione, teli e frangivento stanno nelle tue zone. Le leve della simulazione seguono le zone; se ne cambi una torna la disposizione automatica."
         : best
-          ? sim.kind === "piazza" ? `Posizione migliore: pergolati, aiuole e alberi dove d’estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno.${sim.data.sunny !== undefined ? ` Al sole per gran parte del giorno: ${Math.round(sim.data.sunny * 100)} % dell’area.` : ""}` : "Posizione migliore: i teli d’ombra sulle parti di ogni zona dove d’estate batte più sole (ore 10–18)."
+          ? sim.kind === "piazza" ? `Posizione migliore: vele, aiuole e alberi dove d’estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno.${sim.data.sunny !== undefined ? ` Al sole per gran parte del giorno: ${Math.round(sim.data.sunny * 100)} % dell’area.` : ""}` : "Posizione migliore: i teli d’ombra sulle parti di ogni zona dove d’estate batte più sole (ore 10–18)."
           : "Segue le leve della simulazione: cambia gli alberi o le percentuali e la mappa si aggiorna."}</p>
-      {!canOnly && !only && !arranging && <p className="text-xs text-muted-foreground">Per vedere solo quello che disegni, aggiungi una zona {sim.kind === "piazza" ? "Alberi, Aiuole o Pergolato" : "Irrigazione, Teli d’ombra o Frangivento"}.</p>}
+      {!canOnly && !only && !arranging && <p className="text-xs text-muted-foreground">Per vedere solo quello che disegni, aggiungi una zona {sim.kind === "piazza" ? "Alberi, Aiuole o Vele" : "Irrigazione, Teli d’ombra o Frangivento"}.</p>}
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={onArrange} aria-pressed={arranging} className={cn(barBtn, arranging ? "bg-foreground text-background" : "bg-foreground/[0.08]")}>
           {arranging ? <><Check className="size-4" aria-hidden="true" />Fatto</> : <><Hand className="size-4" aria-hidden="true" />Sposta elementi</>}
@@ -664,7 +664,7 @@ const ZONE_HINT: Record<ZoneKind, string> = {
   libera: "Resta vuota (una fontana, una strada, un parcheggio) e la sua superficie si toglie dai costi.",
   alberi: "Gli alberi della simulazione vanno qui dentro.",
   prato: "Qui ci sono aiuole e ciottoli, poi il resto della percentuale dove c’è posto.",
-  ombra: "Qui c’è un pergolato, poi il resto della percentuale dove c’è posto.",
+  ombra: "Qui ci sono le vele, poi il resto della percentuale dove c’è posto.",
   nebulizzatori: "I nebulizzatori vanno qui dentro: circa uno ogni 40 m².",
   irrigazione: "Qui le viti hanno l’irrigazione a goccia su ogni filare, con il tubo principale lungo il bordo.",
   teli: "Qui le viti stanno sotto i teli d’ombra.",

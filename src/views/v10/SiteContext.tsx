@@ -203,7 +203,7 @@ const FEASIBLE_UI: Record<Feasible, { text: string; dot: string; chip: string }>
 
 /** The proposal in words: "10 alberi · aiuole 30 % · 4 innaffiatoi". */
 export function suggestionText(sug: { piazza?: PiazzaSuggestion | undefined; vine?: VineSuggestion | undefined } | null): string {
-  if (sug?.piazza) { const p = sug.piazza; return [p.trees && `${p.trees} alberi`, p.permeable && `aiuole ${p.permeable} %`, p.shade && `pergolati ${p.shade} %`, p.misters && `${p.misters} nebulizzatori`, p.sprinklers && `${p.sprinklers} innaffiatoi`].filter(Boolean).join(" · "); }
+  if (sug?.piazza) { const p = sug.piazza; return [p.trees && `${p.trees} alberi`, p.permeable && `aiuole ${p.permeable} %`, p.shade && `vele ${p.shade} %`, p.misters && `${p.misters} nebulizzatori`, p.sprinklers && `${p.sprinklers} innaffiatoi`].filter(Boolean).join(" · "); }
   if (sug?.vine) { const v = sug.vine; return [`irrigazione +${v.irrigation} %`, v.shade && `teli ${v.shade} %`, v.windbreak && `frangivento ${v.windbreak} %`].filter(Boolean).join(" · "); }
   return "";
 }

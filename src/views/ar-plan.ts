@@ -5,7 +5,7 @@ import { piazzaLayout, vineLayout, TREE_RADIUS_M, type LatLng, type PiazzaLayout
 import { arObject, arToEn, enToAr, fromEN, insideRing, toEN, type Alignment, type ArObjectDef } from "@/models/ar-objects";
 import { vineMixOf, zoneMixOf } from "@/models/vine-interventions";
 import { objectMesh } from "@/views/ar-object-meshes";
-import { realPergola } from "@/views/ar-pergola";
+import { realSail } from "@/views/ar-sail";
 import { realBed } from "@/views/ar-bed";
 import { realShadeNet } from "@/views/ar-shadenet";
 import { realWindbreak } from "@/views/ar-windbreak";
@@ -150,7 +150,7 @@ export function layoutPlan(
     const shade = L.patches.filter((q) => q.kind === "shade").map((q) => q.ring.map(ar));
     for (const r of merge ? pergolaBlocks(shade, 0.6, fits?.shade) : shade.map(rectOf)) {
       if (r.w < 1 || r.d < 1) continue;
-      const pg = realPergola({ w: r.w, d: r.d, h: 3.2 });
+      const pg = realSail({ w: r.w, d: r.d, h: 3.2 });
       pg.rotation.y = r.yaw;
       put(pg, { x: r.cx, z: r.cz });
       count.pergolas++;
@@ -240,7 +240,7 @@ export async function growPlan(group: THREE.Group, alive: () => boolean, onTree?
 
 export function planText(c: PlanCount): string {
   const parts = [
-    c.trees && `${c.trees} alberi`, c.pergolas && `${c.pergolas} pergolati`, c.beds && `${c.beds} aiuole`,
+    c.trees && `${c.trees} alberi`, c.pergolas && `${c.pergolas} ${c.pergolas === 1 ? "vela" : "vele"}`, c.beds && `${c.beds} aiuole`,
     c.misters && `${c.misters} nebulizzatori`, c.sprinklers && `${c.sprinklers} innaffiatoi`,
     c.cloths && `${c.cloths} teli`, c.lines && `${c.lines} linee`,
   ].filter(Boolean);
