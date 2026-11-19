@@ -1,6 +1,7 @@
 import { raceOverpass, timeout } from "@/lib/overpass-race";
 import { drawsFromCounts, probePoints, ringTag, siteConstraintsQuery, siteDrawsQuery, siteParksQuery, type SiteContext, type SiteEl } from "@/models/site-context";
 import type { Ring } from "@/models/place-area";
+import { getSiteEls } from "@/controllers/site-context.functions";
 
 /** The place's height above sea level (for the mountain constraint): the highest of its points (a drawn area's middle and corners); null when the weather service does not answer. */
 async function elevationOf(pts: Ring): Promise<number | null> {
@@ -26,7 +27,8 @@ async function ask(part: Part, lat: number, lng: number, ring: Ring | null | und
   let last: unknown;
   for (let t = 0; t < tries; t++) {
     const phone = raceOverpass<SiteEl>(queryOf(part, lat, lng, ring), ms);
-    const server = import("@/controllers/site-context.functions").then((m) => m.getSiteEls({ data: { part, lat, lng, ...(ring ? { ring } : {}) } }));
+    // The app's server: its failure (or a page reload it would trigger) never touches the card — only its answer counts.
+    const server = (async () => getSiteEls({ data: { part, lat, lng, ...(ring ? { ring } : {}) } }))();
     try { return await Promise.any([phone, server]); }
     catch (e) { last = e instanceof AggregateError ? e.errors[0] : e; if (t < tries - 1) await new Promise((r) => setTimeout(r, 1500)); }
   }
