@@ -3,7 +3,7 @@ import { DeviceCacheCard } from "@/views/v10/DeviceCache";
 import { biometricOn } from "@/lib/biometric";
 import { BiometricSignIn, leaveProfile, ProfileBioSwitch, proBioKey } from "@/views/v10/Biometric";
 import { getKnownProIds } from "@/lib/use-pro-id";
-import { googleOAuth, leaveAccount } from "@/lib/account-sessions";
+import { googleOAuth, leaveAccount, signInAs } from "@/lib/account-sessions";
 import { keepLink, keptLink, LINK_TTL_S } from "@/lib/signed-links";
 import { dropProIdOnDevice } from "@/lib/use-pro-id";
 import { exitToGate } from "@/lib/exit-to-gate";
@@ -491,6 +491,15 @@ export function AccountControl() {
   const premiumPlan = demo || Boolean(account && !account.guest) || Boolean(getRegisteredEmail());
   // A real account has cloud space for its photos and videos: 50 GB, shown round the picture and as a bar in the panel.
   const cloudAccount = Boolean(account && !account.guest) || Boolean(getRegisteredEmail());
+  // An account the phone remembers (its email) whose session has ended: the panel offers to reconnect it.
+  const reconnectEmail = account && !account.guest && account.id?.startsWith("local-") ? account.email : null;
+  const reconnectProvider = reconnectEmail ? getKnownProIds().find((k) => k.acct?.email?.toLowerCase() === reconnectEmail.toLowerCase())?.acct?.provider : undefined;
+  const [otherSignIn, setOtherSignIn] = useState(false);
+  const reconnect = async () => {
+    if (!reconnectEmail) return;
+    if (reconnectProvider === "email") { setOtherSignIn(true); setEmail(reconnectEmail); changeMode("signin"); return; }
+    await signInAs(reconnectEmail, { provider: "google" });
+  };
   const usage = useCloudUsage(cloudAccount);
   const changeMode = (next: typeof mode) => { setMode(next); setNotice(""); setPassword(""); };
 
@@ -588,7 +597,7 @@ export function AccountControl() {
               </div>
               <Button variant="ghost" className="w-full justify-start" onClick={() => { setDemoSignedIn(false); setOpen(false); }}><LogOut />Esci dalla simulazione</Button>
             </section>
-          ) : account && !account.id.startsWith("local-") && mode !== "signin" ? (
+          ) : account && !account.id?.startsWith("local-") && mode !== "signin" ? (
             <section className="space-y-4">
               <div className="rounded-md border bg-muted/40 p-4">
                 <p className="text-sm font-semibold">{account.guest ? "Sessione ospite" : account.email}</p>
@@ -604,7 +613,20 @@ export function AccountControl() {
             </section>
           ) : (
             <section className="space-y-4">
+              {/* The phone still remembers the account (its email), but its session ended: say so plainly and reconnect in one tap,
+                  instead of reading as signed in (Premium) with an empty sign-in form and no cloud space under it. */}
+              {reconnectEmail && !otherSignIn && (
+                <div className="rounded-md border border-amber-400/40 bg-amber-400/10 p-4">
+                  <p className="text-sm font-semibold">Account da ricollegare</p>
+                  <p className="mt-0.5 break-all text-sm">{reconnectEmail}</p>
+                  <p className="mt-1.5 text-xs text-muted-foreground">Su questo telefono l’accesso a questo account è scaduto: finché non lo ricolleghi, foto, video e cronologia non vanno nel cloud e lo spazio nel cloud non si vede.</p>
+                  <Button className="mt-3 w-full" disabled={pending} onClick={() => void reconnect()}>{reconnectProvider === "email" ? <LockKeyhole /> : <GoogleLogo />}Ricollega l’account</Button>
+                </div>
+              )}
               <BiometricSignIn onDone={() => setOpen(false)} />
+              {reconnectEmail && !otherSignIn ? (
+                <Button variant="ghost" className="w-full" onClick={() => setOtherSignIn(true)}>Accedi con un altro account</Button>
+              ) : <>
               <div className="flex gap-1 border-b" aria-label="Modalità account">
                 <Button variant="ghost" className={`rounded-none border-b-2 px-3 ${mode === "signin" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"}`} onClick={() => changeMode("signin")}>Accedi</Button>
                 <Button variant="ghost" className={`rounded-none border-b-2 px-3 ${mode === "signup" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"}`} onClick={() => changeMode("signup")}>Registrati</Button>
@@ -623,6 +645,7 @@ export function AccountControl() {
               {" "}
               <div className="border-t pt-4"><Button variant="ghost" className="w-full" onClick={enterGuest}>Continua come ospite</Button></div>
               {DEMO_LOGIN_AVAILABLE && <Button variant="outline" className="w-full border-dashed" onClick={() => { setDemoSignedIn(true); setOpen(false); }}>Simula l’accesso (solo anteprima)</Button>}
+              </>}
             </section>
           )}
           {/* Plans, project, help, privacy and legal live on their own page in the panel: one row here opens it. */}
