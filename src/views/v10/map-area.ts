@@ -368,8 +368,9 @@ export function addSimLayers(map: MlMap, _lat: number, raised = false) {
  * While the area or a zone is being drawn or edited the rest of the simulation stays in view, faded (about a third of
  * its strength), so the pins are placed knowing what is around them; back to full strength afterwards.
  */
-export function setSimGhost(map: MlMap, ghost: boolean) {
-  const k = ghost ? 0.35 : 1;
+export function setSimGhost(map: MlMap, ghost: boolean | number) {
+  // true: a third (drawing); a number: that strength (a proposal not yet put in, about 0,6).
+  const k = typeof ghost === "number" ? ghost : ghost ? 0.35 : 1;
   const set = (layer: string, prop: string, value: unknown) => { if (map.getLayer(layer)) map.setPaintProperty(layer, prop as never, value as never); };
   set("sim-fill", "fill-opacity", ["*", ["get", "opacity"], k]);
   set("sim-lawn", "fill-opacity", 0.95 * k);

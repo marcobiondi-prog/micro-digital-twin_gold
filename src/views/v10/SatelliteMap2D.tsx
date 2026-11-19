@@ -42,7 +42,7 @@ type MaxZoom = { getMaxZoomAtLatLng: (at: { lat: number; lng: number }) => Promi
 /** Until the service answers: a closeness Google has nearly everywhere, so the map never opens on its grey "no imagery" tiles. */
 const GOOGLE_SAFE = 19;
 
-export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawing = false, onAreaChange, sim = null, arranging = false, onMove, outline = null, onOutside, onPinMove, still = false }: {
+export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawing = false, onAreaChange, sim = null, arranging = false, onMove, outline = null, onOutside, onPinMove, still = false, proposal = false }: {
   /** The browser key: with it the 2D map uses Google's satellite imagery, like the 3D view. */
   apiKey?: string | undefined;
   lat: number; lng: number; label: string; zoom: number; area?: Ring; drawing?: boolean; onAreaChange?: (ring: Ring) => void;
@@ -53,7 +53,7 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
   /** The simulation drawn inside the area; while `arranging` its trees and handles can be dragged (onMove). */
   sim?: SimLayout | null; arranging?: boolean; onMove?: (moved: MovedPart) => void;
   /** A still preview: framed on the drawn area, without its corner pins nor the recenter button. */
-  still?: boolean;
+  proposal?: boolean; still?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const under = useRef<HTMLDivElement>(null);
@@ -231,7 +231,7 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
     if (state !== "ready" || !map || !lib) return;
     // Drawing or editing: the rest stays visible, faded behind the pins.
     setSimData(map, sim);
-    setSimGhost(map, drawing);
+    setSimGhost(map, drawing ? true : proposal ? 0.62 : false);
     handles.current.forEach((m) => m.remove());
     handles.current = [];
     // The vineyard's zone names on their zones, and every inner zone's name ("Libera", "Lotto A", "Alberi"…).
@@ -265,7 +265,7 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
     } else if (sim.data.lines.some((l) => l.kind === "wind")) {
       add(sim.data.windAt, "Frangivento", (to) => moveRef.current?.({ part: "wind", at: to }));
     }
-  }, [sim, arranging, drawing, state]);
+  }, [sim, arranging, drawing, proposal, state]);
   const recenter = () => {
     const d = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 800;
     if (!frameArea(d)) mapRef.current?.easeTo({ ...camera, duration: d });

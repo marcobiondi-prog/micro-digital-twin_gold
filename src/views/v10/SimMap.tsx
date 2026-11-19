@@ -7,7 +7,8 @@ import { samePlace } from "@/models/place-memory";
 import { ringCentroid } from "@/models/place-area";
 import { loadPlaceArea } from "@/lib/place-area-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { prefetchSite, SuggestedInterventions } from "@/views/v10/SiteContext";
+import { prefetchSite, SuggestedInterventions, suggestionText, useSuggestion } from "@/views/v10/SiteContext";
+import { ringTag, type PiazzaSuggestion, type VineSuggestion } from "@/models/site-context";
 import { useServerFn } from "@tanstack/react-start";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { toast } from "sonner";
@@ -152,11 +153,28 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
     const trees = kind === "urban" ? finds.filter((f) => f.kind === "tree").map((f) => ({ kind: "albero" as const, ring: circleRing(f.lat, f.lng, Math.max(1.5, (f.crownM ?? 6) / 2)), name: f.species ?? "Albero rilevato" })) : [];
     return trees.length ? [...mapReal, ...trees] : mapReal;
   }, [mapReal, finds, kind]);
+  // The interventions the area's constraints allow: while nothing is in place yet they are drawn in the area as a
+  // proposal (faded, with a pill to put them in or set them aside), so the map itself shows what can go where.
+  const suggestion = useSuggestion(saved?.ring, loc.label ?? "", kind === "urban" ? "piazza" : "vigneto", saved ? usableM2(saved) : 0);
+  const empty = kind === "urban"
+    ? !lab.urban.trees && !lab.urban.permeable && !lab.urban.shade && !(lab.urban.misters ?? 0) && !(lab.urban.sprinklers ?? 0)
+    : lab.vineyard.zones.every((z) => { const m = zoneMixOf(z, vineMixOf(lab.vineyard)); return !m.irrigation && !m.shade && !m.windbreak; });
+  const [dismissed, setDismissed] = useState<Set<string>>(() => new Set(readDismissed()));
+  const areaTag = saved ? ringTag(saved.ring) : "";
+  const proposal = !!saved && empty && !!suggestionText(suggestion) && !dismissed.has(areaTag) && !saved.edits?.onlyDrawn;
+  const dismissProposal = () => { const next = new Set(dismissed).add(areaTag); setDismissed(next); writeDismissed([...next]); };
+  const applySuggestion = (sg: { piazza?: PiazzaSuggestion | undefined; vine?: VineSuggestion | undefined }) => {
+    if (sg.piazza) setUrban({ ...sg.piazza, treeCells: null, permeableCells: null, shadeCells: null });
+    if (sg.vine) { const vine = sg.vine; setVineyard((v) => ({ zones: v.zones.map((z) => ({ ...z, ...vine })) })); }
+    toast.success("Interventi consigliati messi", { description: "Li vedi sulla mappa; in Simula leggi l’effetto e li regoli.", action: { label: "Simula", onClick: () => openSimTab(kind, "simula") } });
+  };
   const sim = useMemo<SimLayout | null>(() => {
     if (!saved) return null;
     const edits = saved.edits ?? {}, inner = zonesOfArea(saved);
+    const sp = proposal ? suggestion?.piazza : undefined;
     if (kind === "urban") {
-      const data = piazzaLayout(saved.ring, lab.urban.trees, lab.urban.permeable, lab.urban.shade, edits, inner, lab.urban.misters ?? 0, real.map((o) => o.ring), lab.urban.sprinklers ?? 0);
+      const u = sp ?? { trees: lab.urban.trees, permeable: lab.urban.permeable, shade: lab.urban.shade, misters: lab.urban.misters ?? 0, sprinklers: lab.urban.sprinklers ?? 0 };
+      const data = piazzaLayout(saved.ring, u.trees, u.permeable, u.shade, edits, inner, u.misters, real.map((o) => o.ring), u.sprinklers);
       if (!data) return null;
       // The shadows with the sun of the simulation's season and hour (its "when" chip), on the area's place.
       const when = getSimWhen("urban"), season = rSeason ?? when?.season, hour = rHour ?? when?.hour;
@@ -164,9 +182,14 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
       return { kind: "piazza", data, inner, shadows: piazzaShadows(data, sun), real, finds };
     }
     const v = lab.vineyard, fallback = vineMixOf(v);
-    const data = vineLayout(saved.ring, v.zones.map((z) => zoneMixOf(z, fallback)), edits, inner);
+    const vp = proposal ? suggestion?.vine : undefined;
+    const data = vineLayout(saved.ring, v.zones.map((z) => vp ?? zoneMixOf(z, fallback)), edits, inner);
     return data ? { kind: "vigneto", data, thirst: vineMetrics(v).results.map((r) => r.s), inner, finds } : null;
-  }, [saved, kind, lab.urban, lab.vineyard, rSeason, rHour, real, finds]);
+  }, [saved, kind, lab.urban, lab.vineyard, rSeason, rHour, real, finds, proposal, suggestion]);
+  const proposalPill = proposal && suggestion ? (
+    <ProposalPill text={suggestionText(suggestion)} constrained={suggestion.cs.length > 0}
+      onApply={() => applySuggestion(suggestion)} onDismiss={dismissProposal} />
+  ) : null;
   const setZones = (zones: SubArea[]) => {
     if (!saved) return;
     const area = { ...saved, zones };
@@ -292,10 +315,11 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         <DayNight kind={kind} lat={pin.lat} lng={pin.lng} />
         {/* Still: the map under the button takes no gesture; the page scrolls over it. */}
         <ParallaxLayer>
-          <Suspense fallback={<div className="h-full w-full" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} sim={sim} still /></Suspense>
+          <Suspense fallback={<div className="h-full w-full" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} sim={sim} still proposal={proposal} /></Suspense>
         </ParallaxLayer>
       </div>
-      {kind === "vineyard" && <div className="absolute inset-x-0 top-12 z-[3] flex justify-center px-3"><Suspense fallback={null}><VineZonePicker /></Suspense></div>}
+      {kind === "vineyard" && !proposal && <div className="absolute inset-x-0 top-12 z-[3] flex justify-center px-3"><Suspense fallback={null}><VineZonePicker /></Suspense></div>}
+      {proposalPill}
       <button type="button" onClick={(e) => { e.stopPropagation(); openSimTab(kind, "mappa"); }} aria-label="Apri la mappa: disegna l’area e sposta gli elementi"
         className="absolute bottom-3 right-3 z-[3] inline-flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-[13px] font-semibold text-white outline-none ring-1 ring-white/15 backdrop-blur-sm focus-visible:ring-2 focus-visible:ring-white">
         <MapIcon className="size-4" aria-hidden="true" />Apri la mappa
@@ -348,13 +372,14 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         )}
         {/* Day and night at the simulation's season and hour, over the 2D and the 3D map alike. */}
         <DayNight kind={kind} lat={pin.lat} lng={pin.lng} />
+        {!drawing && !drawingZone && proposalPill}
         {show3d
           ? <Suspense fallback={<div className="h-full w-full bg-card" />}><MapLight kind={kind} lat={pin.lat} lng={pin.lng}>{key
             ? <LocationMap3D key={`${loc.lat},${loc.lng}`} lat={pin.lat} lng={pin.lng} label={name ?? ""} apiKey={key} area={ring} sim={sim}
               fallback={<OpenMap3D lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />} />
             : <OpenMap3D key={`${loc.lat},${loc.lng}`} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />}</MapLight></Suspense>
           : <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} drawing={drawing || drawingZone}
-            onAreaChange={drawingZone ? setZoneDraft : setDraft} sim={editingZone && sim ? { ...sim, inner: (sim.inner ?? []).filter((z) => z.id !== editingZone) } : sim} arranging={arranging} onMove={moved}
+            onAreaChange={drawingZone ? setZoneDraft : setDraft} sim={editingZone && sim ? { ...sim, inner: (sim.inner ?? []).filter((z) => z.id !== editingZone) } : sim} arranging={arranging} onMove={moved} proposal={proposal}
             outline={drawingZone ? saved?.ring ?? null : null} onOutside={() => toast("La zona va dentro l’area disegnata")} onPinMove={arranging ? undefined : movePin} /></Suspense>}
       </div>
       {/* iPhone and iPad only: the 3D shows plain shapes unless the light realistic models are turned on by hand. */}
@@ -400,11 +425,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         // After the area's surroundings are read: the interventions the constraints allow, put in with one tap.
         const [sLat, sLng] = ringCentroid(saved.ring).map((v) => Math.round(v * 1e4) / 1e4) as [number, number];
         return <SuggestedInterventions lat={sLat} lng={sLng} ring={saved.ring} placeName={loc.label ?? ""} kind={kind === "urban" ? "piazza" : "vigneto"} m2={usableM2(saved)}
-          onApply={({ piazza, vine }) => {
-            if (piazza) setUrban({ ...piazza, treeCells: null, permeableCells: null, shadeCells: null });
-            if (vine) setVineyard((v) => ({ zones: v.zones.map((z) => ({ ...z, ...vine })) }));
-            toast.success("Interventi consigliati messi", { description: "Li vedi sulla mappa; in Simula leggi l’effetto e li regoli.", action: { label: "Simula", onClick: () => openSimTab(kind, "simula") } });
-          }} />;
+          onApply={applySuggestion} />;
       })()}
       {saved && !drawing && <ZonesBar area={saved} flow={kind === "urban" ? "piazza" : "vigneto"} onAdd={startZone} onEdit={editZone} onRemove={(id) => setZones(zonesOfArea(saved).filter((z) => z.id !== id))} />}
       </>}
@@ -742,5 +763,26 @@ function IosModelsSwitch() {
         <span className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition-[left] ${on ? "left-[1.125rem]" : "left-0.5"}`} />
       </button>
     </label>
+  );
+}
+
+/** Areas whose proposal was set aside (by their outline), kept on this device. */
+const DISMISS_KEY = "mdt-proposal-off-v1";
+function readDismissed(): string[] { try { return JSON.parse(localStorage.getItem(DISMISS_KEY) ?? "[]") as string[]; } catch { return []; } }
+function writeDismissed(v: string[]) { try { localStorage.setItem(DISMISS_KEY, JSON.stringify(v.slice(-60))); } catch { /* full */ } }
+
+/** Over the map, while the proposal is drawn in the area: what it is, "Metti" to put it in, ✕ to set it aside. */
+function ProposalPill({ text, constrained, onApply, onDismiss }: { text: string; constrained: boolean; onApply: () => void; onDismiss: () => void }) {
+  return (
+    <div role="status" onClick={(e) => e.stopPropagation()}
+      className="absolute inset-x-3 bottom-14 z-[4] mx-auto flex max-w-md items-center gap-2 rounded-2xl bg-black/60 p-2 pl-3 text-white ring-1 ring-white/15 backdrop-blur-sm">
+      <span className="size-2.5 shrink-0 rounded-full bg-amber-300 ring-2 ring-amber-100/40" aria-hidden="true" />
+      <p className="min-w-0 flex-1 text-[12px] leading-snug [text-shadow:0_1px_2px_rgb(0_0_0/.6)]">
+        <span className="font-semibold">Proposta {constrained ? "con i vincoli trovati" : "· nessun vincolo trovato"}</span>
+        <span className="block text-white/80">{text}</span>
+      </p>
+      <button type="button" onClick={onApply} className="h-8 shrink-0 rounded-full bg-white px-3 text-[13px] font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-white">Metti</button>
+      <button type="button" onClick={onDismiss} aria-label="Nascondi la proposta" className="grid size-8 shrink-0 place-items-center rounded-full bg-white/10 outline-none focus-visible:ring-2 focus-visible:ring-white"><X className="size-4" aria-hidden="true" /></button>
+    </div>
   );
 }

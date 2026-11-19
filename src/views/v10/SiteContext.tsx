@@ -201,6 +201,24 @@ const FEASIBLE_UI: Record<Feasible, { text: string; dot: string; chip: string }>
   sconsigliato: { text: "Sconsigliato", dot: "bg-red-400", chip: "bg-red-400/15 text-red-700 ring-red-500/40 dark:text-red-300" },
 };
 
+/** The proposal in words: "10 alberi · aiuole 30 % · 4 innaffiatoi". */
+export function suggestionText(sug: { piazza?: PiazzaSuggestion | undefined; vine?: VineSuggestion | undefined } | null): string {
+  if (sug?.piazza) { const p = sug.piazza; return [p.trees && `${p.trees} alberi`, p.permeable && `aiuole ${p.permeable} %`, p.shade && `pergolati ${p.shade} %`, p.misters && `${p.misters} nebulizzatori`, p.sprinklers && `${p.sprinklers} innaffiatoi`].filter(Boolean).join(" · "); }
+  if (sug?.vine) { const v = sug.vine; return [`irrigazione +${v.irrigation} %`, v.shade && `teli ${v.shade} %`, v.windbreak && `frangivento ${v.windbreak} %`].filter(Boolean).join(" · "); }
+  return "";
+}
+
+/** The interventions the constraints found around a drawn area allow, sized to it (null while reading or unreadable). */
+export function useSuggestion(ring: Ring | null | undefined, placeName: string, kind: "piazza" | "vigneto", m2: number) {
+  const [lat, lng] = ring && ring.length >= 3 ? ringCentroid(ring).map((v) => Math.round(v * 1e4) / 1e4) as [number, number] : [0, 0];
+  const ctx = useSiteContext(lat, lng, !ring || ring.length < 3, ring);
+  return useMemo(() => {
+    if (!ctx.data || ctx.data.constraintsOk === false) return null;
+    const cs = siteConstraints(ctx.data, placeName);
+    return { cs, ...feasibleInterventions(cs, kind, m2) };
+  }, [ctx.data, placeName, kind, m2]);
+}
+
 /**
  * On the Mappa tab, once the area's surroundings are read: which interventions the constraints found allow (each with
  * its state and why) and a starting mix sized to the area — what is sconsigliato left out, what needs an authorisation
@@ -214,9 +232,7 @@ export function SuggestedInterventions({ lat, lng, ring, placeName, kind, m2, on
   const cs = useMemo(() => (ctx.data && ctx.data.constraintsOk !== false ? siteConstraints(ctx.data, placeName) : null), [ctx.data, placeName]);
   const sug = useMemo(() => (cs ? feasibleInterventions(cs, kind, m2) : null), [cs, kind, m2]);
   const [open, setOpen] = useState<string | null>(null);
-  const mix = sug?.piazza
-    ? [sug.piazza.trees && `${sug.piazza.trees} alberi`, sug.piazza.permeable && `aiuole ${sug.piazza.permeable} %`, sug.piazza.shade && `pergolati ${sug.piazza.shade} %`, sug.piazza.misters && `${sug.piazza.misters} nebulizzatori`, sug.piazza.sprinklers && `${sug.piazza.sprinklers} innaffiatoi`].filter(Boolean).join(" · ")
-    : sug?.vine ? [`irrigazione +${sug.vine.irrigation} %`, sug.vine.shade && `teli ${sug.vine.shade} %`, sug.vine.windbreak && `frangivento ${sug.vine.windbreak} %`].filter(Boolean).join(" · ") : "";
+  const mix = suggestionText(sug);
   return (
     <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4" aria-label="Interventi possibili">
       <div className="flex items-center gap-2"><ShieldCheck className="size-5 text-brand-turquoise" aria-hidden="true" /><p className="text-[15px] font-semibold">Interventi possibili</p><span className="ml-auto rounded-full bg-foreground/[0.08] px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">dai vincoli</span></div>
