@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useHomeFocus } from "@/lib/home-focus";
 import { introSeen } from "@/lib/intro-seen";
 import { THEME_DARK, ThemeToggle, themeBootScript } from "@/views/theme-toggle";
+import logoCompact from "@/assets/climate-twin-logo-compact.png";
 import { AccountControl } from "@/views/account-control";
 import { CameraDockButton, CameraSheet } from "@/views/CameraDock";
 import { PermissionsSheet } from "@/views/v10/Permissions";
@@ -439,6 +440,40 @@ function SmartNav() {
   );
 }
 
+/**
+ * Desktop (lg, ≥ 1024 px): the menu stands at the side of the page — the brand on top, the same items as the bottom
+ * bar with their full names and icons, the open page lit with a turquoise edge; the header (account, "i", theme)
+ * sits at its foot. No camera here: it belongs to the phone.
+ */
+function SideNav() {
+  const proId = useProId();
+  const guest = useGuest() && !proId;
+  const pathname = useLocation({ select: (l) => l.pathname });
+  const items = itemsFor(proId, guest), names = navFor(proId, guest);
+  return (
+    <aside className="fixed inset-y-0 left-0 z-[999999995] hidden w-60 flex-col border-r border-foreground/10 bg-background/70 px-3 pb-24 pt-5 backdrop-blur-xl lg:flex">
+      <Link to="/benvenuto" className="mb-6 flex items-center gap-2.5 rounded-xl px-2.5 py-1 outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <img src={logoCompact} alt="" className="size-9 shrink-0 object-contain" />
+        <span className="text-[11px] font-semibold leading-tight tracking-[0.22em] text-foreground">MICRO DIGITAL <span className="text-[#2dd4bf]">TWIN</span></span>
+      </Link>
+      <nav aria-label="Menu principale" className="flex flex-col gap-1">
+        {items.map((it, i) => {
+          const on = pathname === it.to || (it.to === "/profilo" && isProfilePath(pathname));
+          const lock = !guest && (it.to === "/urbano" || it.to === "/vigneto") && proId !== undefined && !unlocks(proId, it.to === "/urbano" ? "urban" : "vineyard");
+          return (
+            <Link key={it.to} to={it.to} aria-current={on ? "page" : undefined} replace={pathname !== "/"}
+              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${on ? "bg-foreground/10 font-medium text-foreground shadow-[inset_3px_0_0_#2dd4bf]" : "text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"}`}>
+              <it.I className="size-5 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+              <span className="min-w-0 truncate">{names[i]?.l ?? it.l}</span>
+              {lock && <Lock className="ml-auto size-3.5" aria-label="bloccato" />}
+            </Link>
+          );
+        })}
+      </nav>
+    </aside>
+  );
+}
+
 // The landing guard below must act only on a real page load, not on the
 // re-hydration a hot reload performs inside the same document.
 
@@ -695,8 +730,10 @@ function RootComponent() {
       {/* The page's light, drawn once for every page so a page change never shows the bare background. */}
       {!intro && <AmbientLayer />}
       {/* Transparent: the page's light and its drifting pools show through behind the account button, the "i" and the theme switch. */}
-      <header id="app-header" className="relative pt-[env(safe-area-inset-top)]">
-        <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-2 sm:px-4 sm:py-3">
+      <SideNav />
+      {/* Desktop: the header (account, "i", theme) sits at the foot of the side menu. */}
+      <header id="app-header" className="relative pt-[env(safe-area-inset-top)] lg:fixed lg:bottom-0 lg:left-0 lg:z-[999999996] lg:w-60 lg:border-t lg:border-foreground/10 lg:pt-0">
+        <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-2 sm:px-4 sm:py-3 lg:max-w-none lg:px-3">
           {/* No logo nor name here: the account sits where the logo was, the theme switch on the right. */}
           <div className="flex min-w-0 items-center"><AccountControl /></div>
           <div className="flex shrink-0 items-center gap-2">
@@ -709,13 +746,15 @@ function RootComponent() {
           </div>
         </div>
       </header>
-      <div className="hidden sm:block"><SmartNav /></div>
+      <div className="hidden sm:block lg:hidden"><SmartNav /></div>
       </>}
 
+      <div className={intro ? undefined : "lg:pl-60"}>
       <main id="main-content" tabIndex={-1} className={intro ? "focus:outline-none" : "app-main mx-auto max-w-7xl px-4 pb-8 pt-6 focus:outline-none sm:pt-8"}><Outlet /></main><Toaster /><UpdatePill />
       {!intro && <footer className="mx-auto max-w-7xl px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] text-sm leading-relaxed text-muted-foreground sm:pb-10 sm:text-[15px]">
         I risultati del simulatore sono indicativi e non sostituiscono modelli fisici calibrati.
       </footer>}
+      </div>
       {!intro && <BottomNav />}
       <CameraSheet />
       <PermissionsSheet />
