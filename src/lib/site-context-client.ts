@@ -72,9 +72,12 @@ export async function loadSiteContext(lat: number, lng: number, fresh = false): 
   const elevation = elevationOf(lat, lng);
   // The three asked together (the parks one optional and shorter), so the card waits for the slowest, not their sum.
   const [dr, cr, pr] = await Promise.allSettled([ask(siteDrawsQuery(lat, lng)), ask(siteConstraintsQuery(lat, lng)), ask(siteParksQuery(lat, lng), 9000)]);
-  const draws = dr.status === "fulfilled" ? dr.value : null, cons = cr.status === "fulfilled" ? cr.value : null;
+  let draws = dr.status === "fulfilled" ? dr.value : null;
+  const cons = cr.status === "fulfilled" ? cr.value : null;
+  // The servers answered the constraints but not the counts in time: asked once more by itself, with more time.
+  if (!draws && cons) { try { draws = await ask(siteDrawsQuery(lat, lng), 22000); } catch { /* said below */ } }
   const parks = pr.status === "fulfilled" ? pr.value : [];
-  const why = dr.status === "rejected" ? (dr.reason as Error).message : "", consWhy = cr.status === "rejected" ? (cr.reason as Error).message : "";
+  const why = !draws && dr.status === "rejected" ? (dr.reason as Error).message : "", consWhy = cr.status === "rejected" ? (cr.reason as Error).message : "";
   if (!draws && !cons) throw new Error(why || consWhy || "nessuna risposta");
   const v: SiteContext = { draws: drawsFromCounts(draws ?? []), els: [...(cons ?? []), ...parks], lat, lng, elevation: await elevation, drawsOk: !!draws, constraintsOk: !!cons, ...(consWhy || why ? { why: consWhy || why } : {}) };
   if (draws && cons) keep(v);

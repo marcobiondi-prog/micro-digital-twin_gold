@@ -222,7 +222,6 @@ export function interventionAdvice(cs: Constraint[], kind: "piazza" | "vigneto")
     if (landscape) tips.push("Teli d’ombra e frangivento con strutture alte cambiano il paesaggio: di solito serve l’autorizzazione paesaggistica, a volte semplificata (DPR 31/2017, allegato B).");
     if (landscape || cultural) tips.push("Le siepi di specie del luogo come frangivento e l’irrigazione a goccia interrata sono gli interventi più leggeri.");
   }
-  if (!tips.length) tips.push("Nelle mappe non risultano vincoli vicini: resta da verificare con l’Ufficio tecnico, perché alcuni vincoli (decreti di notevole interesse pubblico, piani regionali) non sono sulle mappe aperte.");
   return tips;
 }
 
@@ -252,9 +251,9 @@ export function crowdRows(c: Crowd, season: Season, hour: number, shadePlaces: n
 }
 /** The constraints as label · value rows, then the advice (report and copied text). */
 export function constraintRows(cs: Constraint[], kind: "piazza" | "vigneto"): Array<[string, string]> {
-  const rows: Array<[string, string]> = cs.length
-    ? cs.map((c) => [`${c.title} (${c.level})`, `${c.law}. ${c.why} ${c.means}`])
-    : [["Esito", "Nelle mappe aperte non risultano beni tutelati né aree vincolate vicine."]];
+  // Nothing found: no rows (the report leaves the card out).
+  if (!cs.length) return [];
+  const rows: Array<[string, string]> = cs.map((c) => [`${c.title} (${c.level})`, `${c.law}. ${c.why} ${c.means}`]);
   interventionAdvice(cs, kind).forEach((t, i) => rows.push([i ? "" : "Per gli interventi", t]));
   rows.push(["Verifica", "Indicazione dalle mappe aperte, non un parere: il vincolo certo lo dicono l’Ufficio tecnico del Comune e la Soprintendenza."]);
   return rows;

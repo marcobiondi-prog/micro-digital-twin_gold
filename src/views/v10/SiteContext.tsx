@@ -106,7 +106,7 @@ export function ConstraintsCard({ lat, lng, pending, placeName, kind }: { lat: n
         : ctx.isPending ? <p className="inline-flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />Cerco beni tutelati e aree vincolate intorno…</p>
         : !cs ? <Unreadable reason={ctx.error?.message ?? ctx.data?.why} retry={() => void ctx.refetch()} busy={ctx.isFetching} />
         : <>
-          <p className="text-sm">{cs.length === 0 ? "Nelle mappe non risultano beni tutelati né aree vincolate vicine." : probable ? `Probabile tutela: ${cs.length === 1 ? "un vincolo" : `${cs.length} vincoli`} da verificare prima degli interventi.` : `Possibili vincoli: ${cs.length === 1 ? "uno" : cs.length} da verificare.`}</p>
+          {cs.length > 0 && <p className="text-sm">{probable ? `Probabile tutela: ${cs.length === 1 ? "un vincolo" : `${cs.length} vincoli`} da verificare prima degli interventi.` : `Possibili vincoli: ${cs.length === 1 ? "uno" : cs.length} da verificare.`}</p>}
           {cs.length > 0 && <ul className="space-y-2">
             {cs.map((c) => (
               <li key={c.id} className="rounded-2xl bg-foreground/[0.04]">
@@ -120,10 +120,10 @@ export function ConstraintsCard({ lat, lng, pending, placeName, kind }: { lat: n
               </li>
             ))}
           </ul>}
-          <div className="space-y-1.5">
+          {cs.length > 0 && <div className="space-y-1.5">
             <p className="text-xs font-semibold">Per gli interventi</p>
             <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">{interventionAdvice(cs, kind).map((t) => <li key={t}>{t}</li>)}</ul>
-          </div>
+          </div>}
           <div className="flex flex-wrap gap-2">
             <a href="https://vincoliinrete.beniculturali.it/VincoliInRete/" target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-full bg-foreground/[0.08] px-3.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">Beni vincolati (Ministero)<ExternalLink className="size-3.5" aria-hidden="true" /></a>
             <a href="http://sitap.beniculturali.it/" target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-full bg-foreground/[0.08] px-3.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">Vincoli paesaggistici (Ministero)<ExternalLink className="size-3.5" aria-hidden="true" /></a>
@@ -148,7 +148,8 @@ export function FeasibilityStrip({ lat, lng, pending, placeName, sim }: { lat: n
       <ChevronDown className="size-4 shrink-0 -rotate-90 text-muted-foreground" aria-hidden="true" />
     </button>
   );
-  if (pending || !cs) return null;
+  // Nothing found: no line at all (the card at the bottom keeps the links to check).
+  if (pending || !cs || cs.length === 0) return null;
   const probable = cs.some((c) => c.level === "probabile");
   const go = () => document.querySelector('[aria-label="Vincoli dell\'area"]')?.scrollIntoView({ behavior: "smooth", block: "start" });
   return (

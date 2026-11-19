@@ -68,7 +68,8 @@ describe("site context", () => {
     expect(interventionAdvice(cs, "vigneto").join(" ")).toContain("autorizzazione paesaggistica");
     const none = siteConstraints({ draws: drawsFrom([], LAT, LNG), els: [], lat: LAT, lng: LNG, elevation: 50 }, "Via Roma");
     expect(none).toEqual([]);
-    expect(interventionAdvice(none, "piazza")[0]).toContain("non risultano vincoli");
+    expect(interventionAdvice(none, "piazza")).toEqual([]);
+    expect(constraintRows(none, "piazza")).toEqual([]);
   });
   it("writes the report rows and reads the place where the simulation does", () => {
     const d = drawsFrom(els, LAT, LNG);
