@@ -61,6 +61,8 @@ export function CrowdCard({ lat, lng, pending, m2, season, hour, shadePlaces }: 
     d.attractions && plural(d.attractions, "luogo da visitare", "luoghi da visitare"),
     d.hotels && plural(d.hotels, "alloggio", "alloggi"),
     d.markets && plural(d.markets, "mercato", "mercati"),
+    d.offices && plural(d.offices, "ufficio", "uffici"),
+    d.leisure && plural(d.leisure, "parco o campo", "parchi e campi"),
     d.buildings && plural(d.buildings, "edificio", "edifici"),
   ].filter(Boolean) as string[] : [];
   const covered = crowd && crowd.people > 0 ? Math.min(100, Math.round((shadePlaces / crowd.people) * 100)) : 0;
@@ -69,7 +71,7 @@ export function CrowdCard({ lat, lng, pending, m2, season, hour, shadePlaces }: 
       <div className="flex items-center gap-2"><Users className="size-5 text-brand-turquoise" aria-hidden="true" /><p className="text-[15px] font-semibold">Persone nella piazza</p><span className="ml-auto rounded-full bg-foreground/[0.08] px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">stima</span></div>
       {pending ? <DrawFirst sim="urban" />
         : ctx.isPending ? <p className="inline-flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />Guardo cosa c’è intorno alla piazza…</p>
-        : !crowd ? <Unreadable reason={ctx.error?.message} retry={() => void ctx.refetch()} busy={ctx.isFetching} />
+        : !crowd ? <Unreadable reason={ctx.error?.message ?? ctx.data?.why} retry={() => void ctx.refetch()} busy={ctx.isFetching} />
         : <>
           <p className="text-sm text-muted-foreground">{SEASON_LABEL[season]}, ore {String(Math.floor(hour)).padStart(2, "0")}:00</p>
           <p className="font-display text-3xl font-light tabular-nums">≈ {grouped(crowd.low)}–{grouped(crowd.high)} <span className="text-base text-muted-foreground">persone</span></p>
@@ -83,7 +85,7 @@ export function CrowdCard({ lat, lng, pending, m2, season, hour, shadePlaces }: 
           <div className="flex justify-between text-[10px] tabular-nums text-muted-foreground"><span>0</span><span>6</span><span>12</span><span>18</span><span>23</span></div>
           {shadePlaces > 0 && <p className="text-sm">Con gli interventi c’è ombra per <b className="font-semibold tabular-nums">{grouped(shadePlaces)}</b> persone: {covered >= 100 ? "basta per tutti a quest’ora." : `circa il ${covered} % di chi c’è a quest’ora.`}</p>}
           {parts.length > 0 && <p className="text-xs text-muted-foreground">Nel raggio di 300 m: {parts.join(" · ")}.</p>}
-          <p className="text-[11px] leading-snug text-muted-foreground">Stima indicativa, non un conteggio: dai luoghi che attirano persone intorno alla piazza (locali, negozi, scuole, fermate, case), dalla stagione e dall’ora. Un conteggio vero, a mano o con un sensore, la rende più precisa.</p>
+          <p className="text-[11px] leading-snug text-muted-foreground">Stima indicativa, non un conteggio: dai luoghi che attirano persone intorno alla piazza (locali, negozi, scuole, uffici, parchi, fermate, case), dalla grandezza dell’area, dalla stagione e dall’ora. Un conteggio vero, a mano o con un sensore, la rende più precisa.</p>
         </>}
     </div>
   );
@@ -102,7 +104,7 @@ export function ConstraintsCard({ lat, lng, pending, placeName, kind }: { lat: n
       <div className="flex items-center gap-2">{cs && cs.length ? <ShieldAlert className="size-5 text-amber-500" aria-hidden="true" /> : <ShieldCheck className="size-5 text-brand-turquoise" aria-hidden="true" />}<p className="text-[15px] font-semibold">Vincoli dell’area</p><span className="ml-auto rounded-full bg-foreground/[0.08] px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">indicativo</span></div>
       {pending ? <DrawFirst sim={kind === "piazza" ? "urban" : "vineyard"} />
         : ctx.isPending ? <p className="inline-flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />Cerco beni tutelati e aree vincolate intorno…</p>
-        : !cs ? <Unreadable reason={ctx.error?.message} retry={() => void ctx.refetch()} busy={ctx.isFetching} />
+        : !cs ? <Unreadable reason={ctx.error?.message ?? ctx.data?.why} retry={() => void ctx.refetch()} busy={ctx.isFetching} />
         : <>
           <p className="text-sm">{cs.length === 0 ? "Nelle mappe non risultano beni tutelati né aree vincolate vicine." : probable ? `Probabile tutela: ${cs.length === 1 ? "un vincolo" : `${cs.length} vincoli`} da verificare prima degli interventi.` : `Possibili vincoli: ${cs.length === 1 ? "uno" : cs.length} da verificare.`}</p>
           {cs.length > 0 && <ul className="space-y-2">

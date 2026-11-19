@@ -1,5 +1,5 @@
 import { OVERPASS_URLS } from "@/models/place-area";
-import { drawsFromCounts, siteConstraintsQuery, siteDrawsQuery, type SiteContext, type SiteEl } from "@/models/site-context";
+import { drawsFromCounts, siteConstraintsQuery, siteDrawsQuery, siteParksQuery, type SiteContext, type SiteEl } from "@/models/site-context";
 
 /** The place's height above sea level (for the mountain constraint); null when the weather service does not answer. */
 async function elevationOf(lat: number, lng: number): Promise<number | null> {
@@ -24,13 +24,13 @@ const SERVERS = [...new Set([...OVERPASS_URLS, "https://maps.mail.ru/osm/tools/o
  * One query to every map server at once (14 s each): the first good answer wins and the others are cancelled, so a
  * server that keeps the request queued no longer holds the card for minutes ("Riprova" asks again).
  */
-async function ask(query: string): Promise<SiteEl[]> {
+async function ask(query: string, ms = 14000): Promise<SiteEl[]> {
   let reason = "nessuna risposta";
   for (let round = 0; round < 1; round++) {
     const ctrl = new AbortController();
     try {
       return await Promise.any(SERVERS.map(async (url) => {
-        const sig = timeout(14000);
+        const sig = timeout(ms);
         const both = new AbortController();
         const stop = () => both.abort();
         sig.addEventListener("abort", stop); ctrl.signal.addEventListener("abort", stop);
@@ -51,7 +51,7 @@ async function ask(query: string): Promise<SiteEl[]> {
 }
 
 /** The surroundings already read for a place, kept on the phone for a week (they change slowly). */
-const KEEP = "mdt-site-v1";
+const KEEP = "mdt-site-v2";
 const keyOf = (lat: number, lng: number) => `${lat.toFixed(4)},${lng.toFixed(4)}`;
 function kept(lat: number, lng: number): SiteContext | null {
   try { const all = JSON.parse(localStorage.getItem(KEEP) ?? "{}") as Record<string, { at: number; v: SiteContext }>; const e = all[keyOf(lat, lng)]; return e && Date.now() - e.at < 7 * 864e5 ? e.v : null; } catch { return null; }
@@ -70,11 +70,13 @@ export async function loadSiteContext(lat: number, lng: number, fresh = false): 
   const old = fresh ? null : kept(lat, lng);
   if (old) return old;
   const elevation = elevationOf(lat, lng);
-  let draws: SiteEl[] | null = null, cons: SiteEl[] | null = null, why = "";
-  try { draws = await ask(siteDrawsQuery(lat, lng)); } catch (e) { why = (e as Error).message; }
-  try { cons = await ask(siteConstraintsQuery(lat, lng)); } catch (e) { why = why || (e as Error).message; }
-  if (!draws && !cons) throw new Error(why || "nessuna risposta");
-  const v: SiteContext = { draws: drawsFromCounts(draws ?? []), els: cons ?? [], lat, lng, elevation: await elevation, drawsOk: !!draws, constraintsOk: !!cons };
+  // The three asked together (the parks one optional and shorter), so the card waits for the slowest, not their sum.
+  const [dr, cr, pr] = await Promise.allSettled([ask(siteDrawsQuery(lat, lng)), ask(siteConstraintsQuery(lat, lng)), ask(siteParksQuery(lat, lng), 9000)]);
+  const draws = dr.status === "fulfilled" ? dr.value : null, cons = cr.status === "fulfilled" ? cr.value : null;
+  const parks = pr.status === "fulfilled" ? pr.value : [];
+  const why = dr.status === "rejected" ? (dr.reason as Error).message : "", consWhy = cr.status === "rejected" ? (cr.reason as Error).message : "";
+  if (!draws && !cons) throw new Error(why || consWhy || "nessuna risposta");
+  const v: SiteContext = { draws: drawsFromCounts(draws ?? []), els: [...(cons ?? []), ...parks], lat, lng, elevation: await elevation, drawsOk: !!draws, constraintsOk: !!cons, ...(consWhy || why ? { why: consWhy || why } : {}) };
   if (draws && cons) keep(v);
   return v;
 }

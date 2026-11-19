@@ -18,13 +18,14 @@ describe("site context", () => {
   it("asks one query with the places around and the buildings' count", () => {
     const q = siteContextQuery(LAT, LNG);
     expect(q).toContain("around:300");
-    expect(q.split("out count").length - 1).toBe(10);
+    expect(q.split("out count").length - 1).toBe(12);
     expect(q).toContain('"heritage"');
+    expect(q).toContain("is_in");
   });
   it("reads the counts in their order", () => {
-    const counts = [3, 12, 1, 2, 4, 1, 2, 0, 3, 410].map((n) => ({ type: "count", tags: { total: String(n) } }));
+    const counts = [3, 12, 1, 2, 4, 1, 2, 0, 3, 410, 6, 2].map((n) => ({ type: "count", tags: { total: String(n) } }));
     const d = drawsFromCounts(counts);
-    expect([d.food, d.shops, d.schools, d.worship, d.transport, d.attractions, d.hotels, d.markets, d.services, d.buildings]).toEqual([3, 12, 1, 2, 4, 1, 2, 0, 3, 410]);
+    expect([d.food, d.shops, d.schools, d.worship, d.transport, d.attractions, d.hotels, d.markets, d.services, d.buildings, d.offices, d.leisure]).toEqual([3, 12, 1, 2, 4, 1, 2, 0, 3, 410, 6, 2]);
   });
   it("counts what draws people within 300 m", () => {
     const d = drawsFrom(els, LAT, LNG);
@@ -45,6 +46,8 @@ describe("site context", () => {
     expect(tiny.people).toBeLessThanOrEqual(20);
     expect(tiny.capped).toBe(true);
     expect(hourShare("estate", 15)).toBeLessThan(hourShare("primavera", 15));
+    // A small area holds fewer people than a large one with the same surroundings.
+    expect(crowdEstimate(d, 400, "primavera", 18).people).toBeLessThan(crowdEstimate(d, 6000, "primavera", 18).people);
   });
   it("finds the cultural goods and the historic square", () => {
     const cs = siteConstraints({ draws: drawsFrom(els, LAT, LNG), els, lat: LAT, lng: LNG, elevation: 700 }, "Piazza Vittorio Emanuele II");

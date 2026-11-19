@@ -30,10 +30,12 @@ export function siteDrawsQuery(lat: number, lng: number): string {
     + `nwr["tourism"~"^(hotel|guest_house|hostel|apartment)$"]${a};out count;`
     + `nwr["amenity"="marketplace"]${a};out count;`
     + `nwr["amenity"~"^(townhall|library|theatre|cinema|pharmacy|hospital|clinic)$"]${a};out count;`
-    + `way["building"]${a};out count;`;
+    + `way["building"]${a};out count;`
+    + `nwr["office"]${a};out count;`
+    + `nwr["leisure"~"^(park|playground|garden|pitch|sports_centre)$"]${a};out count;`;
 }
 /** The kinds counted by siteDrawsQuery, in its order. */
-export const DRAW_ORDER = ["food", "shops", "schools", "worship", "transport", "attractions", "hotels", "markets", "services", "buildings"] as const;
+export const DRAW_ORDER = ["food", "shops", "schools", "worship", "transport", "attractions", "hotels", "markets", "services", "buildings", "offices", "leisure"] as const;
 /** The counts of siteDrawsQuery's answer. */
 export function drawsFromCounts(els: SiteEl[]): Draws {
   const d = Object.fromEntries(DRAW_ORDER.map((k) => [k, 0])) as Draws;
@@ -46,18 +48,22 @@ export function drawsFromCounts(els: SiteEl[]): Draws {
  */
 export function siteConstraintsQuery(lat: number, lng: number): string {
   const p = `${lat.toFixed(6)},${lng.toFixed(6)}`;
-  return `[out:json][timeout:20];is_in(${p})->.a;`
-    + `(area.a["boundary"="protected_area"];area.a["leisure"="nature_reserve"];area.a["landuse"="forest"];area.a["natural"="wood"];)->.in;.in out tags;`
-    + `(nwr["heritage"](around:250,${p});nwr["historic"](around:300,${p});`
+  return `[out:json][timeout:15];(`
+    + `nwr["heritage"](around:250,${p});nwr["historic"](around:300,${p});`
     + `way["waterway"~"^(river|stream|canal)$"](around:160,${p});way["natural"="coastline"](around:320,${p});`
     + `way["natural"="water"]["water"~"^(lake|reservoir)$"](around:320,${p});`
     + `way["landuse"="forest"](around:60,${p});way["natural"="wood"](around:60,${p}););out tags center 300;`;
 }
+/** The parks, reserves and woods the point lies in (is_in): asked apart, as not every map server answers it. */
+export function siteParksQuery(lat: number, lng: number): string {
+  return `[out:json][timeout:15];is_in(${lat.toFixed(6)},${lng.toFixed(6)})->.a;`
+    + `(area.a["boundary"="protected_area"];area.a["leisure"="nature_reserve"];area.a["landuse"="forest"];area.a["natural"="wood"];);out tags;`;
+}
 /** Both queries (kept for the tests and for reading them together). */
-export const siteContextQuery = (lat: number, lng: number) => `${siteDrawsQuery(lat, lng)}\n${siteConstraintsQuery(lat, lng)}`;
+export const siteContextQuery = (lat: number, lng: number) => `${siteDrawsQuery(lat, lng)}\n${siteConstraintsQuery(lat, lng)}\n${siteParksQuery(lat, lng)}`;
 
-export type Draws = { food: number; shops: number; schools: number; worship: number; transport: number; attractions: number; hotels: number; markets: number; services: number; buildings: number };
-export type SiteContext = { draws: Draws; els: SiteEl[]; lat: number; lng: number; elevation: number | null; drawsOk?: boolean; constraintsOk?: boolean };
+export type Draws = { food: number; shops: number; schools: number; worship: number; transport: number; attractions: number; hotels: number; markets: number; services: number; buildings: number; offices?: number; leisure?: number };
+export type SiteContext = { draws: Draws; els: SiteEl[]; lat: number; lng: number; elevation: number | null; drawsOk?: boolean; constraintsOk?: boolean; why?: string };
 
 const posOf = (e: SiteEl): [number, number] | null => (e.lat != null && e.lon != null ? [e.lat, e.lon] : e.center ? [e.center.lat, e.center.lon] : null);
 export const distM = (a: [number, number], b: [number, number]) => {
@@ -125,11 +131,15 @@ export function crowdEstimate(d: Draws, m2: number, season: Season, hour: number
     const school = season === "estate" ? 0 : d.schools * ((h >= 7 && h < 9) || (h >= 12 && h < 14) ? 12 : 2);
     const market = d.markets * (h >= 7 && h < 13 ? 25 : 2);
     const visitors = (d.attractions * 12 + d.hotels * 3) * tourism;
-    return residents + d.food * 4 + d.shops * 1.2 + d.worship * 3 + d.transport * 2.5 + d.services * 2 + school + market + visitors;
+    const work = (d.offices ?? 0) * (h >= 9 && h < 18 ? 1.5 : 0.2); // offices: people passing at work hours
+    const play = (d.leisure ?? 0) * (h >= 16 && h < 21 ? 4 : h >= 9 && h < 16 ? 2 : 0.3); // parks, playgrounds, pitches
+    return residents + d.food * 4 + d.shops * 1.2 + d.worship * 3 + d.transport * 2.5 + d.services * 2 + school + market + visitors + work + play;
   };
+  // The surroundings' people spread over a usual piazza of about 3.000 m²: a smaller area holds fewer, a larger one more.
+  const size = Math.min(2, Math.max(0.15, Math.pow(Math.max(1, m2) / 3000, 0.7)));
   const cap = Math.max(4, m2 / 1.5);
-  const byHour = Array.from({ length: 24 }, (_, h) => Math.min(cap, Math.max(1, peakOf(h) * SEASON_SHARE[season] * hourShare(season, h))));
-  const raw = peakOf(hour) * SEASON_SHARE[season] * hourShare(season, hour);
+  const byHour = Array.from({ length: 24 }, (_, h) => Math.min(cap, Math.max(1, peakOf(h) * size * SEASON_SHARE[season] * hourShare(season, h))));
+  const raw = peakOf(hour) * size * SEASON_SHARE[season] * hourShare(season, hour);
   const people = Math.round(Math.min(cap, Math.max(1, raw)));
   const peak = Math.round(Math.max(...byHour));
   return { people, low: Math.max(0, Math.round(people * 0.6)), high: Math.round(Math.min(cap, people * 1.4)), peak, per100: m2 > 0 ? (people / m2) * 100 : 0, tourist, capped: raw > cap, byHour: byHour.map((v) => Math.round(v)) };
