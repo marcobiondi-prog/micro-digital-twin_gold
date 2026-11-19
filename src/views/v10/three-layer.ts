@@ -4,6 +4,7 @@ import { vineRowSegments, type LatLng } from "@/models/area-layout";
 import { recognisedPlants } from "@/models/ar-objects";
 import { currentScans } from "@/models/ar-scan-log";
 import { growPlan, layoutPlan } from "@/views/ar-plan";
+import { setShadeTarget } from "@/views/ar-papillon";
 import { castShadows } from "@/views/ar-shadow";
 import type { SimLayout } from "@/views/v10/map-area";
 
@@ -101,6 +102,7 @@ export function simThreeLayer(maplibregl: typeof import("maplibre-gl"), origin: 
     }
   };
 
+  let shadeWas: number | null = null;
   const build = (sim: SimLayout | null) => {
     clear();
     if (!sim) return;
@@ -108,7 +110,11 @@ export function simThreeLayer(maplibregl: typeof import("maplibre-gl"), origin: 
     if (sim.kind === "piazza") {
       // Every intervention as the AR shows it: the same realistic models, on the map's own spots.
       for (const t of sim.data.trees) all.push(xz(t));
-      addPlan({ kind: "urban", L: sim.data, open: sim.shadeOpen ?? 1 });
+      // The sails open and close by themselves: built as they were, then moving to the simulation's sun.
+      const target = sim.shadeOpen ?? 1;
+      addPlan({ kind: "urban", L: sim.data, open: shadeWas ?? target });
+      setShadeTarget(content, target, () => map?.triggerRepaint());
+      shadeWas = target;
       for (const p of sim.data.patches) for (const q of p.ring) all.push(xz(q));
     } else {
       // Vines plant by plant along their rows: a twisted trunk, the leafy wall over the wires, a post every ~6 m.

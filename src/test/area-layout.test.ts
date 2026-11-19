@@ -68,7 +68,7 @@ describe("pergolas", () => {
     const parts = strips.flatMap((p) => pergolaParts(p.ring));
     expect(parts.some((p) => p.base === 0 && p.height > 2.5)).toBe(true);
     // As many fans as poles, at least one each strip.
-    expect(parts.filter((p) => p.base >= 3).length).toBe(parts.filter((p) => p.base === 0).length);
+    expect(parts.filter((p) => p.base >= 3).length).toBe(parts.filter((p) => p.base === 0 && p.height > 2.5).length);
     expect(parts.filter((p) => p.base >= 3).length).toBeGreaterThanOrEqual(strips.length);
     const inShade = (t: [number, number]) => strips.some((p) => ringContains(p.ring, t[0], t[1]));
     expect(l.trees.filter(inShade)).toHaveLength(0);
@@ -121,9 +121,10 @@ describe("side-pole sails", () => {
     expect(shadeOpenness(-10, "estate")).toBe(0);
     expect(shadeOpenness(10, "estate")).toBeCloseTo(0.5);
     expect(shadeOpenness(40, "inverno")).toBe(0);
-    // A 12 × 4 m block: poles along its long edge, fans reaching across it.
+    // A 12 × 4 m block: three round shades in a row, each pole in the middle of its cell, neighbours not overlapping.
     const u = papillonUnits(12, 4);
-    expect(u.length).toBeGreaterThanOrEqual(2);
-    expect(u.every((p) => p.z === -2 && p.r >= 4 && p.r <= 4.2)).toBe(true);
+    expect(u.length).toBe(3);
+    expect(u.every((p) => p.z === 0 && p.r <= 2.05 && p.r >= 1.9)).toBe(true);
+    expect(u[1]!.x - u[0]!.x).toBeGreaterThanOrEqual(2 * u[0]!.r - 0.1);
   });
 });

@@ -528,16 +528,18 @@ export const PERGOLA_COLORS = { post: "#9aa3ab", beam: "#3b4148", slat: "#ece3cf
  * (3.1–3.25 m), leaving light between them. Built as slabs like the trees.
  */
 export function pergolaParts(strip: Ring, lite = false, open = 1): TreePart[] {
-  // Side-pole sails in their simple shape: each a slim pole on the shade's edge and its fan of fabric as one sheet,
-  // 3–3,08 m up, as open as the sun says (the realistic ones are views/ar-papillon).
+  // Round shades in their simple shape: each a slim central pole and its round canopy as one sheet, 3–3,08 m up,
+  // as open as the sun says (the realistic ones are views/ar-papillon).
   if (strip.length < 3) return [];
   const R = rectFrameOf(strip), vy: [number, number] = [-R.ux[1], R.ux[0]];
   const ll = (x: number, z: number) => toLL(R.f, R.cx + R.ux[0] * x + vy[0] * z, R.cy + R.ux[1] * x + vy[1] * z);
   const parts: TreePart[] = [];
   for (const u of papillonUnits(R.w, R.d)) {
     const sq = (r: number): Ring => [[-r, -r], [r, -r], [r, r], [-r, r]].map(([a, b]) => ll(u.x + a!, u.z + b!));
+    const circle = (r: number, n = 16): Ring => Array.from({ length: n }, (_, i) => ll(u.x + Math.sin((2 * Math.PI * i) / n) * r, u.z + Math.cos((2 * Math.PI * i) / n) * r));
+    parts.push({ ring: circle(Math.max(1.1, Math.min(1.7, u.r * 0.55)), lite ? 10 : 16), base: 0, height: 0.12, color: "#a8784c" });
     parts.push({ ring: sq(0.08), base: 0, height: 3.2, color: PERGOLA_COLORS.post });
-    parts.push({ ring: papillonFan(u, open, lite ? 8 : 14).map(([x, z]) => ll(x, z)), base: 3, height: 3.08, color: lite ? `${PERGOLA_COLORS.slat}d9` : PERGOLA_COLORS.slat });
+    parts.push({ ring: papillonFan(u, open, lite ? 12 : 20).map(([x, z]) => ll(x, z)), base: 3, height: 3.08, color: lite ? `${PERGOLA_COLORS.slat}d9` : PERGOLA_COLORS.slat });
   }
   return parts;
 }
@@ -857,17 +859,19 @@ export function shadeBlocks(rings: Ring[]): Ring[] {
  * the row's depth and half the spacing, at most 4,2 m. yaw: the direction the wings face (radians, 0 = +z).
  */
 export type PapillonUnit = { x: number; z: number; yaw: number; r: number };
+/**
+ * Round shades on a central pole (the canopy all round the pole, as asked): the w×d rectangle is cut into cells as
+ * square as possible, at most 6 m a side, a pole in the middle of each and a round canopy of radius r reaching half
+ * the cell's shorter side (at most 3,3 m), so neighbours meet without overlapping. yaw is kept for older callers (0).
+ */
 export function papillonUnits(w: number, d: number): PapillonUnit[] {
-  const along = w >= d, len = along ? w : d, dep = along ? d : w;
-  if (len < 0.8 || dep < 0.8) return [];
-  const rows = Math.max(1, Math.ceil(dep / 4)), dr = dep / rows;
-  const n = Math.max(1, Math.ceil(len / Math.min(8, 2 * Math.max(dr, 2.2)))), s = len / n;
-  const r = Math.min(4.2, Math.max(dr, s / 2) * 1.04);
+  if (w < 0.8 || d < 0.8) return [];
+  const s = Math.min(6, Math.max(1.6, Math.min(w, d)));
+  const nx = Math.max(1, Math.round(w / s)), nz = Math.max(1, Math.round(d / s));
+  const cw = w / nx, cd = d / nz;
+  const r = Math.min(3.3, Math.max(0.6, 0.5 * Math.min(cw, cd) * 1.02));
   const out: PapillonUnit[] = [];
-  for (let k = 0; k < rows; k++) for (let i = 0; i < n; i++) {
-    const a = -len / 2 + s * (i + 0.5), b = -dep / 2 + dr * k;
-    out.push(along ? { x: a, z: b, yaw: 0, r } : { x: b, z: a, yaw: Math.PI / 2, r });
-  }
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) out.push({ x: -w / 2 + cw * (i + 0.5), z: -d / 2 + cd * (j + 0.5), yaw: 0, r });
   return out;
 }
 /**
@@ -878,13 +882,17 @@ export function shadeOpenness(sunHeight: number | null | undefined, season?: str
   if (season === "inverno" || sunHeight == null) return season === "inverno" ? 0 : 1;
   return Math.max(0, Math.min(1, (sunHeight - 5) / 10));
 }
-/** The fan of one unit in its rectangle's frame: the pole, then the arc of the wings (half-angle 90° · open, at least 4°). */
-export function papillonFan(u: PapillonUnit, open: number, seg = 16): Array<[number, number]> {
-  const half = Math.max(4, 90 * Math.max(0, Math.min(1, open))) * (Math.PI / 180);
-  const pts: Array<[number, number]> = [[u.x, u.z]];
-  for (let i = 0; i <= seg; i++) {
-    const a = u.yaw - half + (2 * half * i) / seg;
-    pts.push([u.x + Math.sin(a) * u.r, u.z + Math.cos(a) * u.r]);
+/** How far a canopy reaches when `open` (0–1): folded towards the pole when closed. */
+export function canopyReach(r: number, open: number): number {
+  const o = Math.max(0, Math.min(1, open));
+  return r * (0.12 + 0.88 * o);
+}
+/** The round canopy of one unit seen from above, in its rectangle's frame: a ring of `seg` points round the pole. */
+export function papillonFan(u: PapillonUnit, open: number, seg = 24): Array<[number, number]> {
+  const R = canopyReach(u.r, open), pts: Array<[number, number]> = [];
+  for (let i = 0; i < seg; i++) {
+    const a = (2 * Math.PI * i) / seg;
+    pts.push([u.x + Math.sin(a) * R, u.z + Math.cos(a) * R]);
   }
   return pts;
 }
@@ -913,7 +921,7 @@ export function papillonsOf(ring: Ring, open = 1): { fans: Ring[]; poles: LatLng
     const fan = papillonFan(u, open);
     fans.push(fan.map(([x, z]) => ll(x, z)));
     poles.push(ll(u.x, u.z));
-    for (const k of [1, 5, 9, 13, 17]) { const q = fan[k]; if (q) ribs.push([ll(u.x, u.z), ll(q[0], q[1])]); }
+    for (let k = 0; k < fan.length; k += 3) { const q = fan[k]!; ribs.push([ll(u.x, u.z), ll(q[0], q[1])]); }
   }
   return { fans, poles, ribs };
 }

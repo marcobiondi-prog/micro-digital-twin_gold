@@ -14,6 +14,7 @@ import { hapticTick } from "@/lib/haptics";
 import { easeTo, FloorTracker, placementFor, RAISED_M, surfaceKind, type SurfaceHit } from "@/models/ar-floor";
 import { contactShadow, floorLoop, objectMesh } from "@/views/ar-object-meshes";
 import { buildPlan, growPlan, planText, planTreeDefs } from "@/views/ar-plan";
+import { realShadeOpen, setShadeTarget } from "@/views/ar-papillon";
 import { realTree, wantsRealTree } from "@/views/ar-tree";
 import { ArShadows, castShadows } from "@/views/ar-shadow";
 import { XREstimatedLight } from "three/examples/jsm/webxr/XREstimatedLight.js";
@@ -665,6 +666,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         const def = defOfRef.current(live.current.selected);
         const uid = `o${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
         const g = objectMesh(def);
+        if (def.id === "pergolato") shadeAuto(g, true);
         // The pergola, the bed and the misting pole are planted in the floor with their own footings: no round shadow.
         const shadow = def.id !== "pergolato" && def.id !== "aiuola" && def.id !== "nebulizzatore" && def.id !== "innaffiatoio" ? contactShadow(def) : null;
         if (shadow) g.add(shadow);
@@ -832,6 +834,17 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   }
 
   /** A placed object drawn again (preview rebuilt, or carried from ARCore): its mesh, round shadow and grown tree. */
+  /**
+   * The sails open and close by themselves with the real sun over the place: built open, they then close (or stay
+   * open) smoothly, and every minute they follow the sun again. Said once when one closes as it is put down.
+   */
+  function shadeAuto(root: THREE.Object3D, say: boolean) {
+    const open = realShadeOpen(loc.lat, loc.lng);
+    if (setShadeTarget(root, open) && say && open < 0.5) {
+      const m = new Date().getMonth(), winter = loc.lat >= 0 ? m === 11 || m <= 1 : m >= 5 && m <= 7;
+      setNotice({ text: `La vela si chiude da sola: ${winter ? "d’inverno resta chiusa" : open <= 0 ? "il sole è tramontato" : "il sole è basso"}. Si riapre da sola nelle ore calde.`, tone: "ok" });
+    }
+  }
   function addPlacedMesh(t: NonNullable<typeof three.current>, o: PlacedObject, y: number) {
     const def = o.def ?? defOfRef.current(o.id);
     const g = meshFor(o, y);
@@ -865,6 +878,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     g.position.set(o.x, y, o.z);
     g.scale.setScalar(modelRef.current * (o.scale ?? 1));
     castShadows(g);
+    shadeAuto(g, false);
     return g;
   }
   /**
@@ -1108,6 +1122,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     const { group, count } = buildPlan(kind, getLab(), area, origin, alignment.a, merge, joinBeds);
     group.position.y = y;
     castShadows(group);
+    shadeAuto(group, false);
     t.overlay.add(group);
     // The map's trees grow as the species recognised with the AI camera in this flow (else the realistic oak).
     void growPlan(group, () => group.parent === t.overlay, castShadows, plantsRef.current);
@@ -1118,6 +1133,12 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       setNotice({ text: `Dal progetto: ${said}${alignment.how === "gps" ? " · posizione dal GPS, tocca i 2 angoli per allinearli bene" : ""}`, tone: "ok" });
     }
   }, [alignment, area, origin, showPlan, kind, planKey, merge, joinBeds, plantKey]);
+
+  // The sails follow the real sun by themselves: every minute their openness is worked out again.
+  useEffect(() => {
+    const id = window.setInterval(() => { const t = three.current; if (t) setShadeTarget(t.scene, realShadeOpen(loc.lat, loc.lng)); }, 60000);
+    return () => window.clearInterval(id);
+  }, [loc.lat, loc.lng]);
 
   // The measuring tape between the two points.
   useEffect(() => {
@@ -1783,7 +1804,7 @@ export type FanGroup = { key: string; label: string; Icon: LucideIcon; items: Fa
 
 /** One line on what each object is for, in the AR sheet. */
 const OBJECT_HINT: Record<string, string> = {
-  albero: "Fa ombra e rinfresca l’aria", pergolato: "Palo laterale, ali di tessuto che si aprono e si chiudono", aiuola: "Verde permeabile tra i ciottoli",
+  albero: "Fa ombra e rinfresca l’aria", pergolato: "Tronco inclinato, falda tonda e sotto panca e tavolo rotondi", aiuola: "Verde permeabile tra i ciottoli",
   nebulizzatore: "Nebbia d’acqua che rinfresca vicino agli ugelli", innaffiatoio: "Bagna aiuole e terreno",
   telo: "Rete ombreggiante sopra le viti", frangivento: "Siepe che ferma il vento", irrigazione: "Ala gocciolante lungo il filare",
 };
