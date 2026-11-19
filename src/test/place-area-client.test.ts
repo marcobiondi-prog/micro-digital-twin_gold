@@ -1,29 +1,44 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadPlaceArea } from "@/lib/place-area-client";
 
-// A 40 × 40 m square around (41.56, 14.66), mapped as place=square.
-const d = 0.00018;
-const square = { type: "way", tags: { place: "square", name: "Piazza" }, geometry: [[-d, -d], [-d, d], [d, d], [d, -d], [-d, -d]].map(([a, b]) => ({ lat: 41.56 + a!, lon: 14.66 + b! })) };
+const square = { type: "way", tags: { place: "square", name: "Piazza" }, geometry: [
+  { lat: 41.5600, lon: 14.6600 }, { lat: 41.5600, lon: 14.6610 }, { lat: 41.5607, lon: 14.6610 }, { lat: 41.5607, lon: 14.6600 }, { lat: 41.5600, lon: 14.6600 },
+] };
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); });
 
 describe("loadPlaceArea", () => {
-  it("keeps the server’s answer when it has one", async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    const r = await loadPlaceArea(async () => ({ centre: [1, 2] }), 41.56, 14.66);
-    expect(r).toEqual({ centre: [1, 2] });
-    expect(fetchMock).not.toHaveBeenCalled();
+  it("takes the phone's answer when the app's server hangs", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ elements: [square] }))));
+    const ask = () => new Promise<never>(() => {});
+    const v = await loadPlaceArea(ask, 41.5603, 14.6605);
+    expect(v?.m2).toBeGreaterThan(1000);
   });
-  it("asks the map servers from the phone when the server reached none, moving on after a busy one", async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response("busy", { status: 429 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ elements: [square] }), { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-    const r = await loadPlaceArea(async () => { throw new Error("place-area-unreachable"); }, 41.56, 14.66);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(r?.centre?.[0]).toBeCloseTo(41.56, 4);
-    expect(r?.centre?.[1]).toBeCloseTo(14.66, 4);
-    expect(r?.m2).toBeGreaterThan(1000);
+  it("keeps a shape read before and asks nothing the next time", async () => {
+    const f = vi.fn(async () => new Response(JSON.stringify({ elements: [square] })));
+    vi.stubGlobal("fetch", f);
+    await loadPlaceArea(() => new Promise<never>(() => {}), 41.5603, 14.6605);
+    f.mockClear();
+    const v = await loadPlaceArea(() => Promise.reject(new Error("x")), 41.5603, 14.6605);
+    expect(v?.m2).toBeGreaterThan(1000);
+    expect(f).not.toHaveBeenCalled();
+  });
+  it("says null when nothing answers", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 504 })));
+    expect(await loadPlaceArea(() => Promise.reject(new Error("x")), 41.5603, 14.6605)).toBeNull();
+  });
+});
+
+import { areaCandidates, joinOuter } from "@/models/place-area";
+describe("multipolygon outer edges", () => {
+  it("chains split ways into one ring", () => {
+    const a = { lat: 41, lon: 14 }, b = { lat: 41, lon: 14.001 }, c = { lat: 41.001, lon: 14.001 }, d = { lat: 41.001, lon: 14 };
+    expect(joinOuter([[a, b], [c, b], [d, c], [d, a]])).toHaveLength(1);
+    const els = [{ type: "relation", tags: { place: "square" }, members: [{ role: "outer", geometry: [a, b, c] }, { role: "outer", geometry: [a, d, c] }] }];
+    expect(areaCandidates(els as never)[0]?.kind).toBe("piazza");
+  });
+  it("reads a market square as a piazza", () => {
+    const g = [{ lat: 41, lon: 14 }, { lat: 41, lon: 14.001 }, { lat: 41.001, lon: 14.001 }, { lat: 41, lon: 14 }];
+    expect(areaCandidates([{ type: "way", tags: { amenity: "marketplace" }, geometry: g }] as never)[0]?.kind).toBe("piazza");
   });
 });

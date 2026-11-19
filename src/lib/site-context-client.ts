@@ -1,4 +1,4 @@
-import { OVERPASS_URLS } from "@/models/place-area";
+import { raceOverpass, timeout } from "@/lib/overpass-race";
 import { drawsFromCounts, siteConstraintsQuery, siteDrawsQuery, siteParksQuery, type SiteContext, type SiteEl } from "@/models/site-context";
 
 /** The place's height above sea level (for the mountain constraint); null when the weather service does not answer. */
@@ -11,44 +11,8 @@ async function elevationOf(lat: number, lng: number): Promise<number | null> {
   } catch { return null; }
 }
 
-/** A signal that aborts after ms (AbortSignal.timeout is missing on some older phones). */
-function timeout(ms: number): AbortSignal {
-  if (typeof AbortSignal !== "undefined" && "timeout" in AbortSignal) return AbortSignal.timeout(ms);
-  const c = new AbortController(); setTimeout(() => c.abort(), ms); return c.signal;
-}
-
-/** The map servers asked by the phone: the app's usual ones plus two steady mirrors. */
-const SERVERS = [...new Set([...OVERPASS_URLS, "https://maps.mail.ru/osm/tools/overpass/api/interpreter", "https://overpass.osm.jp/api/interpreter"])];
-
-/**
- * One query to every map server at once (14 s each): the first good answer wins and the others are cancelled, so a
- * server that keeps the request queued no longer holds the card for minutes ("Riprova" asks again).
- */
-async function ask(query: string, ms = 14000): Promise<SiteEl[]> {
-  let reason = "nessuna risposta";
-  for (let round = 0; round < 1; round++) {
-    const ctrl = new AbortController();
-    try {
-      return await Promise.any(SERVERS.map(async (url) => {
-        const sig = timeout(ms);
-        const both = new AbortController();
-        const stop = () => both.abort();
-        sig.addEventListener("abort", stop); ctrl.signal.addEventListener("abort", stop);
-        try {
-          const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ data: query }), signal: both.signal });
-          if (!r.ok) { reason = `risposta ${r.status}`; throw new Error(reason); }
-          return ((await r.json()) as { elements?: SiteEl[] }).elements ?? [];
-        } catch (e) {
-          if (both.signal.aborted && sig.aborted) reason = "tempo scaduto";
-          else if (typeof navigator !== "undefined" && navigator.onLine === false) reason = "senza rete";
-          else if (!(e instanceof Error && e.message.startsWith("risposta"))) reason = "server non raggiungibile";
-          throw e;
-        }
-      }));
-    } catch { /* every server failed this round */ } finally { ctrl.abort(); }
-  }
-  throw new Error(reason);
-}
+/** One query to every map server at once (see lib/overpass-race). */
+const ask = (query: string, ms = 14000) => raceOverpass<SiteEl>(query, ms);
 
 /** The surroundings already read for a place, kept on the phone for a week (they change slowly). */
 const KEEP = "mdt-site-v2";
