@@ -18,13 +18,27 @@ export type SiteEl = { type: string; id?: number; lat?: number; lon?: number; ce
  * within 300 m with the buildings' count…
  */
 export function siteDrawsQuery(lat: number, lng: number): string {
-  const p = `${lat.toFixed(6)},${lng.toFixed(6)}`;
-  return `[out:json][timeout:20];(`
-    + `nwr["amenity"~"^(cafe|restaurant|bar|pub|fast_food|ice_cream|school|kindergarten|college|university|place_of_worship|marketplace|bus_station|townhall|library|theatre|cinema|pharmacy|hospital|clinic)$"](around:${DRAW_M},${p});`
-    + `nwr["shop"](around:${DRAW_M},${p});`
-    + `nwr["tourism"~"^(hotel|guest_house|hostel|apartment|attraction|museum|gallery|viewpoint)$"](around:${DRAW_M},${p});`
-    + `node["highway"="bus_stop"](around:${DRAW_M},${p});node["railway"~"^(station|halt)$"](around:${DRAW_M},${p});`
-    + `);out tags center 900;way["building"](around:${DRAW_M},${p});out count;`;
+  const a = `(around:${DRAW_M},${lat.toFixed(6)},${lng.toFixed(6)})`;
+  // Only counts come back (one per kind, in DRAW_ORDER): a few hundred bytes, however busy the place.
+  return `[out:json][timeout:15];`
+    + `nwr["amenity"~"^(cafe|restaurant|bar|pub|fast_food|ice_cream)$"]${a};out count;`
+    + `nwr["shop"]${a};out count;`
+    + `nwr["amenity"~"^(school|kindergarten|college|university)$"]${a};out count;`
+    + `nwr["amenity"="place_of_worship"]${a};out count;`
+    + `(nwr["amenity"="bus_station"]${a};node["highway"="bus_stop"]${a};node["railway"~"^(station|halt)$"]${a};);out count;`
+    + `nwr["tourism"~"^(attraction|museum|gallery|viewpoint)$"]${a};out count;`
+    + `nwr["tourism"~"^(hotel|guest_house|hostel|apartment)$"]${a};out count;`
+    + `nwr["amenity"="marketplace"]${a};out count;`
+    + `nwr["amenity"~"^(townhall|library|theatre|cinema|pharmacy|hospital|clinic)$"]${a};out count;`
+    + `way["building"]${a};out count;`;
+}
+/** The kinds counted by siteDrawsQuery, in its order. */
+export const DRAW_ORDER = ["food", "shops", "schools", "worship", "transport", "attractions", "hotels", "markets", "services", "buildings"] as const;
+/** The counts of siteDrawsQuery's answer. */
+export function drawsFromCounts(els: SiteEl[]): Draws {
+  const d = Object.fromEntries(DRAW_ORDER.map((k) => [k, 0])) as Draws;
+  els.filter((e) => e.type === "count").forEach((e, i) => { const k = DRAW_ORDER[i]; if (k) d[k] = Number(e.tags?.["total"] ?? 0) || 0; });
+  return d;
 }
 /**
  * …and what can bring a constraint: the parks, reserves and woods the point lies in (is_in, cheap even for huge areas),

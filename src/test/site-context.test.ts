@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { constraintRows, crowdEstimate, crowdRows, drawsFrom, hourShare, interventionAdvice, siteCenter, siteConstraints, siteContextQuery, type SiteEl } from "@/models/site-context";
+import { constraintRows, crowdEstimate, crowdRows, drawsFrom, drawsFromCounts, hourShare, interventionAdvice, siteCenter, siteConstraints, siteContextQuery, type SiteEl } from "@/models/site-context";
 
 const LAT = 41.5603, LNG = 14.6627;
 const at = (dLat: number, dLng = 0) => ({ lat: LAT + dLat / 111_320, lon: LNG + dLng / (111_320 * Math.cos((LAT * Math.PI) / 180)) });
@@ -18,8 +18,13 @@ describe("site context", () => {
   it("asks one query with the places around and the buildings' count", () => {
     const q = siteContextQuery(LAT, LNG);
     expect(q).toContain("around:300");
-    expect(q).toContain("out count");
+    expect(q.split("out count").length - 1).toBe(10);
     expect(q).toContain('"heritage"');
+  });
+  it("reads the counts in their order", () => {
+    const counts = [3, 12, 1, 2, 4, 1, 2, 0, 3, 410].map((n) => ({ type: "count", tags: { total: String(n) } }));
+    const d = drawsFromCounts(counts);
+    expect([d.food, d.shops, d.schools, d.worship, d.transport, d.attractions, d.hotels, d.markets, d.services, d.buildings]).toEqual([3, 12, 1, 2, 4, 1, 2, 0, 3, 410]);
   });
   it("counts what draws people within 300 m", () => {
     const d = drawsFrom(els, LAT, LNG);
