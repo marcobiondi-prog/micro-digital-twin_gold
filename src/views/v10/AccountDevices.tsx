@@ -56,7 +56,8 @@ export function AccountDevices() {
               <li key={d.id} className="flex items-center gap-3 py-2.5">
                 <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium [overflow-wrap:anywhere]">{d.label || "Dispositivo"}{mine && <span className="ml-2 rounded-full bg-brand-turquoise/20 px-2 py-0.5 text-[11px] font-semibold text-brand-turquoise">Questo dispositivo</span>}</p>
+                  <p className="text-sm font-medium [overflow-wrap:anywhere]">{d.label || "Dispositivo"}</p>
+                  {mine && <span className="my-1 inline-block whitespace-nowrap rounded-full bg-brand-turquoise/20 px-2 py-0.5 text-[11px] font-semibold text-brand-turquoise">Questo dispositivo</span>}
                   <p className="text-xs text-muted-foreground">Ultimo uso {seenText(d.last_seen)} · primo accesso {new Date(d.first_seen).toLocaleDateString("it-IT")}</p>
                 </div>
                 {!mine && (
