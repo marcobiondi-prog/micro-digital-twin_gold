@@ -143,7 +143,12 @@ function StorageBar({ used, share, google = 0 }: { used: number; share: number; 
   const urban = useLabMedia("urban"), vineyard = useLabMedia("vineyard");
   const mine = kinds.flatMap((k) => (k === "urban" ? urban : vineyard)).filter((m) => m.path);
   const files = mine.length;
-  const mineBytes = mine.reduce((t, m) => t + (m.size || 0), 0);
+  const sizeOf = (l: typeof mine) => l.reduce((t, m) => t + (m.size || 0), 0);
+  const photos = mine.filter((m) => m.kind !== "video"), videos = mine.filter((m) => m.kind === "video");
+  // What "Svuota" deletes: the app's own photos and/or videos in its cloud space, never anything else of the Google account.
+  const [pick, setPick] = useState<{ photo: boolean; video: boolean }>({ photo: true, video: true });
+  const chosen = mine.filter((m) => (m.kind === "video" ? pick.video : pick.photo));
+  const mineBytes = sizeOf(chosen);
   // "Svuota": every photo and video of the account deleted from the cloud, after one confirm in place (toasts sit under the panel).
   const [ask, setAsk] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -152,10 +157,10 @@ function StorageBar({ used, share, google = 0 }: { used: number; share: number; 
     setBusy(true);
     try {
       for (const k of kinds) {
-        const inCloud = getMedia(k).filter((m) => m.path);
+        const inCloud = getMedia(k).filter((m) => m.path && (m.kind === "video" ? pick.video : pick.photo));
         if (inCloud.length) await removeMedia(k, inCloud);
       }
-      setMsg(`Spazio liberato: ${files === 1 ? "1 file eliminato" : `${files} file eliminati`} ${ofWhat} dal cloud.`);
+      setMsg(`Spazio liberato: ${chosen.length === 1 ? "1 file eliminato" : `${chosen.length} file eliminati`} ${ofWhat} dal cloud dell’app.`);
     } catch {
       setMsg("Non sono riuscito a svuotare tutto: controlla la connessione e riprova.");
     }
@@ -169,16 +174,16 @@ function StorageBar({ used, share, google = 0 }: { used: number; share: number; 
           <p className="text-sm font-semibold">Spazio nel cloud</p>
           <p className="text-xs tabular-nums text-muted-foreground">{bytesText(used)} di 50 GB</p>
         </div>
-        <button type="button" onClick={() => { setAsk(true); setMsg(null); }} disabled={files === 0 || busy}
+        <button type="button" onClick={() => { setAsk(true); setMsg(null); setPick({ photo: photos.length > 0, video: videos.length > 0 }); }} disabled={files === 0 || busy}
           className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-foreground/[0.08] px-3.5 text-xs font-semibold text-danger outline-none hover:bg-danger/10 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40">
           <Trash2 className="size-3.5" aria-hidden="true" />Svuota
         </button>
       </div>
-      <div className="mt-2.5 h-2.5 overflow-hidden rounded-full bg-foreground/10" role="progressbar" aria-label="Spazio nel cloud usato" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)} aria-valuetext={`${bytesText(used)} di 50 GB`}>
-        <div className="h-full rounded-full transition-[width] duration-700 motion-reduce:transition-none" style={{ width: `${used > 0 ? Math.max(pct, 1.5) : 0}%`, background: usageTone(share) }} />
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-foreground/10" role="progressbar" aria-label="Spazio nel cloud usato" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)} aria-valuetext={`${bytesText(used)} di 50 GB`}>
+        <div className="h-full rounded-full transition-[width,background-color] duration-700 motion-reduce:transition-none" style={{ width: `${used > 0 ? Math.max(pct, 1.5) : 0}%`, background: usageTone(share) }} />
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        {files === 1 ? "1 foto o video" : `${files} foto e video`} {ofWhat} nel tuo account · liberi {bytesText(Math.max(0, CLOUD_QUOTA - used))}
+        {files === 1 ? "1 foto o video" : `${files} foto e video`} {ofWhat} salvati dall’app · liberi {bytesText(Math.max(0, CLOUD_QUOTA - used))}
       </p>
       {google > 0 && <p className="mt-0.5 text-xs text-muted-foreground">Comprende {bytesText(google)} già usati nel tuo account Google (posta, file e foto).</p>}
       {share >= 0.95 && (
@@ -189,11 +194,22 @@ function StorageBar({ used, share, google = 0 }: { used: number; share: number; 
       {ask && (
         <div role="alertdialog" aria-label={`Svuotare lo spazio ${ofWhat}?`} className="mt-3 rounded-md border border-danger/40 bg-danger/10 p-3 text-sm">
           <p className="font-semibold">Svuotare lo spazio {ofWhat}?</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">Elimino dal tuo account {files === 1 ? "1 foto o video" : `tutte le ${files} foto e video`} {ofWhat} ({bytesText(mineBytes)}), anche quelli archiviati. Non si possono recuperare.</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Scegli cosa eliminare. Tocca solo le foto e i video salvati da questa app: Google Drive, Gmail, Google Foto e gli altri file del tuo account non vengono toccati.</p>
+          <div className="mt-2.5 space-y-1.5">
+            {([["photo", "Foto", photos], ["video", "Video", videos]] as const).map(([key, label, list]) => (
+              <label key={key} className={`flex min-h-11 items-center gap-3 rounded-xl bg-foreground/[0.06] px-3 ${list.length ? "" : "opacity-40"}`}>
+                <input type="checkbox" className="size-4 accent-[var(--danger,#ef4444)]" checked={pick[key] && list.length > 0} disabled={!list.length || busy}
+                  onChange={(e) => setPick((p) => ({ ...p, [key]: e.target.checked }))} />
+                <span className="flex-1 font-medium">{label}</span>
+                <span className="text-xs tabular-nums text-muted-foreground">{list.length} · {bytesText(sizeOf([...list]))}</span>
+              </label>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">{chosen.length ? <>Elimino dal cloud dell’app {chosen.length === 1 ? "1 file" : `${chosen.length} file`} {ofWhat} ({bytesText(mineBytes)}), anche quelli archiviati. Non si possono recuperare. Restano quelli tenuti sul telefono.</> : "Scegli foto, video o entrambi."}</p>
           <div className="mt-3 flex gap-2">
             <button type="button" onClick={() => setAsk(false)} disabled={busy} className="h-10 flex-1 rounded-full bg-foreground/[0.08] text-sm font-semibold">Annulla</button>
-            <button type="button" onClick={() => void empty()} disabled={busy} className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full bg-danger text-sm font-semibold text-white disabled:opacity-70">
-              {busy ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <Trash2 className="size-4" aria-hidden="true" />}Svuota
+            <button type="button" onClick={() => void empty()} disabled={busy || chosen.length === 0} className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full bg-danger text-sm font-semibold text-white disabled:opacity-70">
+              {busy ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <Trash2 className="size-4" aria-hidden="true" />}Elimina {chosen.length || ""}
             </button>
           </div>
         </div>

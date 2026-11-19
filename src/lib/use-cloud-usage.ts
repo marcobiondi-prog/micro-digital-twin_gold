@@ -30,4 +30,13 @@ export function useCloudUsage(enabled: boolean) {
 }
 
 /** The colour of the space in use: turquoise, amber past 80 %, red past 95 %. */
-export const usageTone = (share: number) => (share > 0.95 ? "var(--danger, #ef4444)" : share > 0.8 ? "#f59e0b" : "var(--brand-turquoise)");
+/** The bar's colour by how full the 50 GB are: turquoise when empty, then green, yellow and orange, red at the limit (blended between stops). */
+const TONE_STOPS: Array<[number, [number, number, number]]> = [[0, [45, 212, 191]], [0.5, [132, 204, 22]], [0.72, [250, 204, 21]], [0.87, [249, 115, 22]], [1, [239, 68, 68]]];
+export function usageTone(share: number): string {
+  const x = Math.min(1, Math.max(0, share));
+  for (let i = 1; i < TONE_STOPS.length; i++) {
+    const [b, cb] = TONE_STOPS[i]!, [a, ca] = TONE_STOPS[i - 1]!;
+    if (x <= b) { const t = (x - a) / (b - a); return `rgb(${ca.map((v, j) => Math.round(v + (cb[j]! - v) * t)).join(", ")})`; }
+  }
+  return "rgb(239, 68, 68)";
+}
