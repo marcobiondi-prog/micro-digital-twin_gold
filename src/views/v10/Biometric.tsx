@@ -161,9 +161,18 @@ export async function enterWithProfile(k: KnownProId, opts: { recognised?: boole
       return true;
     }
   }
-  // Fallback when session token is not stored or expired: activate registered profile immediately and go to Mappa
+  // The account's session kept on this phone is missing or expired: recognised, the account is signed in for real
+  // (Google's sign-in for that address, else the panel with the email written), never pretended.
+  if (email) {
+    rememberWantedSector(k.kind);
+    setProIdOnDevice(k);
+    clearSectorGate();
+    openSimTab(section, "mappa");
+    toast.message(`Accedo con ${email}`, { description: "La sessione dell’account su questo telefono è scaduta: entra una volta, poi l’impronta ti farà entrare da sola." });
+    await signInAs(email, { provider: k.acct?.provider ?? "google", back: to });
+    return true;
+  }
   rememberWantedSector(k.kind);
-  if (email) setRegisteredEmail(email);
   setProIdOnDevice(k);
   notifyAuthChange();
   clearSectorGate();

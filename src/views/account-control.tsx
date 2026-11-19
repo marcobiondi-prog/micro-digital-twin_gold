@@ -18,7 +18,7 @@ import { useUpdateProgress } from "@/lib/update-progress";
 import { buildLabel, checkForUpdate } from "@/lib/app-version";
 import { Link } from "@tanstack/react-router";
 import { InfoNav, InfoPage, type InfoPath } from "@/views/v10/InfoPage";
-import { useSignedIn, getRegisteredEmail, setRegisteredEmail, notifyAuthChange } from "@/lib/use-signed-in";
+import { useSignedIn, getRegisteredEmail, setRegisteredEmail, notifyAuthChange, subscribeAuthChange } from "@/lib/use-signed-in";
 import { pushBackGuard } from "@/hooks/use-back-close";
 import { PermissionsPage } from "@/views/v10/Permissions";
 import { useQueryClient } from "@tanstack/react-query";
@@ -403,7 +403,11 @@ export function AccountControl() {
       // Run database reads outside the auth callback to avoid auth-lock contention.
       setTimeout(() => { if (active) void loadUser(session?.user ?? null); }, 0);
     });
-    return () => { active = false; subscription.unsubscribe(); };
+    // The account remembered on the phone changed (an entry by fingerprint, a reconnection): read it again.
+    const onRegistered = () => { void supabase.auth.getUser().then(({ data }) => { if (active) void loadUser(data.user); }); };
+    window.addEventListener("storage", onRegistered);
+    const unsubRegistered = subscribeAuthChange(onRegistered);
+    return () => { active = false; subscription.unsubscribe(); window.removeEventListener("storage", onRegistered); unsubRegistered(); };
   }, [saveAvatar]);
 
   const enterGuest = () => {

@@ -1,6 +1,7 @@
 import { dropProIdOnDevice, openSectorGate, rememberWantedSector, clearSectorGate, leaveGuest } from "@/lib/use-pro-id";
 import { setRegisteredEmail, notifyAuthChange } from "@/lib/use-signed-in";
 import { supabase } from "@/integrations/supabase/client";
+import { forgetHere } from "@/lib/account-sessions";
 import { goInApp } from "@/lib/app-nav";
 import { toast } from "sonner";
 
@@ -24,7 +25,16 @@ export async function exitToGate(opts: { global?: boolean } = {}): Promise<void>
     sessionStorage.setItem("mdt-bio-skip", "1");
   } catch {}
 
-  // 2. Clear Supabase auth and local session caches
+  // 2. Leave the account on this phone without ending it, so every recognised address can be entered again
+  //    (fingerprint or its profile); only "Esci da tutti i dispositivi" (global) ends the sessions.
+  if (!opts.global) {
+    await forgetHere();
+    notifyAuthChange();
+    window.dispatchEvent(new CustomEvent("mdt-close-account"));
+    goInApp("/benvenuto");
+    toast("Disconnesso", { description: "Sei uscito dal profilo e dall’account. Il tuo account resta su questo telefono: lo ritrovi con il tuo profilo." });
+    return;
+  }
   try {
     supabase.auth.stopAutoRefresh();
     const key = (supabase.auth as unknown as { storageKey?: string }).storageKey;
