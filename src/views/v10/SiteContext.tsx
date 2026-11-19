@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ExternalLink, Landmark, LoaderCircle, ShieldAlert, ShieldCheck, Users } from "lucide-react";
 import { loadSiteContext } from "@/lib/site-context-client";
-import { crowdEstimate, interventionAdvice, siteConstraints, type Constraint, type SiteContext } from "@/models/site-context";
+import { crowdEstimate, interventionAdvice, siteConstraints, siteKey, type Constraint, type SiteContext } from "@/models/site-context";
 import { SEASON_LABEL, type Season } from "@/models/season-climate";
 import { grouped } from "@/models/intervention-cost";
 import { cn } from "@/lib/utils";
@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 /** What is around the place (one query per place, kept for the session). */
 export function useSiteContext(lat: number, lng: number, pending = false) {
   return useQuery<SiteContext>({
-    queryKey: ["site-context", lat.toFixed(4), lng.toFixed(4)],
+    queryKey: siteKey(lat, lng),
     queryFn: () => loadSiteContext(lat, lng),
     enabled: !pending,
     staleTime: Infinity,

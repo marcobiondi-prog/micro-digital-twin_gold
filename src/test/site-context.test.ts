@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { crowdEstimate, drawsFrom, hourShare, interventionAdvice, siteConstraints, siteContextQuery, type SiteEl } from "@/models/site-context";
+import { constraintRows, crowdEstimate, crowdRows, drawsFrom, hourShare, interventionAdvice, siteCenter, siteConstraints, siteContextQuery, type SiteEl } from "@/models/site-context";
 
 const LAT = 41.5603, LNG = 14.6627;
 const at = (dLat: number, dLng = 0) => ({ lat: LAT + dLat / 111_320, lon: LNG + dLng / (111_320 * Math.cos((LAT * Math.PI) / 180)) });
@@ -61,5 +61,16 @@ describe("site context", () => {
     const none = siteConstraints({ draws: drawsFrom([], LAT, LNG), els: [], lat: LAT, lng: LNG, elevation: 50 }, "Via Roma");
     expect(none).toEqual([]);
     expect(interventionAdvice(none, "piazza")[0]).toContain("non risultano vincoli");
+  });
+  it("writes the report rows and reads the place where the simulation does", () => {
+    const d = drawsFrom(els, LAT, LNG);
+    const rows = crowdRows(crowdEstimate(d, 4000, "estate", 20), "estate", 20, 500);
+    expect(rows[0]).toEqual(["Quando", "Estate, ore 20:00"]);
+    expect(rows.find((r) => r[0] === "Ombra degli interventi")?.[1]).toContain("500");
+    const cs = siteConstraints({ draws: d, els, lat: LAT, lng: LNG, elevation: 700 }, "Piazza Garibaldi");
+    const cr = constraintRows(cs, "piazza");
+    expect(cr[0]![0]).toContain("Beni culturali vicini");
+    expect(cr.at(-1)![0]).toBe("Verifica");
+    expect(siteCenter({ lat: LAT, lng: LNG }, null)).toEqual([LAT, LNG]);
   });
 });

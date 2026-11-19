@@ -1,4 +1,6 @@
-import type { Season } from "./season-climate";
+import { SEASON_LABEL, type Season } from "./season-climate";
+import { drawnAreaFor, type DrawnArea } from "./drawn-area";
+import { ringCentroid } from "./place-area";
 
 /**
  * What is around the chosen place, read from the open map data by the phone (one query): what draws people (bars,
@@ -185,4 +187,38 @@ export function interventionAdvice(cs: Constraint[], kind: "piazza" | "vigneto")
   }
   if (!tips.length) tips.push("Nelle mappe non risultano vincoli vicini: resta da verificare con l’Ufficio tecnico, perché alcuni vincoli (decreti di notevole interesse pubblico, piani regionali) non sono sulle mappe aperte.");
   return tips;
+}
+
+/* ---------------- Shared by the simulation, the dashboard and the report ---------------- */
+
+/** Where the place is read: the drawn area's middle (about 10 m) when there is one, else the place's point — the same spot as the simulation's. */
+export function siteCenter(location: { lat: number; lng: number }, area: DrawnArea | null | undefined): [number, number] {
+  const a = drawnAreaFor(area, location);
+  return a ? ringCentroid(a.ring).map((v) => Math.round(v * 1e4) / 1e4) as [number, number] : [location.lat, location.lng];
+}
+/** The query key of a place's surroundings (kept for the session, so the dashboard and the report reuse it). */
+export const siteKey = (lat: number, lng: number) => ["site-context", lat.toFixed(4), lng.toFixed(4)] as const;
+
+const it = (n: number) => Math.round(n).toLocaleString("it-IT");
+
+/** The people's estimate as label · value rows (report and copied text). */
+export function crowdRows(c: Crowd, season: Season, hour: number, shadePlaces: number): Array<[string, string]> {
+  const rows: Array<[string, string]> = [
+    ["Quando", `${SEASON_LABEL[season]}, ore ${String(Math.floor(hour)).padStart(2, "0")}:00`],
+    ["Persone presenti", `circa ${it(c.low)}-${it(c.high)} (stima)`],
+    ["Densità", `circa ${c.per100 < 1 ? c.per100.toFixed(1).replace(".", ",") : it(c.per100)} ogni 100 m²`],
+    ["Momento più affollato", `circa ${it(c.peak)} persone`],
+  ];
+  if (shadePlaces > 0) rows.push(["Ombra degli interventi", `${it(shadePlaces)} posti: ${c.people > 0 && shadePlaces >= c.people ? "basta per tutti a quell’ora" : `circa il ${Math.round((shadePlaces / Math.max(1, c.people)) * 100)} % dei presenti`}`]);
+  if (c.tourist) rows.push(["Zona", "turistica (più persone in estate)"]);
+  return rows;
+}
+/** The constraints as label · value rows, then the advice (report and copied text). */
+export function constraintRows(cs: Constraint[], kind: "piazza" | "vigneto"): Array<[string, string]> {
+  const rows: Array<[string, string]> = cs.length
+    ? cs.map((c) => [`${c.title} (${c.level})`, `${c.law}. ${c.why} ${c.means}`])
+    : [["Esito", "Nelle mappe aperte non risultano beni tutelati né aree vincolate vicine."]];
+  interventionAdvice(cs, kind).forEach((t, i) => rows.push([i ? "" : "Per gli interventi", t]));
+  rows.push(["Verifica", "Indicazione dalle mappe aperte, non un parere: il vincolo certo lo dicono l’Ufficio tecnico del Comune e la Soprintendenza."]);
+  return rows;
 }

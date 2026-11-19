@@ -1,4 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { constraintRows, crowdEstimate, crowdRows, siteCenter, siteConstraints } from "@/models/site-context";
+import { useSiteContext } from "@/views/v10/SiteContext";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useTabSwipe } from "@/lib/use-tab-swipe";
 import { SectionLockCard, useGuestOnly, useSectionOpen } from "@/views/v10/ProfileGate";
@@ -465,6 +467,12 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   const pd = piazzaDash(u, season, yearOf?.profile, areaOf(["place-area", u.location.lat, u.location.lng]), getPiazzaReading());
   const ps = { ...pd.sum, before: pd.before, after: pd.after };
   const vs = vineSummary(v, areaOf(["vine-area", v.location.lat, v.location.lng]));
+  // People at the simulation's season and hour, and the place's constraints: the same reading as the dashboard's cards.
+  const siteLoc = ctx === "Urbano" ? u : v;
+  const [sLat, sLng] = siteCenter(siteLoc.location, siteLoc.area);
+  const site = useSiteContext(sLat, sLng, !!siteLoc.location.pending).data;
+  const crowdR: [string, string][] = ctx === "Urbano" && site ? crowdRows(crowdEstimate(site.draws, pd.sum.m2, getPiazzaReading()?.season ?? season, pd.sum.hour), getPiazzaReading()?.season ?? season, pd.sum.hour, Math.floor(pd.sum.shadeM2 / 2)) : [];
+  const constraintR: [string, string][] = site ? constraintRows(siteConstraints(site, siteLoc.location.label ?? ""), ctx === "Urbano" ? "piazza" : "vigneto") : [];
   const notes = useNotes();
   const f1 = (n: number) => n.toLocaleString("it-IT", { maximumFractionDigits: 1, minimumFractionDigits: 1 });
   const stamp = new Date().toLocaleString("it-IT", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -500,6 +508,8 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
     ...benefits.map(([x, l]): [string, string] => [l, x]),
     ...zoneRows,
     ...noteRows.map(([d, t]): [string, string] => [`Quaderno ${d}`, t]),
+    ...crowdR.map(([k, x]): [string, string] => [`Persone · ${k}`, x]),
+    ...constraintR.map(([k, x]): [string, string] => [k ? `Vincoli · ${k}` : "Vincoli", x]),
   ];
   const text = [`MICRO DIGITAL TWIN`, `Report · ${ctx === "Urbano" ? "Piazza" : "Vigneto"}`, stamp, ...(author ? [`Redatto da ${author}`] : []), "", ...reportRows.map(([k, x]) => `- ${k}: ${x}`), ...(scanRows.length ? ["", "Scansioni fotocamera AI:", ...scanRows.map(([k, x]) => `- ${k}: ${x}`)] : []), "", "Valori indicativi, da validare con un tecnico."].join("\n");
   // Report PDF con intestazione del sito e grafica coerente con l'app (usato da Scarica e Stampa).
@@ -699,6 +709,8 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
     await step("Compilazione delle tabelle…", 30);
     rows([...mixRows.map((r): [string, string] => [`${r.label}  ${r.value}`, r.cost]), ["Totale indicativo", (urban ? ps.empty : vs.empty) ? "Nessun intervento" : euroRange(urban ? ps.cost : vs.cost)]],
       { strongLast: true, head: ["Cosa hai messo", urban ? `${grouped(ps.m2)} m² ${ps.drawn ? "disegnati" : ps.measured ? "della piazza" : "di riferimento"}` : vs.drawn ? `${grouped(vs.m2)} m² disegnati` : vs.measured ? `${grouped(vs.m2)} m² del vigneto` : "1 ettaro di riferimento"] });
+    if (crowdR.length) rows(crowdR, { head: ["Persone nella piazza", "stima"] });
+    if (constraintR.length) rows(constraintR, { head: ["Vincoli dell’area", "indicativo"] });
     if (noteRows.length) rows(noteRows, { head: ["Quaderno di campagna"] });
     // AI camera scans: each one stays in the report even without a photo (indicative estimates).
     if (scanRows.length) rows(scanRows, { head: ["Scansioni della Fotocamera AI"] });

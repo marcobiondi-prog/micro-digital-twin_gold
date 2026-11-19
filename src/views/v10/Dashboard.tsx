@@ -1,4 +1,6 @@
 import { GuestLock, useGuestOnly } from "@/views/v10/ProfileGate";
+import { ConstraintsCard, CrowdCard } from "@/views/v10/SiteContext";
+import { siteCenter } from "@/models/site-context";
 import { lazy, Suspense, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 const DayChart = lazy(() => import("@/views/v10/DayChart"));
 import { loadPlaceArea } from "@/lib/place-area-client";
@@ -294,6 +296,7 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
   const { day, estimated, empty, m2 } = sum;
   const { before, after } = dash;
   const place = splitLocation(urban.location.label);
+  const site = siteCenter(urban.location, urban.area);
   return (
     <div className="space-y-8" data-testid="dashboard-urbana">
       <ResultCard kind="urban" place={place.name}
@@ -333,6 +336,10 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
       </DashSection>
       <ZoneRows rows={zoneSummaryRows(urban.area, urban.location, sum.cost, empty, euroRange)} />
 
+      {/* Who is there at the simulation's season and hour, and what may protect the place (as in the simulation). */}
+      <CrowdCard lat={site[0]} lng={site[1]} pending={!!urban.location.pending} m2={m2} season={season} hour={sum.hour} shadePlaces={Math.floor(sum.shadeM2 / 2)} />
+      <ConstraintsCard lat={site[0]} lng={site[1]} pending={!!urban.location.pending} placeName={urban.location.label ?? ""} kind="piazza" />
+
       {records}
     </div>
   );
@@ -352,6 +359,7 @@ export function VineDashboard({ records }: { records: ReactNode }) {
   const sum = vineSummary(vine, area.data?.m2 ?? null);
   const { before, after: thirst, mix, empty, same, safe, m2 } = sum;
   const place = splitLocation(vine.location.label);
+  const vSite = siteCenter(vine.location, vine.area);
   return (
     <div className="space-y-8" data-testid="dashboard-vitivinicola">
       <ResultCard kind="vineyard" place={place.name} when={<span className="text-xs text-muted-foreground">Media delle tre zone, come le hai lasciate nella simulazione</span>}>
@@ -390,6 +398,9 @@ export function VineDashboard({ records }: { records: ReactNode }) {
           rows={vineMixRows(sum).map((r, i) => ({ ...r, icon: [Droplets, Umbrella, Wind][i] ?? Droplets }))} />
       </DashSection>
       <ZoneRows rows={zoneSummaryRows(vine.area, vine.location, sum.cost, empty, euroRange)} />
+
+      {/* What may protect the vineyard's landscape (as in the simulation). */}
+      <ConstraintsCard lat={vSite[0]} lng={vSite[1]} pending={!!vine.location.pending} placeName={vine.location.label ?? ""} kind="vigneto" />
 
       {records}
     </div>
