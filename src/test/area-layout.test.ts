@@ -68,7 +68,7 @@ describe("pergolas", () => {
     const parts = strips.flatMap((p) => pergolaParts(p.ring));
     expect(parts.some((p) => p.base === 0 && p.height > 2.5)).toBe(true);
     // As many fans as poles, at least one each strip.
-    expect(parts.filter((p) => p.base >= 3).length).toBe(parts.filter((p) => p.base === 0).length);
+    expect(parts.filter((p) => p.base >= 3).length).toBe(parts.filter((p) => p.base === 0 && p.height > 2.5).length);
     expect(parts.filter((p) => p.base >= 3).length).toBeGreaterThanOrEqual(strips.length);
     const inShade = (t: [number, number]) => strips.some((p) => ringContains(p.ring, t[0], t[1]));
     expect(l.trees.filter(inShade)).toHaveLength(0);
