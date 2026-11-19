@@ -18,7 +18,7 @@ import { openAccount } from "@/lib/camera-dock";
 import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn } from "@/lib/demo-login";
 import { cn } from "@/lib/utils";
 import { setUrban, setVineyard, useLab, vineMetrics } from "@/models/lab-store";
-import { piazzaLayout, piazzaShadows, TREE_SHADE_M2, vineLayout, type LayoutEdits, type PiazzaLayout } from "@/models/area-layout";
+import { shadeOpenness, piazzaLayout, piazzaShadows, TREE_SHADE_M2, vineLayout, type LayoutEdits, type PiazzaLayout } from "@/models/area-layout";
 import { dayLight, solarHour, sunAt, sunHeightDeg } from "@/models/sun-shadow";
 import { getSimWhen, useSimWhen } from "@/models/sim-when";
 import { applyZoneMix, vineMixOf, zoneMixOf } from "@/models/vine-interventions";
@@ -179,7 +179,11 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
       // The shadows with the sun of the simulation's season and hour (its "when" chip), on the area's place.
       const when = getSimWhen("urban"), season = rSeason ?? when?.season, hour = rHour ?? when?.hour;
       const sun = season !== undefined && hour !== undefined ? sunAt(saved.lat, saved.lng, season, hour, when?.minute ?? 0, when?.dst) : null;
-      return { kind: "piazza", data, inner, shadows: piazzaShadows(data, sun), real, finds };
+      // The side-pole sails open with the day's heat and close at dusk, at night and in winter (motorised): closed, they
+      // cast no shade.
+      const shadeOpen = season !== undefined && hour !== undefined ? shadeOpenness(sunHeightDeg(saved.lat, saved.lng, season, hour, when?.minute ?? 0, when?.dst), season) : 1;
+      const shadowed = shadeOpen < 0.3 ? { ...data, patches: data.patches.filter((p) => p.kind !== "shade") } : data;
+      return { kind: "piazza", data, inner, shadows: piazzaShadows(shadowed, sun), real, finds, shadeOpen };
     }
     const v = lab.vineyard, fallback = vineMixOf(v);
     const vp = proposal ? suggestion?.vine : undefined;
@@ -621,7 +625,7 @@ function roomText(l: PiazzaLayout) {
 function SimBar({ sim, when, arranging, edited, best, only, canOnly, onArrange, onAuto, onBest, onOnly }: { sim: SimLayout; when?: string | undefined; arranging: boolean; edited: boolean; best: boolean; only: boolean; canOnly: boolean; onArrange: () => void; onAuto: () => void; onBest: () => void; onOnly: () => void }) {
   const m2 = (v: number) => `${Math.round(v).toLocaleString("it-IT")} m²`;
   const legend = sim.kind === "piazza"
-    ? [[dot(SIM_COLORS.tree), `Alberi ${sim.data.trees.length} · ${m2(sim.data.trees.length * TREE_SHADE_M2)} di chioma`], [dot(SIM_COLORS.lawn, false), `Aiuole e ciottoli ${m2(sim.data.lawnM2)}`], [dot(SIM_COLORS.shade, false), `Vele ombreggianti ${m2(sim.data.shadeM2)}`], [dot("#0b0f15", false), "Ombre"], ...(sim.data.misters.length ? [[dot("#7dd3fc"), `Nebulizzatori ${sim.data.misters.length}${sim.data.mistersInZones ? ` (${sim.data.mistersInZones} nelle tue zone)` : ""}`] as const] : []), ...(sim.data.sprinklers.length ? [[dot("#2dd4bf"), `Innaffiatoi ${sim.data.sprinklers.length}`] as const] : [])] as const
+    ? [[dot(SIM_COLORS.tree), `Alberi ${sim.data.trees.length} · ${m2(sim.data.trees.length * TREE_SHADE_M2)} di chioma`], [dot(SIM_COLORS.lawn, false), `Aiuole e ciottoli ${m2(sim.data.lawnM2)}`], [dot(SIM_COLORS.shade, false), `Vele ombreggianti ${m2(sim.data.shadeM2)}${(sim.shadeOpen ?? 1) >= 0.9 ? " · aperte" : (sim.shadeOpen ?? 1) <= 0.1 ? " · chiuse a quest’ora" : " · si stanno aprendo"}`], [dot("#0b0f15", false), "Ombre"], ...(sim.data.misters.length ? [[dot("#7dd3fc"), `Nebulizzatori ${sim.data.misters.length}${sim.data.mistersInZones ? ` (${sim.data.mistersInZones} nelle tue zone)` : ""}`] as const] : []), ...(sim.data.sprinklers.length ? [[dot("#2dd4bf"), `Innaffiatoi ${sim.data.sprinklers.length}`] as const] : [])] as const
     : [[dot(thirstColor(10), false), "Zone (colore = bisogno di intervento)"], [dot(SIM_COLORS.drip, false), "Irrigazione · tubo e ali gocciolanti"], [dot(SIM_COLORS.cloth, false), "Teli d’ombra"], [dot(SIM_COLORS.wind, false), "Frangivento"]] as const;
   return (
     <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4">

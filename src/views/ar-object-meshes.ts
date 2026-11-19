@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { ArObjectDef } from "@/models/ar-objects";
-import { realSail } from "@/views/ar-sail";
+import { realPapillons } from "@/views/ar-papillon";
 import { realBed } from "@/views/ar-bed";
 import { realMister } from "@/views/ar-mister";
 import { realSprinkler } from "@/views/ar-sprinkler";
@@ -39,8 +39,8 @@ export function objectMesh(def: ArObjectDef): THREE.Group {
       break;
     }
     case "pergolato": {
-      // Shade sails (views/ar-sail): woven fabric stretched between steel posts, twisted, concave edges.
-      g.add(realSail(def));
+      // Side-pole shade sails whose wings open like a butterfly's (views/ar-papillon), wide open in the AR.
+      g.add(realPapillons({ w: def.w, d: def.d, h: def.h, open: 1 }));
       break;
     }
     case "aiuola": {
