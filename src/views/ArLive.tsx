@@ -14,7 +14,7 @@ import { hapticTick } from "@/lib/haptics";
 import { easeTo, FloorTracker, placementFor, RAISED_M, surfaceKind, type SurfaceHit } from "@/models/ar-floor";
 import { contactShadow, floorLoop, objectMesh } from "@/views/ar-object-meshes";
 import { buildPlan, growPlan, planText, planTreeDefs } from "@/views/ar-plan";
-import { realShadeOpen, setShadeTarget } from "@/views/ar-papillon";
+import { arLightLevel, lightTarget, setShadeTarget } from "@/views/ar-papillon";
 import { realTree, wantsRealTree } from "@/views/ar-tree";
 import { ArShadows, castShadows } from "@/views/ar-shadow";
 import { XREstimatedLight } from "three/examples/jsm/webxr/XREstimatedLight.js";
@@ -250,6 +250,10 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const [measure, setMeasure] = useState<V[]>([]);
   const hudRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  // The sails' light: ARCore's estimate when it runs, the smoothed level 0–1 and the openness it gives (1 open, 0 closed).
+  const estRef = useRef<XREstimatedLight | null>(null);
+  const lightLevelRef = useRef<number | null>(null);
+  const lightOpenRef = useRef(1);
   // Messages written over the camera: the app's toasts sit under the camera's dialog.
   const [notice, setNotice] = useState<{ text: string; tone: "ok" | "warn" } | null>(null);
   // Why the preview runs instead of ARCore: written in the status line once, at the start.
@@ -373,6 +377,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     let est: XREstimatedLight | null = null;
     if (session) {
       est = new XREstimatedLight(renderer);
+      estRef.current = est;
       const fixed = scene.children.filter((c) => (c as THREE.Light).isLight);
       const e = est;
       e.addEventListener("estimationstart", () => {
@@ -835,14 +840,13 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
 
   /** A placed object drawn again (preview rebuilt, or carried from ARCore): its mesh, round shadow and grown tree. */
   /**
-   * The sails open and close by themselves with the real sun over the place: built open, they then close (or stay
-   * open) smoothly, and every minute they follow the sun again. Said once when one closes as it is put down.
+   * The sails open only with light: put down closed, they open by themselves (about 4 s) when the camera sees enough
+   * light — ARCore's light estimate, else the camera's picture — and close again in the dark (lightRef, below).
    */
   function shadeAuto(root: THREE.Object3D, say: boolean) {
-    const open = realShadeOpen(loc.lat, loc.lng);
-    if (setShadeTarget(root, open) && say && open < 0.5) {
-      const m = new Date().getMonth(), winter = loc.lat >= 0 ? m === 11 || m <= 1 : m >= 5 && m <= 7;
-      setNotice({ text: `La vela si chiude da sola: ${winter ? "d’inverno resta chiusa" : open <= 0 ? "il sole è tramontato" : "il sole è basso"}. Si riapre da sola nelle ore calde.`, tone: "ok" });
+    const target = lightOpenRef.current;
+    if (setShadeTarget(root, target) && say) {
+      setNotice({ text: target >= 0.5 ? "C’è luce: la vela si apre da sola." : "Poca luce: la vela resta chiusa. Si apre da sola quando arriva la luce.", tone: "ok" });
     }
   }
   function addPlacedMesh(t: NonNullable<typeof three.current>, o: PlacedObject, y: number) {
@@ -1134,11 +1138,42 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     }
   }, [alignment, area, origin, showPlan, kind, planKey, merge, joinBeds, plantKey]);
 
-  // The sails follow the real sun by themselves: every minute their openness is worked out again.
+  // The light the sails answer to, read twice a second: ARCore's estimate of the room's or the piazza's light (primary
+  // light and ambient) while it gives one, else the camera's picture (its mean brightness), smoothed; when it crosses
+  // the thresholds every sail opens or closes by itself, said once.
   useEffect(() => {
-    const id = window.setInterval(() => { const t = three.current; if (t) setShadeTarget(t.scene, realShadeOpen(loc.lat, loc.lng)); }, 60000);
+    const cv = document.createElement("canvas"); cv.width = 24; cv.height = 18;
+    const cx = cv.getContext("2d", { willReadFrequently: true });
+    const id = window.setInterval(() => {
+      let level: number | null = null;
+      const e = estRef.current;
+      if (e && e.parent) {
+        const dl = e.directionalLight, col = dl.color;
+        const prim = (0.2126 * col.r + 0.7152 * col.g + 0.0722 * col.b) * dl.intensity;
+        const c0 = e.lightProbe.sh.coefficients[0];
+        const amb = c0 ? (0.2126 * c0.x + 0.7152 * c0.y + 0.0722 * c0.z) * e.lightProbe.intensity : 0;
+        level = arLightLevel(prim, amb);
+      } else {
+        const v = videoRef.current;
+        if (v && cx && v.readyState >= 2) {
+          try {
+            cx.drawImage(v, 0, 0, 24, 18);
+            const d = cx.getImageData(0, 0, 24, 18).data; let sum = 0;
+            for (let i = 0; i < d.length; i += 4) sum += 0.2126 * d[i]! + 0.7152 * d[i + 1]! + 0.0722 * d[i + 2]!;
+            level = sum / (d.length / 4) / 255;
+          } catch { /* the frame is not readable yet */ }
+        }
+      }
+      if (level == null) return;
+      lightLevelRef.current = lightLevelRef.current == null ? level : lightLevelRef.current * 0.6 + level * 0.4;
+      const was = lightOpenRef.current, next = lightTarget(lightLevelRef.current, was);
+      if (next === was) return;
+      lightOpenRef.current = next;
+      const t = three.current;
+      if (t && setShadeTarget(t.scene, next)) setNotice({ text: next ? "C’è luce: le vele si aprono da sole." : "È buio: le vele si chiudono da sole.", tone: "ok" });
+    }, 500);
     return () => window.clearInterval(id);
-  }, [loc.lat, loc.lng]);
+  }, []);
 
   // The measuring tape between the two points.
   useEffect(() => {
