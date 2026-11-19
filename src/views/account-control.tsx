@@ -215,6 +215,8 @@ export function AccountControl() {
       const em = detail?.email;
       if (em) { setEmail(em); }
       setMode(detail?.mode ?? "signin");
+      // Only a request naming an account (sign in as that email) shows the form over a signed-in account.
+      setAskSignIn(Boolean(em));
       setOpen(true);
     };
     const close = () => setOpen(false);
@@ -228,6 +230,7 @@ export function AccountControl() {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [account, setAccount] = useState<Account>(null);
   const [mode, setMode] = useState<"signin" | "signup" | "reset">("signin");
+  const [askSignIn, setAskSignIn] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
@@ -352,6 +355,7 @@ export function AccountControl() {
       }
       sessionStorage.removeItem(guestKey);
       const googleAvatar = typeof user.user_metadata?.['avatar_url'] === "string" ? user.user_metadata['avatar_url'] : typeof user.user_metadata?.['picture'] === "string" ? user.user_metadata['picture'] : undefined;
+      setAskSignIn(false);
       setAccount({ id: user.id, email: user.email ?? "Account", guest: false, ...(user.app_metadata?.['provider'] === "google" && googleAvatar ? { googleAvatar } : {}) });
       // The picture this phone kept for the account shows at once, before the account's data arrive.
       if (user.email) {
@@ -484,6 +488,7 @@ export function AccountControl() {
   const changeOpen = (next: boolean) => {
     // Closing with a page open drops its history step too (the panel's own step goes with the panel).
     if (!next && page) { setPage(null); if (window.history.state?.__accountPage) window.history.back(); }
+    if (!next) setAskSignIn(false);
     setOpen(next);
   };
   const swipe = useRef<{ x: number; y: number } | null>(null);
@@ -597,7 +602,7 @@ export function AccountControl() {
               </div>
               <Button variant="ghost" className="w-full justify-start" onClick={() => { setDemoSignedIn(false); setOpen(false); }}><LogOut />Esci dalla simulazione</Button>
             </section>
-          ) : account && !account.id?.startsWith("local-") && mode !== "signin" ? (
+          ) : account && !account.id?.startsWith("local-") && !askSignIn ? (
             <section className="space-y-4">
               <div className="rounded-md border bg-muted/40 p-4">
                 <p className="text-sm font-semibold">{account.guest ? "Sessione ospite" : account.email}</p>
