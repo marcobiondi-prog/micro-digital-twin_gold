@@ -12,6 +12,7 @@ import { setUrban, useLab, type RealWeather } from "@/models/lab-store";
 import { REFERENCE_M2, grouped } from "@/models/intervention-cost";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { useSeasonClock, WhenPicker } from "@/views/v10/when";
+import { ConstraintsCard, CrowdCard } from "@/views/v10/SiteContext";
 import { coolingShare, estimatedTemp, SEASON_LABEL } from "@/models/season-climate";
 import { setPiazzaReading } from "@/models/sim-reading";
 import { loadAirTemperature } from "@/views/air-temp-client";
@@ -488,6 +489,10 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
         <p className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><Ruler className="size-3.5 shrink-0" aria-hidden="true" />{surface} · {surfaceNote.toLowerCase()}</p>
         <p className="text-[11px] leading-snug text-muted-foreground">Stime indicative su un anno: 22 kg di CO₂ per albero. Ipotesi: 700 mm di pioggia l’anno; le superfici verdi e permeabili ne trattengono fino al 60%. 2 m² d’ombra a persona.</p>
       </div>
+
+      {/* 5 · Who is there at this season and hour, and what may protect the place (indicative, from the open map data). */}
+      <CrowdCard lat={cLat} lng={cLng} pending={!!urban.location.pending} m2={m2} season={season} hour={hour} shadePlaces={Math.floor(shadeM2 / 2)} />
+      <ConstraintsCard lat={cLat} lng={cLng} pending={!!urban.location.pending} placeName={urban.location.label ?? ""} kind="piazza" />
     </section>
   );
 }

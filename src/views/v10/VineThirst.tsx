@@ -8,6 +8,7 @@ import { CalendarDays, ChevronDown, CloudRain, Droplets, ListChecks, Thermometer
 import { phenoPhases, type Pheno } from "@/models/data";
 import { estimatedTemp, type Season } from "@/models/season-climate";
 import { useSeasonClock, WhenPicker } from "@/views/v10/when";
+import { ConstraintsCard } from "@/views/v10/SiteContext";
 import { comparison, type PrototypeId } from "@/models/scenarios";
 import { setVineyard, useLab, vineMetrics, vineThirstPartsOf } from "@/models/lab-store";
 import { NO_MIX, VINE_LEVELS, VINE_MAX, VINE_REFERENCE_M2, vineCost, vineMixAt, vineMixOf, zoneMixOf, type VineMix } from "@/models/vine-interventions";
@@ -321,6 +322,8 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
         ))}
       </dl>
       <VineAccordion needs={zonesAfter.map((r) => r.s)} mixes={mixes} m2={m2} surface={`${surface} · ${surfaceNote}`} />
+      {/* What may protect the vineyard's landscape (indicative, from the open map data). */}
+      <ConstraintsCard lat={vLat} lng={vLng} pending={!!vine.location.pending} placeName={vine.location.label ?? ""} kind="vigneto" />
     </section>
   );
 }
