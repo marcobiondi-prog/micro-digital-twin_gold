@@ -8,6 +8,7 @@ import { CalendarDays, ChevronDown, CloudRain, Droplets, ListChecks, Thermometer
 import { phenoPhases, type Pheno } from "@/models/data";
 import { estimatedTemp, type Season } from "@/models/season-climate";
 import { useSeasonClock, WhenPicker } from "@/views/v10/when";
+import { ConstraintsCard, FeasibilityStrip } from "@/views/v10/SiteContext";
 import { comparison, type PrototypeId } from "@/models/scenarios";
 import { setVineyard, useLab, vineMetrics, vineThirstPartsOf } from "@/models/lab-store";
 import { NO_MIX, VINE_LEVELS, VINE_MAX, VINE_REFERENCE_M2, vineCost, vineMixAt, vineMixOf, zoneMixOf, type VineMix } from "@/models/vine-interventions";
@@ -218,6 +219,8 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">{reach > 1 ? "Trascina il punto bianco o tocca un livello" : "Ritocca il vigneto qui sotto"}</p>
       </div>
+      {/* Feasibility first: the area's constraints in one line, before any intervention. */}
+      <FeasibilityStrip sim="vineyard" lat={vLat} lng={vLng} pending={!areaHere} ring={areaHere?.ring} placeName={vine.location.label ?? ""} />
 
       {/* Once the arc scrolls away, its reading rides under the tabs. */}
       <div aria-hidden={gaugeSeen} className={cn("pointer-events-none sticky top-[calc(var(--nav-h)+3.75rem)] z-[999999996] -mb-5 flex h-0 translate-y-[var(--sim-tabs-shift,0px)] justify-center transition-opacity duration-200 motion-reduce:transition-none", gaugeSeen ? "opacity-0" : "opacity-100")}>
@@ -321,6 +324,8 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
         ))}
       </dl>
       <VineAccordion needs={zonesAfter.map((r) => r.s)} mixes={mixes} m2={m2} surface={`${surface} · ${surfaceNote}`} />
+      {/* What may protect the vineyard's landscape (indicative, from the open map data). */}
+      <ConstraintsCard lat={vLat} lng={vLng} pending={!areaHere} ring={areaHere?.ring} placeName={vine.location.label ?? ""} kind="vigneto" />
     </section>
   );
 }

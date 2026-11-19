@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { ArObjectDef } from "@/models/ar-objects";
-import { realPergola } from "@/views/ar-pergola";
+import { realPapillons } from "@/views/ar-papillon";
 import { realBed } from "@/views/ar-bed";
 import { realMister } from "@/views/ar-mister";
 import { realSprinkler } from "@/views/ar-sprinkler";
@@ -39,8 +39,8 @@ export function objectMesh(def: ArObjectDef): THREE.Group {
       break;
     }
     case "pergolato": {
-      // A realistic timber pergola (views/ar-pergola): grained wood, steel bases, beams, braces, rafters, battens.
-      g.add(realPergola(def));
+      // Side-pole shade sails whose wings open like a butterfly's (views/ar-papillon), wide open in the AR.
+      g.add(realPapillons({ w: def.w, d: def.d, h: def.h, open: 1 }));
       break;
     }
     case "aiuola": {

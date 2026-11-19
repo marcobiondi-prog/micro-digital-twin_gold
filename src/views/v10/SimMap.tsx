@@ -6,7 +6,9 @@ import { setPinFix, usePinFix } from "@/models/pin-fix";
 import { samePlace } from "@/models/place-memory";
 import { ringCentroid } from "@/models/place-area";
 import { loadPlaceArea } from "@/lib/place-area-client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { prefetchSite, SuggestedInterventions, suggestionText, useSuggestion } from "@/views/v10/SiteContext";
+import { ringTag, type PiazzaSuggestion, type VineSuggestion } from "@/models/site-context";
 import { useServerFn } from "@tanstack/react-start";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { toast } from "sonner";
@@ -16,7 +18,7 @@ import { openAccount } from "@/lib/camera-dock";
 import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn } from "@/lib/demo-login";
 import { cn } from "@/lib/utils";
 import { setUrban, setVineyard, useLab, vineMetrics } from "@/models/lab-store";
-import { piazzaLayout, piazzaShadows, TREE_SHADE_M2, vineLayout, type LayoutEdits, type PiazzaLayout } from "@/models/area-layout";
+import { shadeOpenness, piazzaLayout, piazzaShadows, TREE_SHADE_M2, vineLayout, type LayoutEdits, type PiazzaLayout } from "@/models/area-layout";
 import { dayLight, solarHour, sunAt, sunHeightDeg } from "@/models/sun-shadow";
 import { getSimWhen, useSimWhen } from "@/models/sim-when";
 import { applyZoneMix, vineMixOf, zoneMixOf } from "@/models/vine-interventions";
@@ -113,10 +115,21 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
     const area = r && r.length >= 3 ? { lat: loc.lat, lng: loc.lng, ring: r, ...(saved?.zones?.length ? { zones: saved.zones } : {}) } : null;
     if (kind === "urban") setUrban({ area }); else setVineyard({ area });
   };
+  const qc = useQueryClient();
   const startDrawing = () => { setView("2d"); setDraft(saved?.ring ?? []); setDrawing(true); };
   const finish = () => {
     if (draft.length < 3) { toast("Servono almeno 3 pin per chiudere l’area"); return; }
+    const fresh = !saved;
     save(draft); setDrawing(false);
+    // People and constraints start being read right away, so Simula finds them ready.
+    prefetchSite(qc, draft);
+    if (fresh) {
+      // A new area starts free of interventions: its feasibility is looked at first (Simula), the interventions chosen after.
+      if (kind === "urban") setUrban({ trees: 0, permeable: 0, shade: 0, misters: 0, sprinklers: 0, treeCells: null, permeableCells: null, shadeCells: null });
+      else setVineyard((v) => ({ zones: v.zones.map((z) => ({ ...z, irrigation: 0, shade: 0, windbreak: 0 })) }));
+      toast.success("Area salvata · libera da interventi", { description: `${surfaceText(pinsM2(draft))}. Prima guarda la fattibilità dell’area in Simula, poi scegli gli interventi.`, duration: 9000, action: { label: "Fattibilità", onClick: () => openSimTab(kind, "simula") } });
+      return;
+    }
     toast.success("Area salvata", { description: `${surfaceText(pinsM2(draft))}: la usano i costi e i benefici.` });
   };
   const remove = () => { save(null); setDrawing(false); setDraft([]); toast("Area cancellata", { description: "Torna la superficie misurata o di riferimento." }); };
@@ -140,21 +153,47 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
     const trees = kind === "urban" ? finds.filter((f) => f.kind === "tree").map((f) => ({ kind: "albero" as const, ring: circleRing(f.lat, f.lng, Math.max(1.5, (f.crownM ?? 6) / 2)), name: f.species ?? "Albero rilevato" })) : [];
     return trees.length ? [...mapReal, ...trees] : mapReal;
   }, [mapReal, finds, kind]);
+  // The interventions the area's constraints allow: while nothing is in place yet they are drawn in the area as a
+  // proposal (faded, with a pill to put them in or set them aside), so the map itself shows what can go where.
+  const suggestion = useSuggestion(saved?.ring, loc.label ?? "", kind === "urban" ? "piazza" : "vigneto", saved ? usableM2(saved) : 0);
+  const empty = kind === "urban"
+    ? !lab.urban.trees && !lab.urban.permeable && !lab.urban.shade && !(lab.urban.misters ?? 0) && !(lab.urban.sprinklers ?? 0)
+    : lab.vineyard.zones.every((z) => { const m = zoneMixOf(z, vineMixOf(lab.vineyard)); return !m.irrigation && !m.shade && !m.windbreak; });
+  const [dismissed, setDismissed] = useState<Set<string>>(() => new Set(readDismissed()));
+  const areaTag = saved ? ringTag(saved.ring) : "";
+  const proposal = !!saved && empty && !!suggestionText(suggestion) && !dismissed.has(areaTag) && !saved.edits?.onlyDrawn;
+  const dismissProposal = () => { const next = new Set(dismissed).add(areaTag); setDismissed(next); writeDismissed([...next]); };
+  const applySuggestion = (sg: { piazza?: PiazzaSuggestion | undefined; vine?: VineSuggestion | undefined }) => {
+    if (sg.piazza) setUrban({ ...sg.piazza, treeCells: null, permeableCells: null, shadeCells: null });
+    if (sg.vine) { const vine = sg.vine; setVineyard((v) => ({ zones: v.zones.map((z) => ({ ...z, ...vine })) })); }
+    toast.success("Interventi consigliati messi", { description: "Li vedi sulla mappa; in Simula leggi l’effetto e li regoli.", action: { label: "Simula", onClick: () => openSimTab(kind, "simula") } });
+  };
   const sim = useMemo<SimLayout | null>(() => {
     if (!saved) return null;
     const edits = saved.edits ?? {}, inner = zonesOfArea(saved);
+    const sp = proposal ? suggestion?.piazza : undefined;
     if (kind === "urban") {
-      const data = piazzaLayout(saved.ring, lab.urban.trees, lab.urban.permeable, lab.urban.shade, edits, inner, lab.urban.misters ?? 0, real.map((o) => o.ring), lab.urban.sprinklers ?? 0);
+      const u = sp ?? { trees: lab.urban.trees, permeable: lab.urban.permeable, shade: lab.urban.shade, misters: lab.urban.misters ?? 0, sprinklers: lab.urban.sprinklers ?? 0 };
+      const data = piazzaLayout(saved.ring, u.trees, u.permeable, u.shade, edits, inner, u.misters, real.map((o) => o.ring), u.sprinklers);
       if (!data) return null;
       // The shadows with the sun of the simulation's season and hour (its "when" chip), on the area's place.
       const when = getSimWhen("urban"), season = rSeason ?? when?.season, hour = rHour ?? when?.hour;
       const sun = season !== undefined && hour !== undefined ? sunAt(saved.lat, saved.lng, season, hour, when?.minute ?? 0, when?.dst) : null;
-      return { kind: "piazza", data, inner, shadows: piazzaShadows(data, sun), real, finds };
+      // The side-pole sails open with the day's heat and close at dusk, at night and in winter (motorised): closed, they
+      // cast no shade.
+      const shadeOpen = season !== undefined && hour !== undefined ? shadeOpenness(sunHeightDeg(saved.lat, saved.lng, season, hour, when?.minute ?? 0, when?.dst), season) : 1;
+      const shadowed = shadeOpen < 0.3 ? { ...data, patches: data.patches.filter((p) => p.kind !== "shade") } : data;
+      return { kind: "piazza", data, inner, shadows: piazzaShadows(shadowed, sun), real, finds, shadeOpen };
     }
     const v = lab.vineyard, fallback = vineMixOf(v);
-    const data = vineLayout(saved.ring, v.zones.map((z) => zoneMixOf(z, fallback)), edits, inner);
+    const vp = proposal ? suggestion?.vine : undefined;
+    const data = vineLayout(saved.ring, v.zones.map((z) => vp ?? zoneMixOf(z, fallback)), edits, inner);
     return data ? { kind: "vigneto", data, thirst: vineMetrics(v).results.map((r) => r.s), inner, finds } : null;
-  }, [saved, kind, lab.urban, lab.vineyard, rSeason, rHour, real, finds]);
+  }, [saved, kind, lab.urban, lab.vineyard, rSeason, rHour, real, finds, proposal, suggestion]);
+  const proposalPill = proposal && suggestion ? (
+    <ProposalPill text={suggestionText(suggestion)} constrained={suggestion.cs.length > 0}
+      onApply={() => applySuggestion(suggestion)} onDismiss={dismissProposal} />
+  ) : null;
   const setZones = (zones: SubArea[]) => {
     if (!saved) return;
     const area = { ...saved, zones };
@@ -209,9 +248,9 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         return { ...z, ...next };
       });
       if (!changed) return;
-      setVineyard({ zones });
+      // Never put by itself: the zone is offered, so the area's feasibility (Vincoli dell'area in Simula) is seen first.
       const names = [...new Set(zonesOfArea(saved).filter((z) => fresh.has(z.id)).map((z) => ZONE_LABEL[z.kind]))].join(" · ");
-      toast.success("Interventi messi nelle zone", { description: `${names}: li vedi sulla mappa 2D e 3D e contano nella simulazione.` });
+      toast("Zona disegnata: interventi non ancora messi", { description: `${names}. Prima guarda i vincoli dell’area in Simula, poi mettili con un tocco.`, duration: 15000, action: { label: "Mettili", onClick: () => setVineyard({ zones }) } });
       return;
     }
     if (kind !== "urban") return;
@@ -228,9 +267,9 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
     for (const z of zonesOfArea(saved)) if (fresh.has(z.id)) seen.add(`${z.id}:${z.kind}`);
     keepSeeded(seen);
     if (!next) return;
-    setUrban(next);
+    // Never put by itself: the zone is offered, so the area's feasibility (Vincoli dell'area in Simula) is seen first.
     const said = [next.trees !== u.trees && `Alberi ${next.trees}`, next.permeable !== u.permeable && `Aiuole ${next.permeable} %`, next.shade !== u.shade && `Ombra ${next.shade} %`, next.misters !== (u.misters ?? 0) && `Nebulizzatori ${next.misters}`].filter(Boolean).join(" · ");
-    toast.success("Interventi messi nelle zone", { description: `${said}: li vedi sulla mappa 2D e 3D.` });
+    toast("Zona disegnata: interventi non ancora messi", { description: `Proposta: ${said}. Prima guarda i vincoli dell’area in Simula, poi mettili con un tocco.`, duration: 15000, action: { label: "Mettili", onClick: () => setUrban(next) } });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind, zoneSig, !!saved?.edits?.onlyDrawn]);
   const setEdits = (edits: LayoutEdits) => {
@@ -280,10 +319,11 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         <DayNight kind={kind} lat={pin.lat} lng={pin.lng} />
         {/* Still: the map under the button takes no gesture; the page scrolls over it. */}
         <ParallaxLayer>
-          <Suspense fallback={<div className="h-full w-full" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} sim={sim} still /></Suspense>
+          <Suspense fallback={<div className="h-full w-full" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} sim={sim} still proposal={proposal} /></Suspense>
         </ParallaxLayer>
       </div>
-      {kind === "vineyard" && <div className="absolute inset-x-0 top-12 z-[3] flex justify-center px-3"><Suspense fallback={null}><VineZonePicker /></Suspense></div>}
+      {kind === "vineyard" && !proposal && <div className="absolute inset-x-0 top-12 z-[3] flex justify-center px-3"><Suspense fallback={null}><VineZonePicker /></Suspense></div>}
+      {proposalPill}
       <button type="button" onClick={(e) => { e.stopPropagation(); openSimTab(kind, "mappa"); }} aria-label="Apri la mappa: disegna l’area e sposta gli elementi"
         className="absolute bottom-3 right-3 z-[3] inline-flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-[13px] font-semibold text-white outline-none ring-1 ring-white/15 backdrop-blur-sm focus-visible:ring-2 focus-visible:ring-white">
         <MapIcon className="size-4" aria-hidden="true" />Apri la mappa
@@ -336,13 +376,14 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         )}
         {/* Day and night at the simulation's season and hour, over the 2D and the 3D map alike. */}
         <DayNight kind={kind} lat={pin.lat} lng={pin.lng} />
+        {!drawing && !drawingZone && proposalPill}
         {show3d
           ? <Suspense fallback={<div className="h-full w-full bg-card" />}><MapLight kind={kind} lat={pin.lat} lng={pin.lng}>{key
             ? <LocationMap3D key={`${loc.lat},${loc.lng}`} lat={pin.lat} lng={pin.lng} label={name ?? ""} apiKey={key} area={ring} sim={sim}
               fallback={<OpenMap3D lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />} />
             : <OpenMap3D key={`${loc.lat},${loc.lng}`} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />}</MapLight></Suspense>
           : <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} drawing={drawing || drawingZone}
-            onAreaChange={drawingZone ? setZoneDraft : setDraft} sim={editingZone && sim ? { ...sim, inner: (sim.inner ?? []).filter((z) => z.id !== editingZone) } : sim} arranging={arranging} onMove={moved}
+            onAreaChange={drawingZone ? setZoneDraft : setDraft} sim={editingZone && sim ? { ...sim, inner: (sim.inner ?? []).filter((z) => z.id !== editingZone) } : sim} arranging={arranging} onMove={moved} proposal={proposal}
             outline={drawingZone ? saved?.ring ?? null : null} onOutside={() => toast("La zona va dentro l’area disegnata")} onPinMove={arranging ? undefined : movePin} /></Suspense>}
       </div>
       {/* iPhone and iPad only: the 3D shows plain shapes unless the light realistic models are turned on by hand. */}
@@ -365,7 +406,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         only={!!saved?.edits?.onlyDrawn} canOnly={!!saved && zonesOfArea(saved).some((z) => (kind === "urban" ? ["alberi", "prato", "ombra", "nebulizzatori"] : [...VINE_ZONE_KINDS] as string[]).includes(z.kind))}
         onOnly={() => {
           if (!saved) return;
-          if (saved.edits?.onlyDrawn) { setEdits({}); toast("Torna la disposizione automatica", { description: kind === "urban" ? "Le leve tornano a mettere aiuole, pergolati e alberi anche fuori dalle zone." : "Le leve tornano a mettere irrigazione, teli e frangivento anche fuori dalle zone." }); return; }
+          if (saved.edits?.onlyDrawn) { setEdits({}); toast("Torna la disposizione automatica", { description: kind === "urban" ? "Le leve tornano a mettere aiuole, vele e alberi anche fuori dalle zone." : "Le leve tornano a mettere irrigazione, teli e frangivento anche fuori dalle zone." }); return; }
           if (kind === "vineyard") {
             const next = vineLeversOfZones(saved);
             setVineyard((v) => ({ zones: v.zones.map((z) => ({ ...z, ...next })), area: { ...saved, edits: { onlyDrawn: true } } }));
@@ -382,8 +423,14 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         onBest={() => {
           setEdits({ best: true });
           setArranging(false);
-          toast.success("Elementi nella posizione migliore", { description: kind === "urban" ? "Pergolati, aiuole e alberi dove d’estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno all’area." : "I teli d’ombra sulle parti di ogni zona dove d’estate batte più sole (ore 10–18)." });
+          toast.success("Elementi nella posizione migliore", { description: kind === "urban" ? "Vele, aiuole e alberi dove d’estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno all’area." : "I teli d’ombra sulle parti di ogni zona dove d’estate batte più sole (ore 10–18)." });
         }} />}
+      {saved && !drawing && (() => {
+        // After the area's surroundings are read: the interventions the constraints allow, put in with one tap.
+        const [sLat, sLng] = ringCentroid(saved.ring).map((v) => Math.round(v * 1e4) / 1e4) as [number, number];
+        return <SuggestedInterventions lat={sLat} lng={sLng} ring={saved.ring} placeName={loc.label ?? ""} kind={kind === "urban" ? "piazza" : "vigneto"} m2={usableM2(saved)}
+          onApply={applySuggestion} />;
+      })()}
       {saved && !drawing && <ZonesBar area={saved} flow={kind === "urban" ? "piazza" : "vigneto"} onAdd={startZone} onEdit={editZone} onRemove={(id) => setZones(zonesOfArea(saved).filter((z) => z.id !== id))} />}
       </>}
     </div>
@@ -567,8 +614,8 @@ function shadowText(sim: Extract<SimLayout, { kind: "piazza" }>, when?: string) 
 /** Says when the area has no room for all the m² the simulation counts. */
 function roomText(l: PiazzaLayout) {
   const short = (got: number, want: number) => want > 0 && got < want * 0.95 - 10;
-  const parts = [short(l.lawnM2, l.lawnTarget) && `aiuole ${l.lawnTarget.toLocaleString("it-IT")} m²`, short(l.shadeM2, l.shadeTarget) && `pergolati ${l.shadeTarget.toLocaleString("it-IT")} m²`].filter(Boolean);
-  return parts.length ? `La simulazione conta ${parts.join(" e ")}: nell’area disegnata c’è posto per meno.` : "Aiuole e pergolati hanno sulla mappa gli stessi m² contati dalla simulazione.";
+  const parts = [short(l.lawnM2, l.lawnTarget) && `aiuole ${l.lawnTarget.toLocaleString("it-IT")} m²`, short(l.shadeM2, l.shadeTarget) && `vele ${l.shadeTarget.toLocaleString("it-IT")} m²`].filter(Boolean);
+  return parts.length ? `La simulazione conta ${parts.join(" e ")}: nell’area disegnata c’è posto per meno.` : "Aiuole e vele hanno sulla mappa gli stessi m² contati dalla simulazione.";
 }
 
 /**
@@ -578,7 +625,7 @@ function roomText(l: PiazzaLayout) {
 function SimBar({ sim, when, arranging, edited, best, only, canOnly, onArrange, onAuto, onBest, onOnly }: { sim: SimLayout; when?: string | undefined; arranging: boolean; edited: boolean; best: boolean; only: boolean; canOnly: boolean; onArrange: () => void; onAuto: () => void; onBest: () => void; onOnly: () => void }) {
   const m2 = (v: number) => `${Math.round(v).toLocaleString("it-IT")} m²`;
   const legend = sim.kind === "piazza"
-    ? [[dot(SIM_COLORS.tree), `Alberi ${sim.data.trees.length} · ${m2(sim.data.trees.length * TREE_SHADE_M2)} di chioma`], [dot(SIM_COLORS.lawn, false), `Aiuole e ciottoli ${m2(sim.data.lawnM2)}`], [dot(SIM_COLORS.shade, false), `Pergolati ${m2(sim.data.shadeM2)}`], [dot("#0b0f15", false), "Ombre"], ...(sim.data.misters.length ? [[dot("#7dd3fc"), `Nebulizzatori ${sim.data.misters.length}${sim.data.mistersInZones ? ` (${sim.data.mistersInZones} nelle tue zone)` : ""}`] as const] : []), ...(sim.data.sprinklers.length ? [[dot("#2dd4bf"), `Innaffiatoi ${sim.data.sprinklers.length}`] as const] : [])] as const
+    ? [[dot(SIM_COLORS.tree), `Alberi ${sim.data.trees.length} · ${m2(sim.data.trees.length * TREE_SHADE_M2)} di chioma`], [dot(SIM_COLORS.lawn, false), `Aiuole e ciottoli ${m2(sim.data.lawnM2)}`], [dot(SIM_COLORS.shade, false), `Vele ombreggianti ${m2(sim.data.shadeM2)}${(sim.shadeOpen ?? 1) >= 0.9 ? " · aperte" : (sim.shadeOpen ?? 1) <= 0.1 ? " · chiuse a quest’ora" : " · si stanno aprendo"}`], [dot("#0b0f15", false), "Ombre"], ...(sim.data.misters.length ? [[dot("#7dd3fc"), `Nebulizzatori ${sim.data.misters.length}${sim.data.mistersInZones ? ` (${sim.data.mistersInZones} nelle tue zone)` : ""}`] as const] : []), ...(sim.data.sprinklers.length ? [[dot("#2dd4bf"), `Innaffiatoi ${sim.data.sprinklers.length}`] as const] : [])] as const
     : [[dot(thirstColor(10), false), "Zone (colore = bisogno di intervento)"], [dot(SIM_COLORS.drip, false), "Irrigazione · tubo e ali gocciolanti"], [dot(SIM_COLORS.cloth, false), "Teli d’ombra"], [dot(SIM_COLORS.wind, false), "Frangivento"]] as const;
   return (
     <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4">
@@ -592,11 +639,11 @@ function SimBar({ sim, when, arranging, edited, best, only, canOnly, onArrange, 
       <p className="text-sm text-muted-foreground">{arranging
         ? sim.kind === "piazza" ? `Trascina gli alberi, o le etichette Aiuole e Ombra.${(sim.inner ?? []).length ? " Le etichette con ✥ spostano le tue zone con tutto quello che contengono; \"✥ Tutte le zone\" le sposta insieme." : ""}` : `Trascina l’etichetta Frangivento verso il lato dove lo vuoi.${(sim.inner ?? []).length ? " Le etichette con ✥ spostano le tue zone; \"✥ Tutte le zone\" le sposta insieme." : ""}`
         : only
-          ? sim.kind === "piazza" ? "Solo quello disegnato da te: aiuole e pergolati sono le tue zone, gli alberi stanno nelle zone Alberi. Le leve della simulazione seguono le zone; se ne cambi una torna la disposizione automatica." : "Solo quello disegnato da te: irrigazione, teli e frangivento stanno nelle tue zone. Le leve della simulazione seguono le zone; se ne cambi una torna la disposizione automatica."
+          ? sim.kind === "piazza" ? "Solo quello disegnato da te: aiuole e vele sono le tue zone, gli alberi stanno nelle zone Alberi. Le leve della simulazione seguono le zone; se ne cambi una torna la disposizione automatica." : "Solo quello disegnato da te: irrigazione, teli e frangivento stanno nelle tue zone. Le leve della simulazione seguono le zone; se ne cambi una torna la disposizione automatica."
         : best
-          ? sim.kind === "piazza" ? `Posizione migliore: pergolati, aiuole e alberi dove d’estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno.${sim.data.sunny !== undefined ? ` Al sole per gran parte del giorno: ${Math.round(sim.data.sunny * 100)} % dell’area.` : ""}` : "Posizione migliore: i teli d’ombra sulle parti di ogni zona dove d’estate batte più sole (ore 10–18)."
+          ? sim.kind === "piazza" ? `Posizione migliore: vele, aiuole e alberi dove d’estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno.${sim.data.sunny !== undefined ? ` Al sole per gran parte del giorno: ${Math.round(sim.data.sunny * 100)} % dell’area.` : ""}` : "Posizione migliore: i teli d’ombra sulle parti di ogni zona dove d’estate batte più sole (ore 10–18)."
           : "Segue le leve della simulazione: cambia gli alberi o le percentuali e la mappa si aggiorna."}</p>
-      {!canOnly && !only && !arranging && <p className="text-xs text-muted-foreground">Per vedere solo quello che disegni, aggiungi una zona {sim.kind === "piazza" ? "Alberi, Aiuole o Pergolato" : "Irrigazione, Teli d’ombra o Frangivento"}.</p>}
+      {!canOnly && !only && !arranging && <p className="text-xs text-muted-foreground">Per vedere solo quello che disegni, aggiungi una zona {sim.kind === "piazza" ? "Alberi, Aiuole o Vele" : "Irrigazione, Teli d’ombra o Frangivento"}.</p>}
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={onArrange} aria-pressed={arranging} className={cn(barBtn, arranging ? "bg-foreground text-background" : "bg-foreground/[0.08]")}>
           {arranging ? <><Check className="size-4" aria-hidden="true" />Fatto</> : <><Hand className="size-4" aria-hidden="true" />Sposta elementi</>}
@@ -621,7 +668,7 @@ const ZONE_HINT: Record<ZoneKind, string> = {
   libera: "Resta vuota (una fontana, una strada, un parcheggio) e la sua superficie si toglie dai costi.",
   alberi: "Gli alberi della simulazione vanno qui dentro.",
   prato: "Qui ci sono aiuole e ciottoli, poi il resto della percentuale dove c’è posto.",
-  ombra: "Qui c’è un pergolato, poi il resto della percentuale dove c’è posto.",
+  ombra: "Qui ci sono le vele, poi il resto della percentuale dove c’è posto.",
   nebulizzatori: "I nebulizzatori vanno qui dentro: circa uno ogni 40 m².",
   irrigazione: "Qui le viti hanno l’irrigazione a goccia su ogni filare, con il tubo principale lungo il bordo.",
   teli: "Qui le viti stanno sotto i teli d’ombra.",
@@ -720,5 +767,26 @@ function IosModelsSwitch() {
         <span className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition-[left] ${on ? "left-[1.125rem]" : "left-0.5"}`} />
       </button>
     </label>
+  );
+}
+
+/** Areas whose proposal was set aside (by their outline), kept on this device. */
+const DISMISS_KEY = "mdt-proposal-off-v1";
+function readDismissed(): string[] { try { return JSON.parse(localStorage.getItem(DISMISS_KEY) ?? "[]") as string[]; } catch { return []; } }
+function writeDismissed(v: string[]) { try { localStorage.setItem(DISMISS_KEY, JSON.stringify(v.slice(-60))); } catch { /* full */ } }
+
+/** Over the map, while the proposal is drawn in the area: what it is, "Metti" to put it in, ✕ to set it aside. */
+function ProposalPill({ text, constrained, onApply, onDismiss }: { text: string; constrained: boolean; onApply: () => void; onDismiss: () => void }) {
+  return (
+    <div role="status" onClick={(e) => e.stopPropagation()}
+      className="absolute inset-x-3 bottom-14 z-[4] mx-auto flex max-w-md items-center gap-2 rounded-2xl bg-black/60 p-2 pl-3 text-white ring-1 ring-white/15 backdrop-blur-sm">
+      <span className="size-2.5 shrink-0 rounded-full bg-amber-300 ring-2 ring-amber-100/40" aria-hidden="true" />
+      <p className="min-w-0 flex-1 text-[12px] leading-snug [text-shadow:0_1px_2px_rgb(0_0_0/.6)]">
+        <span className="font-semibold">Proposta {constrained ? "con i vincoli trovati" : "· nessun vincolo trovato"}</span>
+        <span className="block text-white/80">{text}</span>
+      </p>
+      <button type="button" onClick={onApply} className="h-8 shrink-0 rounded-full bg-white px-3 text-[13px] font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-white">Metti</button>
+      <button type="button" onClick={onDismiss} aria-label="Nascondi la proposta" className="grid size-8 shrink-0 place-items-center rounded-full bg-white/10 outline-none focus-visible:ring-2 focus-visible:ring-white"><X className="size-4" aria-hidden="true" /></button>
+    </div>
   );
 }

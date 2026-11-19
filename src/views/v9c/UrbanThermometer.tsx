@@ -12,6 +12,7 @@ import { setUrban, useLab, type RealWeather } from "@/models/lab-store";
 import { REFERENCE_M2, grouped } from "@/models/intervention-cost";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { useSeasonClock, WhenPicker } from "@/views/v10/when";
+import { ConstraintsCard, CrowdCard, FeasibilityStrip } from "@/views/v10/SiteContext";
 import { coolingShare, estimatedTemp, SEASON_LABEL } from "@/models/season-climate";
 import { setPiazzaReading } from "@/models/sim-reading";
 import { loadAirTemperature } from "@/views/air-temp-client";
@@ -367,7 +368,7 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
     if (a?.edits?.onlyDrawn) {
       const { onlyDrawn: _off, ...edits } = a.edits;
       setUrban({ ...patch, treeCells: null, permeableCells: null, shadeCells: null, area: { ...a, edits } });
-      toast("Torna la disposizione automatica", { description: "Hai cambiato una leva: aiuole, pergolati e alberi vanno anche fuori dalle zone disegnate." });
+      toast("Torna la disposizione automatica", { description: "Hai cambiato una leva: aiuole, vele e alberi vanno anche fuori dalle zone disegnate." });
       return;
     }
     setUrban({ ...patch, treeCells: null, permeableCells: null, shadeCells: null });
@@ -406,6 +407,8 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">{share > 0.01 ? "Trascina il punto bianco o tocca un livello" : "Modifica gli interventi"}</p>
       </div>
+      {/* Feasibility first: the area's constraints in one line, before any intervention. */}
+      <FeasibilityStrip sim="urban" lat={cLat} lng={cLng} pending={!areaHere} ring={areaHere?.ring} placeName={urban.location.label ?? ""} />
 
       {/* The simulation stays the focus: once the gauge scrolls away, its reading rides under the tabs. */}
       <div aria-hidden={gaugeSeen} className={cn("pointer-events-none sticky top-[calc(var(--nav-h)+3.75rem)] z-[999999996] -mb-5 flex h-0 translate-y-[var(--sim-tabs-shift,0px)] justify-center transition-opacity duration-200 motion-reduce:transition-none", gaugeSeen ? "opacity-0" : "opacity-100")}>
@@ -466,7 +469,7 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
       <div className="space-y-3" role="group" aria-label="Modifica gli interventi">
         <Lever icon={TreePine} label="Alberi" value={urban.trees} step={1} max={30} color="text-ok" swatch="bg-ok" onChange={(v) => change({ trees: v })} />
         <Lever icon={Sprout} label="Superfici verdi e permeabili (% della piazza)" value={urban.permeable} step={10} max={100} color="text-radar-mild" swatch="bg-radar-mild" onChange={(v) => change({ permeable: v })} />
-        <Lever icon={Umbrella} label="Coperture ombreggianti (% della piazza)" hint="Tende, pergole, pensiline." value={urban.shade} step={10} max={100} color="text-urban" swatch="bg-urban" onChange={(v) => change({ shade: v })} />
+        <Lever icon={Umbrella} label="Coperture ombreggianti (% della piazza)" hint="Vele su palo laterale: le ali si aprono nelle ore calde e si richiudono da sole la sera, di notte e d’inverno." value={urban.shade} step={10} max={100} color="text-urban" swatch="bg-urban" onChange={(v) => change({ shade: v })} />
         <Lever icon={CloudDrizzle} label="Nebulizzatori" hint="Funzionano meglio con aria secca e poco vento; effetto locale, vicino agli ugelli." value={misters} step={1} max={20} color="text-sky-300" swatch="bg-sky-400" onChange={(v) => change({ misters: v })} />
         <Lever icon={Droplets} label="Innaffiatoi" hint="Bagnano aiuole e terreno: asciugando rinfrescano un poco l’aria, soprattutto nelle ore calde." value={sprinklers} step={1} max={20} color="text-teal-300" swatch="bg-teal-400" onChange={(v) => change({ sprinklers: v })} />
       </div>
@@ -488,6 +491,10 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
         <p className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><Ruler className="size-3.5 shrink-0" aria-hidden="true" />{surface} · {surfaceNote.toLowerCase()}</p>
         <p className="text-[11px] leading-snug text-muted-foreground">Stime indicative su un anno: 22 kg di CO₂ per albero. Ipotesi: 700 mm di pioggia l’anno; le superfici verdi e permeabili ne trattengono fino al 60%. 2 m² d’ombra a persona.</p>
       </div>
+
+      {/* 5 · Who is there at this season and hour, and what may protect the place (indicative, from the open map data). */}
+      <CrowdCard lat={cLat} lng={cLng} pending={!areaHere} ring={areaHere?.ring} m2={m2} season={season} hour={hour} shadePlaces={Math.floor(shadeM2 / 2)} />
+      <ConstraintsCard lat={cLat} lng={cLng} pending={!areaHere} ring={areaHere?.ring} placeName={urban.location.label ?? ""} kind="piazza" />
     </section>
   );
 }

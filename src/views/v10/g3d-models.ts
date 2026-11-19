@@ -5,7 +5,8 @@ import type { LatLng } from "@/models/area-layout";
 import { arObject, recognisedPlants } from "@/models/ar-objects";
 import { currentScans } from "@/models/ar-scan-log";
 import { planTreeDefs, rectOf } from "@/views/ar-plan";
-import { realPergola } from "@/views/ar-pergola";
+import { realPapillons } from "@/views/ar-papillon";
+import { shadeBlocks } from "@/models/area-layout";
 import { realBed } from "@/views/ar-bed";
 import { realMister } from "@/views/ar-mister";
 import { realSprinkler } from "@/views/ar-sprinkler";
@@ -200,14 +201,17 @@ export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number },
   };
   if (sim.kind === "piazza") {
     const L = sim.data;
-    for (const p of L.patches) {
+    // The shade strips joined into blocks first (shadeBlocks), so the side-pole sails stand along each block's edge.
+    const shadeRings = shadeBlocks(L.patches.filter((p) => p.kind === "shade").map((p) => p.ring));
+    for (const p of [...L.patches.filter((q) => q.kind !== "shade"), ...shadeRings.map((ring) => ({ kind: "shade" as const, ring }))]) {
       const r = rectOf(p.ring.map(xz));
       if (p.kind === "lawn" && r.w >= 0.8 && r.d >= 0.8) {
         const w = half(r.w), d = half(r.d);
         add(`bed:${w}x${d}`, r.cx, r.cz, r.yaw, () => realBed({ w, d }, { far: true }), 0.1);
       } else if (p.kind === "shade" && r.w >= 1 && r.d >= 1) {
         const w = half(r.w), d = half(r.d);
-        add(`pergola:${w}x${d}`, r.cx, r.cz, r.yaw, () => realPergola({ w, d, h: 3.2 }), 0.12);
+        const open = Math.round((sim.shadeOpen ?? 1) * 4) / 4;
+        add(`pap:${w}x${d}:${open}`, r.cx, r.cz, r.yaw, () => realPapillons({ w, d, h: 3.2, open }), 0.12);
       }
     }
     const kind = "urban" as const;

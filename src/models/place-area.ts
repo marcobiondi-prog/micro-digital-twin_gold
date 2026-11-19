@@ -87,7 +87,8 @@ export function ringCentroid(ring: Ring): [number, number] {
 /** Overpass query: closed shapes within 80 m that can be a public space. */
 export function placeAreaQuery(lat: number, lng: number): string {
   const at = `(around:80,${lat.toFixed(6)},${lng.toFixed(6)})`;
-  return `[out:json][timeout:20];(way${at}[place=square];relation${at}[place=square];way${at}[highway=pedestrian][area=yes];way${at}["area:highway"=pedestrian];way${at}[leisure~"^(park|garden|playground)$"];relation${at}[highway=pedestrian];);out geom;`;
+  // Squares, pedestrian areas (also closed pedestrian ways mapped without area=yes), market squares, village greens, parks.
+  return `[out:json][timeout:20];(way${at}[place=square];relation${at}[place=square];way${at}[highway=pedestrian][area=yes];way${at}["area:highway"=pedestrian];way${at}[highway=pedestrian][!area];way${at}[amenity=marketplace];way${at}[landuse=village_green];way${at}[leisure~"^(park|garden|playground)$"];relation${at}[highway=pedestrian];relation${at}[leisure=park];);out geom;`;
 }
 
 /** Overpass query for a vineyard: the mapped vineyard plots (landuse=vineyard) within 150 m. */
@@ -99,6 +100,28 @@ export function vineyardAreaQuery(lat: number, lng: number): string {
 type OsmEl = { type: string; tags?: Record<string, string>; geometry?: Array<{ lat: number; lon: number }>; members?: Array<{ role?: string; geometry?: Array<{ lat: number; lon: number }> }> };
 
 /** Reads the Overpass reply into candidates (ways as one ring, relations as their closed outer rings). */
+/**
+ * A multipolygon's outer edge is often split over several ways, none closed by itself: they are chained end to end
+ * (turned round where needed) into closed rings, so a square or park mapped that way is no longer missed.
+ */
+export function joinOuter(parts: Array<Array<{ lat: number; lon: number }>>): Ring[] {
+  const same = (a: { lat: number; lon: number }, b: { lat: number; lon: number }) => a.lat === b.lat && a.lon === b.lon;
+  const left = parts.filter((p) => p.length >= 2).map((p) => [...p]);
+  const out: Ring[] = [];
+  while (left.length) {
+    const line = left.shift()!;
+    let grew = true;
+    while (!same(line[0]!, line[line.length - 1]!) && grew) {
+      grew = false;
+      const end = line[line.length - 1]!;
+      const i = left.findIndex((p) => same(p[0]!, end) || same(p[p.length - 1]!, end));
+      if (i >= 0) { const p = left.splice(i, 1)[0]!; if (!same(p[0]!, end)) p.reverse(); line.push(...p.slice(1)); grew = true; }
+    }
+    if (line.length >= 4 && same(line[0]!, line[line.length - 1]!)) out.push(line.map((q) => [q.lat, q.lon]));
+  }
+  return out;
+}
+
 export function areaCandidates(elements: OsmEl[]): AreaCandidate[] {
   const ring = (g?: Array<{ lat: number; lon: number }>): Ring | null => {
     if (!g || g.length < 4) return null;
@@ -106,9 +129,10 @@ export function areaCandidates(elements: OsmEl[]): AreaCandidate[] {
     return first.lat === last.lat && first.lon === last.lon ? g.map((p) => [p.lat, p.lon]) : null;
   };
   const kindOf = (t: Record<string, string> = {}): AreaCandidate["kind"] =>
-    t["place"] === "square" ? "piazza" : t["highway"] === "pedestrian" || t["area:highway"] === "pedestrian" ? "pedonale" : t["leisure"] ? "parco" : "altro";
+    t["place"] === "square" || t["amenity"] === "marketplace" || t["landuse"] === "village_green" ? "piazza"
+      : t["highway"] === "pedestrian" || t["area:highway"] === "pedestrian" ? "pedonale" : t["leisure"] ? "parco" : "altro";
   return elements.flatMap((el) => {
-    const rings = el.type === "way" ? [ring(el.geometry)] : (el.members ?? []).filter((m) => m.role === "outer").map((m) => ring(m.geometry));
+    const rings = el.type === "way" ? [ring(el.geometry)] : joinOuter((el.members ?? []).filter((m) => m.role === "outer").map((m) => m.geometry ?? []));
     const closed = rings.filter((r): r is Ring => r !== null);
     return closed.length ? [{ rings: closed, kind: kindOf(el.tags), name: el.tags?.["name"] }] : [];
   });

@@ -19,6 +19,24 @@ const tabs: Record<SimKind, SimTab> = { urban: "mappa", vineyard: "mappa" };
 const listeners = new Set<() => void>();
 // When a tab was last asked for by name (Modifica, Riprendi, the camera…), so entering the page does not override it.
 const askedAt: Record<SimKind, number> = { urban: 0, vineyard: 0 };
+/**
+ * A reload (the app reloads by itself when a new version is out, or Riprova) keeps the tab that was open: the tabs are
+ * written on leaving the page and read back only when this load is a reload within 30 s, so a simulation no longer
+ * jumps back to Mappa in the middle of its Simula. Any other opening still starts on Mappa.
+ */
+const TAB_KEEP = "mdt-sim-tabs-v1";
+const restore: Partial<Record<SimKind, SimTab>> = {};
+if (typeof window !== "undefined") {
+  try {
+    const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    const kept = JSON.parse(sessionStorage.getItem(TAB_KEEP) ?? "null") as { at: number; tabs: Record<SimKind, SimTab> } | null;
+    if (kept && nav?.type === "reload" && Date.now() - kept.at < 30_000) {
+      for (const k of ["urban", "vineyard"] as const) if (kept.tabs[k]) restore[k] = kept.tabs[k];
+    }
+    sessionStorage.removeItem(TAB_KEEP);
+  } catch { /* private mode */ }
+  window.addEventListener("pagehide", () => { try { sessionStorage.setItem(TAB_KEEP, JSON.stringify({ at: Date.now(), tabs })); } catch { /* full */ } });
+}
 export function openSimTab(kind: SimKind, tab: SimTab) {
   askedAt[kind] = Date.now();
   if (tabs[kind] === tab) return;
@@ -51,6 +69,9 @@ export function showSimMedia(kind: SimKind) {
  * the camera's photos).
  */
 export function startOnMap(kind: SimKind) {
+  // Applied after hydration (here, from the page's layout effect), so the server's HTML and the first render agree.
+  const back = restore[kind];
+  if (back) { delete restore[kind]; if (tabs[kind] !== back) { tabs[kind] = back; listeners.forEach((l) => l()); } return; }
   if (Date.now() - askedAt[kind] < 1500 || tabs[kind] === "mappa") return;
   tabs[kind] = "mappa";
   listeners.forEach((l) => l());

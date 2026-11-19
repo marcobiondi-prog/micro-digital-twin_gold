@@ -4,7 +4,7 @@ import { ringContains, type Ring } from "@/models/place-area";
 import type { RealObject } from "@/models/real-objects";
 import { clipBox } from "@/models/drape";
 import { ZONE_LABEL, type SubArea, type ZoneKind } from "@/models/drawn-area";
-import { bedParts, BEDS_3D, SOD, crownRing, hedgeParts, netParts, vineRowParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
+import { papillonsOf, shadeBlocks, bedParts, BEDS_3D, SOD, crownRing, hedgeParts, netParts, vineRowParts, PERGOLA_COLORS, pergolaParts, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
 
 /** The drawn area on a maplibre map: a turquoise fill and a white outline, from a ring of [lat, lng] pins. */
 export const AREA_SOURCE = "drawn-area";
@@ -67,7 +67,7 @@ export function pinElement(n: number, drawing: boolean): HTMLElement {
 
 /** `inner`: the smaller areas drawn inside the big one (free zones, zones for one intervention, lots). */
 /** `shadows`: the piazza's shadows at the simulation's season and hour (models/area-layout piazzaShadows); none at night. */
-export type SimLayout = ({ kind: "piazza"; data: PiazzaLayout; shadows?: Ring[]; real?: RealObject[] } | { kind: "vigneto"; data: VineLayout; thirst: number[] }) & { inner?: SubArea[]; finds?: FieldFind[] };
+export type SimLayout = ({ kind: "piazza"; data: PiazzaLayout; shadows?: Ring[]; real?: RealObject[]; shadeOpen?: number } | { kind: "vigneto"; data: VineLayout; thirst: number[] }) & { inner?: SubArea[]; finds?: FieldFind[] };
 /** The outline colour of each kind of inner zone. */
 export const ZONE_COLORS: Record<ZoneKind, string> = { libera: "#cbd5e1", alberi: "#4ade80", prato: "#86efac", ombra: PERGOLA_COLORS.slat, nebulizzatori: "#7dd3fc", irrigazione: "#38bdf8", teli: "#94a3b8", frangivento: "#22c55e", lotto: "#fbbf24" };
 /** A zone's short name on the map. */
@@ -89,6 +89,7 @@ const poly = (ring: Ring, props: Record<string, unknown>) => ({ type: "Feature",
 const lineF = (ring: Ring, props: Record<string, unknown>) => ({ type: "Feature", properties: props, geometry: { type: "LineString", coordinates: ring.map(([la, ln]) => [ln, la]) } });
 const fc = (features: unknown[]) => ({ type: "FeatureCollection", features }) as unknown as Parameters<GeoJSONSource["setData"]>[0];
 
+const SAIL_FABRICS = ["#f1ebdd", "#dcc59b"];
 /** The flat parts (lawn, shade, zones, cloth, drip lines, windbreak) and, in 2D, the trees as points. */
 export function simFeatures(sim: SimLayout | null, withTreePoints: boolean) {
   if (!sim) return fc([]);
@@ -99,6 +100,15 @@ export function simFeatures(sim: SimLayout | null, withTreePoints: boolean) {
     for (const p of sim.data.patches) if (p.kind === "lawn" || withTreePoints) out.push(poly(p.ring, p.kind === "lawn"
       ? { kind: "lawn", color: SIM_COLORS.lawn, opacity: 0.55 }
       : { kind: "shade", color: SIM_COLORS.shade, opacity: 0.9 }));
+    // Shade sails seen from above (2D): each shade patch split into sails of at most 6 m, their edges cut concave,
+    // off-white and sand in turn, with the steel posts at their corners.
+    if (withTreePoints) for (const ring of shadeBlocks(sim.data.patches.filter((p) => p.kind === "shade").map((p) => p.ring))) {
+      // Side-pole sails seen from above: each fan of fabric as open as the simulation's sun says, its ribs and its pole.
+      const { fans, poles, ribs } = papillonsOf(ring, sim.shadeOpen ?? 1);
+      fans.forEach((r, i) => out.push(poly(r, { kind: "sail", color: SAIL_FABRICS[i % 2] })));
+      for (const r of ribs) out.push(lineF(r, { kind: "sailrib" }));
+      for (const q of poles) out.push({ type: "Feature", properties: { kind: "sailpost" }, geometry: { type: "Point", coordinates: [q[1], q[0]] } });
+    }
     for (const r of sim.shadows ?? []) out.push(poly(r, { kind: "shadow", color: "#0b0f15", opacity: 0.32 }));
     // Misters: the mist they spread (a light blue veil about 3,5 m round) and, in 2D, the pole seen from above.
     for (const m of sim.data.misters) {
@@ -190,8 +200,6 @@ export function bedFeatures(sim: SimLayout | null, bedM: number) {
     }
     return fc(out);
   }
-  // The pergolas: their slats as dark 1 px gaps every 4 px, north–south, over the wood.
-  for (const p of sim.data.patches) if (p.kind === "shade") for (const r of strips(p.ring, "lng", 4 * mPx, 1 * mPx, 3000)) out.push(poly(r, { kind: "slat" }));
   const lawn = sim.data.patches.filter((p) => p.kind === "lawn").map((p) => p.ring);
   if (!lawn.length) return fc(out);
   const pxPerM = 10 / bedM;
@@ -209,7 +217,7 @@ export const ringCentre = (ring: Ring): [number, number] => [ring.reduce((a, p) 
 
 /** What stands up in 3D: each tree and a wooden pergola over each shade strip; in the vineyard the hedge and the shade nets. */
 export const treeCrowns = (sim: SimLayout | null) => fc(!sim ? [] : (sim.kind === "piazza"
-  ? [...bedParts(sim.data.patches.filter((p) => p.kind === "lawn").map((p) => p.ring)).parts.map((p) => ({ ...p, base: p.base - 0.55, height: p.height - 0.55 })), ...sim.data.misters.flatMap((m) => [{ ring: crownRing(m, 0.08, 6), base: 0, height: 3, color: "#cbd5e1" }, { ring: crownRing(m, 0.32, 10), base: 2.95, height: 3.08, color: "#f8fafc" }]), ...sim.data.trees.flatMap((t) => treeParts(t)), ...sim.data.patches.filter((p) => p.kind === "shade").flatMap((p) => (p.exact ? pergolaRingParts(p.ring) : pergolaParts(p.ring)))]
+  ? [...bedParts(sim.data.patches.filter((p) => p.kind === "lawn").map((p) => p.ring)).parts.map((p) => ({ ...p, base: p.base - 0.55, height: p.height - 0.55 })), ...sim.data.misters.flatMap((m) => [{ ring: crownRing(m, 0.08, 6), base: 0, height: 3, color: "#cbd5e1" }, { ring: crownRing(m, 0.32, 10), base: 2.95, height: 3.08, color: "#f8fafc" }]), ...sim.data.trees.flatMap((t) => treeParts(t)), ...sim.data.patches.filter((p) => p.kind === "shade").flatMap((p) => pergolaParts(p.ring, false, sim.shadeOpen ?? 1))]
   : [...vineRowParts(sim.data.patches.filter((p) => p.kind === "zone").map((p) => p.ring), 400), ...sim.data.lines.filter((l) => l.kind === "wind").flatMap((l) => hedgeParts(l.line, l.strength ?? 0)), ...sim.data.patches.filter((p) => p.kind === "cloth").flatMap((p) => netParts(p.ring))]
 ).map((p) => poly(p.ring, { kind: "raised", base: p.base, height: p.height, color: p.color })));
 
@@ -307,7 +315,7 @@ export function addSimLayers(map: MlMap, _lat: number, raised = false) {
   // In 2D every texture (vine rows, droplets, pergola slats, the aiuole) is drawn as shapes of a fixed size on screen on
   // their own source, laid again on every zoom (setBedData): an image pattern grows up to 2× between whole zoom levels.
   if (!raised) map.addSource(SIM_BEDS, { type: "geojson", data: fc([]) });
-  map.addLayer({ id: "sim-fill", type: "fill", source: SIM_SOURCE, filter: ["all", ["==", ["geometry-type"], "Polygon"], ["!=", ["get", "kind"], "shade"], ["!=", ["get", "kind"], "lawn"], ["!=", ["get", "kind"], "zone"], ["!=", ["get", "kind"], "cloth"], ["!=", ["get", "kind"], "tint"], ["!=", ["get", "kind"], "shadow"], ["!=", ["get", "kind"], "bed"]], paint: { "fill-color": ["get", "color"], "fill-opacity": ["get", "opacity"] } }, before);
+  map.addLayer({ id: "sim-fill", type: "fill", source: SIM_SOURCE, filter: ["all", ["==", ["geometry-type"], "Polygon"], ["!=", ["get", "kind"], "shade"], ["!=", ["get", "kind"], "lawn"], ["!=", ["get", "kind"], "zone"], ["!=", ["get", "kind"], "cloth"], ["!=", ["get", "kind"], "tint"], ["!=", ["get", "kind"], "shadow"], ["!=", ["get", "kind"], "bed"], ["!=", ["get", "kind"], "sail"]], paint: { "fill-color": ["get", "color"], "fill-opacity": ["get", "opacity"] } }, before);
   // The vineyard: rows of vines on soil tinted by each zone's thirst, a white seam around each zone, the shade nets.
   const thirstTints = [[0x6f, 0x8f, 0x4a], [0x9a, 0x85, 0x3c], [0x9c, 0x5a, 0x3a]] as const;
   VINE_IMAGES.forEach((id, i) => { if (!map.hasImage(id)) map.addImage(id, vineImage(thirstTints[i]!), { pixelRatio: 2 }); });
@@ -336,9 +344,15 @@ export function addSimLayers(map: MlMap, _lat: number, raised = false) {
   map.addLayer({ id: "sim-shadow", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "shadow"], paint: { "fill-color": "#0b0f15", "fill-opacity": 0.32, "fill-antialias": false } }, before);
   // The pergolas seen from above: slats with light between them, and a wooden frame.
   if (!map.hasImage(SLATS_IMAGE)) map.addImage(SLATS_IMAGE, slatsImage(), { pixelRatio: 2 });
-  map.addLayer({ id: "sim-pergola", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "shade"], paint: raised ? { "fill-pattern": SLATS_IMAGE, "fill-opacity": 0.95 } : { "fill-color": PERGOLA_COLORS.slat, "fill-opacity": 0.95 } }, before);
-  if (!raised) map.addLayer({ id: "sim-slats", type: "fill", source: SIM_BEDS, filter: ["==", ["get", "kind"], "slat"], paint: { "fill-color": "#5a3b1c", "fill-opacity": 0.75, "fill-antialias": false } }, before);
-  map.addLayer({ id: "sim-pergola-frame", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "shade"], paint: { "line-color": PERGOLA_COLORS.beam, "line-width": 1.5 } }, before);
+  // Under the sails the patch's ground in their shade (in 3D the sails stand over it); in 2D the sails themselves over
+  // it, each its fabric with a dark hem, and their steel posts as small dots.
+  map.addLayer({ id: "sim-pergola", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "shade"], paint: { "fill-color": "#0b0f15", "fill-opacity": raised ? 0.22 : 0.28 } }, before);
+  if (!raised) {
+    map.addLayer({ id: "sim-slats", type: "fill", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "sail"], paint: { "fill-color": ["get", "color"], "fill-opacity": 0.93 } }, before);
+    map.addLayer({ id: "sim-pergola-frame", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "sail"], paint: { "line-color": PERGOLA_COLORS.beam, "line-width": 1.2 } }, before);
+    map.addLayer({ id: "sim-sailribs", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "sailrib"], paint: { "line-color": PERGOLA_COLORS.beam, "line-width": 0.8, "line-opacity": 0.55 } }, before);
+    map.addLayer({ id: "sim-sailposts", type: "circle", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "sailpost"], paint: { "circle-radius": 2.6, "circle-color": PERGOLA_COLORS.post, "circle-stroke-color": "#1f2937", "circle-stroke-width": 1 } }, before);
+  }
   // Irrigation: the main pipe (a thick dark blue line with a light core) and the drip lines (a blue pipe with light
   // drippers along it, every ~1 m at street zoom, and a faint wet band on the soil under each).
   map.addLayer({ id: "sim-drip-wet", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "drip"], paint: { "line-color": "#1e3a5f", "line-opacity": 0.35, "line-blur": 1, "line-width": 4 } }, before);
@@ -349,7 +363,7 @@ export function addSimLayers(map: MlMap, _lat: number, raised = false) {
   // The windbreak: a hedge of round bushes along its edge, a fixed width on screen.
   map.addLayer({ id: "sim-hedge", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "wind"], paint: { "line-color": "#245220", "line-width": 9 }, layout: { "line-cap": "round", "line-join": "round" } }, before);
   map.addLayer({ id: "sim-hedge-bush", type: "line", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "wind"], paint: { "line-color": "#4f9a3c", "line-width": 6, "line-dasharray": [0, 1.4] }, layout: { "line-cap": "round", "line-join": "round" } }, before);
-  map.addLayer({ id: "sim-line", type: "line", source: SIM_SOURCE, filter: ["all", ["==", ["geometry-type"], "LineString"], ["!=", ["get", "kind"], "drip"], ["!=", ["get", "kind"], "main"], ["!=", ["get", "kind"], "wind"]], paint: { "line-color": ["get", "color"], "line-width": ["get", "width"], "line-dasharray": ["case", ["==", ["get", "kind"], "drip"], ["literal", [2, 1.5]], ["==", ["get", "kind"], "zoneline"], ["literal", [2.5, 1.5]], ["==", ["get", "kind"], "realline"], ["literal", [1.5, 1.5]], ["literal", [1, 0]]] }, layout: { "line-cap": "round" } }, before);
+  map.addLayer({ id: "sim-line", type: "line", source: SIM_SOURCE, filter: ["all", ["==", ["geometry-type"], "LineString"], ["!=", ["get", "kind"], "drip"], ["!=", ["get", "kind"], "main"], ["!=", ["get", "kind"], "wind"], ["!=", ["get", "kind"], "sailrib"]], paint: { "line-color": ["get", "color"], "line-width": ["get", "width"], "line-dasharray": ["case", ["==", ["get", "kind"], "drip"], ["literal", [2, 1.5]], ["==", ["get", "kind"], "zoneline"], ["literal", [2.5, 1.5]], ["==", ["get", "kind"], "realline"], ["literal", [1.5, 1.5]], ["literal", [1, 0]]] }, layout: { "line-cap": "round" } }, before);
   if (raised) {
     map.addSource(SIM_TREES_3D, { type: "geojson", data: fc([]) });
     map.addLayer({ id: "sim-trees-3d", type: "fill-extrusion", source: SIM_TREES_3D, paint: { "fill-extrusion-color": ["get", "color"], "fill-extrusion-base": ["get", "base"], "fill-extrusion-height": ["get", "height"], "fill-extrusion-opacity": 1, "fill-extrusion-vertical-gradient": true } });
@@ -368,14 +382,15 @@ export function addSimLayers(map: MlMap, _lat: number, raised = false) {
  * While the area or a zone is being drawn or edited the rest of the simulation stays in view, faded (about a third of
  * its strength), so the pins are placed knowing what is around them; back to full strength afterwards.
  */
-export function setSimGhost(map: MlMap, ghost: boolean) {
-  const k = ghost ? 0.35 : 1;
+export function setSimGhost(map: MlMap, ghost: boolean | number) {
+  // true: a third (drawing); a number: that strength (a proposal not yet put in, about 0,6).
+  const k = typeof ghost === "number" ? ghost : ghost ? 0.35 : 1;
   const set = (layer: string, prop: string, value: unknown) => { if (map.getLayer(layer)) map.setPaintProperty(layer, prop as never, value as never); };
   set("sim-fill", "fill-opacity", ["*", ["get", "opacity"], k]);
   set("sim-lawn", "fill-opacity", 0.95 * k);
   set("sim-beds", "fill-opacity", k);
   set("sim-pebbles", "circle-opacity", k);
-  set("sim-pergola", "fill-opacity", 0.95 * k);
+  set("sim-pergola", "fill-opacity", 0.28 * k);
   set("sim-shadow", "fill-opacity", 0.32 * k);
   set("sim-pergola-frame", "line-opacity", k);
   set("sim-line", "line-opacity", k);
@@ -386,7 +401,10 @@ export function setSimGhost(map: MlMap, ghost: boolean) {
   set("sim-netlines", "fill-opacity", 0.9 * k);
   set("sim-hedge", "line-opacity", k);
   set("sim-hedge-bush", "line-opacity", k);
-  set("sim-slats", "fill-opacity", 0.75 * k);
+  set("sim-slats", "fill-opacity", 0.93 * k);
+  set("sim-sailposts", "circle-opacity", k);
+  set("sim-sailribs", "line-opacity", 0.55 * k);
+  set("sim-sailposts", "circle-stroke-opacity", k);
   set("sim-drip-pipe", "line-opacity", k);
   set("sim-drip-dots", "line-opacity", k);
   set("sim-drip-wet", "line-opacity", 0.35 * k);

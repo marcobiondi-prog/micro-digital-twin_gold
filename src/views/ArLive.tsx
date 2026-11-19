@@ -345,8 +345,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   // In the «Modellino» the spots are not the real ones, so there the zones are not asked.
   const fitOf = (id: string, u: Foot): JoinFit => modelRef.current < 1 ? "fits" : joinFitsZone(u, id === "pergolato" ? "ombra" : "prato", joinCtx.current.zones, joinCtx.current.a, joinCtx.current.origin);
   const fitWhy = (fit: JoinFit, pg: boolean) => fit === "noalign" ? "allinea prima l’AR alla mappa (Riporta, i 2 punti)"
-    : fit === "nozone" ? `disegna sulla mappa una zona ${pg ? "Pergolato" : "Aiuole"}`
-    : `uniti uscirebbero dalla zona ${pg ? "Pergolato" : "Aiuole"}`;
+    : fit === "nozone" ? `disegna sulla mappa una zona ${pg ? "Vele" : "Aiuole"}`
+    : `uniti uscirebbero dalla zona ${pg ? "Vele" : "Aiuole"}`;
 
   // The session: three.js on WebXR, the hit test from the screen's centre, a reticle on the floor.
   useEffect(() => {
@@ -820,11 +820,11 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     // The line on top.
     if (near && fb.stage !== "far") {
       const pg = near.o.id === "pergolato";
-      const what = pg ? "al pergolato" : "all’aiuola";
+      const what = pg ? "alla vela" : "all’aiuola";
       const text = fit !== "fits"
         ? `Non si uniscono: ${fitWhy(fit, pg)}`
         : fb.stage === "join"
-        ? `Si uniscono: ${gid ? "lascialo" : "posalo"} qui e ${pg ? "i due pergolati diventano uno solo" : "le due aiuole diventano una sola"}`
+        ? `Si uniscono: ${gid ? "lascialo" : "posalo"} qui e ${pg ? "le due vele diventano una sola" : "le due aiuole diventano una sola"}`
         : `Vicino ${what}: ${metresText(Math.round(near.gap * 10) / 10)} · avvicina ancora per unirli`;
       if (text !== s.said && now - s.saidAt > 180) { s.said = text; s.saidAt = now; setNotice({ text, tone: "ok" }); }
     } else if (s.said) { const was = s.said; s.said = ""; setNotice((n) => (n?.text === was ? null : n)); }
@@ -895,7 +895,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     setPlaced((l) => [...l.filter((p) => p.uid !== a.uid && p.uid !== b.uid), joined]);
     hapticTick([40, 60, 40]);
     const pg = a.id === "pergolato";
-    setNotice({ text: `${pg ? "Pergolati uniti" : "Aiuole unite"}: ${metresText(def.w)} × ${metresText(def.d)} · Annulla li separa`, tone: "ok" });
+    setNotice({ text: `${pg ? "Vele unite" : "Aiuole unite"}: ${metresText(def.w)} × ${metresText(def.d)} · Annulla li separa`, tone: "ok" });
     window.setTimeout(() => setNotice((n) => (n?.text.includes("Annulla li separa") ? null : n)), 2600);
     return true;
   }
@@ -1141,7 +1141,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       const y = o?.position.y ?? t.floorY ?? 0;
       for (const p of last.from) { const g = meshFor(p, y); t.scene.add(g); t.objects.set(p.uid, g); }
       setPlaced((l) => [...l.slice(0, -1), ...last.from!]);
-      setNotice({ text: last.id === "pergolato" ? "Pergolati di nuovo separati" : "Aiuole di nuovo separate", tone: "ok" });
+      setNotice({ text: last.id === "pergolato" ? "Vele di nuovo separate" : "Aiuole di nuovo separate", tone: "ok" });
       window.setTimeout(() => setNotice((n) => (n?.text.includes("di nuovo separat") ? null : n)), 1800);
       return;
     }
@@ -1184,7 +1184,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       : tool === "align"
         ? alignPts.length === 0 ? "Tocca il punto 1 dell’area" : "Tocca il punto 2 dell’area"
         : tool === "move"
-          ? grabbed ? "Punta dove metterlo e tocca: vicino a un pergolato o a un’aiuola si uniscono" : "Tocca l’oggetto da spostare"
+          ? grabbed ? "Punta dove metterlo e tocca: vicino a una vela o a un’aiuola si uniscono" : "Tocca l’oggetto da spostare"
         : tool === "measure"
           ? dist !== null ? `Distanza ${metresText(dist)}` : measure.length === 1 ? "Tocca il secondo punto" : "Tocca il primo punto"
           : session && surface === "raised" ? `Tocca per posare sul piano: ${defOf(selected).label}`
@@ -1197,7 +1197,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const barShort = !found ? "Cerco il pavimento…" : adjusting ? "Regola pavimento"
     : tool === "move" ? (grabbed ? "Mettilo giù" : "Sposta") : tool === "measure" ? (dist !== null ? metresText(dist) : "Misura") : tool === "align" ? `Punto ${alignPts.length + 1} dell’area` : defOf(selected).label;
   const barHelp = !found ? "Inquadra il pavimento a un paio di metri e muovi piano il telefono di lato finché lo riconosco: aiutano una buona luce e un pavimento con disegni o venature; quello lucido o tutto di un colore si trova a fatica."
-    : tool === "move" ? "Tocca un oggetto posato per prenderlo: segue il mirino e gira con il telefono, tocca di nuovo per posarlo. Avvicinato a un altro pergolato o a un’altra aiuola, il telefono vibra sempre più forte e il contorno diventa verde: posato lì, i due diventano uno solo (Annulla li separa)."
+    : tool === "move" ? "Tocca un oggetto posato per prenderlo: segue il mirino e gira con il telefono, tocca di nuovo per posarlo. Avvicinato a un’altra vela o a un’altra aiuola, il telefono vibra sempre più forte e il contorno diventa verde: posato lì, i due diventano uno solo (Annulla li separa)."
     : tool === "measure" ? "Tocca due punti a terra: ti dico quanto distano."
     : tool === "align" ? "Tocca a terra i punti 1 e 2 dell’area disegnata sulla mappa: così gli oggetti tornano al posto giusto."
     : "Tocca il pavimento dove vuoi metterlo: compare a grandezza vera. Il pavimento è il piano più basso che riconosco: un tavolo o un muro non lo ingannano (il mirino scende a terra, più tenue), solo il Modellino si posa anche su un tavolo. Un oggetto già posato si trascina con un dito; con due dita lo ruoti e lo ingrandisci. Annulla toglie l’ultimo, il pulsante AI cambia oggetto.";
@@ -1783,7 +1783,7 @@ export type FanGroup = { key: string; label: string; Icon: LucideIcon; items: Fa
 
 /** One line on what each object is for, in the AR sheet. */
 const OBJECT_HINT: Record<string, string> = {
-  albero: "Fa ombra e rinfresca l’aria", pergolato: "Ombra in legno con telo ed edera", aiuola: "Verde permeabile tra i ciottoli",
+  albero: "Fa ombra e rinfresca l’aria", pergolato: "Palo laterale, ali di tessuto che si aprono e si chiudono", aiuola: "Verde permeabile tra i ciottoli",
   nebulizzatore: "Nebbia d’acqua che rinfresca vicino agli ugelli", innaffiatoio: "Bagna aiuole e terreno",
   telo: "Rete ombreggiante sopra le viti", frangivento: "Siepe che ferma il vento", irrigazione: "Ala gocciolante lungo il filare",
 };

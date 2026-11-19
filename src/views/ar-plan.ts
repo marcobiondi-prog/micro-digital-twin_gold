@@ -1,11 +1,11 @@
 import * as THREE from "three";
 import type { LabState } from "@/models/lab-store";
 import { zonesOfArea, type DrawnArea } from "@/models/drawn-area";
-import { piazzaLayout, vineLayout, TREE_RADIUS_M, type LatLng, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
+import { piazzaLayout, vineLayout, TREE_RADIUS_M, type LatLng, type PiazzaLayout, type VineLayout, shadeBlocks } from "@/models/area-layout";
 import { arObject, arToEn, enToAr, fromEN, insideRing, toEN, type Alignment, type ArObjectDef } from "@/models/ar-objects";
 import { vineMixOf, zoneMixOf } from "@/models/vine-interventions";
 import { objectMesh } from "@/views/ar-object-meshes";
-import { realPergola } from "@/views/ar-pergola";
+import { realPapillons } from "@/views/ar-papillon";
 import { realBed } from "@/views/ar-bed";
 import { realShadeNet } from "@/views/ar-shadenet";
 import { realWindbreak } from "@/views/ar-windbreak";
@@ -119,7 +119,7 @@ export function buildPlan(kind: "urban" | "vineyard", lab: LabState, area: Drawn
  * pergolas, aiuole, misting poles, sprinklers, shade nets, hedges and drip lines.
  */
 export function layoutPlan(
-  plan: { kind: "urban"; L: PiazzaLayout | null } | { kind: "vineyard"; L: VineLayout | null },
+  plan: { kind: "urban"; L: PiazzaLayout | null; open?: number } | { kind: "vineyard"; L: VineLayout | null },
   ar: (p: LatLng) => XZ, merge = false, far = false, joinBeds = false,
   fits?: { shade?: (corners: XZ[]) => boolean; lawn?: (corners: XZ[]) => boolean },
 ): { group: THREE.Group; count: PlanCount } {
@@ -148,9 +148,9 @@ export function layoutPlan(
     // round it) are joined into one pergola covering them all, so a block of shade is one structure, not a row of them.
     // With «Pergolati separati» chosen, each shade patch is its own pergola as on the map.
     const shade = L.patches.filter((q) => q.kind === "shade").map((q) => q.ring.map(ar));
-    for (const r of merge ? pergolaBlocks(shade, 0.6, fits?.shade) : shade.map(rectOf)) {
+    for (const r of merge ? pergolaBlocks(shade, 0.6, fits?.shade) : shadeBlocks(L.patches.filter((q) => q.kind === "shade").map((q) => q.ring)).map((q) => rectOf(q.map(ar)))) {
       if (r.w < 1 || r.d < 1) continue;
-      const pg = realPergola({ w: r.w, d: r.d, h: 3.2 });
+      const pg = realPapillons({ w: r.w, d: r.d, h: 3.2, open: plan.open ?? 1 });
       pg.rotation.y = r.yaw;
       put(pg, { x: r.cx, z: r.cz });
       count.pergolas++;
@@ -240,7 +240,7 @@ export async function growPlan(group: THREE.Group, alive: () => boolean, onTree?
 
 export function planText(c: PlanCount): string {
   const parts = [
-    c.trees && `${c.trees} alberi`, c.pergolas && `${c.pergolas} pergolati`, c.beds && `${c.beds} aiuole`,
+    c.trees && `${c.trees} alberi`, c.pergolas && `${c.pergolas} ${c.pergolas === 1 ? "vela" : "vele"}`, c.beds && `${c.beds} aiuole`,
     c.misters && `${c.misters} nebulizzatori`, c.sprinklers && `${c.sprinklers} innaffiatoi`,
     c.cloths && `${c.cloths} teli`, c.lines && `${c.lines} linee`,
   ].filter(Boolean);

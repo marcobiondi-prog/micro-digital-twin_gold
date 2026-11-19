@@ -26,7 +26,7 @@ const KEY = "micro-digital-twin-lab";
 /** The place's real weather imported into the piazza (besides the air temperature, kept as realTemp): when, humidity %, wind km/h, ground temperature °C, sun kWh/m² a day and rain mm over the last week. */
 export type RealWeather = { at: string; humidity: number | null; wind: number | null; groundTemp: number | null; sun: number | null; rainWeek: number | null };
 const defaults = (): LabState => ({
-  urban: { trees: 6, permeable: 20, shade: 15, location: { label: "Nessun luogo scelto", lat: 41.55837, lng: 14.659698, pending: true }, treeCells: null, permeableCells: null, shadeCells: null },
+  urban: { trees: 0, permeable: 0, shade: 0, location: { label: "Nessun luogo scelto", lat: 41.55837, lng: 14.659698, pending: true }, treeCells: null, permeableCells: null, shadeCells: null },
   vineyard: { zones: vineZones.map((z) => ({ temperature: z.temp, moisture: z.moist, wind: z.wind, rain: false })), phase: "Invaiatura" as Pheno, selected: 2, allZones: false, location: { label: "Nessun luogo scelto", lat: 41.83, lng: 14.98, pending: true } },
 });
 
@@ -70,7 +70,7 @@ export function setUrban(patch: Partial<LabState["urban"]>) {
   if (to && !samePlace(base.location, to)) {
     const { trees, permeable, shade, misters, sprinklers } = base;
     const { places, back } = movePlace(base.places, base.location, { trees, permeable, shade, misters: misters ?? 0, sprinklers: sprinklers ?? 0, area: base.area ?? null }, to);
-    base = { ...base, places, ...(back ? { trees: back.trees, permeable: back.permeable, shade: back.shade, misters: back.misters ?? 0, sprinklers: back.sprinklers ?? 0, area: reanchor(back.area, to), treeCells: null, permeableCells: null, shadeCells: null } : { area: null }) };
+    base = { ...base, places, ...(back ? { trees: back.trees, permeable: back.permeable, shade: back.shade, misters: back.misters ?? 0, sprinklers: back.sprinklers ?? 0, area: reanchor(back.area, to), treeCells: null, permeableCells: null, shadeCells: null } : { area: null, trees: 0, permeable: 0, shade: 0, misters: 0, sprinklers: 0, treeCells: null, permeableCells: null, shadeCells: null }) };
   }
   state = { ...state, urban: { ...base, ...patch } }; emit("urban", quiet);
 }
@@ -85,7 +85,9 @@ export function setVineyard(patch: Partial<LabState["vineyard"]> | ((v: LabState
     const { zones, selected, allZones, irrigation, shade, windbreak } = base;
     const snap: VineSnap = { zones, selected, allZones, area: base.area ?? null, ...(irrigation !== undefined ? { irrigation } : {}), ...(shade !== undefined ? { shade } : {}), ...(windbreak !== undefined ? { windbreak } : {}) };
     const { places, back } = movePlace(base.places, base.location, snap, to);
-    base = { ...base, places, ...(back ? { ...back, area: reanchor(back.area, to) } : { area: null }) };
+    // A place never seen starts with no interventions (each zone keeps its weather), so its feasibility is seen first.
+    const bare = () => { const { irrigation: _i, shade: _s, windbreak: _w, ...rest } = base; return { ...rest, zones: base.zones.map(({ irrigation: _a, shade: _b, windbreak: _c, ...z }) => z), area: null }; };
+    base = back ? { ...base, places, ...back, area: reanchor(back.area, to) } : { ...bare(), places };
   }
   state = { ...state, vineyard: { ...base, ...p } }; emit("vineyard", quiet);
 }

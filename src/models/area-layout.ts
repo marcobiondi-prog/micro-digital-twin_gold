@@ -519,60 +519,32 @@ function tint(hex: string, f: number): string {
 }
 
 /** Pergola wood: posts and beams darker, the slats of the roof lighter. */
-export const PERGOLA_COLORS = { post: "#7a4a22", beam: "#6b4019", slat: "#c99a63" } as const;
+/** The shade sails' colours (the names stay from the pergolas they replaced): steel posts, dark hem, off-white fabric. */
+export const PERGOLA_COLORS = { post: "#9aa3ab", beam: "#3b4148", slat: "#ece3cf" } as const;
 
 /**
  * A pergola over a shade strip (a row rectangle from piazzaLayout) for the 3D views: posts about every 4 m along both
  * long sides (0–2.9 m), a beam on top of each long side (2.8–3.1 m) and a roof of slats across it every 0.7 m
  * (3.1–3.25 m), leaving light between them. Built as slabs like the trees.
  */
-export function pergolaParts(strip: Ring, lite = false): TreePart[] {
-  if (strip.length < 4) return [];
-  const f = frameOf(strip);
-  const [a, b, , d] = strip.map((p) => toXY(f, p)) as Array<[number, number]>;
-  // The strip runs from a to b (its length) and from a to d (its depth).
-  const len = dist(a!, b!), dep = dist(a!, d!);
-  if (len < 1 || dep < 1) return [];
-  const ux = [(b![0] - a![0]) / len, (b![1] - a![1]) / len], vy = [(d![0] - a![0]) / dep, (d![1] - a![1]) / dep];
-  const at = (s: number, t: number): [number, number] => [a![0] + ux[0]! * s + vy[0]! * t, a![1] + ux[1]! * s + vy[1]! * t];
-  const box = (s0: number, s1: number, t0: number, t1: number): Ring => [at(s0, t0), at(s1, t0), at(s1, t1), at(s0, t1)].map(([x, y]) => toLL(f, x, y));
-  const inset = 0.3, parts: TreePart[] = [];
-  // Lite (the photorealistic 3D, where every shape costs): posts about every 8 m and one see-through roof instead of slats.
-  const posts = Math.max(2, Math.round(len / (lite ? 8 : 4)) + 1);
-  for (let i = 0; i < posts; i++) {
-    const s = inset + ((len - 2 * inset) * i) / (posts - 1);
-    for (const t of [inset, dep - inset]) parts.push({ ring: box(s - 0.12, s + 0.12, t - 0.12, t + 0.12), base: 0, height: 2.9, color: PERGOLA_COLORS.post });
+export function pergolaParts(strip: Ring, lite = false, open = 1): TreePart[] {
+  // Side-pole sails in their simple shape: each a slim pole on the shade's edge and its fan of fabric as one sheet,
+  // 3–3,08 m up, as open as the sun says (the realistic ones are views/ar-papillon).
+  if (strip.length < 3) return [];
+  const R = rectFrameOf(strip), vy: [number, number] = [-R.ux[1], R.ux[0]];
+  const ll = (x: number, z: number) => toLL(R.f, R.cx + R.ux[0] * x + vy[0] * z, R.cy + R.ux[1] * x + vy[1] * z);
+  const parts: TreePart[] = [];
+  for (const u of papillonUnits(R.w, R.d)) {
+    const sq = (r: number): Ring => [[-r, -r], [r, -r], [r, r], [-r, r]].map(([a, b]) => ll(u.x + a!, u.z + b!));
+    parts.push({ ring: sq(0.08), base: 0, height: 3.2, color: PERGOLA_COLORS.post });
+    parts.push({ ring: papillonFan(u, open, lite ? 8 : 14).map(([x, z]) => ll(x, z)), base: 3, height: 3.08, color: lite ? `${PERGOLA_COLORS.slat}d9` : PERGOLA_COLORS.slat });
   }
-  for (const t of [inset, dep - inset]) parts.push({ ring: box(0, len, t - 0.14, t + 0.14), base: 2.8, height: 3.1, color: PERGOLA_COLORS.beam });
-  if (lite) { parts.push({ ring: box(0, len, 0, dep), base: 3.1, height: 3.25, color: `${PERGOLA_COLORS.slat}b3` }); return parts; }
-  for (let s = 0.35; s < len - 0.2; s += 0.7) parts.push({ ring: box(s - 0.12, s + 0.12, 0, dep), base: 3.1, height: 3.25, color: PERGOLA_COLORS.slat });
   return parts;
 }
 
-/**
- * A pergola over any outline (a Pergolato zone as drawn): posts at every corner and along every edge (about every 4 m,
- * 8 m when `lite`), a beam along each edge (2.8–3.1 m) and a roof of the outline's very shape (3.1–3.25 m), light wood
- * and see-through so the shade under it shows.
- */
-export function pergolaRingParts(ring: Ring, lite = false): TreePart[] {
-  if (ring.length < 3) return [];
-  const f = frameOf(ring), pts = ring.map((p) => toXY(f, p));
-  const parts: TreePart[] = [];
-  const square = (x: number, y: number, r: number): Ring => [[x - r, y - r], [x + r, y - r], [x + r, y + r], [x - r, y + r]].map(([a, b]) => toLL(f, a!, b!));
-  pts.forEach((a, i) => {
-    const b = pts[(i + 1) % pts.length]!, len = dist(a, b);
-    const n = Math.max(1, Math.round(len / (lite ? 8 : 4)));
-    for (let k = 0; k < n; k++) {
-      const t = k / n;
-      parts.push({ ring: square(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, 0.12), base: 0, height: 2.9, color: PERGOLA_COLORS.post });
-    }
-    if (!lite && len > 0.5) {
-      const nx = (-(b[1] - a[1]) / len) * 0.14, ny = ((b[0] - a[0]) / len) * 0.14;
-      parts.push({ ring: [[a[0] + nx, a[1] + ny], [b[0] + nx, b[1] + ny], [b[0] - nx, b[1] - ny], [a[0] - nx, a[1] - ny]].map(([x, y]) => toLL(f, x!, y!)), base: 2.8, height: 3.1, color: PERGOLA_COLORS.beam });
-    }
-  });
-  parts.push({ ring, base: 3.1, height: 3.25, color: `${PERGOLA_COLORS.slat}b3` });
-  return parts;
+/** The same side-pole sails over a shade zone drawn by hand, laid along its longest edge. */
+export function pergolaRingParts(ring: Ring, lite = false, open = 1): TreePart[] {
+  return pergolaParts(ring, lite, open);
 }
 
 /**
@@ -831,4 +803,117 @@ export function netParts(strip: Ring, lite = false): TreePart[] {
   for (let s2 = 0; s2 <= len + 1e-6; s2 += step) parts.push({ ring: box(s2 - t, s2 + t, 0, dep), base: 2.15, height: 2.2, color: VINE_3D.net });
   for (let t2 = 0; t2 <= dep + 1e-6; t2 += step) parts.push({ ring: box(0, len, t2 - t, t2 + t), base: 2.15, height: 2.2, color: VINE_3D.net });
   return parts;
+}
+
+/**
+ * The shade strips the layout makes (rows of grid cells) joined into blocks, so the sails are cut over a whole block
+ * (at most 6 m each) instead of over every strip: strips touching side by side form one block when together they
+ * fill at least 85 % of its rectangle; any other strip, and a zone of its own shape, stays as it is.
+ */
+export function shadeBlocks(rings: Ring[]): Ring[] {
+  const quads = rings.map((r) => (r.length > 3 && r[0]![0] === r[r.length - 1]![0] && r[0]![1] === r[r.length - 1]![1] ? r.slice(0, -1) : r));
+  const four = quads.filter((q) => q.length === 4);
+  if (four.length < 2) return quads;
+  const o = four[0]![0]!, k = Math.cos((o[0] * Math.PI) / 180);
+  const xy = (p: [number, number]): [number, number] => [(p[1] - o[1]) * 111_320 * k, (p[0] - o[0]) * 111_320];
+  const ll = (x: number, y: number): [number, number] => [o[0] + y / 111_320, o[1] + x / (111_320 * k)];
+  const [a0, b0] = [xy(four[0]![0]!), xy(four[0]![1]!)], [, , , d0] = [0, 0, 0, xy(four[0]![3]!)];
+  const ab = Math.hypot(b0[0] - a0[0], b0[1] - a0[1]), ad = Math.hypot(d0[0] - a0[0], d0[1] - a0[1]);
+  const lng = ab >= ad ? [b0[0] - a0[0], b0[1] - a0[1]] : [d0[0] - a0[0], d0[1] - a0[1]];
+  const L = Math.hypot(lng[0]!, lng[1]!) || 1, u = [lng[0]! / L, lng[1]! / L], v = [-u[1]!, u[0]!];
+  const box = four.map((q) => {
+    const ps = q.map(xy), ss = ps.map((p) => p[0] * u[0]! + p[1] * u[1]!), ts = ps.map((p) => p[0] * v[0]! + p[1] * v[1]!);
+    return { s0: Math.min(...ss), s1: Math.max(...ss), t0: Math.min(...ts), t1: Math.max(...ts) };
+  });
+  const parent = box.map((_, i) => i), find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i]!)));
+  const near = (a: number, b: number, c: number, d: number) => Math.max(a, c) - Math.min(b, d) <= 0.6; // ranges touch or nearly
+  const over = (a: number, b: number, c: number, d: number) => Math.min(b, d) - Math.max(a, c) > 0.5;
+  for (let i = 0; i < box.length; i++) for (let j = i + 1; j < box.length; j++) {
+    const A = box[i]!, B = box[j]!;
+    if ((over(A.s0, A.s1, B.s0, B.s1) && near(A.t0, A.t1, B.t0, B.t1)) || (over(A.t0, A.t1, B.t0, B.t1) && near(A.s0, A.s1, B.s0, B.s1))) parent[find(i)] = find(j);
+  }
+  const groups = new Map<number, number[]>();
+  box.forEach((_, i) => { const r = find(i); groups.set(r, [...(groups.get(r) ?? []), i]); });
+  const out: Ring[] = quads.filter((q) => q.length !== 4);
+  for (const idx of groups.values()) {
+    const bs = idx.map((i) => box[i]!);
+    const s0 = Math.min(...bs.map((b) => b.s0)), s1 = Math.max(...bs.map((b) => b.s1)), t0 = Math.min(...bs.map((b) => b.t0)), t1 = Math.max(...bs.map((b) => b.t1));
+    const filled = bs.reduce((n, b) => n + (b.s1 - b.s0) * (b.t1 - b.t0), 0) / Math.max(1e-6, (s1 - s0) * (t1 - t0));
+    if (idx.length > 1 && filled >= 0.85) {
+      const at = (ss: number, tt: number) => ll(u[0]! * ss + v[0]! * tt, u[1]! * ss + v[1]! * tt);
+      out.push([at(s0, t0), at(s1, t0), at(s1, t1), at(s0, t1)]);
+    } else for (const i of idx) out.push(four[i]!);
+  }
+  return out;
+}
+
+/* ---------------- Shade sails on a side pole, opening like butterfly wings ---------------- */
+
+/**
+ * The shade is made of sails on a single side pole whose two fabric wings open horizontally like a butterfly's and
+ * close back under their arm (the kind of shade the user pointed to): each unit is a pole on one edge of the shade
+ * with a fan of fabric reaching into it. In a w×d rectangle centred on 0 (x along w, z along d) the poles stand on
+ * the long side's edge, in rows of at most 4 m deep, one every ≤ 2·r along the row; r (the wings' reach) covers both
+ * the row's depth and half the spacing, at most 4,2 m. yaw: the direction the wings face (radians, 0 = +z).
+ */
+export type PapillonUnit = { x: number; z: number; yaw: number; r: number };
+export function papillonUnits(w: number, d: number): PapillonUnit[] {
+  const along = w >= d, len = along ? w : d, dep = along ? d : w;
+  if (len < 0.8 || dep < 0.8) return [];
+  const rows = Math.max(1, Math.ceil(dep / 4)), dr = dep / rows;
+  const n = Math.max(1, Math.ceil(len / Math.min(8, 2 * Math.max(dr, 2.2)))), s = len / n;
+  const r = Math.min(4.2, Math.max(dr, s / 2) * 1.04);
+  const out: PapillonUnit[] = [];
+  for (let k = 0; k < rows; k++) for (let i = 0; i < n; i++) {
+    const a = -len / 2 + s * (i + 0.5), b = -dep / 2 + dr * k;
+    out.push(along ? { x: a, z: b, yaw: 0, r } : { x: b, z: a, yaw: Math.PI / 2, r });
+  }
+  return out;
+}
+/**
+ * How open the wings are (0–1) at the simulation's sun: they open with the day's heat and close at dusk, at night and
+ * in winter (motorised, with sun and wind sensors): fully open from 15° of sun, closed under 5°.
+ */
+export function shadeOpenness(sunHeight: number | null | undefined, season?: string): number {
+  if (season === "inverno" || sunHeight == null) return season === "inverno" ? 0 : 1;
+  return Math.max(0, Math.min(1, (sunHeight - 5) / 10));
+}
+/** The fan of one unit in its rectangle's frame: the pole, then the arc of the wings (half-angle 90° · open, at least 4°). */
+export function papillonFan(u: PapillonUnit, open: number, seg = 16): Array<[number, number]> {
+  const half = Math.max(4, 90 * Math.max(0, Math.min(1, open))) * (Math.PI / 180);
+  const pts: Array<[number, number]> = [[u.x, u.z]];
+  for (let i = 0; i <= seg; i++) {
+    const a = u.yaw - half + (2 * half * i) / seg;
+    pts.push([u.x + Math.sin(a) * u.r, u.z + Math.cos(a) * u.r]);
+  }
+  return pts;
+}
+/** A shade ring (a four-cornered strip or block, else its box along its longest edge) as a centred rectangle frame. */
+export function rectFrameOf(ring: Ring): { f: Frame; cx: number; cy: number; ux: [number, number]; w: number; d: number } {
+  const f = frameOf(ring), pts = ring.map((p) => toXY(f, p));
+  let best = 0, ux: [number, number] = [1, 0];
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i]!, b = pts[(i + 1) % pts.length]!, L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (L > best) { best = L; ux = [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; }
+  }
+  const vy: [number, number] = [-ux[1], ux[0]];
+  const ss = pts.map((p) => p[0] * ux[0] + p[1] * ux[1]), ts = pts.map((p) => p[0] * vy[0] + p[1] * vy[1]);
+  const s0 = Math.min(...ss), s1 = Math.max(...ss), t0 = Math.min(...ts), t1 = Math.max(...ts);
+  const cs = (s0 + s1) / 2, ct = (t0 + t1) / 2;
+  return { f, cx: ux[0] * cs + vy[0] * ct, cy: ux[1] * cs + vy[1] * ct, ux, w: s1 - s0, d: t1 - t0 };
+}
+/** The side-pole sails of a shade ring on the map: their fans (lat/lng) and poles, open as the sun says. */
+export function papillonsOf(ring: Ring, open = 1): { fans: Ring[]; poles: LatLng[]; ribs: Ring[] } {
+  if (ring.length < 3) return { fans: [], poles: [], ribs: [] };
+  const R = rectFrameOf(ring), vy: [number, number] = [-R.ux[1], R.ux[0]];
+  // Rectangle frame: x along ux (w), z along vy (d).
+  const ll = (x: number, z: number) => toLL(R.f, R.cx + R.ux[0] * x + vy[0] * z, R.cy + R.ux[1] * x + vy[1] * z);
+  const fans: Ring[] = [], poles: LatLng[] = [], ribs: Ring[] = [];
+  for (const u of papillonUnits(R.w, R.d)) {
+    const fan = papillonFan(u, open);
+    fans.push(fan.map(([x, z]) => ll(x, z)));
+    poles.push(ll(u.x, u.z));
+    for (const k of [1, 5, 9, 13, 17]) { const q = fan[k]; if (q) ribs.push([ll(u.x, u.z), ll(q[0], q[1])]); }
+  }
+  return { fans, poles, ribs };
 }

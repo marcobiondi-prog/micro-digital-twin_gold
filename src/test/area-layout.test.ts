@@ -61,17 +61,19 @@ describe("3D tree", () => {
 });
 
 describe("pergolas", () => {
-  it("raise posts, beams and slats over each shade strip, and keep the trees out from under them", async () => {
+  it("raise a side pole and its fan of fabric for each sail over the shade strips, and keep the trees out from under them", async () => {
     const { pergolaParts, piazzaLayout: layout } = await import("@/models/area-layout");
     const l = layout(ring, 10, 0, 30)!;
     const strips = l.patches.filter((p) => p.kind === "shade");
     const parts = strips.flatMap((p) => pergolaParts(p.ring));
     expect(parts.some((p) => p.base === 0 && p.height > 2.5)).toBe(true);
-    expect(parts.filter((p) => p.base >= 3).length).toBeGreaterThan(strips.length * 3);
+    // As many fans as poles, at least one each strip.
+    expect(parts.filter((p) => p.base >= 3).length).toBe(parts.filter((p) => p.base === 0).length);
+    expect(parts.filter((p) => p.base >= 3).length).toBeGreaterThanOrEqual(strips.length);
     const inShade = (t: [number, number]) => strips.some((p) => ringContains(p.ring, t[0], t[1]));
     expect(l.trees.filter(inShade)).toHaveLength(0);
   });
-  it("cover a Pergolato zone with one pergola of exactly its drawn outline", async () => {
+  it("keep a shade zone drawn by hand exactly, with side-pole sails over it", async () => {
     const { pergolaRingParts, piazzaLayout: layout } = await import("@/models/area-layout");
     const lats = ring.map((p) => p[0]), lngs = ring.map((p) => p[1]);
     const mLat = (Math.min(...lats) + Math.max(...lats)) / 2, mLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
@@ -82,8 +84,10 @@ describe("pergolas", () => {
     expect(exact).toHaveLength(1);
     expect(exact[0]!.ring).toEqual(zone);
     const parts = pergolaRingParts(zone);
-    expect(parts.at(-1)!.ring).toEqual(zone);
-    expect(parts.filter((p) => p.base === 0).length).toBeGreaterThanOrEqual(4);
+    expect(parts.filter((p) => p.base === 0).length).toBeGreaterThanOrEqual(1);
+    // Closed (night, winter), the fan is a thin wedge of the same reach.
+    const closed = pergolaRingParts(zone, false, 0).filter((p) => p.base >= 3);
+    expect(closed.length).toBe(parts.filter((p) => p.base >= 3).length);
   });
 });
 
@@ -109,3 +113,17 @@ describe("zones drawn by hand", () => {
   });
 });
 
+
+describe("side-pole sails", () => {
+  it("open with the day's sun and close at night and in winter", async () => {
+    const { shadeOpenness, papillonUnits } = await import("@/models/area-layout");
+    expect(shadeOpenness(40, "estate")).toBe(1);
+    expect(shadeOpenness(-10, "estate")).toBe(0);
+    expect(shadeOpenness(10, "estate")).toBeCloseTo(0.5);
+    expect(shadeOpenness(40, "inverno")).toBe(0);
+    // A 12 × 4 m block: poles along its long edge, fans reaching across it.
+    const u = papillonUnits(12, 4);
+    expect(u.length).toBeGreaterThanOrEqual(2);
+    expect(u.every((p) => p.z === -2 && p.r >= 4 && p.r <= 4.2)).toBe(true);
+  });
+});

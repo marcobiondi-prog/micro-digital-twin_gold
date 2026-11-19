@@ -108,7 +108,7 @@ export function simThreeLayer(maplibregl: typeof import("maplibre-gl"), origin: 
     if (sim.kind === "piazza") {
       // Every intervention as the AR shows it: the same realistic models, on the map's own spots.
       for (const t of sim.data.trees) all.push(xz(t));
-      addPlan({ kind: "urban", L: sim.data });
+      addPlan({ kind: "urban", L: sim.data, open: sim.shadeOpen ?? 1 });
       for (const p of sim.data.patches) for (const q of p.ring) all.push(xz(q));
     } else {
       // Vines plant by plant along their rows: a twisted trunk, the leafy wall over the wires, a post every ~6 m.

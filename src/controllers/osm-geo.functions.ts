@@ -1,8 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
+import { raceOverpass } from "@/lib/overpass-race";
 import { z } from "zod";
 import type { SearchedLocation } from "@/controllers/geo.functions";
 import { photonSuggestions, photonUrl, type OsmSuggestion } from "@/models/osm-suggest";
-import { OVERPASS_URLS, areaCandidates, placeAreaQuery, placeAreaResult, vineyardAreaQuery, type PlaceAreaResult } from "@/models/place-area";
+import { areaCandidates, placeAreaQuery, placeAreaResult, vineyardAreaQuery, type PlaceAreaResult } from "@/models/place-area";
 
 // Ricerca gratuita per ospiti tramite OpenStreetMap (Nominatim): nessun costo Google.
 const UA = { "User-Agent": "MicroDigitalTwin/1.0", "Accept-Language": "it" };
@@ -60,20 +61,11 @@ export const getPlaceArea = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180), kind: z.enum(["piazza", "vigneto"]).optional() }).parse(d))
   .handler(async ({ data }): Promise<PlaceAreaResult> => {
     const query = data.kind === "vigneto" ? vineyardAreaQuery(data.lat, data.lng) : placeAreaQuery(data.lat, data.lng);
-    // The main server and its mirrors in turn, each given 12 s: a busy one used to leave the pin on the address.
-    for (const url of OVERPASS_URLS) {
-      try {
-        const r = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json", "User-Agent": UA["User-Agent"] },
-          body: new URLSearchParams({ data: query }),
-          signal: AbortSignal.timeout(12000),
-        });
-        if (!r.ok) { console.error(`Place area failed [${r.status}] ${url}`); continue; }
-        const j = (await r.json()) as { elements?: Parameters<typeof areaCandidates>[0] };
-        return placeAreaResult(j.elements ?? [], data.lat, data.lng);
-      } catch (e) { console.error(`Place area failed ${url}`, e); }
-    }
-    // No answer at all: the browser then asks the servers itself (lib/place-area-client).
+    // Every map server at once, 12 s each: the first answer wins (a busy one used to leave the pin on the address).
+    try {
+      const els = await raceOverpass<Parameters<typeof areaCandidates>[0][number]>(query, 12000, { "User-Agent": UA["User-Agent"] });
+      return placeAreaResult(els, data.lat, data.lng);
+    } catch (e) { console.error("Place area failed", e); }
+    // No answer at all: the browser asks the servers itself too (lib/place-area-client).
     throw new Error("place-area-unreachable");
   });

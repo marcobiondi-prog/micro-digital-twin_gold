@@ -2,7 +2,7 @@ import { isKeyRejected, loadGoogleMaps, onKeyRejected } from "@/lib/google-maps-
 import { useModels3D } from "@/lib/use-ios-3d";
 import { densify, tileRing } from "@/models/drape";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { bedParts, BEDS_3D, crownRing, hedgeParts, netParts, vineRowParts, PERGOLA_COLORS, pergolaParts, pergolaRingParts, treeParts } from "@/models/area-layout";
+import { bedParts, BEDS_3D, crownRing, hedgeParts, netParts, vineRowParts, PERGOLA_COLORS, pergolaParts, treeParts } from "@/models/area-layout";
 import { MIST_RADIUS_M, SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, LoaderCircle, Minus, Move, Plus, RotateCcw, X } from "lucide-react";
 import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camera";
@@ -158,10 +158,10 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
       }
       for (const pt of sim.data.patches) {
         if (pt.kind !== "shade" || models) continue;
-        for (const p of pt.exact ? pergolaRingParts(pt.ring, true) : pergolaParts(pt.ring, true)) {
-          if (p.base === 0) part({ ...p, color: "#5c3a1c" });
-          else if (p.height < 3.2) part(p, p.height, "#4a2e14", 1);
-          else part(p, p.height, PERGOLA_COLORS.beam, 3);
+        for (const p of pergolaParts(pt.ring, true, sim.shadeOpen ?? 1)) {
+          // The pole in steel, the fan of fabric with a dark hem.
+          if (p.base === 0) part(p);
+          else part(p, p.height, PERGOLA_COLORS.beam, 2);
         }
       }
       // Each mister: a soft veil of mist on the ground, a slim steel pole with a ring head, and the mist
