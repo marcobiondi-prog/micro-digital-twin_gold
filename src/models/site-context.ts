@@ -338,3 +338,58 @@ export function constraintRows(cs: Constraint[], kind: "piazza" | "vigneto"): Ar
   rows.push(["Verifica", "Indicazione dalle mappe aperte, non un parere: il vincolo certo lo dicono l’Ufficio tecnico del Comune e la Soprintendenza."]);
   return rows;
 }
+
+/* ---------------- Interventions possible with the constraints found ---------------- */
+
+export type Feasible = "libero" | "autorizzazione" | "sconsigliato";
+export type InterventionHint = { id: string; label: string; status: Feasible; why: string };
+export type PiazzaSuggestion = { trees: number; permeable: number; shade: number; misters: number; sprinklers: number };
+export type VineSuggestion = { irrigation: number; shade: number; windbreak: number };
+
+const worst = (a: Feasible, b: Feasible): Feasible => (a === "sconsigliato" || b === "sconsigliato" ? "sconsigliato" : a === "autorizzazione" || b === "autorizzazione" ? "autorizzazione" : "libero");
+
+/**
+ * After the surroundings are read: each intervention with how easy it is under the constraints found (libero: the
+ * Comune's ordinary permits; autorizzazione: Soprintendenza or landscape authorisation; sconsigliato: fixed works that
+ * change the look of a protected space) and why, plus a starting mix sized to the area that leaves out what is
+ * sconsigliato and keeps light what needs an authorisation. Indicative, as the cards say.
+ */
+export function feasibleInterventions(cs: Constraint[], kind: "piazza" | "vigneto", m2: number):
+  { hints: InterventionHint[]; piazza?: PiazzaSuggestion; vine?: VineSuggestion } {
+  const cultural = cs.some((c) => c.id === "culturali" || c.id === "spazio-storico");
+  const landscape = cs.some((c) => !["culturali", "spazio-storico", "archeologia"].includes(c.id));
+  const arch = cs.some((c) => c.id === "archeologia");
+  const dig = (s: Feasible): Feasible => (arch ? worst(s, "autorizzazione") : s);
+  const digWhy = arch ? " Prima di scavare serve la verifica archeologica." : "";
+  const area = Math.max(50, m2);
+  if (kind === "piazza") {
+    const trees: Feasible = dig(cultural ? "autorizzazione" : "libero");
+    const beds: Feasible = dig("libero");
+    const pergola: Feasible = cultural ? "sconsigliato" : landscape ? "autorizzazione" : "libero";
+    const misters: Feasible = cultural || landscape ? "autorizzazione" : "libero";
+    const sprink: Feasible = dig("libero");
+    const hints: InterventionHint[] = [
+      { id: "alberi", label: "Alberi", status: trees, why: (cultural ? "Specie del luogo, con il parere della Soprintendenza: cambiano poco l’aspetto della piazza." : "Specie del luogo: tra gli interventi più facili da far approvare (DPR 31/2017, all. A).") + digWhy },
+      { id: "aiuole", label: "Aiuole e ciottoli", status: beds, why: "Superfici verdi a raso: intervento leggero, di solito senza autorizzazione paesaggistica." + digWhy },
+      { id: "pergolati", label: "Pergolati e coperture", status: pergola, why: cultural ? "Strutture fisse che cambiano l’aspetto di uno spazio tutelato: meglio tende leggere e rimovibili, con progetto e parere." : landscape ? "Strutture fisse in area di paesaggio tutelato: serve l’autorizzazione paesaggistica." : "Nessun vincolo trovato: bastano i permessi ordinari del Comune." },
+      { id: "nebulizzatori", label: "Nebulizzatori", status: misters, why: cultural || landscape ? "Pali fissi: vanno autorizzati; quelli mobili o stagionali sono più semplici." : "Nessun vincolo trovato: permessi ordinari." },
+      { id: "innaffiatoi", label: "Innaffiatoi", status: sprink, why: "Impianto interrato sotto le aiuole: non si vede." + digWhy },
+    ];
+    const n = (per: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Math.round(area / per)));
+    const piazza: PiazzaSuggestion = {
+      trees: trees === "libero" ? n(120, 1, 20) : n(250, 1, 10),
+      permeable: beds === "libero" ? 30 : 20,
+      shade: pergola === "libero" ? 30 : pergola === "autorizzazione" ? 10 : 0,
+      misters: misters === "libero" ? n(400, 1, 6) : 0,
+      sprinklers: n(500, 1, 4),
+    };
+    return { hints, piazza };
+  }
+  const cloth: Feasible = landscape || cultural ? "autorizzazione" : "libero";
+  const hints: InterventionHint[] = [
+    { id: "irrigazione", label: "Irrigazione a goccia", status: dig("libero"), why: "Ali gocciolanti lungo i filari, anche interrate: non cambiano il paesaggio." + digWhy },
+    { id: "teli", label: "Teli d’ombra", status: cloth, why: cloth === "libero" ? "Nessun vincolo trovato: permessi ordinari." : "Strutture alte sopra i filari: di solito serve l’autorizzazione paesaggistica, a volte semplificata (DPR 31/2017, all. B)." },
+    { id: "frangivento", label: "Frangivento", status: "libero", why: landscape || cultural ? "Siepe di specie del luogo: la scelta più leggera; una rete alta andrebbe autorizzata." : "Siepe o rete: nessun vincolo trovato." },
+  ];
+  return { hints, vine: { irrigation: 8, shade: cloth === "libero" ? 30 : 0, windbreak: 40 } };
+}

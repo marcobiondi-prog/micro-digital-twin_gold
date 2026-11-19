@@ -7,7 +7,7 @@ import { samePlace } from "@/models/place-memory";
 import { ringCentroid } from "@/models/place-area";
 import { loadPlaceArea } from "@/lib/place-area-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { prefetchSite } from "@/views/v10/SiteContext";
+import { prefetchSite, SuggestedInterventions } from "@/views/v10/SiteContext";
 import { useServerFn } from "@tanstack/react-start";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { toast } from "sonner";
@@ -396,6 +396,16 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
           setArranging(false);
           toast.success("Elementi nella posizione migliore", { description: kind === "urban" ? "Pergolati, aiuole e alberi dove d’estate batte più sole (ore 10–18), contando palazzi di circa 12 m attorno all’area." : "I teli d’ombra sulle parti di ogni zona dove d’estate batte più sole (ore 10–18)." });
         }} />}
+      {saved && !drawing && (() => {
+        // After the area's surroundings are read: the interventions the constraints allow, put in with one tap.
+        const [sLat, sLng] = ringCentroid(saved.ring).map((v) => Math.round(v * 1e4) / 1e4) as [number, number];
+        return <SuggestedInterventions lat={sLat} lng={sLng} ring={saved.ring} placeName={loc.label ?? ""} kind={kind === "urban" ? "piazza" : "vigneto"} m2={usableM2(saved)}
+          onApply={({ piazza, vine }) => {
+            if (piazza) setUrban({ ...piazza, treeCells: null, permeableCells: null, shadeCells: null });
+            if (vine) setVineyard((v) => ({ zones: v.zones.map((z) => ({ ...z, ...vine })) }));
+            toast.success("Interventi consigliati messi", { description: "Li vedi sulla mappa; in Simula leggi l’effetto e li regoli.", action: { label: "Simula", onClick: () => openSimTab(kind, "simula") } });
+          }} />;
+      })()}
       {saved && !drawing && <ZonesBar area={saved} flow={kind === "urban" ? "piazza" : "vigneto"} onAdd={startZone} onEdit={editZone} onRemove={(id) => setZones(zonesOfArea(saved).filter((z) => z.id !== id))} />}
       </>}
     </div>

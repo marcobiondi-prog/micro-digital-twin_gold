@@ -3,7 +3,7 @@ import { useQuery, type QueryClient } from "@tanstack/react-query";
 import { ChevronDown, ExternalLink, Landmark, LoaderCircle, ShieldAlert, ShieldCheck, Users } from "lucide-react";
 import { loadSiteContext } from "@/lib/site-context-client";
 import { ringCentroid, type Ring } from "@/models/place-area";
-import { crowdEstimate, interventionAdvice, siteConstraints, siteKey, type Constraint, type SiteContext } from "@/models/site-context";
+import { crowdEstimate, feasibleInterventions, interventionAdvice, siteConstraints, siteKey, type Constraint, type Feasible, type PiazzaSuggestion, type SiteContext, type VineSuggestion } from "@/models/site-context";
 import { SEASON_LABEL, type Season } from "@/models/season-climate";
 import { grouped } from "@/models/intervention-cost";
 import { cn } from "@/lib/utils";
@@ -192,5 +192,57 @@ export function FeasibilityStrip({ lat, lng, pending, ring, placeName, sim }: { 
       </span>
       <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
     </button>
+  );
+}
+
+const FEASIBLE_UI: Record<Feasible, { text: string; dot: string; chip: string }> = {
+  libero: { text: "Si può fare", dot: "bg-emerald-400", chip: "bg-emerald-400/15 text-emerald-700 ring-emerald-500/40 dark:text-emerald-300" },
+  autorizzazione: { text: "Con autorizzazione", dot: "bg-amber-400", chip: "bg-amber-400/15 text-amber-700 ring-amber-500/40 dark:text-amber-300" },
+  sconsigliato: { text: "Sconsigliato", dot: "bg-red-400", chip: "bg-red-400/15 text-red-700 ring-red-500/40 dark:text-red-300" },
+};
+
+/**
+ * On the Mappa tab, once the area's surroundings are read: which interventions the constraints found allow (each with
+ * its state and why) and a starting mix sized to the area — what is sconsigliato left out, what needs an authorisation
+ * kept light — put in with one tap and then drawn on the map.
+ */
+export function SuggestedInterventions({ lat, lng, ring, placeName, kind, m2, onApply }: {
+  lat: number; lng: number; ring: Ring; placeName: string; kind: "piazza" | "vigneto"; m2: number;
+  onApply: (s: { piazza?: PiazzaSuggestion | undefined; vine?: VineSuggestion | undefined }) => void;
+}) {
+  const ctx = useSiteContext(lat, lng, false, ring);
+  const cs = useMemo(() => (ctx.data && ctx.data.constraintsOk !== false ? siteConstraints(ctx.data, placeName) : null), [ctx.data, placeName]);
+  const sug = useMemo(() => (cs ? feasibleInterventions(cs, kind, m2) : null), [cs, kind, m2]);
+  const [open, setOpen] = useState<string | null>(null);
+  const mix = sug?.piazza
+    ? [sug.piazza.trees && `${sug.piazza.trees} alberi`, sug.piazza.permeable && `aiuole ${sug.piazza.permeable} %`, sug.piazza.shade && `pergolati ${sug.piazza.shade} %`, sug.piazza.misters && `${sug.piazza.misters} nebulizzatori`, sug.piazza.sprinklers && `${sug.piazza.sprinklers} innaffiatoi`].filter(Boolean).join(" · ")
+    : sug?.vine ? [`irrigazione +${sug.vine.irrigation} %`, sug.vine.shade && `teli ${sug.vine.shade} %`, sug.vine.windbreak && `frangivento ${sug.vine.windbreak} %`].filter(Boolean).join(" · ") : "";
+  return (
+    <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4" aria-label="Interventi possibili">
+      <div className="flex items-center gap-2"><ShieldCheck className="size-5 text-brand-turquoise" aria-hidden="true" /><p className="text-[15px] font-semibold">Interventi possibili</p><span className="ml-auto rounded-full bg-foreground/[0.08] px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">dai vincoli</span></div>
+      {ctx.isPending ? <Searching on text="Guardo i vincoli attorno all’area…" />
+        : !sug ? <Unreadable reason={ctx.error?.message ?? ctx.data?.why} retry={() => void ctx.refetch()} busy={ctx.isFetching} />
+        : <>
+          <p className="text-sm text-muted-foreground">{cs && cs.length ? `Con ${cs.length === 1 ? "il vincolo trovato" : `i ${cs.length} vincoli trovati`} attorno all’area:` : "Nessun vincolo trovato attorno all’area: bastano i permessi ordinari del Comune."}</p>
+          <ul className="space-y-1.5">
+            {sug.hints.map((h) => (
+              <li key={h.id} className="rounded-2xl bg-foreground/[0.04]">
+                <button type="button" aria-expanded={open === h.id} onClick={() => setOpen(open === h.id ? null : h.id)} className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-2xl">
+                  <span className={cn("size-2.5 shrink-0 rounded-full", FEASIBLE_UI[h.status].dot)} aria-hidden="true" />
+                  <span className="min-w-0 flex-1 text-sm font-medium">{h.label}</span>
+                  <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1", FEASIBLE_UI[h.status].chip)}>{FEASIBLE_UI[h.status].text}</span>
+                  <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open === h.id && "rotate-180")} aria-hidden="true" />
+                </button>
+                {open === h.id ? <p className="px-3 pb-3 text-xs text-muted-foreground">{h.why}</p> : null}
+              </li>
+            ))}
+          </ul>
+          {mix ? <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">Proposta per {grouped(Math.round(m2))} m²: <span className="font-semibold text-foreground">{mix}</span>.</p>
+            <button type="button" onClick={() => onApply({ piazza: sug.piazza, vine: sug.vine })} className="inline-flex h-10 items-center rounded-full bg-foreground px-4 text-sm font-semibold text-background outline-none focus-visible:ring-2 focus-visible:ring-ring">Metti gli interventi consigliati</button>
+          </div> : null}
+          <p className="text-[11px] text-muted-foreground">Indicativo: lo confermano l’Ufficio tecnico del Comune e la Soprintendenza.</p>
+        </>}
+    </div>
   );
 }
