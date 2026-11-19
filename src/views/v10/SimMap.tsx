@@ -6,7 +6,8 @@ import { setPinFix, usePinFix } from "@/models/pin-fix";
 import { samePlace } from "@/models/place-memory";
 import { ringCentroid } from "@/models/place-area";
 import { loadPlaceArea } from "@/lib/place-area-client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { prefetchSite } from "@/views/v10/SiteContext";
 import { useServerFn } from "@tanstack/react-start";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { toast } from "sonner";
@@ -113,11 +114,14 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
     const area = r && r.length >= 3 ? { lat: loc.lat, lng: loc.lng, ring: r, ...(saved?.zones?.length ? { zones: saved.zones } : {}) } : null;
     if (kind === "urban") setUrban({ area }); else setVineyard({ area });
   };
+  const qc = useQueryClient();
   const startDrawing = () => { setView("2d"); setDraft(saved?.ring ?? []); setDrawing(true); };
   const finish = () => {
     if (draft.length < 3) { toast("Servono almeno 3 pin per chiudere l’area"); return; }
     const fresh = !saved;
     save(draft); setDrawing(false);
+    // People and constraints start being read right away, so Simula finds them ready.
+    prefetchSite(qc, draft);
     if (fresh) {
       // A new area starts free of interventions: its feasibility is looked at first (Simula), the interventions chosen after.
       if (kind === "urban") setUrban({ trees: 0, permeable: 0, shade: 0, misters: 0, sprinklers: 0, treeCells: null, permeableCells: null, shadeCells: null });

@@ -13,8 +13,25 @@ async function elevationOf(pts: Ring): Promise<number | null> {
   } catch { return null; }
 }
 
-/** One query to every map server at once (see lib/overpass-race). */
-const ask = (query: string, ms = 14000) => raceOverpass<SiteEl>(query, ms);
+type Part = "draws" | "constraints" | "parks";
+const queryOf = (part: Part, lat: number, lng: number, ring?: Ring | null) =>
+  part === "draws" ? siteDrawsQuery(lat, lng, ring) : part === "constraints" ? siteConstraintsQuery(lat, lng, ring) : siteParksQuery(lat, lng, ring);
+
+/**
+ * One part of the surroundings: the phone asks every map server at once and the app's server does the same; the first
+ * answer wins. A round that gets nothing is tried again by itself (up to `tries`), so a slow first answer never shows
+ * as "tempo scaduto": the card keeps searching instead.
+ */
+async function ask(part: Part, lat: number, lng: number, ring: Ring | null | undefined, ms: number, tries: number): Promise<SiteEl[]> {
+  let last: unknown;
+  for (let t = 0; t < tries; t++) {
+    const phone = raceOverpass<SiteEl>(queryOf(part, lat, lng, ring), ms);
+    const server = import("@/controllers/site-context.functions").then((m) => m.getSiteEls({ data: { part, lat, lng, ...(ring ? { ring } : {}) } }));
+    try { return await Promise.any([phone, server]); }
+    catch (e) { last = e instanceof AggregateError ? e.errors[0] : e; if (t < tries - 1) await new Promise((r) => setTimeout(r, 1500)); }
+  }
+  throw last instanceof Error ? last : new Error("nessuna risposta");
+}
 
 /** The surroundings already read for a place, kept on the phone for a week (they change slowly). */
 const KEEP = "mdt-site-v3";
@@ -37,11 +54,9 @@ export async function loadSiteContext(lat: number, lng: number, ring?: Ring | nu
   if (old) return old;
   const elevation = elevationOf(probePoints(lat, lng, ring));
   // The three asked together (the parks one optional and shorter), so the card waits for the slowest, not their sum.
-  const [dr, cr, pr] = await Promise.allSettled([ask(siteDrawsQuery(lat, lng, ring)), ask(siteConstraintsQuery(lat, lng, ring)), ask(siteParksQuery(lat, lng, ring), 9000)]);
-  let draws = dr.status === "fulfilled" ? dr.value : null;
+  const [dr, cr, pr] = await Promise.allSettled([ask("draws", lat, lng, ring, 20000, 3), ask("constraints", lat, lng, ring, 20000, 3), ask("parks", lat, lng, ring, 12000, 1)]);
+  const draws = dr.status === "fulfilled" ? dr.value : null;
   const cons = cr.status === "fulfilled" ? cr.value : null;
-  // The servers answered the constraints but not the counts in time: asked once more by itself, with more time.
-  if (!draws && cons) { try { draws = await ask(siteDrawsQuery(lat, lng, ring), 22000); } catch { /* said below */ } }
   const parks = pr.status === "fulfilled" ? pr.value : [];
   const why = !draws && dr.status === "rejected" ? (dr.reason as Error).message : "", consWhy = cr.status === "rejected" ? (cr.reason as Error).message : "";
   if (!draws && !cons) throw new Error(why || consWhy || "nessuna risposta");

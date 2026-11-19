@@ -17,7 +17,7 @@ const els: SiteEl[] = [
 describe("site context", () => {
   it("asks one query with the places around and the buildings' count", () => {
     const q = siteContextQuery(LAT, LNG);
-    expect(q).toContain("around:300");
+    expect(q).toMatch(/\[bbox:[\d.,-]+\]/);
     expect(q.split("out count").length - 1).toBe(12);
     expect(q).toContain('"heritage"');
     expect(q).toContain("is_in");
@@ -92,10 +92,14 @@ describe("reading the drawn area", () => {
     const d = distToPlace([41.5608, 14.6640], 41.5608, 14.6625, ring);
     expect(d).toBeGreaterThan(70); expect(d).toBeLessThan(95);
   });
-  it("asks round the outline and inside it, and a redrawn area is read again", () => {
+  it("asks on the area's box, cuts long shapes to it, and a redrawn area is read again", () => {
     const q = siteContextQuery(41.5608, 14.6625, ring);
-    expect(q).toContain("poly:\"41.560500 14.662000");
-    expect(q).toMatch(/around:250,41\.560500,14\.662000,.*41\.560500,14\.662000\)/);
+    expect(q).toContain("out tags geom(");
+    expect(q).toContain("is_in(41.560500,14.662000)");
+    // A river 120 m east of the edge counts (≤ 160 m), measured on its nearest point, not its centre far away.
+    const river = { type: "way", tags: { waterway: "river", name: "Biferno" }, center: { lat: 41.58, lon: 14.6645 }, geometry: [{ lat: 41.5608, lon: 14.6644 }, { lat: 41.58, lon: 14.6645 }] };
+    const cs = siteConstraints({ draws: drawsFromCounts([]), els: [river], lat: 41.5608, lng: 14.6625, ring, elevation: 300 }, "Vigneto");
+    expect(cs.some((c) => c.id === "fiumi")).toBe(true);
     expect(siteKey(1, 2, ring)[3]).not.toBe(siteKey(1, 2, ring.map(([a, b]) => [a + 0.0002, b] as [number, number]))[3]);
   });
 });

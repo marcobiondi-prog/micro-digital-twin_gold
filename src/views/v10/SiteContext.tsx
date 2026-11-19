@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, type QueryClient } from "@tanstack/react-query";
 import { ChevronDown, ExternalLink, Landmark, LoaderCircle, ShieldAlert, ShieldCheck, Users } from "lucide-react";
 import { loadSiteContext } from "@/lib/site-context-client";
-import type { Ring } from "@/models/place-area";
+import { ringCentroid, type Ring } from "@/models/place-area";
 import { crowdEstimate, interventionAdvice, siteConstraints, siteKey, type Constraint, type SiteContext } from "@/models/site-context";
 import { SEASON_LABEL, type Season } from "@/models/season-climate";
 import { grouped } from "@/models/intervention-cost";
@@ -19,19 +19,45 @@ function DrawFirst({ sim }: { sim: "urban" | "vineyard" }) {
   );
 }
 
-/** What is around the place (one query per place, kept for the session). */
-export function useSiteContext(lat: number, lng: number, pending = false, ring?: Ring | null) {
-  return useQuery<SiteContext>({
+/** The query of a place's surroundings (shared by the cards and by the map's prefetch, so both hit the same cache). */
+export function siteQuery(lat: number, lng: number, ring?: Ring | null) {
+  return {
     queryKey: siteKey(lat, lng, ring),
-    // Never longer than 45 s, whatever the servers or the phone do: the card then says why, with Riprova.
-    queryFn: () => Promise.race([loadSiteContext(lat, lng, ring), new Promise<never>((_, no) => setTimeout(() => no(new Error("tempo scaduto")), 45_000))]),
-    // Asked even when the phone believes it is offline (a paused query kept the spinner turning for ever).
-    networkMode: "always",
-    enabled: !pending,
+    // Never longer than 75 s (three rounds of the phone and the app's server), whatever the servers or the phone do: the card then says why, with Riprova.
+    queryFn: () => Promise.race([loadSiteContext(lat, lng, ring), new Promise<never>((_, no) => setTimeout(() => no(new Error("i server delle mappe non rispondono")), 75_000))]),
     staleTime: Infinity,
     gcTime: 60 * 60_000,
     retry: 0,
-  });
+    // Asked even when the phone believes it is offline (a paused query kept the spinner turning for ever).
+    networkMode: "always" as const,
+  };
+}
+
+/** What is around the place (one query per place and outline, kept for the session). */
+export function useSiteContext(lat: number, lng: number, pending = false, ring?: Ring | null) {
+  return useQuery<SiteContext>({ ...siteQuery(lat, lng, ring), enabled: !pending });
+}
+
+/** Starts reading the surroundings as soon as an area is drawn on the map, so Simula finds them ready. */
+export function prefetchSite(qc: QueryClient, ring: Ring) {
+  const [lat, lng] = ringCentroid(ring).map((v) => Math.round(v * 1e4) / 1e4) as [number, number];
+  void qc.prefetchQuery(siteQuery(lat, lng, ring));
+}
+
+/** After 12 s of searching, a line saying the map servers are slow and the search goes on (never "tempo scaduto" at once). */
+function useSlow(on: boolean) {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => { if (!on) { setSlow(false); return; } const t = setTimeout(() => setSlow(true), 12_000); return () => clearTimeout(t); }, [on]);
+  return slow;
+}
+function Searching({ text, on }: { text: string; on: boolean }) {
+  const slow = useSlow(on);
+  return (
+    <div className="space-y-1">
+      <p className="inline-flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />{text}</p>
+      {slow ? <p className="text-xs text-muted-foreground">I server delle mappe sono lenti in questo momento: continuo a cercare da solo.</p> : null}
+    </div>
+  );
 }
 
 /** The surroundings could not be read: why, and a button to ask again. */
@@ -74,7 +100,7 @@ export function CrowdCard({ lat, lng, pending, ring, m2, season, hour, shadePlac
     <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4" aria-label="Persone nella piazza">
       <div className="flex items-center gap-2"><Users className="size-5 text-brand-turquoise" aria-hidden="true" /><p className="text-[15px] font-semibold">Persone nella piazza</p><span className="ml-auto rounded-full bg-foreground/[0.08] px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">stima</span></div>
       {pending ? <DrawFirst sim="urban" />
-        : ctx.isPending ? <p className="inline-flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />Guardo cosa c’è intorno alla piazza…</p>
+        : ctx.isPending ? <Searching on text="Guardo cosa c’è intorno alla piazza…" />
         : !crowd ? <Unreadable reason={ctx.error?.message ?? ctx.data?.why} retry={() => void ctx.refetch()} busy={ctx.isFetching} />
         : <>
           <p className="text-sm text-muted-foreground">{SEASON_LABEL[season]}, ore {String(Math.floor(hour)).padStart(2, "0")}:00</p>
@@ -107,7 +133,7 @@ export function ConstraintsCard({ lat, lng, pending, ring, placeName, kind }: { 
     <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4" aria-label="Vincoli dell'area">
       <div className="flex items-center gap-2">{cs && cs.length ? <ShieldAlert className="size-5 text-amber-500" aria-hidden="true" /> : <ShieldCheck className="size-5 text-brand-turquoise" aria-hidden="true" />}<p className="text-[15px] font-semibold">Vincoli dell’area</p><span className="ml-auto rounded-full bg-foreground/[0.08] px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">indicativo</span></div>
       {pending ? <DrawFirst sim={kind === "piazza" ? "urban" : "vineyard"} />
-        : ctx.isPending ? <p className="inline-flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />Cerco beni tutelati e aree vincolate intorno…</p>
+        : ctx.isPending ? <Searching on text="Cerco beni tutelati e aree vincolate intorno…" />
         : !cs ? <Unreadable reason={ctx.error?.message ?? ctx.data?.why} retry={() => void ctx.refetch()} busy={ctx.isFetching} />
         : <>
           {cs.length > 0 && <p className="text-sm">{probable ? `Probabile tutela: ${cs.length === 1 ? "un vincolo" : `${cs.length} vincoli`} da verificare prima degli interventi.` : `Possibili vincoli: ${cs.length === 1 ? "uno" : cs.length} da verificare.`}</p>}

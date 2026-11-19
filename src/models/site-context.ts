@@ -11,7 +11,8 @@ import { ringCentroid, ringContains, type Ring } from "./place-area";
  */
 
 export const DRAW_M = 300; // radius for what draws people
-export type SiteEl = { type: string; id?: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> };
+type LL = { lat: number; lon: number };
+export type SiteEl = { type: string; id?: number; lat?: number; lon?: number; center?: LL; geometry?: Array<LL | null>; members?: Array<{ lat?: number; lon?: number; geometry?: Array<LL | null> }>; tags?: Record<string, string> };
 
 /** At most 40 points of the drawn outline (enough for the map servers' filters, short enough for the query). */
 export function outline(ring?: Ring | null): Ring | null {
@@ -37,30 +38,36 @@ export function zoneFilters(lat: number, lng: number, r: number, ring?: Ring | n
   const pts = [...o, o[0]!];
   return [`(around:${r},${pts.map(([a, b]) => `${a.toFixed(6)},${b.toFixed(6)}`).join(",")})`, `(poly:"${o.map(([a, b]) => `${a.toFixed(6)} ${b.toFixed(6)}`).join(" ")}")`];
 }
+/** The box round the place (the drawn area, else the point) grown by r metres: "S,W,N,E" for the map servers' bbox, their fastest filter. */
+export function placeBox(lat: number, lng: number, r: number, ring?: Ring | null): string {
+  const o = outline(ring) ?? [[lat, lng]];
+  const la = o.map((p) => p[0]), ln = o.map((p) => p[1]);
+  const dLat = r / 111_320, dLng = r / (111_320 * Math.cos((lat * Math.PI) / 180));
+  return [Math.min(...la) - dLat, Math.min(...ln) - dLng, Math.max(...la) + dLat, Math.max(...ln) + dLng].map((v) => v.toFixed(6)).join(",");
+}
 const union = (sels: string[], zs: string[]) => `(${sels.flatMap((s) => zs.map((z) => `${s}${z};`)).join("")})`;
 
 /**
- * Two light queries (asked together). What draws people within 300 m of the place with the buildings' count — round a
- * drawn area, within 300 m less its half-size of its edge (at least 150 m) and inside it, so a small piazza reads the
- * same as before and a large area is not counted twice by crowdEstimate's size factor…
+ * Two light queries (asked together), both on one box — the map servers' fastest filter, so even a busy server answers
+ * in a few seconds (the round-the-outline filters tried before made the first reading time out). What draws people in
+ * the box 300 m round the place (a drawn area's box grown by max(150, 300 − its half-size)), counts only…
  */
 export function siteDrawsQuery(lat: number, lng: number, ring?: Ring | null): string {
-  const z = zoneFilters(lat, lng, ring && outline(ring) ? Math.max(150, Math.round(DRAW_M - areaRadius(ring))) : DRAW_M, ring);
-  const c = (...sels: string[]) => `${union(sels, z)};out count;`;
+  const box = placeBox(lat, lng, ring && outline(ring) ? Math.max(150, Math.round(DRAW_M - areaRadius(ring))) : DRAW_M, ring);
   // Only counts come back (one per kind, in DRAW_ORDER): a few hundred bytes, however busy the place.
-  return `[out:json][timeout:15];`
-    + c(`nwr["amenity"~"^(cafe|restaurant|bar|pub|fast_food|ice_cream)$"]`)
-    + c(`nwr["shop"]`)
-    + c(`nwr["amenity"~"^(school|kindergarten|college|university)$"]`)
-    + c(`nwr["amenity"="place_of_worship"]`)
-    + c(`nwr["amenity"="bus_station"]`, `node["highway"="bus_stop"]`, `node["railway"~"^(station|halt)$"]`)
-    + c(`nwr["tourism"~"^(attraction|museum|gallery|viewpoint)$"]`)
-    + c(`nwr["tourism"~"^(hotel|guest_house|hostel|apartment)$"]`)
-    + c(`nwr["amenity"="marketplace"]`)
-    + c(`nwr["amenity"~"^(townhall|library|theatre|cinema|pharmacy|hospital|clinic)$"]`)
-    + c(`way["building"]`)
-    + c(`nwr["office"]`)
-    + c(`nwr["leisure"~"^(park|playground|garden|pitch|sports_centre)$"]`);
+  return `[out:json][timeout:20][bbox:${box}];`
+    + `nwr["amenity"~"^(cafe|restaurant|bar|pub|fast_food|ice_cream)$"];out count;`
+    + `nwr["shop"];out count;`
+    + `nwr["amenity"~"^(school|kindergarten|college|university)$"];out count;`
+    + `nwr["amenity"="place_of_worship"];out count;`
+    + `(nwr["amenity"="bus_station"];node["highway"="bus_stop"];node["railway"~"^(station|halt)$"];);out count;`
+    + `nwr["tourism"~"^(attraction|museum|gallery|viewpoint)$"];out count;`
+    + `nwr["tourism"~"^(hotel|guest_house|hostel|apartment)$"];out count;`
+    + `nwr["amenity"="marketplace"];out count;`
+    + `nwr["amenity"~"^(townhall|library|theatre|cinema|pharmacy|hospital|clinic)$"];out count;`
+    + `way["building"];out count;`
+    + `nwr["office"];out count;`
+    + `nwr["leisure"~"^(park|playground|garden|pitch|sports_centre)$"];out count;`;
 }
 /** The kinds counted by siteDrawsQuery, in its order. */
 export const DRAW_ORDER = ["food", "shops", "schools", "worship", "transport", "attractions", "hotels", "markets", "services", "buildings", "offices", "leisure"] as const;
@@ -71,17 +78,17 @@ export function drawsFromCounts(els: SiteEl[]): Draws {
   return d;
 }
 /**
- * …and what can bring a constraint close to the place — round a drawn area, measured from its edge and inside it, as
- * the law's distances are: cultural goods, rivers, coast, lakes and woods.
+ * …and what can bring a constraint, in the box 330 m round the place, with its shape cut to that box (geom(box): long
+ * rivers and coasts come back as the few metres that matter): cultural goods, rivers, coast, lakes and woods. Their
+ * distance from the area's edge is measured on the phone (elDist) against the law's distances (CONSTRAINT_M).
  */
 export function siteConstraintsQuery(lat: number, lng: number, ring?: Ring | null): string {
-  const z = (r: number) => zoneFilters(lat, lng, r, ring);
-  return `[out:json][timeout:15];(`
-    + union([`nwr["heritage"]`], z(250)).slice(1, -1) + union([`nwr["historic"]`], z(300)).slice(1, -1)
-    + union([`way["waterway"~"^(river|stream|canal)$"]`], z(160)).slice(1, -1) + union([`way["natural"="coastline"]`], z(320)).slice(1, -1)
-    + union([`way["natural"="water"]["water"~"^(lake|reservoir)$"]`], z(320)).slice(1, -1)
-    + union([`way["landuse"="forest"]`, `way["natural"="wood"]`], z(60)).slice(1, -1) + `);out tags center 300;`;
+  const box = placeBox(lat, lng, 330, ring);
+  return `[out:json][timeout:20][bbox:${box}];(nwr["heritage"];nwr["historic"];way["waterway"~"^(river|stream|canal)$"];way["natural"="coastline"];`
+    + `way["natural"="water"]["water"~"^(lake|reservoir)$"];way["landuse"="forest"];way["natural"="wood"];);out tags geom(${box}) 400;`;
 }
+/** How near each kind must be (m from the area's edge, 0 inside) to count. */
+export const CONSTRAINT_M = { heritage: 250, historic: 300, river: 160, coast: 320, lake: 320, wood: 60 } as const;
 /** Points where the place is read for is_in: its middle and, with a drawn area, four of its corners spread round it. */
 export function probePoints(lat: number, lng: number, ring?: Ring | null): Ring {
   const o = outline(ring);
@@ -121,6 +128,20 @@ export function distToPlace(p: [number, number], lat: number, lng: number, ring?
     const t = L ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / L)) : 0;
     best = Math.min(best, Math.hypot(ax + t * dx, ay + t * dy));
   }
+  return best;
+}
+
+/** How far an element is from the place: its nearest point (shape, members, centre or position); null when it has none (an is_in area: it contains the place). */
+export function elDist(e: SiteEl, lat: number, lng: number, ring?: Ring | null): number | null {
+  const pts: LL[] = [];
+  if (e.lat != null && e.lon != null) pts.push({ lat: e.lat, lon: e.lon });
+  if (e.center) pts.push(e.center);
+  for (const g of e.geometry ?? []) if (g) pts.push(g);
+  for (const m of e.members ?? []) { if (m.lat != null && m.lon != null) pts.push({ lat: m.lat, lon: m.lon }); for (const g of m.geometry ?? []) if (g) pts.push(g); }
+  if (!pts.length) return null;
+  const step = Math.max(1, Math.floor(pts.length / 400));
+  let best = Infinity;
+  for (let i = 0; i < pts.length; i += step) best = Math.min(best, distToPlace([pts[i]!.lat, pts[i]!.lon], lat, lng, ring));
   return best;
 }
 
@@ -222,7 +243,7 @@ const nameOf = (e: SiteEl) => e.tags?.["name"] ?? null;
 export function siteConstraints(ctx: SiteContext, placeName: string): Constraint[] {
   const out: Constraint[] = [];
   const near = (f: (t: Record<string, string>) => boolean) => ctx.els.filter((e) => e.type !== "count" && f(e.tags ?? {}))
-    .map((e) => ({ e, d: (() => { const p = posOf(e); return p ? distToPlace(p, ctx.lat, ctx.lng, ctx.ring) : null; })() }))
+    .map((e) => ({ e, d: (() => { return elDist(e, ctx.lat, ctx.lng, ctx.ring); })() }))
     .sort((a, b) => (a.d ?? 1e9) - (b.d ?? 1e9));
   const listed = (xs: Array<{ e: SiteEl; d: number | null }>) => xs.slice(0, 3).map(({ e, d }) => `${nameOf(e) ?? "bene storico"}${d != null ? ` (${Math.round(d / 10) * 10} m)` : ""}`).join(", ");
 
@@ -245,19 +266,19 @@ export function siteConstraints(ctx: SiteContext, placeName: string): Constraint
   if (arch.length) out.push({ id: "archeologia", level: "possibile", title: "Area archeologica vicina", law: "D.Lgs. 42/2004, art. 10; D.Lgs. 36/2023, art. 41",
     why: `Nel raggio di 300 m: ${listed(arch)}.`, means: "Scavi per alberi, aiuole o tubazioni possono richiedere la verifica preventiva dell’interesse archeologico." });
 
-  const has = (f: (t: Record<string, string>) => boolean) => ctx.els.some((e) => e.type !== "count" && f(e.tags ?? {}));
+  const has = (f: (t: Record<string, string>) => boolean, m: number) => near(f).some((x) => x.d == null || x.d <= m);
   const lscape = "D.Lgs. 42/2004, art. 142 (autorizzazione art. 146)";
   const lsMeans = "Serve l’autorizzazione paesaggistica (Comune o Regione, con il parere della Soprintendenza). Nei centri abitati il vincolo può non valere (art. 142 c. 2): lo dice l’Ufficio tecnico.";
-  if (has((t) => t["natural"] === "coastline")) out.push({ id: "costa", level: "probabile", title: "Fascia costiera", law: `${lscape}, lett. a`, why: "La costa è entro 300 m.", means: lsMeans });
-  if (has((t) => t["natural"] === "water" && /^(lake|reservoir)$/.test(t["water"] ?? ""))) out.push({ id: "laghi", level: "probabile", title: "Sponda di lago", law: `${lscape}, lett. b`, why: "Un lago o un invaso è entro 300 m.", means: lsMeans });
-  const river = near((t) => /^(river|stream|canal)$/.test(t["waterway"] ?? ""));
+  if (has((t) => t["natural"] === "coastline", CONSTRAINT_M.coast)) out.push({ id: "costa", level: "probabile", title: "Fascia costiera", law: `${lscape}, lett. a`, why: "La costa è entro 300 m.", means: lsMeans });
+  if (has((t) => t["natural"] === "water" && /^(lake|reservoir)$/.test(t["water"] ?? ""), CONSTRAINT_M.lake)) out.push({ id: "laghi", level: "probabile", title: "Sponda di lago", law: `${lscape}, lett. b`, why: "Un lago o un invaso è entro 300 m.", means: lsMeans });
+  const river = near((t) => /^(river|stream|canal)$/.test(t["waterway"] ?? "")).filter((x) => x.d == null || x.d <= CONSTRAINT_M.river);
   if (river.length) out.push({ id: "fiumi", level: river.some((x) => x.e.tags?.["waterway"] === "river") ? "probabile" : "possibile", title: "Fascia di fiume o torrente", law: `${lscape}, lett. c`,
     why: `${river[0] && nameOf(river[0].e) ? `${nameOf(river[0].e)}: ` : ""}il corso d’acqua è entro 150 m (vale per quelli iscritti negli elenchi delle acque pubbliche).`, means: lsMeans });
   const alps = ctx.lat > 45.5;
   if (ctx.elevation != null && ctx.elevation > (alps ? 1600 : 1200)) out.push({ id: "montagna", level: "probabile", title: "Montagna oltre i " + (alps ? "1.600" : "1.200") + " m", law: `${lscape}, lett. d`, why: `Il luogo è a circa ${Math.round(ctx.elevation)} m di quota.`, means: lsMeans });
   const park = near((t) => t["boundary"] === "protected_area" || t["leisure"] === "nature_reserve");
   if (park.length) out.push({ id: "parchi", level: "probabile", title: "Parco o riserva", law: `${lscape}, lett. f`, why: `${nameOf(park[0]!.e) ?? "Un’area protetta"} comprende o lambisce il luogo.`, means: `${lsMeans} Nel parco valgono anche le regole del suo ente.` });
-  if (has((t) => t["landuse"] === "forest" || t["natural"] === "wood")) out.push({ id: "boschi", level: "possibile", title: "Bosco vicino", law: `${lscape}, lett. g`, why: "Un bosco è entro 60 m.", means: lsMeans });
+  if (has((t) => t["landuse"] === "forest" || t["natural"] === "wood", CONSTRAINT_M.wood)) out.push({ id: "boschi", level: "possibile", title: "Bosco vicino", law: `${lscape}, lett. g`, why: "Un bosco è entro 60 m.", means: lsMeans });
   return out;
 }
 
