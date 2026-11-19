@@ -82,7 +82,10 @@ export function platformRadius(r: number): number {
   return Math.max(1.1, Math.min(1.7, r * 0.55));
 }
 
-function unit(u: PapillonUnit, h: number, open: number, mats: Mats, out: THREE.Group, put: (m: THREE.Material, g: THREE.BufferGeometry) => void) {
+type Put = (m: THREE.Material, g: THREE.BufferGeometry) => void;
+
+/** The unit's fixed parts (platform, table, bench, trunk, hub); returns what draws its canopy at a given openness. */
+function unit(u: PapillonUnit, h: number, mats: Mats, out: THREE.Group, put: Put): (open: number, put: Put) => void {
   const H = h, x = u.x, z = u.z;
   // The round platform where one can stop and eat: a low stone disc with a wooden deck, a round bench along its
   // edge on slim legs and a round table in the middle on one pedestal.
@@ -113,36 +116,59 @@ function unit(u: PapillonUnit, h: number, open: number, mats: Mats, out: THREE.G
   const ringAt = foot.clone().lerp(top, 0.09); ring.translate(ringAt.x, ringAt.y, ringAt.z); put(mats.satin, ring);
   const disc = new THREE.Mesh(new THREE.CircleGeometry(rp + 0.35, 40), mats.shadow); disc.rotation.x = -Math.PI / 2; disc.position.set(x, 0.004, z); out.add(disc);
   const along = (yy: number) => foot.clone().lerp(top, (yy - foot.y) / (top.y - foot.y));
-  const o = Math.max(0, Math.min(1, open));
-  if (o < 0.08) {
-    // Closed: the canopy furled into a slim sleeve round the top of the trunk, a satin band holding it.
-    const len = Math.max(0.6, u.r * 0.9);
-    const lo = along(hubY - len);
-    put(mats.fabric, rodBetween(lo, top.clone().setY(hubY), 0.15, 0.07, 16));
-    const band = along(hubY - len * 0.55);
-    const b = new THREE.SphereGeometry(0.13, 16, 8); b.scale(1, 0.18, 1); b.translate(band.x, band.y, band.z); put(mats.satin, b);
-    const tip = new THREE.SphereGeometry(0.05, 12, 8); tip.translate(x, hubY + 0.04, z); put(mats.satin, tip);
-    return;
-  }
-  // Open: the hub with its finial and LED ring, the canopy, its ribs with caps and the piping round the edge.
-  const reach = canopyReach(u.r, o);
-  const drop = DROP * u.r + (1 - o) * 0.55 * u.r;          // folding down towards the trunk as it closes
   const hub = new THREE.CylinderGeometry(0.075, 0.09, 0.12, 24); hub.translate(x, hubY, z); put(mats.pole, hub);
   const finial = new THREE.SphereGeometry(0.045, 16, 10); finial.translate(x, hubY + 0.09, z); put(mats.satin, finial);
-  const led = new THREE.TorusGeometry(0.11, 0.012, 8, 32); led.rotateX(Math.PI / 2); led.translate(x, hubY - 0.08, z); put(mats.led, led);
-  const fabricHub = new THREE.Vector3(x, hubY + 0.05, z);
-  const c = canopy(fabricHub, reach, drop);
-  put(mats.fabric, c.geo);
-  const strutFrom = along(hubY - 0.55 - (1 - o) * 0.3);
-  for (const line of c.ribs) {
-    put(mats.pole, tube([fabricHub.clone().setY(fabricHub.y - 0.03), ...line], 0.011, 5));
-    const tip = line[line.length - 1]!;
-    const cap = new THREE.SphereGeometry(0.02, 10, 6); cap.translate(tip.x, tip.y, tip.z); put(mats.satin, cap);
-    // A slim strut from the trunk to the rib's middle, as a real canopy is held.
-    put(mats.pole, tube([strutFrom, line[Math.floor(line.length * 0.45)]!], 0.008, 4));
-  }
-  put(mats.trim, tube(c.edge, 0.009, 4, true));
+  return (open: number, put: Put) => {
+    const o = Math.max(0, Math.min(1, open));
+    if (o < 0.08) {
+      // Closed: the canopy furled into a slim sleeve round the top of the trunk, a satin band holding it.
+      const len = Math.max(0.6, Math.min(1.5, u.r * 0.5));
+      const lo = along(hubY - len);
+      put(mats.fabric, rodBetween(lo, top.clone().setY(hubY), 0.15, 0.07, 16));
+      const band = along(hubY - len * 0.55);
+      const b = new THREE.SphereGeometry(0.13, 16, 8); b.scale(1, 0.18, 1); b.translate(band.x, band.y, band.z); put(mats.satin, b);
+      return;
+    }
+    // Open: the hub with its finial and LED ring, the canopy, its ribs with caps and the piping round the edge.
+    const reach = canopyReach(u.r, o);
+    const drop = DROP * u.r + (1 - o) * 0.55 * u.r;          // folding down towards the trunk as it closes
+    const led = new THREE.TorusGeometry(0.11, 0.012, 8, 32); led.rotateX(Math.PI / 2); led.translate(x, hubY - 0.08, z); put(mats.led, led);
+    const fabricHub = new THREE.Vector3(x, hubY + 0.05, z);
+    const c = canopy(fabricHub, reach, drop);
+    put(mats.fabric, c.geo);
+    const strutFrom = along(hubY - 0.55 - (1 - o) * 0.3);
+    for (const line of c.ribs) {
+      put(mats.pole, tube([fabricHub.clone().setY(fabricHub.y - 0.03), ...line], 0.011, 5));
+      const tip = line[line.length - 1]!;
+      const cap = new THREE.SphereGeometry(0.02, 10, 6); cap.translate(tip.x, tip.y, tip.z); put(mats.satin, cap);
+      // A slim strut from the trunk to the rib's middle, as a real canopy is held.
+      put(mats.pole, tube([strutFrom, line[Math.floor(line.length * 0.45)]!], 0.008, 4));
+    }
+    put(mats.trim, tube(c.edge, 0.009, 4, true));
+  };
 }
+
+const MERGE = (bins: Map<THREE.Material, THREE.BufferGeometry[]>, into: THREE.Group) => {
+  for (const [mat, list] of bins) {
+    const merged = mergeGeometries(list, false);
+    if (merged) into.add(new THREE.Mesh(merged, mat));
+  }
+};
+function binner(bins: Map<THREE.Material, THREE.BufferGeometry[]>): Put {
+  return (m, g) => {
+    if (!g.getAttribute("normal")) g.computeVertexNormals();
+    const n = g.index ? g.toNonIndexed() : g;
+    const c = new THREE.BufferGeometry();
+    c.setAttribute("position", n.getAttribute("position"));
+    c.setAttribute("normal", n.getAttribute("normal"));
+    const l = bins.get(m) ?? []; l.push(c); bins.set(m, l);
+  };
+}
+
+/** How fast the canopy moves when it opens or closes by itself: the whole way in about 4 s. */
+const TRAVEL_S = 4;
+
+type PapillonState = { open: number; built: number; target: number; build: (o: number) => void; onFrame?: (() => void) | undefined; last: number };
 
 export function realPapillons(def: { w: number; d: number; h?: number; open?: number }): THREE.Group {
   const out = new THREE.Group();
@@ -157,19 +183,73 @@ export function realPapillons(def: { w: number; d: number; h?: number; open?: nu
     led: new THREE.MeshStandardMaterial({ color: "#fff3d6", emissive: "#ffd39a", emissiveIntensity: 1.1, roughness: 0.4 }),
     shadow: new THREE.MeshBasicMaterial({ color: "#000", transparent: true, opacity: 0.28, depthWrite: false }),
   };
-  const bins = new Map<THREE.Material, THREE.BufferGeometry[]>();
-  const put = (m: THREE.Material, g: THREE.BufferGeometry) => {
-    if (!g.getAttribute("normal")) g.computeVertexNormals();
-    const n = g.index ? g.toNonIndexed() : g;
-    const c = new THREE.BufferGeometry();
-    c.setAttribute("position", n.getAttribute("position"));
-    c.setAttribute("normal", n.getAttribute("normal"));
-    const l = bins.get(m) ?? []; l.push(c); bins.set(m, l);
+  const fixed = new Map<THREE.Material, THREE.BufferGeometry[]>();
+  const canopies = papillonUnits(Math.max(1, def.w), Math.max(1, def.d)).map((u) => unit(u, def.h ?? 3.2, mats, out, binner(fixed)));
+  MERGE(fixed, out);
+  // The canopies in a group of their own, drawn again when the openness changes (opening or closing by itself).
+  const canopy = new THREE.Group();
+  canopy.name = "papillon-canopy";
+  out.add(canopy);
+  const build = (o: number) => {
+    for (const c of [...canopy.children]) { canopy.remove(c); (c as THREE.Mesh).geometry?.dispose(); }
+    const bins = new Map<THREE.Material, THREE.BufferGeometry[]>();
+    const put = binner(bins);
+    for (const draw of canopies) draw(o, put);
+    MERGE(bins, canopy);
+    // Shadows as the fixed parts were set to cast them (castShadows runs after the model is built).
+    const cast = out.children.some((c) => c !== canopy && (c as THREE.Mesh).isMesh && c.castShadow && !((c as THREE.Mesh).material as THREE.Material).transparent);
+    for (const c of canopy.children) c.castShadow = cast;
   };
-  for (const u of papillonUnits(Math.max(1, def.w), Math.max(1, def.d))) unit(u, def.h ?? 3.2, def.open ?? 1, mats, out, put);
-  for (const [mat, list] of bins) {
-    const merged = mergeGeometries(list, false);
-    if (merged) out.add(new THREE.Mesh(merged, mat));
-  }
+  const start = Math.max(0, Math.min(1, def.open ?? 1));
+  build(start);
+  const state: PapillonState = { open: start, built: start, target: start, build, last: 0 };
+  out.userData["papillon"] = state;
+  // The animation steps itself whenever the model is drawn (the first fixed mesh's onBeforeRender), so any scene that
+  // renders it — the AR view, the map's 3D — shows the canopy opening or closing without a loop of its own.
+  const driver = out.children.find((c) => (c as THREE.Mesh).isMesh) as THREE.Mesh | undefined;
+  if (driver) driver.onBeforeRender = () => stepPapillon(state);
   return out;
+}
+
+function stepPapillon(s: PapillonState) {
+  const now = performance.now();
+  const dt = s.last ? Math.min(0.1, (now - s.last) / 1000) : 0;
+  s.last = now;
+  if (s.open === s.target) return;
+  const step = dt / TRAVEL_S;
+  s.open = s.open < s.target ? Math.min(s.target, s.open + step) : Math.max(s.target, s.open - step);
+  if (Math.abs(s.open - s.built) >= 0.025 || s.open === s.target) { s.build(s.open); s.built = s.open; }
+  s.onFrame?.();
+}
+
+/**
+ * Makes every canopy under `root` open or close by itself towards `target` (0 closed – 1 open), moving smoothly
+ * (about 4 s the whole way). onFrame is called at each step (the map's 3D asks for a repaint there).
+ * Returns how many canopies will move.
+ */
+export function setShadeTarget(root: THREE.Object3D, target: number, onFrame?: () => void): number {
+  let n = 0;
+  const t = Math.max(0, Math.min(1, target));
+  root.traverse((o) => {
+    const s = o.userData?.["papillon"] as PapillonState | undefined;
+    if (!s) return;
+    if (Math.abs(s.target - t) > 1e-3 || Math.abs(s.open - t) > 1e-3) n++;
+    s.target = t; s.onFrame = onFrame; s.last = 0;
+    onFrame?.();
+  });
+  return n;
+}
+
+/** The canopies' openness under the real sun now over (lat, lng): open from 15° of sun, closed under 5° and in winter. */
+export function realShadeOpen(lat: number, lng: number, date = new Date()): number {
+  const rad = Math.PI / 180;
+  const start = Date.UTC(date.getUTCFullYear(), 0, 0);
+  const day = (date.getTime() - start) / 86400000;
+  const decl = 23.44 * rad * Math.sin(((2 * Math.PI) / 365) * (284 + day));
+  const solar = date.getUTCHours() + date.getUTCMinutes() / 60 + lng / 15;
+  const h = 15 * (solar - 12) * rad, phi = lat * rad;
+  const sun = Math.asin(Math.sin(phi) * Math.sin(decl) + Math.cos(phi) * Math.cos(decl) * Math.cos(h)) / rad;
+  const m = date.getMonth();
+  const winter = lat >= 0 ? m === 11 || m <= 1 : m >= 5 && m <= 7;
+  return winter ? 0 : Math.max(0, Math.min(1, (sun - 5) / 10));
 }
