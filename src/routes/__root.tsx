@@ -462,8 +462,8 @@ function SideNav() {
           const lock = !guest && (it.to === "/urbano" || it.to === "/vigneto") && proId !== undefined && !unlocks(proId, it.to === "/urbano" ? "urban" : "vineyard");
           return (
             <Link key={it.to} to={it.to} aria-current={on ? "page" : undefined} replace={pathname !== "/"}
-              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${on ? "bg-foreground/10 font-medium text-foreground shadow-[inset_3px_0_0_#2dd4bf]" : "text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"}`}>
-              <it.I className="size-5 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${on ? "bg-foreground/10 font-medium text-foreground" : "text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"}`}>
+              <span className="nav-orb">{on && <><span className="nav-orb-glow" aria-hidden="true" /><span className="nav-orb-ring" aria-hidden="true" /></>}<it.I className="size-5 shrink-0" strokeWidth={1.8} aria-hidden="true" /></span>
               <span className="min-w-0 truncate">{names[i]?.l ?? it.l}</span>
               {lock && <Lock className="ml-auto size-3.5" aria-label="bloccato" />}
             </Link>
@@ -489,8 +489,8 @@ function TabletRail() {
     const lock = !guest && (it.to === "/urbano" || it.to === "/vigneto") && proId !== undefined && !unlocks(proId, it.to === "/urbano" ? "urban" : "vineyard");
     return (
       <Link key={it.to} to={it.to} aria-current={on ? "page" : undefined} replace={pathname !== "/"} aria-label={it.l}
-        className={`relative flex w-16 flex-col items-center gap-1 rounded-2xl px-1 py-2 text-[11px] leading-tight outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${on ? "bg-foreground/10 font-semibold text-foreground shadow-[inset_3px_0_0_#2dd4bf]" : "text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"}`}>
-        <it.I className="size-6 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+        className={`relative flex w-16 flex-col items-center gap-1 rounded-2xl px-1 py-2 text-[11px] leading-tight outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${on ? "bg-foreground/10 font-semibold text-foreground" : "text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"}`}>
+        <span className="nav-orb mb-1 mt-1">{on && <><span className="nav-orb-glow" aria-hidden="true" /><span className="nav-orb-ring" aria-hidden="true" /></>}<it.I className="size-6 shrink-0" strokeWidth={1.8} aria-hidden="true" /></span>
         <span className="w-full truncate text-center">{it.l}</span>
         {lock && <Lock className="absolute right-1.5 top-1.5 size-3" aria-label="bloccato" />}
       </Link>
@@ -801,7 +801,7 @@ function RootComponent() {
 
       <div className={intro ? undefined : "md:pl-20 lg:pl-60"}>
       <main id="main-content" tabIndex={-1} className={intro ? "focus:outline-none" : "app-main mx-auto max-w-7xl px-4 pb-8 pt-6 focus:outline-none sm:pt-8 md:max-w-none md:px-6"}><Outlet /></main><Toaster /><UpdatePill />
-      {!intro && <footer className="mx-auto max-w-7xl px-4 md:max-w-none md:px-6 pb-[calc(6.5rem+env(safe-area-inset-bottom))] text-sm leading-relaxed text-muted-foreground sm:pb-10 sm:text-[15px]">
+      {!intro && <footer className="mx-auto max-w-7xl px-4 md:max-w-none md:px-6 md:text-center pb-[calc(6.5rem+env(safe-area-inset-bottom))] text-sm leading-relaxed text-muted-foreground sm:pb-10 sm:text-[15px]">
         I risultati del simulatore sono indicativi e non sostituiscono modelli fisici calibrati.
       </footer>}
       </div>

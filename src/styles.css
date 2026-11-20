@@ -2402,3 +2402,20 @@ html[data-sys-camera] nav {
 
 
 
+
+/* Side menu and tablet rail: the open page's icon inside a turning turquoise ring (like the open pile's). */
+.nav-orb { position: relative; display: grid; place-items: center; flex-shrink: 0; }
+.nav-orb-ring {
+  position: absolute; inset: -7px; border-radius: 9999px; pointer-events: none; padding: 2.5px;
+  background: conic-gradient(from var(--pile-angle), rgb(45 212 191 / 0.45) 0deg, rgb(45 212 191) 70deg, #fff 95deg, rgb(45 212 191) 120deg, rgb(45 212 191 / 0.45) 190deg, rgb(45 212 191 / 0.45) 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  box-shadow: 0 0 14px 1px rgb(45 212 191 / 0.35);
+  animation: pile-turn 2.6s linear infinite, nav-orb-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.nav-orb-glow { position: absolute; inset: -7px; border-radius: 9999px; pointer-events: none; animation: pile-breathe 2.6s ease-in-out infinite, nav-orb-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both; box-shadow: 0 0 18px 2px rgb(45 212 191 / 0.3); }
+@keyframes nav-orb-in { from { opacity: 0; transform: scale(0.4) rotate(-90deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .nav-orb-ring { animation: none; background: rgb(45 212 191); }
+  .nav-orb-glow { animation: none; }
+}
