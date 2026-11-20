@@ -533,6 +533,17 @@ function RootComponent() {
   usePermissions(true);
   // Position and camera revoked inside the app are refused whoever asks for them.
   useEffect(() => { installAppPermissionGuards(); installGoogleUsageSync(); }, []);
+  // The page's width without the scrollbar (100vw counts it on computers): the tab bars that run to the screen's
+  // right edge use it, so they never go past it nor under the scrollbar.
+  useEffect(() => {
+    const root = document.documentElement;
+    const set = () => root.style.setProperty("--page-w", `${root.clientWidth}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(root);
+    window.addEventListener("resize", set);
+    return () => { ro.disconnect(); window.removeEventListener("resize", set); };
+  }, []);
   // The index's preloader goes once the app has started and its fonts are in.
   useEffect(() => {
     const fonts = (document as Document & { fonts?: { ready: Promise<unknown> } }).fonts?.ready ?? Promise.resolve();
