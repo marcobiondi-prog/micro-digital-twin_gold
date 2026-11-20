@@ -123,7 +123,7 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, medi
         { id: "mappa", always: true, content: (
           <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] items-start gap-6">
             <div className="no-scrollbar sticky top-[calc(var(--nav-h)+4.5rem)] max-h-[calc(100vh-var(--nav-h)-5.5rem)] overflow-y-auto overscroll-contain rounded-3xl"><SimMap kind={kind} /></div>
-            <div className="min-w-0 space-y-6">{simula}<section id={simMediaId(kind)} aria-label="Foto e video" className="fuse-canvas scroll-mt-[calc(var(--nav-h)+5rem)] rounded-t-3xl px-5 pt-4 pb-6">{media}</section></div>
+            <div className="desk-sim min-w-0 space-y-6">{simula}<section id={simMediaId(kind)} aria-label="Foto e video" className="fuse-canvas scroll-mt-[calc(var(--nav-h)+5rem)] rounded-t-3xl px-5 pt-4 pb-6">{media}</section></div>
           </div>) },
         { id: "sensori", content: sensori },
       ]} /> : <Panels value={tab} panels={[

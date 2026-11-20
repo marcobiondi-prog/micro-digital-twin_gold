@@ -2420,3 +2420,9 @@ html[data-sys-camera] nav {
   .nav-orb-ring { animation: none; background: rgb(45 212 191); }
   .nav-orb-glow { animation: none; }
 }
+
+/* Desktop "Mappa e simulazione": the simulation's column is a little see-through, so the header's blue glow shows through. */
+.desk-sim .fuse-canvas {
+  background: linear-gradient(180deg, color-mix(in oklab, var(--card) 38%, transparent) 0%, color-mix(in oklab, var(--card) 24%, transparent) 45%, color-mix(in oklab, var(--background) 20%, transparent) 100%);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}

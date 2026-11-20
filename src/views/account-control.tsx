@@ -568,14 +568,14 @@ export function AccountControl() {
             </div>
           );
         })() : (<>
-        <DialogHeader className="border-b px-6 py-5 text-left">
-          <div className="mb-2">{avatar("size-10")}</div>
+        <DialogHeader className="border-b px-6 py-5 text-left md:grid md:grid-cols-[auto_minmax(0,1fr)] md:gap-x-4 md:gap-y-0.5 md:space-y-0 md:px-8 md:py-4">
+          <div className="mb-2 md:row-span-3 md:mb-0 md:self-center">{avatar("size-10")}</div>
           <DialogTitle className="text-xl">Account</DialogTitle>
           <DialogDescription>{account ? account.email : demo ? "Accesso simulato (solo anteprima)" : "Accedi o continua come ospite."}</DialogDescription>
           {/* The plan in use, at a glance (Premium is free with an account). */}
           <p className="pt-1"><span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${premiumPlan ? "bg-primary text-primary-foreground" : "bg-foreground/[0.08] text-foreground"}`}>Piano {premiumPlan ? "Premium" : "Free"}</span></p>
         </DialogHeader>
-        <div className="space-y-6 px-6 py-6 md:grid md:grid-cols-2 md:items-start md:gap-x-8 md:gap-y-6 md:space-y-0 md:px-8">
+        <div className="space-y-6 px-6 py-6 md:grid md:grid-cols-2 md:items-start md:gap-x-8 md:gap-y-5 md:space-y-0 md:px-8 md:py-5">
           <div className="min-w-0 space-y-6">
           {/* The professional profile first: the bottom bar's profile badge opens this panel. Who is identified (one at a time), and the identification pages that open each simulation. */}
           <section aria-label="Profilo professionale" className="rounded-3xl bg-foreground/[0.05] px-5 py-3">
@@ -615,6 +615,13 @@ export function AccountControl() {
               <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" tabIndex={-1} aria-label="Seleziona immagine account" onChange={chooseFile} />
             </div>
           </section>}
+          {/* Computers: the device cache and "Piani e informazioni" sit in the left column, so the two columns end level. */}
+          {account && !account.id?.startsWith("local-") && !account.guest && !askSignIn && <div className="hidden md:block"><DeviceCacheCard /></div>}
+          <div className="hidden md:block"><button type="button" onClick={() => openPage("menu")} className="flex w-full items-center gap-3 rounded-3xl bg-foreground/[0.05] px-5 py-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <span className="min-w-0 flex-1"><span className="block text-base font-semibold">Piani e informazioni</span><span className="block text-sm text-muted-foreground">Piano {premiumPlan ? "Premium" : "Free"} · Chi siamo · Aiuto · Privacy · Legale</span></span>
+              <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            </button>
+          </div>
           </div>
           <div className="min-w-0">
           {demo && !account ? (
@@ -633,7 +640,7 @@ export function AccountControl() {
               </div>
               {cloudAccount && <StorageBar used={usage.used} share={usage.share} files={usage.files} google={usage.google} />}
               {cloudAccount && <Suspense fallback={null}><AccountDevices /></Suspense>}
-              <DeviceCacheCard />
+              <div className={account.guest ? "" : "md:hidden"}><DeviceCacheCard /></div>
               {account.guest && <Button variant="outline" className="w-full" onClick={() => { sessionStorage.removeItem(guestKey); setAccount(null); changeMode("signup"); }}>Crea un account</Button>}
               {account && notice && <p role="status" className="text-sm text-muted-foreground">{notice}</p>}
               {isAdmin && <Button asChild variant="outline" className="w-full justify-start"><Link to="/admin" onClick={() => setOpen(false)}><ShieldCheck />Pannello di controllo</Link></Button>}
@@ -678,7 +685,7 @@ export function AccountControl() {
           )}
           </div>
           {/* Plans, project, help, privacy and legal live on their own page in the panel: one row here opens it. */}
-          <div className="border-t pt-6 md:col-span-2">
+<div className="border-t pt-6 md:hidden">
             <button type="button" onClick={() => openPage("menu")} className="flex w-full items-center gap-3 rounded-3xl bg-foreground/[0.05] px-5 py-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <span className="min-w-0 flex-1"><span className="block text-base font-semibold">Piani e informazioni</span><span className="block text-sm text-muted-foreground">Piano {premiumPlan ? "Premium" : "Free"} · Chi siamo · Aiuto · Privacy · Legale</span></span>
               <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -686,7 +693,7 @@ export function AccountControl() {
           </div>
           <div className="md:col-span-2"><AppVersion /></div>
           {/* Twin closes the panel: still (no animation, no name), smiling. */}
-          <TwinStill className="mx-auto block h-16 w-auto md:col-span-2" />
+          <TwinStill className="mx-auto block h-16 w-auto md:col-span-2 md:hidden" />
         </div>
         </>)}
       </DialogContent>
