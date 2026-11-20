@@ -333,7 +333,7 @@ function UrbanRecords() {
                 const a = approvals[e] ?? EMPTY_APPROVAL;
                 return (
                    <li key={e} className="dashboard-tile min-w-0 rounded-xl bg-muted/40 p-2.5 text-xs" data-testid="external-approval">
-                     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                     <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
                        <span className="min-w-0 font-semibold">{e}</span>
                       <span className={`font-semibold ${a.status === "approvato" ? "text-ok" : a.status === "respinto" ? "text-danger" : "text-muted-foreground"}`}>
                         {a.status === "approvato" ? `Approvato${a.date ? ` ${a.date}` : ""}` : a.status === "respinto" ? `Respinto${a.date ? ` ${a.date}` : ""}` : "In attesa"}
@@ -938,7 +938,7 @@ function Dashboard() {
           <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
         </Link>
       ) : (
-        <div className="sticky top-[var(--nav-h)] transition-[top] duration-300 z-[999999998] isolate mx-[calc(50%-50vw)] mb-5 mt-3 min-w-0 bg-transparent px-0 py-2 sm:px-[calc(50vw-50%)] md:mx-0 md:px-0 backdrop-blur-xl sm:mb-6">
+        <div className="sticky top-[var(--nav-h)] transition-[top] duration-300 z-[999999998] isolate mx-[calc(50%-50vw)] mb-5 mt-3 min-w-0 bg-transparent px-0 py-2 sm:px-[calc(50vw-50%)] md:mx-[calc(50%-50vw+2.5rem)] md:px-[calc(50vw-2.5rem-50%)] lg:mx-[calc(50%-50vw+7.5rem)] lg:px-[calc(50vw-7.5rem-50%)] backdrop-blur-xl sm:mb-6">
           <TabRow fill label="Dashboard" items={[{ id: "Piazza", label: "Piazza", icon: Building2 }, { id: "Vigneto", label: "Vigneto", icon: Grape }]} value={t} onChange={setT} />
         </div>
       )}

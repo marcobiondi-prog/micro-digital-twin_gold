@@ -345,6 +345,9 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
       <CrowdCard lat={site[0]} lng={site[1]} pending={!drawnAreaFor(urban.area, urban.location)} ring={drawnAreaFor(urban.area, urban.location)?.ring} m2={m2} season={season} hour={sum.hour} shadePlaces={Math.floor(sum.shadeM2 / 2)} />
       <ConstraintsCard lat={site[0]} lng={site[1]} pending={!drawnAreaFor(urban.area, urban.location)} ring={drawnAreaFor(urban.area, urban.location)?.ring} placeName={urban.location.label ?? ""} kind="piazza" />
 
+      </div>
+      {/* The records (history, register, send, Premium) run across both columns: in a half column the approvals were squeezed. */}
+      <div className="min-w-0 space-y-8 lg:col-span-2">
       {records}
       </div>
     </div>
@@ -412,6 +415,9 @@ export function VineDashboard({ records }: { records: ReactNode }) {
       {/* What may protect the vineyard's landscape (as in the simulation). */}
       <ConstraintsCard lat={vSite[0]} lng={vSite[1]} pending={!drawnAreaFor(vine.area, vine.location)} ring={drawnAreaFor(vine.area, vine.location)?.ring} placeName={vine.location.label ?? ""} kind="vigneto" />
 
+      </div>
+      {/* The records (history, register, send, Premium) run across both columns: in a half column the approvals were squeezed. */}
+      <div className="min-w-0 space-y-8 lg:col-span-2">
       {records}
       </div>
     </div>
