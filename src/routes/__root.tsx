@@ -9,13 +9,14 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useHomeFocus } from "@/lib/home-focus";
-import { introSeen } from "@/lib/intro-seen";
+import { introSeen, markIntroSeen } from "@/lib/intro-seen";
 import { THEME_DARK, ThemeToggle, themeBootScript } from "@/views/theme-toggle";
 import logoCompact from "@/assets/climate-twin-logo-compact.png";
 import { AccountControl } from "@/views/account-control";
 import { CameraDockButton, CameraSheet } from "@/views/CameraDock";
 import { PermissionsSheet } from "@/views/v10/Permissions";
 // The sector page is loaded after the first paint (it covers the app only with no profile, or when asked).
+const DesktopTour = lazy(() => import("@/views/v10/DesktopTour"));
 const SectorGate = lazy(() => import("@/views/v10/SectorGate").then((m) => ({ default: m.SectorGate })));
 import { syncAppOrientation } from "@/lib/ar-orientation";
 import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
@@ -728,6 +729,8 @@ function RootComponent() {
     if (params.has("scenario") || params.has("rivedi")) return;
     // After the tutorial a fresh open lands on the Mappa tab of the profile's simulation (the agronomist's vineyard,
     // otherwise the piazza).
+    // On a computer the tutorial page is skipped: its speech-bubble tour starts over the simulation instead (DesktopTour).
+    if (!introSeen() && window.matchMedia("(min-width: 1024px)").matches) markIntroSeen();
     const seen = introSeen(), vine = getProId()?.kind === "agronomo";
     const home = seen ? (vine ? "/vigneto" : "/urbano") : "/";
     if (seen) openSimTab(vine ? "vineyard" : "urban", "mappa");
@@ -788,7 +791,7 @@ function RootComponent() {
           <div className="flex min-w-0 items-center"><AccountControl /></div>
           <div className="flex shrink-0 items-center gap-2 md:flex-col lg:flex-row">
             {/* "i" shows the tutorial again (only the tutorial: it ends by coming back here). */}
-            <button type="button" onClick={() => void navigate({ to: "/?rivedi=1" as any })} aria-label="Come funziona" title="Come funziona"
+            <button type="button" onClick={() => { if (window.matchMedia("(min-width: 1024px)").matches) window.dispatchEvent(new CustomEvent("mdt-desk-tour")); else void navigate({ to: "/?rivedi=1" as any }); }} aria-label="Come funziona" title="Come funziona"
               className="grid size-9 shrink-0 place-items-center rounded-full border border-foreground/15 bg-foreground/[0.06] text-foreground outline-none transition-colors hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring sm:size-10">
               <Info className="size-4 sm:size-[1.15rem]" aria-hidden="true" />
             </button>
@@ -809,6 +812,8 @@ function RootComponent() {
       <CameraSheet />
       <PermissionsSheet />
       <Suspense fallback={null}><SectorGate /></Suspense>
+      {/* Desktop: the tutorial as speech bubbles (first access, the "i" button, hover tips). */}
+      <Suspense fallback={null}><DesktopTour /></Suspense>
     </QueryClientProvider>
   );
 }
