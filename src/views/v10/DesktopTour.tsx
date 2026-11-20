@@ -24,6 +24,8 @@ const TOUR: Step[] = [
   { sel: '[role="group"][aria-label="Disegna l’area"]', title: "Disegna l’area", text: "Clicca sugli angoli per mettere i pin: la superficie serve per stimare costi e vincoli." },
   { sel: 'main [role="slider"]', title: "Scegli quanto rinfrescare", text: "Trascina il punto bianco sull’arco o clicca un livello: gli interventi si mettono da soli." },
   { sel: '[role="group"][aria-label="Modifica gli interventi"]', title: "Regola a mano", text: "Con − e + cambi alberi, aiuole, vele, nebulizzatori e innaffiatoi uno per uno." },
+  { sel: '[aria-label="Persone nella piazza"]', title: "Persone nella piazza", text: "Una stima di quante persone ci sono nel luogo alla stagione e all’ora della simulazione, e quante stanno all’ombra degli interventi." },
+  { sel: '[aria-label="Vincoli dell\'area"]', title: "Vincoli dell’area", text: "Beni tutelati, paesaggio e archeologia intorno all’area disegnata: ti dice quali interventi chiedono un’autorizzazione." },
   { sel: "#app-header", title: "Account e aiuto", text: "Qui accedi al tuo account, cambi tema e con «i» rivedi questa guida quando vuoi." },
 ];
 

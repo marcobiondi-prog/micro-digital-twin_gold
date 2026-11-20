@@ -1438,9 +1438,10 @@
    schermo è touch — il flag data-touch vince sulla media query. */
 html[data-touch] .lab-media-ai { display: inline-flex; }
 /* Desktop: "Carica" apre subito i file del computer, senza menu Galleria/Scatta/Registra, e "Cartella" una cartella intera. */
-.lab-media-upload-direct, .lab-media-folder { display: none; }
+.lab-media-upload-direct, .lab-media-folder, .lab-media-dropzone { display: none; }
 @media (min-width: 1024px) and (any-pointer: fine) {
   html:not([data-touch]) .lab-media-folder { display: inline-flex; }
+  html:not([data-touch]) .lab-media-dropzone { display: flex; }
   html:not([data-touch]) .lab-media-upload-direct { display: inline-flex; }
   html:not([data-touch]) .lab-media-upload-menu { display: none; }
 }

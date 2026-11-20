@@ -804,7 +804,7 @@ function RootComponent() {
 
       <div className={intro ? undefined : "md:pl-20 lg:pl-60"}>
       <main id="main-content" tabIndex={-1} className={intro ? "focus:outline-none" : "app-main mx-auto max-w-7xl px-4 pb-8 pt-6 focus:outline-none sm:pt-8 md:max-w-none md:px-6"}><Outlet /></main><Toaster /><UpdatePill />
-      {!intro && <footer className="mx-auto max-w-7xl px-4 md:max-w-none md:px-6 md:text-center pb-[calc(6.5rem+env(safe-area-inset-bottom))] text-sm leading-relaxed text-muted-foreground sm:pb-10 sm:text-[15px]">
+      {!intro && <footer className="mx-auto max-w-7xl px-4 md:max-w-none md:px-6 md:pt-14 md:text-center pb-[calc(6.5rem+env(safe-area-inset-bottom))] text-sm leading-relaxed text-muted-foreground sm:pb-10 sm:text-[15px]">
         I risultati del simulatore sono indicativi e non sostituiscono modelli fisici calibrati.
       </footer>}
       </div>
