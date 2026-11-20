@@ -569,28 +569,51 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     const Q_BACK = new THREE.Quaternion(-Math.SQRT1_2, 0, 0, Math.SQRT1_2), Z_AXIS = new THREE.Vector3(0, 0, 1);
     let yaw0: number | null = null;
     fl.yaw = 0;
+    let roll = 0;
+    const fwd = new THREE.Vector3(), eul = new THREE.Euler();
+    const wrap = (a: number) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
+    // From the camera's orientation (y up, −z ahead): how far it looks up or down, its turn round the vertical (the
+    // first reading is "straight ahead", the direction the objects were put or carried in, so turning leaves them
+    // where they stand: the preview has no tracking, only the turn is known, not a step) and its roll, so the objects
+    // lean with the picture when the device is held a little crooked. A little smoothing against the sensor's jitter.
+    const applyQ = (q: THREE.Quaternion) => {
+      fwd.set(0, 0, -1).applyQuaternion(q);
+      fl.tilt = Math.max(-80, Math.min(-8, (Math.asin(Math.max(-1, Math.min(1, fwd.y))) * 180) / Math.PI));
+      eul.setFromQuaternion(q, "YXZ");
+      if (yaw0 === null) yaw0 = eul.y;
+      fl.yaw += wrap(wrap(eul.y - yaw0) - fl.yaw) * 0.5;
+      roll += (Math.max(-0.8, Math.min(0.8, eul.z)) - roll) * 0.4;
+    };
+    // On Windows tablets (Surface) and many Android phones the orientation sensor (Generic Sensor API) is steadier and
+    // faster than deviceorientation, which Chrome on Windows often does not fire at all: used when it starts.
+    let sensorOn = false;
+    let sensor: { start(): void; stop(): void; quaternion?: number[] | null; addEventListener(t: string, f: () => void): void } | null = null;
+    const Q_UP = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2), sq = new THREE.Quaternion();
+    try {
+      const Ctor = (window as unknown as { RelativeOrientationSensor?: new (o: object) => NonNullable<typeof sensor> }).RelativeOrientationSensor;
+      if (Ctor) {
+        sensor = new Ctor({ frequency: 60, referenceFrame: "screen" });
+        sensor.addEventListener("reading", () => {
+          const q = sensor?.quaternion;
+          if (!q) return;
+          sensorOn = true;
+          // The sensor's world is z up, y north; the camera's is y up, −z ahead.
+          applyQ(sq.set(q[0]!, q[1]!, q[2]!, q[3]!).premultiply(Q_UP));
+        });
+        sensor.addEventListener("error", () => { sensorOn = false; });
+        sensor.start();
+      }
+    } catch { sensor = null; }
     const onTilt = (e: DeviceOrientationEvent) => {
-      if (e.beta === null) return;
+      if (sensorOn || e.beta === null) return;
       const b = (e.beta * Math.PI) / 180, g = ((e.gamma ?? 0) * Math.PI) / 180;
-      const elev = (Math.asin(Math.max(-1, Math.min(1, -Math.cos(b) * Math.cos(g)))) * 180) / Math.PI;
-      fl.tilt = Math.max(-80, Math.min(-8, elev));
-      // Where the phone points round the vertical, so turning it leaves the objects where they stand instead of
-      // carrying them along (the preview has no tracking: only the turn is known, not a step). The camera's −z axis
-      // from alpha, beta, gamma and the screen's angle, as three's device-orientation controls do; the first reading
-      // is "straight ahead", the direction the objects were put or carried in.
-      if (e.alpha === null) return;
-      devQ.setFromEuler(devE.set(b, (e.alpha * Math.PI) / 180, -g, "YXZ")).multiply(Q_BACK)
-        .multiply(scrQ.setFromAxisAngle(Z_AXIS, -(((screen.orientation?.angle ?? 0) * Math.PI) / 180)));
-      const y = new THREE.Euler().setFromQuaternion(devQ, "YXZ").y;
-      if (yaw0 === null) yaw0 = y;
-      let d = y - yaw0;
-      while (d > Math.PI) d -= 2 * Math.PI;
-      while (d < -Math.PI) d += 2 * Math.PI;
-      // A little smoothing against the sensor's jitter, the short way round.
-      let step = d - fl.yaw;
-      while (step > Math.PI) step -= 2 * Math.PI;
-      while (step < -Math.PI) step += 2 * Math.PI;
-      fl.yaw += step * 0.5;
+      // Without alpha only the elevation of the back camera's axis (−z of the device), whichever way it is held.
+      if (e.alpha === null) {
+        fl.tilt = Math.max(-80, Math.min(-8, (Math.asin(Math.max(-1, Math.min(1, -Math.cos(b) * Math.cos(g)))) * 180) / Math.PI));
+        return;
+      }
+      applyQ(devQ.setFromEuler(devE.set(b, (e.alpha * Math.PI) / 180, -g, "YXZ")).multiply(Q_BACK)
+        .multiply(scrQ.setFromAxisAngle(Z_AXIS, -(((screen.orientation?.angle ?? 0) * Math.PI) / 180))));
     };
     window.addEventListener("deviceorientation", onTilt);
     window.addEventListener("resize", size);
@@ -613,7 +636,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       const fov = fovAt(zoomRef.current);
       if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
       const pitch = Math.max(-80, Math.min(10, fl.tilt + fl.offset));
-      camera.rotation.set((pitch * Math.PI) / 180, fl.yaw, 0, "YXZ");
+      camera.rotation.set((pitch * Math.PI) / 180, fl.yaw, roll, "YXZ");
       if (horizonLine.current) horizonLine.current.style.top = `${(horizonAt(pitch, camera.fov) * 100).toFixed(2)}%`;
       camera.updateMatrixWorld();
       const t = three.current;
@@ -653,6 +676,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       window.removeEventListener("pointerup", onTap, true);
       el.removeEventListener("webglcontextlost", onLost);
       window.removeEventListener("deviceorientation", onTilt);
+      try { sensor?.stop(); } catch { /* already stopped */ }
       window.removeEventListener("resize", size);
       renderer.setAnimationLoop(null);
       renderer.dispose();
