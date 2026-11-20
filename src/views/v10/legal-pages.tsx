@@ -298,9 +298,12 @@ export function PlansPage() {
   return (
     <InfoPage title="Free e Premium" intro="Premium è gratis: basta registrarsi.">
       <div className="space-y-3">
+        {/* On its own page from tablet up the two plans stand side by side; inside the narrow account panel, one under the other. */}
+        <div className={nav ? "space-y-3" : "space-y-3 md:grid md:grid-cols-2 md:items-start md:gap-3 md:space-y-0"}>
         <PlanCard name="Free" price="Senza registrazione" features={FREE_FEATURES} current={!signedIn} />
         <PlanCard name="Premium" price="Gratis con la registrazione" lead="Tutto di Free, più:" features={PREMIUM_FEATURES} current={signedIn}
           action={!signedIn && <button type="button" onClick={signIn} className="mt-1 inline-flex h-11 w-full items-center justify-center rounded-full bg-foreground text-sm font-semibold text-background outline-none focus-visible:ring-2 focus-visible:ring-ring">Accedi per passare a Premium</button>} />
+        </div>
         <p className="px-1 text-xs text-muted-foreground">Proposta di suddivisione delle funzioni, da validare con i test di usabilità.</p>
       </div>
     </InfoPage>
