@@ -13,3 +13,19 @@ const subscribe = (cb: () => void) => {
 export function useIsDesktop(): boolean {
   return useSyncExternalStore(subscribe, () => window.matchMedia(DESKTOP_QUERY).matches, () => false);
 }
+
+/**
+ * Map beside the simulation: desktops (≥ 1024 px) and tablets held sideways (landscape, ≥ 900 px wide and ≥ 600 px
+ * tall, so a phone turned sideways keeps its own layout). A tablet held upright keeps the tabs one at a time.
+ */
+export const SIDE_BY_SIDE_QUERY = "(min-width: 1024px), (orientation: landscape) and (min-width: 900px) and (min-height: 600px)";
+
+const subscribeSide = (cb: () => void) => {
+  const m = window.matchMedia(SIDE_BY_SIDE_QUERY);
+  m.addEventListener("change", cb);
+  return () => m.removeEventListener("change", cb);
+};
+
+export function useSideBySide(): boolean {
+  return useSyncExternalStore(subscribeSide, () => window.matchMedia(SIDE_BY_SIDE_QUERY).matches, () => false);
+}

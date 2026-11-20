@@ -4,7 +4,7 @@ import { setCameraSheetOpen } from "@/lib/camera-dock";
 import { useTabSwipe } from "@/lib/use-tab-swipe";
 import { useAutoHistory } from "@/lib/use-auto-history";
 import { SimMap } from "@/views/v10/SimMap";
-import { useIsDesktop } from "@/lib/use-desktop";
+import { useSideBySide } from "@/lib/use-desktop";
 import { Ambient, HeroButton, PageHero, Panels, TabRow, openSimTab, showSimMedia, startOnMap, simMediaId, useSimTab, type SimKind, type SimTab } from "./console";
 
 const loadMenu = () => import("@/views/v8/SimMenu");
@@ -78,7 +78,7 @@ function useHideOnScroll(bar: RefObject<HTMLDivElement | null>, root: RefObject<
 export function SimShell({ kind, place, onCompare, onReset, onSend, simula, media, sensori }: { kind: SimKind; place: string; onCompare?: (() => void) | undefined; onReset: () => void; onSend?: () => void; simula: ReactNode; media: ReactNode; sensori: ReactNode }) {
   const tab = useSimTab(kind);
   // Desktop: Mappa and Simula are one tab with the map on the left (kept in view) and the simulation on the right.
-  const desk = useIsDesktop();
+  const desk = useSideBySide();
   // Entering the page always starts on Mappa (unless a tab was asked for on the way in).
   useLayoutEffect(() => startOnMap(kind), [kind]);
   const go = (t: SimTab) => openSimTab(kind, t);
