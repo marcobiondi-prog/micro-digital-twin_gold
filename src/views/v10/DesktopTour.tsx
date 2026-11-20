@@ -13,7 +13,9 @@ const DESK_QUERY = "(min-width: 1024px)";
 const SEEN_KEY = "mdt-desk-tour-v1";
 const OPEN_EVENT = "mdt-desk-tour";
 
-export const isDesktopLayout = () => typeof window !== "undefined" && window.matchMedia(DESK_QUERY).matches;
+export const isDesktopLayout = () => typeof window !== "undefined" && window.matchMedia(GUIDE_QUERY).matches;
+/** The bubbles from the "i" button: computers and tablets held sideways. */
+const GUIDE_QUERY = "(min-width: 1024px), (orientation: landscape) and (min-width: 900px) and (min-height: 600px)";
 export function openDesktopTour() { window.dispatchEvent(new CustomEvent(OPEN_EVENT)); }
 
 const TOUR: Step[] = [
@@ -197,14 +199,15 @@ export default function DesktopTour() {
   const blur = "fixed z-[1000000030] bg-black/45 backdrop-blur-[6px]";
   return createPortal(
     <div aria-live="polite">
-      {mode === "full" ? <>
-        {/* Four blurred panes round the target, and a clear one over it: nothing behind can be clicked. */}
-        <div className={blur} style={{ left: 0, top: 0, right: 0, height: Math.max(0, r.y) }} />
-        <div className={blur} style={{ left: 0, top: r.y + r.h, right: 0, bottom: 0 }} />
-        <div className={blur} style={{ left: 0, top: r.y, width: Math.max(0, r.x), height: r.h }} />
-        <div className={blur} style={{ left: r.x + r.w, top: r.y, right: 0, height: r.h }} />
-        <div className="fixed z-[1000000030]" style={{ left: r.x, top: r.y, width: r.w, height: r.h }} />
-      </> : <div className="fixed inset-0 z-[1000000030]" onMouseDown={() => setMode(null)} />}
+      {/* Four blurred panes round the target, and a clear one over it: nothing behind can be clicked.
+          In the simplified guide (the "i" button) a tap on them closes it. */}
+      {[
+        { left: 0, top: 0, right: 0, height: Math.max(0, r.y) },
+        { left: 0, top: r.y + r.h, right: 0, bottom: 0 },
+        { left: 0, top: r.y, width: Math.max(0, r.x), height: r.h },
+        { left: r.x + r.w, top: r.y, right: 0, height: r.h },
+      ].map((st, k) => <div key={k} className={blur} style={st} onPointerDown={mode === "simple" ? () => setMode(null) : undefined} />)}
+      <div className="fixed z-[1000000030]" style={{ left: r.x, top: r.y, width: r.w, height: r.h }} onPointerDown={mode === "simple" ? () => setMode(null) : undefined} />
       <div aria-hidden="true" className="desk-spot pointer-events-none fixed z-[1000000031] rounded-2xl ring-2 ring-[#2dd4bf] shadow-[0_0_0_4px_rgb(45_212_191/0.18),0_0_30px_rgb(45_212_191/0.35)] transition-[left,top,width,height] duration-300 motion-reduce:transition-none"
         style={{ left: r.x, top: r.y, width: r.w, height: r.h }} />
       <Bubble target={r} title={step.title} text={step.text} key={i}>

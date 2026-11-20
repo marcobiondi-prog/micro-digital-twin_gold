@@ -791,7 +791,7 @@ function RootComponent() {
           <div className="flex min-w-0 items-center"><AccountControl /></div>
           <div className="flex shrink-0 items-center gap-2 md:flex-col lg:flex-row">
             {/* "i" shows the tutorial again (only the tutorial: it ends by coming back here). */}
-            <button type="button" onClick={() => { if (window.matchMedia("(min-width: 1024px)").matches) window.dispatchEvent(new CustomEvent("mdt-desk-tour")); else void navigate({ to: "/?rivedi=1" as any }); }} aria-label="Come funziona" title="Come funziona"
+            <button type="button" onClick={() => { if (window.matchMedia("(min-width: 1024px), (orientation: landscape) and (min-width: 900px) and (min-height: 600px)").matches) window.dispatchEvent(new CustomEvent("mdt-desk-tour")); else void navigate({ to: "/?rivedi=1" as any }); }} aria-label="Come funziona" title="Come funziona"
               className="grid size-9 shrink-0 place-items-center rounded-full border border-foreground/15 bg-foreground/[0.06] text-foreground outline-none transition-colors hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring sm:size-10">
               <Info className="size-4 sm:size-[1.15rem]" aria-hidden="true" />
             </button>
