@@ -613,7 +613,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
             className="lab-media-dropzone mt-3 w-full flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-foreground/20 px-4 py-6 text-center text-sm text-muted-foreground outline-none transition-colors hover:border-brand-turquoise/70 hover:bg-brand-turquoise/[0.06] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">
             <FolderOpen className="size-6 text-brand-turquoise" aria-hidden="true" />
             <span className="font-semibold text-foreground">Trascina qui foto, video o cartelle</span>
-            <span className="text-xs">oppure clicca per sceglierli dal computer</span>
+            <span className="text-xs">oppure tocca o clicca qui per sceglierli</span>
           </button>
           {uploads.length > 0 && (
             <ul className="mt-3 space-y-2" aria-label="Caricamenti in corso">

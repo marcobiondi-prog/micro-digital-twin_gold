@@ -1445,6 +1445,10 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
   html:not([data-touch]) .lab-media-upload-direct { display: inline-flex; }
   html:not([data-touch]) .lab-media-upload-menu { display: none; }
 }
+/* Tablets held sideways (touch): the same dashed drop box, for files dragged in from the tablet's Files app or a split screen. */
+@media (orientation: landscape) and (min-width: 900px) and (min-height: 600px) {
+  html[data-touch] .lab-media-dropzone { display: flex; }
+}
 
 /* Foto e video: su smartphone anche le righe dell'elenco entrano in cascata, una dopo l'altra */
 @keyframes lab-media-row-in {
