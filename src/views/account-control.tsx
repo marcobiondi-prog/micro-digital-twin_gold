@@ -552,7 +552,7 @@ export function AccountControl() {
           {/* Signed in, a ring round the picture fills with the cloud space in use, out of 50 GB. */}
           {cloudAccount && <StorageRing share={usage.share} />}
         </span>
-      <DialogContent ref={placePanel} overlayClassName="account-overlay !z-[1000000020]" className="account-panel !z-[1000000021] flex max-h-[min(680px,90dvh)] w-[min(420px,calc(100vw-2rem))] flex-col gap-0 overflow-y-auto rounded-lg border bg-popover p-0 text-popover-foreground shadow-xl sm:rounded-lg">
+      <DialogContent ref={placePanel} overlayClassName="account-overlay !z-[1000000020]" className="account-panel !z-[1000000021] flex max-h-[min(680px,90dvh)] w-[min(420px,calc(100vw-2rem))] flex-col md:max-h-[min(860px,92dvh)] md:w-[min(900px,calc(100vw-8rem))] md:max-w-none gap-0 overflow-y-auto rounded-lg border bg-popover p-0 text-popover-foreground shadow-xl sm:rounded-lg">
         {page ? (() => {
           const Page = page === "menu" ? InfoMenu : PAGES[page];
           return (
@@ -575,7 +575,8 @@ export function AccountControl() {
           {/* The plan in use, at a glance (Premium is free with an account). */}
           <p className="pt-1"><span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${premiumPlan ? "bg-primary text-primary-foreground" : "bg-foreground/[0.08] text-foreground"}`}>Piano {premiumPlan ? "Premium" : "Free"}</span></p>
         </DialogHeader>
-        <div className="space-y-6 px-6 py-6">
+        <div className="space-y-6 px-6 py-6 md:grid md:grid-cols-2 md:items-start md:gap-x-8 md:gap-y-6 md:space-y-0 md:px-8">
+          <div className="min-w-0 space-y-6">
           {/* The professional profile first: the bottom bar's profile badge opens this panel. Who is identified (one at a time), and the identification pages that open each simulation. */}
           <section aria-label="Profilo professionale" className="rounded-3xl bg-foreground/[0.05] px-5 py-3">
             <h3 className="py-2 text-base font-semibold">Profilo professionale</h3>
@@ -614,6 +615,8 @@ export function AccountControl() {
               <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" tabIndex={-1} aria-label="Seleziona immagine account" onChange={chooseFile} />
             </div>
           </section>}
+          </div>
+          <div className="min-w-0">
           {demo && !account ? (
             <section className="space-y-4">
               <div className="rounded-md border bg-muted/40 p-4">
@@ -673,16 +676,17 @@ export function AccountControl() {
               </>}
             </section>
           )}
+          </div>
           {/* Plans, project, help, privacy and legal live on their own page in the panel: one row here opens it. */}
-          <div className="border-t pt-6">
+          <div className="border-t pt-6 md:col-span-2">
             <button type="button" onClick={() => openPage("menu")} className="flex w-full items-center gap-3 rounded-3xl bg-foreground/[0.05] px-5 py-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <span className="min-w-0 flex-1"><span className="block text-base font-semibold">Piani e informazioni</span><span className="block text-sm text-muted-foreground">Piano {premiumPlan ? "Premium" : "Free"} · Chi siamo · Aiuto · Privacy · Legale</span></span>
               <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
             </button>
           </div>
-          <AppVersion />
+          <div className="md:col-span-2"><AppVersion /></div>
           {/* Twin closes the panel: still (no animation, no name), smiling. */}
-          <TwinStill className="mx-auto block h-16 w-auto" />
+          <TwinStill className="mx-auto block h-16 w-auto md:col-span-2" />
         </div>
         </>)}
       </DialogContent>
