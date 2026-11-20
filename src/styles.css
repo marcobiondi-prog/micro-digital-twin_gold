@@ -1966,6 +1966,12 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .nav-arc { filter: drop-shadow(0 -4px 12px color-mix(in oklab, var(--foreground) 10%, transparent)); }
 /* v3: on phones the central camera of the arched bar already offers AI, photo, video and gallery,
    so the media panel keeps only its own actions (send, delete). Tablets and desktops keep them. */
+/* Tablets held upright: the side rail's camera already offers AI, photo, video and gallery, so the panel keeps only Invia and Elimina. */
+@media (min-width: 768px) and (max-width: 1023.98px) and (orientation: portrait) {
+  html .lab-media-actions .lab-media-ai,
+  html .lab-media-actions .lab-media-upload-direct,
+  html .lab-media-actions .lab-media-upload-menu { display: none; }
+}
 @media (max-width: 639.98px) {
   html .lab-media-actions .lab-media-ai,
   html .lab-media-actions .lab-media-upload-direct,
