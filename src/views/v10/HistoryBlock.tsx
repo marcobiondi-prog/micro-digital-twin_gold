@@ -429,7 +429,8 @@ function PhotoPiles({ shots, by = "giorno" }: { shots: Shot[]; by?: PileView }) 
   const shown = piles.find((p) => p.key === open) ?? null;
   // The opened pile shows right under the row of the pile tapped (not under every pile, where it fell out of
   // sight with many groups), and the page brings it into view.
-  const cols = useGridColumns();
+  const grid = useRef<HTMLDivElement>(null);
+  const cols = useGridColumns(grid);
   const openAt = shown ? piles.indexOf(shown) : -1;
   const rowEnd = openAt < 0 ? -1 : Math.min(piles.length - 1, Math.floor(openAt / cols) * cols + cols - 1);
   const panel = useRef<HTMLDivElement>(null);
@@ -439,7 +440,7 @@ function PhotoPiles({ shots, by = "giorno" }: { shots: Shot[]; by?: PileView }) 
     return () => window.clearTimeout(t);
   }, [open]);
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 md:grid-cols-4">
+    <div ref={grid} className="grid gap-x-4 gap-y-5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
       {piles.map((p, idx) => {
           const [top, second, third] = p.shots;
           const isOpen = open === p.key;
@@ -476,16 +477,26 @@ function PhotoPiles({ shots, by = "giorno" }: { shots: Shot[]; by?: PileView }) 
   );
 }
 
-/** How many piles a row holds now: 2 on phones, 3 from 640 px, 4 from 768 px (the grid's own breakpoints). */
-function useGridColumns() {
-  const read = () => (typeof window === "undefined" ? 2 : matchMedia("(min-width: 768px)").matches ? 4 : matchMedia("(min-width: 640px)").matches ? 3 : 2);
+/**
+ * How many piles a row holds, from the grid's own width: 2 on phones, 3 from about 576 px, 4 from 704 px (as the old
+ * viewport breakpoints gave), then 5 and 6 on wide tablets and desktops — measured on the grid, so in the dashboard's
+ * narrower right column the piles stay readable.
+ */
+export function pileColumns(width: number) {
+  return width >= 1100 ? 6 : width >= 900 ? 5 : width >= 704 ? 4 : width >= 576 ? 3 : 2;
+}
+
+function useGridColumns(ref: React.RefObject<HTMLDivElement | null>) {
   const [cols, setCols] = useState(2);
   useEffect(() => {
-    const update = () => setCols(read());
+    const el = ref.current;
+    if (!el) return;
+    const update = () => setCols(pileColumns(el.clientWidth));
     update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref]);
   return cols;
 }
 
@@ -1300,9 +1311,9 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
             <p className="text-[15px] font-medium">{loading ? "Carico la cronologia…" : archivedEntries.length ? "Gli interventi sono tutti nell’archivio" : f === "tutti" ? "Ancora nessun intervento" : `Ancora nessun intervento ${f === "piazza" ? "nella piazza" : "nel vigneto"}`}</p>
             {!loading && !archivedEntries.length && <p className="max-w-xs text-sm text-muted-foreground">Quando cambi alberi, aiuole, ombra o irrigazione nella simulazione, ogni modifica viene salvata in automatico e la trovi qui, con foto e video.</p>}
           </DashCard>
-        ) : groups.map((g) => compact
-          ? <DayTab key={g.key} label={g.label} items={g.items} />
-          : (
+        ) : compact ? groups.map((g) => <DayTab key={g.key} label={g.label} items={g.items} />) : (
+          // Wide tablets and desktops: the day cards two by two.
+          <div className="space-y-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0">{groups.map((g) => (
           <div key={g.key} className="space-y-2">
             {/* One card per day: its date on top (with Archivia for the whole day), then each intervention of that day with its time. */}
             <div className="flex items-center gap-3 px-1">
@@ -1314,7 +1325,8 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
               {g.items.map((e) => <EntryRow key={e.id} e={e} />)}
             </DashCard>
           </div>
-        ))}
+        ))}</div>
+        )}
       </>
     );
   };
