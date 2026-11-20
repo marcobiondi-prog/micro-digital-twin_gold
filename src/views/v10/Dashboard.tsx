@@ -299,7 +299,9 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
   const place = splitLocation(urban.location.label);
   const site = siteCenter(urban.location, urban.area);
   return (
-    <div className="space-y-8" data-testid="dashboard-urbana">
+    <div className="space-y-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0" data-testid="dashboard-urbana">
+      {/* Desktop: the result and its day (or zones) on the left, what it gives, costs and records on the right. */}
+      <div className="min-w-0 space-y-8">
       <ResultCard kind="urban" place={place.name}
         when={<SeasonPills value={season} onChange={setDashSeason} only={reading?.season} />}>
         <p className="text-center text-sm text-muted-foreground">{dash.sim ? "Come nella simulazione" : dash.fromSim ? "Alla stessa ora della simulazione" : "Nell’ora più calda"} · {dash.when.toLowerCase()}</p>
@@ -322,6 +324,8 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
         </DashCard>
       </DashSection>
 
+      </div>
+      <div className="min-w-0 space-y-8">
       <DashSection title="Cosa ottieni" hint="stima annua">
         <Facts items={[
           { icon: Leaf, value: `${sum.co2} kg`, label: "CO₂ assorbita all’anno" },
@@ -342,6 +346,7 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
       <ConstraintsCard lat={site[0]} lng={site[1]} pending={!drawnAreaFor(urban.area, urban.location)} ring={drawnAreaFor(urban.area, urban.location)?.ring} placeName={urban.location.label ?? ""} kind="piazza" />
 
       {records}
+      </div>
     </div>
   );
 }
@@ -362,7 +367,9 @@ export function VineDashboard({ records }: { records: ReactNode }) {
   const place = splitLocation(vine.location.label);
   const vSite = siteCenter(vine.location, vine.area);
   return (
-    <div className="space-y-8" data-testid="dashboard-vitivinicola">
+    <div className="space-y-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0" data-testid="dashboard-vitivinicola">
+      {/* Desktop: the result and its day (or zones) on the left, what it gives, costs and records on the right. */}
+      <div className="min-w-0 space-y-8">
       <ResultCard kind="vineyard" place={place.name} when={<span className="text-xs text-muted-foreground">Media delle tre zone, come le hai lasciate nella simulazione</span>}>
         <p className="text-center text-sm text-muted-foreground">Bisogno di intervento</p>
         <ResultArc before={before} after={thirst} min={Math.max(0, Math.floor(Math.min(thirst, before) - 8))} max={Math.min(100, Math.ceil(before + 6))} unit=""
@@ -385,6 +392,8 @@ export function VineDashboard({ records }: { records: ReactNode }) {
         </div>
       </DashSection>
 
+      </div>
+      <div className="min-w-0 space-y-8">
       <DashSection title="Cosa ottieni">
         <Facts items={[
           { icon: ShieldCheck, value: `${safe} di ${sum.zones.length}`, label: "Zone al sicuro" },
@@ -404,6 +413,7 @@ export function VineDashboard({ records }: { records: ReactNode }) {
       <ConstraintsCard lat={vSite[0]} lng={vSite[1]} pending={!drawnAreaFor(vine.area, vine.location)} ring={drawnAreaFor(vine.area, vine.location)?.ring} placeName={vine.location.label ?? ""} kind="vigneto" />
 
       {records}
+      </div>
     </div>
   );
 }
