@@ -474,6 +474,45 @@ function SideNav() {
   );
 }
 
+/**
+ * Tablet (md, 768–1023 px): the menu is a narrow rail of icons at the side — the same items as the bottom bar, each
+ * with a short name under it, the open page on the slate pill with a turquoise edge, and the camera button (with its
+ * AI camera) between the pages, as in the phone's bar; the header (account, "i", theme) stands at its foot.
+ */
+function TabletRail() {
+  const proId = useProId();
+  const guest = useGuest() && !proId;
+  const pathname = useLocation({ select: (l) => l.pathname });
+  const items = itemsFor(proId, guest);
+  const link = (it: (typeof items)[number]) => {
+    const on = pathname === it.to || (it.to === "/profilo" && isProfilePath(pathname));
+    const lock = !guest && (it.to === "/urbano" || it.to === "/vigneto") && proId !== undefined && !unlocks(proId, it.to === "/urbano" ? "urban" : "vineyard");
+    return (
+      <Link key={it.to} to={it.to} aria-current={on ? "page" : undefined} replace={pathname !== "/"} aria-label={it.l}
+        className={`relative flex w-16 flex-col items-center gap-1 rounded-2xl px-1 py-2 text-[11px] leading-tight outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${on ? "bg-foreground/10 font-semibold text-foreground shadow-[inset_3px_0_0_#2dd4bf]" : "text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"}`}>
+        <it.I className="size-6 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+        <span className="w-full truncate text-center">{it.l}</span>
+        {lock && <Lock className="absolute right-1.5 top-1.5 size-3" aria-label="bloccato" />}
+      </Link>
+    );
+  };
+  return (
+    <aside className="fixed inset-y-0 left-0 z-[999999995] hidden w-20 flex-col items-center border-r border-foreground/10 bg-background/70 pb-48 pt-[calc(1rem+env(safe-area-inset-top))] backdrop-blur-xl md:flex lg:hidden">
+      <Link to="/benvenuto" aria-label="Micro Digital Twin" className="mb-5 rounded-xl p-1 outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <img src={logoCompact} alt="" className="size-9 object-contain" />
+      </Link>
+      <nav aria-label="Menu principale" className="flex flex-col items-center gap-1.5">
+        {items.slice(0, 2).map(link)}
+        {/* The camera (and its AI camera) between the pages, like the centre of the phone's bar. */}
+        <div className="my-2 grid place-items-center [&_.ps-nav-camera]:!mt-0 [&_.ps-nav-camera]:!size-14">
+          <CameraDockButton />
+        </div>
+        {items.slice(2).map(link)}
+      </nav>
+    </aside>
+  );
+}
+
 // The landing guard below must act only on a real page load, not on the
 // re-hydration a hot reload performs inside the same document.
 
@@ -731,12 +770,13 @@ function RootComponent() {
       {!intro && <AmbientLayer />}
       {/* Transparent: the page's light and its drifting pools show through behind the account button, the "i" and the theme switch. */}
       <SideNav />
+      <TabletRail />
       {/* Desktop: the header (account, "i", theme) sits at the foot of the side menu. */}
-      <header id="app-header" className="relative pt-[env(safe-area-inset-top)] lg:fixed lg:bottom-0 lg:left-0 lg:z-[999999996] lg:w-60 lg:border-t lg:border-foreground/10 lg:pt-0">
-        <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-2 sm:px-4 sm:py-3 lg:max-w-none lg:px-3">
+      <header id="app-header" className="relative pt-[env(safe-area-inset-top)] md:fixed md:bottom-0 md:left-0 md:z-[999999996] md:w-20 md:border-t md:border-foreground/10 md:pt-0 lg:w-60">
+        <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-2 sm:px-4 sm:py-3 md:flex md:max-w-none md:flex-col md:px-2 lg:grid lg:px-3">
           {/* No logo nor name here: the account sits where the logo was, the theme switch on the right. */}
           <div className="flex min-w-0 items-center"><AccountControl /></div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2 md:flex-col lg:flex-row">
             {/* "i" shows the tutorial again (only the tutorial: it ends by coming back here). */}
             <button type="button" onClick={() => void navigate({ to: "/?rivedi=1" as any })} aria-label="Come funziona" title="Come funziona"
               className="grid size-9 shrink-0 place-items-center rounded-full border border-foreground/15 bg-foreground/[0.06] text-foreground outline-none transition-colors hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring sm:size-10">
@@ -746,10 +786,10 @@ function RootComponent() {
           </div>
         </div>
       </header>
-      <div className="hidden sm:block lg:hidden"><SmartNav /></div>
+      <div className="hidden sm:block md:hidden"><SmartNav /></div>
       </>}
 
-      <div className={intro ? undefined : "lg:pl-60"}>
+      <div className={intro ? undefined : "md:pl-20 lg:pl-60"}>
       <main id="main-content" tabIndex={-1} className={intro ? "focus:outline-none" : "app-main mx-auto max-w-7xl px-4 pb-8 pt-6 focus:outline-none sm:pt-8"}><Outlet /></main><Toaster /><UpdatePill />
       {!intro && <footer className="mx-auto max-w-7xl px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] text-sm leading-relaxed text-muted-foreground sm:pb-10 sm:text-[15px]">
         I risultati del simulatore sono indicativi e non sostituiscono modelli fisici calibrati.
