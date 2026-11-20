@@ -247,7 +247,7 @@ export function Lever({ icon: Icon, label, value, step, max, color, swatch, onCh
 function PerceivedInfo() {
   const [open, setOpen] = useState(false);
   return (
-    <div className="mx-auto -mt-1 max-w-[21rem] lg:max-w-[27rem] text-center">
+    <div className="mx-auto -mt-1 max-w-[21rem] md:portrait:max-w-[27rem] lg:max-w-[27rem] text-center">
       <p className="inline-flex items-center gap-1.5 text-sm font-semibold">
         Temperatura percepita
         <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label="Che cos’è la temperatura percepita"
@@ -422,19 +422,19 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
       </div>
 
       {/* 2 · The gauge: drag the white dot to choose how much to cool. */}
-      <div ref={gaugeRef} className="relative mx-auto mt-10 flex max-w-[21rem] lg:max-w-[27rem] flex-col items-center px-7">
+      <div ref={gaugeRef} className="relative mx-auto mt-10 flex max-w-[21rem] md:portrait:max-w-[27rem] lg:max-w-[27rem] flex-col items-center px-7">
         <Gauge before={before} after={after} lowest={lowest} min={dialMin} max={dialMax} stops={share > 0.15 ? stops : []} onSlide={slideTo} onStop={applyLevel} rightEnd={`${fmt(before)}°`} />
         {/* Inside the arc: how it feels, the reading and the degrees gained, all following the dot. */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center" aria-live="polite">
-          <span className={cn("rounded-full px-3 py-0.5 text-[13px] font-semibold text-white transition-colors lg:text-[15px] duration-300", feel.bg ?? GAIN_BG[feel.step])}>{feel.text}</span>
-          <span className="mt-1 font-display text-6xl font-light lg:text-7xl leading-none tracking-tight tabular-nums">{fmt(after)}°</span>
-          <span className="mt-1.5 text-xs font-semibold lg:text-sm">{gainNow > 0.05 ? <><span className="font-mono text-sm tabular-nums">−{fmt(gainNow)}°</span> rispetto a senza interventi</> : est.dT > 0.05 ? "A quest’ora non serve" : "Nessun intervento"}</span>
+          <span className={cn("rounded-full px-3 py-0.5 text-[13px] font-semibold text-white transition-colors md:portrait:text-[15px] lg:text-[15px] duration-300", feel.bg ?? GAIN_BG[feel.step])}>{feel.text}</span>
+          <span className="mt-1 font-display text-6xl font-light md:portrait:text-7xl lg:text-7xl leading-none tracking-tight tabular-nums">{fmt(after)}°</span>
+          <span className="mt-1.5 text-xs font-semibold md:portrait:text-sm lg:text-sm">{gainNow > 0.05 ? <><span className="font-mono text-sm tabular-nums">−{fmt(gainNow)}°</span> rispetto a senza interventi</> : est.dT > 0.05 ? "A quest’ora non serve" : "Nessun intervento"}</span>
         </div>
       </div>
 
       {/* Labels under the two numbers at the arc's ends: the coolest it can get, and on the right the exact seasonal
           average of the place at this hour without interventions (the arc itself keeps its small margins, unnumbered). */}
-      <div className="mx-auto -mt-3 flex w-full max-w-[21rem] lg:max-w-[27rem] justify-between px-3 text-[10px] font-semibold uppercase lg:text-xs tracking-wide text-muted-foreground" aria-hidden="true">
+      <div className="mx-auto -mt-3 flex w-full max-w-[21rem] md:portrait:max-w-[27rem] lg:max-w-[27rem] justify-between px-3 text-[10px] font-semibold uppercase md:portrait:text-xs lg:text-xs tracking-wide text-muted-foreground" aria-hidden="true">
         {/* The label the white dot is near lights up, the other dims: near the seasonal average the right one turns warm,
             near the coolest the left one turns bright blue. */}
         <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "left" ? "bg-sky-500/20 text-sky-800 dark:bg-sky-400/30 dark:text-sky-200" : "bg-sky-500/10 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300", near === "right" && "opacity-50 dark:opacity-35")}>Minimo raggiungibile</span>
@@ -445,12 +445,12 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
       {/* Under the arc: the place's real temperature right now (the reading without interventions is in the chip below). */}
       {/* The user's own sensors, when one has read the air in the last 2 hours, come first. */}
       {mySensorAir ? (
-        <p className="-mt-1 flex items-center justify-center gap-1.5 text-center text-sm text-muted-foreground lg:text-base">
+        <p className="-mt-1 flex items-center justify-center gap-1.5 text-center text-sm text-muted-foreground md:portrait:text-base lg:text-base">
           <Thermometer className="size-4 text-primary" aria-hidden="true" />{mySensorAir.count > 1 ? `Dai tuoi ${mySensorAir.count} sensori adesso` : "Dal tuo sensore adesso"} <b className="font-semibold tabular-nums text-foreground">{fmt(mySensorAir.value)}°</b>
           {mySurface && <span className="tabular-nums">· superfici {fmt(mySurface.value)}°</span>}
         </p>
       ) : typeof realNow.data === "number" && (
-        <p className="-mt-1 flex items-center justify-center gap-1.5 text-center text-sm text-muted-foreground lg:text-base">
+        <p className="-mt-1 flex items-center justify-center gap-1.5 text-center text-sm text-muted-foreground md:portrait:text-base lg:text-base">
           <Thermometer className="size-4" aria-hidden="true" />Temperatura dell’aria ora <b className="font-semibold tabular-nums text-foreground">{fmt(realNow.data)}°</b>
         </p>
       )}
