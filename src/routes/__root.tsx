@@ -452,7 +452,7 @@ function SideNav() {
   const items = itemsFor(proId, guest), names = navFor(proId, guest);
   return (
     <aside className="fixed inset-y-0 left-0 z-[999999995] hidden w-60 flex-col border-r border-foreground/10 bg-background/70 px-3 pb-24 pt-5 backdrop-blur-xl lg:flex">
-      <Link to="/benvenuto" className="mb-6 flex items-center gap-2.5 rounded-xl px-2.5 py-1 outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <Link to="/urbano" onClick={() => openSimTab("urban", "mappa")} aria-label="Micro Digital Twin · Simulazione urbana" className="mb-6 flex items-center gap-2.5 rounded-xl px-2.5 py-1 outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <img src={logoCompact} alt="" className="size-9 shrink-0 object-contain" />
         <span className="text-[11px] font-semibold leading-tight tracking-[0.22em] text-foreground">MICRO DIGITAL <span className="text-[#2dd4bf]">TWIN</span></span>
       </Link>
@@ -498,7 +498,7 @@ function TabletRail() {
   };
   return (
     <aside className="fixed inset-y-0 left-0 z-[999999995] hidden w-20 flex-col items-center border-r border-foreground/10 bg-background/70 pb-48 pt-[calc(1rem+env(safe-area-inset-top))] backdrop-blur-xl md:flex lg:hidden">
-      <Link to="/benvenuto" aria-label="Micro Digital Twin" className="mb-5 rounded-xl p-1 outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <Link to="/urbano" onClick={() => openSimTab("urban", "mappa")} aria-label="Micro Digital Twin · Simulazione urbana" className="mb-5 rounded-xl p-1 outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <img src={logoCompact} alt="" className="size-9 object-contain" />
       </Link>
       <nav aria-label="Menu principale" className="flex flex-col items-center gap-1.5">
