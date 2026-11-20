@@ -19,7 +19,7 @@ import { PermissionsSheet } from "@/views/v10/Permissions";
 const DesktopTour = lazy(() => import("@/views/v10/DesktopTour"));
 const SectorGate = lazy(() => import("@/views/v10/SectorGate").then((m) => ({ default: m.SectorGate })));
 import { syncAppOrientation } from "@/lib/ar-orientation";
-import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
+import { isSlate, isTouchDevice, markSlate, markTouchDevice } from "@/lib/touch-device";
 import { installUiClicks } from "@/lib/ui-sounds";
 import { isChunkError, reloadFresh } from "@/router";
 import { History, Building2, Grape, Info, LayoutDashboard, Lock, UserRound } from "lucide-react";
@@ -452,7 +452,7 @@ function SideNav() {
   const pathname = useLocation({ select: (l) => l.pathname });
   const items = itemsFor(proId, guest), names = navFor(proId, guest);
   return (
-    <aside className="fixed inset-y-0 left-0 z-[999999995] hidden w-60 flex-col border-r border-foreground/10 bg-background/70 px-3 pb-24 pt-5 backdrop-blur-xl lg:flex">
+    <aside className="fixed inset-y-0 left-0 z-[999999995] hidden w-60 flex-col border-r border-foreground/10 bg-background/70 px-3 pb-24 pt-5 backdrop-blur-xl lg:flex slate-off">
       <Link to="/urbano" onClick={() => openSimTab("urban", "mappa")} aria-label="Micro Digital Twin · Simulazione urbana" className="mb-6 flex items-center gap-2.5 rounded-xl px-2.5 py-1 outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <img src={logoCompact} alt="" className="size-9 shrink-0 object-contain" />
         <span className="text-[11px] font-semibold leading-tight tracking-[0.22em] text-foreground">MICRO DIGITAL <span className="text-[#2dd4bf]">TWIN</span></span>
@@ -498,7 +498,7 @@ function TabletRail() {
     );
   };
   return (
-    <aside className="fixed inset-y-0 left-0 z-[999999995] hidden w-20 flex-col items-center border-r border-foreground/10 bg-background/70 pb-48 pt-[calc(1rem+env(safe-area-inset-top))] backdrop-blur-xl md:flex lg:hidden">
+    <aside className="fixed inset-y-0 left-0 z-[999999995] hidden w-20 flex-col items-center border-r border-foreground/10 bg-background/70 pb-48 pt-[calc(1rem+env(safe-area-inset-top))] backdrop-blur-xl md:flex lg:hidden slate-on">
       <Link to="/urbano" onClick={() => openSimTab("urban", "mappa")} aria-label="Micro Digital Twin · Simulazione urbana" className="mb-5 rounded-xl p-1 outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <img src={logoCompact} alt="" className="size-9 object-contain" />
       </Link>
@@ -743,6 +743,7 @@ function RootComponent() {
     // Surface Pro-like hybrids: expose real touch capability as a class-independent
     // attribute, so the AI camera controls are not hidden behind pointer queries.
     markTouchDevice();
+    markSlate();
     void import("@/lib/register-sw").then((m) => m.registerServiceWorker());
   }, []);
   // Soft keyboard-style tap on every button across the app.
@@ -785,13 +786,13 @@ function RootComponent() {
       <SideNav />
       <TabletRail />
       {/* Desktop: the header (account, "i", theme) sits at the foot of the side menu. */}
-      <header id="app-header" className="relative pt-[env(safe-area-inset-top)] md:fixed md:bottom-0 md:left-0 md:z-[999999996] md:w-20 md:border-t md:border-foreground/10 md:pt-0 lg:w-60">
-        <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-2 sm:px-4 sm:py-3 md:flex md:max-w-none md:flex-col md:px-2 lg:grid lg:px-3">
+      <header id="app-header" className="relative pt-[env(safe-area-inset-top)] md:fixed md:bottom-0 md:left-0 md:z-[999999996] md:w-20 md:border-t md:border-foreground/10 md:pt-0 lg:w-60 slate-head">
+        <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-2 sm:px-4 sm:py-3 md:flex md:max-w-none md:flex-col md:px-2 lg:grid lg:px-3 slate-stack">
           {/* No logo nor name here: the account sits where the logo was, the theme switch on the right. */}
           <div className="flex min-w-0 items-center"><AccountControl /></div>
-          <div className="flex shrink-0 items-center gap-2 md:flex-col lg:flex-row">
+          <div className="flex shrink-0 items-center gap-2 md:flex-col lg:flex-row slate-stack">
             {/* "i" shows the tutorial again (only the tutorial: it ends by coming back here). */}
-            <button type="button" onClick={() => { if (window.matchMedia("(min-width: 1024px), (orientation: landscape) and (min-width: 900px) and (min-height: 600px)").matches) window.dispatchEvent(new CustomEvent("mdt-desk-tour")); else void navigate({ to: "/?rivedi=1" as any }); }} aria-label="Come funziona" title="Come funziona"
+            <button type="button" onClick={() => { if (!isSlate() && window.matchMedia("(min-width: 1024px), (orientation: landscape) and (min-width: 900px) and (min-height: 600px)").matches) window.dispatchEvent(new CustomEvent("mdt-desk-tour")); else void navigate({ to: "/?rivedi=1" as any }); }} aria-label="Come funziona" title="Come funziona"
               className="grid size-9 shrink-0 place-items-center rounded-full border border-foreground/15 bg-foreground/[0.06] text-foreground outline-none transition-colors hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring sm:size-10">
               <Info className="size-4 sm:size-[1.15rem]" aria-hidden="true" />
             </button>
@@ -802,7 +803,7 @@ function RootComponent() {
       <div className="hidden sm:block md:hidden"><SmartNav /></div>
       </>}
 
-      <div className={intro ? undefined : "md:pl-20 lg:pl-60"}>
+      <div className={intro ? undefined : "md:pl-20 lg:pl-60 slate-pad"}>
       <main id="main-content" tabIndex={-1} className={intro ? "focus:outline-none" : "app-main mx-auto max-w-7xl px-4 pb-8 pt-6 focus:outline-none sm:pt-8 md:max-w-none md:px-6"}><Outlet /></main><Toaster /><UpdatePill />
       {!intro && <footer className="mx-auto max-w-7xl px-4 md:max-w-none md:px-6 md:pt-14 md:text-center pb-[calc(6.5rem+env(safe-area-inset-bottom))] text-sm leading-relaxed text-muted-foreground sm:pb-10 sm:text-[15px]">
         I risultati del simulatore sono indicativi e non sostituiscono modelli fisici calibrati.

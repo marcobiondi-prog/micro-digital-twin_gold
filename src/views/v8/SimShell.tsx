@@ -114,7 +114,7 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, medi
                 <SimMenu open={menu === "open"} onCamera={() => setCameraSheetOpen(true)} onMedia={() => showSimMedia(kind)} onSensors={() => go("sensori")} onMap={toMap} onSend={onSend} onReset={onReset} />
               </Suspense>}
         </>} />
-      <div ref={barRef} data-sim-tabs="" className="sticky top-[var(--nav-h)] z-[999999997] -mx-4 bg-transparent px-4 py-2 md:mx-[calc(50%-var(--page-w,100vw)/2+2.5rem)] md:px-[calc(var(--page-w,100vw)/2-2.5rem-50%)] lg:mx-[calc(50%-var(--page-w,100vw)/2+7.5rem)] lg:px-[calc(var(--page-w,100vw)/2-7.5rem-50%)] backdrop-blur-xl will-change-transform data-[hidden]:pointer-events-none">
+      <div ref={barRef} data-sim-tabs="" className="sticky top-[var(--nav-h)] z-[999999997] -mx-4 bg-transparent px-4 py-2 md:mx-[calc(50%-var(--page-w,100vw)/2+2.5rem)] md:px-[calc(var(--page-w,100vw)/2-2.5rem-50%)] lg:mx-[calc(50%-var(--page-w,100vw)/2+7.5rem)] lg:px-[calc(var(--page-w,100vw)/2-7.5rem-50%)] backdrop-blur-xl slate-bleed will-change-transform data-[hidden]:pointer-events-none">
         <TabRow label="Sezioni" items={desk ? DESK_TABS : TABS} value={desk && tab === "simula" ? "mappa" : tab} onChange={go} />
       </div>
       {/* The open tab follows the finger and the next slides in once it turns; nothing peeks beside it. */}

@@ -1,3 +1,4 @@
+import { isSlate, SLATE_QUERY } from "@/lib/touch-device";
 import { useSyncExternalStore } from "react";
 
 /** The desktop layout starts at 1024 px of width (Tailwind's lg): menu at the side, map beside the simulation. */
@@ -21,11 +22,11 @@ export function useIsDesktop(): boolean {
 export const SIDE_BY_SIDE_QUERY = "(min-width: 1024px), (orientation: landscape) and (min-width: 900px) and (min-height: 600px)";
 
 const subscribeSide = (cb: () => void) => {
-  const m = window.matchMedia(SIDE_BY_SIDE_QUERY);
-  m.addEventListener("change", cb);
-  return () => m.removeEventListener("change", cb);
+  const m = window.matchMedia(SIDE_BY_SIDE_QUERY), t = window.matchMedia(SLATE_QUERY);
+  m.addEventListener("change", cb); t.addEventListener("change", cb);
+  return () => { m.removeEventListener("change", cb); t.removeEventListener("change", cb); };
 };
 
 export function useSideBySide(): boolean {
-  return useSyncExternalStore(subscribeSide, () => window.matchMedia(SIDE_BY_SIDE_QUERY).matches, () => false);
+  return useSyncExternalStore(subscribeSide, () => window.matchMedia(SIDE_BY_SIDE_QUERY).matches && !isSlate(), () => false);
 }

@@ -1440,10 +1440,10 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
 /* Desktop: "Carica" apre subito i file del computer, senza menu Galleria/Scatta/Registra, e "Cartella" una cartella intera. */
 .lab-media-upload-direct, .lab-media-folder, .lab-media-dropzone { display: none; }
 @media (min-width: 1024px) and (any-pointer: fine) {
-  html:not([data-touch]) .lab-media-folder { display: inline-flex; }
-  html:not([data-touch]) .lab-media-dropzone { display: flex; }
-  html:not([data-touch]) .lab-media-upload-direct { display: inline-flex; }
-  html:not([data-touch]) .lab-media-upload-menu { display: none; }
+  html:not([data-slate]) .lab-media-folder { display: inline-flex; }
+  html:not([data-slate]) .lab-media-dropzone { display: flex; }
+  html:not([data-slate]) .lab-media-upload-direct { display: inline-flex; }
+  html:not([data-slate]) .lab-media-upload-menu { display: none; }
 }
 /* Tablets held sideways (touch): the same dashed drop box, for files dragged in from the tablet's Files app or a split screen. */
 @media (orientation: landscape) and (min-width: 900px) and (min-height: 600px) {
@@ -2435,4 +2435,22 @@ html[data-sys-camera] nav {
 .desk-sim .fuse-canvas {
   background: linear-gradient(180deg, color-mix(in oklab, var(--card) 38%, transparent) 0%, color-mix(in oklab, var(--card) 24%, transparent) 45%, color-mix(in oklab, var(--background) 20%, transparent) 100%);
   -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+
+/* Tablet mode of a 2-in-1 (html[data-slate], Surface without its keyboard) and touch tablets from 1024 px: the upright
+   tablet's interface — the 80 px rail with the camera above the account instead of the wide side menu, and the photos
+   panel without AI / Carica, which the rail's camera offers. */
+@media (min-width: 1024px) {
+  html[data-slate] .slate-off { display: none !important; }
+  html[data-slate] .slate-on { display: flex !important; }
+  html[data-slate] .slate-head { width: 5rem !important; }
+  html[data-slate] .slate-stack { display: flex !important; flex-direction: column !important; }
+  html[data-slate] .slate-pad { padding-left: 5rem !important; }
+  html[data-slate] .slate-bleed {
+    margin-left: calc(50% - var(--page-w, 100vw) / 2 + 2.5rem) !important; margin-right: calc(50% - var(--page-w, 100vw) / 2 + 2.5rem) !important;
+    padding-left: calc(var(--page-w, 100vw) / 2 - 2.5rem - 50%) !important; padding-right: calc(var(--page-w, 100vw) / 2 - 2.5rem - 50%) !important;
+  }
+  html[data-slate] .lab-media-actions .lab-media-ai,
+  html[data-slate] .lab-media-actions .lab-media-upload-direct,
+  html[data-slate] .lab-media-actions .lab-media-upload-menu { display: none !important; }
 }
