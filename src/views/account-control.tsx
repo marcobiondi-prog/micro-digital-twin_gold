@@ -552,7 +552,7 @@ export function AccountControl() {
           {/* Signed in, a ring round the picture fills with the cloud space in use, out of 50 GB. */}
           {cloudAccount && <StorageRing share={usage.share} />}
         </span>
-      <DialogContent ref={placePanel} overlayClassName="account-overlay !z-[1000000020]" className="account-panel !z-[1000000021] flex max-h-[min(680px,90dvh)] w-[min(420px,calc(100vw-2rem))] flex-col md:max-h-[min(860px,92dvh)] md:w-[min(900px,calc(100vw-8rem))] md:max-w-none gap-0 overflow-y-auto rounded-lg border bg-popover p-0 text-popover-foreground shadow-xl sm:rounded-lg">
+      <DialogContent ref={placePanel} overlayClassName="account-overlay !z-[1000000020] md:!fixed md:!inset-0 md:!h-auto md:!min-h-0 md:bg-black/45 md:backdrop-blur-md" className="account-panel !z-[1000000021] flex max-h-[min(680px,90dvh)] w-[min(420px,calc(100vw-2rem))] flex-col md:max-h-[min(860px,92dvh)] md:w-[min(900px,calc(100vw-8rem))] md:max-w-none gap-0 overflow-y-auto rounded-lg border bg-popover p-0 text-popover-foreground shadow-xl sm:rounded-lg">
         {page ? (() => {
           const Page = page === "menu" ? InfoMenu : PAGES[page];
           return (
