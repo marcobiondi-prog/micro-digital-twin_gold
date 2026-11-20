@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import { createPortal, flushSync } from "react-dom";
 import "@/styles/ar-camera.css";
 import { isTouchDevice } from "@/lib/touch-device";
-import { isTabletViewport } from "@/lib/tablet-camera";
 import { ArLive, arFullscreen, requestArSession, type FanGroup } from "@/views/ArLive";
 import { ScanSheet } from "@/views/ScanSheet";
 import { recognisedPlants, type PlacedObject } from "@/models/ar-objects";
@@ -298,7 +297,8 @@ export function ArCamera({
   const [, setStreamN] = useState(0);
   const [onPhone, setOnPhone] = useState(false);
   useEffect(() => {
-    const sync = () => setOnPhone(isTouchDevice() && !isTabletViewport(window.screen?.width || window.innerWidth, window.screen?.height || window.innerHeight));
+    // Phones and tablets (touch screens) get Rileva | AR; computers stay on Rileva.
+    const sync = () => setOnPhone(isTouchDevice());
     sync();
     window.addEventListener("resize", sync);
     return () => window.removeEventListener("resize", sync);

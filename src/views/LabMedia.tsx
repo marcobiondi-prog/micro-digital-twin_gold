@@ -9,12 +9,14 @@ import {
   ChevronDown,
   FileImage,
   FileVideo,
+  FolderOpen,
   ImagePlus,
   Images,
   Send,
   Trash2,
   Video,
 } from "lucide-react";
+import { filesFromDrop, mediaOnly } from "@/lib/folder-files";
 import { toast } from "sonner";
 import { prepareArOrientation } from "@/lib/ar-orientation";
 import { useInstalledApp } from "@/lib/installed-app";
@@ -157,6 +159,9 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
   /** Cascata identica al caricamento: ogni riga aspetta più della precedente, come le pillole. */
   const cascade = (index: number) => Math.min(400, index * 60 + index * (index - 1) * 4);
   const gallery = useRef<HTMLInputElement>(null);
+  // Desktop: a whole folder of photos and videos from the computer.
+  const folder = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
   const cameraPhoto = useRef<HTMLInputElement>(null);
   const cameraVideo = useRef<HTMLInputElement>(null);
   const [systemCamera, setSystemCamera] = useState<"photo" | "video" | "burst" | null>(null);
@@ -386,7 +391,21 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
   );
 
   return (
+    <div className="relative"
+      // Desktop: photos, videos and whole folders dragged from the computer onto the panel go to the review sheet.
+      onDragOver={(e: React.DragEvent<HTMLDivElement>) => { if (Array.from(e.dataTransfer.types).includes("Files")) { e.preventDefault(); setDragging(true); } }}
+      onDragLeave={(e: React.DragEvent<HTMLDivElement>) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false); }}
+      onDrop={(e: React.DragEvent<HTMLDivElement>) => {
+        if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+        e.preventDefault(); setDragging(false);
+        void filesFromDrop(e.dataTransfer).then((files) => { if (files.length) review(files); else toast.info("Nessuna foto né video tra i file trascinati"); });
+      }}>
     <Card className={embedded ? "bg-transparent p-0 shadow-none" : "p-4"}>
+      {dragging && (
+        <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center rounded-3xl border-2 border-dashed border-brand-turquoise bg-background/80 text-center backdrop-blur-sm">
+          <span className="flex flex-col items-center gap-2 text-sm font-semibold"><FolderOpen className="size-7 text-brand-turquoise" aria-hidden="true" />Rilascia qui foto, video o cartelle</span>
+        </div>
+      )}
       {!embedded && (
       <button
         type="button"
@@ -453,6 +472,14 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
       {/* Su Android la selezione multipla apre il gestore file; con un file alla volta si apre
           la galleria di sistema (Google Foto). Altrove resta la scelta multipla. */}
       {input(gallery, "image/*,video/*", undefined, galleryMultiple)}
+      {/* Desktop: a folder of the computer, its photos and videos (subfolders too) go to the same review sheet. */}
+      <input ref={folder} type="file" multiple className="hidden" {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
+        onChange={(e) => {
+          const files = mediaOnly(e.target.files);
+          if (files.length) review(files);
+          else if (e.target.files?.length) toast.info("Nella cartella non ci sono foto né video");
+          e.target.value = "";
+        }} />
       </>)}
       <div
         id={bodyId}
@@ -495,6 +522,18 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
               >
                 <ImagePlus className="size-4" />
                 <span>Carica</span>
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={busy}
+                className="lab-media-action lab-media-folder"
+                aria-label="Carica una cartella di foto e video dal computer"
+                title="Carica una cartella (anche trascinandola qui)"
+                onClick={() => folder.current?.click()}
+              >
+                <FolderOpen className="size-4" />
+                <span>Cartella</span>
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -569,6 +608,13 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
               </div>
             )}
           </div>
+          {/* Computers: a dashed box under Carica and Cartella to drop files and folders (or click to pick them). */}
+          <button type="button" disabled={busy} onClick={() => void pickGallery()}
+            className="lab-media-dropzone mt-3 w-full flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-foreground/20 px-4 py-6 text-center text-sm text-muted-foreground outline-none transition-colors hover:border-brand-turquoise/70 hover:bg-brand-turquoise/[0.06] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">
+            <FolderOpen className="size-6 text-brand-turquoise" aria-hidden="true" />
+            <span className="font-semibold text-foreground">Trascina qui foto, video o cartelle</span>
+            <span className="text-xs">oppure tocca o clicca qui per sceglierli</span>
+          </button>
           {uploads.length > 0 && (
             <ul className="mt-3 space-y-2" aria-label="Caricamenti in corso">
               {uploads.map((u, i) => (
@@ -747,5 +793,6 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
         </DialogContent>
       </Dialog>
     </Card>
+    </div>
   );
 }

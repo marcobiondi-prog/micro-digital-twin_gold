@@ -85,7 +85,7 @@ export function platformRadius(r: number): number {
 type Put = (m: THREE.Material, g: THREE.BufferGeometry) => void;
 
 /** The unit's fixed parts (platform, table, bench, trunk, hub); returns what draws its canopy at a given openness. */
-function unit(u: PapillonUnit, h: number, mats: Mats, out: THREE.Group, put: Put): (open: number, put: Put) => void {
+function unit(u: PapillonUnit, h: number, mats: Mats, out: THREE.Group, put: Put, joinedTop?: number): (open: number, put: Put) => void {
   const H = h, x = u.x, z = u.z;
   // The round platform where one can stop and eat: a low stone disc with a wooden deck, a round bench along its
   // edge on slim legs and a round table in the middle on one pedestal.
@@ -107,7 +107,7 @@ function unit(u: PapillonUnit, h: number, mats: Mats, out: THREE.Group, put: Put
   // The trunk: from a foot between the table and the bench it leans so the canopy stands over the platform's middle.
   const footR = Math.max(tableR + 0.25, bi - 0.14), fa = u.yaw + Math.PI;
   const foot = new THREE.Vector3(x + Math.sin(fa) * footR, 0.11, z + Math.cos(fa) * footR);
-  const hubY = H + 0.035;
+  const hubY = joinedTop ?? H + 0.035;
   const top = new THREE.Vector3(x, hubY - 0.06, z);
   put(mats.pole, rodBetween(foot, top, 0.07, 0.048));
   const plate = new THREE.CylinderGeometry(0.15, 0.16, 0.025, 24); plate.translate(foot.x, 0.123, foot.z); put(mats.pole, plate);
@@ -117,7 +117,7 @@ function unit(u: PapillonUnit, h: number, mats: Mats, out: THREE.Group, put: Put
   const disc = new THREE.Mesh(new THREE.CircleGeometry(rp + 0.35, 40), mats.shadow); disc.rotation.x = -Math.PI / 2; disc.position.set(x, 0.004, z); out.add(disc);
   const along = (yy: number) => foot.clone().lerp(top, (yy - foot.y) / (top.y - foot.y));
   const hub = new THREE.CylinderGeometry(0.075, 0.09, 0.12, 24); hub.translate(x, hubY, z); put(mats.pole, hub);
-  const finial = new THREE.SphereGeometry(0.045, 16, 10); finial.translate(x, hubY + 0.09, z); put(mats.satin, finial);
+  if (joinedTop == null) { const finial = new THREE.SphereGeometry(0.045, 16, 10); finial.translate(x, hubY + 0.09, z); put(mats.satin, finial); }
   return (open: number, put: Put) => {
     const o = Math.max(0, Math.min(1, open));
     if (o < 0.08) {
@@ -129,6 +129,7 @@ function unit(u: PapillonUnit, h: number, mats: Mats, out: THREE.Group, put: Put
       const b = new THREE.SphereGeometry(0.13, 16, 8); b.scale(1, 0.18, 1); b.translate(band.x, band.y, band.z); put(mats.satin, b);
       return;
     }
+    if (joinedTop != null) return;                         // joined: one shared canopy is drawn over all the trunks
     // Open: the hub with its finial and LED ring, the canopy, its ribs with caps and the piping round the edge.
     const reach = canopyReach(u.r, o);
     const drop = DROP * u.r + (1 - o) * 0.55 * u.r;          // folding down towards the trunk as it closes
@@ -146,6 +147,48 @@ function unit(u: PapillonUnit, h: number, mats: Mats, out: THREE.Group, put: Put
     }
     put(mats.trim, tube(c.edge, 0.009, 4, true));
   };
+}
+
+/**
+ * Joined sails (two or more brought together in the AR): one continuous canopy over the whole rectangle instead of a
+ * round one per trunk — a rounded-rectangle dome (a superellipse) of the same taut fabric, peaking at the middle and
+ * held by every trunk, its edge scalloped between twelve ribs with the dark piping, so they read as a single sail.
+ */
+function joinedCanopy(w: number, d: number, H: number, mats: Mats) {
+  const ax0 = w / 2 * 0.97, az0 = d / 2 * 0.97, m = Math.min(ax0, az0), N = 12, n = 4;
+  const hubY = H + 0.035;
+  const heightAt = (o: number, x: number, z: number) => {
+    const s = 0.12 + 0.88 * o, ax = ax0 * s, az = az0 * s, drop = DROP * m + (1 - o) * 0.55 * m;
+    const t = Math.min(1, (Math.abs(x / ax) ** n + Math.abs(z / az) ** n) ** (1 / n));
+    return hubY + 0.05 - drop * t * t;
+  };
+  const draw = (o: number, put: Put) => {
+    const s = 0.12 + 0.88 * o, ax = ax0 * s, az = az0 * s, drop = DROP * m + (1 - o) * 0.55 * m;
+    const segA = N * 8, segT = 12;
+    const point = (k: number, t: number) => {
+      const a = (2 * Math.PI * k) / segA, f = ((k / segA) * N) % 1, cut = Math.sin(Math.PI * f) ** 2;
+      const sx = Math.sin(a), cz = Math.cos(a);
+      const r = 1 / ((Math.abs(sx) / ax) ** n + (Math.abs(cz) / az) ** n) ** (1 / n);
+      const rr = r * (1 - SCALLOP * 0.6 * cut) * t;
+      return new THREE.Vector3(sx * rr, hubY + 0.05 - drop * t * t - 0.05 * cut * t, cz * rr);
+    };
+    const pos: number[] = [], idx: number[] = [];
+    for (let k = 0; k <= segA; k++) for (let j = 0; j <= segT; j++) { const p = point(k, j / segT); pos.push(p.x, p.y, p.z); }
+    for (let k = 0; k < segA; k++) for (let j = 0; j < segT; j++) { const a = k * (segT + 1) + j, b = a + 1, c = a + segT + 1, e = c + 1; idx.push(a, b, c, b, e, c); }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+    put(mats.fabric, geo);
+    const top = new THREE.Vector3(0, hubY + 0.05, 0);
+    for (let i = 0; i < N; i++) {
+      const line: THREE.Vector3[] = [top.clone().setY(top.y - 0.03)];
+      for (let j = 1; j <= segT; j++) { const q = point(i * 8, j / segT); q.y -= 0.018; line.push(q); }
+      put(mats.pole, tube(line, 0.011, 5));
+      const tip = line[line.length - 1]!; const cap = new THREE.SphereGeometry(0.02, 10, 6); cap.translate(tip.x, tip.y, tip.z); put(mats.satin, cap);
+    }
+    const edge: THREE.Vector3[] = []; for (let k = 0; k < segA; k++) edge.push(point(k, 1));
+    put(mats.trim, tube(edge, 0.009, 4, true));
+    const fin = new THREE.SphereGeometry(0.05, 16, 10); fin.translate(0, hubY + 0.11, 0); put(mats.satin, fin);
+  };
+  return { draw, heightAt };
 }
 
 const MERGE = (bins: Map<THREE.Material, THREE.BufferGeometry[]>, into: THREE.Group) => {
@@ -170,7 +213,7 @@ const TRAVEL_S = 4;
 
 type PapillonState = { open: number; built: number; target: number; build: (o: number) => void; onFrame?: (() => void) | undefined; last: number };
 
-export function realPapillons(def: { w: number; d: number; h?: number; open?: number }): THREE.Group {
+export function realPapillons(def: { w: number; d: number; h?: number; open?: number; joined?: boolean }): THREE.Group {
   const out = new THREE.Group();
   const mats: Mats = {
     pole: new THREE.MeshStandardMaterial({ color: "#2b2f34", roughness: 0.42, metalness: 0.55 }),
@@ -184,7 +227,11 @@ export function realPapillons(def: { w: number; d: number; h?: number; open?: nu
     shadow: new THREE.MeshBasicMaterial({ color: "#000", transparent: true, opacity: 0.28, depthWrite: false }),
   };
   const fixed = new Map<THREE.Material, THREE.BufferGeometry[]>();
-  const canopies = papillonUnits(Math.max(1, def.w), Math.max(1, def.d)).map((u) => unit(u, def.h ?? 3.2, mats, out, binner(fixed)));
+  const units = papillonUnits(Math.max(1, def.w), Math.max(1, def.d)), H = def.h ?? 3.2;
+  const joined = def.joined && units.length > 1 ? joinedCanopy(Math.max(1, def.w), Math.max(1, def.d), H, mats) : null;
+  // Joined, each trunk's top meets the shared canopy where it passes over it (wide open).
+  const canopies: Array<(open: number, put: Put) => void> = units.map((u) => unit(u, H, mats, out, binner(fixed), joined ? joined.heightAt(1, u.x, u.z) - 0.04 : undefined));
+  if (joined) canopies.push((o, put) => { if (o >= 0.08) joined.draw(o, put); });
   MERGE(fixed, out);
   // The canopies in a group of their own, drawn again when the openness changes (opening or closing by itself).
   const canopy = new THREE.Group();
@@ -252,4 +299,19 @@ export function realShadeOpen(lat: number, lng: number, date = new Date()): numb
   const m = date.getMonth();
   const winter = lat >= 0 ? m === 11 || m <= 1 : m >= 5 && m <= 7;
   return winter ? 0 : Math.max(0, Math.min(1, (sun - 5) / 10));
+}
+
+/**
+ * How much light there is, 0 (dark) – 1 (bright), turned into the sails' openness with some hysteresis: they open
+ * above `on` and close below `off`, so a shadow passing by does not make them flap. `was` is the last target.
+ */
+export function lightTarget(level: number, was: number): number {
+  const on = 0.34, off = 0.2;
+  if (level >= on) return 1;
+  if (level <= off) return 0;
+  return was;
+}
+/** ARCore's light estimate (primary light and ambient, HDR) as a 0–1 light level. */
+export function arLightLevel(primary: number, ambient: number): number {
+  return 1 - Math.exp(-(Math.max(0, primary) + Math.max(0, ambient) * 2) / 1.2);
 }

@@ -14,7 +14,7 @@ import { hapticTick } from "@/lib/haptics";
 import { easeTo, FloorTracker, placementFor, RAISED_M, surfaceKind, type SurfaceHit } from "@/models/ar-floor";
 import { contactShadow, floorLoop, objectMesh } from "@/views/ar-object-meshes";
 import { buildPlan, growPlan, planText, planTreeDefs } from "@/views/ar-plan";
-import { realShadeOpen, setShadeTarget } from "@/views/ar-papillon";
+import { arLightLevel, lightTarget, setShadeTarget } from "@/views/ar-papillon";
 import { realTree, wantsRealTree } from "@/views/ar-tree";
 import { ArShadows, castShadows } from "@/views/ar-shadow";
 import { XREstimatedLight } from "three/examples/jsm/webxr/XREstimatedLight.js";
@@ -250,6 +250,10 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const [measure, setMeasure] = useState<V[]>([]);
   const hudRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  // The sails' light: ARCore's estimate when it runs, the smoothed level 0–1 and the openness it gives (1 open, 0 closed).
+  const estRef = useRef<XREstimatedLight | null>(null);
+  const lightLevelRef = useRef<number | null>(null);
+  const lightOpenRef = useRef(1);
   // Messages written over the camera: the app's toasts sit under the camera's dialog.
   const [notice, setNotice] = useState<{ text: string; tone: "ok" | "warn" } | null>(null);
   // Why the preview runs instead of ARCore: written in the status line once, at the start.
@@ -373,6 +377,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     let est: XREstimatedLight | null = null;
     if (session) {
       est = new XREstimatedLight(renderer);
+      estRef.current = est;
       const fixed = scene.children.filter((c) => (c as THREE.Light).isLight);
       const e = est;
       e.addEventListener("estimationstart", () => {
@@ -564,28 +569,51 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     const Q_BACK = new THREE.Quaternion(-Math.SQRT1_2, 0, 0, Math.SQRT1_2), Z_AXIS = new THREE.Vector3(0, 0, 1);
     let yaw0: number | null = null;
     fl.yaw = 0;
+    let roll = 0;
+    const fwd = new THREE.Vector3(), eul = new THREE.Euler();
+    const wrap = (a: number) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
+    // From the camera's orientation (y up, −z ahead): how far it looks up or down, its turn round the vertical (the
+    // first reading is "straight ahead", the direction the objects were put or carried in, so turning leaves them
+    // where they stand: the preview has no tracking, only the turn is known, not a step) and its roll, so the objects
+    // lean with the picture when the device is held a little crooked. A little smoothing against the sensor's jitter.
+    const applyQ = (q: THREE.Quaternion) => {
+      fwd.set(0, 0, -1).applyQuaternion(q);
+      fl.tilt = Math.max(-80, Math.min(-8, (Math.asin(Math.max(-1, Math.min(1, fwd.y))) * 180) / Math.PI));
+      eul.setFromQuaternion(q, "YXZ");
+      if (yaw0 === null) yaw0 = eul.y;
+      fl.yaw += wrap(wrap(eul.y - yaw0) - fl.yaw) * 0.5;
+      roll += (Math.max(-0.8, Math.min(0.8, eul.z)) - roll) * 0.4;
+    };
+    // On Windows tablets (Surface) and many Android phones the orientation sensor (Generic Sensor API) is steadier and
+    // faster than deviceorientation, which Chrome on Windows often does not fire at all: used when it starts.
+    let sensorOn = false;
+    let sensor: { start(): void; stop(): void; quaternion?: number[] | null; addEventListener(t: string, f: () => void): void } | null = null;
+    const Q_UP = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2), sq = new THREE.Quaternion();
+    try {
+      const Ctor = (window as unknown as { RelativeOrientationSensor?: new (o: object) => NonNullable<typeof sensor> }).RelativeOrientationSensor;
+      if (Ctor) {
+        sensor = new Ctor({ frequency: 60, referenceFrame: "screen" });
+        sensor.addEventListener("reading", () => {
+          const q = sensor?.quaternion;
+          if (!q) return;
+          sensorOn = true;
+          // The sensor's world is z up, y north; the camera's is y up, −z ahead.
+          applyQ(sq.set(q[0]!, q[1]!, q[2]!, q[3]!).premultiply(Q_UP));
+        });
+        sensor.addEventListener("error", () => { sensorOn = false; });
+        sensor.start();
+      }
+    } catch { sensor = null; }
     const onTilt = (e: DeviceOrientationEvent) => {
-      if (e.beta === null) return;
+      if (sensorOn || e.beta === null) return;
       const b = (e.beta * Math.PI) / 180, g = ((e.gamma ?? 0) * Math.PI) / 180;
-      const elev = (Math.asin(Math.max(-1, Math.min(1, -Math.cos(b) * Math.cos(g)))) * 180) / Math.PI;
-      fl.tilt = Math.max(-80, Math.min(-8, elev));
-      // Where the phone points round the vertical, so turning it leaves the objects where they stand instead of
-      // carrying them along (the preview has no tracking: only the turn is known, not a step). The camera's −z axis
-      // from alpha, beta, gamma and the screen's angle, as three's device-orientation controls do; the first reading
-      // is "straight ahead", the direction the objects were put or carried in.
-      if (e.alpha === null) return;
-      devQ.setFromEuler(devE.set(b, (e.alpha * Math.PI) / 180, -g, "YXZ")).multiply(Q_BACK)
-        .multiply(scrQ.setFromAxisAngle(Z_AXIS, -(((screen.orientation?.angle ?? 0) * Math.PI) / 180)));
-      const y = new THREE.Euler().setFromQuaternion(devQ, "YXZ").y;
-      if (yaw0 === null) yaw0 = y;
-      let d = y - yaw0;
-      while (d > Math.PI) d -= 2 * Math.PI;
-      while (d < -Math.PI) d += 2 * Math.PI;
-      // A little smoothing against the sensor's jitter, the short way round.
-      let step = d - fl.yaw;
-      while (step > Math.PI) step -= 2 * Math.PI;
-      while (step < -Math.PI) step += 2 * Math.PI;
-      fl.yaw += step * 0.5;
+      // Without alpha only the elevation of the back camera's axis (−z of the device), whichever way it is held.
+      if (e.alpha === null) {
+        fl.tilt = Math.max(-80, Math.min(-8, (Math.asin(Math.max(-1, Math.min(1, -Math.cos(b) * Math.cos(g)))) * 180) / Math.PI));
+        return;
+      }
+      applyQ(devQ.setFromEuler(devE.set(b, (e.alpha * Math.PI) / 180, -g, "YXZ")).multiply(Q_BACK)
+        .multiply(scrQ.setFromAxisAngle(Z_AXIS, -(((screen.orientation?.angle ?? 0) * Math.PI) / 180))));
     };
     window.addEventListener("deviceorientation", onTilt);
     window.addEventListener("resize", size);
@@ -608,7 +636,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       const fov = fovAt(zoomRef.current);
       if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
       const pitch = Math.max(-80, Math.min(10, fl.tilt + fl.offset));
-      camera.rotation.set((pitch * Math.PI) / 180, fl.yaw, 0, "YXZ");
+      camera.rotation.set((pitch * Math.PI) / 180, fl.yaw, roll, "YXZ");
       if (horizonLine.current) horizonLine.current.style.top = `${(horizonAt(pitch, camera.fov) * 100).toFixed(2)}%`;
       camera.updateMatrixWorld();
       const t = three.current;
@@ -648,6 +676,7 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       window.removeEventListener("pointerup", onTap, true);
       el.removeEventListener("webglcontextlost", onLost);
       window.removeEventListener("deviceorientation", onTilt);
+      try { sensor?.stop(); } catch { /* already stopped */ }
       window.removeEventListener("resize", size);
       renderer.setAnimationLoop(null);
       renderer.dispose();
@@ -835,14 +864,13 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
 
   /** A placed object drawn again (preview rebuilt, or carried from ARCore): its mesh, round shadow and grown tree. */
   /**
-   * The sails open and close by themselves with the real sun over the place: built open, they then close (or stay
-   * open) smoothly, and every minute they follow the sun again. Said once when one closes as it is put down.
+   * The sails open only with light: put down closed, they open by themselves (about 4 s) when the camera sees enough
+   * light — ARCore's light estimate, else the camera's picture — and close again in the dark (lightRef, below).
    */
   function shadeAuto(root: THREE.Object3D, say: boolean) {
-    const open = realShadeOpen(loc.lat, loc.lng);
-    if (setShadeTarget(root, open) && say && open < 0.5) {
-      const m = new Date().getMonth(), winter = loc.lat >= 0 ? m === 11 || m <= 1 : m >= 5 && m <= 7;
-      setNotice({ text: `La vela si chiude da sola: ${winter ? "d’inverno resta chiusa" : open <= 0 ? "il sole è tramontato" : "il sole è basso"}. Si riapre da sola nelle ore calde.`, tone: "ok" });
+    const target = lightOpenRef.current;
+    if (setShadeTarget(root, target) && say) {
+      setNotice({ text: target >= 0.5 ? "C’è luce: la vela si apre da sola." : "Poca luce: la vela resta chiusa. Si apre da sola quando arriva la luce.", tone: "ok" });
     }
   }
   function addPlacedMesh(t: NonNullable<typeof three.current>, o: PlacedObject, y: number) {
@@ -1134,11 +1162,42 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
     }
   }, [alignment, area, origin, showPlan, kind, planKey, merge, joinBeds, plantKey]);
 
-  // The sails follow the real sun by themselves: every minute their openness is worked out again.
+  // The light the sails answer to, read twice a second: ARCore's estimate of the room's or the piazza's light (primary
+  // light and ambient) while it gives one, else the camera's picture (its mean brightness), smoothed; when it crosses
+  // the thresholds every sail opens or closes by itself, said once.
   useEffect(() => {
-    const id = window.setInterval(() => { const t = three.current; if (t) setShadeTarget(t.scene, realShadeOpen(loc.lat, loc.lng)); }, 60000);
+    const cv = document.createElement("canvas"); cv.width = 24; cv.height = 18;
+    const cx = cv.getContext("2d", { willReadFrequently: true });
+    const id = window.setInterval(() => {
+      let level: number | null = null;
+      const e = estRef.current;
+      if (e && e.parent) {
+        const dl = e.directionalLight, col = dl.color;
+        const prim = (0.2126 * col.r + 0.7152 * col.g + 0.0722 * col.b) * dl.intensity;
+        const c0 = e.lightProbe.sh.coefficients[0];
+        const amb = c0 ? (0.2126 * c0.x + 0.7152 * c0.y + 0.0722 * c0.z) * e.lightProbe.intensity : 0;
+        level = arLightLevel(prim, amb);
+      } else {
+        const v = videoRef.current;
+        if (v && cx && v.readyState >= 2) {
+          try {
+            cx.drawImage(v, 0, 0, 24, 18);
+            const d = cx.getImageData(0, 0, 24, 18).data; let sum = 0;
+            for (let i = 0; i < d.length; i += 4) sum += 0.2126 * d[i]! + 0.7152 * d[i + 1]! + 0.0722 * d[i + 2]!;
+            level = sum / (d.length / 4) / 255;
+          } catch { /* the frame is not readable yet */ }
+        }
+      }
+      if (level == null) return;
+      lightLevelRef.current = lightLevelRef.current == null ? level : lightLevelRef.current * 0.6 + level * 0.4;
+      const was = lightOpenRef.current, next = lightTarget(lightLevelRef.current, was);
+      if (next === was) return;
+      lightOpenRef.current = next;
+      const t = three.current;
+      if (t && setShadeTarget(t.scene, next)) setNotice({ text: next ? "C’è luce: le vele si aprono da sole." : "È buio: le vele si chiudono da sole.", tone: "ok" });
+    }, 500);
     return () => window.clearInterval(id);
-  }, [loc.lat, loc.lng]);
+  }, []);
 
   // The measuring tape between the two points.
   useEffect(() => {

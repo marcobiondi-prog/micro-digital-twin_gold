@@ -58,8 +58,8 @@ export function CameraDockButton({ focused = false }: { focused?: boolean }) {
 function RoundAction({ icon: Icon, label, tone, onClick }: { icon: LucideIcon; label: string; tone: string; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick}
-      className="flex flex-col items-center gap-2 rounded-2xl p-2 text-sm font-semibold outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:active:scale-100">
-      <span className={cn("grid size-14 place-items-center rounded-full text-white", tone)}><Icon className="size-6" aria-hidden="true" /></span>
+      className="flex flex-col items-center gap-2 rounded-2xl p-2 text-sm font-semibold md:portrait:gap-3 md:portrait:text-base outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:active:scale-100">
+      <span className={cn("grid size-14 place-items-center rounded-full text-white md:portrait:size-20", tone)}><Icon className="size-6 md:portrait:size-8" aria-hidden="true" /></span>
       {label}
     </button>
   );
@@ -222,10 +222,10 @@ export function CameraSheet() {
     <input ref={videoInput} type="file" accept="video/*" capture="environment" className="hidden" aria-hidden="true" tabIndex={-1} onChange={onPicked("camera")} />
     <input ref={galleryInput} type="file" accept="image/*,video/*" multiple={galleryMultiple} className="hidden" aria-hidden="true" tabIndex={-1} onChange={onPicked("gallery")} />
     <Dialog open={open} onOpenChange={setCameraSheetOpen}>
-      <DialogContent className="gap-4 border-foreground/20 bg-card dark:bg-[oklch(0.25_0.016_258)] shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_-24px_60px_rgb(0_0_0/0.6)] p-5 max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-[1.75rem] max-sm:border-x-0 max-sm:border-b-0 max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-sm:data-[state=open]:slide-in-from-bottom-1/2 max-sm:data-[state=closed]:slide-out-to-bottom-1/2 sm:w-[min(440px,calc(100vw-1.5rem))] sm:rounded-2xl">
+      <DialogContent overlayClassName="bg-black/45 backdrop-blur-md sm:!fixed sm:!inset-0 sm:!h-auto sm:!min-h-0" className="gap-4 md:portrait:max-w-xl md:portrait:gap-6 md:portrait:p-8 border-foreground/20 bg-card dark:bg-[oklch(0.25_0.016_258)] shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_-24px_60px_rgb(0_0_0/0.6)] p-5 max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-[1.75rem] max-sm:border-x-0 max-sm:border-b-0 max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-sm:data-[state=open]:slide-in-from-bottom-1/2 max-sm:data-[state=closed]:slide-out-to-bottom-1/2 sm:w-[min(440px,calc(100vw-1.5rem))] md:portrait:w-[min(600px,calc(100vw-8rem))] sm:rounded-2xl">
         <span className="mx-auto -mt-1 h-1.5 w-10 rounded-full bg-foreground/20 sm:hidden" aria-hidden="true" />
         <DialogHeader className="text-left">
-          <DialogTitle>Fotocamera</DialogTitle>
+          <DialogTitle className="md:portrait:text-2xl">Fotocamera</DialogTitle>
           <DialogDescription>{kind ? (guest ? (kind === "urban" ? "Foto e video della piazza" : "Foto e video del vigneto") : kind === "urban" ? "Foto e video della tua piazza" : "Foto e video del tuo vigneto") : "Per scattare, dicci chi sei"}</DialogDescription>
         </DialogHeader>
         {!kind ? (
@@ -240,14 +240,14 @@ export function CameraSheet() {
           <>
             {(aiReady || !signedIn || AI_STANDBY) && (
               <button type="button" disabled={signedIn && AI_STANDBY} onClick={() => (aiReady ? start("ai") : afterClose(openAccount))}
-                className="relative flex items-center gap-4 overflow-hidden rounded-[1.25rem] border border-brand-turquoise/40 bg-[radial-gradient(120%_120%_at_0%_0%,color-mix(in_oklch,var(--brand-turquoise)_32%,transparent),transparent_60%)] bg-muted/60 p-4 text-left outline-none transition-transform active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 disabled:active:scale-100 motion-reduce:active:scale-100">
-                <span className={cn("relative grid size-16 shrink-0 place-items-center rounded-full bg-background", signedIn && AI_STANDBY ? "camera-dev-ring-card" : "border-[3px] border-brand-turquoise shadow-[0_0_22px_color-mix(in_oklch,var(--brand-turquoise)_45%,transparent)]")}>
-                  <img src={aiLogo} alt="" aria-hidden="true" className="size-8" />
+                className="relative flex items-center gap-4 md:portrait:gap-6 md:portrait:p-6 overflow-hidden rounded-[1.25rem] border border-brand-turquoise/40 bg-[radial-gradient(120%_120%_at_0%_0%,color-mix(in_oklch,var(--brand-turquoise)_32%,transparent),transparent_60%)] bg-muted/60 p-4 text-left outline-none transition-transform active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 disabled:active:scale-100 motion-reduce:active:scale-100">
+                <span className={cn("relative grid size-16 md:portrait:size-20 shrink-0 place-items-center rounded-full bg-background", signedIn && AI_STANDBY ? "camera-dev-ring-card" : "border-[3px] border-brand-turquoise shadow-[0_0_22px_color-mix(in_oklch,var(--brand-turquoise)_45%,transparent)]")}>
+                  <img src={aiLogo} alt="" aria-hidden="true" className="size-8 md:portrait:size-10" />
                   {!aiReady && <span className={cn("absolute -bottom-1 -right-1 grid size-6 place-items-center rounded-full ring-2 ring-card", signedIn && AI_STANDBY ? "bg-amber-400 text-black" : "bg-foreground text-background")}>{signedIn && AI_STANDBY ? <Wrench className="size-3.5" aria-hidden="true" /> : <Lock className="size-3.5" aria-hidden="true" />}</span>}
                 </span>
                 <span className="min-w-0">
-                  <span className="flex items-center gap-2 text-lg font-bold">Fotocamera AI{AI_STANDBY && <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-400">In sviluppo</span>}</span>
-                  <span className="block text-sm text-muted-foreground">{aiReady ? "Inquadra una pianta: la riconosce e calcola il fresco" : AI_STANDBY ? `Non è ancora disponibile: la stiamo sviluppando e arriverà con un prossimo aggiornamento. Per ora puoi usare Foto, Video e Galleria.${signedIn ? "" : " Quando sarà pronta, accedi per usarla."}` : "Accedi per usarla"}</span>
+                  <span className="flex items-center gap-2 text-lg font-bold md:portrait:text-xl">Fotocamera AI{AI_STANDBY && <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-400">In sviluppo</span>}</span>
+                  <span className="block text-sm text-muted-foreground md:portrait:text-base">{aiReady ? "Inquadra una pianta: la riconosce e calcola il fresco" : AI_STANDBY ? `Non è ancora disponibile: la stiamo sviluppando e arriverà con un prossimo aggiornamento. Per ora puoi usare Foto, Video e Galleria.${signedIn ? "" : " Quando sarà pronta, accedi per usarla."}` : "Accedi per usarla"}</span>
                   {place && <span className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-full bg-brand-turquoise/15 px-2.5 py-1 text-xs font-semibold text-brand-turquoise"><MapPin className="size-3.5 shrink-0" aria-hidden="true" /><span className="truncate">{place}</span></span>}
                 </span>
               </button>

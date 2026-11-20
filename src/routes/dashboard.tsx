@@ -150,7 +150,7 @@ const DEFAULT_LOG: { d: string; t: string }[] = [
 ];
 
 /** Premium records of the piazza: the approval cycle with the public bodies, the log of interventions and the AI plan. */
-function UrbanRecords() {
+function UrbanRecords({ history }: { history?: ReactNode }) {
   const lab = useLab().urban, m = urbanMetrics(lab);
   const [stage, setStage] = useState(0);
   const [approvals, setApprovals] = useState<Record<string, Approval>>({});
@@ -297,7 +297,9 @@ function UrbanRecords() {
     return () => { alive = false; clearInterval(iv); window.removeEventListener("focus", check); document.removeEventListener("visibilitychange", back); };
   }, [uid, loaded]);
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0">
+      <div className="min-w-0 space-y-8">{history}</div>
+      <div className="min-w-0 space-y-8">
       <DashSection title="Registro interventi">
         <DashCard>
             <form className="grid grid-cols-[minmax(0,1fr)_auto] gap-2" onSubmit={(e) => { e.preventDefault(); if (draft.trim()) { addLog(draft.trim()); setDraft(""); } }}>
@@ -313,7 +315,8 @@ function UrbanRecords() {
         </DashCard>
       </DashSection>
       <SendProject flow="piazza" />
-      <PremiumPart locked={URBAN_LOCKED}>
+      </div>
+      <div className="min-w-0 lg:col-span-2"><PremiumPart locked={URBAN_LOCKED}>
         <div className="space-y-8">
           <DashSection title="Approvazioni degli enti" hint={STAGES[displayedStage]}>
         <DashCard>
@@ -333,7 +336,7 @@ function UrbanRecords() {
                 const a = approvals[e] ?? EMPTY_APPROVAL;
                 return (
                    <li key={e} className="dashboard-tile min-w-0 rounded-xl bg-muted/40 p-2.5 text-xs" data-testid="external-approval">
-                     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                     <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
                        <span className="min-w-0 font-semibold">{e}</span>
                       <span className={`font-semibold ${a.status === "approvato" ? "text-ok" : a.status === "respinto" ? "text-danger" : "text-muted-foreground"}`}>
                         {a.status === "approvato" ? `Approvato${a.date ? ` ${a.date}` : ""}` : a.status === "respinto" ? `Respinto${a.date ? ` ${a.date}` : ""}` : "In attesa"}
@@ -361,7 +364,7 @@ function UrbanRecords() {
       </DashSection>
           <DashSection title="Piano suggerito dall’AI"><FieldAI kind="urban" onAdd={addLog} /></DashSection>
         </div>
-      </PremiumPart>
+      </PremiumPart></div>
     </div>
   );
 }
@@ -373,7 +376,7 @@ const setNotesStore = (n: Notes) => { vineNotes = n; notesSubs.forEach((f) => f(
 function useNotes() { return useSyncExternalStore((f) => { notesSubs.add(f); return () => notesSubs.delete(f); }, () => vineNotes, () => vineNotes); }
 
 /** Premium records of the vineyard: the field notebook and the AI plan. */
-function VineRecords() {
+function VineRecords({ history }: { history?: ReactNode }) {
   const notes = useNotes();
   const setNotes = (u: Notes | ((p: Notes) => Notes)) => setNotesStore(typeof u === "function" ? u(vineNotes) : u);
   const [txt, setTxt] = useState("");
@@ -383,7 +386,9 @@ function VineRecords() {
     void addHistory("vigneto", t, place, null, getSimWhen("vineyard"));
   };
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:space-y-0">
+      <div className="min-w-0 space-y-8">{history}</div>
+      <div className="min-w-0 space-y-8">
       <DashSection title="Quaderno di campagna">
         <DashCard>
           <form className="grid grid-cols-[minmax(0,1fr)_auto] gap-2" onSubmit={(e) => { e.preventDefault(); if (!txt.trim()) return; addNote(txt); setTxt(""); }}>
@@ -398,9 +403,10 @@ function VineRecords() {
         </DashCard>
       </DashSection>
       <SendProject flow="vigneto" />
-      <PremiumPart locked={VINE_LOCKED}>
+      </div>
+      <div className="min-w-0 lg:col-span-2"><PremiumPart locked={VINE_LOCKED}>
         <DashSection title="Piano suggerito dall’AI"><FieldAI onAdd={addNote} /></DashSection>
-      </PremiumPart>
+      </PremiumPart></div>
     </div>
   );
 }
@@ -938,7 +944,7 @@ function Dashboard() {
           <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
         </Link>
       ) : (
-        <div className="sticky top-[var(--nav-h)] transition-[top] duration-300 z-[999999998] isolate mx-[calc(50%-50vw)] mb-5 mt-3 min-w-0 bg-transparent px-0 py-2 sm:px-[calc(50vw-50%)] backdrop-blur-xl sm:mb-6">
+        <div className="sticky top-[var(--nav-h)] transition-[top] duration-300 z-[999999998] isolate mx-[calc(50%-50vw)] mb-5 mt-3 min-w-0 bg-transparent px-0 py-2 sm:px-[calc(50vw-50%)] md:mx-[calc(50%-var(--page-w,100vw)/2+2.5rem)] md:px-[calc(var(--page-w,100vw)/2-2.5rem-50%)] lg:mx-[calc(50%-var(--page-w,100vw)/2+7.5rem)] lg:px-[calc(var(--page-w,100vw)/2-7.5rem-50%)] backdrop-blur-xl slate-bleed sm:mb-6">
           <TabRow fill label="Dashboard" items={[{ id: "Piazza", label: "Piazza", icon: Building2 }, { id: "Vigneto", label: "Vigneto", icon: Grape }]} value={t} onChange={setT} />
         </div>
       )}
@@ -947,8 +953,8 @@ function Dashboard() {
         ? <DashboardLoading label={t === "Piazza" ? "dashboard della piazza" : "dashboard del vigneto"} tone={t === "Piazza" ? "urban" : "vine"} />
         : !sectionOpen ? <SectionLockCard section={t === "Piazza" ? "urban" : "vineyard"} className="dashboard-content-enter" />
         : <div className="dashboard-content-enter">{t === "Piazza"
-          ? <PiazzaDashboard records={<><HistoryBlock compact flow="piazza" /><UrbanRecords /></>} />
-          : <VineDashboard records={<><HistoryBlock compact flow="vigneto" /><VineRecords /></>} />}</div>}
+          ? <PiazzaDashboard records={<UrbanRecords history={<HistoryBlock compact flow="piazza" />} />} />
+          : <VineDashboard records={<VineRecords history={<HistoryBlock compact flow="vigneto" />} />} />}</div>}
       </div>
     </div>
   );

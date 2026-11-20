@@ -17,3 +17,20 @@ export function markTouchDevice(): void {
   if (typeof document === "undefined") return;
   document.documentElement.toggleAttribute("data-touch", isTouchDevice());
 }
+
+/**
+ * Tablet mode of a 2-in-1 (Surface with the keyboard folded away or detached, Windows "tablet mode"): Chrome and
+ * Edge on Windows then report a coarse primary pointer and no hover, and switch back to fine when the keyboard and
+ * touchpad return, firing the media query's change. Also true for touch tablets (iPad, Android) held either way.
+ */
+export const SLATE_QUERY = "(pointer: coarse)";
+export function isSlate(): boolean {
+  return typeof window !== "undefined" && isTouchDevice() && window.matchMedia(SLATE_QUERY).matches;
+}
+/** Marks <html data-slate> and keeps it in step as the device goes into or out of tablet mode. */
+export function markSlate(): void {
+  if (typeof document === "undefined") return;
+  const set = () => document.documentElement.toggleAttribute("data-slate", isSlate());
+  set();
+  window.matchMedia(SLATE_QUERY).addEventListener("change", set);
+}

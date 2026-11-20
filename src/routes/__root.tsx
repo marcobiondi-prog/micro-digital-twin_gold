@@ -9,15 +9,17 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useHomeFocus } from "@/lib/home-focus";
-import { introSeen } from "@/lib/intro-seen";
+import { introSeen, markIntroSeen } from "@/lib/intro-seen";
 import { THEME_DARK, ThemeToggle, themeBootScript } from "@/views/theme-toggle";
+import logoCompact from "@/assets/climate-twin-logo-compact.png";
 import { AccountControl } from "@/views/account-control";
 import { CameraDockButton, CameraSheet } from "@/views/CameraDock";
 import { PermissionsSheet } from "@/views/v10/Permissions";
 // The sector page is loaded after the first paint (it covers the app only with no profile, or when asked).
+const DesktopTour = lazy(() => import("@/views/v10/DesktopTour"));
 const SectorGate = lazy(() => import("@/views/v10/SectorGate").then((m) => ({ default: m.SectorGate })));
 import { syncAppOrientation } from "@/lib/ar-orientation";
-import { isTouchDevice, markTouchDevice } from "@/lib/touch-device";
+import { isSlate, isTouchDevice, markSlate, markTouchDevice } from "@/lib/touch-device";
 import { installUiClicks } from "@/lib/ui-sounds";
 import { isChunkError, reloadFresh } from "@/router";
 import { History, Building2, Grape, Info, LayoutDashboard, Lock, UserRound } from "lucide-react";
@@ -132,7 +134,7 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 const nav: ReadonlyArray<{ to: "/benvenuto" | "/urbano" | "/vigneto" | "/dashboard" | "/profilo"; l: string }> = [
-  { to: "/benvenuto", l: "Benvenuto" },
+  { to: "/benvenuto", l: "Cronologia" },
   { to: "/urbano", l: "Simulazione urbana" },
   { to: "/vigneto", l: "Simulazione vigneto" },
   { to: "/dashboard", l: "Dashboard" },
@@ -427,7 +429,7 @@ function SmartNav() {
                   aria-current={pathname === n.to || (n.to === "/profilo" && isProfilePath(pathname)) ? "page" : undefined}
                   replace={pathname !== "/"}
                   onClick={(e) => { if (goHomeBack(e, n.to, pathname)) return; centerTapped(e.currentTarget, pathname === n.to); }}
-                  className={`nav-glass nav-glass-gloss relative shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring ${pathname === n.to ? "nav-glass-on bg-nav-accent text-nav-accent-foreground" : "text-muted-foreground dark:text-nav-accent-foreground"}`}>
+                  className={`relative shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none ${pathname === n.to ? "bg-secondary text-secondary-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]" : "text-foreground/85 hover:bg-foreground/[0.06]"}`}>
                   {n.l}{!guest && (n.to === "/urbano" || n.to === "/vigneto") && proId !== undefined && !unlocks(proId, n.to === "/urbano" ? "urban" : "vineyard") && <Lock className="ml-1 inline size-3.5 align-[-2px]" aria-label="bloccato" />}
                 </Link>
               ))}
@@ -436,6 +438,78 @@ function SmartNav() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Desktop (lg, ≥ 1024 px): the menu stands at the side of the page — the brand on top, the same items as the bottom
+ * bar with their full names and icons, the open page lit with a turquoise edge; the header (account, "i", theme)
+ * sits at its foot. No camera here: it belongs to the phone.
+ */
+function SideNav() {
+  const proId = useProId();
+  const guest = useGuest() && !proId;
+  const pathname = useLocation({ select: (l) => l.pathname });
+  const items = itemsFor(proId, guest), names = navFor(proId, guest);
+  return (
+    <aside className="fixed inset-y-0 left-0 z-[999999995] hidden w-60 flex-col border-r border-foreground/10 bg-background/70 px-3 pb-24 pt-5 backdrop-blur-xl lg:flex slate-off">
+      <Link to="/urbano" onClick={() => openSimTab("urban", "mappa")} aria-label="Micro Digital Twin · Simulazione urbana" className="mb-6 flex items-center gap-2.5 rounded-xl px-2.5 py-1 outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <img src={logoCompact} alt="" className="size-9 shrink-0 object-contain" />
+        <span className="text-[11px] font-semibold leading-tight tracking-[0.22em] text-foreground">MICRO DIGITAL <span className="text-[#2dd4bf]">TWIN</span></span>
+      </Link>
+      <nav aria-label="Menu principale" className="flex flex-col gap-1">
+        {items.map((it, i) => {
+          const on = pathname === it.to || (it.to === "/profilo" && isProfilePath(pathname));
+          const lock = !guest && (it.to === "/urbano" || it.to === "/vigneto") && proId !== undefined && !unlocks(proId, it.to === "/urbano" ? "urban" : "vineyard");
+          return (
+            <Link key={it.to} to={it.to} aria-current={on ? "page" : undefined} replace={pathname !== "/"}
+              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${on ? "bg-foreground/10 font-medium text-foreground" : "text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"}`}>
+              <span className="nav-orb">{on && <><span className="nav-orb-glow" aria-hidden="true" /><span className="nav-orb-ring" aria-hidden="true" /></>}<it.I className="size-5 shrink-0" strokeWidth={1.8} aria-hidden="true" /></span>
+              <span className="min-w-0 truncate">{names[i]?.l ?? it.l}</span>
+              {lock && <Lock className="ml-auto size-3.5" aria-label="bloccato" />}
+            </Link>
+          );
+        })}
+      </nav>
+    </aside>
+  );
+}
+
+/**
+ * Tablet (md, 768–1023 px): the menu is a narrow rail of icons at the side — the same items as the bottom bar, each
+ * with a short name under it, the open page on the slate pill with a turquoise edge, and the camera button (with its
+ * AI camera) at its foot, right above the account; the header (account, "i", theme) stands at its foot.
+ */
+function TabletRail() {
+  const proId = useProId();
+  const guest = useGuest() && !proId;
+  const pathname = useLocation({ select: (l) => l.pathname });
+  const items = itemsFor(proId, guest);
+  const link = (it: (typeof items)[number]) => {
+    const on = pathname === it.to || (it.to === "/profilo" && isProfilePath(pathname));
+    const lock = !guest && (it.to === "/urbano" || it.to === "/vigneto") && proId !== undefined && !unlocks(proId, it.to === "/urbano" ? "urban" : "vineyard");
+    return (
+      <Link key={it.to} to={it.to} aria-current={on ? "page" : undefined} replace={pathname !== "/"} aria-label={it.l}
+        className={`relative flex w-16 flex-col items-center gap-1 rounded-2xl px-1 py-2 text-[11px] leading-tight outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${on ? "bg-foreground/10 font-semibold text-foreground" : "text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"}`}>
+        <span className="nav-orb mb-1 mt-1">{on && <><span className="nav-orb-glow" aria-hidden="true" /><span className="nav-orb-ring" aria-hidden="true" /></>}<it.I className="size-6 shrink-0" strokeWidth={1.8} aria-hidden="true" /></span>
+        <span className="w-full truncate text-center">{it.l}</span>
+        {lock && <Lock className="absolute right-1.5 top-1.5 size-3" aria-label="bloccato" />}
+      </Link>
+    );
+  };
+  return (
+    <aside className="fixed inset-y-0 left-0 z-[999999995] hidden w-20 flex-col items-center border-r border-foreground/10 bg-background/70 pb-48 pt-[calc(1rem+env(safe-area-inset-top))] backdrop-blur-xl md:flex lg:hidden slate-on">
+      <Link to="/urbano" onClick={() => openSimTab("urban", "mappa")} aria-label="Micro Digital Twin · Simulazione urbana" className="mb-5 rounded-xl p-1 outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <img src={logoCompact} alt="" className="size-9 object-contain" />
+      </Link>
+      <nav aria-label="Menu principale" className="flex flex-col items-center gap-1.5">
+        {items.map(link)}
+      </nav>
+      {/* The camera (and its AI camera) at the foot of the rail, right above the account: in reach of the thumb. */}
+      <div className="mt-auto grid place-items-center [&_.ps-nav-camera]:!mt-0 [&_.ps-nav-camera]:!size-14">
+        <CameraDockButton />
+      </div>
+    </aside>
   );
 }
 
@@ -460,6 +534,17 @@ function RootComponent() {
   usePermissions(true);
   // Position and camera revoked inside the app are refused whoever asks for them.
   useEffect(() => { installAppPermissionGuards(); installGoogleUsageSync(); }, []);
+  // The page's width without the scrollbar (100vw counts it on computers): the tab bars that run to the screen's
+  // right edge use it, so they never go past it nor under the scrollbar.
+  useEffect(() => {
+    const root = document.documentElement;
+    const set = () => root.style.setProperty("--page-w", `${root.clientWidth}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(root);
+    window.addEventListener("resize", set);
+    return () => { ro.disconnect(); window.removeEventListener("resize", set); };
+  }, []);
   // The index's preloader goes once the app has started and its fonts are in.
   useEffect(() => {
     const fonts = (document as Document & { fonts?: { ready: Promise<unknown> } }).fonts?.ready ?? Promise.resolve();
@@ -644,6 +729,8 @@ function RootComponent() {
     if (params.has("scenario") || params.has("rivedi")) return;
     // After the tutorial a fresh open lands on the Mappa tab of the profile's simulation (the agronomist's vineyard,
     // otherwise the piazza).
+    // On a computer the tutorial page is skipped: its speech-bubble tour starts over the simulation instead (DesktopTour).
+    if (!introSeen() && window.matchMedia("(min-width: 1024px)").matches) markIntroSeen();
     const seen = introSeen(), vine = getProId()?.kind === "agronomo";
     const home = seen ? (vine ? "/vigneto" : "/urbano") : "/";
     if (seen) openSimTab(vine ? "vineyard" : "urban", "mappa");
@@ -656,6 +743,7 @@ function RootComponent() {
     // Surface Pro-like hybrids: expose real touch capability as a class-independent
     // attribute, so the AI camera controls are not hidden behind pointer queries.
     markTouchDevice();
+    markSlate();
     void import("@/lib/register-sw").then((m) => m.registerServiceWorker());
   }, []);
   // Soft keyboard-style tap on every button across the app.
@@ -695,13 +783,16 @@ function RootComponent() {
       {/* The page's light, drawn once for every page so a page change never shows the bare background. */}
       {!intro && <AmbientLayer />}
       {/* Transparent: the page's light and its drifting pools show through behind the account button, the "i" and the theme switch. */}
-      <header id="app-header" className="relative pt-[env(safe-area-inset-top)]">
-        <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-2 sm:px-4 sm:py-3">
+      <SideNav />
+      <TabletRail />
+      {/* Desktop: the header (account, "i", theme) sits at the foot of the side menu. */}
+      <header id="app-header" className="relative pt-[env(safe-area-inset-top)] md:fixed md:bottom-0 md:left-0 md:z-[999999996] md:w-20 md:border-t md:border-foreground/10 md:pt-0 lg:w-60 slate-head">
+        <div className="relative mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-2 py-2 sm:px-4 sm:py-3 md:flex md:max-w-none md:flex-col md:px-2 lg:grid lg:px-3 slate-stack">
           {/* No logo nor name here: the account sits where the logo was, the theme switch on the right. */}
           <div className="flex min-w-0 items-center"><AccountControl /></div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2 md:flex-col lg:flex-row slate-stack">
             {/* "i" shows the tutorial again (only the tutorial: it ends by coming back here). */}
-            <button type="button" onClick={() => void navigate({ to: "/?rivedi=1" as any })} aria-label="Come funziona" title="Come funziona"
+            <button type="button" onClick={() => { if (!isSlate() && window.matchMedia("(min-width: 1024px), (orientation: landscape) and (min-width: 900px) and (min-height: 600px)").matches) window.dispatchEvent(new CustomEvent("mdt-desk-tour")); else void navigate({ to: "/?rivedi=1" as any }); }} aria-label="Come funziona" title="Come funziona"
               className="grid size-9 shrink-0 place-items-center rounded-full border border-foreground/15 bg-foreground/[0.06] text-foreground outline-none transition-colors hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring sm:size-10">
               <Info className="size-4 sm:size-[1.15rem]" aria-hidden="true" />
             </button>
@@ -709,17 +800,21 @@ function RootComponent() {
           </div>
         </div>
       </header>
-      <div className="hidden sm:block"><SmartNav /></div>
+      <div className="hidden sm:block md:hidden"><SmartNav /></div>
       </>}
 
-      <main id="main-content" tabIndex={-1} className={intro ? "focus:outline-none" : "app-main mx-auto max-w-7xl px-4 pb-8 pt-6 focus:outline-none sm:pt-8"}><Outlet /></main><Toaster /><UpdatePill />
-      {!intro && <footer className="mx-auto max-w-7xl px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] text-sm leading-relaxed text-muted-foreground sm:pb-10 sm:text-[15px]">
+      <div className={intro ? undefined : "md:pl-20 lg:pl-60 slate-pad"}>
+      <main id="main-content" tabIndex={-1} className={intro ? "focus:outline-none" : "app-main mx-auto max-w-7xl px-4 pb-8 pt-6 focus:outline-none sm:pt-8 md:max-w-none md:px-6"}><Outlet /></main><Toaster /><UpdatePill />
+      {!intro && <footer className="mx-auto max-w-7xl px-4 md:max-w-none md:px-6 md:pt-14 md:text-center pb-[calc(6.5rem+env(safe-area-inset-bottom))] text-sm leading-relaxed text-muted-foreground sm:pb-10 sm:text-[15px]">
         I risultati del simulatore sono indicativi e non sostituiscono modelli fisici calibrati.
       </footer>}
+      </div>
       {!intro && <BottomNav />}
       <CameraSheet />
       <PermissionsSheet />
       <Suspense fallback={null}><SectorGate /></Suspense>
+      {/* Desktop: the tutorial as speech bubbles (first access, the "i" button, hover tips). */}
+      <Suspense fallback={null}><DesktopTour /></Suspense>
     </QueryClientProvider>
   );
 }

@@ -39,8 +39,10 @@ export function objectMesh(def: ArObjectDef): THREE.Group {
       break;
     }
     case "pergolato": {
-      // Side-pole shade sails whose wings open like a butterfly's (views/ar-papillon), wide open in the AR.
-      g.add(realPapillons({ w: def.w, d: def.d, h: def.h, open: 1 }));
+      // Round shade sails on leaning trunks (views/ar-papillon).
+      // Two or more joined (a footprint larger than one sail) are one continuous canopy over all their trunks.
+      // Built closed: they open by themselves only with light (ArLive shadeAuto).
+      g.add(realPapillons({ w: def.w, d: def.d, h: def.h, open: 0, joined: Math.max(def.w, def.d) > 4.6 }));
       break;
     }
     case "aiuola": {

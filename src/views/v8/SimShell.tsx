@@ -4,6 +4,7 @@ import { setCameraSheetOpen } from "@/lib/camera-dock";
 import { useTabSwipe } from "@/lib/use-tab-swipe";
 import { useAutoHistory } from "@/lib/use-auto-history";
 import { SimMap } from "@/views/v10/SimMap";
+import { useSideBySide } from "@/lib/use-desktop";
 import { Ambient, HeroButton, PageHero, Panels, TabRow, openSimTab, showSimMedia, startOnMap, simMediaId, useSimTab, type SimKind, type SimTab } from "./console";
 
 const loadMenu = () => import("@/views/v8/SimMenu");
@@ -13,6 +14,11 @@ const MENU_BUTTON = "grid size-11 place-items-center rounded-full bg-foreground/
 const TABS: ReadonlyArray<{ id: SimTab; label: string; icon: LucideIcon }> = [
   { id: "mappa", label: "Mappa", icon: MapIcon },
   { id: "simula", label: "Simula", icon: SlidersHorizontal },
+  { id: "sensori", label: "Sensori AI", icon: Radar },
+];
+// Desktop: the map and the simulation side by side in one tab.
+const DESK_TABS: ReadonlyArray<{ id: SimTab; label: string; icon: LucideIcon }> = [
+  { id: "mappa", label: "Mappa e simulazione", icon: MapIcon },
   { id: "sensori", label: "Sensori AI", icon: Radar },
 ];
 const TONE: Record<SimKind, string> = { urban: "rgb(28 112 210 / 0.42)", vineyard: "rgb(150 36 110 / 0.42)" };
@@ -71,6 +77,8 @@ function useHideOnScroll(bar: RefObject<HTMLDivElement | null>, root: RefObject<
  */
 export function SimShell({ kind, place, onCompare, onReset, onSend, simula, media, sensori }: { kind: SimKind; place: string; onCompare?: (() => void) | undefined; onReset: () => void; onSend?: () => void; simula: ReactNode; media: ReactNode; sensori: ReactNode }) {
   const tab = useSimTab(kind);
+  // Desktop: Mappa and Simula are one tab with the map on the left (kept in view) and the simulation on the right.
+  const desk = useSideBySide();
   // Entering the page always starts on Mappa (unless a tab was asked for on the way in).
   useLayoutEffect(() => startOnMap(kind), [kind]);
   const go = (t: SimTab) => openSimTab(kind, t);
@@ -106,18 +114,25 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, medi
                 <SimMenu open={menu === "open"} onCamera={() => setCameraSheetOpen(true)} onMedia={() => showSimMedia(kind)} onSensors={() => go("sensori")} onMap={toMap} onSend={onSend} onReset={onReset} />
               </Suspense>}
         </>} />
-      <div ref={barRef} data-sim-tabs="" className="sticky top-[var(--nav-h)] z-[999999997] -mx-4 bg-transparent px-4 py-2 backdrop-blur-xl will-change-transform data-[hidden]:pointer-events-none">
-        <TabRow label="Sezioni" items={TABS} value={tab} onChange={go} />
+      <div ref={barRef} data-sim-tabs="" className="sticky top-[var(--nav-h)] z-[999999997] -mx-4 bg-transparent px-4 py-2 md:mx-[calc(50%-var(--page-w,100vw)/2+2.5rem)] md:px-[calc(var(--page-w,100vw)/2-2.5rem-50%)] lg:mx-[calc(50%-var(--page-w,100vw)/2+7.5rem)] lg:px-[calc(var(--page-w,100vw)/2-7.5rem-50%)] backdrop-blur-xl slate-bleed will-change-transform data-[hidden]:pointer-events-none">
+        <TabRow label="Sezioni" items={desk ? DESK_TABS : TABS} value={desk && tab === "simula" ? "mappa" : tab} onChange={go} />
       </div>
       {/* The open tab follows the finger and the next slides in once it turns; nothing peeks beside it. */}
       <div ref={swipe.ref} style={swipe.style} className="relative">
-      <Panels value={tab} panels={[
+      {desk ? <Panels value={tab === "sensori" ? "sensori" : "mappa"} panels={[
+        { id: "mappa", always: true, content: (
+          <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] items-start gap-6">
+            <div className="no-scrollbar sticky top-[calc(var(--nav-h)+4.5rem)] max-h-[calc(100vh-var(--nav-h)-5.5rem)] overflow-y-auto overscroll-contain rounded-3xl"><SimMap kind={kind} /></div>
+            <div className="desk-sim min-w-0 space-y-6">{simula}<section id={simMediaId(kind)} aria-label="Foto e video" className="fuse-canvas scroll-mt-[calc(var(--nav-h)+5rem)] rounded-t-3xl px-5 pt-4 pb-6">{media}</section></div>
+          </div>) },
+        { id: "sensori", content: sensori },
+      ]} /> : <Panels value={tab} panels={[
         // In the tabs' order (Mappa · Simula · Sensori AI), so a later tab enters from the right.
         { id: "mappa", content: <SimMap kind={kind} /> },
         // Simula carries the photos and videos under the simulation, so it stays mounted: the camera dock reaches LabMedia from any tab.
         { id: "simula", always: true, content: <div className="space-y-6">{tab === "simula" && <SimMap kind={kind} preview />}{simula}<section id={simMediaId(kind)} aria-label="Foto e video" className="fuse-canvas scroll-mt-[calc(var(--nav-h)+5rem)] rounded-t-3xl px-3 pt-4 pb-6 sm:px-5">{media}</section></div> },
         { id: "sensori", content: sensori },
-      ]} />
+      ]} />}
       </div>
     </div>
   );

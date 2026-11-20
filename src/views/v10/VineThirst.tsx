@@ -233,12 +233,12 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
       </div>
 
       {/* The arc of the vines' thirst: drag the white dot or touch a level. */}
-      <div ref={gaugeRef} className="relative mx-auto mt-10 flex max-w-[21rem] flex-col items-center px-7">
+      <div ref={gaugeRef} className="relative mx-auto mt-10 flex max-w-[21rem] md:portrait:max-w-[27rem] lg:max-w-[27rem] flex-col items-center px-7">
         <Gauge before={before} after={after} lowest={lowest} min={dialMin} max={dialMax} stops={reach > 1 ? stops : []} onSlide={slideTo} onStop={applyLevel}
           unit="" spoken="su 100" label={`Bisogno di intervento da raggiungere, ${scopeName}`} step={1} rightEnd={`${Math.round(before)}`} bands={NEED_BANDS} />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center" aria-live="polite">
           <span className={cn("rounded-full px-3 py-0.5 text-[13px] font-semibold text-white transition-colors duration-300", GAIN_BG[gain])}>{verdict(after)}</span>
-          <span className="mt-1 font-display text-6xl font-light leading-none tracking-tight tabular-nums">{Math.round(after)}<span className="text-2xl text-muted-foreground">/100</span></span>
+          <span className="mt-1 font-display text-6xl font-light md:portrait:text-7xl lg:text-7xl leading-none tracking-tight tabular-nums">{Math.round(after)}<span className="text-2xl text-muted-foreground">/100</span></span>
           {/* What the big number is, said under it: the vines' thirst out of 100, and what the interventions take off. */}
           <span className="mt-1.5 text-center text-[13px] font-semibold leading-tight">Bisogno di intervento <span className="tabular-nums">{Math.round(before - after) >= 1 ? `· −${Math.round(before - after)} rispetto a oggi` : any ? "· a quest’ora non cambia" : "· nessun intervento fatto"}</span></span>
         </div>
@@ -246,7 +246,7 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
 
       {/* Labels under the arc's two end numbers, as in the piazza: the lowest thirst reachable on the left, the thirst
           without interventions (exact, on the right end); the one the white dot is near lights up, the other dims. */}
-      <div className="mx-auto -mt-3 flex w-full max-w-[21rem] justify-between px-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground" aria-hidden="true">
+      <div className="mx-auto -mt-3 flex w-full max-w-[21rem] md:portrait:max-w-[27rem] lg:max-w-[27rem] justify-between px-3 text-[10px] font-semibold uppercase md:portrait:text-xs lg:text-xs tracking-wide text-muted-foreground" aria-hidden="true">
         <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "left" ? "bg-sky-500/20 text-sky-800 dark:bg-sky-400/30 dark:text-sky-200" : "bg-sky-500/10 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300", near === "right" && "opacity-50 dark:opacity-35")}>Il minimo possibile</span>
         <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 text-right transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "right" ? "bg-amber-400/30 text-amber-900 dark:bg-amber-400/25 dark:text-amber-200" : "bg-foreground/[0.08] text-foreground/75", near === "left" && "opacity-50 dark:opacity-35")}>Senza interventi</span>
       </div>

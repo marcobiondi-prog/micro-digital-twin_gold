@@ -23,7 +23,7 @@ import { dayLight, solarHour, sunAt, sunHeightDeg } from "@/models/sun-shadow";
 import { getSimWhen, useSimWhen } from "@/models/sim-when";
 import { applyZoneMix, vineMixOf, zoneMixOf } from "@/models/vine-interventions";
 import { usePiazzaReading } from "@/models/sim-reading";
-import { Thermometer } from "lucide-react";
+import { Glasses, Thermometer } from "lucide-react";
 import { SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import type { MovedPart } from "@/views/v10/SatelliteMap2D";
 import { drawnAreaFor, freeM2, leversForZones, vineLeversForZones, vineLeversOfZones, VINE_ZONE_KINDS, leversOfZones, lotsOf, MAX_PINS, moveZones, pinsM2, surfaceText, usableM2, ZONE_KINDS, ZONE_LABEL, zoneName, zonesOfArea, type DrawnArea, type SubArea, type ZoneKind } from "@/models/drawn-area";
@@ -388,6 +388,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
       </div>
       {/* iPhone and iPad only: the 3D shows plain shapes unless the light realistic models are turned on by hand. */}
       {show3d && iosDevice && <IosModelsSwitch />}
+      {!preview && !drawing && !drawingZone && saved && <VrButton kind={kind} area={saved} />}
       {/* The pin can be put right by hand on the 2D map; a pin moved by hand can go back to the automatic one. */}
       {!drawing && !drawingZone && !arranging && (
         <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 px-2 text-center text-xs text-muted-foreground">
@@ -787,6 +788,37 @@ function ProposalPill({ text, constrained, onApply, onDismiss }: { text: string;
       </p>
       <button type="button" onClick={onApply} className="h-8 shrink-0 rounded-full bg-white px-3 text-[13px] font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-white">Metti</button>
       <button type="button" onClick={onDismiss} aria-label="Nascondi la proposta" className="grid size-8 shrink-0 place-items-center rounded-full bg-white/10 outline-none focus-visible:ring-2 focus-visible:ring-white"><X className="size-4" aria-hidden="true" /></button>
+    </div>
+  );
+}
+
+/**
+ * «Visore VR»: shown only where the browser offers WebXR immersive-vr (a headset on the computer: Windows Mixed
+ * Reality, Quest through Link, SteamVR in Edge or Chrome) and an area is drawn; opens the project at real size in the
+ * headset (views/v10/vr-view, loaded on the first tap).
+ */
+function VrButton({ kind, area }: { kind: SimKind; area: DrawnArea }) {
+  const [ok, setOk] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void import("@/views/v10/vr-view").then((m) => m.vrSupported()).then((v) => { if (live) setOk(v); });
+    return () => { live = false; };
+  }, []);
+  if (!ok) return null;
+  const open = () => {
+    setBusy(true);
+    void import("@/views/v10/vr-view")
+      .then((m) => m.startVr(kind === "urban" ? "urban" : "vineyard", area, () => setBusy(false)))
+      .then(() => toast("Visore VR · Grilletto per spostarti dove punti, levetta di lato per girarti."))
+      .catch((e: unknown) => { setBusy(false); toast.error("Il visore non è partito", { description: e instanceof Error ? e.message : String(e) }); });
+  };
+  return (
+    <div className="flex justify-center">
+      <button type="button" onClick={open} disabled={busy}
+        className="inline-flex h-11 items-center gap-2 rounded-full bg-foreground/[0.08] px-5 text-sm font-semibold outline-none transition-colors hover:bg-foreground/[0.14] focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">
+        <Glasses className="size-4" aria-hidden="true" />{busy ? "Visore in uso…" : "Guarda nel visore VR"}
+      </button>
     </div>
   );
 }
