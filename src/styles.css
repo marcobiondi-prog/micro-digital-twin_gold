@@ -1437,8 +1437,6 @@
 /* Ibridi touch (Surface Pro e simili): il puntatore primario è fine, ma lo
    schermo è touch — il flag data-touch vince sulla media query. */
 html[data-touch] .lab-media-ai { display: inline-flex; }
-/* Desktop layout (side menu, from 1024 px): no AI camera, touch screen or not (Surface Pro and the like). */
-@media (min-width: 1024px) { html .lab-media-actions .lab-media-ai { display: none; } }
 /* Desktop: "Carica" apre subito i file del computer, senza menu Galleria/Scatta/Registra, e "Cartella" una cartella intera. */
 .lab-media-upload-direct, .lab-media-folder { display: none; }
 @media (min-width: 1024px) and (any-pointer: fine) {
