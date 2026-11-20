@@ -477,7 +477,7 @@ function SideNav() {
 /**
  * Tablet (md, 768–1023 px): the menu is a narrow rail of icons at the side — the same items as the bottom bar, each
  * with a short name under it, the open page on the slate pill with a turquoise edge, and the camera button (with its
- * AI camera) under the pages; the header (account, "i", theme) stands at its foot.
+ * AI camera) at its foot, right above the account; the header (account, "i", theme) stands at its foot.
  */
 function TabletRail() {
   const proId = useProId();
@@ -503,11 +503,11 @@ function TabletRail() {
       </Link>
       <nav aria-label="Menu principale" className="flex flex-col items-center gap-1.5">
         {items.map(link)}
-        {/* The camera (and its AI camera) under the pages. */}
-        <div className="mt-3 grid place-items-center [&_.ps-nav-camera]:!mt-0 [&_.ps-nav-camera]:!size-14">
-          <CameraDockButton />
-        </div>
       </nav>
+      {/* The camera (and its AI camera) at the foot of the rail, right above the account: in reach of the thumb. */}
+      <div className="mt-auto grid place-items-center [&_.ps-nav-camera]:!mt-0 [&_.ps-nav-camera]:!size-14">
+        <CameraDockButton />
+      </div>
     </aside>
   );
 }
