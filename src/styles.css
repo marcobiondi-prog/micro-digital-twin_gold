@@ -2456,3 +2456,27 @@ html[data-sys-camera] nav {
   html[data-slate] .lab-media-actions .lab-media-upload-direct,
   html[data-slate] .lab-media-actions .lab-media-upload-menu { display: none !important; }
 }
+
+/* A phone held sideways (or any screen wide but low, under 500 px tall): the side rail of the tablet, compact — icons
+   only, no logo, smaller account / "i" / theme buttons at its foot — also from 1024 px instead of the wide menu, so
+   nothing piles up on a 360 px high screen (seen mirrored on a TV). */
+@media (orientation: landscape) and (min-width: 768px) and (max-height: 500px) {
+  .slate-off { display: none !important; }
+  .slate-on { display: flex !important; }
+  .slate-head { width: 5rem !important; }
+  .slate-stack { display: flex !important; flex-direction: column !important; gap: 0.25rem !important; padding-top: 0.25rem !important; padding-bottom: 0.25rem !important; }
+  .slate-pad { padding-left: 5rem !important; }
+  .slate-bleed {
+    margin-left: calc(50% - var(--page-w, 100vw) / 2 + 2.5rem) !important; margin-right: calc(50% - var(--page-w, 100vw) / 2 + 2.5rem) !important;
+    padding-left: calc(var(--page-w, 100vw) / 2 - 2.5rem - 50%) !important; padding-right: calc(var(--page-w, 100vw) / 2 - 2.5rem - 50%) !important;
+  }
+  .slate-head button, .slate-head [role="button"] { width: 2.125rem !important; height: 2.125rem !important; }
+  .slate-head button img, .slate-head button > span { max-width: 2.125rem; max-height: 2.125rem; }
+  .rail { padding-top: calc(0.5rem + env(safe-area-inset-top)) !important; padding-bottom: 7.5rem !important; }
+  .rail-logo, .rail-label { display: none !important; }
+  .rail-nav { gap: 0.25rem !important; min-height: 0; overflow-y: auto; scrollbar-width: none; }
+  .rail-item { width: 3.25rem !important; padding-top: 0.375rem !important; padding-bottom: 0.375rem !important; }
+  .rail-orb { margin: 0 !important; }
+  .rail-cam { margin-top: auto; padding-top: 0.25rem; }
+  .rail-cam .ps-nav-camera { width: 2.75rem !important; height: 2.75rem !important; }
+}
