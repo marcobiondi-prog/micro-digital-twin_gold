@@ -50,7 +50,7 @@ export function Welcome() {
       <Ambient tone={TONE} />
       <PageHero kicker={<span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1"><span className="whitespace-nowrap">Micro Digital</span><span className="inline-flex items-center gap-1.5 whitespace-nowrap"><span className="text-brand-turquoise">Twin</span><span className="rounded-full border border-brand-turquoise/40 bg-brand-turquoise/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-turquoise">Beta</span></span></span>} title="Benvenuto" />
       <p className="text-[15px] leading-relaxed text-muted-foreground">Scegli da dove partire. Qui sotto trovi gli ultimi interventi che hai registrato.</p>
-      <div className="flex gap-3">
+      <div data-guide="start" className="flex gap-3">
         {/* Identified, the section the profile locks gives its place to the round profile button (the agronomist's where Piazza was, the officer's where Vigneto was). */}
         {proId?.kind === "agronomo" ? <ProfileButton id={proId} /> : <Start to="/urbano" icon={Building2} title="Piazza" text="Simula gli interventi in città" who="Per i funzionari del Comune" />}
         {proId?.kind === "funzionario" ? <ProfileButton id={proId} /> : <Start to="/vigneto" icon={Grape} title="Vigneto" text="Simula gli interventi in vigna" who="Per chi lavora nel settore agricolo" />}

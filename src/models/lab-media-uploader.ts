@@ -146,15 +146,23 @@ async function runQueue(
         else mark(up.id, "error");
         return;
       }
-      const { data } = await supabase.storage.from(MEDIA_BUCKET).createSignedUrl(path, LINK_TTL_S);
-      if (data) {
-        keepLink(MEDIA_BUCKET, path, data.signedUrl);
-        setMedia(kind, (p) => [
-          { id: path, path, name: safe, size: file.size, url: data.signedUrl, kind: up.kind },
-          ...p,
-        ]);
-        mark(up.id, "done");
-      } else mark(up.id, "error");
+      // The file is in the account now. Its link is asked with the session read again first, a few times: a link asked
+      // while the session was being refreshed went out without it ("Object not found" to the anonymous role) and the
+      // upload read as failed. Without a link the file still shows, from its copy on the phone, and is signed at the
+      // next listing.
+      let signed: string | null = null;
+      for (let t = 0; t < 3 && !signed; t++) {
+        if (t) await new Promise((r) => setTimeout(r, 600 * t));
+        await supabase.auth?.getSession().catch(() => undefined);
+        const { data } = await supabase.storage.from(MEDIA_BUCKET).createSignedUrl(path, LINK_TTL_S);
+        signed = data?.signedUrl ?? null;
+      }
+      if (signed) keepLink(MEDIA_BUCKET, path, signed);
+      setMedia(kind, (p) => [
+        { id: path, path, name: safe, size: file.size, url: signed ?? URL.createObjectURL(file), kind: up.kind },
+        ...p,
+      ]);
+      mark(up.id, "done");
     } catch (e) {
       if (userId && networkError(e)) { try { await keepOnPhone(file, up); return; } catch { /* below */ } }
       console.error("[uploader] errore file", up.name, e);

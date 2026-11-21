@@ -404,10 +404,12 @@ export function AccountControl() {
       setTimeout(() => { if (active) void loadUser(session?.user ?? null); }, 0);
     });
     // The account remembered on the phone changed (an entry by fingerprint, a reconnection): read it again.
-    const onRegistered = () => { void supabase.auth.getUser().then(({ data }) => { if (active) void loadUser(data.user); }); };
-    window.addEventListener("storage", onRegistered);
+    // Read from the session kept on the phone (no server call), and only for the keys that say who is signed in.
+    const onRegistered = () => { void supabase.auth.getSession().then(({ data }) => { if (active) void loadUser(data.session?.user ?? null); }); };
+    const onStorage = (e: StorageEvent) => { if (e.key === null || e.key === "mdt-registered-email" || e.key.includes("auth-token")) onRegistered(); };
+    window.addEventListener("storage", onStorage);
     const unsubRegistered = subscribeAuthChange(onRegistered);
-    return () => { active = false; subscription.unsubscribe(); window.removeEventListener("storage", onRegistered); unsubRegistered(); };
+    return () => { active = false; subscription.unsubscribe(); window.removeEventListener("storage", onStorage); unsubRegistered(); };
   }, [saveAvatar]);
 
   const enterGuest = () => {

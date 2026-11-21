@@ -73,7 +73,7 @@ export function GalleryReview({ kind, files, zones, onAddMore, onConfirm, onClos
   return (
     <>
       <Dialog open={open} onOpenChange={(o) => { if (!o) close(); }}>
-        <DialogContent className={SHEET}>
+        <DialogContent overlayClassName="bg-black/45 backdrop-blur-md sm:!fixed sm:!inset-0 sm:!h-auto sm:!min-h-0" className={SHEET}>
           <span className="mx-auto -mt-1 h-1.5 w-10 rounded-full bg-foreground/20 sm:hidden" aria-hidden="true" />
           {reviewing ? (
             <>

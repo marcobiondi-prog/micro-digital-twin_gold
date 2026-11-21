@@ -36,14 +36,14 @@ export function ProfilePage() {
     <div className="mx-auto max-w-xl space-y-6">
       <Ambient tone="rgb(40 130 120 / 0.40)" />
       <PageHero kicker="Profilo professionale" title="Profilo" />
-      {id === undefined ? <div className="min-h-[40vh]" /> : guest && !id ? <GuestCard /> : id ? (
+      <div data-guide="profile">{id === undefined ? <div className="min-h-[40vh]" /> : guest && !id ? <GuestCard /> : id ? (
         <ProfileCard kind={id.kind} go={() => void navigate({ to: id.kind === "agronomo" ? "/vigneto" : "/urbano" })} />
       ) : (
         <>
           <p className="text-[15px] leading-relaxed text-muted-foreground">Identificati per aprire la tua simulazione.</p>
           <div className="space-y-3"><Way kind="agronomo" /><Way kind="funzionario" /></div>
         </>
-      )}
+      )}</div>
     </div>
   );
 }

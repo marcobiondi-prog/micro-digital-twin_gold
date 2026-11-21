@@ -31,32 +31,60 @@ const TOUR: Step[] = [
   { sel: "#app-header", title: "Account e aiuto", text: "Qui accedi al tuo account, cambi tema e con «i» rivedi questa guida quando vuoi." },
 ];
 
-/** The "i" guide (simplified, any page): only the points that are not obvious, those on the page open shown. */
-const GUIDE: Step[] = [
-  // Simulations: the map.
-  { sel: '[role="group"][aria-label="Disegna l’area"]', title: "Prima disegna l’area", text: "Clicca sugli angoli per mettere i pin. Da lì partono la ricerca dei vincoli, la stima delle persone e i costi: senza area restano vuoti." },
-  { sel: '[data-guide="proposal"]', title: "La proposta", text: "Gli interventi tratteggiati sono un suggerimento fatto in base ai vincoli trovati: non contano finché non premi «Metti»." },
+/** The "i" guide (simplified): the main elements of the page open, each explained, then its less obvious points. */
+const SIM_GUIDE: Step[] = [
+  { sel: '[role="tablist"][aria-label="Sezioni"]', title: "Le schede", text: "«Mappa» (con la simulazione affiancata su computer) e «Sensori AI», che consiglia dove mettere le centraline." },
+  { sel: 'form[role="search"]', title: "Il luogo", text: "Cerca la piazza o il vigneto, oppure accendi il GPS: resta acceso e ti segue, finché non scegli un luogo a mano." },
+  { sel: '[role="group"][aria-label="Vista della mappa"]', title: "2D o 3D", text: "Dall’alto o in rilievo, con gli interventi disegnati sopra. Il 3D è per chi ha fatto l’accesso." },
+  { sel: '[role="group"][aria-label="Disegna l’area"]', title: "Prima disegna l’area", text: "Clicca sugli angoli per mettere i pin. Da lì partono la ricerca dei vincoli, la stima delle persone e i costi." },
+  { sel: '[data-guide="proposal"]', title: "La proposta", text: "Gli interventi tratteggiati sono un suggerimento fatto in base ai vincoli: non contano finché non premi «Metti»." },
   { sel: '[aria-label="Interventi possibili"]', title: "Cosa si può fare", text: "Ogni intervento con il suo stato: si può fare, serve un’autorizzazione o è sconsigliato. Clicca una riga per sapere perché." },
-  { sel: '[data-guide="add-zone"]', title: "Zone dentro l’area", text: "Disegna dove vuoi alberi, aiuole, vele o una zona da lasciare libera. Un «Lotto» divide solo i costi, senza cambiare la disposizione." },
-  { sel: '[data-guide="only-drawn"]', title: "Solo quello disegnato", text: "Mette gli interventi solo nelle zone che hai disegnato e regola le leve di conseguenza. Se poi muovi una leva torna la disposizione automatica." },
+  { sel: '[data-guide="add-zone"]', title: "Zone dentro l’area", text: "Disegna dove vuoi alberi, aiuole, vele o una zona libera. Un «Lotto» divide solo i costi." },
+  { sel: '[data-guide="only-drawn"]', title: "Solo quello disegnato", text: "Mette gli interventi solo nelle tue zone e regola le leve di conseguenza; se poi muovi una leva torna la disposizione automatica." },
   { sel: '[data-guide="best-sun"]', title: "Posizione migliore", text: "Sposta vele, aiuole e alberi dove d’estate batte più sole, tenendo conto dei palazzi attorno." },
   { sel: '[data-guide="arrange"]', title: "Sposta elementi", text: "Trascina alberi, zone ed etichette sulla mappa. «Disposizione automatica» annulla gli spostamenti." },
-  // Simulations: the reading.
   { sel: '[data-guide="feasibility"]', title: "Fattibilità", text: "I vincoli trovati intorno all’area, in breve. Clicca per leggere i dettagli più sotto." },
-  { sel: 'main [role="slider"]', title: "L’arco", text: "Trascina il punto bianco o clicca uno dei tre livelli: le leve sotto si regolano da sole. A destra c’è la media della stagione senza interventi." },
-  { sel: '[aria-label="Persone nella piazza"]', title: "Persone nella piazza", text: "Una stima, non un conteggio: dipende da cosa c’è intorno, dalla stagione e dall’ora scelte nella simulazione." },
-  { sel: '[aria-label="Vincoli dell\'area"]', title: "Vincoli dell’area", text: "Indicativi: beni tutelati, paesaggio e archeologia intorno all’area. Solo il Comune e la Soprintendenza possono confermarli." },
-  // Dashboard.
-  { sel: '[role="radiogroup"][aria-label="Stagione"], [aria-label="Stagione"]', title: "La stagione", text: "La dashboard mostra la stagione e l’ora scelte nella simulazione: si cambiano lì, non qui." },
-  { sel: '[aria-label="Nuova voce del registro"]', title: "Registro", text: "Annota gli interventi fatti davvero: restano nel registro con data e ora, separati dalla simulazione." },
-  { sel: '[data-guide="export"]', title: "Esporta report", text: "Scegli i file (PDF, tabella, dati per la mappa, foto), poi a chi mandarli: email, condivisione o salvataggio." },
-  { sel: '[aria-label="Avanzamento approvazione"]', title: "Approvazioni", text: "Manda la richiesta a ogni ente via email: la risposta arriva qui e fa avanzare la barra." },
-  // History.
-  { sel: '[aria-label="Uffici"]', title: "Uffici", text: "Vedi gli interventi del tuo ufficio, di tutti o di un altro ufficio del Comune." },
-  { sel: '[aria-label="Raggruppa foto e video"]', title: "Per gruppo o per giorno", text: "Raggruppa le foto come nella simulazione (gruppi da 20) oppure per giorno di scatto." },
+  { sel: 'main [role="slider"]', title: "L’arco", text: "Il calore percepito (o il bisogno di intervento nel vigneto). Trascina il punto bianco o clicca un livello: le leve sotto si regolano da sole." },
+  { sel: '[role="group"][aria-label="Modifica gli interventi"]', title: "Gli interventi", text: "Con − e + cambi uno per uno alberi, aiuole, vele, nebulizzatori e innaffiatoi (nel vigneto irrigazione, teli e frangivento)." },
+  { sel: '[aria-label="Persone nella piazza"]', title: "Persone nella piazza", text: "Una stima, non un conteggio: dipende da cosa c’è intorno, dalla stagione e dall’ora della simulazione." },
+  { sel: '[aria-label="Vincoli dell\'area"]', title: "Vincoli dell’area", text: "Indicativi: beni tutelati, paesaggio e archeologia. Solo il Comune e la Soprintendenza possono confermarli." },
+  { sel: ".lab-media-actions", title: "Foto e video", text: "Carica foto e video (anche intere cartelle, o trascinandoli qui): restano nella simulazione e finiscono nel report." },
+];
+const DASH_GUIDE: Step[] = [
+  { sel: '[role="tablist"][aria-label="Dashboard"]', title: "Piazza o vigneto", text: "Il riepilogo di ciascun progetto. Identificato, vedi solo il tuo." },
+  { sel: '[data-guide="export"]', title: "Esporta report", text: "Scegli i file (PDF, tabella, dati per la mappa, foto) e a chi mandarli: email, condivisione o salvataggio." },
+  { sel: '[role="radiogroup"][aria-label="Stagione"], [aria-label="Stagione"]', title: "La stagione", text: "È quella scelta nella simulazione: si cambia lì, non qui." },
+  { sel: '[aria-label="La giornata"]', title: "La giornata", text: "Il calore percepito ora per ora, senza e con gli interventi." },
+  { sel: '[aria-label="Le tre zone"]', title: "Le tre zone", text: "Il bisogno di intervento di ogni zona del vigneto, con temperatura e acqua." },
+  { sel: '[aria-label="Cosa ottieni"]', title: "Cosa ottieni", text: "I benefici stimati in un anno: CO₂, acqua piovana, ombra (nel vigneto foglie e vento)." },
+  { sel: '[aria-label="Cosa hai messo"]', title: "Cosa hai messo", text: "Ogni intervento con il suo costo indicativo e il totale sulla superficie disegnata." },
+  { sel: '[aria-label="Persone nella piazza"]', title: "Persone nella piazza", text: "La stessa stima della simulazione, alla stagione e all’ora scelte lì." },
+  { sel: '[aria-label="Vincoli dell\'area"]', title: "Vincoli dell’area", text: "Indicativi: da confermare con il Comune e la Soprintendenza." },
+  { sel: '[aria-label="Registro interventi"], [aria-label="Quaderno di campagna"]', title: "Registro", text: "Annota gli interventi fatti davvero: restano con data e ora, separati dalla simulazione." },
+  { sel: '[aria-label="Invia il progetto"]', title: "Invia il progetto", text: "Manda il progetto aperto per email o con la condivisione del dispositivo." },
+  { sel: '[aria-label="Premium"]', title: "Premium", text: "Con l’accesso: le approvazioni degli enti via email e il piano suggerito dall’AI." },
+];
+const HISTORY_GUIDE: Step[] = [
+  { sel: '[data-guide="start"]', title: "Da dove partire", text: "Apri la simulazione della piazza o del vigneto (o il tuo profilo, se sei identificato)." },
+  { sel: '[aria-label="Uffici"]', title: "Uffici", text: "Gli interventi del tuo ufficio, di tutti o di un altro ufficio del Comune." },
+  { sel: '[role="tablist"][aria-label="Luogo"]', title: "Piazza o vigneto", text: "Filtra la cronologia per progetto." },
+  { sel: '[aria-label="Tipo di foto e video"]', title: "Tipi di foto", text: "Foto, scatti multipli, foto con l’AI e video, ognuno con quanti ce ne sono." },
+  { sel: '[aria-label="Raggruppa foto e video"]', title: "Per gruppo o per giorno", text: "Raggruppa come nella simulazione (gruppi da 20) oppure per giorno di scatto. Clicca una pila per aprirla." },
   { sel: '[data-guide="archive"]', title: "Archivio", text: "Le foto archiviate escono dalle pile ma non sono cancellate: da qui le ripristini, le salvi o le elimini per sempre." },
   { sel: '[data-guide="open-history"]', title: "Tutta la cronologia", text: "Qui vedi solo gli ultimi giorni: la cronologia completa ha filtri, archivio e cancellazione." },
+  { sel: '[data-guide="clear-history"]', title: "Cancella cronologia", text: "Svuota solo la scheda aperta; l’archivio resta." },
 ];
+const PROFILE_GUIDE: Step[] = [
+  { sel: '[data-guide="profile"]', title: "Il tuo profilo", text: "Chi sei per l’app (funzionario o agricoltore), i tuoi dati e da qui l’accesso con impronta o volto e «Esci dal profilo»." },
+  { sel: "#app-header", title: "Account", text: "Accedi, scegli l’immagine, guarda lo spazio nel cloud e i dispositivi collegati." },
+];
+const MENU_STEP: Step = { sel: 'aside nav[aria-label="Menu principale"]', title: "Il menu", text: "Da qui passi tra cronologia, simulazioni e dashboard; il cerchio turchese segna la pagina aperta." };
+const HEADER_STEP: Step = { sel: "#app-header", title: "Account e aiuto", text: "Accedi al tuo account, cambia tema e con «i» rivedi questa guida in ogni pagina." };
+const guideFor = (path: string): Step[] =>
+  path.startsWith("/urbano") || path.startsWith("/vigneto") ? [...SIM_GUIDE, HEADER_STEP]
+    : path.startsWith("/dashboard") ? [...DASH_GUIDE, HEADER_STEP]
+      : path.startsWith("/benvenuto") || path.startsWith("/cronologia") || path.startsWith("/archivio") ? [MENU_STEP, ...HISTORY_GUIDE, HEADER_STEP]
+        : path.startsWith("/profilo") || path.startsWith("/identificazione") ? PROFILE_GUIDE : [];
 
 /** Hover bubbles on the controls whose use is not obvious from their look. */
 const TIPS: Step[] = [
@@ -128,7 +156,8 @@ export default function DesktopTour() {
 
   const start = useCallback((m: "full" | "simple") => {
     const pick = (list: Step[]) => list.filter((s) => visible(document.querySelector(s.sel)));
-    const found = m === "simple" ? (pick(GUIDE).length ? pick(GUIDE) : pick(TOUR)) : pick(TOUR);
+    const page = pick(guideFor(window.location.pathname));
+    const found = m === "simple" ? (page.length ? page : pick(TOUR)) : pick(TOUR);
     if (!found.length) return false;
     setTip(null); setSteps(found); setI(0); setMode(m);
     return true;
