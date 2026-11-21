@@ -883,7 +883,7 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   const mapText = useCallback(() => JSON.stringify(scenarioGeoJson(labState, flowKey, new Date().toISOString()), null, 2), [labState, flowKey]);
   return (
     <>
-      <button onClick={startExport} className="inline-flex min-w-0 items-center justify-center gap-2 h-11 rounded-full bg-foreground px-4 text-sm font-semibold text-background transition-colors hover:bg-foreground/90 active:bg-foreground/80"><Download className="size-4 shrink-0" /><span className="truncate">Esporta report</span></button>
+      <button onClick={startExport} data-guide="export" className="inline-flex min-w-0 items-center justify-center gap-2 h-11 rounded-full bg-foreground px-4 text-sm font-semibold text-background transition-colors hover:bg-foreground/90 active:bg-foreground/80"><Download className="size-4 shrink-0" /><span className="truncate">Esporta report</span></button>
       {sheetUsed && <Suspense fallback={null}><ExportSheetLazy open={open} onOpenChange={setOpen} flow={ctx === "Urbano" ? "piazza" : "vigneto"} place={(ctx === "Urbano" ? u : v).location.label}
         author={author} media={reportMedia} progress={progress} report={reportBlob} table={tableText} map={mapText} text={text}
         onPrint={() => void openPreview("print")} onOpenReport={() => void openPreview("save")} /></Suspense>}

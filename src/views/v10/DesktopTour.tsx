@@ -31,16 +31,43 @@ const TOUR: Step[] = [
   { sel: "#app-header", title: "Account e aiuto", text: "Qui accedi al tuo account, cambi tema e con «i» rivedi questa guida quando vuoi." },
 ];
 
+/** The "i" guide (simplified, any page): only the points that are not obvious, those on the page open shown. */
+const GUIDE: Step[] = [
+  // Simulations: the map.
+  { sel: '[role="group"][aria-label="Disegna l’area"]', title: "Prima disegna l’area", text: "Clicca sugli angoli per mettere i pin. Da lì partono la ricerca dei vincoli, la stima delle persone e i costi: senza area restano vuoti." },
+  { sel: '[data-guide="proposal"]', title: "La proposta", text: "Gli interventi tratteggiati sono un suggerimento fatto in base ai vincoli trovati: non contano finché non premi «Metti»." },
+  { sel: '[aria-label="Interventi possibili"]', title: "Cosa si può fare", text: "Ogni intervento con il suo stato: si può fare, serve un’autorizzazione o è sconsigliato. Clicca una riga per sapere perché." },
+  { sel: '[data-guide="add-zone"]', title: "Zone dentro l’area", text: "Disegna dove vuoi alberi, aiuole, vele o una zona da lasciare libera. Un «Lotto» divide solo i costi, senza cambiare la disposizione." },
+  { sel: '[data-guide="only-drawn"]', title: "Solo quello disegnato", text: "Mette gli interventi solo nelle zone che hai disegnato e regola le leve di conseguenza. Se poi muovi una leva torna la disposizione automatica." },
+  { sel: '[data-guide="best-sun"]', title: "Posizione migliore", text: "Sposta vele, aiuole e alberi dove d’estate batte più sole, tenendo conto dei palazzi attorno." },
+  { sel: '[data-guide="arrange"]', title: "Sposta elementi", text: "Trascina alberi, zone ed etichette sulla mappa. «Disposizione automatica» annulla gli spostamenti." },
+  // Simulations: the reading.
+  { sel: '[data-guide="feasibility"]', title: "Fattibilità", text: "I vincoli trovati intorno all’area, in breve. Clicca per leggere i dettagli più sotto." },
+  { sel: 'main [role="slider"]', title: "L’arco", text: "Trascina il punto bianco o clicca uno dei tre livelli: le leve sotto si regolano da sole. A destra c’è la media della stagione senza interventi." },
+  { sel: '[aria-label="Persone nella piazza"]', title: "Persone nella piazza", text: "Una stima, non un conteggio: dipende da cosa c’è intorno, dalla stagione e dall’ora scelte nella simulazione." },
+  { sel: '[aria-label="Vincoli dell\'area"]', title: "Vincoli dell’area", text: "Indicativi: beni tutelati, paesaggio e archeologia intorno all’area. Solo il Comune e la Soprintendenza possono confermarli." },
+  // Dashboard.
+  { sel: '[role="radiogroup"][aria-label="Stagione"], [aria-label="Stagione"]', title: "La stagione", text: "La dashboard mostra la stagione e l’ora scelte nella simulazione: si cambiano lì, non qui." },
+  { sel: '[aria-label="Nuova voce del registro"]', title: "Registro", text: "Annota gli interventi fatti davvero: restano nel registro con data e ora, separati dalla simulazione." },
+  { sel: '[data-guide="export"]', title: "Esporta report", text: "Scegli i file (PDF, tabella, dati per la mappa, foto), poi a chi mandarli: email, condivisione o salvataggio." },
+  { sel: '[aria-label="Avanzamento approvazione"]', title: "Approvazioni", text: "Manda la richiesta a ogni ente via email: la risposta arriva qui e fa avanzare la barra." },
+  // History.
+  { sel: '[aria-label="Uffici"]', title: "Uffici", text: "Vedi gli interventi del tuo ufficio, di tutti o di un altro ufficio del Comune." },
+  { sel: '[aria-label="Raggruppa foto e video"]', title: "Per gruppo o per giorno", text: "Raggruppa le foto come nella simulazione (gruppi da 20) oppure per giorno di scatto." },
+  { sel: '[data-guide="archive"]', title: "Archivio", text: "Le foto archiviate escono dalle pile ma non sono cancellate: da qui le ripristini, le salvi o le elimini per sempre." },
+  { sel: '[data-guide="open-history"]', title: "Tutta la cronologia", text: "Qui vedi solo gli ultimi giorni: la cronologia completa ha filtri, archivio e cancellazione." },
+];
+
+/** Hover bubbles on the controls whose use is not obvious from their look. */
 const TIPS: Step[] = [
-  { sel: "[data-sim-tabs]", title: "Schede", text: "Passa da mappa e simulazione ai sensori consigliati dall’AI." },
-  { sel: 'form[role="search"] input', title: "Cerca un luogo", text: "Scrivi il nome di una piazza, di una via o di un vigneto." },
-  { sel: 'form[role="search"] button[aria-pressed]', title: "GPS", text: "Usa la tua posizione: resta acceso e segue i tuoi spostamenti." },
-  { sel: '[role="group"][aria-label="Vista della mappa"]', title: "2D o 3D", text: "Cambia la vista della mappa." },
-  { sel: '[role="group"][aria-label="Disegna l’area"]', title: "Disegna l’area", text: "Metti i pin sugli angoli del luogo da progettare." },
+  { sel: 'form[role="search"] button[aria-pressed]', title: "GPS", text: "Resta acceso e segue i tuoi spostamenti; se scegli un luogo a mano si mette in pausa." },
   { sel: 'main [role="slider"]', title: "L’arco", text: "Trascina il punto bianco: più a sinistra, più fresco." },
-  { sel: '[role="group"][aria-label="Modifica gli interventi"] button', title: "Interventi", text: "Aggiungi o togli un intervento alla volta." },
-  { sel: '[aria-label="Come funziona"]', title: "Come funziona", text: "Rivedi la guida a fumetti." },
-  { sel: '#app-header button[aria-haspopup], #app-header > div > div:first-child button', title: "Account", text: "Accedi, scegli l’immagine e guarda lo spazio nel cloud." },
+  { sel: '[data-guide="only-drawn"]', title: "Solo quello disegnato", text: "Interventi solo nelle tue zone; muovere una leva lo spegne." },
+  { sel: '[data-guide="best-sun"]', title: "Posizione migliore", text: "Mette l’ombra dove d’estate batte più sole." },
+  { sel: '[data-guide="arrange"]', title: "Sposta elementi", text: "Trascina alberi e zone sulla mappa." },
+  { sel: '[data-guide="add-zone"]', title: "Aggiungi zona", text: "Alberi, aiuole, vele, zona libera o un lotto per dividere i costi." },
+  { sel: '[aria-label="Raggruppa foto e video"]', title: "Raggruppa", text: "Per gruppo come nella simulazione, o per giorno." },
+  { sel: '[data-guide="archive"]', title: "Archivio", text: "Archiviate, non cancellate: puoi ripristinarle." },
 ];
 
 type Rect = { x: number; y: number; w: number; h: number };
@@ -95,7 +122,8 @@ export default function DesktopTour() {
   }, []);
 
   const start = useCallback((m: "full" | "simple") => {
-    const found = TOUR.filter((s) => visible(document.querySelector(s.sel)));
+    const pick = (list: Step[]) => list.filter((s) => visible(document.querySelector(s.sel)));
+    const found = m === "simple" ? (pick(GUIDE).length ? pick(GUIDE) : pick(TOUR)) : pick(TOUR);
     if (!found.length) return false;
     setTip(null); setSteps(found); setI(0); setMode(m);
     return true;

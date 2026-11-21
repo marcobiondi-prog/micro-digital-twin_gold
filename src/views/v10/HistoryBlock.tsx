@@ -675,7 +675,7 @@ function ArchiveBlock({ shots: all, keys, defaultOpen = false }: { shots: Shot[]
   const current = piles.find((p) => p.key === shown) ?? null;
   return (
     <div className="rounded-2xl bg-foreground/[0.04]">
-      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-3 px-4 py-3.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-2xl">
+      <button type="button" data-guide="archive" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-3 px-4 py-3.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-2xl">
         <ArchiveIcon kind="foto" />
         <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Archivio foto e video</span><span className="block text-xs text-muted-foreground">{all.length ? `${piles.length === 1 ? "1 giorno" : `${piles.length} giorni`} · ${countText(shots)}` : `${keys.length === 1 ? "1 file" : `${keys.length} file`} archiviati`} · {signedIn ? "nell’account" : "su questo dispositivo"}</span></span>
         <ChevronDown className={`size-5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
@@ -1354,7 +1354,7 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
       {failed && <DashCard><p className="text-sm text-muted-foreground">Non riesco a leggere la cronologia del tuo account. Vedi solo quella di questo dispositivo.</p></DashCard>}
       {list(filter)}
       {more && (
-        <Link to="/cronologia" onClick={() => rememberBack("/cronologia")} className="flex h-12 items-center justify-center gap-2 rounded-full bg-foreground text-sm font-semibold text-background outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <Link to="/cronologia" data-guide="open-history" onClick={() => rememberBack("/cronologia")} className="flex h-12 items-center justify-center gap-2 rounded-full bg-foreground text-sm font-semibold text-background outline-none focus-visible:ring-2 focus-visible:ring-ring">
           Apri la cronologia{entries.length > 0 ? ` · ${entries.length} ${entries.length === 1 ? "intervento" : "interventi"}` : ""}<ArrowRight className="size-4" aria-hidden="true" />
         </Link>
       )}
