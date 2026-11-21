@@ -116,6 +116,17 @@ export async function ensureMedia(k: MediaKind, userId: string | null) {
     return state[k];
   }
   const folder = `${userId}/${k}`;
+  // Listed without the session the storage answers an empty list (the anonymous role sees nothing): wait for it.
+  {
+    let session = (await supabase.auth.getSession()).data.session;
+    for (let t = 0; t < 3 && !session; t++) { await new Promise((r) => setTimeout(r, 500)); session = (await supabase.auth.getSession()).data.session; }
+    if (!session) {
+      loadedFor[k] = null;
+      clearTimeout(retryTimer[k]);
+      retryTimer[k] = setTimeout(() => { if (loadedFor[k] === null) void ensureMedia(k, userId); }, 3000);
+      return state[k];
+    }
+  }
   // The photos and videos taken on this device without signing in stay listed too (they live in its local store),
   // so signing in never hides them.
   const device = await loadGuestFiles(k);

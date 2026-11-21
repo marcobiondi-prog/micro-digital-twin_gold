@@ -8,13 +8,24 @@ import { SEASON_LABEL, type Season } from "@/models/season-climate";
 import { grouped } from "@/models/intervention-cost";
 import { cn } from "@/lib/utils";
 import { openSimTab } from "@/views/v8/console";
+import { useLocation, useNavigate } from "@tanstack/react-router";
+import { requestDraw } from "@/lib/draw-request";
 
 /** Before an area is circled on the map nothing is searched: the search starts from the area. */
 function DrawFirst({ sim }: { sim: "urban" | "vineyard" }) {
+  const navigate = useNavigate();
+  const path = useLocation({ select: (l) => l.pathname });
+  // To the simulation's map, which starts drawing by itself (lib/draw-request).
+  const draw = () => {
+    const to = sim === "urban" ? "/urbano" : "/vigneto";
+    requestDraw(sim);
+    openSimTab(sim, "mappa");
+    if (path !== to) void navigate({ to: to as never });
+  };
   return (
     <div className="space-y-2">
       <p className="text-sm text-muted-foreground">Circoscrivi l’area sulla mappa: la ricerca parte da lì.</p>
-      <button type="button" onClick={() => openSimTab(sim, "mappa")} className="inline-flex h-9 items-center rounded-full bg-foreground/[0.08] px-3.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">Disegna l’area</button>
+      <button type="button" onClick={draw} className="inline-flex h-9 items-center rounded-full bg-foreground/[0.08] px-3.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">Disegna l’area</button>
     </div>
   );
 }
@@ -183,7 +194,7 @@ export function FeasibilityStrip({ lat, lng, pending, ring, placeName, sim }: { 
   const probable = cs.some((c) => c.level === "probabile");
   const go = () => document.querySelector('[aria-label="Vincoli dell\'area"]')?.scrollIntoView({ behavior: "smooth", block: "start" });
   return (
-    <button type="button" onClick={go} className={cn("flex w-full items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-left ring-1 outline-none focus-visible:ring-2 focus-visible:ring-ring",
+    <button type="button" data-guide="feasibility" onClick={go} className={cn("flex w-full items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-left ring-1 outline-none focus-visible:ring-2 focus-visible:ring-ring",
       cs.length ? "bg-amber-400/10 ring-amber-500/30" : "bg-brand-turquoise/10 ring-brand-turquoise/30")}>
       {cs.length ? <ShieldAlert className="size-5 shrink-0 text-amber-500" aria-hidden="true" /> : <ShieldCheck className="size-5 shrink-0 text-brand-turquoise" aria-hidden="true" />}
       <span className="min-w-0 flex-1">

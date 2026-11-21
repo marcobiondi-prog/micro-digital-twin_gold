@@ -8,10 +8,17 @@ const subs = new Set<() => void>();
 /** Called whenever notifyAuthChange runs (the remembered account changed); returns the unsubscribe. */
 export function subscribeAuthChange(f: () => void): () => void { subs.add(f); return () => { subs.delete(f); }; }
 
+// Coalesced: many components call it on the same auth event (each useSignedIn), and every listener reads the account
+// again; one round per burst, 60 ms after the last call, instead of dozens of reads that also fought for the auth lock.
+let notifyTimer: ReturnType<typeof setTimeout> | null = null;
 export function notifyAuthChange() {
-  subs.forEach((f) => {
-    try { f(); } catch {}
-  });
+  if (notifyTimer) clearTimeout(notifyTimer);
+  notifyTimer = setTimeout(() => {
+    notifyTimer = null;
+    subs.forEach((f) => {
+      try { f(); } catch {}
+    });
+  }, 60);
 }
 
 /** Returns the registered email if the user is currently registered or signed in on this device. */
@@ -28,12 +35,11 @@ export function getRegisteredEmail(): string | null {
 
 export function setRegisteredEmail(email: string | null) {
   if (typeof window === "undefined") return;
+  const next = email && email.includes("@") ? email.trim().toLowerCase() : null;
   try {
-    if (email && email.includes("@")) {
-      window.localStorage.setItem(REGISTERED_EMAIL_KEY, email.trim().toLowerCase());
-    } else {
-      window.localStorage.removeItem(REGISTERED_EMAIL_KEY);
-    }
+    if (window.localStorage.getItem(REGISTERED_EMAIL_KEY) === next) return; // nothing changed: nobody to tell
+    if (next) window.localStorage.setItem(REGISTERED_EMAIL_KEY, next);
+    else window.localStorage.removeItem(REGISTERED_EMAIL_KEY);
   } catch {}
   notifyAuthChange();
 }

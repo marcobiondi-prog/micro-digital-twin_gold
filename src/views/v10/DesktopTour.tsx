@@ -31,16 +31,71 @@ const TOUR: Step[] = [
   { sel: "#app-header", title: "Account e aiuto", text: "Qui accedi al tuo account, cambi tema e con «i» rivedi questa guida quando vuoi." },
 ];
 
+/** The "i" guide (simplified): the main elements of the page open, each explained, then its less obvious points. */
+const SIM_GUIDE: Step[] = [
+  { sel: '[role="tablist"][aria-label="Sezioni"]', title: "Le schede", text: "«Mappa» (con la simulazione affiancata su computer) e «Sensori AI», che consiglia dove mettere le centraline." },
+  { sel: 'form[role="search"]', title: "Il luogo", text: "Cerca la piazza o il vigneto, oppure accendi il GPS: resta acceso e ti segue, finché non scegli un luogo a mano." },
+  { sel: '[role="group"][aria-label="Vista della mappa"]', title: "2D o 3D", text: "Dall’alto o in rilievo, con gli interventi disegnati sopra. Il 3D è per chi ha fatto l’accesso." },
+  { sel: '[role="group"][aria-label="Disegna l’area"]', title: "Prima disegna l’area", text: "Clicca sugli angoli per mettere i pin. Da lì partono la ricerca dei vincoli, la stima delle persone e i costi." },
+  { sel: '[data-guide="proposal"]', title: "La proposta", text: "Gli interventi tratteggiati sono un suggerimento fatto in base ai vincoli: non contano finché non premi «Metti»." },
+  { sel: '[aria-label="Interventi possibili"]', title: "Cosa si può fare", text: "Ogni intervento con il suo stato: si può fare, serve un’autorizzazione o è sconsigliato. Clicca una riga per sapere perché." },
+  { sel: '[data-guide="add-zone"]', title: "Zone dentro l’area", text: "Disegna dove vuoi alberi, aiuole, vele o una zona libera. Un «Lotto» divide solo i costi." },
+  { sel: '[data-guide="only-drawn"]', title: "Solo quello disegnato", text: "Mette gli interventi solo nelle tue zone e regola le leve di conseguenza; se poi muovi una leva torna la disposizione automatica." },
+  { sel: '[data-guide="best-sun"]', title: "Posizione migliore", text: "Sposta vele, aiuole e alberi dove d’estate batte più sole, tenendo conto dei palazzi attorno." },
+  { sel: '[data-guide="arrange"]', title: "Sposta elementi", text: "Trascina alberi, zone ed etichette sulla mappa. «Disposizione automatica» annulla gli spostamenti." },
+  { sel: '[data-guide="feasibility"]', title: "Fattibilità", text: "I vincoli trovati intorno all’area, in breve. Clicca per leggere i dettagli più sotto." },
+  { sel: 'main [role="slider"]', title: "L’arco", text: "Il calore percepito (o il bisogno di intervento nel vigneto). Trascina il punto bianco o clicca un livello: le leve sotto si regolano da sole." },
+  { sel: '[role="group"][aria-label="Modifica gli interventi"]', title: "Gli interventi", text: "Con − e + cambi uno per uno alberi, aiuole, vele, nebulizzatori e innaffiatoi (nel vigneto irrigazione, teli e frangivento)." },
+  { sel: '[aria-label="Persone nella piazza"]', title: "Persone nella piazza", text: "Una stima, non un conteggio: dipende da cosa c’è intorno, dalla stagione e dall’ora della simulazione." },
+  { sel: '[aria-label="Vincoli dell\'area"]', title: "Vincoli dell’area", text: "Indicativi: beni tutelati, paesaggio e archeologia. Solo il Comune e la Soprintendenza possono confermarli." },
+  { sel: ".lab-media-actions", title: "Foto e video", text: "Carica foto e video (anche intere cartelle, o trascinandoli qui): restano nella simulazione e finiscono nel report." },
+];
+const DASH_GUIDE: Step[] = [
+  { sel: '[role="tablist"][aria-label="Dashboard"]', title: "Piazza o vigneto", text: "Il riepilogo di ciascun progetto. Identificato, vedi solo il tuo." },
+  { sel: '[data-guide="export"]', title: "Esporta report", text: "Scegli i file (PDF, tabella, dati per la mappa, foto) e a chi mandarli: email, condivisione o salvataggio." },
+  { sel: '[role="radiogroup"][aria-label="Stagione"], [aria-label="Stagione"]', title: "La stagione", text: "È quella scelta nella simulazione: si cambia lì, non qui." },
+  { sel: '[aria-label="La giornata"]', title: "La giornata", text: "Il calore percepito ora per ora, senza e con gli interventi." },
+  { sel: '[aria-label="Le tre zone"]', title: "Le tre zone", text: "Il bisogno di intervento di ogni zona del vigneto, con temperatura e acqua." },
+  { sel: '[aria-label="Cosa ottieni"]', title: "Cosa ottieni", text: "I benefici stimati in un anno: CO₂, acqua piovana, ombra (nel vigneto foglie e vento)." },
+  { sel: '[aria-label="Cosa hai messo"]', title: "Cosa hai messo", text: "Ogni intervento con il suo costo indicativo e il totale sulla superficie disegnata." },
+  { sel: '[aria-label="Persone nella piazza"]', title: "Persone nella piazza", text: "La stessa stima della simulazione, alla stagione e all’ora scelte lì." },
+  { sel: '[aria-label="Vincoli dell\'area"]', title: "Vincoli dell’area", text: "Indicativi: da confermare con il Comune e la Soprintendenza." },
+  { sel: '[aria-label="Registro interventi"], [aria-label="Quaderno di campagna"]', title: "Registro", text: "Annota gli interventi fatti davvero: restano con data e ora, separati dalla simulazione." },
+  { sel: '[aria-label="Invia il progetto"]', title: "Invia il progetto", text: "Manda il progetto aperto per email o con la condivisione del dispositivo." },
+  { sel: '[aria-label="Premium"]', title: "Premium", text: "Con l’accesso: le approvazioni degli enti via email e il piano suggerito dall’AI." },
+];
+const HISTORY_GUIDE: Step[] = [
+  { sel: '[data-guide="start"]', title: "Da dove partire", text: "Apri la simulazione della piazza o del vigneto (o il tuo profilo, se sei identificato)." },
+  { sel: '[aria-label="Uffici"]', title: "Uffici", text: "Gli interventi del tuo ufficio, di tutti o di un altro ufficio del Comune." },
+  { sel: '[role="tablist"][aria-label="Luogo"]', title: "Piazza o vigneto", text: "Filtra la cronologia per progetto." },
+  { sel: '[aria-label="Tipo di foto e video"]', title: "Tipi di foto", text: "Foto, scatti multipli, foto con l’AI e video, ognuno con quanti ce ne sono." },
+  { sel: '[aria-label="Raggruppa foto e video"]', title: "Per gruppo o per giorno", text: "Raggruppa come nella simulazione (gruppi da 20) oppure per giorno di scatto. Clicca una pila per aprirla." },
+  { sel: '[data-guide="archive"]', title: "Archivio", text: "Le foto archiviate escono dalle pile ma non sono cancellate: da qui le ripristini, le salvi o le elimini per sempre." },
+  { sel: '[data-guide="open-history"]', title: "Tutta la cronologia", text: "Qui vedi solo gli ultimi giorni: la cronologia completa ha filtri, archivio e cancellazione." },
+  { sel: '[data-guide="clear-history"]', title: "Cancella cronologia", text: "Svuota solo la scheda aperta; l’archivio resta." },
+];
+const PROFILE_GUIDE: Step[] = [
+  { sel: '[data-guide="profile"]', title: "Il tuo profilo", text: "Chi sei per l’app (funzionario o agricoltore), i tuoi dati e da qui l’accesso con impronta o volto e «Esci dal profilo»." },
+  { sel: "#app-header", title: "Account", text: "Accedi, scegli l’immagine, guarda lo spazio nel cloud e i dispositivi collegati." },
+];
+const MENU_STEP: Step = { sel: 'aside nav[aria-label="Menu principale"]', title: "Il menu", text: "Da qui passi tra cronologia, simulazioni e dashboard; il cerchio turchese segna la pagina aperta." };
+const HEADER_STEP: Step = { sel: "#app-header", title: "Account e aiuto", text: "Accedi al tuo account, cambia tema e con «i» rivedi questa guida in ogni pagina." };
+const guideFor = (path: string): Step[] =>
+  path.startsWith("/urbano") || path.startsWith("/vigneto") ? [...SIM_GUIDE, HEADER_STEP]
+    : path.startsWith("/dashboard") ? [...DASH_GUIDE, HEADER_STEP]
+      : path.startsWith("/benvenuto") || path.startsWith("/cronologia") || path.startsWith("/archivio") ? [MENU_STEP, ...HISTORY_GUIDE, HEADER_STEP]
+        : path.startsWith("/profilo") || path.startsWith("/identificazione") ? PROFILE_GUIDE : [];
+
+/** Hover bubbles on the controls whose use is not obvious from their look. */
 const TIPS: Step[] = [
-  { sel: "[data-sim-tabs]", title: "Schede", text: "Passa da mappa e simulazione ai sensori consigliati dall’AI." },
-  { sel: 'form[role="search"] input', title: "Cerca un luogo", text: "Scrivi il nome di una piazza, di una via o di un vigneto." },
-  { sel: 'form[role="search"] button[aria-pressed]', title: "GPS", text: "Usa la tua posizione: resta acceso e segue i tuoi spostamenti." },
-  { sel: '[role="group"][aria-label="Vista della mappa"]', title: "2D o 3D", text: "Cambia la vista della mappa." },
-  { sel: '[role="group"][aria-label="Disegna l’area"]', title: "Disegna l’area", text: "Metti i pin sugli angoli del luogo da progettare." },
+  { sel: 'form[role="search"] button[aria-pressed]', title: "GPS", text: "Resta acceso e segue i tuoi spostamenti; se scegli un luogo a mano si mette in pausa." },
   { sel: 'main [role="slider"]', title: "L’arco", text: "Trascina il punto bianco: più a sinistra, più fresco." },
-  { sel: '[role="group"][aria-label="Modifica gli interventi"] button', title: "Interventi", text: "Aggiungi o togli un intervento alla volta." },
-  { sel: '[aria-label="Come funziona"]', title: "Come funziona", text: "Rivedi la guida a fumetti." },
-  { sel: '#app-header button[aria-haspopup], #app-header > div > div:first-child button', title: "Account", text: "Accedi, scegli l’immagine e guarda lo spazio nel cloud." },
+  { sel: '[data-guide="only-drawn"]', title: "Solo quello disegnato", text: "Interventi solo nelle tue zone; muovere una leva lo spegne." },
+  { sel: '[data-guide="best-sun"]', title: "Posizione migliore", text: "Mette l’ombra dove d’estate batte più sole." },
+  { sel: '[data-guide="arrange"]', title: "Sposta elementi", text: "Trascina alberi e zone sulla mappa." },
+  { sel: '[data-guide="add-zone"]', title: "Aggiungi zona", text: "Alberi, aiuole, vele, zona libera o un lotto per dividere i costi." },
+  { sel: '[aria-label="Raggruppa foto e video"]', title: "Raggruppa", text: "Per gruppo come nella simulazione, o per giorno." },
+  { sel: '[data-guide="archive"]', title: "Archivio", text: "Archiviate, non cancellate: puoi ripristinarle." },
 ];
 
 type Rect = { x: number; y: number; w: number; h: number };
@@ -65,13 +120,18 @@ function Bubble({ target, title, text, children, width = 320, onRef, passive }: 
   const [h, setH] = useState(140);
   useLayoutEffect(() => { if (ref.current) setH(ref.current.offsetHeight); });
   const p = placeBubble(target, width, h);
-  const arrowStyle: React.CSSProperties = p.side === "left" ? { left: -7, top: p.arrow - 7 } : p.side === "top" ? { top: -7, left: p.arrow - 7 } : { bottom: -7, left: p.arrow - 7 };
+  // A whole pointed triangle (not a turned square, whose corner read as cut), the bubble's own see-through slate.
+  const TIP = 18, DEPTH = 10;
+  const arrowStyle: React.CSSProperties = p.side === "left"
+    ? { left: -DEPTH, top: p.arrow - TIP / 2, width: DEPTH, height: TIP, clipPath: "polygon(100% 0, 0 50%, 100% 100%)" }
+    : p.side === "top"
+      ? { top: -DEPTH, left: p.arrow - TIP / 2, width: TIP, height: DEPTH, clipPath: "polygon(0 100%, 50% 0, 100% 100%)" }
+      : { bottom: -DEPTH, left: p.arrow - TIP / 2, width: TIP, height: DEPTH, clipPath: "polygon(0 0, 50% 100%, 100% 0)" };
   return (
     <div ref={(el) => { ref.current = el; onRef?.(el); }} role="dialog" aria-label={title}
-      className={`desk-bubble ${passive ? "pointer-events-none animate-in fade-in-0 zoom-in-95 duration-150" : "pointer-events-auto animate-in fade-in-0 zoom-in-95 duration-200"} fixed z-[1000000032] rounded-2xl border border-white/15 bg-[oklch(0.25_0.02_255/0.97)] p-4 text-left text-white shadow-[0_18px_50px_-12px_rgb(0_0_0/0.7)] motion-reduce:animate-none`}
+      className={`desk-bubble ${passive ? "pointer-events-none animate-in fade-in-0 zoom-in-95 duration-150" : "pointer-events-auto animate-in fade-in-0 zoom-in-95 duration-200"} fixed z-[1000000032] rounded-2xl bg-[oklch(0.25_0.02_255/0.84)] p-4 text-left text-white shadow-[0_18px_50px_-12px_rgb(0_0_0/0.7)] ring-1 ring-white/15 backdrop-blur-md motion-reduce:animate-none`}
       style={{ left: p.left, top: p.top, width }}>
-      <span aria-hidden="true" className="absolute size-3.5 rotate-45 border-l border-t border-white/15 bg-[oklch(0.25_0.02_255)]"
-        style={{ ...arrowStyle, transform: `rotate(${p.side === "left" ? -45 : p.side === "top" ? 45 : 225}deg)` }} />
+      <span aria-hidden="true" className="absolute bg-[oklch(0.25_0.02_255/0.84)]" style={arrowStyle} />
       <p className="text-[15px] font-semibold">{title}</p>
       <p className="mt-1 text-sm leading-snug text-white/75">{text}</p>
       {children}
@@ -95,7 +155,9 @@ export default function DesktopTour() {
   }, []);
 
   const start = useCallback((m: "full" | "simple") => {
-    const found = TOUR.filter((s) => visible(document.querySelector(s.sel)));
+    const pick = (list: Step[]) => list.filter((s) => visible(document.querySelector(s.sel)));
+    const page = pick(guideFor(window.location.pathname));
+    const found = m === "simple" ? (page.length ? page : pick(TOUR)) : pick(TOUR);
     if (!found.length) return false;
     setTip(null); setSteps(found); setI(0); setMode(m);
     return true;

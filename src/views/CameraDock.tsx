@@ -146,7 +146,7 @@ export function CameraSheet() {
   const pickFromSheet = (target: "urban" | "vineyard") => {
     const picker = (window as unknown as { showOpenFilePicker?: (o: unknown) => Promise<{ getFile: () => Promise<File> }[]> }).showOpenFilePicker;
     if (picker) {
-      void picker({ multiple: true, types: [{ description: "Foto e video", accept: { "image/*": [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".gif"], "video/*": [".mp4", ".mov", ".webm", ".m4v"] } }] })
+      void picker({ multiple: true, types: [{ description: "Foto e video", accept: { "image/*": [".jpg", ".jpeg", ".jfif", ".png", ".webp", ".heic", ".heif", ".gif", ".bmp", ".tif", ".tiff", ".avif"], "video/*": [".mp4", ".mov", ".webm", ".m4v"] } }] })
         .then(async (handles) => deliverFiles(target, { files: await Promise.all(handles.map((h) => h.getFile())), via: "gallery" }))
         .catch(() => undefined);
       return;

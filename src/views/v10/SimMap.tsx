@@ -24,6 +24,7 @@ import { getSimWhen, useSimWhen } from "@/models/sim-when";
 import { applyZoneMix, vineMixOf, zoneMixOf } from "@/models/vine-interventions";
 import { usePiazzaReading } from "@/models/sim-reading";
 import { Glasses, Thermometer } from "lucide-react";
+import { DRAW_EVENT, takeDrawRequest } from "@/lib/draw-request";
 import { SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import type { MovedPart } from "@/views/v10/SatelliteMap2D";
 import { drawnAreaFor, freeM2, leversForZones, vineLeversForZones, vineLeversOfZones, VINE_ZONE_KINDS, leversOfZones, lotsOf, MAX_PINS, moveZones, pinsM2, surfaceText, usableM2, ZONE_KINDS, ZONE_LABEL, zoneName, zonesOfArea, type DrawnArea, type SubArea, type ZoneKind } from "@/models/drawn-area";
@@ -117,6 +118,20 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   };
   const qc = useQueryClient();
   const startDrawing = () => { setView("2d"); setDraft(saved?.ring ?? []); setDrawing(true); };
+  // "Disegna l'area" asked from elsewhere (people / constraints cards, dashboard): start drawing here, map in view.
+  const drawAsk = useRef(startDrawing);
+  drawAsk.current = () => {
+    setArranging(false);
+    startDrawing();
+    window.setTimeout(() => document.querySelector("[data-sim-map-box]")?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
+  };
+  useEffect(() => {
+    if (preview) return;
+    const check = () => { if (takeDrawRequest(kind)) drawAsk.current(); };
+    check();
+    window.addEventListener(DRAW_EVENT, check);
+    return () => window.removeEventListener(DRAW_EVENT, check);
+  }, [kind, preview]);
   const finish = () => {
     if (draft.length < 3) { toast("Servono almeno 3 pin per chiudere l’area"); return; }
     const fresh = !saved;
@@ -646,16 +661,16 @@ function SimBar({ sim, when, arranging, edited, best, only, canOnly, onArrange, 
           : "Segue le leve della simulazione: cambia gli alberi o le percentuali e la mappa si aggiorna."}</p>
       {!canOnly && !only && !arranging && <p className="text-xs text-muted-foreground">Per vedere solo quello che disegni, aggiungi una zona {sim.kind === "piazza" ? "Alberi, Aiuole o Vele" : "Irrigazione, Teli d’ombra o Frangivento"}.</p>}
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={onArrange} aria-pressed={arranging} className={cn(barBtn, arranging ? "bg-foreground text-background" : "bg-foreground/[0.08]")}>
+        <button type="button" data-guide="arrange" onClick={onArrange} aria-pressed={arranging} className={cn(barBtn, arranging ? "bg-foreground text-background" : "bg-foreground/[0.08]")}>
           {arranging ? <><Check className="size-4" aria-hidden="true" />Fatto</> : <><Hand className="size-4" aria-hidden="true" />Sposta elementi</>}
         </button>
         {!arranging && (
-          <button type="button" onClick={onOnly} disabled={!canOnly && !only} aria-pressed={only} className={cn(barBtn, only ? "bg-brand-turquoise/20 text-brand-turquoise ring-1 ring-brand-turquoise/40" : "bg-foreground/[0.08]", "disabled:opacity-40")}>
+          <button type="button" data-guide="only-drawn" onClick={onOnly} disabled={!canOnly && !only} aria-pressed={only} className={cn(barBtn, only ? "bg-brand-turquoise/20 text-brand-turquoise ring-1 ring-brand-turquoise/40" : "bg-foreground/[0.08]", "disabled:opacity-40")}>
             <PenLine className="size-4" aria-hidden="true" />{only ? "Solo disegnato · attivo" : "Solo quello disegnato"}
           </button>
         )}
         {!arranging && !only && (
-          <button type="button" onClick={onBest} aria-pressed={best} className={cn(barBtn, best ? "bg-brand-turquoise/20 text-brand-turquoise ring-1 ring-brand-turquoise/40" : "bg-foreground/[0.08]")}>
+          <button type="button" data-guide="best-sun" onClick={onBest} aria-pressed={best} className={cn(barBtn, best ? "bg-brand-turquoise/20 text-brand-turquoise ring-1 ring-brand-turquoise/40" : "bg-foreground/[0.08]")}>
             <Sun className="size-4" aria-hidden="true" />{best ? "Posizione migliore · attiva" : "Posizione migliore"}
           </button>
         )}
@@ -747,7 +762,7 @@ function ZonesBar({ area, flow, onAdd, onEdit, onRemove }: { area: DrawnArea; fl
           <button type="button" onClick={() => setChoosing(false)} className={cn(barBtn, "text-muted-foreground")}><X className="size-4" aria-hidden="true" />Annulla</button>
         </div>
       ) : (
-        <button type="button" onClick={() => setChoosing(true)} className={cn(barBtn, "bg-foreground/[0.08]")}><PenLine className="size-4" aria-hidden="true" />Aggiungi zona</button>
+        <button type="button" data-guide="add-zone" onClick={() => setChoosing(true)} className={cn(barBtn, "bg-foreground/[0.08]")}><PenLine className="size-4" aria-hidden="true" />Aggiungi zona</button>
       )}
     </div>
   );
@@ -779,7 +794,7 @@ function writeDismissed(v: string[]) { try { localStorage.setItem(DISMISS_KEY, J
 /** Over the map, while the proposal is drawn in the area: what it is, "Metti" to put it in, ✕ to set it aside. */
 function ProposalPill({ text, constrained, onApply, onDismiss }: { text: string; constrained: boolean; onApply: () => void; onDismiss: () => void }) {
   return (
-    <div role="status" onClick={(e) => e.stopPropagation()}
+    <div role="status" data-guide="proposal" onClick={(e) => e.stopPropagation()}
       className="absolute inset-x-3 bottom-14 z-[4] mx-auto flex max-w-md items-center gap-2 rounded-2xl bg-black/60 p-2 pl-3 text-white ring-1 ring-white/15 backdrop-blur-sm">
       <span className="size-2.5 shrink-0 rounded-full bg-amber-300 ring-2 ring-amber-100/40" aria-hidden="true" />
       <p className="min-w-0 flex-1 text-[12px] leading-snug [text-shadow:0_1px_2px_rgb(0_0_0/.6)]">

@@ -2,7 +2,7 @@
 // WAV, not MP3: MP3 encoders pad the start with silence, which would delay the tap.
 // Imported as an asset so its URL carries a content hash: a changed sound never plays from a stale cache.
 import compareClickUrl from "@/assets/compare-click.wav";
-import { isTouchDevice } from "@/lib/touch-device";
+import { isTouchDevice, SLATE_QUERY } from "@/lib/touch-device";
 
 export const COMPARE_CLICK_URL = compareClickUrl;
 /** Slightly below full scale: the tap accompanies every button, so it stays discreet. */
@@ -16,6 +16,8 @@ export const TABLET_CLICK_VOLUME = 0.6;
  */
 export function uiClickVolume(): number {
   if (typeof window === "undefined" || !isTouchDevice()) return 0;
+  // A 2-in-1 in desktop mode (Surface with its keyboard: fine primary pointer) is silent like a computer.
+  if (isTabletScreen() && typeof window.matchMedia === "function" && !window.matchMedia(SLATE_QUERY).matches) return 0;
   return isTabletScreen() ? TABLET_CLICK_VOLUME : UI_CLICK_VOLUME;
 }
 

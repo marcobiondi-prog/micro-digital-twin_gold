@@ -404,10 +404,12 @@ export function AccountControl() {
       setTimeout(() => { if (active) void loadUser(session?.user ?? null); }, 0);
     });
     // The account remembered on the phone changed (an entry by fingerprint, a reconnection): read it again.
-    const onRegistered = () => { void supabase.auth.getUser().then(({ data }) => { if (active) void loadUser(data.user); }); };
-    window.addEventListener("storage", onRegistered);
+    // Read from the session kept on the phone (no server call), and only for the keys that say who is signed in.
+    const onRegistered = () => { void supabase.auth.getSession().then(({ data }) => { if (active) void loadUser(data.session?.user ?? null); }); };
+    const onStorage = (e: StorageEvent) => { if (e.key === null || e.key === "mdt-registered-email" || e.key.includes("auth-token")) onRegistered(); };
+    window.addEventListener("storage", onStorage);
     const unsubRegistered = subscribeAuthChange(onRegistered);
-    return () => { active = false; subscription.unsubscribe(); window.removeEventListener("storage", onRegistered); unsubRegistered(); };
+    return () => { active = false; subscription.unsubscribe(); window.removeEventListener("storage", onStorage); unsubRegistered(); };
   }, [saveAvatar]);
 
   const enterGuest = () => {
@@ -589,20 +591,22 @@ export function AccountControl() {
                   <button type="button" onClick={() => { setOpen(false); void leaveProfile(); }} className="mt-1 inline-flex min-h-10 items-center gap-1.5 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"><LogOut className="size-4" aria-hidden="true" />Esci dal profilo</button>
                 </div>
               </div>
-            ) : <p className="pb-2 text-sm text-muted-foreground">Nessun profilo: piazza e vigneto sono bloccati.</p>}
+            ) : (
+              /* No profile: one way to the sector page, where the sector is chosen and the profile registered or recognised. */
+              <button type="button" onClick={() => { setOpen(false); openSectorGate(null); }}
+                className="mb-2 flex w-full items-center gap-3 rounded-2xl bg-foreground/[0.06] p-3 text-left outline-none transition-colors hover:bg-foreground/[0.1] focus-visible:ring-2 focus-visible:ring-ring">
+                <span className="flex shrink-0 -space-x-2" aria-hidden="true">
+                  <ProfileIcon kind="funzionario" className="size-9 rounded-full bg-sky-500/15 p-1.5 ring-2 ring-background" />
+                  <ProfileIcon kind="agronomo" className="size-9 rounded-full bg-emerald-500/15 p-1.5 ring-2 ring-background" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-semibold">Scegli il settore</span>
+                  <span className="block text-sm text-muted-foreground">Urbano o agricolo: ti identifichi e si apre la tua simulazione.</span>
+                </span>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              </button>
+            )}
             {proId && <ProfileBioSwitch id={proId} />}
-            {/* Identified, the card shows only that profile: the ways to identify appear when there is none. */}
-            {!proId && <ul>
-              {/* Straight to that profile's registration form (the sector page, over everything), past the profile page. */}
-              {([["Agricoltore · apre il vigneto", "agronomo"], ["Funzionario comunale · apre la piazza", "funzionario"]] as const).map(([label, kind]) => (
-                <li key={kind}>
-                  <button type="button" onClick={() => { setOpen(false); openSectorGate(kind); }} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl text-left text-[15px] outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
-                    <span className="min-w-0 flex-1">{label}</span>
-                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                  </button>
-                </li>
-              ))}
-            </ul>}
           </section>
           {mode !== "reset" && <section className="space-y-3" aria-label="Immagine account">
             <div className="flex items-center gap-3">
