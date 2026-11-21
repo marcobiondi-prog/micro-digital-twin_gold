@@ -4,7 +4,7 @@ import { SIDE_BY_SIDE_QUERY } from "@/lib/use-desktop";
 import { useSwipeBack } from "@/lib/use-swipe-back";
 import { useBackClose } from "@/hooks/use-back-close";
 import { createPortal } from "react-dom";
-import { useLocation, useNavigate } from "@tanstack/react-router";
+import { useLocation, useNavigate, useRouter } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Building2, Grape, LogIn, Mail, Pencil, Plus, Trash2, UserPlus, UserRound, X } from "lucide-react";
 import { openAccount } from "@/lib/camera-dock";
 import { addGoogleAccount, leaveAccount, signInAs, switchToAccount } from "@/lib/account-sessions";
@@ -353,6 +353,7 @@ function ContinueLabel({ k }: { k: KnownProId }) {
 const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || "?";
 
 function SectorPage({ start }: { start: ProKind | null }) {
+  const router = useRouter();
   useDarkChrome();
   const { signedIn } = useSignedIn();
   const [kind, setKind] = useState<ProKind | null>(start);
@@ -459,7 +460,7 @@ function SectorPage({ start }: { start: ProKind | null }) {
             </div>
             <div className="mt-auto space-y-3 pt-6">
               {signIn}
-              <button type="button" onClick={() => { hapticTick(); enterAsGuest(); toast("Sei entrato come ospite", { description: "Prova la piazza e il vigneto. Quando vuoi, identificati dal tuo account." }); }}
+              <button type="button" onClick={() => { hapticTick(); enterAsGuest(); void router.navigate({ to: "/benvenuto" as never }); toast("Sei entrato come ospite", { description: "Prova la piazza e il vigneto. Quando vuoi, identificati dal tuo account." }); }}
                 className="flex w-full items-center gap-3 rounded-3xl px-5 py-4 text-left outline-none ring-1 ring-foreground/15 transition-colors hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-ring">
                 <UserRound className="size-5 shrink-0 text-foreground/70" aria-hidden="true" />
                 <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Entra come ospite</span><span className="block text-xs text-foreground/60">Prova la piazza e il vigneto senza identificarti.</span></span>
