@@ -224,6 +224,13 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
         showOpenFilePicker?: (options: unknown) => Promise<{ getFile: () => Promise<File> }[]>;
       }
     ).showOpenFilePicker;
+    // On a computer (fine pointer: a PC, a Surface with its keyboard) the standard file window of the system, every
+    // image format offered (JPEG, PNG, WebP, GIF, BMP, TIFF, HEIC, AVIF…) and several files at once.
+    if (window.matchMedia?.("(pointer: fine)").matches && gallery.current) {
+      gallery.current.multiple = true;
+      pick(gallery.current);
+      return;
+    }
     if (picker) {
       try {
         const handles = await picker({
@@ -232,7 +239,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
             {
               description: "Foto e video",
               accept: {
-                "image/*": [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".gif"],
+                "image/*": [".jpg", ".jpeg", ".jfif", ".png", ".webp", ".heic", ".heif", ".gif", ".bmp", ".tif", ".tiff", ".avif"],
                 "video/*": [".mp4", ".mov", ".webm", ".m4v"],
               },
             },
@@ -471,7 +478,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
       {input(cameraVideo, "video/*", "environment")}
       {/* Su Android la selezione multipla apre il gestore file; con un file alla volta si apre
           la galleria di sistema (Google Foto). Altrove resta la scelta multipla. */}
-      {input(gallery, "image/*,video/*", undefined, galleryMultiple)}
+      {input(gallery, "image/*,video/*,.jpg,.jpeg,.jfif,.png,.webp,.gif,.bmp,.tif,.tiff,.heic,.heif,.avif", undefined, galleryMultiple)}
       {/* Desktop: a folder of the computer, its photos and videos (subfolders too) go to the same review sheet. */}
       <input ref={folder} type="file" multiple className="hidden" {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
         onChange={(e) => {

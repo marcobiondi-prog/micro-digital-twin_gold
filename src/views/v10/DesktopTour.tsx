@@ -92,13 +92,18 @@ function Bubble({ target, title, text, children, width = 320, onRef, passive }: 
   const [h, setH] = useState(140);
   useLayoutEffect(() => { if (ref.current) setH(ref.current.offsetHeight); });
   const p = placeBubble(target, width, h);
-  const arrowStyle: React.CSSProperties = p.side === "left" ? { left: -7, top: p.arrow - 7 } : p.side === "top" ? { top: -7, left: p.arrow - 7 } : { bottom: -7, left: p.arrow - 7 };
+  // A whole pointed triangle (not a turned square, whose corner read as cut), the bubble's own see-through slate.
+  const TIP = 18, DEPTH = 10;
+  const arrowStyle: React.CSSProperties = p.side === "left"
+    ? { left: -DEPTH, top: p.arrow - TIP / 2, width: DEPTH, height: TIP, clipPath: "polygon(100% 0, 0 50%, 100% 100%)" }
+    : p.side === "top"
+      ? { top: -DEPTH, left: p.arrow - TIP / 2, width: TIP, height: DEPTH, clipPath: "polygon(0 100%, 50% 0, 100% 100%)" }
+      : { bottom: -DEPTH, left: p.arrow - TIP / 2, width: TIP, height: DEPTH, clipPath: "polygon(0 0, 50% 100%, 100% 0)" };
   return (
     <div ref={(el) => { ref.current = el; onRef?.(el); }} role="dialog" aria-label={title}
-      className={`desk-bubble ${passive ? "pointer-events-none animate-in fade-in-0 zoom-in-95 duration-150" : "pointer-events-auto animate-in fade-in-0 zoom-in-95 duration-200"} fixed z-[1000000032] rounded-2xl border border-white/15 bg-[oklch(0.25_0.02_255/0.97)] p-4 text-left text-white shadow-[0_18px_50px_-12px_rgb(0_0_0/0.7)] motion-reduce:animate-none`}
+      className={`desk-bubble ${passive ? "pointer-events-none animate-in fade-in-0 zoom-in-95 duration-150" : "pointer-events-auto animate-in fade-in-0 zoom-in-95 duration-200"} fixed z-[1000000032] rounded-2xl bg-[oklch(0.25_0.02_255/0.84)] p-4 text-left text-white shadow-[0_18px_50px_-12px_rgb(0_0_0/0.7)] ring-1 ring-white/15 backdrop-blur-md motion-reduce:animate-none`}
       style={{ left: p.left, top: p.top, width }}>
-      <span aria-hidden="true" className="absolute size-3.5 rotate-45 border-l border-t border-white/15 bg-[oklch(0.25_0.02_255)]"
-        style={{ ...arrowStyle, transform: `rotate(${p.side === "left" ? -45 : p.side === "top" ? 45 : 225}deg)` }} />
+      <span aria-hidden="true" className="absolute bg-[oklch(0.25_0.02_255/0.84)]" style={arrowStyle} />
       <p className="text-[15px] font-semibold">{title}</p>
       <p className="mt-1 text-sm leading-snug text-white/75">{text}</p>
       {children}
