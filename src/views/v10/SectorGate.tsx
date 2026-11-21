@@ -1,5 +1,6 @@
 import { goInApp } from "@/lib/app-nav";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { SIDE_BY_SIDE_QUERY } from "@/lib/use-desktop";
 import { useSwipeBack } from "@/lib/use-swipe-back";
 import { useBackClose } from "@/hooks/use-back-close";
 import { createPortal } from "react-dom";
@@ -190,8 +191,18 @@ export function KnownProfiles({ kind, onPicked }: { kind: ProKind; onPicked?: ()
  * initials), the name, the profile, the account's email, a white "Continua come …" and a bin that asks in place before
  * taking the profile off the phone. Flat with reduced motion.
  */
+/** Wide screens (computer, Surface, tablet held sideways): the 3D carousel with cards of a fixed width and a gentler turn. */
+function useWideProfiles(): boolean {
+  return useSyncExternalStore((cb) => {
+    const m = window.matchMedia(SIDE_BY_SIDE_QUERY);
+    m.addEventListener("change", cb);
+    return () => m.removeEventListener("change", cb);
+  }, () => window.matchMedia(SIDE_BY_SIDE_QUERY).matches, () => false);
+}
+
 function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[]; foreign: (k: KnownProId) => boolean; onPick: (k: KnownProId) => void; onAdd: () => void }) {
   const avatar = useAccountAvatar();
+  const wide = useWideProfiles();
   const row = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
   const [asking, setAsking] = useState<string | null>(null);
@@ -222,7 +233,9 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
         const inner = card.firstElementChild as HTMLElement | null;
         if (inner) {
           inner.style.transformOrigin = t > 0 ? "left center" : "right center";
-          inner.style.transform = `perspective(800px) translateZ(${-Math.abs(t) * 90}px) rotateY(${-t * 42}deg)`;
+          inner.style.transform = wide
+            ? `perspective(1600px) translateZ(${-Math.abs(t) * 70}px) rotateY(${-t * 26}deg)`
+            : `perspective(800px) translateZ(${-Math.abs(t) * 90}px) rotateY(${-t * 42}deg)`;
           inner.style.opacity = String(1 - Math.min(0.5, Math.abs(t) * 0.4));
         }
       });
@@ -233,7 +246,7 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
     el.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
     return () => { el.removeEventListener("scroll", onScroll); window.removeEventListener("resize", onScroll); if (frame) cancelAnimationFrame(frame); };
-  }, [known.length]);
+  }, [known.length, wide]);
   const go = (i: number) => {
     const el = row.current, card = el?.children[i] as HTMLElement | undefined;
     if (el && card) el.scrollTo({ left: card.offsetLeft - (el.clientWidth - card.offsetWidth) / 2, behavior: "smooth" });
@@ -241,11 +254,11 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
   return (
     <div className="space-y-3">
       <div ref={row} role="list" aria-label="Profili registrati" data-map-gestures=""
-        className={`no-scrollbar -mx-6 flex snap-x snap-mandatory gap-3 overflow-x-auto px-[11%] py-4 touch-pan-x [scrollbar-width:none] sm:-mx-0`}>
+        className={`no-scrollbar -mx-6 flex snap-x snap-mandatory overflow-x-auto py-4 touch-pan-x [scrollbar-width:none] sm:-mx-0 ${wide ? "!mx-[calc(50%-min(50vw-2rem,36rem))] gap-6 px-[calc(min(50vw-2rem,36rem)-12.5rem)] [mask-image:linear-gradient(90deg,transparent,#000_12%,#000_88%,transparent)]" : "gap-3 px-[11%]"}`}>
         {known.map((k, i) => {
           const pic = resolveProfilePic(k, avatar);
           return (
-          <div key={keyOf(k)} role="listitem" className="w-[78%] shrink-0 snap-center">
+          <div key={keyOf(k)} role="listitem" className={wide ? "w-[25rem] shrink-0 snap-center" : "w-[78%] shrink-0 snap-center"}>
             <div data-active={i === active || undefined}
               className="relative flex h-full flex-col gap-3 rounded-3xl bg-[oklch(0.24_0.016_258/0.96)] p-4 ring-1 ring-brand-turquoise/25 shadow-[0_18px_40px_-16px_rgb(0_0_0/0.75)] transition-[box-shadow] duration-300 will-change-transform data-[active]:ring-brand-turquoise/55 data-[active]:shadow-[0_18px_40px_-16px_rgb(0_0_0/0.75),0_0_28px_-8px_rgb(45_212_191/0.4)]">
               <div className="flex items-center justify-between gap-2">
@@ -307,7 +320,7 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
           </div>
         )})}
         {/* The last slide: add another personal account, quickly. */}
-        <div role="listitem" className="w-[78%] shrink-0 snap-center">
+        <div role="listitem" className={wide ? "w-[25rem] shrink-0 snap-center" : "w-[78%] shrink-0 snap-center"}>
           <div data-active={known.length === active || undefined}
             className="relative flex h-full flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-brand-turquoise/40 bg-[oklch(0.24_0.016_258/0.7)] p-5 text-center will-change-transform data-[active]:border-brand-turquoise/70">
             <span className="grid size-16 place-items-center rounded-full bg-brand-turquoise/15 text-brand-turquoise ring-2 ring-brand-turquoise/50" aria-hidden="true"><UserPlus className="size-7" /></span>
