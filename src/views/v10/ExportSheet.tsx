@@ -346,7 +346,7 @@ export function ExportSheet({ open, onOpenChange, flow, place, author, media, pr
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className={SHEET}>
+        <DialogContent overlayClassName="bg-black/45 backdrop-blur-md sm:!fixed sm:!inset-0 sm:!h-auto sm:!min-h-0" className={SHEET}>
           <span className="mx-auto mb-3 h-1.5 w-10 shrink-0 rounded-full bg-foreground/20 sm:hidden" aria-hidden="true" />
           <div className="relative mb-2 flex h-9 items-center justify-center">
             {(step === "foto" || step === "dove") && (
