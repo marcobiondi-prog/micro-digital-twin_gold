@@ -435,7 +435,6 @@ function SectorPage({ start }: { start: ProKind | null }) {
             <h1 className="font-display text-[2.6rem] font-extralight leading-[1] tracking-tight">{sector.name}</h1>
             <p className="text-[15px] leading-relaxed text-foreground/60">{profileIntro(sector.kind)}</p>
             <KnownProfiles kind={sector.kind} />
-            {signIn}
             {!(acct?.kind && acct.kind !== sector.kind) && <p className="px-1 pt-2 text-sm font-semibold text-foreground/70">Oppure registra un altro profilo</p>}
             <IdentifyForm kind={sector.kind} onDone={done} />
           </>
