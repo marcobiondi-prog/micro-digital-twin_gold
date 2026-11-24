@@ -31,7 +31,7 @@ import type { MovedPart } from "@/views/v10/SatelliteMap2D";
 import { drawnAreaFor, freeM2, initialRingAngle, leversForZones, vineLeversForZones, vineLeversOfZones, VINE_ZONE_KINDS, leversOfZones, lotsOf, MAX_PINS, moveZones, pinsM2, rotateZone, surfaceText, usableM2, ZONE_KINDS, ZONE_LABEL, zoneName, zonesOfArea, type DrawnArea, type SubArea, type ZoneKind } from "@/models/drawn-area";
 import type { Ring } from "@/models/place-area";
 import { openSimTab, type SimKind } from "@/views/v8/console";
-import { PlaceSearch } from "@/views/SimulationGrid";
+import { PlaceSearch, gpsFollowing } from "@/views/SimulationGrid";
 import { loadRealObjects } from "@/lib/real-objects-client";
 import { circleRing, realCountText, type RealObject } from "@/models/real-objects";
 import { findsCountText, useFieldFinds, type FieldFind } from "@/models/field-finds";
@@ -101,7 +101,10 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   // A pin put in place by hand wins; then the middle of the area drawn on the map; then the mapped shape's centre.
   const pinFix = usePinFix(loc.lat, loc.lng);
   const drawnCentre = saved && saved.ring.length >= 3 ? ringCentroid(saved.ring) : null;
-  const at = pinFix ?? drawnCentre ?? centre ?? null;
+  // While the GPS follows the phone the pin stands on the fix itself (the live position, not the map's anchor nor the
+  // centre of the nearest mapped square or field, which put it tens of metres away from where one stands).
+  const following = !liveLoc.pending && !saved && gpsFollowing();
+  const at = following ? [liveLoc.lat, liveLoc.lng] as [number, number] : pinFix ?? drawnCentre ?? centre ?? null;
   const pin = at ? { lat: at[0], lng: at[1] } : { lat: loc.lat, lng: loc.lng };
   const movePin = (lat: number, lng: number) => { setPinFix(loc.lat, loc.lng, [lat, lng]); toast.success("Pin spostato", { description: "Resta qui per questo luogo, anche in 3D." }); };
   const [drawing, setDrawing] = useState(false);
