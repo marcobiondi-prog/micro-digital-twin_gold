@@ -186,40 +186,61 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
     if (!gps) return;
     if (typeof navigator === "undefined" || !("geolocation" in navigator)) { setError("Il dispositivo non supporta la geolocalizzazione."); setGps(false); saveGps(false); return; }
     let busy = false, live = true;
+    const lastGeocoded = { lat: 0, lng: 0 };
     const id = navigator.geolocation.watchPosition(async ({ coords }) => {
       const here = { lat: coords.latitude, lng: coords.longitude };
       // The first fix of each switch-on is said once: the GPS is on and following.
-      if (!lastFix.current) toast.success("GPS attivo", { description: pausedRef.current ? "Hai scelto tu la zona: il GPS resta acceso ma non la sposta." : "La mappa segue la tua posizione.", id: "gps-state" });
+      if (!lastFix.current) toast.success("GPS attivo", { description: pausedRef.current ? "Hai scelto tu la zona: il GPS resta acceso ma non la sposta." : "La mappa ti segue passo passo in tempo reale.", id: "gps-state" });
       lastFix.current = here;
       setLocating(false);
       setError(null); // a fix came: any earlier "not available" is over
+      if (pausedRef.current) return;
+
       const acc = coords.accuracy || 9999, moved = metresBetween(placeRef.current, here);
-      const placeAcc = placeAccuracy.get(accKey(placeRef.current)) ?? 0;
-      const sharper = (placeAcc >= 25 && acc < placeAcc * 0.7 && moved > Math.max(5, acc)) || (placeRef.current.pending);
-      const away = moved >= Math.max(GPS_STEP_M, Math.min(25, acc * 0.8));
-      if (pausedRef.current || busy || (!placeRef.current.pending && !away && !sharper)) return;
+      // Suppress micro-jitter under 0.8m when still, but update step-by-step as soon as user takes a step
+      if (!placeRef.current.pending && moved < Math.max(0.8, Math.min(2.5, acc * 0.1))) return;
+
+      placeAccuracy.set(accKey(here), acc);
       appliedAcc.current = acc;
-      busy = true;
-      const fallback = { label: `La mia posizione (${here.lat.toFixed(5)}, ${here.lng.toFixed(5)})`, ...here };
-      const pick = (loc: SearchedLocation) => { placeAccuracy.set(accKey(loc), acc); selectRef.current(loc); };
-      try {
-        const result = await reverseGoogle({ data: here }).catch(() => null);
-        if (live && result?.location) { pick(result.location); return; }
-        const osm = await reverseOsm({ data: here }).catch(() => null);
-        if (live && osm?.location) { pick(osm.location); return; }
-        if (live) pick(fallback);
-      } catch {
-        try {
-          const osm = await reverseOsm({ data: here }).catch(() => null);
-          if (live && osm?.location) { pick(osm.location); return; }
-        } catch { /* ignore */ }
-        if (live) pick(fallback);
-      } finally { busy = false; }
+
+      // Real-time synchronous position dispatch: zero network lag, follows each step immediately
+      const updated: SearchedLocation = {
+        ...placeRef.current,
+        lat: here.lat,
+        lng: here.lng,
+        pending: false,
+      };
+      selectRef.current(updated);
+
+      // Decoupled reverse geocoding in background: refine place name only after significant movement (> 25m) or initial fix
+      const geocodedMoved = metresBetween(lastGeocoded, here);
+      if (!busy && (lastGeocoded.lat === 0 || geocodedMoved > 25)) {
+        busy = true;
+        lastGeocoded.lat = here.lat;
+        lastGeocoded.lng = here.lng;
+        void (async () => {
+          try {
+            const result = await reverseGoogle({ data: here }).catch(() => null);
+            if (live && result?.location) {
+              selectRef.current({ ...result.location, lat: here.lat, lng: here.lng });
+              return;
+            }
+            const osm = await reverseOsm({ data: here }).catch(() => null);
+            if (live && osm?.location) {
+              selectRef.current({ ...osm.location, lat: here.lat, lng: here.lng });
+            }
+          } catch {
+            /* ignore */
+          } finally {
+            busy = false;
+          }
+        })();
+      }
     }, (geoError) => {
       setLocating(false);
       if (geoError.code === 1) { setGps(false); saveGps(false); setError("Permesso di posizione negato. Abilitalo nelle impostazioni del browser."); }
       else if (!lastFix.current && placeRef.current.pending) setError("Sto ancora cercando la posizione: il GPS resta attivo e riprova da solo.");
-    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 2000 });
+    }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 });
     return () => { live = false; lastFix.current = null; appliedAcc.current = Infinity; navigator.geolocation.clearWatch(id); };
   }, [gps, reverseGoogle, reverseOsm]);
   // Back to following the phone: at once to the last position known, then on with every move.
