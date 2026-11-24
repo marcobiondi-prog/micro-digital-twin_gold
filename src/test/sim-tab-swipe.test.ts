@@ -16,10 +16,11 @@ describe("sim-tab-swipe", () => {
   });
   it("leaves sliders and maps to themselves", () => {
     const root = document.createElement("div");
-    root.innerHTML = `<input type="range" id="r"><div data-map-gestures><span id="m"></span></div><p id="p"></p>`;
+    root.innerHTML = `<input type="range" id="r"><div data-map-gestures><span id="m"></span></div><gmp-map-3d id="g3d"></gmp-map-3d><p id="p"></p>`;
     document.body.append(root);
     expect(startsOnOwnGesture(root.querySelector("#r"), root)).toBe(true);
     expect(startsOnOwnGesture(root.querySelector("#m"), root)).toBe(true);
+    expect(startsOnOwnGesture(root.querySelector("#g3d"), root)).toBe(true);
     expect(startsOnOwnGesture(root.querySelector("#p"), root)).toBe(false);
     root.remove();
   });
