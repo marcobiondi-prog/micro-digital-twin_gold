@@ -317,20 +317,20 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
       altitude.current = ground;
       libs.current = lib;
       const cam = frameCamera(lat, lng, el.clientHeight, ground);
-      const map = new lib.Map3DElement({ ...cam, mode: "HYBRID", gestureHandling: "greedy" }) as Map3D;
+      let map: Map3D;
+      try {
+        map = new lib.Map3DElement({ ...cam, mode: "HYBRID", gestureHandling: "GREEDY" }) as Map3D;
+      } catch {
+        map = new lib.Map3DElement({ ...cam, mode: "HYBRID" }) as Map3D;
+      }
       map.style.cssText = "display:block;width:100%;height:100%;touch-action:none";
-      // greedy: one finger moves the camera; the auto default turns cooperative inside a
-      // scrollable page and asks for two fingers. Set both attribute and property so the
-      // Web Component observer and internal getters recognize greedy mode.
-      map.setAttribute("gesture-handling", "greedy");
       map.setAttribute("data-map-gestures", "");
       try {
-        const maps3d = (window as any).google?.maps?.maps3d;
-        const greedyVal = maps3d?.GestureHandling?.GREEDY ?? "greedy";
-        (map as any).gestureHandling = greedyVal;
-      } catch {
-        (map as any).gestureHandling = "greedy";
-      }
+        (map as any).gestureHandling = "GREEDY";
+      } catch {}
+      try {
+        map.setAttribute("gesture-handling", "greedy");
+      } catch {}
       // On top of the 3D mesh (roofs, trees) and drawn even when occluded: a ground pin in a street disappears behind buildings.
       const marker = new lib.Marker3DElement({ position: { lat, lng, altitude: 0 }, altitudeMode: "RELATIVE_TO_MESH", drawsWhenOccluded: true, label });
       map.append(marker);
@@ -434,7 +434,7 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
   ) : <p role="status" className="grid h-full w-full place-items-center bg-lab-surface px-3 text-center text-xs text-muted-foreground">Vista 3D non disponibile in questo momento.</p>;
   return <div className="relative h-full w-full overflow-hidden bg-lab-surface">
     {/* touch-none + data-map-gestures: drag, pinch and rotate belong to the 3D map, not to the page. */}
-    <div ref={host} data-map-gestures="" style={{ filter: "var(--map-light-filter, none)" }} className="absolute inset-0 touch-none transition-[filter] duration-700 motion-reduce:transition-none" aria-label={`Vista 3D di ${label}`} role="img" />
+    <div ref={host} data-map-gestures="" style={{ filter: "var(--map-light-filter, none)" }} className="absolute inset-0 touch-none transition-[filter] duration-700 motion-reduce:transition-none" aria-label={`Vista 3D di ${label}`} />
     {/* Top-left: Google keeps its map-type thumbnail top-right, compass and fullscreen bottom-right, logo bottom-left. */}
     {state === "ready" && <button type="button" onClick={() => recenter(true)} aria-label="Ricentra la vista 3D sul punto" className="absolute left-2 top-2 grid size-9 place-items-center rounded-full border border-border/60 bg-background/90 text-foreground shadow-sm backdrop-blur"><Crosshair className="size-4" aria-hidden="true" /></button>}
     {/* The drawing's position by hand: Google's ground can lie under the photographed floor (the shapes slide when
