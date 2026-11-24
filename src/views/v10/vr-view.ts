@@ -20,7 +20,13 @@ import { castShadows } from "@/views/ar-shadow";
  */
 export async function vrSupported(): Promise<boolean> {
   try {
-    return typeof navigator !== "undefined" && !!navigator.xr && (await navigator.xr.isSessionSupported("immersive-vr"));
+    if (typeof navigator === "undefined" || !navigator.xr) return false;
+    const ua = navigator.userAgent || "";
+    const isHeadset = /OculusBrowser|Quest|Pico|ViveFocus/i.test(ua);
+    if (!isHeadset && (/Android|iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1))) {
+      return false;
+    }
+    return await navigator.xr.isSessionSupported("immersive-vr");
   } catch { return false; }
 }
 
