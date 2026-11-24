@@ -191,7 +191,7 @@ export function modelUrl(key: string, build: () => THREE.Object3D | Promise<THRE
 
 const half = (v: number) => Math.max(0.5, Math.round(v * 2) / 2);
 /** The side of the bed tiles (m): small enough to follow a hilly ground, large enough to keep the models few. */
-export const BED_TILE_M = 2.5;
+export const BED_TILE_M = 1.25;
 const deg = (yaw: number) => ((-yaw * 180) / Math.PI + 360) % 360;
 
 /**
