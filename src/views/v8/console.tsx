@@ -43,6 +43,23 @@ export function openSimTab(kind: SimKind, tab: SimTab) {
   tabs[kind] = tab;
   listeners.forEach((l) => l());
 }
+/**
+ * Opens Simula and brings its arc into view: the arc's two end labels ([data-sim-focus]) just under the sticky tabs,
+ * with the reading, the "when" chip and the levers below. Used by the "Simula" of the toast after the suggested
+ * interventions are put in; retried while the lazy arc loads (about 1 s).
+ */
+export function openSimAtArc(kind: SimKind) {
+  openSimTab(kind, "simula");
+  const tryScroll = (left: number) => {
+    const el = document.querySelector<HTMLElement>("[data-sim-focus]");
+    if (!el || !el.offsetParent) { if (left > 0) window.setTimeout(() => tryScroll(left - 1), 80); return; }
+    const bar = document.querySelector<HTMLElement>("[data-sim-tabs]");
+    const under = bar ? bar.getBoundingClientRect().height + (parseFloat(getComputedStyle(bar).top) || 0) : 120;
+    const top = el.getBoundingClientRect().top + window.scrollY - under - 56;
+    window.scrollTo({ top: Math.max(0, top), behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  };
+  window.setTimeout(() => tryScroll(12), 60);
+}
 /** Id of the photo and video block under a simulator, which the camera and the ⋮ menu bring into view. */
 export const simMediaId = (kind: SimKind) => `sim-media-${kind}`;
 /** Opens Simula and scrolls to its photos and videos, once the panel shows and the closing menu or sheet has handed focus back. */

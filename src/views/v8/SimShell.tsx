@@ -86,21 +86,7 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, medi
   const tabItems = (desk ? DESK_TABS : TABS).map((t) => (t.id === "sensori" ? { ...t, locked: guest } : t));
   // Entering the page always starts on Mappa (unless a tab was asked for on the way in).
   useLayoutEffect(() => startOnMap(kind), [kind]);
-  // A tap on Simula brings the simulation's arc into view: its two end labels just under the tabs, with the reading,
-  // the "when" chip and the levers below (the map preview above it scrolled away). Not on desktop, where the
-  // simulation sits beside the map, nor when the tab opens by itself.
-  const go = (t: SimTab) => {
-    openSimTab(kind, t);
-    if (t !== "simula" || desk) return;
-    const tryScroll = (left: number) => {
-      const el = rootRef.current?.querySelector<HTMLElement>("[data-sim-focus]");
-      if (!el || !el.offsetParent) { if (left > 0) window.setTimeout(() => tryScroll(left - 1), 80); return; }
-      const bar = barRef.current, under = bar ? bar.getBoundingClientRect().height + (parseFloat(getComputedStyle(bar).top) || 0) : 120;
-      const top = el.getBoundingClientRect().top + window.scrollY - under - 56;
-      window.scrollTo({ top: Math.max(0, top), behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-    };
-    window.setTimeout(() => tryScroll(12), 60);
-  };
+  const go = (t: SimTab) => openSimTab(kind, t);
   // The place's name in the small line above the title (Piazza / Vigneto); a position from the GPS reads its street or
   // town instead of "La mia posizione".
   const parts = place.split(" · ").map((x) => x.trim()).filter(Boolean);
