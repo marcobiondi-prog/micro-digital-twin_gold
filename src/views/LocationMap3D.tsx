@@ -327,10 +327,21 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
       map.setAttribute("data-map-gestures", "");
       try {
         (map as any).gestureHandling = "GREEDY";
+        map.setAttribute("gesture-handling", "GREEDY");
       } catch {}
-      try {
-        map.setAttribute("gesture-handling", "greedy");
-      } catch {}
+      const fixShadow = () => {
+        try {
+          if (map.shadowRoot && !map.shadowRoot.querySelector("style[data-touch-fix]")) {
+            const s = document.createElement("style");
+            s.setAttribute("data-touch-fix", "");
+            s.textContent = "* { touch-action: none !important; }";
+            map.shadowRoot.appendChild(s);
+          }
+        } catch {}
+      };
+      fixShadow();
+      setTimeout(fixShadow, 50);
+      setTimeout(fixShadow, 300);
       // On top of the 3D mesh (roofs, trees) and drawn even when occluded: a ground pin in a street disappears behind buildings.
       const marker = new lib.Marker3DElement({ position: { lat, lng, altitude: 0 }, altitudeMode: "RELATIVE_TO_MESH", drawsWhenOccluded: true, label });
       map.append(marker);
@@ -423,16 +434,16 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
     observer.observe(el);
     return () => { observer.disconnect(); window.clearTimeout(timer); };
   });
-  // The photographic 3D refused (key, quota or billing): the simplified map instead, and a line saying so.
-  if (rejected) return fallback ? (
-    <div className="relative h-full w-full">
+  // The photographic 3D refused (key, quota, WebGL or loading error): show the fallback simplified map instead.
+  if (rejected || state === "error") return fallback ? (
+    <div data-map-gestures="" className="relative h-full w-full touch-none">
       {fallback}
       <p role="status" className="pointer-events-none absolute inset-x-0 bottom-3 z-[3] mx-auto w-fit max-w-[92%] rounded-full bg-black/60 px-3 py-1.5 text-center text-[12px] font-semibold text-white ring-1 ring-white/15 backdrop-blur-sm">
         Vista 3D fotografica non disponibile ora: mostro la mappa semplificata
       </p>
     </div>
   ) : <p role="status" className="grid h-full w-full place-items-center bg-lab-surface px-3 text-center text-xs text-muted-foreground">Vista 3D non disponibile in questo momento.</p>;
-  return <div className="relative h-full w-full overflow-hidden bg-lab-surface">
+  return <div data-map-gestures="" className="relative h-full w-full overflow-hidden bg-lab-surface touch-none">
     {/* touch-none + data-map-gestures: drag, pinch and rotate belong to the 3D map, not to the page. */}
     <div ref={host} data-map-gestures="" style={{ filter: "var(--map-light-filter, none)" }} className="absolute inset-0 touch-none transition-[filter] duration-700 motion-reduce:transition-none" aria-label={`Vista 3D di ${label}`} />
     {/* Top-left: Google keeps its map-type thumbnail top-right, compass and fullscreen bottom-right, logo bottom-left. */}
@@ -475,6 +486,5 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
       </div>
     )}
     {state === "loading" && <div className="absolute inset-0 grid place-items-center text-xs text-muted-foreground"><LoaderCircle className="size-4 animate-spin" aria-label="Caricamento vista 3D" /></div>}
-    {state === "error" && <p role="status" className="absolute inset-0 grid place-items-center px-3 text-center text-xs text-muted-foreground">Vista 3D non disponibile in questo momento.</p>}
   </div>;
 }

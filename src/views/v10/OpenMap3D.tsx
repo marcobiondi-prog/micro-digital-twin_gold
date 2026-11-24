@@ -35,7 +35,7 @@ export function OpenMap3D({ lat, lng, label, zoom, area = [], sim = null }: { la
     setState("loading");
     void import("maplibre-gl").then(({ default: maplibregl }) => {
       if (cancelled || !host.current) return;
-      const map = new maplibregl.Map({ container: host.current, style: STYLE, locale: MAP_LOCALE, ...camera, maxPitch: 75, attributionControl: false });
+      const map = new maplibregl.Map({ container: host.current, style: STYLE, locale: MAP_LOCALE, ...camera, maxPitch: 75, attributionControl: false, dragPan: true, touchZoomRotate: true, touchPitch: true });
       map.on("load", () => {
         // The style already raises buildings only at close zoom: make sure they stand up wherever there are heights.
         if (!map.getLayer("building-3d") && map.getSource("openmaptiles")) {
@@ -60,7 +60,11 @@ export function OpenMap3D({ lat, lng, label, zoom, area = [], sim = null }: { la
         }).catch(() => { engine.current = { map, three: null }; if (!cancelled) setState("ready"); });
         engine.current = { map, three };
       });
-      map.on("error", () => { if (!cancelled && !map.loaded()) setState("error"); });
+      map.on("error", (e) => {
+        // Non-fatal errors like missing tiles or glyphs must never kill the 3D view
+        console.warn("[OpenMap3D] non-fatal map error:", e);
+      });
+      map.on("webglcontextlost", () => { if (!cancelled) setState("error"); });
       new maplibregl.Marker({ element: placePinElement(), anchor: "bottom" }).setLngLat([lng, lat]).setPopup(new maplibregl.Popup({ offset: 38 }).setText(label)).addTo(map);
       mapRef.current = map;
       remove = () => map.remove();

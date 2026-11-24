@@ -10,9 +10,9 @@ describe("3D models by device", () => {
     ua("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36");
     expect(models3D()).toBe("real");
   });
-  it("keeps the realistic models on Android devices", () => {
+  it("draws plain shapes on Android mobile and tablet devices to prevent freezing", () => {
     ua("Mozilla/5.0 (Linux; Android 14; XQ-EC54) Chrome/130 Mobile");
-    expect(models3D()).toBe("real");
+    expect(models3D()).toBe("shapes");
   });
   it("draws plain shapes on iPhone until the light models are turned on", () => {
     ua("Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) Safari/604.1");
