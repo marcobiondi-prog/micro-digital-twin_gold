@@ -273,12 +273,11 @@ function writeAdjust(lat: number, lng: number, a: Adjust) {
 const metres = (v: number) => `${v > 0 ? "+" : ""}${v.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} m`;
 
 function applyCamera(map: Map3D, camera: Camera, animate: boolean) {
-  if (map.flyCameraTo) {
+  if (animate && map.flyCameraTo) {
     try {
-      const mode = camera.altitudeMode ?? (camera.center.altitude > 0 ? "ABSOLUTE" : "RELATIVE_TO_GROUND");
-      map.flyCameraTo({ endCamera: { ...camera, altitudeMode: mode }, durationMillis: animate ? 900 : 0 });
+      map.flyCameraTo({ endCamera: camera, durationMillis: 900 });
       return;
-    } catch { /* fallback to property assignment */ }
+    } catch { /* fallback to direct property assignment */ }
   }
   Object.assign(map, camera);
 }
@@ -329,10 +328,11 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
       // Google's own red pin, like the 2D one.
       el.replaceChildren(map);
       mapRef.current = map;
-      // Immediately target ground surface via flyCameraTo to prevent diving into the void/underground (Google issue 372413906).
-      applyCamera(map, cam, false);
       setState("ready");
-    }).catch(() => { if (!cancelled) setState("error"); });
+    }).catch((err) => {
+      console.error("[LocationMap3D] Failed to load 3D map:", err);
+      if (!cancelled) setState("error");
+    });
     return () => { cancelled = true; mapRef.current = null; badges.current.clear(); el?.replaceChildren(); };
   }, [lat, lng, label, apiKey]);
   // Three layers, each laid again only when its own content changes: the drawing (area, zones, ground shapes), the
