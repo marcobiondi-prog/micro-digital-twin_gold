@@ -146,16 +146,18 @@ export async function addGoogleAccount(): Promise<boolean> {
 export async function googleOAuth(redirectTo: string, queryParams?: Record<string, string>): Promise<{ error: Error | null }> {
   // First Google's chooser inside the app (no window of Google's left behind the app); its pages only when it cannot show.
   const hint = queryParams?.["login_hint"];
-  const inApp = await googleInApp(hint ? { loginHint: hint } : {});
-  if (inApp !== "unavailable") {
-    try { localStorage.removeItem("mdt-auth-return"); } catch { /* none */ }
+  const prompt = queryParams?.["prompt"];
+  // When an explicit prompt is requested (like "select_account" to add another account), bypass Google One Tap which cannot choose or add accounts.
+  if (!prompt) {
+    const inApp = await googleInApp(hint ? { loginHint: hint } : {});
     if (inApp === "signed") {
+      try { localStorage.removeItem("mdt-auth-return"); } catch { /* none */ }
       // The account is read (its profile, or the sector page with its form or the lock), then its simulation opens.
       await nextAdoptDone();
       const pro = getProId();
       if (pro && !getSectorGateKind()) goInApp(pro.kind === "agronomo" ? "/vigneto" : "/urbano");
+      return { error: null };
     }
-    return { error: null };
   }
   const r = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo, skipBrowserRedirect: true, ...(queryParams ? { queryParams } : {}) } });
   if (r.error || !r.data?.url) return { error: r.error ?? new Error("Accesso Google non disponibile") };

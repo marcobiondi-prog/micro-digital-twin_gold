@@ -135,7 +135,11 @@ export function KnownProfiles({ kind, onPicked }: { kind: ProKind; onPicked?: ()
     rememberWantedSector(kind);
     rememberAddingSector(kind);
     if (accEmail) await keepProIdInAccount();
-    if (!(await addGoogleAccount())) openAccount({ mode: "signin" });
+    try {
+      if (!(await addGoogleAccount())) openAccount({ mode: "signin" });
+    } catch {
+      openAccount({ mode: "signin" });
+    }
   };
   // No profile of this sector on the phone yet (often the vineyard, the first time): the quick "Aggiungi account"
   // still shows, on its own, so another personal account can sign in here and bring its profile.
@@ -260,6 +264,7 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
           return (
           <div key={keyOf(k)} role="listitem" className={wide ? "w-[25rem] 2k:w-[32rem] 4k:w-[36rem] shrink-0 snap-center" : "w-[78%] shrink-0 snap-center"}>
             <div data-active={i === active || undefined}
+              onClick={() => { if (i !== active) go(i); }}
               className="relative flex h-full flex-col gap-3 rounded-3xl bg-[oklch(0.24_0.016_258/0.96)] p-4 ring-1 ring-brand-turquoise/25 shadow-[0_18px_40px_-16px_rgb(0_0_0/0.75)] transition-[box-shadow] duration-300 will-change-transform data-[active]:ring-brand-turquoise/55 data-[active]:shadow-[0_18px_40px_-16px_rgb(0_0_0/0.75),0_0_28px_-8px_rgb(45_212_191/0.4)] 2k:p-6 2k:rounded-[2rem] 2k:gap-4">
               <div className="flex items-center justify-between gap-2">
                 <p className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-turquoise 2k:text-xs">Ti abbiamo riconosciuto</p>
@@ -308,7 +313,7 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
                   <p className="text-xs 2k:text-sm text-foreground/60">{foreign(k)
                     ? <>Entri anche con il suo account personale {k.acct?.email} e ritrovi la cronologia {k.kind === "funzionario" ? "della piazza" : "del vigneto"}.</>
                     : <>Ti eri già registrato con questo profilo: continua e ritrovi la cronologia {k.kind === "funzionario" ? "della piazza" : "del vigneto"}.</>}</p>
-                  <button type="button" onClick={() => (i === active ? onPick(k) : go(i))} aria-label={foreign(k) ? `Accedi con l’account di ${k.name}` : `Continua come ${k.name}`}
+                  <button type="button" onClick={(e) => { e.stopPropagation(); onPick(k); }} aria-label={foreign(k) ? `Accedi con l’account di ${k.name}` : `Continua come ${k.name}`}
                     className="mt-auto inline-flex h-12 2k:h-14 w-full items-center justify-center gap-2 rounded-full bg-white px-4 text-sm 2k:text-base font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
                     {foreign(k)
                       ? <><LogIn className="size-4 2k:size-5 shrink-0" aria-hidden="true" /><span className="truncate">Accedi come {k.name.trim().split(/\s+/)[0]}</span></>
@@ -322,11 +327,12 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
         {/* The last slide: add another personal account, quickly. */}
         <div role="listitem" className={wide ? "w-[25rem] 2k:w-[32rem] 4k:w-[36rem] shrink-0 snap-center" : "w-[78%] shrink-0 snap-center"}>
           <div data-active={known.length === active || undefined}
+            onClick={() => { if (known.length !== active) go(known.length); }}
             className="relative flex h-full flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-brand-turquoise/40 bg-[oklch(0.24_0.016_258/0.7)] p-5 text-center will-change-transform data-[active]:border-brand-turquoise/70 2k:p-8 2k:rounded-[2rem] 2k:gap-4">
             <span className="grid size-16 2k:size-20 place-items-center rounded-full bg-brand-turquoise/15 text-brand-turquoise ring-2 ring-brand-turquoise/50" aria-hidden="true"><UserPlus className="size-7 2k:size-9" /></span>
             <p className="text-xl 2k:text-2xl font-semibold">Aggiungi account</p>
             <p className="text-xs 2k:text-sm text-foreground/65">Scegli un altro account Google: il suo profilo si aggiunge qui.</p>
-            <button type="button" onClick={() => (known.length === active ? onAdd() : go(known.length))}
+            <button type="button" onClick={(e) => { e.stopPropagation(); onAdd(); }}
               className="mt-auto inline-flex h-12 2k:h-14 w-full items-center justify-center gap-2 rounded-full bg-white px-4 text-sm 2k:text-base font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
               <Plus className="size-4 2k:size-5" aria-hidden="true" />Aggiungi account
             </button>
