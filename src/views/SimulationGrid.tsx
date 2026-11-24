@@ -94,6 +94,8 @@ function saveGps(on: boolean) { try { localStorage.setItem(GPS_KEY, on ? "on" : 
 /** A place chosen by hand while the GPS is on pauses the following (kept across openings) until "Seguimi di nuovo". */
 const GPS_PAUSE_KEY = "mdt-gps-paused-v1";
 function readGpsPaused() { try { return typeof localStorage !== "undefined" && localStorage.getItem(GPS_PAUSE_KEY) === "1"; } catch { return false; } }
+/** The GPS is on and following the phone (not paused on a place chosen by hand): the map's pin then stands on the fix itself. */
+export function gpsFollowing() { return readGps() && !readGpsPaused(); }
 function saveGpsPaused(on: boolean) { try { if (on) localStorage.setItem(GPS_PAUSE_KEY, "1"); else localStorage.removeItem(GPS_PAUSE_KEY); } catch { /* storage unavailable */ } }
 function metresBetween(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const r = Math.PI / 180, x = (b.lng - a.lng) * r * Math.cos(((a.lat + b.lat) / 2) * r), y = (b.lat - a.lat) * r;
