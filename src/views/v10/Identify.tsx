@@ -27,29 +27,29 @@ import {
 import { Ambient, PageHero, openSimTab } from "@/views/v8/console";
 import { SECTION_TONE } from "@/views/v10/ProfileGate";
 
-const fieldCls = "h-12 w-full rounded-2xl border border-foreground/10 bg-foreground/[0.05] px-4 text-[15px] outline-none focus-visible:ring-2 focus-visible:ring-ring aria-[invalid=true]:border-danger dark:[color-scheme:dark]";
+const fieldCls = "h-12 2k:h-14 4k:h-16 w-full rounded-2xl 2k:rounded-[1.25rem] border border-foreground/10 bg-foreground/[0.05] px-4 2k:px-5 4k:px-6 text-[15px] 2k:text-base 4k:text-lg outline-none focus-visible:ring-2 focus-visible:ring-ring aria-[invalid=true]:border-danger dark:[color-scheme:dark]";
 /** The list a select opens is drawn by the system: its rows get the theme's own colours, else on Windows they read white on white. */
 const optionCls = "bg-background text-foreground";
 
 function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string | undefined; children: (id: string, describedBy: string | undefined) => ReactNode }) {
   const id = useId(), msg = `${id}-msg`;
   return (
-    <div className="space-y-1.5">
-      <label htmlFor={id} className="block px-1 text-sm font-medium">{label}</label>
+    <div className="space-y-1.5 2k:space-y-2">
+      <label htmlFor={id} className="block px-1 text-sm 2k:text-base font-medium">{label}</label>
       {children(id, error || hint ? msg : undefined)}
-      {(error || hint) && <p id={msg} className={cn("px-1 text-xs", error ? "text-danger" : "text-muted-foreground")}>{error ?? hint}</p>}
+      {(error || hint) && <p id={msg} className={cn("px-1 text-xs 2k:text-sm", error ? "text-danger" : "text-muted-foreground")}>{error ?? hint}</p>}
     </div>
   );
 }
 
 function Declare({ checked, onChange, error }: { checked: boolean; onChange: (v: boolean) => void; error?: string | undefined }) {
   return (
-    <div className="space-y-1">
-      <label className="flex items-start gap-3 rounded-2xl bg-foreground/[0.05] px-4 py-3 text-sm">
-        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-current" aria-invalid={!!error} />
+    <div className="space-y-1 2k:space-y-2">
+      <label className="flex items-start gap-3 rounded-2xl bg-foreground/[0.05] px-4 py-3 text-sm 2k:text-base 2k:py-4 2k:rounded-[1.25rem]">
+        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 size-5 2k:size-6 shrink-0 accent-current" aria-invalid={!!error} />
         <span>Dichiaro che i dati sono miei e veri. So che vengono controllati solo nella forma e non con il registro ufficiale.</span>
       </label>
-      {error && <p className="px-1 text-xs text-danger">{error}</p>}
+      {error && <p className="px-1 text-xs 2k:text-sm text-danger">{error}</p>}
     </div>
   );
 }
@@ -237,8 +237,8 @@ function FunzionarioForm({ onDone }: { onDone: () => void }) {
 
 function Submit({ label }: { label: string }) {
   return (
-    <button type="submit" className="flex h-14 w-full items-center justify-between rounded-full bg-foreground pl-6 pr-2 text-base font-semibold text-background outline-none focus-visible:ring-4 focus-visible:ring-ring/50 active:scale-[0.99]">
-      {label}<span className="grid size-10 place-items-center rounded-full bg-background text-foreground"><ArrowRight className="size-5" aria-hidden="true" /></span>
+    <button type="submit" className="flex h-14 2k:h-16 4k:h-18 w-full items-center justify-between rounded-full bg-foreground pl-6 2k:pl-8 pr-2 2k:pr-3 text-base 2k:text-lg 4k:text-xl font-semibold text-background outline-none focus-visible:ring-4 focus-visible:ring-ring/50 active:scale-[0.99]">
+      {label}<span className="grid size-10 2k:size-12 4k:size-13 place-items-center rounded-full bg-background text-foreground"><ArrowRight className="size-5 2k:size-6 4k:size-7" aria-hidden="true" /></span>
     </button>
   );
 }

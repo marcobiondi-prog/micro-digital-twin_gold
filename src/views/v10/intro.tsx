@@ -357,35 +357,35 @@ export function Choice() {
   return (
     <div className="dark relative isolate min-h-dvh bg-background px-6 text-foreground [color-scheme:dark] sm:px-12">
       <Backdrop />
-      <section aria-label="Scelta" className="mx-auto flex min-h-dvh max-w-xl flex-col pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-[calc(3rem+env(safe-area-inset-top))]">
+      <section aria-label="Scelta" className="mx-auto flex min-h-dvh max-w-xl 2xl:max-w-2xl 2k:max-w-4xl 4k:max-w-5xl flex-col pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-[calc(3rem+env(safe-area-inset-top))] 2k:my-auto 2k:justify-center 2k:py-16 4k:py-20">
         <h1 className="sr-only">Da dove vuoi iniziare</h1>
         <div>
-          <p className="mb-3 inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.35em] text-foreground/60"><span className="whitespace-nowrap">Micro Digital</span><span className="inline-flex items-center gap-1.5 whitespace-nowrap"><span className="text-brand-turquoise">Twin</span><span className="rounded-full border border-brand-turquoise/40 bg-brand-turquoise/15 px-2 py-0.5 text-[10px] font-bold tracking-[0.12em] text-brand-turquoise">ALPHA</span></span></p>
-          <h2 aria-hidden="true" className="font-display text-[3.4rem] font-extralight leading-[0.95] tracking-tight text-foreground sm:text-7xl">Da dove<br />vuoi iniziare?</h2>
-          <p className="mt-5 max-w-xs text-[15px] leading-relaxed text-foreground/60">Dicci chi sei: ti identifichi qui e si apre la tua simulazione.</p>
+          <p className="mb-3 inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.35em] text-foreground/60 2k:text-sm 2k:tracking-[0.4em] 2k:gap-x-3 4k:text-base"><span className="whitespace-nowrap">Micro Digital</span><span className="inline-flex items-center gap-1.5 whitespace-nowrap"><span className="text-brand-turquoise">Twin</span><span className="rounded-full border border-brand-turquoise/40 bg-brand-turquoise/15 px-2 py-0.5 text-[10px] font-bold tracking-[0.12em] text-brand-turquoise 2k:px-3 2k:py-1 2k:text-xs 4k:text-sm">ALPHA</span></span></p>
+          <h2 aria-hidden="true" className="font-display text-[3.4rem] font-extralight leading-[0.95] tracking-tight text-foreground sm:text-7xl 2k:text-8xl 2k:leading-[0.9] 4k:text-9xl">Da dove<br />vuoi iniziare?</h2>
+          <p className="mt-5 max-w-xs text-[15px] leading-relaxed text-foreground/60 2xl:max-w-md 2k:max-w-2xl 2k:text-xl 2k:leading-relaxed 4k:text-2xl">Dicci chi sei: ti identifichi qui e si apre la tua simulazione.</p>
         </div>
-        <div role="list" aria-label="Da dove vuoi iniziare" className="mt-10 space-y-3">
+        <div role="list" aria-label="Da dove vuoi iniziare" className="mt-10 space-y-3 2k:mt-8 2k:space-y-5 4k:mt-10 4k:space-y-6">
           {items.map((it) => {
             const off = it.id === "camera" && AI_STANDBY;
             const mine = it.id !== "camera" && proId?.kind === KIND_OF[it.id];
             const body = (
               <>
                 {it.id === "camera" && ai && !off
-                  ? <img src={aiLogo} alt="" aria-hidden="true" className="size-8 shrink-0 rounded-lg bg-white p-1" />
-                  : <it.Icon className={`size-8 shrink-0 ${off ? "text-foreground/40" : "text-brand-turquoise"}`} strokeWidth={1.5} aria-hidden="true" />}
+                  ? <img src={aiLogo} alt="" aria-hidden="true" className="size-8 2k:size-12 4k:size-14 shrink-0 rounded-lg bg-white p-1" />
+                  : <it.Icon className={`size-8 2k:size-12 4k:size-14 shrink-0 ${off ? "text-foreground/40" : "text-brand-turquoise"}`} strokeWidth={1.5} aria-hidden="true" />}
                 <span className="min-w-0 flex-1">
-                  <span className="flex flex-wrap items-center gap-2 text-xl font-semibold">
+                  <span className="flex flex-wrap items-center gap-2 text-xl 2k:text-2xl 4k:text-3xl font-semibold">
                     {it.name}
-                    {off && <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-300 ring-1 ring-amber-300/30">In sviluppo</span>}
-                    {mine && <span className="rounded-full bg-brand-turquoise/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-turquoise">Il tuo profilo</span>}
+                    {off && <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] 2k:text-xs font-semibold uppercase tracking-wide text-amber-300 ring-1 ring-amber-300/30">In sviluppo</span>}
+                    {mine && <span className="rounded-full bg-brand-turquoise/15 px-2 py-0.5 text-[11px] 2k:text-xs font-semibold uppercase tracking-wide text-brand-turquoise">Il tuo profilo</span>}
                   </span>
-                  {it.who && <span className="block text-sm text-foreground/70">{it.who}</span>}
-                  <span className="mt-1 block text-xs text-foreground/55">{mine ? `Entra ${it.id === "urban" ? "nella piazza" : "nel vigneto"}: ${it.desc.replace(/^Si apre [^:]+: /, "")}` : it.desc}</span>
+                  {it.who && <span className="block text-sm 2k:text-base 2k:mt-1 4k:text-lg text-foreground/70">{it.who}</span>}
+                  <span className="mt-1 block text-xs 2k:text-sm 2k:mt-1.5 4k:text-base text-foreground/55">{mine ? `Entra ${it.id === "urban" ? "nella piazza" : "nel vigneto"}: ${it.desc.replace(/^Si apre [^:]+: /, "")}` : it.desc}</span>
                 </span>
-                {!off && <ArrowRight className="size-5 shrink-0 text-foreground/60" aria-hidden="true" />}
+                {!off && <ArrowRight className="size-5 2k:size-7 4k:size-8 shrink-0 text-foreground/60" aria-hidden="true" />}
               </>
             );
-            const card = "flex w-full items-center gap-4 rounded-3xl p-5 text-left ring-1";
+            const card = "flex w-full items-center gap-4 2k:gap-6 rounded-3xl p-5 2k:p-7 2k:rounded-[2rem] 4k:p-9 4k:gap-8 text-left ring-1";
             return (
               <div key={it.id} role="listitem">
                 {off
@@ -397,13 +397,13 @@ export function Choice() {
             );
           })}
         </div>
-        <div className="mt-auto flex flex-col items-stretch gap-1 pb-8 pt-10 sm:pb-10">
+        <div className="mt-auto flex flex-col items-stretch gap-1 2k:mt-8 2k:gap-3 4k:mt-10 pb-8 pt-10 2k:pt-0 sm:pb-10">
           {!proId && (
-            <Link to="/benvenuto" onClick={() => enterAsGuest()} className="inline-flex h-12 items-center justify-center gap-2 rounded-full text-[15px] font-semibold text-foreground outline-none ring-1 ring-foreground/20 hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-ring">
-              Entra come ospite<ArrowRight className="size-4" aria-hidden="true" />
+            <Link to="/benvenuto" onClick={() => enterAsGuest()} className="inline-flex h-12 2k:h-14 items-center justify-center gap-2 rounded-full text-[15px] 2k:text-lg font-semibold text-foreground outline-none ring-1 ring-foreground/20 hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-ring">
+              Entra come ospite<ArrowRight className="size-4 2k:size-6" aria-hidden="true" />
             </Link>
           )}
-          <button type="button" onClick={openAccount} className="inline-flex h-12 items-center justify-center gap-1.5 rounded-full text-sm font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+          <button type="button" onClick={openAccount} className="inline-flex h-12 2k:h-14 items-center justify-center gap-1.5 rounded-full text-sm 2k:text-base font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
             Hai già un account?<span className="text-foreground">Accedi</span>
           </button>
         </div>

@@ -145,38 +145,38 @@ export function KnownProfiles({ kind, onPicked }: { kind: ProKind; onPicked?: ()
   // is in, and shows here at once — its picture and email — with one step left, the profile below.
   const freshAccount = !!accEmail && (!acc?.kind || acc.kind === kind) && !all.some((k) => k.acct?.email?.toLowerCase() === accEmail.toLowerCase());
   const fresh = freshAccount && <NewAccountCard email={accEmail!} pic={avatar} kind={kind} />;
-  if (!known.length) return <div className="space-y-3">{fresh}<ProfileCarousel known={[]} foreign={foreign} onPick={(k) => void pick(k)} onAdd={() => void addAccount()} /></div>;
+  if (!known.length) return <div className="space-y-3 2k:space-y-5">{fresh}<ProfileCarousel known={[]} foreign={foreign} onPick={(k) => void pick(k)} onAdd={() => void addAccount()} /></div>;
   if (known.length > 0) return (
-    <div className="space-y-2">
+    <div className="space-y-2 2k:space-y-4">
       {fresh}
-      {known.length > 1 && <p className="px-1 text-sm text-foreground/70">Su questo telefono ci sono {known.length} profili {kind === "funzionario" ? "del settore urbano" : "del settore agricolo"}: scorri e scegli chi sei.</p>}
+      {known.length > 1 && <p className="px-1 text-sm 2k:text-base text-foreground/70">Su questo telefono ci sono {known.length} profili {kind === "funzionario" ? "del settore urbano" : "del settore agricolo"}: scorri e scegli chi sei.</p>}
       <ProfileCarousel known={known} foreign={foreign} onPick={(k) => void pick(k)} onAdd={() => void addAccount()} />
     </div>
   );
   return (
-              <div className="space-y-3 rounded-3xl bg-foreground/[0.08] p-5 ring-1 ring-brand-turquoise/40">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-turquoise">Ti abbiamo riconosciuto</p>
+              <div className="space-y-3 rounded-3xl bg-foreground/[0.08] p-5 ring-1 ring-brand-turquoise/40 2k:space-y-4 2k:rounded-[2rem] 2k:p-8">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-turquoise 2k:text-sm">Ti abbiamo riconosciuto</p>
                 {known.length === 1 ? (
                   <>
-                    <div className="flex items-center gap-3.5">
-                      <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-full bg-foreground/10 ring-2 ring-brand-turquoise/50">
-                        {resolveProfilePic(known[0], avatar) ? <img src={resolveProfilePic(known[0], avatar)!} alt="Immagine dell’account" referrerPolicy="no-referrer" className="size-full object-cover" /> : <UserRound className="size-7 text-foreground/60" aria-hidden="true" />}
+                    <div className="flex items-center gap-3.5 2k:gap-5">
+                      <span className="grid size-14 2k:size-18 shrink-0 place-items-center overflow-hidden rounded-full bg-foreground/10 ring-2 ring-brand-turquoise/50">
+                        {resolveProfilePic(known[0], avatar) ? <img src={resolveProfilePic(known[0], avatar)!} alt="Immagine dell’account" referrerPolicy="no-referrer" className="size-full object-cover" /> : <UserRound className="size-7 2k:size-9 text-foreground/60" aria-hidden="true" />}
                       </span>
                       <div className="min-w-0">
-                        <p className="text-xl font-semibold">{known[0]!.name}</p>
-                        <p className="text-sm text-foreground/70">{proSummary(known[0]!)}</p>
-                        {known[0]!.acct?.email && <p className="text-xs text-foreground/55 [overflow-wrap:anywhere]">{known[0]!.acct.email}</p>}
+                        <p className="text-xl 2k:text-3xl font-semibold">{known[0]!.name}</p>
+                        <p className="text-sm 2k:text-base text-foreground/70">{proSummary(known[0]!)}</p>
+                        {known[0]!.acct?.email && <p className="text-xs 2k:text-sm text-foreground/55 [overflow-wrap:anywhere]">{known[0]!.acct.email}</p>}
                       </div>
                     </div>
-                    <p className="text-xs text-foreground/60">Ti eri già registrato con questo profilo: continua e ritrovi la cronologia {kind === "funzionario" ? "della piazza" : "del vigneto"}.</p>
+                    <p className="text-xs 2k:text-sm text-foreground/60">Ti eri già registrato con questo profilo: continua e ritrovi la cronologia {kind === "funzionario" ? "della piazza" : "del vigneto"}.</p>
                     <button type="button" onClick={() => void pick(known[0]!)}
-                      className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white text-[15px] font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
-                      Continua come {known[0]!.name}<ArrowRight className="size-4" aria-hidden="true" />
+                      className="inline-flex h-12 2k:h-14 w-full items-center justify-center gap-2 rounded-full bg-white text-[15px] 2k:text-base font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+                      Continua come {known[0]!.name}<ArrowRight className="size-4 2k:size-5" aria-hidden="true" />
                     </button>
                   </>
                 ) : (
                   <>
-                    <p className="text-sm text-foreground/70">Su questo telefono si sono registrati {known.length} profili {kind === "funzionario" ? "del settore urbano" : "del settore agricolo"}: scegli chi sei e ritrovi la tua cronologia.</p>
+                    <p className="text-sm 2k:text-base text-foreground/70">Su questo telefono si sono registrati {known.length} profili {kind === "funzionario" ? "del settore urbano" : "del settore agricolo"}: scegli chi sei e ritrovi la tua cronologia.</p>
                     <ProfileCarousel known={known} foreign={foreign} onPick={(k) => void pick(k)} onAdd={() => void addAccount()} />
                   </>
                 )}
@@ -258,60 +258,60 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
         {known.map((k, i) => {
           const pic = resolveProfilePic(k, avatar);
           return (
-          <div key={keyOf(k)} role="listitem" className={wide ? "w-[25rem] shrink-0 snap-center" : "w-[78%] shrink-0 snap-center"}>
+          <div key={keyOf(k)} role="listitem" className={wide ? "w-[25rem] 2k:w-[32rem] 4k:w-[36rem] shrink-0 snap-center" : "w-[78%] shrink-0 snap-center"}>
             <div data-active={i === active || undefined}
-              className="relative flex h-full flex-col gap-3 rounded-3xl bg-[oklch(0.24_0.016_258/0.96)] p-4 ring-1 ring-brand-turquoise/25 shadow-[0_18px_40px_-16px_rgb(0_0_0/0.75)] transition-[box-shadow] duration-300 will-change-transform data-[active]:ring-brand-turquoise/55 data-[active]:shadow-[0_18px_40px_-16px_rgb(0_0_0/0.75),0_0_28px_-8px_rgb(45_212_191/0.4)]">
+              className="relative flex h-full flex-col gap-3 rounded-3xl bg-[oklch(0.24_0.016_258/0.96)] p-4 ring-1 ring-brand-turquoise/25 shadow-[0_18px_40px_-16px_rgb(0_0_0/0.75)] transition-[box-shadow] duration-300 will-change-transform data-[active]:ring-brand-turquoise/55 data-[active]:shadow-[0_18px_40px_-16px_rgb(0_0_0/0.75),0_0_28px_-8px_rgb(45_212_191/0.4)] 2k:p-6 2k:rounded-[2rem] 2k:gap-4">
               <div className="flex items-center justify-between gap-2">
-                <p className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-turquoise">Ti abbiamo riconosciuto</p>
+                <p className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-turquoise 2k:text-xs">Ti abbiamo riconosciuto</p>
                 <div className="-mr-1.5 -mt-1.5 flex shrink-0">
                 <ProfileBioButton id={k} />
                 <button type="button" onClick={() => { setAsking(null); if (editing === keyOf(k)) setEditing(null); else { setEditing(keyOf(k)); setDraft(k.name); } }} aria-label={`Cambia il nome di ${k.name}`} title="Cambia nome"
-                  className="grid size-9 place-items-center rounded-full text-foreground/50 outline-none transition-colors hover:bg-foreground/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand-turquoise">
-                  <Pencil className="size-4" aria-hidden="true" />
+                  className="grid size-9 2k:size-11 place-items-center rounded-full text-foreground/50 outline-none transition-colors hover:bg-foreground/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+                  <Pencil className="size-4 2k:size-5" aria-hidden="true" />
                 </button>
                 <button type="button" onClick={() => { setEditing(null); setAsking(asking === keyOf(k) ? null : keyOf(k)); }} aria-label={`Elimina ${k.name} da questo telefono`} title="Elimina da questo telefono"
-                  className="grid size-9 shrink-0 place-items-center rounded-full text-foreground/50 outline-none transition-colors hover:bg-red-500/20 hover:text-red-300 focus-visible:ring-2 focus-visible:ring-brand-turquoise">
-                  <Trash2 className="size-4" aria-hidden="true" />
+                  className="grid size-9 2k:size-11 shrink-0 place-items-center rounded-full text-foreground/50 outline-none transition-colors hover:bg-red-500/20 hover:text-red-300 focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+                  <Trash2 className="size-4 2k:size-5" aria-hidden="true" />
                 </button>
                 </div>
               </div>
-              <div className="flex items-center gap-3.5">
-                <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-full bg-brand-turquoise/15 text-lg font-semibold text-brand-turquoise ring-2 ring-brand-turquoise/50" aria-hidden="true">
+              <div className="flex items-center gap-3.5 2k:gap-5">
+                <span className="grid size-14 2k:size-18 shrink-0 place-items-center overflow-hidden rounded-full bg-brand-turquoise/15 text-lg 2k:text-2xl font-semibold text-brand-turquoise ring-2 ring-brand-turquoise/50" aria-hidden="true">
                   {pic ? <img src={pic} alt="" referrerPolicy="no-referrer" className="size-full object-cover" /> : initials(k.name)}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-xl font-semibold leading-tight [overflow-wrap:anywhere]">{k.name}</p>
-                  <p className="text-sm text-foreground/70">{proSummary(k)}</p>
-                  {k.acct?.email && <p className="text-xs text-foreground/55 [overflow-wrap:anywhere]">{k.acct.email}</p>}
+                  <p className="text-xl 2k:text-2xl font-semibold leading-tight [overflow-wrap:anywhere]">{k.name}</p>
+                  <p className="text-sm 2k:text-base text-foreground/70">{proSummary(k)}</p>
+                  {k.acct?.email && <p className="text-xs 2k:text-sm text-foreground/55 [overflow-wrap:anywhere]">{k.acct.email}</p>}
                 </div>
               </div>
               {editing === keyOf(k) ? (
                 <form className="mt-auto space-y-2" onSubmit={(e) => { e.preventDefault(); void rename(k); }}>
-                  <label className="block text-xs text-foreground/70" htmlFor={`nome-${keyOf(k)}`}>Che nome vuoi dare a questo profilo?</label>
+                  <label className="block text-xs 2k:text-sm text-foreground/70" htmlFor={`nome-${keyOf(k)}`}>Che nome vuoi dare a questo profilo?</label>
                   <input id={`nome-${keyOf(k)}`} value={draft} onChange={(e) => setDraft(e.target.value)} autoFocus maxLength={60} autoComplete="off"
-                    className="h-11 w-full rounded-xl bg-foreground/[0.08] px-3 text-[15px] outline-none ring-1 ring-foreground/15 focus:ring-2 focus:ring-brand-turquoise" />
+                    className="h-11 2k:h-13 w-full rounded-xl bg-foreground/[0.08] px-3 2k:px-4 text-[15px] 2k:text-base outline-none ring-1 ring-foreground/15 focus:ring-2 focus:ring-brand-turquoise" />
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => setEditing(null)} className="h-11 flex-1 rounded-full bg-foreground/[0.1] text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">Annulla</button>
-                    <button type="submit" className="h-11 flex-1 rounded-full bg-white text-sm font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">Salva</button>
+                    <button type="button" onClick={() => setEditing(null)} className="h-11 2k:h-13 flex-1 rounded-full bg-foreground/[0.1] text-sm 2k:text-base font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">Annulla</button>
+                    <button type="submit" className="h-11 2k:h-13 flex-1 rounded-full bg-white text-sm 2k:text-base font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">Salva</button>
                   </div>
                 </form>
               ) : asking === keyOf(k) ? (
                 <div role="alertdialog" aria-label={`Eliminare ${k.name}?`} className="mt-auto space-y-2">
-                  <p className="text-xs text-foreground/70">Eliminare questo profilo dal telefono? Resta nel suo account.</p>
+                  <p className="text-xs 2k:text-sm text-foreground/70">Eliminare questo profilo dal telefono? Resta nel suo account.</p>
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => setAsking(null)} className="h-11 flex-1 rounded-full bg-foreground/[0.1] text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">Annulla</button>
-                    <button type="button" onClick={() => { setAsking(null); forgetKnownProId(k); toast(`${k.name} eliminato da questo telefono`); }} className="h-11 flex-1 rounded-full bg-red-500 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-white">Elimina</button>
+                    <button type="button" onClick={() => setAsking(null)} className="h-11 2k:h-13 flex-1 rounded-full bg-foreground/[0.1] text-sm 2k:text-base font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">Annulla</button>
+                    <button type="button" onClick={() => { setAsking(null); forgetKnownProId(k); toast(`${k.name} eliminato da questo telefono`); }} className="h-11 2k:h-13 flex-1 rounded-full bg-red-500 text-sm 2k:text-base font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-white">Elimina</button>
                   </div>
                 </div>
               ) : (
                 <>
-                  <p className="text-xs text-foreground/60">{foreign(k)
+                  <p className="text-xs 2k:text-sm text-foreground/60">{foreign(k)
                     ? <>Entri anche con il suo account personale {k.acct?.email} e ritrovi la cronologia {k.kind === "funzionario" ? "della piazza" : "del vigneto"}.</>
                     : <>Ti eri già registrato con questo profilo: continua e ritrovi la cronologia {k.kind === "funzionario" ? "della piazza" : "del vigneto"}.</>}</p>
                   <button type="button" onClick={() => (i === active ? onPick(k) : go(i))} aria-label={foreign(k) ? `Accedi con l’account di ${k.name}` : `Continua come ${k.name}`}
-                    className="mt-auto inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+                    className="mt-auto inline-flex h-12 2k:h-14 w-full items-center justify-center gap-2 rounded-full bg-white px-4 text-sm 2k:text-base font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
                     {foreign(k)
-                      ? <><LogIn className="size-4 shrink-0" aria-hidden="true" /><span className="truncate">Accedi come {k.name.trim().split(/\s+/)[0]}</span></>
+                      ? <><LogIn className="size-4 2k:size-5 shrink-0" aria-hidden="true" /><span className="truncate">Accedi come {k.name.trim().split(/\s+/)[0]}</span></>
                       : <ContinueLabel k={k} />}
                   </button>
                 </>
@@ -320,15 +320,15 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
           </div>
         )})}
         {/* The last slide: add another personal account, quickly. */}
-        <div role="listitem" className={wide ? "w-[25rem] shrink-0 snap-center" : "w-[78%] shrink-0 snap-center"}>
+        <div role="listitem" className={wide ? "w-[25rem] 2k:w-[32rem] 4k:w-[36rem] shrink-0 snap-center" : "w-[78%] shrink-0 snap-center"}>
           <div data-active={known.length === active || undefined}
-            className="relative flex h-full flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-brand-turquoise/40 bg-[oklch(0.24_0.016_258/0.7)] p-5 text-center will-change-transform data-[active]:border-brand-turquoise/70">
-            <span className="grid size-16 place-items-center rounded-full bg-brand-turquoise/15 text-brand-turquoise ring-2 ring-brand-turquoise/50" aria-hidden="true"><UserPlus className="size-7" /></span>
-            <p className="text-xl font-semibold">Aggiungi account</p>
-            <p className="text-xs text-foreground/65">Scegli un altro account Google: il suo profilo si aggiunge qui.</p>
+            className="relative flex h-full flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-brand-turquoise/40 bg-[oklch(0.24_0.016_258/0.7)] p-5 text-center will-change-transform data-[active]:border-brand-turquoise/70 2k:p-8 2k:rounded-[2rem] 2k:gap-4">
+            <span className="grid size-16 2k:size-20 place-items-center rounded-full bg-brand-turquoise/15 text-brand-turquoise ring-2 ring-brand-turquoise/50" aria-hidden="true"><UserPlus className="size-7 2k:size-9" /></span>
+            <p className="text-xl 2k:text-2xl font-semibold">Aggiungi account</p>
+            <p className="text-xs 2k:text-sm text-foreground/65">Scegli un altro account Google: il suo profilo si aggiunge qui.</p>
             <button type="button" onClick={() => (known.length === active ? onAdd() : go(known.length))}
-              className="mt-auto inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
-              <Plus className="size-4" aria-hidden="true" />Aggiungi account
+              className="mt-auto inline-flex h-12 2k:h-14 w-full items-center justify-center gap-2 rounded-full bg-white px-4 text-sm 2k:text-base font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+              <Plus className="size-4 2k:size-5" aria-hidden="true" />Aggiungi account
             </button>
           </div>
         </div>
@@ -418,53 +418,53 @@ function SectorPage({ start }: { start: ProKind | null }) {
     openAccount({ mode: "signin" });
   };
   const signIn = (
-    <button type="button" onClick={openAccountFromSector} className="flex w-full items-center gap-3 rounded-3xl bg-foreground/[0.06] px-5 py-4 text-left outline-none transition-colors hover:bg-foreground/[0.1] focus-visible:ring-2 focus-visible:ring-ring">
-      <LogIn className="size-5 shrink-0 text-brand-turquoise" aria-hidden="true" />
-      <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Hai già un account? Accedi</span><span className="block text-xs text-foreground/60">Il profilo che avevi salvato torna da solo.</span></span>
-      <ArrowRight className="size-4 shrink-0 text-foreground/60" aria-hidden="true" />
+    <button type="button" onClick={openAccountFromSector} className="flex w-full items-center gap-3 rounded-3xl bg-foreground/[0.06] px-5 py-4 text-left outline-none transition-colors hover:bg-foreground/[0.1] focus-visible:ring-2 focus-visible:ring-ring 2k:gap-5 2k:px-7 2k:py-5 2k:rounded-[2rem] 4k:px-8 4k:py-6">
+      <LogIn className="size-5 shrink-0 text-brand-turquoise 2k:size-7 4k:size-8" aria-hidden="true" />
+      <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold 2k:text-lg 4k:text-xl">Hai già un account? Accedi</span><span className="block text-xs text-foreground/60 2k:text-sm 4k:text-base">Il profilo che avevi salvato torna da solo.</span></span>
+      <ArrowRight className="size-4 shrink-0 text-foreground/60 2k:size-6 4k:size-7" aria-hidden="true" />
     </button>
   );
   return (
     <div role="dialog" aria-modal="true" aria-label="Scegli il settore" className={`dark fixed inset-0 z-[1000000005] isolate overflow-y-auto overscroll-contain bg-background px-6 text-foreground [color-scheme:dark] sm:px-12`}>
       <Backdrop />
-      <section ref={formRef} className={`mx-auto flex min-h-full max-w-xl flex-col gap-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(3rem+env(safe-area-inset-top))]${armed ? "" : " pointer-events-none"}`}>
+      <section ref={formRef} className={`mx-auto flex min-h-full max-w-xl 2xl:max-w-2xl 2k:max-w-4xl 4k:max-w-5xl flex-col gap-5 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(3rem+env(safe-area-inset-top))] 2k:my-auto 2k:justify-center 2k:gap-8 2k:py-16 4k:gap-10 4k:py-20${armed ? "" : " pointer-events-none"}`}>
         {sector ? (
           <>
-            <button type="button" onClick={backToSectors} className="-ml-1 inline-flex h-10 w-fit items-center gap-1.5 rounded-full pr-3 text-sm font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
-              <ArrowLeft className="size-5" aria-hidden="true" />Indietro
+            <button type="button" onClick={backToSectors} className="-ml-1 inline-flex h-10 w-fit items-center gap-1.5 rounded-full pr-3 text-sm font-semibold text-foreground/60 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring 2k:h-12 2k:text-base 2k:gap-2">
+              <ArrowLeft className="size-5 2k:size-6" aria-hidden="true" />Indietro
             </button>
-            <h1 className="font-display text-[2.6rem] font-extralight leading-[1] tracking-tight">{sector.name}</h1>
-            <p className="text-[15px] leading-relaxed text-foreground/60">{profileIntro(sector.kind)}</p>
+            <h1 className="font-display text-[2.6rem] font-extralight leading-[1] tracking-tight sm:text-6xl 2k:text-7xl 4k:text-8xl">{sector.name}</h1>
+            <p className="text-[15px] leading-relaxed text-foreground/60 2k:text-lg 2k:max-w-2xl 4k:text-xl">{profileIntro(sector.kind)}</p>
             <KnownProfiles kind={sector.kind} />
-            {!(acct?.kind && acct.kind !== sector.kind) && <p className="px-1 pt-2 text-sm font-semibold text-foreground/70">Oppure registra un altro profilo</p>}
+            {!(acct?.kind && acct.kind !== sector.kind) && <p className="px-1 pt-2 text-sm font-semibold text-foreground/70 2k:text-base">Oppure registra un altro profilo</p>}
             <IdentifyForm kind={sector.kind} onDone={done} />
           </>
         ) : (
           <>
-            <p className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.35em] text-foreground/60"><span className="whitespace-nowrap">Micro Digital</span><span className="inline-flex items-center gap-1.5 whitespace-nowrap"><span className="text-brand-turquoise">Twin</span><span className="rounded-full border border-brand-turquoise/40 bg-brand-turquoise/15 px-2 py-0.5 text-[10px] font-bold tracking-[0.12em] text-brand-turquoise">ALPHA</span></span></p>
-            <h1 className="font-display text-[3.2rem] font-extralight leading-[0.95] tracking-tight sm:text-7xl">Da dove<br />vuoi usarmi?</h1>
-            <p className="max-w-xs text-[15px] leading-relaxed text-foreground/60">Scegli il tuo settore e identificati: si apre la tua simulazione.</p>
-            <div role="radiogroup" aria-label="Settore" className="mt-4 space-y-3">
+            <p className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.35em] text-foreground/60 2k:text-sm 2k:tracking-[0.4em] 2k:gap-x-3 4k:text-base"><span className="whitespace-nowrap">Micro Digital</span><span className="inline-flex items-center gap-1.5 whitespace-nowrap"><span className="text-brand-turquoise">Twin</span><span className="rounded-full border border-brand-turquoise/40 bg-brand-turquoise/15 px-2 py-0.5 text-[10px] font-bold tracking-[0.12em] text-brand-turquoise 2k:px-3 2k:py-1 2k:text-xs 4k:text-sm">ALPHA</span></span></p>
+            <h1 className="font-display text-[3.2rem] font-extralight leading-[0.95] tracking-tight sm:text-7xl 2k:text-8xl 2k:leading-[0.9] 4k:text-9xl">Da dove<br />vuoi usarmi?</h1>
+            <p className="max-w-xs text-[15px] leading-relaxed text-foreground/60 2xl:max-w-md 2k:max-w-2xl 2k:text-xl 2k:leading-relaxed 4k:text-2xl">Scegli il tuo settore e identificati: si apre la tua simulazione.</p>
+            <div role="radiogroup" aria-label="Settore" className="mt-4 space-y-3 2k:mt-8 2k:space-y-5 4k:mt-10 4k:space-y-6">
               {SECTORS.map((s) => (
                 <button key={s.kind} type="button" role="radio" aria-checked={false} onClick={() => { hapticTick(); setKind(s.kind); rememberWantedSector(s.kind); rememberAddingSector(s.kind); document.querySelector('[aria-label="Scegli il settore"]')?.scrollTo({ top: 0 }); }}
-                  className="flex w-full items-center gap-4 rounded-3xl bg-foreground/[0.07] p-5 text-left outline-none ring-1 ring-foreground/10 transition-colors hover:bg-foreground/[0.11] focus-visible:ring-2 focus-visible:ring-foreground">
-                  <s.Icon className="size-8 shrink-0 text-brand-turquoise" strokeWidth={1.5} aria-hidden="true" />
+                  className="flex w-full items-center gap-4 rounded-3xl bg-foreground/[0.07] p-5 text-left outline-none ring-1 ring-foreground/10 transition-colors hover:bg-foreground/[0.11] focus-visible:ring-2 focus-visible:ring-foreground 2k:gap-6 2k:p-7 2k:rounded-[2rem] 4k:p-9 4k:gap-8">
+                  <s.Icon className="size-8 shrink-0 text-brand-turquoise 2k:size-12 4k:size-14" strokeWidth={1.5} aria-hidden="true" />
                   <span className="min-w-0 flex-1">
-                    <span className="block text-xl font-semibold">{s.name}</span>
-                    <span className="block text-sm text-foreground/70">{s.who}</span>
-                    <span className="mt-1 block text-xs text-foreground/55">{s.opens}</span>
+                    <span className="block text-xl font-semibold 2k:text-2xl 4k:text-3xl">{s.name}</span>
+                    <span className="block text-sm text-foreground/70 2k:text-base 2k:mt-1 4k:text-lg">{s.who}</span>
+                    <span className="mt-1 block text-xs text-foreground/55 2k:text-sm 2k:mt-1.5 4k:text-base">{s.opens}</span>
                   </span>
-                  <ArrowRight className="size-5 shrink-0 text-foreground/60" aria-hidden="true" />
+                  <ArrowRight className="size-5 shrink-0 text-foreground/60 2k:size-7 4k:size-8" aria-hidden="true" />
                 </button>
               ))}
             </div>
-            <div className="mt-auto space-y-3 pt-6">
+            <div className="mt-auto space-y-3 pt-6 2k:mt-8 2k:space-y-4 2k:pt-0 4k:mt-10 4k:space-y-5">
               {signIn}
               <button type="button" onClick={() => { hapticTick(); enterAsGuest(); void router.navigate({ to: "/benvenuto" as never }); toast("Sei entrato come ospite", { description: "Prova la piazza e il vigneto. Quando vuoi, identificati dal tuo account." }); }}
-                className="flex w-full items-center gap-3 rounded-3xl px-5 py-4 text-left outline-none ring-1 ring-foreground/15 transition-colors hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-ring">
-                <UserRound className="size-5 shrink-0 text-foreground/70" aria-hidden="true" />
-                <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Entra come ospite</span><span className="block text-xs text-foreground/60">Prova la piazza e il vigneto senza identificarti.</span></span>
-                <ArrowRight className="size-4 shrink-0 text-foreground/60" aria-hidden="true" />
+                className="flex w-full items-center gap-3 rounded-3xl px-5 py-4 text-left outline-none ring-1 ring-foreground/15 transition-colors hover:bg-foreground/[0.06] focus-visible:ring-2 focus-visible:ring-ring 2k:gap-5 2k:px-7 2k:py-5 2k:rounded-[2rem] 4k:px-8 4k:py-6">
+                <UserRound className="size-5 shrink-0 text-foreground/70 2k:size-7 4k:size-8" aria-hidden="true" />
+                <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold 2k:text-lg 4k:text-xl">Entra come ospite</span><span className="block text-xs text-foreground/60 2k:text-sm 4k:text-base">Prova la piazza e il vigneto senza identificarti.</span></span>
+                <ArrowRight className="size-4 shrink-0 text-foreground/60 2k:size-6 4k:size-7" aria-hidden="true" />
               </button>
             </div>
           </>
@@ -483,17 +483,17 @@ function NewAccountCard({ email, pic, kind }: { email: string; pic: string | nul
   };
   const resolvedPic = pic ?? readLocalAvatar(email);
   return (
-    <div className="flex items-center gap-3.5 rounded-3xl bg-brand-turquoise/[0.12] p-4 ring-2 ring-brand-turquoise/60 shadow-[0_0_28px_-8px_oklch(0.72_0.15_190/0.7)]">
-      <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-full bg-foreground/10 ring-2 ring-brand-turquoise/60">
-        {resolvedPic ? <img src={resolvedPic} alt="Immagine dell’account" referrerPolicy="no-referrer" className="size-full object-cover" /> : <UserRound className="size-7 text-foreground/60" aria-hidden="true" />}
+    <div className="flex items-center gap-3.5 rounded-3xl bg-brand-turquoise/[0.12] p-4 ring-2 ring-brand-turquoise/60 shadow-[0_0_28px_-8px_oklch(0.72_0.15_190/0.7)] 2k:p-6 2k:rounded-[2rem] 2k:gap-5">
+      <span className="grid size-14 2k:size-18 shrink-0 place-items-center overflow-hidden rounded-full bg-foreground/10 ring-2 ring-brand-turquoise/60">
+        {resolvedPic ? <img src={resolvedPic} alt="Immagine dell’account" referrerPolicy="no-referrer" className="size-full object-cover" /> : <UserRound className="size-7 2k:size-9 text-foreground/60" aria-hidden="true" />}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-turquoise">Account aggiunto</p>
-        <p className="break-all text-[15px] font-semibold">{email}</p>
-        <p className="text-xs text-foreground/70">Ultimo passo: registra qui sotto il suo profilo {kind === "funzionario" ? "della piazza" : "del vigneto"}. Poi lo ritrovi tra i profili.</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-turquoise 2k:text-sm">Account aggiunto</p>
+        <p className="break-all text-[15px] 2k:text-lg font-semibold">{email}</p>
+        <p className="text-xs 2k:text-sm text-foreground/70">Ultimo passo: registra qui sotto il suo profilo {kind === "funzionario" ? "della piazza" : "del vigneto"}. Poi lo ritrovi tra i profili.</p>
       </div>
-      <button type="button" onClick={toForm} className="inline-flex h-11 shrink-0 items-center gap-1 rounded-full bg-white px-4 text-sm font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
-        Completa<ArrowRight className="size-4" aria-hidden="true" />
+      <button type="button" onClick={toForm} className="inline-flex h-11 2k:h-13 shrink-0 items-center gap-1 rounded-full bg-white px-4 2k:px-6 text-sm 2k:text-base font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+        Completa<ArrowRight className="size-4 2k:size-5" aria-hidden="true" />
       </button>
     </div>
   );
