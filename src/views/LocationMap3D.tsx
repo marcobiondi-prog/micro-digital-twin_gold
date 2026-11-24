@@ -79,7 +79,7 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
   // The shadows alone, a layer of their own: they follow the simulation's clock (a new sun every minute), and laid with
   // everything else they made the whole drawing and its models go and come back each time.
   if (layer === "shadows") {
-    if (sim?.kind === "piazza") try { for (const r of sim.shadows ?? []) out.push(absPoly({ fillColor: "rgba(11,15,21,0.4)", strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 }, r, 0.74)); } catch { /* polygons not supported */ }
+    if (sim) try { for (const r of sim.shadows ?? []) out.push(absPoly({ fillColor: "rgba(11,15,21,0.4)", strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 }, r, 0.74)); } catch { /* polygons not supported */ }
     return out;
   }
   // Ground shapes sit on the photographed mesh, 20 cm up, like the place's pin (RELATIVE_TO_MESH): clamped to the terrain
@@ -367,9 +367,9 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
   // shadows (they move with the simulation's clock) and the realistic models (kept on the map and only added or taken
   // away where they change). Before, any change — a minute of the clock, a save — took everything away and laid it again,
   // and the 3D seemed to reload.
-  const baseSim = sim?.kind === "piazza" ? { ...sim, shadows: [] } : sim;
+  const baseSim = sim ? { ...sim, shadows: [] } : sim;
   const areaKey = JSON.stringify(area), simKey = JSON.stringify(baseSim);
-  const shadowKey = sim?.kind === "piazza" ? JSON.stringify(sim.shadows ?? []) : "";
+  const shadowKey = sim?.shadows?.length ? JSON.stringify(sim.shadows) : "";
   const modelPool = useRef(new Map<string, HTMLElement>());
   // iPhone and iPad: plain shapes, or the light realistic models once turned on (Safari froze on the full ones).
   const models = useModels3D();
@@ -413,7 +413,7 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
           void ensure(sp.key).then((src) => {
             if (cancelled || !src || pool.has(id)) return;
             try {
-              const node = new Model({ src, position: { lat: sp.lat + dLat, lng: sp.lng + dLng, altitude: floor.h }, altitudeMode: "RELATIVE_TO_GROUND", orientation: { heading: sp.heading, tilt: 270, roll: 0 }, scale: 1 });
+              const node = new Model({ src, position: { lat: sp.lat + dLat, lng: sp.lng + dLng, altitude: floor.h + (sp.up ?? 0) }, altitudeMode: "RELATIVE_TO_GROUND", orientation: { heading: sp.heading, tilt: 270, roll: 0 }, scale: 1 });
               node.style.pointerEvents = "none";
               node.style.touchAction = "none";
               node.setAttribute("data-map-gestures", "");

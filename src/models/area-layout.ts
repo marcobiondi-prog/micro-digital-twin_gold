@@ -543,6 +543,18 @@ export function piazzaShadows(l: PiazzaLayout, sun: SunPos | null): Ring[] {
   return out;
 }
 
+/** How high the vineyard's shade cloth is stretched (its net in 3D stands at 2,2 m). */
+export const CLOTH_ROOF_M = 2.2;
+/**
+ * The shadows of the vineyard's shade cloths with the sun at `sun`: each cloth's outline moved away from the sun by its
+ * height over the sun's tangent, as the piazza's sails. None with the sun down.
+ */
+export function vineShadows(l: VineLayout, sun: SunPos | null): Ring[] {
+  if (!sun || sun.alt <= 0.05) return [];
+  const [cx, cy] = castBy(CLOTH_ROOF_M, sun);
+  return l.patches.filter((p) => p.kind === "cloth").map((p) => moveRing(p.ring, cx, cy));
+}
+
 /** A tree's crown as a small polygon (for the 3D views). */
 export function crownRing([lat, lng]: LatLng, radius = TREE_RADIUS_M, sides = 10): Ring {
   const k = M * Math.cos((lat * Math.PI) / 180);
