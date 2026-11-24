@@ -52,11 +52,15 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
   const DRAPE_STEP = 5, DRAPE_CELL = 8;
   const rawPoly = (o: Record<string, unknown>, ring: Array<[number, number]>, h: number) => {
     const p = new Polygon3DElement({ ...o, altitudeMode: MODE, drawsOccludedSegments: true }) as Shape;
+    p.style.pointerEvents = "none";
+    p.style.touchAction = "none";
     p.outerCoordinates = ring.map(([pLat, pLng]) => ({ lat: pLat + dLat, lng: pLng + dLng, altitude: h + UP }));
     return p;
   };
   const absLine = (o: Record<string, unknown>, coords: Array<{ lat: number; lng: number; h: number }>) => {
     const pl = new Polyline3DElement!({ ...o, altitudeMode: MODE, drawsOccludedSegments: true }) as Shape;
+    pl.style.pointerEvents = "none";
+    pl.style.touchAction = "none";
     const vertical = coords.length === 2 && coords[0]!.lat === coords[1]!.lat && coords[0]!.lng === coords[1]!.lng;
     pl.coordinates = (vertical ? coords : densify(coords, DRAPE_STEP)).map((c) => ({ lat: c.lat + dLat, lng: c.lng + dLng, altitude: c.h + UP }));
     return pl;
@@ -83,7 +87,11 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
   // the pin and from the real piazza. An older build without that mode clamps them to the ground as before.
   const LIFT = 0.2;
   const onMesh = (Ctor: new (o: Record<string, unknown>) => HTMLElement, o: Record<string, unknown>) => {
-    try { return new Ctor({ ...o, altitudeMode: "RELATIVE_TO_MESH" }) as Shape; } catch { return new Ctor({ ...o, altitudeMode: "CLAMP_TO_GROUND" }) as Shape; }
+    let s: Shape;
+    try { s = new Ctor({ ...o, altitudeMode: "RELATIVE_TO_MESH" }) as Shape; } catch { s = new Ctor({ ...o, altitudeMode: "CLAMP_TO_GROUND" }) as Shape; }
+    s.style.pointerEvents = "none";
+    s.style.touchAction = "none";
+    return s;
   };
   const meshPoly = (o: Record<string, unknown>) => onMesh(Polygon3DElement, o);
   const meshLine = (o: Record<string, unknown>) => onMesh(Polyline3DElement!, o);
@@ -406,6 +414,9 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
             if (cancelled || !src || pool.has(id)) return;
             try {
               const node = new Model({ src, position: { lat: sp.lat + dLat, lng: sp.lng + dLng, altitude: floor.h }, altitudeMode: "RELATIVE_TO_GROUND", orientation: { heading: sp.heading, tilt: 270, roll: 0 }, scale: 1 });
+              node.style.pointerEvents = "none";
+              node.style.touchAction = "none";
+              node.setAttribute("data-map-gestures", "");
               map.append(node); pool.set(id, node);
             } catch { /* an older build without models */ }
           });

@@ -1084,6 +1084,13 @@
   .maplibregl-map * {
     touch-action: none !important;
   }
+  gmp-model-3d,
+  gmp-polygon-3d,
+  gmp-polyline-3d,
+  gmp-marker-3d {
+    pointer-events: none !important;
+    touch-action: none !important;
+  }
   html {
     overscroll-behavior-y: none;
     scroll-padding-top: calc(var(--nav-h, 0px) + 0.75rem);

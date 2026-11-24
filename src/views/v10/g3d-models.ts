@@ -158,6 +158,15 @@ async function toDataUrl(obj: THREE.Object3D, glow: number, lite = false): Promi
   brighten(obj, glow);
   bake(obj, lite);
   const buf = (await new GLTFExporter().parseAsync(flatten(obj), { binary: true, maxTextureSize: lite ? 256 : 512 })) as ArrayBuffer;
+  if (typeof FileReader !== "undefined") {
+    const blob = new Blob([buf], { type: "model/gltf-binary" });
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
   const bytes = new Uint8Array(buf);
   let bin = "";
   for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
@@ -165,17 +174,15 @@ async function toDataUrl(obj: THREE.Object3D, glow: number, lite = false): Promi
 }
 
 /** A model's data URL, built once per key for the session. */
-// The light version builds one model at a time, with a pause between, so the page keeps answering.
-let liteQueue: Promise<unknown> = Promise.resolve();
+// Builds models sequentially with brief pauses between so the browser event loop stays responsive.
+let modelQueue: Promise<unknown> = Promise.resolve();
 export function modelUrl(key: string, build: () => THREE.Object3D | Promise<THREE.Object3D | null> | null, glow = 0.15, lite = false): Promise<string | null> {
   const id = lite ? `lite:${key}` : key;
   let p = cache.get(id);
   if (!p) {
     const make = () => Promise.resolve().then(build).then((o) => (o ? toDataUrl(o, glow, lite) : null)).catch(() => null);
-    if (lite) {
-      p = liteQueue.then(() => new Promise((r) => setTimeout(r, 60))).then(make);
-      liteQueue = p.catch(() => null);
-    } else p = make();
+    p = modelQueue.then(() => new Promise((r) => setTimeout(r, 40))).then(make);
+    modelQueue = p.catch(() => null);
     cache.set(id, p);
   }
   return p;
