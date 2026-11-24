@@ -191,7 +191,7 @@ export function modelUrl(key: string, build: () => THREE.Object3D | Promise<THRE
 
 const half = (v: number) => Math.max(0.5, Math.round(v * 2) / 2);
 /** The side of the bed tiles (m): small enough to follow a hilly ground, large enough to keep the models few. */
-export const BED_TILE_M = 1.25;
+export const BED_TILE_M = 1;
 const deg = (yaw: number) => ((-yaw * 180) / Math.PI + 360) % 360;
 
 /**
@@ -224,7 +224,7 @@ export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number },
         const ang = -r.yaw, c = Math.cos(ang), s = Math.sin(ang);
         for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
           const u = -r.w / 2 + (i + 0.5) * tw, v = -r.d / 2 + (j + 0.5) * td;
-          add(`bedtile:${kw}x${kd}`, r.cx + u * c - v * s, r.cz + u * s + v * c, r.yaw, () => realBed({ w: kw, d: kd }, { tile: true }), 0.1, 0.12);
+          add(`bedtile:${kw}x${kd}`, r.cx + u * c - v * s, r.cz + u * s + v * c, r.yaw, () => realBed({ w: kw, d: kd }, { tile: true }), 0.1, 0.25);
         }
       } else if (p.kind === "shade" && r.w >= 1 && r.d >= 1) {
         const w = half(r.w), d = half(r.d);
