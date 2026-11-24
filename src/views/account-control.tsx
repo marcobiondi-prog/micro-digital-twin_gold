@@ -548,8 +548,8 @@ export function AccountControl() {
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
         <span className="relative inline-grid shrink-0 place-items-center">
-          <Button ref={triggerRef} variant="outline" size="icon" className="size-9 shrink-0 rounded-full sm:size-10" aria-label={cloudAccount ? `Apri account · spazio nel cloud ${bytesText(usage.used)} di 50 GB` : "Apri account"} title="Account" onClick={() => setOpen(true)}>
-            {avatar("size-9 sm:size-10")}
+          <Button ref={triggerRef} variant="outline" size="icon" className="size-11 shrink-0 rounded-full sm:size-12" aria-label={cloudAccount ? `Apri account · spazio nel cloud ${bytesText(usage.used)} di 50 GB` : "Apri account"} title="Account" onClick={() => setOpen(true)}>
+            {avatar("size-11 sm:size-12")}
           </Button>
           {/* Signed in, a ring round the picture fills with the cloud space in use, out of 50 GB. */}
           {cloudAccount && <StorageRing share={usage.share} />}
