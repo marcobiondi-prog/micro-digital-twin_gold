@@ -258,7 +258,7 @@ export function Tutorial() {
               <span className="whitespace-nowrap">Micro Digital</span>
               <span className="inline-flex items-center gap-2 whitespace-nowrap">
                 <span className="text-brand-turquoise">Twin</span>
-                <span className="rounded-full border border-brand-turquoise/40 bg-brand-turquoise/15 px-2 py-0.5 text-[0.55em] font-bold tracking-[0.12em] text-brand-turquoise">BETA</span>
+                <span className="rounded-full border border-brand-turquoise/40 bg-brand-turquoise/15 px-2 py-0.5 text-[0.55em] font-bold tracking-[0.12em] text-brand-turquoise">ALPHA</span>
               </span>
             </p>
             <h2 className="mt-[clamp(0.375rem,2dvh,1.5rem)] font-display text-[clamp(1.8rem,min(9vw,8dvh),3.75rem)] font-extralight leading-[1.02] tracking-tight text-foreground">Simula gli interventi di raffrescamento,<br />prima di implementarli.</h2>
@@ -360,7 +360,7 @@ export function Choice() {
       <section aria-label="Scelta" className="mx-auto flex min-h-dvh max-w-xl flex-col pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-[calc(3rem+env(safe-area-inset-top))]">
         <h1 className="sr-only">Da dove vuoi iniziare</h1>
         <div>
-          <p className="mb-3 inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.35em] text-foreground/60"><span className="whitespace-nowrap">Micro Digital</span><span className="inline-flex items-center gap-1.5 whitespace-nowrap"><span className="text-brand-turquoise">Twin</span><span className="rounded-full border border-brand-turquoise/40 bg-brand-turquoise/15 px-2 py-0.5 text-[10px] font-bold tracking-[0.12em] text-brand-turquoise">BETA</span></span></p>
+          <p className="mb-3 inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.35em] text-foreground/60"><span className="whitespace-nowrap">Micro Digital</span><span className="inline-flex items-center gap-1.5 whitespace-nowrap"><span className="text-brand-turquoise">Twin</span><span className="rounded-full border border-brand-turquoise/40 bg-brand-turquoise/15 px-2 py-0.5 text-[10px] font-bold tracking-[0.12em] text-brand-turquoise">ALPHA</span></span></p>
           <h2 aria-hidden="true" className="font-display text-[3.4rem] font-extralight leading-[0.95] tracking-tight text-foreground sm:text-7xl">Da dove<br />vuoi iniziare?</h2>
           <p className="mt-5 max-w-xs text-[15px] leading-relaxed text-foreground/60">Dicci chi sei: ti identifichi qui e si apre la tua simulazione.</p>
         </div>
