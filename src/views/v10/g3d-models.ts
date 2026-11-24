@@ -212,7 +212,7 @@ export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number },
       } else if (p.kind === "shade" && r.w >= 1 && r.d >= 1) {
         const w = half(r.w), d = half(r.d);
         const open = Math.round((sim.shadeOpen ?? 1) * 4) / 4;
-        add(`pap:${w}x${d}:${open}`, r.cx, r.cz, r.yaw, () => realPapillons({ w, d, h: 3.2, open }), 0.12);
+        add(`pap:${w}x${d}:${open}`, r.cx, r.cz, r.yaw, () => realPapillons({ w, d, h: 3.2, open }, { far: true }), 0.12);
       }
     }
     const kind = "urban" as const;

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { isIOS, setIosRealModels } from "@/lib/ios";
+import { isMobileDevice, setMobileRealModels } from "@/lib/ios";
 import { useModels3D } from "@/lib/use-ios-3d";
 const VineZonePicker = lazy(() => import("@/views/v10/VineThirst").then((m) => ({ default: m.VineZonePicker })));
 import { setPinFix, usePinFix } from "@/models/pin-fix";
@@ -83,8 +83,8 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   useEffect(() => { if (!can3d) setView("2d"); else setHint(false); }, [can3d]);
   // Always both: with the browser key 3D is the photorealistic view, without it an open map with the buildings raised.
   const show3d = view === "3d" && can3d;
-  const [iosDevice, setIosDevice] = useState(false);
-  useEffect(() => { setIosDevice(isIOS()); }, []);
+  const [mobileDevice, setMobileDevice] = useState(false);
+  useEffect(() => { setMobileDevice(isMobileDevice()); }, []);
   const zoom3d = kind === "urban" ? 17 : 15;
   // The area drawn with pins for this place (kept with the simulation), and the pins being placed while drawing.
   const saved = drawnAreaFor(kind === "urban" ? lab.urban.area : lab.vineyard.area, loc);
@@ -407,8 +407,8 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
             {sim.data.mistersInZones > 0 && <span className="font-normal text-white/80"> · {sim.data.mistersInZones} nelle tue zone{sim.data.misters.length > sim.data.mistersInZones ? ` · ${sim.data.mistersInZones < sim.data.misters.length ? sim.data.misters.length - sim.data.mistersInZones : 0} messi dall’app` : ""}</span>}
           </p>
         )}
-        {/* Day and night at the simulation's season and hour, over the 2D and the 3D map alike. */}
-        <DayNight kind={kind} lat={pin.lat} lng={pin.lng} />
+        {/* Day and night at the simulation's season and hour, over the 2D map. The 3D map handles its own lighting via MapLight. */}
+        {!show3d && <DayNight kind={kind} lat={pin.lat} lng={pin.lng} />}
         {!drawing && !drawingZone && proposalPill}
         {show3d
           ? <Suspense fallback={<div className="h-full w-full bg-card" />}><MapLight kind={kind} lat={pin.lat} lng={pin.lng}>{key
@@ -419,8 +419,8 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
             onAreaChange={drawingZone ? setZoneDraft : setDraft} sim={editingZone && sim ? { ...sim, inner: (sim.inner ?? []).filter((z) => z.id !== editingZone) } : sim} arranging={arranging} onMove={moved} proposal={proposal}
             outline={drawingZone ? saved?.ring ?? null : null} onOutside={() => toast("La zona va dentro l’area disegnata")} onPinMove={arranging ? undefined : movePin} /></Suspense>}
       </div>
-      {/* iPhone and iPad only: the 3D shows plain shapes unless the light realistic models are turned on by hand. */}
-      {show3d && iosDevice && <IosModelsSwitch />}
+      {/* Mobile devices (Android, iPhone, iPad): the 3D shows plain shapes unless the light realistic models are turned on by hand. */}
+      {show3d && mobileDevice && <IosModelsSwitch />}
       {!preview && !drawing && !drawingZone && saved && <VrButton kind={kind} area={saved} guest={guest} />}
       {/* The pin can be put right by hand on the 2D map; a pin moved by hand can go back to the automatic one. */}
       {!drawing && !drawingZone && !arranging && (
@@ -530,8 +530,8 @@ function useDayLight(kind: SimKind, lat: number, lng: number) {
 export function lightFilter(height: number | null | undefined): string {
   if (height == null || height >= 10) return "none";
   if (height >= 0) { const k = 1 - height / 10; return `sepia(${(0.35 * k).toFixed(2)}) saturate(${(1 + 0.2 * k).toFixed(2)}) brightness(${(1 - 0.12 * k).toFixed(2)})`; }
-  if (height >= -6) { const k = -height / 6; return `brightness(${(0.88 - 0.38 * k).toFixed(2)}) saturate(${(1 - 0.3 * k).toFixed(2)}) hue-rotate(${Math.round(12 * k)}deg)`; }
-  return "brightness(0.45) saturate(0.65) hue-rotate(15deg)";
+  if (height >= -6) { const k = -height / 6; return `brightness(${(0.90 - 0.18 * k).toFixed(2)}) saturate(${(1 - 0.2 * k).toFixed(2)}) hue-rotate(${Math.round(8 * k)}deg)`; }
+  return "brightness(0.72) saturate(0.8) hue-rotate(10deg)";
 }
 
 /** Hands the 3D maps the light of the simulation's hour (--map-light-filter, applied to the photographic map's canvas). */
@@ -786,17 +786,17 @@ function ZonesBar({ area, flow, onAdd, onEdit, onRemove }: { area: DrawnArea; fl
   );
 }
 
-/** iPhone and iPad: the 3D's realistic models in their light version, off by default (the full ones froze Safari). */
+/** Mobile devices (Android, iPhone, iPad): the 3D realistic models in their light version, off by default. */
 function IosModelsSwitch() {
   const on = useModels3D() === "lite";
   return (
     <label className="mx-auto flex w-fit max-w-full cursor-pointer items-center gap-3 rounded-full bg-card px-3 py-1.5 text-xs ring-1 ring-border">
       <span className="min-w-0">
         <span className="font-semibold text-foreground">Modelli realistici</span>
-        <span className="text-muted-foreground"> · {on ? "versione leggera per iPhone" : "spenti: forme semplici"}</span>
+        <span className="text-muted-foreground"> · {on ? "versione leggera per smartphone" : "spenti: forme semplici"}</span>
       </span>
       <button type="button" role="switch" aria-checked={on} aria-label="Modelli realistici nel 3D"
-        onClick={() => { setIosRealModels(!on); toast(on ? "Modelli realistici spenti" : "Modelli realistici accesi", { description: on ? "Il 3D torna alle forme semplici." : "Versione leggera per iPhone: se il 3D si blocca, spegnili di nuovo." }); }}
+        onClick={() => { setMobileRealModels(!on); toast(on ? "Modelli realistici spenti" : "Modelli realistici accesi", { description: on ? "Il 3D torna alle forme semplici." : "Versione leggera: se il 3D si blocca, spegnili di nuovo." }); }}
         className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${on ? "bg-teal-400" : "bg-foreground/25"}`}>
         <span className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition-[left] ${on ? "left-[1.125rem]" : "left-0.5"}`} />
       </button>
