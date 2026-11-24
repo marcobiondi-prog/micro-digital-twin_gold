@@ -79,7 +79,7 @@ let googleRetryAt = 0;
 const osmCache = new Map<string, OsmSuggestion[]>();
 
 /** Below this the phone has not really moved: the place stays as it is. */
-const GPS_STEP_M = 100;
+const GPS_STEP_M = 15;
 /**
  * How precise the fix was that set each place (by its coordinates), kept for the whole session: before, each opening of
  * the map started from "unknown" and the next fix, a little sharper, moved the place by some tens of metres — standing
@@ -153,7 +153,7 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
   };
   const [locating, setLocating] = useState(false);
   // GPS always on: once turned on it stays on (on this device, across openings) and keeps following the phone —
-  // the place moves with it when it has gone more than 100 m — until tapped off.
+  // the place moves with it when it has gone more than 15 m — until tapped off.
   const [gps, setGps] = useState(false);
   // While the GPS is on, a place chosen by hand (search or suggestion) stays chosen: the GPS keeps running but stops
   // moving the place until "Seguimi di nuovo" (or a tap on the GPS button) brings it back to the phone's position.
@@ -193,51 +193,100 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
       lastFix.current = here;
       setLocating(false);
       setError(null); // a fix came: any earlier "not available" is over
-      // With no place chosen yet the first fix sets it, however near.
-      // A coarse first fix (from the network, hundreds of metres off) is put right as soon as a sharper one comes:
-      // a fix much more precise than the one the place came from moves it even within the 100 m step.
-      // Only a coarse place (set from a fix worse than 100 m) is put right by a sharper one, and only for a real
-      // distance; otherwise the place moves when the phone has gone well beyond the step and beyond the fix's own error,
-      // so a phone lying still (fixes wandering by tens of metres indoors) never changes place.
       const acc = coords.accuracy || 9999, moved = metresBetween(placeRef.current, here);
       const placeAcc = placeAccuracy.get(accKey(placeRef.current)) ?? 0;
-      const sharper = placeAcc >= GPS_STEP_M && acc < placeAcc / 2 && moved > Math.max(30, acc * 2);
-      const away = moved >= Math.max(GPS_STEP_M, acc * 2);
+      const sharper = (placeAcc >= 25 && acc < placeAcc * 0.7 && moved > Math.max(5, acc)) || (placeRef.current.pending);
+      const away = moved >= Math.max(GPS_STEP_M, Math.min(25, acc * 0.8));
       if (pausedRef.current || busy || (!placeRef.current.pending && !away && !sharper)) return;
       appliedAcc.current = acc;
       busy = true;
-      const fallback = { label: `La mia posizione (${here.lat.toFixed(4)}, ${here.lng.toFixed(4)})`, ...here };
+      const fallback = { label: `La mia posizione (${here.lat.toFixed(5)}, ${here.lng.toFixed(5)})`, ...here };
       const pick = (loc: SearchedLocation) => { placeAccuracy.set(accKey(loc), acc); selectRef.current(loc); };
-      try { const result = await reverseGoogle({ data: here }); if (live) pick(result.location ?? fallback); }
-      catch { if (live) pick(fallback); } finally { busy = false; }
+      try {
+        const result = await reverseGoogle({ data: here }).catch(() => null);
+        if (live && result?.location) { pick(result.location); return; }
+        const osm = await reverseOsm({ data: here }).catch(() => null);
+        if (live && osm?.location) { pick(osm.location); return; }
+        if (live) pick(fallback);
+      } catch {
+        try {
+          const osm = await reverseOsm({ data: here }).catch(() => null);
+          if (live && osm?.location) { pick(osm.location); return; }
+        } catch { /* ignore */ }
+        if (live) pick(fallback);
+      } finally { busy = false; }
     }, (geoError) => {
       setLocating(false);
       if (geoError.code === 1) { setGps(false); saveGps(false); setError("Permesso di posizione negato. Abilitalo nelle impostazioni del browser."); }
-      // A fix that did not come in time (indoors, under a roof) is said only while there is no place yet: with a place
-      // already set, or a fix already had, the GPS simply keeps trying and the map stays as it is — the red line,
-      // left on screen even after the next fix, read as an error.
       else if (!lastFix.current && placeRef.current.pending) setError("Sto ancora cercando la posizione: il GPS resta attivo e riprova da solo.");
-    }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 15000 });
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 2000 });
     return () => { live = false; lastFix.current = null; appliedAcc.current = Infinity; navigator.geolocation.clearWatch(id); };
-  }, [gps, reverseGoogle]);
+  }, [gps, reverseGoogle, reverseOsm]);
   // Back to following the phone: at once to the last position known, then on with every move.
   const resume = () => {
     setPaused(false); saveGpsPaused(false);
     const here = lastFix.current;
     if (!here) { setLocating(true); return; }
-    const fallback = { label: `La mia posizione (${here.lat.toFixed(4)}, ${here.lng.toFixed(4)})`, ...here };
-    if (metresBetween(placeRef.current, here) < GPS_STEP_M) return;
-    void reverseGoogle({ data: here }).then((r) => selectRef.current(r.location ?? fallback), () => selectRef.current(fallback));
+    const fallback = { label: `La mia posizione (${here.lat.toFixed(5)}, ${here.lng.toFixed(5)})`, ...here };
+    if (metresBetween(placeRef.current, here) < 2) return;
+    void reverseGoogle({ data: here }).then(
+      (r) => {
+        if (r?.location) selectRef.current(r.location);
+        else void reverseOsm({ data: here }).then((osm) => selectRef.current(osm?.location ?? fallback), () => selectRef.current(fallback));
+      },
+      () => void reverseOsm({ data: here }).then((osm) => selectRef.current(osm?.location ?? fallback), () => selectRef.current(fallback)),
+    );
   };
   const locate = () => {
     if (gps && paused) { resume(); return; }
     if (gps) {
-      setGps(false); saveGps(false); setPaused(false); saveGpsPaused(false); setLocating(false);
-      toast("GPS spento", { description: "La mappa non segue più la tua posizione. Toccalo di nuovo per riaccenderlo.", id: "gps-state" });
+      setLocating(true);
+      if (typeof navigator !== "undefined" && "geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          async ({ coords }) => {
+            const here = { lat: coords.latitude, lng: coords.longitude };
+            lastFix.current = here;
+            setLocating(false);
+            const fallback = { label: `La mia posizione (${here.lat.toFixed(5)}, ${here.lng.toFixed(5)})`, ...here };
+            toast.success("Posizione GPS aggiornata", { description: `${here.lat.toFixed(5)}, ${here.lng.toFixed(5)} (±${Math.round(coords.accuracy)} m)`, id: "gps-state" });
+            const result = await reverseGoogle({ data: here }).catch(() => null);
+            if (result?.location) selectRef.current(result.location);
+            else {
+              const osm = await reverseOsm({ data: here }).catch(() => null);
+              selectRef.current(osm?.location ?? fallback);
+            }
+          },
+          () => {
+            setGps(false); saveGps(false); setPaused(false); saveGpsPaused(false); setLocating(false);
+            toast("GPS spento", { description: "La mappa non segue più la tua posizione. Toccalo di nuovo per riaccenderlo.", id: "gps-state" });
+          },
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
+        );
+      } else {
+        setGps(false); saveGps(false); setPaused(false); saveGpsPaused(false); setLocating(false);
+      }
       return;
     }
     if (!guardUse("posizione")) return;
     setError(null); setLocating(true); setGps(true); saveGps(true);
+    if (typeof navigator !== "undefined" && "geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        async ({ coords }) => {
+          const here = { lat: coords.latitude, lng: coords.longitude };
+          lastFix.current = here;
+          setLocating(false);
+          const fallback = { label: `La mia posizione (${here.lat.toFixed(5)}, ${here.lng.toFixed(5)})`, ...here };
+          const result = await reverseGoogle({ data: here }).catch(() => null);
+          if (result?.location) selectRef.current(result.location);
+          else {
+            const osm = await reverseOsm({ data: here }).catch(() => null);
+            selectRef.current(osm?.location ?? fallback);
+          }
+        },
+        () => undefined,
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
+      );
+    }
   };
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

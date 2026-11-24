@@ -1457,7 +1457,7 @@
 html[data-touch] .lab-media-ai { display: inline-flex; }
 /* Surface (and other 2-in-1s) in desktop mode — keyboard attached, fine pointer, not tablet mode: no AI camera. */
 @media (min-width: 1024px) { html[data-touch]:not([data-slate]) .lab-media-actions .lab-media-ai { display: none !important; } }
-/* Desktop: "Carica" apre subito i file del computer, senza menu Galleria/Scatta/Registra, e "Cartella" una cartella intera. */
+/* Desktop & Tablet: upload actions and touch dropzone */
 .lab-media-upload-direct, .lab-media-folder, .lab-media-dropzone { display: none; }
 @media (min-width: 1024px) and (any-pointer: fine) {
   html:not([data-slate]) .lab-media-folder { display: inline-flex; }
@@ -1465,7 +1465,13 @@ html[data-touch] .lab-media-ai { display: inline-flex; }
   html:not([data-slate]) .lab-media-upload-direct { display: inline-flex; }
   html:not([data-slate]) .lab-media-upload-menu { display: none; }
 }
-/* Tablets held sideways (touch): the same dashed drop box, for files dragged in from the tablet's Files app or a split screen. */
+/* Tablets (slate or touch, portrait & landscape): display dropzone and upload actions */
+html[data-slate] .lab-media-dropzone,
+html[data-touch] .lab-media-dropzone,
+@media (min-width: 640px) and (max-width: 1023.98px) {
+  .lab-media-dropzone { display: flex !important; min-height: 5rem; }
+  .lab-media-upload-direct { display: inline-flex !important; }
+}
 @media (orientation: landscape) and (min-width: 900px) and (min-height: 600px) {
   html[data-touch] .lab-media-dropzone { display: flex; }
 }
@@ -1986,12 +1992,7 @@ html[data-home-video], html[data-home-video] body { overflow: hidden; overscroll
 .nav-arc { filter: drop-shadow(0 -4px 12px color-mix(in oklab, var(--foreground) 10%, transparent)); }
 /* v3: on phones the central camera of the arched bar already offers AI, photo, video and gallery,
    so the media panel keeps only its own actions (send, delete). Tablets and desktops keep them. */
-/* Tablets held upright: the side rail's camera already offers AI, photo, video and gallery, so the panel keeps only Invia and Elimina. */
-@media (min-width: 768px) and (max-width: 1023.98px) and (orientation: portrait) {
-  html .lab-media-actions .lab-media-ai,
-  html .lab-media-actions .lab-media-upload-direct,
-  html .lab-media-actions .lab-media-upload-menu { display: none; }
-}
+/* Phones keep upload actions in the central camera of the bottom bar; tablets and desktops keep them in the media panel. */
 @media (max-width: 639.98px) {
   html .lab-media-actions .lab-media-ai,
   html .lab-media-actions .lab-media-upload-direct,
@@ -2470,9 +2471,23 @@ html[data-sys-camera] nav {
     margin-left: calc(50% - var(--page-w, 100vw) / 2 + 2.5rem) !important; margin-right: calc(50% - var(--page-w, 100vw) / 2 + 2.5rem) !important;
     padding-left: calc(var(--page-w, 100vw) / 2 - 2.5rem - 50%) !important; padding-right: calc(var(--page-w, 100vw) / 2 - 2.5rem - 50%) !important;
   }
-  html[data-slate] .lab-media-actions .lab-media-ai,
-  html[data-slate] .lab-media-actions .lab-media-upload-direct,
-  html[data-slate] .lab-media-actions .lab-media-upload-menu { display: none !important; }
+  html[data-slate] .lab-media-actions .lab-media-ai { display: none !important; }
+}
+
+/* Tablet: remove halo (glow) around the rotating ring */
+.rail-orb .nav-orb-glow,
+html[data-slate] .rail-orb .nav-orb-glow,
+html[data-slate] .nav-orb-glow {
+  display: none !important;
+  box-shadow: none !important;
+}
+
+/* Tablet mode: large touch-proportioned buttons for media upload */
+html[data-slate] .lab-media-actions .lab-media-action {
+  min-height: 2.75rem !important;
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+  font-size: 0.875rem !important;
 }
 
 /* A phone held sideways (or any screen wide but low, under 500 px tall): the side rail of the tablet, compact — icons

@@ -792,7 +792,35 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
             </>
           ) : (
             uploads.length === 0 && (
-              <p className="mt-3 text-xs text-muted-foreground">Nessun file ancora.</p>
+              <div className="mt-3 flex flex-col gap-3">
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void pickGallery()}
+                    className="flex min-h-[6.5rem] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border/80 bg-muted/30 p-3.5 text-center transition-all hover:border-brand-turquoise hover:bg-brand-turquoise/10 active:scale-[0.98] disabled:opacity-50"
+                  >
+                    <FolderOpen className="size-7 text-brand-turquoise" aria-hidden="true" />
+                    <div>
+                      <span className="block text-sm font-semibold text-foreground">File manager & Galleria</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">Scegli foto e video dal dispositivo</span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => openCamera("photo")}
+                    className="flex min-h-[6.5rem] flex-col items-center justify-center gap-2 rounded-2xl border border-border/80 bg-muted/30 p-3.5 text-center transition-all hover:border-brand-turquoise hover:bg-brand-turquoise/10 active:scale-[0.98] disabled:opacity-50"
+                  >
+                    <Camera className="size-7 text-brand-turquoise" aria-hidden="true" />
+                    <div>
+                      <span className="block text-sm font-semibold text-foreground">Fotocamera dispositivo</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">Scatta foto o registra video</span>
+                    </div>
+                  </button>
+                </div>
+                <p className="text-center text-xs text-muted-foreground">Nessun file ancora caricato nella simulazione.</p>
+              </div>
             )
           )}
         </div>
