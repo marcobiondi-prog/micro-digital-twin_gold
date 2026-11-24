@@ -337,6 +337,7 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
         role="list"
         aria-label="Profili registrati"
         data-map-gestures=""
+        data-no-tab-swipe=""
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={finishDrag}
