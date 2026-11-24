@@ -231,8 +231,8 @@ export function AccountControl() {
       const em = detail?.email;
       if (em) { setEmail(em); }
       setMode(detail?.mode ?? "signin");
-      // Only a request naming an account (sign in as that email) shows the form over a signed-in account.
-      setAskSignIn(Boolean(em));
+      // Opening with an explicit email or signin/signup mode shows the form over a signed-in account.
+      setAskSignIn(Boolean(em || detail?.mode === "signin" || detail?.mode === "signup"));
       setOpen(true);
     };
     const close = () => setOpen(false);
