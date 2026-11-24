@@ -78,13 +78,14 @@ function timberTexture(): THREE.CanvasTexture | null {
   return woodTex;
 }
 
-function tube(points: THREE.Vector3[], r: number, radial = 6, closed = false): THREE.BufferGeometry {
+function tube(points: THREE.Vector3[], r: number, radial = 4, closed = false): THREE.BufferGeometry {
   const curve = new THREE.CatmullRomCurve3(points, closed);
-  return new THREE.TubeGeometry(curve, Math.max(2, points.length * 3), r, radial, closed);
+  const segs = Math.max(2, Math.min(24, Math.round(points.length * 0.9)));
+  return new THREE.TubeGeometry(curve, segs, r, radial, closed);
 }
 
 /** A round rod (tapering r0 → r1) from a to b. */
-function rodBetween(a: THREE.Vector3, b: THREE.Vector3, r0: number, r1: number, radial = 12): THREE.BufferGeometry {
+function rodBetween(a: THREE.Vector3, b: THREE.Vector3, r0: number, r1: number, radial = 6): THREE.BufferGeometry {
   const len = Math.max(1e-4, a.distanceTo(b));
   const geo = new THREE.CylinderGeometry(r1, r0, len, radial, 1);
   geo.translate(0, len / 2, 0);
@@ -127,8 +128,9 @@ function hyparSailGeo(
   c01: THREE.Vector3,
   c11: THREE.Vector3,
   open: number,
+  far = false,
 ) {
-  const N = 26;
+  const N = far ? 10 : 14;
   const scoop = 0.215 * (0.3 + 0.7 * open); // deep concave catenary inward pull on all 4 edges
   const diagSpan = c00.distanceTo(c11);
   const ridgeDip = Math.min(0.32, diagSpan * 0.042) * open;
@@ -256,12 +258,12 @@ function buildWoodPost(p: PostNode, mats: Mats, out: THREE.Group, put: Put) {
   out.add(disc);
 }
 
-function buildSailBay(bay: SailBay, mats: Mats, putFixed: Put): (open: number, putDyn: Put) => void {
+function buildSailBay(bay: SailBay, mats: Mats, putFixed: Put, far = false): (open: number, putDyn: Put) => void {
   const { postA, postC, lowBAnchor, lowDAnchor, lowBFull, lowDFull, hiAFull, hiCFull } = bay;
 
   // Discreet ground stakes at the two low guy-line anchor points.
   for (const st of [lowBAnchor, lowDAnchor]) {
-    const peg = new THREE.CylinderGeometry(0.022, 0.016, 0.045, 8);
+    const peg = new THREE.CylinderGeometry(0.022, 0.016, 0.045, far ? 5 : 8);
     peg.translate(st.x, 0.022, st.z);
     putFixed(mats.satin, peg);
   }
@@ -280,31 +282,33 @@ function buildSailBay(bay: SailBay, mats: Mats, putFixed: Put): (open: number, p
     const o = Math.max(0, Math.min(1, open));
 
     // Twin light V-bridle cords from each wooden post top to the high sail corners.
-    putDyn(mats.cord, rodBetween(aTop1, hiAFull, 0.006, 0.006, 6));
-    putDyn(mats.cord, rodBetween(aTop2, hiAFull, 0.0055, 0.0055, 6));
-    putDyn(mats.cord, rodBetween(cTop1, hiCFull, 0.006, 0.006, 6));
-    putDyn(mats.cord, rodBetween(cTop2, hiCFull, 0.0055, 0.0055, 6));
+    putDyn(mats.cord, rodBetween(aTop1, hiAFull, 0.006, 0.006, far ? 4 : 6));
+    putDyn(mats.cord, rodBetween(aTop2, hiAFull, 0.0055, 0.0055, far ? 4 : 6));
+    putDyn(mats.cord, rodBetween(cTop1, hiCFull, 0.006, 0.006, far ? 4 : 6));
+    putDyn(mats.cord, rodBetween(cTop2, hiCFull, 0.0055, 0.0055, far ? 4 : 6));
 
-    // Stainless D-rings at the two high sail tips.
-    for (const tip of [hiAFull, hiCFull]) {
-      const ring = new THREE.TorusGeometry(0.026, 0.006, 6, 14);
-      ring.translate(tip.x, tip.y, tip.z);
-      putDyn(mats.satin, ring);
+    // Stainless D-rings at the two high sail tips (skipped when viewed from afar).
+    if (!far) {
+      for (const tip of [hiAFull, hiCFull]) {
+        const ring = new THREE.TorusGeometry(0.026, 0.006, 6, 12);
+        ring.translate(tip.x, tip.y, tip.z);
+        putDyn(mats.satin, ring);
+      }
     }
 
     if (o < 0.05) {
       // Retracted / furled: a slim taut taupe fabric sleeve suspended in a gentle catenary between the two high tips,
       // with the two low guy cords slackened neatly to the ground stakes.
       const pts: THREE.Vector3[] = [];
-      for (let k = 0; k <= 12; k++) {
-        const t = k / 12;
+      for (let k = 0; k <= 8; k++) {
+        const t = k / 8;
         const p = hiAFull.clone().lerp(hiCFull, t);
         p.y -= 0.16 * 4 * t * (1 - t);
         pts.push(p);
       }
-      putDyn(mats.fabric, tube(pts, 0.058, 12));
-      putDyn(mats.wire, rodBetween(diagMid, lowBAnchor, 0.004, 0.004, 6));
-      putDyn(mats.wire, rodBetween(diagMid, lowDAnchor, 0.004, 0.004, 6));
+      putDyn(mats.fabric, tube(pts, 0.058, far ? 5 : 8));
+      putDyn(mats.wire, rodBetween(diagMid, lowBAnchor, 0.004, 0.004, far ? 4 : 6));
+      putDyn(mats.wire, rodBetween(diagMid, lowDAnchor, 0.004, 0.004, far ? 4 : 6));
       return;
     }
 
@@ -313,20 +317,22 @@ function buildSailBay(bay: SailBay, mats: Mats, putFixed: Put): (open: number, p
     const lowD = diagMid.clone().lerp(lowDFull, o);
 
     // Taut guy cords from the two low sail tips down to their ground anchor stakes (as in the photo's lower corners).
-    putDyn(mats.cord, rodBetween(lowB, lowBAnchor, 0.0055, 0.0055, 6));
-    putDyn(mats.cord, rodBetween(lowD, lowDAnchor, 0.0055, 0.0055, 6));
+    putDyn(mats.cord, rodBetween(lowB, lowBAnchor, 0.0055, 0.0055, far ? 4 : 6));
+    putDyn(mats.cord, rodBetween(lowD, lowDAnchor, 0.0055, 0.0055, far ? 4 : 6));
 
-    for (const tip of [lowB, lowD]) {
-      const ring = new THREE.TorusGeometry(0.024, 0.0055, 6, 14);
-      ring.translate(tip.x, tip.y, tip.z);
-      putDyn(mats.satin, ring);
+    if (!far) {
+      for (const tip of [lowB, lowD]) {
+        const ring = new THREE.TorusGeometry(0.024, 0.0055, 6, 12);
+        ring.translate(tip.x, tip.y, tip.z);
+        putDyn(mats.satin, ring);
+      }
     }
 
     // The continuous 4-point hypar saddle sail and its stitched matching-taupe catenary edge hem.
-    const sail = hyparSailGeo(hiAFull, lowB, lowD, hiCFull, o);
+    const sail = hyparSailGeo(hiAFull, lowB, lowD, hiCFull, o, far);
     putDyn(mats.fabric, sail.geo);
     for (const edge of sail.edges) {
-      putDyn(mats.hem, tube(edge, 0.0085, 5));
+      putDyn(mats.hem, tube(edge, 0.0085, far ? 3 : 4));
     }
   };
 }
@@ -359,7 +365,10 @@ const TRAVEL_S = 4;
 
 type PapillonState = { open: number; built: number; target: number; build: (o: number) => void; onFrame?: (() => void) | undefined; last: number };
 
-export function realPapillons(def: { w: number; d: number; h?: number; open?: number; joined?: boolean }): THREE.Group {
+export function realPapillons(
+  def: { w: number; d: number; h?: number; open?: number; joined?: boolean },
+  opts: { far?: boolean } = {}
+): THREE.Group {
   const out = new THREE.Group();
   const W = Math.max(1, def.w), D = Math.max(1, def.d), H = def.h ?? 3.2;
   const sTex = sailFabricTexture();
@@ -479,8 +488,9 @@ export function realPapillons(def: { w: number; d: number; h?: number; open?: nu
 
   const fixed = new Map<THREE.Material, THREE.BufferGeometry[]>();
   const putFixed = binner(fixed);
+  const far = Boolean(opts.far);
   for (const p of posts.values()) buildWoodPost(p, mats, out, putFixed);
-  const drawers = bays.map((b) => buildSailBay(b, mats, putFixed));
+  const drawers = bays.map((b) => buildSailBay(b, mats, putFixed, far));
   MERGE(fixed, out);
 
   const canopy = new THREE.Group();

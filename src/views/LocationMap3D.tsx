@@ -273,7 +273,13 @@ function writeAdjust(lat: number, lng: number, a: Adjust) {
 const metres = (v: number) => `${v > 0 ? "+" : ""}${v.toLocaleString("it-IT", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} m`;
 
 function applyCamera(map: Map3D, camera: Camera, animate: boolean) {
-  if (animate && map.flyCameraTo) { map.flyCameraTo({ endCamera: camera, durationMillis: 900 }); return; }
+  if (map.flyCameraTo) {
+    try {
+      const mode = camera.altitudeMode ?? (camera.center.altitude > 0 ? "ABSOLUTE" : "RELATIVE_TO_GROUND");
+      map.flyCameraTo({ endCamera: { ...camera, altitudeMode: mode }, durationMillis: animate ? 900 : 0 });
+      return;
+    } catch { /* fallback to property assignment */ }
+  }
   Object.assign(map, camera);
 }
 
@@ -311,7 +317,8 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
       if (cancelled || !el) return;
       altitude.current = ground;
       libs.current = lib;
-      const map = new lib.Map3DElement({ ...frameCamera(lat, lng, el.clientHeight, ground), mode: "HYBRID" }) as Map3D;
+      const cam = frameCamera(lat, lng, el.clientHeight, ground);
+      const map = new lib.Map3DElement({ ...cam, mode: "HYBRID" }) as Map3D;
       map.style.cssText = "display:block;width:100%;height:100%;touch-action:none";
       // GREEDY: one finger moves the camera; the AUTO default turns cooperative inside a
       // scrollable page and asks for two fingers. Set as a property so older builds ignore it.
@@ -322,6 +329,8 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
       // Google's own red pin, like the 2D one.
       el.replaceChildren(map);
       mapRef.current = map;
+      // Immediately target ground surface via flyCameraTo to prevent diving into the void/underground (Google issue 372413906).
+      applyCamera(map, cam, false);
       setState("ready");
     }).catch(() => { if (!cancelled) setState("error"); });
     return () => { cancelled = true; mapRef.current = null; badges.current.clear(); el?.replaceChildren(); };
