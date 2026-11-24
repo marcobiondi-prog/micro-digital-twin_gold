@@ -43,7 +43,11 @@ const vineLeaf = drawn("vine-leaf", 128, 128, (g, r) => {
   leaf(38, 100, -0.9, 1); leaf(90, 70, 0.8, 1.05); leaf(40, 46, -0.6, 0.95); leaf(66, 22, 0, 0.9);
 });
 
-export function realVine(def: { h: number; w: number }, seed = 1): THREE.Group {
+/**
+ * `far`: seen from afar (Google's photographic 3D), a lighter row — a quarter of the leaves, each larger so the wall
+ * stays full, and smaller bunches — as a whole vineyard is many pieces of row.
+ */
+export function realVine(def: { h: number; w: number }, seed = 1, opts: { far?: boolean } = {}): THREE.Group {
   const r = rng(seed * 601 + 3);
   const H = Math.max(1, def.h);
   const L = Math.max(1.2, def.w || 4);
@@ -95,7 +99,8 @@ export function realVine(def: { h: number; w: number }, seed = 1): THREE.Group {
   // The leaf wall: between the second wire and the top, about 45 cm thick, a little wider at the top.
   const plane = new THREE.PlaneGeometry(1, 1).translate(0, 0.35, 0);
   const twigGeo = mergeGeometries([plane.clone(), plane.clone().rotateY(Math.PI / 2)])!;
-  const count = Math.min(1600, Math.round(L * 160));
+  const far = !!opts.far;
+  const count = far ? Math.min(400, Math.round(L * 40)) : Math.min(1600, Math.round(L * 160));
   const leaves = new THREE.InstancedMesh(twigGeo, new THREE.MeshStandardMaterial({ map: vineLeaf(), alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.75 }), count);
   const d = new THREE.Object3D(), col = new THREE.Color();
   const y0 = wireYs[0]! + H * 0.05, y1 = H;
@@ -104,7 +109,7 @@ export function realVine(def: { h: number; w: number }, seed = 1): THREE.Group {
     const half = 0.16 + 0.14 * t;
     d.position.set(-L / 2 + 0.05 + r() * (L - 0.1), y, (r() - 0.5) * 2 * half);
     d.rotation.set((r() - 0.5) * 1, r() * Math.PI, (r() - 0.5) * 1);
-    d.scale.setScalar(0.32 + r() * 0.18);
+    d.scale.setScalar((0.32 + r() * 0.18) * (far ? 1.75 : 1));
     d.updateMatrix();
     leaves.setMatrixAt(i, d.matrix);
     leaves.setColorAt(i, col.setHSL(0.23 + r() * 0.05, 0.45 + r() * 0.15, 0.3 + r() * 0.12));
@@ -113,7 +118,7 @@ export function realVine(def: { h: number; w: number }, seed = 1): THREE.Group {
 
   // Bunches: cones of berries hanging under the leaves, dark purple.
   const berry = new THREE.IcosahedronGeometry(1, 1);
-  const perBunch = 34;
+  const perBunch = far ? 8 : 34;
   const berries = new THREE.InstancedMesh(berry, new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.35 }), bunchAt.length * perBunch);
   let k = 0;
   for (const b of bunchAt) {
@@ -123,7 +128,7 @@ export function realVine(def: { h: number; w: number }, seed = 1): THREE.Group {
       const a = r() * Math.PI * 2;
       d.position.set(b.x + Math.cos(a) * rad * r(), b.y - t * blen, b.z + Math.sin(a) * rad * r());
       d.rotation.set(0, 0, 0);
-      d.scale.setScalar(0.009 + r() * 0.003);
+      d.scale.setScalar((0.009 + r() * 0.003) * (far ? 1.9 : 1));
       d.updateMatrix();
       berries.setMatrixAt(k, d.matrix);
       berries.setColorAt(k, col.setHSL(0.78 + r() * 0.04, 0.35, 0.16 + r() * 0.08));

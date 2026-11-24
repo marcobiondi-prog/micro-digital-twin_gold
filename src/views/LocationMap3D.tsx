@@ -195,7 +195,8 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
     } else if (sim?.kind === "vigneto") {
       for (const pt of sim.data.patches) if (pt.kind === "zone") ground(pt.ring, `${thirstColor(sim.thirst[pt.zone ?? 0] ?? 0)}59`);
       // The vines in relief: a low green wall per row across each zone, standing on the ground (kept to 160 rows).
-      for (const p of vineRowParts(sim.data.patches.filter((x) => x.kind === "zone").map((x) => x.ring), 160, true)) part(p, p.height, "#2a5a22", 1);
+      // With the realistic models the rows are trained vines (g3d-models), not these walls.
+      if (!models) for (const p of vineRowParts(sim.data.patches.filter((x) => x.kind === "zone").map((x) => x.ring), 160, true)) part(p, p.height, "#2a5a22", 1);
       // The shade cloth: a see-through dark sheet on corner posts; the windbreak: a hedge along its edge.
       if (!models) {
         for (const p of sim.data.patches.filter((x) => x.kind === "cloth").flatMap((x) => netParts(x.ring, true))) part(p, p.height, "#0b1220", 2);

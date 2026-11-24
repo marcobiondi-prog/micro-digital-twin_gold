@@ -6,12 +6,13 @@ import { arObject, recognisedPlants } from "@/models/ar-objects";
 import { currentScans } from "@/models/ar-scan-log";
 import { planTreeDefs, rectOf, xzAngleOf } from "@/views/ar-plan";
 import { realPapillons } from "@/views/ar-papillon";
-import { shadePatchBlocks } from "@/models/area-layout";
+import { shadePatchBlocks, vineRowSegments } from "@/models/area-layout";
 import { realBed } from "@/views/ar-bed";
 import { realMister } from "@/views/ar-mister";
 import { realSprinkler } from "@/views/ar-sprinkler";
 import { realShadeNet } from "@/views/ar-shadenet";
 import { realWindbreak } from "@/views/ar-windbreak";
+import { realVine } from "@/views/ar-vine";
 import { realTree } from "@/views/ar-tree";
 import type { SimLayout } from "@/views/v10/map-area";
 
@@ -190,6 +191,8 @@ export function modelUrl(key: string, build: () => THREE.Object3D | Promise<THRE
 }
 
 const half = (v: number) => Math.max(0.5, Math.round(v * 2) / 2);
+/** The vineyard's rows in Google's 3D: pieces of about 5 m, at most 400 in all. */
+const VINE_PIECE_M = 5, MAX_VINE_PIECES = 400;
 /** The side of the bed tiles (m): small enough to follow a hilly ground, large enough to keep the models few. */
 export const BED_TILE_M = 1;
 const deg = (yaw: number) => ((-yaw * 180) / Math.PI + 360) % 360;
@@ -251,6 +254,22 @@ export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number },
       if (r.w < 1 || r.d < 1) continue;
       const w = half(r.w), d = half(r.d);
       add(`net:${w}x${d}`, r.cx, r.cz, r.yaw, () => realShadeNet({ w, d, h: 2.2 }, { far: true }), 0.1);
+    }
+    // The vines: each row cut in pieces of at most VINE_PIECE_M (so a row follows a hilly ground and pieces of a length
+    // share one model), each a realistic trained row — posts, wires, gnarled trunks, the leaf wall and the bunches —,
+    // in a light version seen from afar; pieces grow longer while there would be more than MAX_VINE_PIECES.
+    const rows = vineRowSegments(L.patches.filter((p) => p.kind === "zone").map((p) => p.ring), 160).map(([a, b]) => [xz(a), xz(b)] as const);
+    const total = rows.reduce((t, [a, b]) => t + Math.hypot(b.x - a.x, b.z - a.z), 0);
+    const piece = Math.max(VINE_PIECE_M, total / MAX_VINE_PIECES);
+    let n = 0;
+    for (const [a, b] of rows) {
+      const len = Math.hypot(b.x - a.x, b.z - a.z);
+      if (len < 1) continue;
+      const k = Math.max(1, Math.round(len / piece)), w = half(len / k), yaw = -Math.atan2(b.z - a.z, b.x - a.x);
+      for (let i = 0; i < k; i++) {
+        const t = (i + 0.5) / k, v = n++ % 2;
+        add(`vine:${w}:${v}`, a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t, yaw, () => realVine({ h: 1.6, w }, v + 1, { far: true }), 0.12);
+      }
     }
     for (const l of L.lines) {
       if (l.kind !== "wind") continue;
