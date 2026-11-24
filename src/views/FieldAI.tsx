@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useSignedIn } from "@/lib/use-signed-in";
+import { useGuestOnly } from "@/views/v10/ProfileGate";
 import { useServerFn } from "@tanstack/react-start";
 import { Building2, Grape, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -21,10 +22,11 @@ export function FieldAI({ onAdd, kind = "vineyard" }: { onAdd: (t: string) => vo
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ sintesi: string; interventi: Intervention[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Signed in, or the simulated sign-in on previews (the AI call itself still needs a real account).
+  // Signed in, or the simulated sign-in on previews (the AI call itself still needs a real account); never in guest mode.
   const { signedIn } = useSignedIn();
+  const guest = useGuestOnly();
   const submit = async () => {
-    if (!signedIn || obs.trim().length < 3 || loading) return;
+    if (!signedIn || guest || obs.trim().length < 3 || loading) return;
     setLoading(true); setError(null); setResult(null);
     try {
       const r = await plan({ data: { observation: obs, phase, kind } });
@@ -33,8 +35,8 @@ export function FieldAI({ onAdd, kind = "vineyard" }: { onAdd: (t: string) => vo
     } catch { setError("Impossibile contattare il servizio AI."); }
     finally { setLoading(false); }
   };
-  // Guests never see the AI card: it stays hidden until they sign in.
-  if (!signedIn) return null;
+  // Guests and signed-out users never see the AI card: it stays locked until identified and signed in.
+  if (!signedIn || guest) return null;
   return (
     <Card>
       <div className="flex items-center gap-2 text-sm font-semibold">{kind === "urban" ? <Building2 className="size-4 text-urban" /> : <Grape className="size-4 text-vine" />} {c.title}</div>

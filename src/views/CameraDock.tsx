@@ -11,7 +11,7 @@ import { pushBackGuard } from "@/hooks/use-back-close";
 import { deliverFiles, openAccount, requestCapture, setCameraSheetOpen, useCameraSheetOpen, type CaptureAction } from "@/lib/camera-dock";
 import { galleryMultiple, openSystemCamera, supportsSystemCapture } from "@/lib/system-camera";
 import { cn } from "@/lib/utils";
-import { useGuest, useProId } from "@/lib/use-pro-id";
+import { openSectorGate, useGuest, useProId } from "@/lib/use-pro-id";
 import { useLab } from "@/models/lab-store";
 import { splitLocation } from "@/views/SimulationGrid";
 import aiLogo from "@/assets/ai-logo.png";
@@ -21,13 +21,14 @@ import { appAllowed, guardUse } from "@/lib/app-permissions";
 type Kind = "urban" | "vineyard";
 const kindOf = (pathname: string): Kind | null => (pathname === "/urbano" ? "urban" : pathname === "/vigneto" ? "vineyard" : null);
 
-/** AI ready = signed in (or simulated in a preview) and, for real accounts, the installed app. On a test preview
- *  (PREVIEW_BUILD: vite dev and Vercel previews, never production) it opens for everyone, also in a browser tab, so
- *  the camera can be tried without signing in. */
+/** AI ready = signed in (or simulated in a preview) and, for real accounts, the installed app; never in guest mode. */
 function useAiReady() {
   const { signedIn, demo } = useSignedIn();
   const installed = useInstalledApp();
-  return { signedIn: signedIn || PREVIEW_BUILD, aiReady: !AI_STANDBY && (PREVIEW_BUILD || (signedIn && (installed || demo))) };
+  const proId = useProId();
+  const guest = useGuest() && proId === null;
+  if (guest) return { signedIn: false, aiReady: false, guest: true };
+  return { signedIn: signedIn || PREVIEW_BUILD, aiReady: !AI_STANDBY && (PREVIEW_BUILD || (signedIn && (installed || demo))), guest: false };
 }
 
 /** Fotocamera al centro della barra ad arco, rialzata e luminosa (logo AI dopo l'accesso); apre il pannello con tutte le opzioni. */
@@ -163,6 +164,7 @@ export function CameraSheet() {
     // The camera revoked inside the app: the sheet closes and the message says how to turn it back on (toasts sit under the sheet).
     if (action !== "gallery" && !appAllowed("fotocamera")) { afterClose(() => guardUse("fotocamera")); return; }
     if (action === "ai") {
+      if (guest) { afterClose(() => openSectorGate(kind === "urban" ? "funzionario" : "agronomo")); return; }
       // The AI camera opens only once the sheet's history entry is gone (its fullscreen falls back to the dark bars).
       afterClose(() => {
         if (here) { if (!requestCapture(kind, "ai")) toast.error("Fotocamera non pronta, riprova tra un attimo"); return; }
@@ -238,16 +240,16 @@ export function CameraSheet() {
           </>
         ) : (
           <>
-            {(aiReady || !signedIn || AI_STANDBY) && (
-              <button type="button" disabled={signedIn && AI_STANDBY} onClick={() => (aiReady ? start("ai") : afterClose(openAccount))}
+            {(aiReady || !signedIn || AI_STANDBY || guest) && (
+              <button type="button" disabled={!guest && signedIn && AI_STANDBY} onClick={() => (aiReady ? start("ai") : guest ? afterClose(() => openSectorGate(kind === "urban" ? "funzionario" : "agronomo")) : afterClose(openAccount))}
                 className="relative flex items-center gap-4 md:portrait:gap-6 md:portrait:p-6 overflow-hidden rounded-[1.25rem] border border-brand-turquoise/40 bg-[radial-gradient(120%_120%_at_0%_0%,color-mix(in_oklch,var(--brand-turquoise)_32%,transparent),transparent_60%)] bg-muted/60 p-4 text-left outline-none transition-transform active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 disabled:active:scale-100 motion-reduce:active:scale-100">
-                <span className={cn("relative grid size-16 md:portrait:size-20 shrink-0 place-items-center rounded-full bg-background", signedIn && AI_STANDBY ? "camera-dev-ring-card" : "border-[3px] border-brand-turquoise shadow-[0_0_22px_color-mix(in_oklch,var(--brand-turquoise)_45%,transparent)]")}>
+                <span className={cn("relative grid size-16 md:portrait:size-20 shrink-0 place-items-center rounded-full bg-background", !guest && signedIn && AI_STANDBY ? "camera-dev-ring-card" : "border-[3px] border-brand-turquoise shadow-[0_0_22px_color-mix(in_oklch,var(--brand-turquoise)_45%,transparent)]")}>
                   <img src={aiLogo} alt="" aria-hidden="true" className="size-8 md:portrait:size-10" />
-                  {!aiReady && <span className={cn("absolute -bottom-1 -right-1 grid size-6 place-items-center rounded-full ring-2 ring-card", signedIn && AI_STANDBY ? "bg-amber-400 text-black" : "bg-foreground text-background")}>{signedIn && AI_STANDBY ? <Wrench className="size-3.5" aria-hidden="true" /> : <Lock className="size-3.5" aria-hidden="true" />}</span>}
+                  {!aiReady && <span className={cn("absolute -bottom-1 -right-1 grid size-6 place-items-center rounded-full ring-2 ring-card", !guest && signedIn && AI_STANDBY ? "bg-amber-400 text-black" : "bg-foreground text-background")}>{!guest && signedIn && AI_STANDBY ? <Wrench className="size-3.5" aria-hidden="true" /> : <Lock className="size-3.5" aria-hidden="true" />}</span>}
                 </span>
                 <span className="min-w-0">
-                  <span className="flex items-center gap-2 text-lg font-bold md:portrait:text-xl">Fotocamera AI{AI_STANDBY && <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-400">In sviluppo</span>}</span>
-                  <span className="block text-sm text-muted-foreground md:portrait:text-base">{aiReady ? "Inquadra una pianta: la riconosce e calcola il fresco" : AI_STANDBY ? `Non è ancora disponibile: la stiamo sviluppando e arriverà con un prossimo aggiornamento. Per ora puoi usare Foto, Video e Galleria.${signedIn ? "" : " Quando sarà pronta, accedi per usarla."}` : "Accedi per usarla"}</span>
+                  <span className="flex flex-wrap items-center gap-2 text-lg font-bold md:portrait:text-xl">Fotocamera AI{guest && <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">non per gli ospiti</span>}{!guest && AI_STANDBY && <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-400">In sviluppo</span>}</span>
+                  <span className="block text-sm text-muted-foreground md:portrait:text-base">{aiReady ? "Inquadra una pianta: la riconosce e calcola il fresco" : guest ? "Bloccata in modalità ospite: tocca per identificarti" : AI_STANDBY ? `Non è ancora disponibile: la stiamo sviluppando e arriverà con un prossimo aggiornamento. Per ora puoi usare Foto, Video e Galleria.${signedIn ? "" : " Quando sarà pronta, accedi per usarla."}` : "Accedi per usarla"}</span>
                   {place && <span className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-full bg-brand-turquoise/15 px-2.5 py-1 text-xs font-semibold text-brand-turquoise"><MapPin className="size-3.5 shrink-0" aria-hidden="true" /><span className="truncate">{place}</span></span>}
                 </span>
               </button>

@@ -5,6 +5,7 @@ import { useTabSwipe } from "@/lib/use-tab-swipe";
 import { useAutoHistory } from "@/lib/use-auto-history";
 import { SimMap } from "@/views/v10/SimMap";
 import { useSideBySide } from "@/lib/use-desktop";
+import { useGuest, useProId } from "@/lib/use-pro-id";
 import { Ambient, HeroButton, PageHero, Panels, TabRow, openSimTab, showSimMedia, startOnMap, simMediaId, useSimTab, type SimKind, type SimTab } from "./console";
 
 const loadMenu = () => import("@/views/v8/SimMenu");
@@ -75,10 +76,12 @@ function useHideOnScroll(bar: RefObject<HTMLDivElement | null>, root: RefObject<
  * the ⋮ context menu on the right, then pill tabs (Mappa · Simula · Sensori AI) and one panel.
  * Simula shows the simulation with its photos and videos below it.
  */
-export function SimShell({ kind, place, onCompare, onReset, onSend, simula, media, sensori }: { kind: SimKind; place: string; onCompare?: (() => void) | undefined; onReset: () => void; onSend?: () => void; simula: ReactNode; media: ReactNode; sensori: ReactNode }) {
+export function SimShell({ kind, place, onCompare, onReset, onSend, simula, media, sensori }: { kind: SimKind; place: string; onCompare?: (() => void) | undefined; onReset: () => void; onSend?: (() => void) | undefined; simula: ReactNode; media: ReactNode; sensori: ReactNode }) {
   const tab = useSimTab(kind);
   // Desktop: Mappa and Simula are one tab with the map on the left (kept in view) and the simulation on the right.
   const desk = useSideBySide();
+  const guest = useGuest() && useProId() === null;
+  const tabItems = (desk ? DESK_TABS : TABS).map((t) => (t.id === "sensori" ? { ...t, locked: guest } : t));
   // Entering the page always starts on Mappa (unless a tab was asked for on the way in).
   useLayoutEffect(() => startOnMap(kind), [kind]);
   const go = (t: SimTab) => openSimTab(kind, t);
@@ -111,11 +114,11 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, medi
           {menu === "none"
             ? <button type="button" aria-label="Altre azioni" aria-haspopup="menu" className={MENU_BUTTON} onClick={() => setMenu("open")}><EllipsisVertical className="size-6" aria-hidden="true" /></button>
             : <Suspense fallback={<span className={MENU_BUTTON} aria-hidden="true"><EllipsisVertical className="size-6" /></span>}>
-                <SimMenu open={menu === "open"} onCamera={() => setCameraSheetOpen(true)} onMedia={() => showSimMedia(kind)} onSensors={() => go("sensori")} onMap={toMap} onSend={onSend} onReset={onReset} />
+                <SimMenu open={menu === "open"} guest={guest} onCamera={() => setCameraSheetOpen(true)} onMedia={() => showSimMedia(kind)} onSensors={() => go("sensori")} onMap={toMap} onSend={onSend} onReset={onReset} />
               </Suspense>}
         </>} />
       <div ref={barRef} data-sim-tabs="" className="sticky top-[var(--nav-h)] z-[999999997] -mx-4 bg-transparent px-4 py-2 md:mx-[calc(50%-var(--page-w,100vw)/2+2.5rem)] md:px-[calc(var(--page-w,100vw)/2-2.5rem-50%)] lg:mx-[calc(50%-var(--page-w,100vw)/2+7.5rem)] lg:px-[calc(var(--page-w,100vw)/2-7.5rem-50%)] backdrop-blur-xl slate-bleed will-change-transform data-[hidden]:pointer-events-none">
-        <TabRow label="Sezioni" items={desk ? DESK_TABS : TABS} value={desk && tab === "simula" ? "mappa" : tab} onChange={go} />
+        <TabRow label="Sezioni" items={tabItems} value={desk && tab === "simula" ? "mappa" : tab} onChange={go} />
       </div>
       {/* The open tab follows the finger and the next slides in once it turns; nothing peeks beside it. */}
       <div ref={swipe.ref} style={swipe.style} className="relative">

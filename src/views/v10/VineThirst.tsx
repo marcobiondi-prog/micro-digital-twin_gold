@@ -18,6 +18,7 @@ import { GAIN_BG, GAIN_TEXT } from "@/views/v7/studio-ui";
 import { Gauge, Lever, type Stop } from "@/views/v9c/UrbanThermometer";
 import { ImportWeatherButton } from "@/views/SimulationGrid";
 import { useMySensors } from "@/lib/use-my-sensors";
+import { useGuestOnly } from "@/views/v10/ProfileGate";
 import { freshAverage, type SensorKind } from "@/models/sensor-devices";
 import { toast } from "sonner";
 import { hapticTick } from "@/lib/haptics";
@@ -166,11 +167,13 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
       return { climateKey, ...(phase ? { phase } : {}), zones: v.zones.map((z) => ({ ...z, temperature: Math.round(Math.max(0, Math.min(45, seasonAir + z.temperature - mean)) * 10) / 10 })) };
     });
   }, [climateKey, clock.pending]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Fresh readings of the user's own sensors (last 2 hours), per zone: a zone's own sensors, else those of the whole vineyard.
+  // Fresh readings of the user's own sensors (last 2 hours), per zone: a zone's own sensors, else those of the whole vineyard (off for guests).
+  const guest = useGuestOnly();
   const mine = useMySensors("vigneto");
-  const fresh = (k: SensorKind, zi: number) => freshAverage(mine.sensors.filter((x) => x.zone === zi), k) ?? freshAverage(mine.sensors.filter((x) => x.zone === null), k);
+  const activeSensors = guest ? [] : mine.sensors;
+  const fresh = (k: SensorKind, zi: number) => freshAverage(activeSensors.filter((x) => x.zone === zi), k) ?? freshAverage(activeSensors.filter((x) => x.zone === null), k);
   const sensorLine = (() => {
-    const t = freshAverage(mine.sensors, "temperatura"), m = freshAverage(mine.sensors, "umidita_suolo"), w = freshAverage(mine.sensors, "vento"), r = freshAverage(mine.sensors, "pioggia");
+    const t = freshAverage(activeSensors, "temperatura"), m = freshAverage(activeSensors, "umidita_suolo"), w = freshAverage(activeSensors, "vento"), r = freshAverage(activeSensors, "pioggia");
     const bits = [t && `${fmt1(t.value)}°`, m && `terreno ${Math.round(m.value)} %`, w && `vento ${Math.round(w.value)} km/h`, r && (r.value > 0.2 ? "piove" : "niente pioggia")].filter(Boolean);
     return bits.length ? bits.join(" · ") : null;
   })();

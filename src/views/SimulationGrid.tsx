@@ -23,6 +23,7 @@ import { levelTone, piazzaEstimate, prototypeLevel, vineZones, type AreaKind, ty
 
 import { ResetScenarioButton } from "@/views/ResetScenarioButton";
 import { useSignedIn as useSignedInState } from "@/lib/use-signed-in";
+import { useGuest, useProId } from "@/lib/use-pro-id";
 
 export const COLS = 9;
 export const ROWS = 6;
@@ -266,8 +267,9 @@ function LocationMapPreview({ location }: { location: SearchedLocation }) {
   // With a browser key (Maps Embed API, referrer-restricted) use the official embed;
   // otherwise Google's keyless classic embed, so the preview is always Google Maps.
   const key = import.meta.env.VITE_GOOGLE_MAPS_BROWSER_KEY;
-  // The photorealistic 3D view is Premium: everyone sees the 2D/3D switch, only signed-in users open 3D.
-  const premium = useSignedIn();
+  // The photorealistic 3D view is Premium: everyone sees the 2D/3D switch, only signed-in non-guest users open 3D.
+  const guest = useGuest() && useProId() === null;
+  const premium = useSignedIn() && !guest;
   const has3d = Boolean(key) && premium;
   const [lockedHint, setLockedHint] = useState(false);
   const [view, setView] = useState<"2d" | "3d">("2d");

@@ -316,7 +316,7 @@ function UrbanRecords({ history }: { history?: ReactNode }) {
       </DashSection>
       <SendProject flow="piazza" />
       </div>
-      <div className="min-w-0 lg:col-span-2"><PremiumPart locked={URBAN_LOCKED}>
+      <div className="min-w-0 lg:col-span-2"><PremiumPart locked={URBAN_LOCKED} kind="funzionario">
         <div className="space-y-8">
           <DashSection title="Approvazioni degli enti" hint={STAGES[displayedStage]}>
         <DashCard>
@@ -404,7 +404,7 @@ function VineRecords({ history }: { history?: ReactNode }) {
       </DashSection>
       <SendProject flow="vigneto" />
       </div>
-      <div className="min-w-0 lg:col-span-2"><PremiumPart locked={VINE_LOCKED}>
+      <div className="min-w-0 lg:col-span-2"><PremiumPart locked={VINE_LOCKED} kind="agronomo">
         <DashSection title="Piano suggerito dall’AI"><FieldAI onAdd={addNote} /></DashSection>
       </PremiumPart></div>
     </div>

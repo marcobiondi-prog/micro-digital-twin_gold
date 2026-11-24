@@ -5,6 +5,7 @@ import { Card } from "@/views/health";
 import { Button } from "@/components/ui/button";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { openAccount } from "@/lib/camera-dock";
+import { GuestLock, useGuestOnly } from "@/views/v10/ProfileGate";
 import { suggestHeatSensors, type NetworkSummary, type SensorPick } from "@/controllers/sensor-ai.functions";
 import { useLab } from "@/models/lab-store";
 import { exampleSensorSuggestion } from "@/models/sensor-example";
@@ -21,6 +22,7 @@ export function SensorAdvisor({ kind, embedded = false }: { kind: "urban" | "vin
   const lab = useLab();
   const location = kind === "urban" ? lab.urban.location : lab.vineyard.location;
   const { signedIn, demo } = useSignedIn();
+  const guest = useGuestOnly();
   const [open, setOpen] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +35,7 @@ export function SensorAdvisor({ kind, embedded = false }: { kind: "urban" | "vin
   const area = drawnAreaFor(kind === "urban" ? lab.urban.area : lab.vineyard.area, location);
   const [cLat, cLng] = area ? ringCentroid(area.ring) : [location.lat, location.lng];
   const run = async () => {
-    if (loading) return;
+    if (loading || guest) return;
     // The suggestion runs on an auth-protected server function: a simulated sign-in shows a labelled example instead.
     if (demo) { setError(null); setExample(true); setResult(exampleSensorSuggestion(kind, location.lat, location.lng)); return; }
     setExample(false);
@@ -51,7 +53,9 @@ export function SensorAdvisor({ kind, embedded = false }: { kind: "urban" | "vin
     setLoading(false);
   };
 
-  // Guests see what the tool does and a sign-in button instead of the panel (like the AI camera).
+  if (guest) return embedded ? <GuestLock kind={kind === "urban" ? "funzionario" : "agronomo"} title="Sensori AI" line="Dove mettere i sensori e i tuoi sensori si usano dopo esserti identificato." /> : null;
+
+  // Unauthenticated users see what the tool does and a sign-in button instead of the panel (like the AI camera).
   if (!signedIn) {
     if (!embedded) return null;
     return (

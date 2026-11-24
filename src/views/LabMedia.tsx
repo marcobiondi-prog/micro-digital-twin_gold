@@ -12,6 +12,7 @@ import {
   FolderOpen,
   ImagePlus,
   Images,
+  Lock,
   Send,
   Trash2,
   Video,
@@ -27,6 +28,7 @@ import { PREVIEW_BUILD } from "@/lib/demo-login";
 import { galleryMultiple, openSystemCamera, prepareSystemCamera, supportsSystemCapture } from "@/lib/system-camera";
 import { guardUse } from "@/lib/app-permissions";
 import { useRegisteredEmail } from "@/lib/use-signed-in";
+import { openSectorGate, useGuest, useProId } from "@/lib/use-pro-id";
 import { useLab } from "@/models/lab-store";
 import { ZONE_LABEL, drawnAreaFor } from "@/models/drawn-area";
 import { MEDIA_GROUP, uploadGroups } from "@/models/media-groups";
@@ -264,8 +266,10 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
   const demo = useDemoSignedIn();
   // AI_STANDBY: the AI camera is paused for now.
   const registeredEmail = useRegisteredEmail();
-  // On a test preview (PREVIEW_BUILD, never production) it opens for everyone, also in a browser tab.
-  const aiReady = !AI_STANDBY && (PREVIEW_BUILD || ((Boolean(userId) || Boolean(registeredEmail) || demo) && (installedApp || demo)));
+  const proId = useProId();
+  const guest = useGuest() && proId === null;
+  // On a test preview (PREVIEW_BUILD, never production) it opens in a browser tab too, except in guest mode.
+  const aiReady = !guest && !AI_STANDBY && (PREVIEW_BUILD || ((Boolean(userId) || Boolean(registeredEmail) || demo) && (installedApp || demo)));
   // The central camera button of the menu starts captures here, inside the same tap.
   const captureRef = useRef<(action: "ai" | "photo" | "video" | "burst" | "gallery") => void>(() => undefined);
   captureRef.current = (action) => {
@@ -504,7 +508,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
                 : "Salvato su questo dispositivo (in modalità ospite non va nel cloud)."}
             </p>
             <div className={`lab-media-actions flex flex-nowrap gap-2 rounded-full ${embedded ? "!p-0" : "simulation-selector-capsule"}`} role="group" aria-label={`Azioni sui file ${kind === "urban" ? "della piazza" : "del vigneto"}`}>
-              {aiReady && (
+              {aiReady ? (
                 <Button
                   size="sm"
                   variant="secondary"
@@ -519,7 +523,18 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
                   {/* The logo already reads "AI": no extra label beside it. */}
                   <img src={aiLogo} alt="" aria-hidden="true" draggable={false} className="size-6 shrink-0 select-none" />
                 </Button>
-              )}
+              ) : guest ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => openSectorGate(kind === "urban" ? "funzionario" : "agronomo")}
+                  className="lab-media-action lab-media-ai opacity-75"
+                  aria-label="Fotocamera AI: bloccata in modalità ospite"
+                >
+                  <Lock className="size-3.5 shrink-0" aria-hidden="true" />
+                  <img src={aiLogo} alt="" aria-hidden="true" draggable={false} className="size-5 shrink-0 select-none opacity-65 grayscale-[35%]" />
+                </Button>
+              ) : null}
               <Button
                 size="sm"
                 disabled={busy}
