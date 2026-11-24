@@ -1,3 +1,4 @@
+import { setLastSection } from "@/lib/last-section";
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Map as MapIcon, MapPin, EllipsisVertical, Radar, Scale, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import { setCameraSheetOpen } from "@/lib/camera-dock";
@@ -78,6 +79,7 @@ function useHideOnScroll(bar: RefObject<HTMLDivElement | null>, root: RefObject<
  */
 export function SimShell({ kind, place, onCompare, onReset, onSend, simula, media, sensori }: { kind: SimKind; place: string; onCompare?: (() => void) | undefined; onReset: () => void; onSend?: (() => void) | undefined; simula: ReactNode; media: ReactNode; sensori: ReactNode }) {
   const tab = useSimTab(kind);
+  useEffect(() => { setLastSection(kind === "urban" ? "piazza" : "vigneto"); }, [kind]);
   // Desktop: Mappa and Simula are one tab with the map on the left (kept in view) and the simulation on the right.
   const desk = useSideBySide();
   const guest = useGuest() && useProId() === null;

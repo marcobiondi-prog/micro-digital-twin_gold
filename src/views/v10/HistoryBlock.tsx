@@ -1,6 +1,8 @@
 import { rememberBack } from "@/lib/back-to";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { getLastSection } from "@/lib/last-section";
+import { openSimTab } from "@/views/v8/console";
 import { toast } from "sonner";
 import { ArrowRight, Building2, CalendarDays, Check, Share2, ChevronDown, Clock3, Cloud, Smartphone, Grape, History, Archive, ArchiveRestore, Camera, FolderClosed, Layers, Play, Sparkles, Trash2, Video, Download, Images, ClipboardList } from "lucide-react";
 import { currentMedia, refreshMedia, removeMedia, useLabMedia, useMediaListError, type MediaItem } from "@/models/lab-media-store";
@@ -25,7 +27,7 @@ import { SEASON_LABEL } from "@/models/season-climate";
 import { DashCard, DashSection } from "@/views/v10/Dashboard";
 import { cn } from "@/lib/utils";
 import { OFFICES } from "@/models/professional-id";
-import { clearHistory, removeHistory, setOfficeScope, useHistory, useOfficeScope, type OfficeScope } from "@/lib/use-history";
+import { clearHistory, removeHistory, reopenHistory, setOfficeScope, useHistory, useOfficeScope, type OfficeScope } from "@/lib/use-history";
 import { archiveHistory, restoreHistory, useHistoryArchive } from "@/models/history-archive";
 import { byOf, groupByDay, whenClock, whenOf, type HistoryEntry, type HistoryFlow, type HistorySource, type SourcedEntry } from "@/models/intervention-history";
 
@@ -906,6 +908,83 @@ function OfficeScopePills({ value, office, offices }: { value: OfficeScope; offi
   );
 }
 
+/** "Oggi", "Ieri", else the weekday and date ("sabato 22/11"; the year only when it is not this one). */
+function dayWord(items: HistoryEntry[]): string {
+  const d = new Date(items[0]!.at), now = new Date();
+  const start = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((start(now) - start(d)) / 86400000);
+  if (diff === 0) return "Oggi";
+  if (diff === 1) return "Ieri";
+  const two = (n: number) => String(n).padStart(2, "0");
+  const wd = d.toLocaleDateString("it-IT", { weekday: "long" });
+  return `${wd.charAt(0).toUpperCase()}${wd.slice(1)} ${two(d.getDate())}/${two(d.getMonth() + 1)}${d.getFullYear() === now.getFullYear() ? "" : `/${d.getFullYear()}`}`;
+}
+
+/** The intervention's text without the project's name in front ("Piazza: 8 alberi…" → "8 alberi…"), as the page says the branch once. */
+const plainText = (e: HistoryEntry) => e.text.replace(/^(Piazza|Vigneto)\s*[:·]\s*/i, "");
+
+/**
+ * One intervention on the time line: its hour, a dot on the line and what was done, with the simulated season and hour
+ * under it; a tap opens it in place with where it is kept, who recorded it, "Dettagli" (its page) and "Riprendi" (back
+ * into the simulation).
+ */
+function TimelineRow({ e, open, onToggle }: { e: SourcedEntry; open: boolean; onToggle: () => void }) {
+  const navigate = useNavigate();
+  const t = time(e), w = whenOf(e), by = byOf(e);
+  const when = w ? `${SEASON_LABEL[w.season]}, ${whenClock(w)}` : "Stagione e ora non registrate";
+  const resume = () => {
+    if (!e.mix) return;
+    reopenHistory(e.mix, w);
+    openSimTab(e.flow === "piazza" ? "urban" : "vineyard", "simula");
+    toast.success("Intervento ripreso nella simulazione", { description: plainText(e) });
+    void navigate({ to: e.flow === "piazza" ? "/urbano" : "/vigneto" });
+  };
+  return (
+    <li className="relative pl-7">
+      <span aria-hidden="true" className={cn("absolute left-[3px] top-[1.15rem] size-3 rounded-full ring-4 ring-background", e.flow === "piazza" ? "bg-brand-turquoise" : "bg-lime-400")} />
+      <div className={cn("rounded-2xl transition-colors", open ? "bg-card ring-1 ring-brand-turquoise/40" : "bg-card/70")}>
+        <button type="button" aria-expanded={open} onClick={onToggle} className="flex w-full items-start gap-3 px-4 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-2xl">
+          <span className="w-11 shrink-0 pt-px text-sm tabular-nums text-muted-foreground" aria-label={`alle ${t}`}>{t}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block break-words text-[15px] leading-snug">{plainText(e)}</span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">{when}</span>
+          </span>
+          <ChevronDown className={cn("mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", open && "rotate-180")} aria-hidden="true" />
+        </button>
+        {open && (
+          <div className="px-4 pb-4 pl-[4.25rem]">
+            {e.place && <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">{e.place}</p>}
+            {by && <p className="mt-0.5 text-xs text-muted-foreground [overflow-wrap:anywhere]">{by.office}{by.role ? ` · ${by.role}` : ""} · Comune di {by.comune}</p>}
+            <SourceChip source={e.source} />
+            <div className="mt-3 flex gap-2">
+              <Link to="/cronologia/$id" params={{ id: e.id }} className="inline-flex h-10 flex-1 items-center justify-center rounded-full bg-foreground/[0.08] text-sm font-semibold outline-none hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring">Dettagli</Link>
+              {e.mix && <button type="button" onClick={resume} className="inline-flex h-10 flex-1 items-center justify-center rounded-full bg-white text-sm font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-ring">Riprendi</button>}
+            </div>
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
+
+/** A day of the time line: "Oggi" / "Ieri" / the date, how many, a small Archivia, then its interventions on the line. */
+function TimelineDay({ items, archivable = true }: { items: SourcedEntry[]; archivable?: boolean }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const label = dayWord(items);
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-3 px-1">
+        <h3 className="min-w-0 flex-1 text-sm font-semibold text-foreground/90">{label}<span className="ml-2 font-medium text-muted-foreground">{items.length}</span></h3>
+        {archivable && <button type="button" aria-label={`Archivia ${label.toLowerCase()}`} onClick={() => { archiveHistory(items.map((e) => e.id)); toast.success(`${entriesText(items.length)} in Archivio · ${label}`); }}
+          className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:underline"><Archive className="size-3.5" aria-hidden="true" />Archivia</button>}
+      </div>
+      <ol className="relative space-y-2 before:absolute before:bottom-3 before:left-[8px] before:top-3 before:w-0.5 before:bg-foreground/10">
+        {items.map((e) => <TimelineRow key={e.id} e={e} open={open === e.id} onToggle={() => setOpen((o) => (o === e.id ? null : e.id))} />)}
+      </ol>
+    </div>
+  );
+}
+
 function EntryRow({ e }: { e: SourcedEntry }) {
   const t = time(e);
   const by = byOf(e);
@@ -947,7 +1026,7 @@ function DayTab({ label, items }: { label: string; items: SourcedEntry[] }) {
         </span>
         <ChevronDown className={`size-5 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none ${open ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
-      {open && <div className="divide-y divide-foreground/10 border-t border-foreground/10">{items.map((e) => <EntryRow key={e.id} e={e} />)}</div>}
+      {open && <div className="border-t border-foreground/10 pb-2 pt-3"><TimelineDay items={items} archivable={false} /></div>}
     </DashCard>
   );
 }
@@ -1003,7 +1082,7 @@ function ArchiveAllEntries({ items }: { items: SourcedEntry[] }) {
   if (items.length < 2) return null;
   const days = groupByDay(items).length;
   return ask ? (
-    <div role="alertdialog" aria-label="Archiviare tutti gli interventi?" className="rounded-2xl bg-foreground/[0.06] p-3.5 text-sm">
+    <div role="alertdialog" aria-label="Archiviare tutti gli interventi?" className="w-full rounded-2xl bg-foreground/[0.06] p-3.5 text-left text-sm">
       <p className="font-semibold">Archiviare tutti gli interventi?</p>
       <p className="mt-0.5 text-muted-foreground">{entriesText(items.length)} di {days === 1 ? "1 giorno" : `${days} giorni`} vanno nell’Archivio. Non si cancella niente: li puoi ripristinare quando vuoi.</p>
       <div className="mt-3 flex gap-2">
@@ -1013,8 +1092,8 @@ function ArchiveAllEntries({ items }: { items: SourcedEntry[] }) {
       </div>
     </div>
   ) : (
-    <button type="button" onClick={() => setAsk(true)} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-foreground/[0.08] text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">
-      <Archive className="size-4" aria-hidden="true" />Archivia tutti gli interventi · {items.length}
+    <button type="button" onClick={() => setAsk(true)} className="inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+      <Archive className="size-4" aria-hidden="true" />Archivia tutti · {items.length}
     </button>
   );
 }
@@ -1221,9 +1300,12 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
   const officeScope = useOfficeScope();
   // Identified, the history is that profile's project only: the piazza for the municipal officer, the vineyard for the agronomist.
   const proId = useProId();
-  const flow: HistoryFlow | undefined = asked ?? (proId ? (proId.kind === "funzionario" ? "piazza" : "vigneto") : undefined);
+  // With no profile (a guest), the branch of the simulation last opened: never the two mixed.
+  const [last, setLast] = useState<HistoryFlow>("piazza");
+  useEffect(() => { setLast(getLastSection()); }, []);
+  const flow: HistoryFlow = asked ?? (proId ? (proId.kind === "funzionario" ? "piazza" : "vigneto") : last);
   const [chosen, setFilter] = useState<Filter>("tutti");
-  const filter: Filter = flow ?? chosen;
+  const filter = (flow ?? chosen) as Filter;
   // Only the full page without a profile has the filter to swipe: otherwise the swipe listens to a ref that stays empty.
   const area = useRef<HTMLDivElement>(null), none = useRef<HTMLDivElement>(null);
   const swipe = useTabSwipe(FILTERS.map((f) => f.id), filter, setFilter, compact || flow ? none : area);
@@ -1304,7 +1386,6 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
             <ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />
           </Link>
         )}
-        {!compact && <ArchiveAllEntries items={inTab} />}
         {groups.length === 0 ? visibleShots.length > 0 ? null : (
           <DashCard className="flex flex-col items-center gap-2 py-8 text-center">
             <History className="size-7 text-muted-foreground" aria-hidden="true" />
@@ -1312,20 +1393,8 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
             {!loading && !archivedEntries.length && <p className="max-w-xs text-sm text-muted-foreground">Quando cambi alberi, aiuole, ombra o irrigazione nella simulazione, ogni modifica viene salvata in automatico e la trovi qui, con foto e video.</p>}
           </DashCard>
         ) : compact ? groups.map((g) => <DayTab key={g.key} label={g.label} items={g.items} />) : (
-          // Wide tablets and desktops: the day cards two by two.
-          <div className="space-y-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0">{groups.map((g) => (
-          <div key={g.key} className="space-y-2">
-            {/* One card per day: its date on top (with Archivia for the whole day), then each intervention of that day with its time. */}
-            <div className="flex items-center gap-3 px-1">
-              <h3 className="min-w-0 flex-1 text-sm font-semibold tabular-nums text-foreground/90">{g.label}<span className="ml-2 font-medium text-muted-foreground">{entriesText(g.items.length)}</span></h3>
-              <button type="button" onClick={() => { archiveHistory(g.items.map((e) => e.id)); toast.success(`${entriesText(g.items.length)} in Archivio · ${g.label}`); }}
-                className="inline-flex items-center gap-1 text-sm font-semibold outline-none focus-visible:underline"><Archive className="size-4" aria-hidden="true" />Archivia</button>
-            </div>
-            <DashCard className="divide-y divide-foreground/10 py-1 sm:py-1">
-              {g.items.map((e) => <EntryRow key={e.id} e={e} />)}
-            </DashCard>
-          </div>
-        ))}</div>
+          // Wide tablets and desktops: the days two by two.
+          <div className="space-y-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">{groups.map((g) => <TimelineDay key={g.key} items={g.items} />)}</div>
         )}
       </>
     );
@@ -1371,9 +1440,12 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
               </button>
             </>
           ) : (
+            <>
+            <ArchiveAllEntries items={entries} />
             <button type="button" data-guide="clear-history" onClick={() => setConfirm(true)} className="inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
-              <Trash2 className="size-4" aria-hidden="true" />{filter === "tutti" ? "Cancella cronologia" : `Cancella cronologia ${OF[filter]}`}
+              <Trash2 className="size-4" aria-hidden="true" />{filter === "tutti" ? "Cancella cronologia" : "Cancella"}
             </button>
+            </>
           )}
         </div>
       )}

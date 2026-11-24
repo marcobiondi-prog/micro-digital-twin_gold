@@ -87,6 +87,7 @@ export function castShadows(o: THREE.Object3D) {
     if (!m.isMesh) return;
     const mat = (Array.isArray(m.material) ? m.material[0] : m.material) as THREE.Material | undefined;
     const veil = !!mat && mat.transparent && !mat.depthWrite;
-    m.castShadow = !veil && !(mat instanceof THREE.MeshBasicMaterial);
+    // A see-through sheet that stands for a real cloth (the shade net seen from afar) still casts its shade.
+    m.castShadow = m.userData["caster"] === true || (!veil && !(mat instanceof THREE.MeshBasicMaterial));
   });
 }

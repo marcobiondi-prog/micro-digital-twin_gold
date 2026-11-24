@@ -19,7 +19,7 @@ import { openAccount } from "@/lib/camera-dock";
 import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn } from "@/lib/demo-login";
 import { cn } from "@/lib/utils";
 import { setUrban, setVineyard, useLab, vineMetrics } from "@/models/lab-store";
-import { shadeOpenness, piazzaLayout, piazzaShadows, TREE_SHADE_M2, vineLayout, type LayoutEdits, type PiazzaLayout } from "@/models/area-layout";
+import { shadeOpenness, piazzaLayout, piazzaShadows, vineShadows, TREE_SHADE_M2, vineLayout, type LayoutEdits, type PiazzaLayout } from "@/models/area-layout";
 import { dayLight, solarHour, sunAt, sunHeightDeg } from "@/models/sun-shadow";
 import { getSimWhen, useSimWhen } from "@/models/sim-when";
 import { applyZoneMix, vineMixOf, zoneMixOf } from "@/models/vine-interventions";
@@ -160,6 +160,8 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   const [arranging, setArranging] = useState(false);
   useEffect(() => { if (!saved) setArranging(false); }, [saved]);
   const reading = usePiazzaReading(), rSeason = reading?.season, rHour = reading?.hour;
+  // The vineyard's clock (its "when" chip): the shade cloths' shadows follow it.
+  const vWhen = useSimWhen("vineyard");
   // What already stands in the drawn area (existing trees, fountains, buildings, monuments): the piazza's interventions keep off it.
   const realKey = saved && kind === "urban" ? saved.ring.map(([a, b]) => `${a.toFixed(5)},${b.toFixed(5)}`).join(";") : "";
   const realQ = useQuery({ queryKey: ["real-objects", realKey], queryFn: () => loadRealObjects(saved!.ring), enabled: !!realKey, staleTime: Infinity, retry: 1 });
@@ -211,8 +213,10 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
     const v = lab.vineyard, fallback = vineMixOf(v);
     const vp = proposal ? suggestion?.vine : undefined;
     const data = vineLayout(saved.ring, v.zones.map((z) => vp ?? zoneMixOf(z, fallback)), edits, inner);
-    return data ? { kind: "vigneto", data, thirst: vineMetrics(v).results.map((r) => r.s), inner, finds } : null;
-  }, [saved, kind, lab.urban, lab.vineyard, rSeason, rHour, real, finds, proposal, suggestion]);
+    if (!data) return null;
+    const vSun = vWhen ? sunAt(saved.lat, saved.lng, vWhen.season, vWhen.hour, vWhen.minute ?? 0, vWhen.dst) : null;
+    return { kind: "vigneto", data, thirst: vineMetrics(v).results.map((r) => r.s), inner, finds, shadows: vineShadows(data, vSun) };
+  }, [saved, kind, lab.urban, lab.vineyard, rSeason, rHour, vWhen?.season, vWhen?.hour, vWhen?.minute, vWhen?.dst, real, finds, proposal, suggestion]);
   const proposalPill = proposal && suggestion ? (
     <ProposalPill text={suggestionText(suggestion)} constrained={suggestion.cs.length > 0}
       onApply={() => applySuggestion(suggestion)} onDismiss={dismissProposal} />

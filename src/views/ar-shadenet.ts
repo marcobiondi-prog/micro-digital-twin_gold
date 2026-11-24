@@ -78,9 +78,12 @@ export function realShadeNet(def: { w: number; d: number; h: number }, opts: { f
   }
   geo.computeVertexNormals();
   const tex = netTex().clone(); tex.needsUpdate = true; tex.repeat.set(W / 0.35, D / 0.35); tex.anisotropy = 8;
-  g.add(new THREE.Mesh(geo, opts.far
+  const sheet = new THREE.Mesh(geo, opts.far
     ? new THREE.MeshStandardMaterial({ color: "#1f3a2a", transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide, roughness: 0.85 })
-    : new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.35, side: THREE.DoubleSide, roughness: 0.85, color: "#ffffff" })));
+    : new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.35, side: THREE.DoubleSide, roughness: 0.85, color: "#ffffff" }));
+  // Seen from afar the net is a see-through sheet, but it shades the vines under it all the same.
+  sheet.userData["caster"] = true;
+  g.add(sheet);
   // Edging tape round the net.
   const tape = new THREE.MeshStandardMaterial({ color: "#3d5a40", roughness: 0.8 });
   for (const z of [-hd, hd]) g.add(new THREE.Mesh(new THREE.BoxGeometry(W, 0.012, 0.05).translate(0, H, z), tape));

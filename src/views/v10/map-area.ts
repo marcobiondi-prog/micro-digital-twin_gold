@@ -116,7 +116,7 @@ export function pinElement(n: number, drawing: boolean): HTMLElement {
 
 /** `inner`: the smaller areas drawn inside the big one (free zones, zones for one intervention, lots). */
 /** `shadows`: the piazza's shadows at the simulation's season and hour (models/area-layout piazzaShadows); none at night. */
-export type SimLayout = ({ kind: "piazza"; data: PiazzaLayout; shadows?: Ring[]; real?: RealObject[]; shadeOpen?: number } | { kind: "vigneto"; data: VineLayout; thirst: number[] }) & { inner?: SubArea[]; finds?: FieldFind[] };
+export type SimLayout = ({ kind: "piazza"; data: PiazzaLayout; shadows?: Ring[]; real?: RealObject[]; shadeOpen?: number } | { kind: "vigneto"; data: VineLayout; thirst: number[]; shadows?: Ring[] }) & { inner?: SubArea[]; finds?: FieldFind[] };
 /** The outline colour of each kind of inner zone. */
 export const ZONE_COLORS: Record<ZoneKind, string> = { libera: "#cbd5e1", alberi: "#4ade80", prato: "#86efac", ombra: PERGOLA_COLORS.slat, nebulizzatori: "#7dd3fc", irrigazione: "#38bdf8", teli: "#94a3b8", frangivento: "#22c55e", lotto: "#fbbf24" };
 /** A zone's short name on the map. */
@@ -179,6 +179,8 @@ export function simFeatures(sim: SimLayout | null, withTreePoints: boolean) {
       : { kind: "cloth", color: SIM_COLORS.cloth, opacity: 0.5 }));
     // Each zone also gets a see-through veil of its thirst colour on top, so the three zones stand apart at a glance.
     for (const p of sim.data.patches) if (p.kind === "zone") out.push(poly(p.ring, { kind: "tint", color: thirstColor(sim.thirst[p.zone ?? 0] ?? 0), opacity: 0.3 }));
+    // The shadows the shade cloths cast with the sun of the simulation's season and hour.
+    for (const r of sim.shadows ?? []) out.push(poly(r, { kind: "shadow", color: "#0b0f15", opacity: 0.32 }));
     for (const l of sim.data.lines) out.push(lineF(l.line, l.kind === "drip"
       ? { kind: "drip", color: SIM_COLORS.drip, width: 2 }
       : l.kind === "main" ? { kind: "main", color: SIM_COLORS.main, width: 4 }

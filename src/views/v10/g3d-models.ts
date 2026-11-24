@@ -6,12 +6,13 @@ import { arObject, recognisedPlants } from "@/models/ar-objects";
 import { currentScans } from "@/models/ar-scan-log";
 import { planTreeDefs, rectOf, xzAngleOf } from "@/views/ar-plan";
 import { realPapillons } from "@/views/ar-papillon";
-import { shadePatchBlocks } from "@/models/area-layout";
+import { shadePatchBlocks, vineRowSegments } from "@/models/area-layout";
 import { realBed } from "@/views/ar-bed";
 import { realMister } from "@/views/ar-mister";
 import { realSprinkler } from "@/views/ar-sprinkler";
 import { realShadeNet } from "@/views/ar-shadenet";
 import { realWindbreak } from "@/views/ar-windbreak";
+import { realVine } from "@/views/ar-vine";
 import { realTree } from "@/views/ar-tree";
 import type { SimLayout } from "@/views/v10/map-area";
 
@@ -25,7 +26,8 @@ import type { SimLayout } from "@/views/v10/map-area";
  * darker than three.js. Each one is placed at its spot, turned by heading (clockwise from north) with tilt 270 (glTF's
  * up made the map's up).
  */
-export type ModelSpot = { key: string; lat: number; lng: number; heading: number };
+/** `up`: metres over the ground (the bed tiles a little lifted so the ground’s waves never cover them). */
+export type ModelSpot = { key: string; lat: number; lng: number; heading: number; up?: number };
 
 const cache = new Map<string, Promise<string | null>>();
 
@@ -189,6 +191,10 @@ export function modelUrl(key: string, build: () => THREE.Object3D | Promise<THRE
 }
 
 const half = (v: number) => Math.max(0.5, Math.round(v * 2) / 2);
+/** The vineyard's rows in Google's 3D: pieces of about 5 m, at most 400 in all. */
+const VINE_PIECE_M = 5, MAX_VINE_PIECES = 400;
+/** The side of the bed tiles (m): small enough to follow a hilly ground, large enough to keep the models few. */
+export const BED_TILE_M = 1;
 const deg = (yaw: number) => ((-yaw * 180) / Math.PI + 360) % 360;
 
 /**
@@ -202,8 +208,8 @@ export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number },
   const spots: ModelSpot[] = [];
   const builders = new Map<string, () => THREE.Object3D | Promise<THREE.Object3D | null> | null>();
   const glows = new Map<string, number>();
-  const add = (key: string, x: number, z: number, yaw: number, build: () => THREE.Object3D | Promise<THREE.Object3D | null> | null, glow = 0.15) => {
-    spots.push({ key, ...ll(x, z), heading: deg(yaw) });
+  const add = (key: string, x: number, z: number, yaw: number, build: () => THREE.Object3D | Promise<THREE.Object3D | null> | null, glow = 0.15, up = 0) => {
+    spots.push({ key, ...ll(x, z), heading: deg(yaw), ...(up ? { up } : {}) });
     if (!builders.has(key)) { builders.set(key, build); glows.set(key, glow); }
   };
   if (sim.kind === "piazza") {
@@ -214,8 +220,15 @@ export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number },
     for (const p of [...L.patches.filter((q) => q.kind !== "shade"), ...shadeRings.map((b) => ({ kind: "shade" as const, ring: b.ring, angle: b.angle }))]) {
       const r = rectOf(p.ring.map(xz), xzAngleOf(p.ring, p.angle, xz));
       if (p.kind === "lawn" && r.w >= 0.8 && r.d >= 0.8) {
-        const w = half(r.w), d = half(r.d);
-        add(`bed:${w}x${d}`, r.cx, r.cz, r.yaw, () => realBed({ w, d }, { far: true }), 0.1);
+        // Laid in small tiles, each at its own ground height: one flat bed many metres long sat at the ground's height
+        // under its middle and the waves of a hilly ground covered it. The tiles of one size share one light model.
+        const nx = Math.max(1, Math.ceil(r.w / BED_TILE_M)), ny = Math.max(1, Math.ceil(r.d / BED_TILE_M));
+        const tw = r.w / nx, td = r.d / ny, kw = half(tw), kd = half(td);
+        const ang = -r.yaw, c = Math.cos(ang), s = Math.sin(ang);
+        for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
+          const u = -r.w / 2 + (i + 0.5) * tw, v = -r.d / 2 + (j + 0.5) * td;
+          add(`bedtile:${kw}x${kd}`, r.cx + u * c - v * s, r.cz + u * s + v * c, r.yaw, () => realBed({ w: kw, d: kd }, { tile: true }), 0.1, 0.25);
+        }
       } else if (p.kind === "shade" && r.w >= 1 && r.d >= 1) {
         const w = half(r.w), d = half(r.d);
         const open = Math.round((sim.shadeOpen ?? 1) * 4) / 4;
@@ -241,6 +254,22 @@ export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number },
       if (r.w < 1 || r.d < 1) continue;
       const w = half(r.w), d = half(r.d);
       add(`net:${w}x${d}`, r.cx, r.cz, r.yaw, () => realShadeNet({ w, d, h: 2.2 }, { far: true }), 0.1);
+    }
+    // The vines: each row cut in pieces of at most VINE_PIECE_M (so a row follows a hilly ground and pieces of a length
+    // share one model), each a realistic trained row — posts, wires, gnarled trunks, the leaf wall and the bunches —,
+    // in a light version seen from afar; pieces grow longer while there would be more than MAX_VINE_PIECES.
+    const rows = vineRowSegments(L.patches.filter((p) => p.kind === "zone").map((p) => p.ring), 160).map(([a, b]) => [xz(a), xz(b)] as const);
+    const total = rows.reduce((t, [a, b]) => t + Math.hypot(b.x - a.x, b.z - a.z), 0);
+    const piece = Math.max(VINE_PIECE_M, total / MAX_VINE_PIECES);
+    let n = 0;
+    for (const [a, b] of rows) {
+      const len = Math.hypot(b.x - a.x, b.z - a.z);
+      if (len < 1) continue;
+      const k = Math.max(1, Math.round(len / piece)), w = half(len / k), yaw = -Math.atan2(b.z - a.z, b.x - a.x);
+      for (let i = 0; i < k; i++) {
+        const t = (i + 0.5) / k, v = n++ % 2;
+        add(`vine:${w}:${v}`, a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t, yaw, () => realVine({ h: 1.6, w }, v + 1, { far: true }), 0.12);
+      }
     }
     for (const l of L.lines) {
       if (l.kind !== "wind") continue;
