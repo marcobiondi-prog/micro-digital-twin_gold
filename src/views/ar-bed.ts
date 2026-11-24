@@ -187,7 +187,7 @@ function bedTile(g: THREE.Group, W: number, D: number): THREE.Group {
   const grass = new THREE.InstancedMesh(tuftGeo, new THREE.MeshStandardMaterial({ map: grassTexture(), alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9 }), n);
   for (let i = 0; i < n; i++) {
     const s = 0.18 + rnd() * 0.14;
-    dummy.position.set((rnd() - 0.5) * W, 0, (rnd() - 0.5) * D);
+    dummy.position.set(-W / 2 + Math.min(0.24, W * 0.22) + rnd() * (W - Math.min(0.24, W * 0.22)), 0, (rnd() - 0.5) * D);
     dummy.rotation.set(0, rnd() * Math.PI, 0);
     dummy.scale.set(s * 0.9, s * (1 + rnd() * 0.5), s * 0.9);
     dummy.updateMatrix();
@@ -206,5 +206,25 @@ function bedTile(g: THREE.Group, W: number, D: number): THREE.Group {
     heads.setColorAt(i, col.set(petals[Math.floor(rnd() * petals.length)]!));
   }
   g.add(heads);
+  // A path of pebbles along one side of the tile (its −x edge): laid side by side the tiles make beds of grass
+  // parted by pebble paths, like the 2D map. A gravel band under round pebbles in white, sand, grey and brown.
+  const band = Math.min(0.24, W * 0.22);
+  const gravel = new THREE.Mesh(new THREE.PlaneGeometry(band, D * 1.04), new THREE.MeshStandardMaterial({ color: "#b9ab8f", roughness: 1 }));
+  gravel.rotation.x = -Math.PI / 2; gravel.position.set(-W / 2 + band / 2, 0.012, 0);
+  gravel.receiveShadow = true;
+  g.add(gravel);
+  const np = Math.max(8, Math.min(36, Math.round(D * band * 150)));
+  const peb = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.6 }), np);
+  const pebColors = ["#e7e2d7", "#cfc5b2", "#a39a8a", "#8c7b66", "#d9cdb4", "#b7b3ac"];
+  for (let i = 0; i < np; i++) {
+    const r = 0.03 + rnd() * 0.025;
+    dummy.position.set(-W / 2 + r + rnd() * (band - 2 * r), r * 0.35, (rnd() - 0.5) * D);
+    dummy.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3);
+    dummy.scale.set(r * (1 + rnd() * 0.4), r * 0.6, r);
+    dummy.updateMatrix();
+    peb.setMatrixAt(i, dummy.matrix);
+    peb.setColorAt(i, col.set(pebColors[Math.floor(rnd() * pebColors.length)]!));
+  }
+  g.add(peb);
   return g;
 }
