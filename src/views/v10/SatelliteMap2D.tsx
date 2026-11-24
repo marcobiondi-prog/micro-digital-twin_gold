@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap, Marker } from "maplibre-gl";
 import type { Ring } from "@/models/place-area";
 import { MAX_PINS, initialRingAngle } from "@/models/drawn-area";
-import { addAreaLayers, addSimLayers, findElement, handleElement, rotateHandleElement, misterElement, placePinElement, ringCentre, tagElement, zoneTag, pinElement, setAreaData, setOutlineData, setSimData, setBedData, setSimGhost, type SimLayout, MAP_LOCALE } from "@/views/v10/map-area";
+import { addAreaLayers, addSimLayers, addTrailLayers, setTrailData, findElement, handleElement, rotateHandleElement, misterElement, placePinElement, ringCentre, tagElement, zoneTag, pinElement, setAreaData, setOutlineData, setSimData, setBedData, setSimGhost, type SimLayout, MAP_LOCALE } from "@/views/v10/map-area";
 import { ringContains } from "@/models/place-area";
 import type { LatLng } from "@/models/area-layout";
 
@@ -147,7 +147,7 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
         offKey = onKeyRejected(() => { setGoogleOn(false); for (const l of ["imagery", "places"]) if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "visible"); });
       }
       libRef.current = maplibregl;
-      map.on("load", () => { addAreaLayers(map); addSimLayers(map, lat); if (!cancelled) setState("ready"); });
+      map.on("load", () => { addAreaLayers(map); addSimLayers(map, lat); addTrailLayers(map); if (!cancelled) setState("ready"); });
       // The aiuole keep their stripes the same size on screen: laid again for the new zoom once it settles.
       // …and during the zoom too, so the grass never swells under the fingers.
       // Once per frame at most: only the aiuole's own light source is laid again.
@@ -165,7 +165,18 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
       });
       // A tile that does not arrive leaves a gap, not an error: the map stays usable.
       const pinMarker = new maplibregl.Marker({ element: placePinElement(), anchor: "bottom", draggable: !!pinMoveRef.current && !live.current.drawing }).setLngLat([lng, lat]).setPopup(new maplibregl.Popup({ offset: 38 }).setText(label)).addTo(map);
-      pinMarker.on("dragend", () => { const p = pinMarker.getLngLat(); draggedTo.current = `${p.lat},${p.lng}`; pinMoveRef.current?.(p.lat, p.lng); });
+      let pinTrail: [number, number][] = [];
+      pinMarker.on("dragstart", () => { const p = pinMarker.getLngLat(); pinTrail = [[p.lng, p.lat]]; setTrailData(map, pinTrail); });
+      pinMarker.on("drag", () => {
+        const p = pinMarker.getLngLat(), last = pinTrail[pinTrail.length - 1];
+        if (!last || Math.hypot(p.lng - last[0], p.lat - last[1]) > 0.000008) { pinTrail.push([p.lng, p.lat]); if (pinTrail.length > 50) pinTrail.shift(); setTrailData(map, pinTrail); }
+      });
+      pinMarker.on("dragend", () => {
+        const p = pinMarker.getLngLat();
+        draggedTo.current = `${p.lat},${p.lng}`;
+        pinMoveRef.current?.(p.lat, p.lng);
+        setTrailData(map, []);
+      });
       placePin.current = pinMarker;
       mapRef.current = map;
       // Dev-only registry so demo scripts can drive the map (wide shot, zoom to the area); never in production builds.
@@ -197,8 +208,19 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
     pins.current.forEach((m) => m.remove());
     pins.current = (still ? [] : area).map(([pLat, pLng], i) => {
       const m = new lib.Marker({ element: pinElement(i + 1, drawing), draggable: drawing }).setLngLat([pLng, pLat]).addTo(map);
-      m.on("drag", () => { const p = m.getLngLat(), next = live.current.area.map((q, j): [number, number] => (j === i ? [p.lat, p.lng] : q)); setAreaData(map, next, next.length >= 3); });
-      m.on("dragend", () => { const p = m.getLngLat(); live.current.onAreaChange?.(live.current.area.map((q, j): [number, number] => (j === i ? [p.lat, p.lng] : q))); });
+      let pinPath: [number, number][] = [];
+      m.on("dragstart", () => { const p = m.getLngLat(); pinPath = [[p.lng, p.lat]]; setTrailData(map, pinPath); });
+      m.on("drag", () => {
+        const p = m.getLngLat(), last = pinPath[pinPath.length - 1];
+        if (!last || Math.hypot(p.lng - last[0], p.lat - last[1]) > 0.000008) { pinPath.push([p.lng, p.lat]); if (pinPath.length > 50) pinPath.shift(); setTrailData(map, pinPath); }
+        const next = live.current.area.map((q, j): [number, number] => (j === i ? [p.lat, p.lng] : q));
+        setAreaData(map, next, next.length >= 3);
+      });
+      m.on("dragend", () => {
+        const p = m.getLngLat();
+        live.current.onAreaChange?.(live.current.area.map((q, j): [number, number] => (j === i ? [p.lat, p.lng] : q)));
+        setTrailData(map, []);
+      });
       return m;
     });
   }, [area, drawing, state, outline, still]);
@@ -243,13 +265,25 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
     // The AI camera's finds, draggable to put their spot right.
     if (sim && !drawing) for (const f of sim.finds ?? []) {
       const m = new lib.Marker({ element: findElement(f), draggable: true }).setLngLat([f.lng, f.lat]).addTo(map);
-      m.on("dragend", () => { const q = m.getLngLat(); moveFind(f.id, q.lat, q.lng); });
+      let fPath: [number, number][] = [];
+      m.on("dragstart", () => { const q = m.getLngLat(); fPath = [[q.lng, q.lat]]; setTrailData(map, fPath); });
+      m.on("drag", () => {
+        const q = m.getLngLat(), last = fPath[fPath.length - 1];
+        if (!last || Math.hypot(q.lng - last[0], q.lat - last[1]) > 0.000008) { fPath.push([q.lng, q.lat]); if (fPath.length > 50) fPath.shift(); setTrailData(map, fPath); }
+      });
+      m.on("dragend", () => { const q = m.getLngLat(); moveFind(f.id, q.lat, q.lng); setTrailData(map, []); });
       handles.current.push(m);
     }
     if (!arranging || drawing || !sim) return;
     const add = (at: LatLng, label: string | null, done: (to: LatLng) => void) => {
       const m = new lib.Marker({ element: handleElement(label), draggable: true }).setLngLat([at[1], at[0]]).addTo(map);
-      m.on("dragend", () => { const p = m.getLngLat(); done([p.lat, p.lng]); });
+      let path: [number, number][] = [];
+      m.on("dragstart", () => { const p = m.getLngLat(); path = [[p.lng, p.lat]]; setTrailData(map, path); });
+      m.on("drag", () => {
+        const p = m.getLngLat(), last = path[path.length - 1];
+        if (!last || Math.hypot(p.lng - last[0], p.lat - last[1]) > 0.000008) { path.push([p.lng, p.lat]); if (path.length > 50) path.shift(); setTrailData(map, path); }
+      });
+      m.on("dragend", () => { const p = m.getLngLat(); done([p.lat, p.lng]); setTrailData(map, []); });
       handles.current.push(m);
     };
     // Orientation is free, never automatic: beside each block and zone a turning handle, dragged round its centre,
@@ -259,7 +293,13 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
     const addRot = (c: LatLng, angle: number, r: number, label: string, done: (angle: number) => void) => {
       const at: LatLng = [c[0] + (Math.sin(angle) * r) / 111_195, c[1] + (Math.cos(angle) * r) / kLng(c[0])];
       const m = new lib.Marker({ element: rotateHandleElement(label), draggable: true }).setLngLat([at[1], at[0]]).addTo(map);
-      m.on("dragend", () => { const p = m.getLngLat(); done(Math.atan2((p.lat - c[0]) * 111_195, (p.lng - c[1]) * kLng(c[0]))); });
+      let path: [number, number][] = [];
+      m.on("dragstart", () => { const p = m.getLngLat(); path = [[p.lng, p.lat]]; setTrailData(map, path); });
+      m.on("drag", () => {
+        const p = m.getLngLat(), last = path[path.length - 1];
+        if (!last || Math.hypot(p.lng - last[0], p.lat - last[1]) > 0.000008) { path.push([p.lng, p.lat]); if (path.length > 50) path.shift(); setTrailData(map, path); }
+      });
+      m.on("dragend", () => { const p = m.getLngLat(); done(Math.atan2((p.lat - c[0]) * 111_195, (p.lng - c[1]) * kLng(c[0]))); setTrailData(map, []); });
       handles.current.push(m);
     };
     // The zones drawn by hand move as a group, with all they hold: a handle on each, and one for all of them together.

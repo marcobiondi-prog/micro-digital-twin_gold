@@ -737,11 +737,21 @@ function RootComponent() {
     if (location.pathname === "/reset-password") return;
     if (location.pathname !== "/" && location.pathname !== "/index") return;
     const params = new URLSearchParams(location.searchStr);
+    const isDesktop = typeof window !== "undefined" && !document.documentElement.hasAttribute("data-slate") && window.matchMedia("(min-width: 1024px)").matches;
+    if (isDesktop) {
+      markIntroSeen();
+      const vine = getProId()?.kind === "agronomo";
+      openSimTab(vine ? "vineyard" : "urban", "mappa");
+      const dest = vine ? "/vigneto" : "/urbano";
+      void navigate({ to: dest, replace: true });
+      if (params.has("rivedi")) {
+        window.setTimeout(() => window.dispatchEvent(new CustomEvent("mdt-desk-tour")), 150);
+      }
+      return;
+    }
     if (params.has("scenario") || params.has("rivedi")) return;
     // After the tutorial a fresh open lands on the Mappa tab of the profile's simulation (the agronomist's vineyard,
     // otherwise the piazza).
-    // On a computer the tutorial page is skipped: its speech-bubble tour starts over the simulation instead (DesktopTour).
-    if (!introSeen() && window.matchMedia("(min-width: 1024px)").matches) markIntroSeen();
     const seen = introSeen(), vine = getProId()?.kind === "agronomo";
     const home = seen ? (vine ? "/vigneto" : "/urbano") : "/";
     if (seen) openSimTab(vine ? "vineyard" : "urban", "mappa");

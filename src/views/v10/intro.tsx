@@ -186,6 +186,16 @@ export function Tutorial() {
   // Already seen on this device (and not asked for with the "i"): the root moves on to the map, so draw nothing meanwhile.
   const [skip, setSkip] = useState(false);
   useEffect(() => {
+    const isDesktop = typeof window !== "undefined" && !document.documentElement.hasAttribute("data-slate") && window.matchMedia("(min-width: 1024px)").matches;
+    if (isDesktop) {
+      markIntroSeen();
+      const vine = getProId()?.kind === "agronomo";
+      openSimTab(vine ? "vineyard" : "urban", "mappa");
+      void navigate({ to: vine ? "/vigneto" : "/urbano", replace: true });
+      window.setTimeout(() => window.dispatchEvent(new CustomEvent("mdt-desk-tour")), 150);
+      setSkip(true);
+      return;
+    }
     const params = new URLSearchParams(window.location.search);
     setAgain(fromInfo());
     const skipNow = introSeen() && !params.has("rivedi") && !params.has("scenario");
