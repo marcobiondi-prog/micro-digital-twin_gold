@@ -716,7 +716,7 @@ function AppVersion() {
     setState(result);
   };
   return (
-    <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-2 rounded-2xl bg-foreground/[0.05] p-3 text-center">
+    <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-2 p-3 text-center">
       <p className="text-sm text-muted-foreground">Versione dell’app · <span className="tabular-nums text-foreground">{buildLabel()}</span></p>
       <button type="button" onClick={() => void check()} disabled={state === "checking" || state === "updated"}
         className="inline-flex h-10 items-center gap-2 rounded-full bg-foreground/10 px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">
