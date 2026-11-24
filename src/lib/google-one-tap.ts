@@ -1,4 +1,7 @@
 import { PREVIEW_BUILD } from "@/lib/demo-login";
+
+/** The test branch's fixed preview address, authorised in the Google OAuth client: the in-app chooser works there. */
+export const TEST_BRANCH_HOST = "micro-digital-twin-gold-git-main-sgme1w-digital-twin-team.vercel.app";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
@@ -62,8 +65,9 @@ function loadGis(): Promise<Gis | null> {
  */
 export async function googleInApp(opts: { loginHint?: string } = {}): Promise<"signed" | "cancelled" | "unavailable"> {
   // Test previews change address at every build and Google's client lists only the app's own addresses, so its
-  // in-app chooser answers origin_mismatch there: previews go straight to Google's pages (the Supabase redirect).
-  if (PREVIEW_BUILD) return "unavailable";
+  // in-app chooser answers origin_mismatch there: previews go straight to Google's pages (the Supabase redirect) —
+  // except the test branch's fixed address, which is listed among the client's authorised origins.
+  if (PREVIEW_BUILD && (typeof location === "undefined" || location.hostname !== TEST_BRANCH_HOST)) return "unavailable";
   if (typeof window === "undefined" || !crypto?.subtle) return "unavailable";
   const gis = await loadGis();
   if (!gis) return "unavailable";
