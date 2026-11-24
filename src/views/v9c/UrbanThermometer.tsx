@@ -17,6 +17,7 @@ import { coolingShare, estimatedTemp, SEASON_LABEL } from "@/models/season-clima
 import { setPiazzaReading } from "@/models/sim-reading";
 import { loadAirTemperature } from "@/views/air-temp-client";
 import { useMySensors } from "@/lib/use-my-sensors";
+import { useGuestOnly } from "@/views/v10/ProfileGate";
 import { freshAverage } from "@/models/sensor-devices";
 import { clockText } from "@/models/sim-when";
 import { GAIN_BG, GAIN_TEXT } from "@/views/v7/studio-ui";
@@ -341,9 +342,10 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
   }, [before, after, season, hour, clock.minute, dialMin, dialMax]);
   // The real temperature of the place right now, written under the arc beside the reading without interventions.
   const [rLat, rLng] = [cLat, cLng];
+  const guest = useGuestOnly();
   const mine = useMySensors("piazza");
-  const mySensorAir = freshAverage(mine.sensors, "temperatura");
-  const mySurface = freshAverage(mine.sensors, "superficie");
+  const mySensorAir = guest ? null : freshAverage(mine.sensors, "temperatura");
+  const mySurface = guest ? null : freshAverage(mine.sensors, "superficie");
   const realNow = useQuery({ queryKey: ["air-now", rLat.toFixed(3), rLng.toFixed(3)], queryFn: () => loadAirTemperature(rLat, rLng), staleTime: 10 * 60_000, refetchInterval: 15 * 60_000, retry: 1 });
   const feel = feeling(after);
   const preset = PRESETS.find((p) => p.trees === urban.trees && p.permeable === urban.permeable && p.shade === urban.shade)?.id ?? null;

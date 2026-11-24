@@ -49,7 +49,14 @@ export function ProfilePage() {
 }
 
 const GUEST_CAN = ["La simulazione della piazza e quella del vigneto", "La mappa in 2D, il luogo e l’area disegnata", "Foto e video", "La dashboard"];
-const GUEST_CANNOT = ["La cronologia degli interventi: da ospite non si registra", "Sensori AI", "Esporta report e Invia il progetto"];
+const GUEST_CANNOT = [
+  "Vista 3D e visore VR",
+  "Fotocamera AI e suggerimenti AI",
+  "Persone nella piazza, fattibilità e vincoli dell’area",
+  "Sensori AI e i tuoi sensori",
+  "La cronologia degli interventi: da ospite non si registra",
+  "Esporta report e Invia il progetto",
+];
 
 /** The guest's profile: what one can use without identifying, what not, the two ways to identify and "Esci da ospite". */
 function GuestCard() {

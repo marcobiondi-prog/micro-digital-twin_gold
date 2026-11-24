@@ -50,6 +50,7 @@ export function UrbanFlow() {
 /** Simulazione del vigneto completa: riepilogo con Confronta e invio, dati reali, media, griglia. */
 export function VineyardFlow() {
   const [send, setSend] = useState(false);
+  const guest = useGuestOnly();
   const vineyard = useLab().vineyard;
   const fetchClimate = useServerFn(getRealClimate);
   // Signed-in only: real weather values land on every zone; the interventions stay as they are.
@@ -74,7 +75,7 @@ export function VineyardFlow() {
     <div className="space-y-4">
       <LabSyncIndicator />
       {/* v10: built like the piazza (the arc of the vines' thirst with the three levels on it), so no Confronta here either. */}
-      <SimShell kind="vineyard" place={place} onReset={resetVineyard} onSend={() => setSend(true)}
+      <SimShell kind="vineyard" place={place} onReset={resetVineyard} onSend={guest ? undefined : () => setSend(true)}
         simula={<Suspense fallback={<div className="h-[28rem]" />}><VineThirst onImportWeather={importRealWeather} /></Suspense>}
         media={<LabMedia embedded kind="vineyard" context={`${vineyard.allZones ? "Tutte le zone" : `Zona ${vineyard.selected + 1}`} · ${vineyard.phase}`} />}
         sensori={<GuestSensors kind="vineyard" />} />

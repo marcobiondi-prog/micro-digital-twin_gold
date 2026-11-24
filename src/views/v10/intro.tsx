@@ -14,7 +14,7 @@ import { TwinMascot } from "@/views/TwinMascot";
 import { NavigationArrows } from "@/views/navigation-arrows";
 import { THEME_DARK, THEME_META } from "@/views/theme-toggle";
 import { introSeen, markIntroSeen } from "@/lib/intro-seen";
-import { enterAsGuest, getProId, rememberWantedSector, useProId } from "@/lib/use-pro-id";
+import { enterAsGuest, getProId, rememberWantedSector, useGuest, useProId } from "@/lib/use-pro-id";
 // The recognised profiles' carousel, the same on both sectors' forms everywhere (loaded with the sector page's code).
 const KnownProfiles = lazy(() => import("@/views/v10/SectorGate").then((m) => ({ default: m.KnownProfiles })));
 import { proSummary, type ProKind } from "@/models/professional-id";
@@ -415,5 +415,6 @@ export function Choice() {
 function useAiReadyHome() {
   const { signedIn, demo } = useSignedIn();
   const installed = useInstalledApp();
-  return signedIn && (installed || demo);
+  const guest = useGuest() && useProId() === null;
+  return !guest && signedIn && (installed || demo);
 }

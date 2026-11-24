@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, type QueryClient } from "@tanstack/react-query";
-import { ChevronDown, ExternalLink, Landmark, LoaderCircle, ShieldAlert, ShieldCheck, Users } from "lucide-react";
+import { ChevronDown, ExternalLink, Landmark, LoaderCircle, Lock, ShieldAlert, ShieldCheck, Users } from "lucide-react";
 import { loadSiteContext } from "@/lib/site-context-client";
 import { ringCentroid, type Ring } from "@/models/place-area";
 import { crowdEstimate, feasibleInterventions, interventionAdvice, siteConstraints, siteKey, type Constraint, type Feasible, type PiazzaSuggestion, type SiteContext, type VineSuggestion } from "@/models/site-context";
@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 import { openSimTab } from "@/views/v8/console";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { requestDraw } from "@/lib/draw-request";
+import { openSectorGate } from "@/lib/use-pro-id";
+import { GuestLock, useGuestOnly } from "@/views/v10/ProfileGate";
 
 /** Before an area is circled on the map nothing is searched: the search starts from the area. */
 function DrawFirst({ sim }: { sim: "urban" | "vineyard" }) {
@@ -90,8 +92,10 @@ const plural = (n: number, one: string, many: string) => `${grouped(n)} ${n === 
  * through the hours (the chosen one lit), what draws them, and how many of them the shade of the interventions covers.
  */
 export function CrowdCard({ lat, lng, pending, ring, m2, season, hour, shadePlaces }: { lat: number; lng: number; pending?: boolean; ring?: Ring | null | undefined; m2: number; season: Season; hour: number; shadePlaces: number }) {
-  const ctx = useSiteContext(lat, lng, pending, ring);
+  const guest = useGuestOnly();
+  const ctx = useSiteContext(lat, lng, pending || guest, ring);
   const crowd = useMemo(() => (ctx.data && ctx.data.drawsOk !== false ? crowdEstimate(ctx.data.draws, m2, season, hour) : null), [ctx.data, m2, season, hour]);
+  if (guest) return <GuestLock kind="funzionario" title="Persone nella piazza" line="La stima delle persone presenti nell’area e dei posti all’ombra è disponibile dopo esserti identificato." />;
   const d = ctx.data?.draws;
   const parts = d ? [
     d.food && plural(d.food, "bar o ristorante", "bar e ristoranti"),
@@ -136,9 +140,11 @@ const LEVEL_TONE: Record<Constraint["level"], string> = { probabile: "bg-amber-4
 
 /** "Vincoli dell'area": the constraints the open map data point to, what they mean for the interventions, and where to check them. */
 export function ConstraintsCard({ lat, lng, pending, ring, placeName, kind }: { lat: number; lng: number; pending?: boolean; ring?: Ring | null | undefined; placeName: string; kind: "piazza" | "vigneto" }) {
-  const ctx = useSiteContext(lat, lng, pending, ring);
+  const guest = useGuestOnly();
+  const ctx = useSiteContext(lat, lng, pending || guest, ring);
   const cs = useMemo(() => (ctx.data && ctx.data.constraintsOk !== false ? siteConstraints(ctx.data, placeName) : null), [ctx.data, placeName]);
   const [open, setOpen] = useState<string | null>(null);
+  if (guest) return <GuestLock kind={kind === "piazza" ? "funzionario" : "agronomo"} title="Fattibilità dell’area" line="I vincoli paesaggistici e culturali attorno all’area e le indicazioni sugli interventi si vedono dopo esserti identificato." />;
   const probable = cs?.some((c) => c.level === "probabile");
   return (
     <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4" aria-label="Vincoli dell'area">
@@ -177,11 +183,22 @@ export function ConstraintsCard({ lat, lng, pending, ring, placeName, kind }: { 
 
 /**
  * At the top of Simula, before the levers: the area's feasibility in one line (the constraints found, or none), with a
- * tap down to the "Vincoli dell'area" card. Nothing while no place is chosen or the surroundings are being read.
+ * tap down to the "Vincoli dell'area" card. Locked in guest mode.
  */
 export function FeasibilityStrip({ lat, lng, pending, ring, placeName, sim }: { lat: number; lng: number; pending?: boolean; ring?: Ring | null | undefined; placeName: string; sim: "urban" | "vineyard" }) {
-  const ctx = useSiteContext(lat, lng, pending, ring);
+  const guest = useGuestOnly();
+  const ctx = useSiteContext(lat, lng, pending || guest, ring);
   const cs = useMemo(() => (ctx.data && ctx.data.constraintsOk !== false ? siteConstraints(ctx.data, placeName) : null), [ctx.data, placeName]);
+  if (guest) return (
+    <button type="button" data-guide="feasibility" onClick={() => openSectorGate(sim === "urban" ? "funzionario" : "agronomo")}
+      className="flex w-full items-center gap-2.5 rounded-2xl bg-foreground/[0.05] px-3.5 py-2.5 text-left ring-1 ring-foreground/10 outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <Lock className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">Fattibilità dell’area <span className="ml-1 rounded-full bg-foreground/[0.08] px-2 py-0.5 align-[1px] text-[11px] font-semibold text-muted-foreground">non per gli ospiti</span></span>
+        <span className="block text-xs text-muted-foreground">La verifica di fattibilità e dei vincoli dell’area è disponibile dopo esserti identificato.</span>
+      </span>
+    </button>
+  );
   if (pending) return (
     <button type="button" onClick={() => openSimTab(sim, "mappa")} className="flex w-full items-center gap-2.5 rounded-2xl bg-foreground/[0.05] px-3.5 py-2.5 text-left ring-1 ring-foreground/10 outline-none focus-visible:ring-2 focus-visible:ring-ring">
       <ShieldCheck className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -219,30 +236,33 @@ export function suggestionText(sug: { piazza?: PiazzaSuggestion | undefined; vin
   return "";
 }
 
-/** The interventions the constraints found around a drawn area allow, sized to it (null while reading or unreadable). */
+/** The interventions the constraints found around a drawn area allow, sized to it (null while reading, unreadable or in guest mode). */
 export function useSuggestion(ring: Ring | null | undefined, placeName: string, kind: "piazza" | "vigneto", m2: number) {
+  const guest = useGuestOnly();
   const [lat, lng] = ring && ring.length >= 3 ? ringCentroid(ring).map((v) => Math.round(v * 1e4) / 1e4) as [number, number] : [0, 0];
-  const ctx = useSiteContext(lat, lng, !ring || ring.length < 3, ring);
+  const ctx = useSiteContext(lat, lng, guest || !ring || ring.length < 3, ring);
   return useMemo(() => {
-    if (!ctx.data || ctx.data.constraintsOk === false) return null;
+    if (guest || !ctx.data || ctx.data.constraintsOk === false) return null;
     const cs = siteConstraints(ctx.data, placeName);
     return { cs, ...feasibleInterventions(cs, kind, m2) };
-  }, [ctx.data, placeName, kind, m2]);
+  }, [guest, ctx.data, placeName, kind, m2]);
 }
 
 /**
  * On the Mappa tab, once the area's surroundings are read: which interventions the constraints found allow (each with
  * its state and why) and a starting mix sized to the area — what is sconsigliato left out, what needs an authorisation
- * kept light — put in with one tap and then drawn on the map.
+ * kept light — put in with one tap and then drawn on the map. Locked for guests.
  */
 export function SuggestedInterventions({ lat, lng, ring, placeName, kind, m2, onApply }: {
   lat: number; lng: number; ring: Ring; placeName: string; kind: "piazza" | "vigneto"; m2: number;
   onApply: (s: { piazza?: PiazzaSuggestion | undefined; vine?: VineSuggestion | undefined }) => void;
 }) {
-  const ctx = useSiteContext(lat, lng, false, ring);
+  const guest = useGuestOnly();
+  const ctx = useSiteContext(lat, lng, guest, ring);
   const cs = useMemo(() => (ctx.data && ctx.data.constraintsOk !== false ? siteConstraints(ctx.data, placeName) : null), [ctx.data, placeName]);
   const sug = useMemo(() => (cs ? feasibleInterventions(cs, kind, m2) : null), [cs, kind, m2]);
   const [open, setOpen] = useState<string | null>(null);
+  if (guest) return <GuestLock kind={kind === "piazza" ? "funzionario" : "agronomo"} title="Fattibilità e suggerimenti" line="Gli interventi ammessi dai vincoli dell’area e la proposta consigliata si usano dopo esserti identificato." />;
   const mix = suggestionText(sug);
   return (
     <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4" aria-label="Interventi possibili">

@@ -1,4 +1,6 @@
 import { GuestLock, useGuestOnly } from "@/views/v10/ProfileGate";
+import { openSectorGate } from "@/lib/use-pro-id";
+import type { ProKind } from "@/models/professional-id";
 import { drawnAreaFor } from "@/models/drawn-area";
 import { ConstraintsCard, CrowdCard } from "@/views/v10/SiteContext";
 import { siteCenter } from "@/models/site-context";
@@ -218,20 +220,23 @@ export function SendProject({ flow }: { flow: "piazza" | "vigneto" }) {
  * The Premium part of the dashboard. Signed in (or simulated on previews) it shows its tools; otherwise each one stays
  * visible with a lock, so it is clear what the sign-in adds, with one Accedi (and "Simula l'accesso" on previews).
  */
-export function PremiumPart({ locked, children }: { locked: Locked[]; children: ReactNode }) {
+export function PremiumPart({ locked, kind, children }: { locked: Locked[]; kind?: ProKind | undefined; children: ReactNode }) {
   const { signedIn } = useSignedIn();
+  const guest = useGuestOnly();
+  const active = signedIn && !guest;
+  const unlock = () => (guest ? openSectorGate(kind ?? null) : openAccount());
   return (
     <section className="space-y-3" aria-label="Premium">
       <div className="flex items-center gap-2 px-1">
         <h2 className="text-lg font-semibold tracking-tight">Premium</h2>
-        <span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-semibold", signedIn ? "bg-ok/15 text-ok" : "bg-foreground/[0.08] text-muted-foreground")}>{signedIn ? "attivo" : "con l’accesso"}</span>
+        <span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-semibold", active ? "bg-ok/15 text-ok" : "bg-foreground/[0.08] text-muted-foreground")}>{active ? "attivo" : guest ? "non per gli ospiti" : "con l’accesso"}</span>
       </div>
-      {signedIn ? children : (
+      {active ? children : (
         <div className="space-y-3">
           <ul className="overflow-hidden rounded-3xl bg-foreground/[0.05]">
             {locked.map((l) => (
               <li key={l.title} className="border-b border-foreground/10 last:border-b-0">
-                <button type="button" onClick={openAccount} className="flex w-full items-center gap-3 px-4 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5">
+                <button type="button" onClick={unlock} className="flex w-full items-center gap-3 px-4 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5">
                   <l.icon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
                   <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{l.title}</span><span className="block text-xs text-muted-foreground">{l.line}</span></span>
                   <Lock className="size-4 shrink-0 text-muted-foreground" aria-label="Bloccato" />
@@ -240,9 +245,9 @@ export function PremiumPart({ locked, children }: { locked: Locked[]; children: 
             ))}
           </ul>
           <div className="flex flex-wrap items-center gap-2 px-1">
-            <button type="button" onClick={openAccount} className="inline-flex h-11 items-center rounded-full bg-foreground px-5 text-sm font-semibold text-background outline-none focus-visible:ring-2 focus-visible:ring-ring">Accedi per sbloccare</button>
-            {DEMO_LOGIN_AVAILABLE && <button type="button" onClick={() => setDemoSignedIn(true)} className="inline-flex h-11 items-center rounded-full bg-foreground/[0.08] px-5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">Simula l’accesso</button>}
-            <span className="text-xs text-muted-foreground">Premium è gratis con la registrazione.</span>
+            <button type="button" onClick={unlock} className="inline-flex h-11 items-center rounded-full bg-foreground px-5 text-sm font-semibold text-background outline-none focus-visible:ring-2 focus-visible:ring-ring">{guest ? "Identificati per sbloccare" : "Accedi per sbloccare"}</button>
+            {!guest && DEMO_LOGIN_AVAILABLE && <button type="button" onClick={() => setDemoSignedIn(true)} className="inline-flex h-11 items-center rounded-full bg-foreground/[0.08] px-5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">Simula l’accesso</button>}
+            <span className="text-xs text-muted-foreground">{guest ? "I suggerimenti AI e gli strumenti Premium si sbloccano dopo l’identificazione." : "Premium è gratis con la registrazione."}</span>
           </div>
         </div>
       )}

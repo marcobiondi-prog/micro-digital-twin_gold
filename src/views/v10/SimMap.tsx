@@ -14,6 +14,7 @@ import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { toast } from "sonner";
 import { Check, Hand, Lock, Map as MapIcon, MapPin, Moon, Navigation, PenLine, RotateCcw, Sun, Sunrise, Sunset, Trash2, Undo2, X } from "lucide-react";
 import { useSignedIn } from "@/lib/use-signed-in";
+import { openSectorGate, useGuest, useProId } from "@/lib/use-pro-id";
 import { openAccount } from "@/lib/camera-dock";
 import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn } from "@/lib/demo-login";
 import { cn } from "@/lib/utils";
@@ -74,11 +75,14 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   // 2D is the default; 3D (photorealistic, needs the browser key) opens only for signed-in users:
   // guests see the switch with a lock, and touching it offers the sign-in.
   const { signedIn } = useSignedIn();
+  const proId = useProId();
+  const guest = useGuest() && proId === null;
+  const can3d = signedIn && !guest;
   const [view, setView] = useState<"2d" | "3d">("2d");
   const [hint, setHint] = useState(false);
-  useEffect(() => { if (!signedIn) setView("2d"); else setHint(false); }, [signedIn]);
+  useEffect(() => { if (!can3d) setView("2d"); else setHint(false); }, [can3d]);
   // Always both: with the browser key 3D is the photorealistic view, without it an open map with the buildings raised.
-  const show3d = view === "3d" && signedIn;
+  const show3d = view === "3d" && can3d;
   const [iosDevice, setIosDevice] = useState(false);
   useEffect(() => { setIosDevice(isIOS()); }, []);
   const zoom3d = kind === "urban" ? 17 : 15;
@@ -136,13 +140,14 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
     if (draft.length < 3) { toast("Servono almeno 3 pin per chiudere l’area"); return; }
     const fresh = !saved;
     save(draft); setDrawing(false);
-    // People and constraints start being read right away, so Simula finds them ready.
-    prefetchSite(qc, draft);
+    // People and constraints start being read right away (for identified users), so Simula finds them ready.
+    if (!guest) prefetchSite(qc, draft);
     if (fresh) {
       // A new area starts free of interventions: its feasibility is looked at first (Simula), the interventions chosen after.
       if (kind === "urban") setUrban({ trees: 0, permeable: 0, shade: 0, misters: 0, sprinklers: 0, treeCells: null, permeableCells: null, shadeCells: null });
       else setVineyard((v) => ({ zones: v.zones.map((z) => ({ ...z, irrigation: 0, shade: 0, windbreak: 0 })) }));
-      toast.success("Area salvata · libera da interventi", { description: `${surfaceText(pinsM2(draft))}. Prima guarda la fattibilità dell’area in Simula, poi scegli gli interventi.`, duration: 9000, action: { label: "Fattibilità", onClick: () => openSimTab(kind, "simula") } });
+      if (guest) toast.success("Area salvata", { description: `${surfaceText(pinsM2(draft))}: apri Simula per provare gli interventi.` });
+      else toast.success("Area salvata · libera da interventi", { description: `${surfaceText(pinsM2(draft))}. Prima guarda la fattibilità dell’area in Simula, poi scegli gli interventi.`, duration: 9000, action: { label: "Fattibilità", onClick: () => openSimTab(kind, "simula") } });
       return;
     }
     toast.success("Area salvata", { description: `${surfaceText(pinsM2(draft))}: la usano i costi e i benefici.` });
@@ -265,7 +270,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
       if (!changed) return;
       // Never put by itself: the zone is offered, so the area's feasibility (Vincoli dell'area in Simula) is seen first.
       const names = [...new Set(zonesOfArea(saved).filter((z) => fresh.has(z.id)).map((z) => ZONE_LABEL[z.kind]))].join(" · ");
-      toast("Zona disegnata: interventi non ancora messi", { description: `${names}. Prima guarda i vincoli dell’area in Simula, poi mettili con un tocco.`, duration: 15000, action: { label: "Mettili", onClick: () => setVineyard({ zones }) } });
+      toast("Zona disegnata: interventi non ancora messi", { description: guest ? `${names}. Tocca per metterli.` : `${names}. Prima guarda i vincoli dell’area in Simula, poi mettili con un tocco.`, duration: 15000, action: { label: "Mettili", onClick: () => setVineyard({ zones }) } });
       return;
     }
     if (kind !== "urban") return;
@@ -284,7 +289,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
     if (!next) return;
     // Never put by itself: the zone is offered, so the area's feasibility (Vincoli dell'area in Simula) is seen first.
     const said = [next.trees !== u.trees && `Alberi ${next.trees}`, next.permeable !== u.permeable && `Aiuole ${next.permeable} %`, next.shade !== u.shade && `Ombra ${next.shade} %`, next.misters !== (u.misters ?? 0) && `Nebulizzatori ${next.misters}`].filter(Boolean).join(" · ");
-    toast("Zona disegnata: interventi non ancora messi", { description: `Proposta: ${said}. Prima guarda i vincoli dell’area in Simula, poi mettili con un tocco.`, duration: 15000, action: { label: "Mettili", onClick: () => setUrban(next) } });
+    toast("Zona disegnata: interventi non ancora messi", { description: guest ? `${said}. Tocca per metterli.` : `Proposta: ${said}. Prima guarda i vincoli dell’area in Simula, poi mettili con un tocco.`, duration: 15000, action: { label: "Mettili", onClick: () => setUrban(next) } });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind, zoneSig, !!saved?.edits?.onlyDrawn]);
   const setEdits = (edits: LayoutEdits) => {
@@ -358,9 +363,9 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         </div>
         <div role="group" aria-label="Vista della mappa" className="flex shrink-0 rounded-full bg-foreground/[0.08] p-1">
           {(["2d", "3d"] as const).map((v) => {
-            const locked = v === "3d" && !signedIn, on = view === v && !locked;
+            const locked = v === "3d" && !can3d, on = view === v && !locked;
             return (
-              <button key={v} type="button" aria-pressed={on} aria-label={locked ? "3D: accedi per usarla" : v === "2d" ? "2D" : "3D"}
+              <button key={v} type="button" aria-pressed={on} aria-label={locked ? (guest ? "3D: bloccata in modalità ospite" : "3D: accedi per usarla") : v === "2d" ? "2D" : "3D"}
                 onClick={() => { if (locked) setHint(true); else { setHint(false); setView(v); } }}
                 className={cn("inline-flex h-10 min-w-12 items-center justify-center gap-1 rounded-full px-3 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", on ? "bg-foreground text-background" : "text-foreground/80")}>
                 {locked && <Lock className="size-3.5" aria-hidden="true" />}{v === "2d" ? "2D" : "3D"}
@@ -369,13 +374,17 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
           })}
         </div>
       </div>
-      {hint && !signedIn && (
+      {hint && !can3d && (guest ? (
+        <p role="status" className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">La vista 3D è bloccata in modalità ospite.
+          <button type="button" onClick={() => openSectorGate(kind === "urban" ? "funzionario" : "agronomo")} className="font-semibold text-foreground underline underline-offset-4">Identificati</button>
+        </p>
+      ) : (
         <p role="status" className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">La vista 3D è per chi ha fatto l’accesso.
           <button type="button" onClick={openAccount} className="font-semibold text-foreground underline underline-offset-4">Accedi</button>
           {/* Previews only: unlock the 3D view on this device without an account. */}
           {DEMO_LOGIN_AVAILABLE && <button type="button" onClick={() => { setDemoSignedIn(true); setView("3d"); }} className="font-semibold text-foreground underline underline-offset-4">Simula l’accesso</button>}
         </p>
-      )}
+      ))}
       {/* The place is chosen here: search it or use the device position; the map follows. */}
       <PlaceSearch kind={kind} />
       <div data-sim-map-box="" className="relative -mx-4 h-[52vh] min-h-72 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
@@ -386,7 +395,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
           <p role="status" className="pointer-events-none absolute left-1/2 top-12 z-[3] -translate-x-1/2 whitespace-nowrap rounded-full bg-black/45 px-3 py-1 text-[12px] font-semibold text-white ring-1 ring-white/15 backdrop-blur-sm [text-shadow:0_1px_2px_rgb(0_0_0/.6)]">
             <span className="mr-1 inline-block size-2.5 rounded-full bg-sky-400 align-middle ring-2 ring-sky-100" aria-hidden="true" />
             Nebulizzatori {sim.data.misters.length}
-            {sim.data.mistersInZones > 0 && <span className="font-normal text-white/80"> · {sim.data.mistersInZones} nelle tue zone{sim.data.misters.length > sim.data.mistersInZones ? ` · ${sim.data.misters.length - sim.data.mistersInZones} messi dall’app` : ""}</span>}
+            {sim.data.mistersInZones > 0 && <span className="font-normal text-white/80"> · {sim.data.mistersInZones} nelle tue zone{sim.data.misters.length > sim.data.mistersInZones ? ` · ${sim.data.mistersInZones < sim.data.misters.length ? sim.data.misters.length - sim.data.mistersInZones : 0} messi dall’app` : ""}</span>}
           </p>
         )}
         {/* Day and night at the simulation's season and hour, over the 2D and the 3D map alike. */}
@@ -403,7 +412,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
       </div>
       {/* iPhone and iPad only: the 3D shows plain shapes unless the light realistic models are turned on by hand. */}
       {show3d && iosDevice && <IosModelsSwitch />}
-      {!preview && !drawing && !drawingZone && saved && <VrButton kind={kind} area={saved} />}
+      {!preview && !drawing && !drawingZone && saved && <VrButton kind={kind} area={saved} guest={guest} />}
       {/* The pin can be put right by hand on the 2D map; a pin moved by hand can go back to the automatic one. */}
       {!drawing && !drawingZone && !arranging && (
         <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 px-2 text-center text-xs text-muted-foreground">
@@ -812,9 +821,11 @@ function ProposalPill({ text, constrained, onApply, onDismiss }: { text: string;
  * Reality, Quest through Link, SteamVR in Edge or Chrome) and an area is drawn; opens the project at real size in the
  * headset (views/v10/vr-view, loaded on the first tap).
  */
-function VrButton({ kind, area }: { kind: SimKind; area: DrawnArea }) {
+function VrButton({ kind, area, guest = false }: { kind: SimKind; area: DrawnArea; guest?: boolean }) {
   const [ok, setOk] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [hint, setHint] = useState(false);
+  useEffect(() => { if (!guest) setHint(false); }, [guest]);
   useEffect(() => {
     let live = true;
     void import("@/views/v10/vr-view").then((m) => m.vrSupported()).then((v) => { if (live) setOk(v); });
@@ -822,6 +833,7 @@ function VrButton({ kind, area }: { kind: SimKind; area: DrawnArea }) {
   }, []);
   if (!ok) return null;
   const open = () => {
+    if (guest) { setHint(true); return; }
     setBusy(true);
     void import("@/views/v10/vr-view")
       .then((m) => m.startVr(kind === "urban" ? "urban" : "vineyard", area, () => setBusy(false)))
@@ -829,11 +841,16 @@ function VrButton({ kind, area }: { kind: SimKind; area: DrawnArea }) {
       .catch((e: unknown) => { setBusy(false); toast.error("Il visore non è partito", { description: e instanceof Error ? e.message : String(e) }); });
   };
   return (
-    <div className="flex justify-center">
-      <button type="button" onClick={open} disabled={busy}
+    <div className="flex flex-col items-center gap-2">
+      <button type="button" onClick={open} disabled={busy} aria-label={guest ? "Guarda nel visore VR: bloccato in modalità ospite" : undefined}
         className="inline-flex h-11 items-center gap-2 rounded-full bg-foreground/[0.08] px-5 text-sm font-semibold outline-none transition-colors hover:bg-foreground/[0.14] focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">
-        <Glasses className="size-4" aria-hidden="true" />{busy ? "Visore in uso…" : "Guarda nel visore VR"}
+        {guest && <Lock className="size-3.5" aria-hidden="true" />}<Glasses className="size-4" aria-hidden="true" />{busy ? "Visore in uso…" : "Guarda nel visore VR"}
       </button>
+      {hint && guest && (
+        <p role="status" className="flex flex-wrap items-center justify-center gap-x-2 text-center text-sm text-muted-foreground">Il visore VR è bloccato in modalità ospite.
+          <button type="button" onClick={() => openSectorGate(kind === "urban" ? "funzionario" : "agronomo")} className="font-semibold text-foreground underline underline-offset-4">Identificati</button>
+        </p>
+      )}
     </div>
   );
 }
