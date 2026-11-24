@@ -396,7 +396,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
       ))}
       {/* The place is chosen here: search it or use the device position; the map follows. */}
       <PlaceSearch kind={kind} />
-      <div data-sim-map-box="" className="relative -mx-4 h-[52vh] min-h-72 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
+      <div data-sim-map-box="" data-map-gestures={show3d ? "" : undefined} className="relative -mx-4 h-[52vh] min-h-72 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
         {/* The temperature the interventions bring, on the map itself (2D and 3D), following the levers live. */}
         <MapReading kind={kind} lat={pin.lat} lng={pin.lng} />
         {/* How many misting poles the map shows, exactly: those in the zones drawn for them and those the app placed. */}

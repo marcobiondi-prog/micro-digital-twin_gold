@@ -10,10 +10,11 @@ export function simTabSwipeStep(index: number, total: number, dx: number, dy: nu
 const OWN_GESTURE = "input, textarea, select, canvas, iframe, gmp-map-3d, [role='slider'], [data-map-gestures], [data-no-tab-swipe], [role='dialog'], [role='alertdialog'], [role='menu'], [role='listbox']";
 
 /** True when a touch started on something that uses sideways moves itself (sliders, maps, rows that scroll sideways). */
-export function startsOnOwnGesture(target: EventTarget | null, boundary: Element): boolean {
-  if (target && typeof (target as any).composedPath === "function") {
-    const path = (target as any).composedPath() as EventTarget[];
-    for (const item of path) {
+export function startsOnOwnGesture(target: EventTarget | null, boundary: Element, event?: Event): boolean {
+  if (event && typeof event.composedPath === "function") {
+    const path = event.composedPath();
+    for (let i = 0; i < path.length; i++) {
+      const item = path[i];
       if (item instanceof Element) {
         if (item.matches(OWN_GESTURE) || item.hasAttribute("data-map-gestures") || item.tagName.toLowerCase() === "gmp-map-3d") return true;
         if (item === boundary) break;

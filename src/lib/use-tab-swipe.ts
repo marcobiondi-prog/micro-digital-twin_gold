@@ -99,10 +99,10 @@ export function useTabSwipe<T extends string>(ids: ReadonlyArray<T>, value: T, o
     let trail: Array<[number, number]> = [];
     let start: { x: number; y: number; axis: "x" | "y" | null } | null = null;
     const showPeek = (peek: T | null, side: 1 | -1) => setPeekState((p) => (p.peek === peek && p.side === side && p.top === top ? p : { peek, side, top }));
-    const begin = (x: number, y: number, target: EventTarget | null) => {
+    const begin = (x: number, y: number, target: EventTarget | null, ev?: Event) => {
       claimed = false;
       trail = [[x, performance.now()]];
-      start = document.documentElement.hasAttribute("data-ar-camera") || startsOnOwnGesture(target, scope?.current ?? document.body) ? null : { x, y, axis: null };
+      start = document.documentElement.hasAttribute("data-ar-camera") || startsOnOwnGesture(target, scope?.current ?? document.body, ev) ? null : { x, y, axis: null };
     };
     const move = (x: number, y: number) => {
       const s = start;
@@ -165,10 +165,10 @@ export function useTabSwipe<T extends string>(ids: ReadonlyArray<T>, value: T, o
       dragged = 0;
     };
     const cancel = () => { if (start?.axis === "x") { settleFrom(dragged); showPeek(null, 1); } start = null; dragged = 0; };
-    const ts = (e: TouchEvent) => { const t = e.touches[0]; if (t && e.touches.length === 1) begin(t.clientX, t.clientY, e.target); else cancel(); };
+    const ts = (e: TouchEvent) => { const t = e.touches[0]; if (t && e.touches.length === 1) begin(t.clientX, t.clientY, e.target, e); else cancel(); };
     const tm = (e: TouchEvent) => { const t = e.touches[0]; if (t && e.touches.length === 1) move(t.clientX, t.clientY); };
     const te = (e: TouchEvent) => { const t = e.changedTouches[0]; if (t) finish(t.clientX, t.clientY); else cancel(); };
-    const pd = (e: PointerEvent) => { if (e.pointerType === "mouse" && e.button === 0) begin(e.clientX, e.clientY, e.target); };
+    const pd = (e: PointerEvent) => { if (e.pointerType === "mouse" && e.button === 0) begin(e.clientX, e.clientY, e.target, e); };
     const pm = (e: PointerEvent) => { if (e.pointerType === "mouse" && e.buttons & 1) move(e.clientX, e.clientY); };
     const pu = (e: PointerEvent) => { if (e.pointerType === "mouse") finish(e.clientX, e.clientY); };
     host.addEventListener("touchstart", ts, { passive: true });
