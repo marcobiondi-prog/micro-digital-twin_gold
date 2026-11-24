@@ -194,7 +194,11 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
   useEffect(() => {
     placePin.current?.setLngLat([lng, lat]);
     if (draggedTo.current === `${lat},${lng}`) { draggedTo.current = null; return; }
-    mapRef.current?.jumpTo({ center: [lng, lat] });
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      mapRef.current?.jumpTo({ center: [lng, lat] });
+    } else {
+      mapRef.current?.easeTo({ center: [lng, lat], duration: 300 });
+    }
   }, [lat, lng]);
   // The pin can be dragged only outside drawing.
   useEffect(() => { placePin.current?.setDraggable(!!onPinMove && !drawing); }, [drawing, onPinMove, state]);

@@ -348,7 +348,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         <DayNight kind={kind} lat={pin.lat} lng={pin.lng} />
         {/* Still: the map under the button takes no gesture; the page scrolls over it. */}
         <ParallaxLayer>
-          <Suspense fallback={<div className="h-full w-full" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} sim={sim} still proposal={proposal} /></Suspense>
+          <Suspense fallback={<div className="h-full w-full" />}><SatelliteMap2D key={`preview-${kind}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} sim={sim} still proposal={proposal} /></Suspense>
         </ParallaxLayer>
       </div>
       {kind === "vineyard" && !proposal && <div className="absolute inset-x-0 top-12 z-[3] flex justify-center px-3"><Suspense fallback={null}><VineZonePicker /></Suspense></div>}
@@ -412,10 +412,10 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         {!drawing && !drawingZone && proposalPill}
         {show3d
           ? <Suspense fallback={<div className="h-full w-full bg-card" />}><MapLight kind={kind} lat={pin.lat} lng={pin.lng}>{key
-            ? <LocationMap3D key={`${loc.lat},${loc.lng}`} lat={pin.lat} lng={pin.lng} label={name ?? ""} apiKey={key} area={ring} sim={sim}
+            ? <LocationMap3D key={`map3d-${kind}`} lat={pin.lat} lng={pin.lng} label={name ?? ""} apiKey={key} area={ring} sim={sim}
               fallback={<OpenMap3D lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />} />
-            : <OpenMap3D key={`${loc.lat},${loc.lng}`} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />}</MapLight></Suspense>
-          : <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`${loc.lat},${loc.lng}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} drawing={drawing || drawingZone}
+            : <OpenMap3D key={`openmap3d-${kind}`} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />}</MapLight></Suspense>
+          : <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`map2d-${kind}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} drawing={drawing || drawingZone}
             onAreaChange={drawingZone ? setZoneDraft : setDraft} sim={editingZone && sim ? { ...sim, inner: (sim.inner ?? []).filter((z) => z.id !== editingZone) } : sim} arranging={arranging} onMove={moved} proposal={proposal}
             outline={drawingZone ? saved?.ring ?? null : null} onOutside={() => toast("La zona va dentro l’area disegnata")} onPinMove={arranging ? undefined : movePin} /></Suspense>}
       </div>
