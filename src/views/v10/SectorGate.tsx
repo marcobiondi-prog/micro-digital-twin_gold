@@ -227,11 +227,14 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
     let frame = 0;
     const paint = () => {
       frame = 0;
-      const mid = el.scrollLeft + el.clientWidth / 2;
+      const elRect = el.getBoundingClientRect();
+      const elMid = elRect.left + elRect.width / 2;
       let best = 0, bestD = Infinity;
       Array.from(el.children).forEach((c, i) => {
         const card = c as HTMLElement;
-        const d = (card.offsetLeft + card.offsetWidth / 2 - mid) / card.offsetWidth; // −1 … 1 for the neighbours
+        const cardRect = card.getBoundingClientRect();
+        const cardMid = cardRect.left + cardRect.width / 2;
+        const d = (cardMid - elMid) / (cardRect.width || 1); // −1 … 1 for the neighbours
         if (Math.abs(d) < bestD) { bestD = Math.abs(d); best = i; }
         const t = Math.max(-1.5, Math.min(1.5, d));
         const inner = card.firstElementChild as HTMLElement | null;
@@ -251,9 +254,15 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
     window.addEventListener("resize", onScroll);
     return () => { el.removeEventListener("scroll", onScroll); window.removeEventListener("resize", onScroll); if (frame) cancelAnimationFrame(frame); };
   }, [known.length, wide]);
+
   const go = (i: number) => {
     const el = row.current, card = el?.children[i] as HTMLElement | undefined;
-    if (el && card) el.scrollTo({ left: card.offsetLeft - (el.clientWidth - card.offsetWidth) / 2, behavior: "smooth" });
+    if (el && card) {
+      const elRect = el.getBoundingClientRect();
+      const cardRect = card.getBoundingClientRect();
+      const delta = (cardRect.left + cardRect.width / 2) - (elRect.left + elRect.width / 2);
+      el.scrollBy({ left: delta, behavior: "smooth" });
+    }
   };
 
   // Mouse pan/drag on desktop devices without touch
@@ -263,14 +272,13 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
   const hasMovedRef = useRef(false);
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType === "mouse" && e.button !== 0) return;
-    const el = row.current;
-    if (!el) return;
+    // Only drag with primary mouse button; never intercept clicks on interactive elements
+    if (e.pointerType !== "mouse" || e.button !== 0) return;
+    if ((e.target as HTMLElement).closest("button, a, input, textarea, select, [role='button']")) return;
     isDraggingRef.current = true;
     startXRef.current = e.clientX;
-    startScrollLeftRef.current = el.scrollLeft;
+    startScrollLeftRef.current = row.current?.scrollLeft ?? 0;
     hasMovedRef.current = false;
-    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* none */ }
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -278,13 +286,14 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
     const el = row.current;
     if (!el) return;
     const dx = e.clientX - startXRef.current;
-    if (Math.abs(dx) > 4) {
-      if (!hasMovedRef.current) {
-        hasMovedRef.current = true;
-        el.style.scrollSnapType = "none";
-        el.style.scrollBehavior = "auto";
-        el.classList.add("cursor-grabbing");
-      }
+    if (!hasMovedRef.current && Math.abs(dx) > 6) {
+      hasMovedRef.current = true;
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* none */ }
+      el.style.scrollSnapType = "none";
+      el.style.scrollBehavior = "auto";
+      el.classList.add("cursor-grabbing");
+    }
+    if (hasMovedRef.current) {
       el.scrollLeft = startScrollLeftRef.current - dx;
     }
   };
@@ -299,15 +308,18 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
     el.style.scrollSnapType = "";
     el.style.scrollBehavior = "";
     if (hasMovedRef.current) {
-      const mid = el.scrollLeft + el.clientWidth / 2;
+      const elRect = el.getBoundingClientRect();
+      const elMid = elRect.left + elRect.width / 2;
       let best = 0, bestD = Infinity;
       Array.from(el.children).forEach((c, i) => {
         const card = c as HTMLElement;
-        const d = Math.abs(card.offsetLeft + card.offsetWidth / 2 - mid);
+        const cardRect = card.getBoundingClientRect();
+        const cardMid = cardRect.left + cardRect.width / 2;
+        const d = Math.abs(cardMid - elMid);
         if (d < bestD) { bestD = d; best = i; }
       });
       go(best);
-      setTimeout(() => { hasMovedRef.current = false; }, 60);
+      setTimeout(() => { hasMovedRef.current = false; }, 80);
     }
   };
 
@@ -319,7 +331,7 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4 2k:space-y-6">
       <div
         ref={row}
         role="list"
@@ -330,7 +342,7 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
         onPointerUp={finishDrag}
         onPointerCancel={finishDrag}
         onClickCapture={onClickCapture}
-        className={`no-scrollbar -mx-6 flex snap-x snap-mandatory overflow-x-auto py-4 touch-pan-x cursor-grab select-none [scrollbar-width:none] sm:-mx-0 ${
+        className={`no-scrollbar -mx-6 flex snap-x snap-mandatory overflow-x-auto py-5 touch-pan-x cursor-grab [scrollbar-width:none] sm:-mx-0 ${
           wide
             ? "!mx-[calc(50%-min(50vw-2rem,36rem))] 2k:!mx-[calc(50%-min(50vw-2rem,48rem))] gap-6 px-[calc(min(50vw-2rem,36rem)-12.5rem)] 2k:px-[calc(min(50vw-2rem,48rem)-16rem)] 4k:px-[calc(min(50vw-2rem,56rem)-18rem)] [mask-image:linear-gradient(90deg,transparent,#000_12%,#000_88%,transparent)]"
             : "gap-3 px-[11%]"
@@ -339,19 +351,27 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
         {known.map((k, i) => {
           const pic = resolveProfilePic(k, avatar);
           return (
-          <div key={keyOf(k)} role="listitem" className={wide ? "w-[25rem] 2k:w-[32rem] 4k:w-[36rem] shrink-0 snap-center" : "w-[78%] shrink-0 snap-center"}>
+          <div
+            key={keyOf(k)}
+            role="listitem"
+            className={
+              wide
+                ? "w-[25rem] min-h-[22rem] 2k:w-[32rem] 2k:min-h-[27rem] 4k:w-[36rem] 4k:min-h-[30rem] shrink-0 snap-center flex flex-col"
+                : "w-[78%] min-h-[20rem] shrink-0 snap-center flex flex-col"
+            }
+          >
             <div data-active={i === active || undefined}
               onClick={() => { if (i !== active) go(i); }}
-              className="relative flex h-full flex-col gap-3 rounded-3xl bg-[oklch(0.24_0.016_258/0.96)] p-4 ring-1 ring-brand-turquoise/25 shadow-[0_18px_40px_-16px_rgb(0_0_0/0.75)] transition-[box-shadow] duration-300 will-change-transform data-[active]:ring-brand-turquoise/55 data-[active]:shadow-[0_18px_40px_-16px_rgb(0_0_0/0.75),0_0_28px_-8px_rgb(45_212_191/0.4)] 2k:p-6 2k:rounded-[2rem] 2k:gap-4">
+              className="relative flex h-full min-h-[inherit] flex-col justify-between rounded-3xl bg-[oklch(0.24_0.016_258/0.96)] p-5 ring-1 ring-brand-turquoise/25 shadow-[0_18px_40px_-16px_rgb(0_0_0/0.75)] transition-[box-shadow] duration-300 will-change-transform data-[active]:ring-brand-turquoise/55 data-[active]:shadow-[0_18px_40px_-16px_rgb(0_0_0/0.75),0_0_28px_-8px_rgb(45_212_191/0.4)] 2k:p-8 2k:rounded-[2rem] gap-4 2k:gap-6 cursor-pointer">
               <div className="flex items-center justify-between gap-2">
                 <p className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-turquoise 2k:text-xs">Ti abbiamo riconosciuto</p>
                 <div className="-mr-1.5 -mt-1.5 flex shrink-0">
                 <ProfileBioButton id={k} />
-                <button type="button" onClick={() => { setAsking(null); if (editing === keyOf(k)) setEditing(null); else { setEditing(keyOf(k)); setDraft(k.name); } }} aria-label={`Cambia il nome di ${k.name}`} title="Cambia nome"
+                <button type="button" onClick={(e) => { e.stopPropagation(); setAsking(null); if (editing === keyOf(k)) setEditing(null); else { setEditing(keyOf(k)); setDraft(k.name); } }} aria-label={`Cambia il nome di ${k.name}`} title="Cambia nome"
                   className="grid size-9 2k:size-11 place-items-center rounded-full text-foreground/50 outline-none transition-colors hover:bg-foreground/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand-turquoise">
                   <Pencil className="size-4 2k:size-5" aria-hidden="true" />
                 </button>
-                <button type="button" onClick={() => { setEditing(null); setAsking(asking === keyOf(k) ? null : keyOf(k)); }} aria-label={`Elimina ${k.name} da questo telefono`} title="Elimina da questo telefono"
+                <button type="button" onClick={(e) => { e.stopPropagation(); setEditing(null); setAsking(asking === keyOf(k) ? null : keyOf(k)); }} aria-label={`Elimina ${k.name} da questo telefono`} title="Elimina da questo telefono"
                   className="grid size-9 2k:size-11 shrink-0 place-items-center rounded-full text-foreground/50 outline-none transition-colors hover:bg-red-500/20 hover:text-red-300 focus-visible:ring-2 focus-visible:ring-brand-turquoise">
                   <Trash2 className="size-4 2k:size-5" aria-hidden="true" />
                 </button>
@@ -386,49 +406,60 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
                   </div>
                 </div>
               ) : (
-                <>
+                <div className="mt-auto space-y-3 pt-2">
                   <p className="text-xs 2k:text-sm text-foreground/60">{foreign(k)
                     ? <>Entri anche con il suo account personale {k.acct?.email} e ritrovi la cronologia {k.kind === "funzionario" ? "della piazza" : "del vigneto"}.</>
                     : <>Ti eri già registrato con questo profilo: continua e ritrovi la cronologia {k.kind === "funzionario" ? "della piazza" : "del vigneto"}.</>}</p>
                   <button type="button" onClick={(e) => { e.stopPropagation(); onPick(k); }} aria-label={foreign(k) ? `Accedi con l’account di ${k.name}` : `Continua come ${k.name}`}
-                    className="mt-auto inline-flex h-12 2k:h-14 w-full items-center justify-center gap-2 rounded-full bg-white px-4 text-sm 2k:text-base font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
+                    className="inline-flex h-12 2k:h-14 w-full items-center justify-center gap-2 rounded-full bg-white px-4 text-sm 2k:text-base font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise shadow-md">
                     {foreign(k)
                       ? <><LogIn className="size-4 2k:size-5 shrink-0" aria-hidden="true" /><span className="truncate">Accedi come {k.name.trim().split(/\s+/)[0]}</span></>
                       : <ContinueLabel k={k} />}
                   </button>
-                </>
+                </div>
               )}
             </div>
           </div>
         )})}
         {/* The last slide: add another personal account, quickly. */}
-        <div role="listitem" className={wide ? "w-[25rem] 2k:w-[32rem] 4k:w-[36rem] shrink-0 snap-center" : "w-[78%] shrink-0 snap-center"}>
+        <div
+          role="listitem"
+          className={
+            wide
+              ? "w-[25rem] min-h-[22rem] 2k:w-[32rem] 2k:min-h-[27rem] 4k:w-[36rem] 4k:min-h-[30rem] shrink-0 snap-center flex flex-col"
+              : "w-[78%] min-h-[20rem] shrink-0 snap-center flex flex-col"
+          }
+        >
           <div data-active={known.length === active || undefined}
-            onClick={() => { if (known.length !== active) go(known.length); }}
-            className="relative flex h-full flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-brand-turquoise/40 bg-[oklch(0.24_0.016_258/0.7)] p-5 text-center will-change-transform data-[active]:border-brand-turquoise/70 2k:p-8 2k:rounded-[2rem] 2k:gap-4">
-            <span className="grid size-16 2k:size-20 place-items-center rounded-full bg-brand-turquoise/15 text-brand-turquoise ring-2 ring-brand-turquoise/50" aria-hidden="true"><UserPlus className="size-7 2k:size-9" /></span>
-            <p className="text-xl 2k:text-2xl font-semibold">Aggiungi account</p>
-            <p className="text-xs 2k:text-sm text-foreground/65">Scegli un altro account Google: il suo profilo si aggiunge qui.</p>
-            <button type="button" onClick={(e) => { e.stopPropagation(); onAdd(); }}
-              className="mt-auto inline-flex h-12 2k:h-14 w-full items-center justify-center gap-2 rounded-full bg-white px-4 text-sm 2k:text-base font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise">
-              <Plus className="size-4 2k:size-5" aria-hidden="true" />Aggiungi account
-            </button>
+            onClick={() => { if (known.length !== active) go(known.length); else onAdd(); }}
+            className="relative flex h-full min-h-[inherit] flex-col items-center justify-between gap-4 rounded-3xl border-2 border-dashed border-brand-turquoise/40 bg-[oklch(0.24_0.016_258/0.7)] p-6 text-center will-change-transform data-[active]:border-brand-turquoise/70 2k:p-8 2k:rounded-[2rem] 2k:gap-6 cursor-pointer">
+            <div className="flex flex-col items-center gap-3 pt-2 2k:pt-4">
+              <span className="grid size-16 2k:size-20 place-items-center rounded-full bg-brand-turquoise/15 text-brand-turquoise ring-2 ring-brand-turquoise/50" aria-hidden="true"><UserPlus className="size-7 2k:size-9" /></span>
+              <p className="text-xl 2k:text-2xl font-semibold">Aggiungi account</p>
+              <p className="max-w-[18rem] 2k:max-w-[22rem] text-xs 2k:text-sm text-foreground/65">Scegli un altro account Google: il suo profilo si aggiunge qui.</p>
+            </div>
+            <div className="mt-auto w-full pt-2">
+              <button type="button" onClick={(e) => { e.stopPropagation(); onAdd(); }}
+                className="inline-flex h-12 2k:h-14 w-full items-center justify-center gap-2 rounded-full bg-white px-4 text-sm 2k:text-base font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-brand-turquoise shadow-md">
+                <Plus className="size-4 2k:size-5" aria-hidden="true" />Aggiungi account
+              </button>
+            </div>
           </div>
         </div>
       </div>
-      <div className="relative mx-auto h-1.5" style={{ width: `${(known.length + 1) * 24 - 4}px` }} role="tablist" aria-label="Indicatori profilo">
+      <div className="relative mx-auto h-2 pt-2" style={{ width: `${(known.length + 1) * 24 - 4}px` }} role="tablist" aria-label="Indicatori profilo">
         {/* Track dots */}
         {Array.from({ length: known.length + 1 }).map((_, i) => (
           <span
             key={i}
-            className="absolute top-0 size-1.5 rounded-full bg-white/30"
+            className="absolute top-2 size-1.5 rounded-full bg-white/30"
             style={{ left: `${i * 24 + 7}px` }}
             aria-hidden="true"
           />
         ))}
         {/* Sliding turquoise pill / blue cursor */}
         <span
-          className="absolute top-0 h-1.5 w-5 rounded-full bg-brand-turquoise shadow-[0_0_12px_rgba(45,212,191,0.7)] transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none"
+          className="absolute top-2 h-1.5 w-5 rounded-full bg-brand-turquoise shadow-[0_0_12px_rgba(45,212,191,0.7)] transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none"
           style={{ transform: `translateX(${active * 24}px)` }}
           aria-hidden="true"
         />
@@ -440,7 +471,7 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
             tabIndex={-1}
             aria-label={`Vai alla scheda ${i + 1}`}
             onClick={() => go(i)}
-            className="absolute -top-3 h-7 w-6 cursor-pointer rounded-full outline-none focus-visible:ring-1 focus-visible:ring-brand-turquoise"
+            className="absolute -top-1 h-7 w-6 cursor-pointer rounded-full outline-none focus-visible:ring-1 focus-visible:ring-brand-turquoise"
             style={{ left: `${i * 24}px` }}
           />
         ))}
