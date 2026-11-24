@@ -92,8 +92,10 @@ const plural = (n: number, one: string, many: string) => `${grouped(n)} ${n === 
  * through the hours (the chosen one lit), what draws them, and how many of them the shade of the interventions covers.
  */
 export function CrowdCard({ lat, lng, pending, ring, m2, season, hour, shadePlaces }: { lat: number; lng: number; pending?: boolean; ring?: Ring | null | undefined; m2: number; season: Season; hour: number; shadePlaces: number }) {
-  const ctx = useSiteContext(lat, lng, pending, ring);
+  const guest = useGuestOnly();
+  const ctx = useSiteContext(lat, lng, pending || guest, ring);
   const crowd = useMemo(() => (ctx.data && ctx.data.drawsOk !== false ? crowdEstimate(ctx.data.draws, m2, season, hour) : null), [ctx.data, m2, season, hour]);
+  if (guest) return <GuestLock kind="funzionario" title="Persone nella piazza" line="La stima delle persone presenti nell’area e dei posti all’ombra è disponibile dopo esserti identificato." />;
   const d = ctx.data?.draws;
   const parts = d ? [
     d.food && plural(d.food, "bar o ristorante", "bar e ristoranti"),

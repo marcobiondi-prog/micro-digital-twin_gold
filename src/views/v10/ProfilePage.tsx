@@ -52,7 +52,7 @@ const GUEST_CAN = ["La simulazione della piazza e quella del vigneto", "La mappa
 const GUEST_CANNOT = [
   "Vista 3D e visore VR",
   "Fotocamera AI e suggerimenti AI",
-  "Fattibilità e vincoli dell’area",
+  "Persone nella piazza, fattibilità e vincoli dell’area",
   "Sensori AI e i tuoi sensori",
   "La cronologia degli interventi: da ospite non si registra",
   "Esporta report e Invia il progetto",

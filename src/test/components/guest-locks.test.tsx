@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { enterAsGuest, leaveGuest, getSectorGateKind, clearSectorGate } from "@/lib/use-pro-id";
 import { setRegisteredEmail } from "@/lib/use-signed-in";
 import { setUrban, resetUrban } from "@/models/lab-store";
-import { FeasibilityStrip, ConstraintsCard, SuggestedInterventions } from "@/views/v10/SiteContext";
+import { CrowdCard, FeasibilityStrip, ConstraintsCard, SuggestedInterventions } from "@/views/v10/SiteContext";
 import { PremiumPart, URBAN_LOCKED } from "@/views/v10/Dashboard";
 import { SensorAdvisor } from "@/views/SensorAdvisor";
 import { FieldAI } from "@/views/FieldAI";
@@ -54,15 +54,17 @@ describe("Guest mode locks", () => {
     clearSectorGate();
   });
 
-  it("locks FeasibilityStrip, ConstraintsCard, and SuggestedInterventions in guest mode", () => {
+  it("locks CrowdCard, FeasibilityStrip, ConstraintsCard, and SuggestedInterventions in guest mode", () => {
     const { unmount } = withQuery(
       <div>
+        <CrowdCard lat={41.56} lng={14.66} ring={RING} m2={500} season="estate" hour={14} shadePlaces={40} />
         <FeasibilityStrip sim="urban" lat={41.56} lng={14.66} ring={RING} placeName="Campobasso" />
         <ConstraintsCard lat={41.56} lng={14.66} ring={RING} placeName="Campobasso" kind="piazza" />
         <SuggestedInterventions lat={41.56} lng={14.66} ring={RING} placeName="Campobasso" kind="piazza" m2={500} onApply={vi.fn()} />
       </div>,
     );
-    expect(screen.getAllByText("non per gli ospiti").length).toBeGreaterThanOrEqual(3);
+    expect(screen.getAllByText("non per gli ospiti").length).toBeGreaterThanOrEqual(4);
+    expect(screen.getByText("Persone nella piazza")).toBeInTheDocument();
     expect(screen.getByText("Fattibilità e suggerimenti")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Fattibilità dell’area/i }));
     expect(getSectorGateKind()).toBe("funzionario");
