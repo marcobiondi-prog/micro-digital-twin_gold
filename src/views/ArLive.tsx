@@ -213,6 +213,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   const adjustingRef = useRef(false);
   adjustingRef.current = adjusting;
   const floorRef = useRef({ tilt: -14, offset: readFloorOffset(), yaw: 0 });
+  /** The turn last given by hand (two fingers) to each kind of object: the next one put keeps it, never auto-turned. */
+  const turnRef = useRef<Record<string, number>>({});
   const horizonLine = useRef<HTMLDivElement>(null);
   // Zoom of the preview (the camera's own dial, in landscape): the picture is cropped from its middle and the 3D
   // camera narrows its view by the same amount, so the objects stay on the floor they were put on.
@@ -709,7 +711,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         });
         // A pergola or a shade cloth stands on posts at its edges: put by its centre, its posts fell 2 m beyond the
         // tap, often behind a desk or a wall, and it looked afloat. It is put instead with the middle of its near side
-        // on the spot tapped, turned to face the phone, so its front posts stand right where one looks.
+        // on the spot tapped, so its front posts stand right where one looks; its orientation stays free (the turn
+        // last given with two fingers), never turned by itself towards the phone.
         let { cx, cz, yaw } = placementOf(def, hit, t);
         g.rotation.y = -yaw;
         // A new object takes the size given last with two fingers, so what is put after it stays in proportion.
@@ -749,16 +752,18 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
   }
 
   /** Where an object goes for a tap on the floor: on the spot, or — a pergola, a shade cloth — with the middle of its
-   *  near side there, turned to face the phone (put by its centre its posts fell 2 m beyond, behind desks and walls). */
+   *  near side there (put by its centre its posts fell 2 m beyond, behind desks and walls). Its orientation is free,
+   *  never automatic: it keeps the turn last given by hand with two fingers to that kind (else none), and is never
+   *  turned to face the phone. */
   function placementOf(def: ArObjectDef, hit: V, t: NonNullable<typeof three.current>): { cx: number; cz: number; yaw: number } {
-    if (def.id !== "pergolato" && def.id !== "telo") return { cx: hit.x, cz: hit.z, yaw: 0 };
+    const yaw = turnRef.current[def.id] ?? 0;
+    if (def.id !== "pergolato" && def.id !== "telo") return { cx: hit.x, cz: hit.z, yaw };
     const eye = eyeOf(t);
-    let dx = hit.x - eye.x, dz = hit.z - eye.z;
-    const len = Math.hypot(dx, dz);
-    if (len <= 0.05) return { cx: hit.x, cz: hit.z, yaw: 0 };
-    dx /= len; dz /= len;
+    // The object's own depth axis, pointed away from the phone: the near side lands on the tap.
+    const ax = -Math.sin(yaw), az = Math.cos(yaw);
+    const s = (hit.x - eye.x) * ax + (hit.z - eye.z) * az >= 0 ? 1 : -1;
     const reach = (def.d / 2 - 0.12) * modelRef.current * sizeRef.current;
-    return { cx: hit.x + dx * reach, cz: hit.z + dz * reach, yaw: -Math.atan2(dx, dz) };
+    return { cx: hit.x + ax * s * reach, cz: hit.z + az * s * reach, yaw };
   }
 
   /** An object's footprint on the floor at the size it is drawn. */
@@ -1507,6 +1512,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
         const k = Math.round(tw.cur * 100) / 100;
         pinchUntil.current = performance.now() + 400;
         setPlaced((l) => l.map((p) => (p.uid === tw.uid ? { ...p, scale: k, ...(g ? { yaw: -g.rotation.y } : {}) } : p)));
+        const turned = live.current.placed.find((p) => p.uid === tw.uid);
+        if (turned && g) turnRef.current[turned.id] = -g.rotation.y;
         sizeRef.current = k;
         hapticTick([20]);
         window.setTimeout(() => setNotice((n) => (n?.text.includes("di altezza") ? null : n)), 1800);
@@ -1863,7 +1870,7 @@ export type FanGroup = { key: string; label: string; Icon: LucideIcon; items: Fa
 
 /** One line on what each object is for, in the AR sheet. */
 const OBJECT_HINT: Record<string, string> = {
-  albero: "Fa ombra e rinfresca l’aria", pergolato: "Tronco inclinato, falda tonda e sotto panca e tavolo rotondi", aiuola: "Verde permeabile tra i ciottoli",
+  albero: "Fa ombra e rinfresca l’aria", pergolato: "Vela a quattro punte retrattile, su due pali in legno inclinati e cavi agli angoli; due dita per ruotarla", aiuola: "Verde permeabile tra i ciottoli",
   nebulizzatore: "Nebbia d’acqua che rinfresca vicino agli ugelli", innaffiatoio: "Bagna aiuole e terreno",
   telo: "Rete ombreggiante sopra le viti", frangivento: "Siepe che ferma il vento", irrigazione: "Ala gocciolante lungo il filare",
 };

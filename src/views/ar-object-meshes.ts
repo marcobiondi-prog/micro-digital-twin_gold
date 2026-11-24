@@ -39,8 +39,8 @@ export function objectMesh(def: ArObjectDef): THREE.Group {
       break;
     }
     case "pergolato": {
-      // Round shade sails on leaning trunks (views/ar-papillon).
-      // Two or more joined (a footprint larger than one sail) are one continuous canopy over all their trunks.
+      // Motorised retractable shade sails on inclined masts and diagonal roller boom (views/ar-papillon).
+      // Two or more joined (a footprint larger than one sail) span as one continuous retractable sail.
       // Built closed: they open by themselves only with light (ArLive shadeAuto).
       g.add(realPapillons({ w: def.w, d: def.d, h: def.h, open: 0, joined: Math.max(def.w, def.d) > 4.6 }));
       break;

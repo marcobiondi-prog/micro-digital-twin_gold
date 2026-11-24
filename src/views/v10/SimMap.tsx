@@ -28,7 +28,7 @@ import { Glasses, Thermometer } from "lucide-react";
 import { DRAW_EVENT, takeDrawRequest } from "@/lib/draw-request";
 import { SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import type { MovedPart } from "@/views/v10/SatelliteMap2D";
-import { drawnAreaFor, freeM2, leversForZones, vineLeversForZones, vineLeversOfZones, VINE_ZONE_KINDS, leversOfZones, lotsOf, MAX_PINS, moveZones, pinsM2, surfaceText, usableM2, ZONE_KINDS, ZONE_LABEL, zoneName, zonesOfArea, type DrawnArea, type SubArea, type ZoneKind } from "@/models/drawn-area";
+import { drawnAreaFor, freeM2, initialRingAngle, leversForZones, vineLeversForZones, vineLeversOfZones, VINE_ZONE_KINDS, leversOfZones, lotsOf, MAX_PINS, moveZones, pinsM2, rotateZone, surfaceText, usableM2, ZONE_KINDS, ZONE_LABEL, zoneName, zonesOfArea, type DrawnArea, type SubArea, type ZoneKind } from "@/models/drawn-area";
 import type { Ring } from "@/models/place-area";
 import { openSimTab, type SimKind } from "@/views/v8/console";
 import { PlaceSearch } from "@/views/SimulationGrid";
@@ -233,7 +233,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
       setZones(all.map((z) => (z.id === old.id ? { ...z, kind: zoneKind, ring: zoneDraft, ...(name ? { name } : {}) } : z)));
       toast.success(`Zona «${name ?? ZONE_LABEL[zoneKind]}» aggiornata`, { description: surfaceText(pinsM2(zoneDraft)) });
     } else {
-      const z: SubArea = { id: crypto.randomUUID?.() ?? String(Date.now()), kind: zoneKind, ring: zoneDraft, name: zoneName(saved, zoneKind) };
+      const z: SubArea = { id: crypto.randomUUID?.() ?? String(Date.now()), kind: zoneKind, ring: zoneDraft, name: zoneName(saved, zoneKind), angle: initialRingAngle(zoneDraft) };
       setZones([...all, z]);
       toast.success(`${z.name} aggiunta`, { description: `${surfaceText(pinsM2(zoneDraft))}${zoneKind === "libera" ? ": tolti dalla superficie dei costi." : "."}` });
     }
@@ -308,6 +308,15 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
       if (kind === "urban") setUrban({ area: next ?? { ...saved } }); else setVineyard({ area: next ?? { ...saved } });
       return;
     }
+    if (m.part === "zoneAngle") {
+      if (!saved) return;
+      const next = rotateZone(saved, m.id, m.angle);
+      if (kind === "urban") setUrban({ area: next }); else setVineyard({ area: next });
+      toast.success("Zona ruotata", { description: `Orientamento ${Math.round((((90 - (m.angle * 180) / Math.PI) % 360) + 360) % 360)}° da nord` });
+      return;
+    }
+    if (m.part === "lawnAngle") { setEdits({ ...e, lawnAngle: m.angle }); return; }
+    if (m.part === "shadeAngle") { setEdits({ ...e, shadeAngle: m.angle }); return; }
     if (m.part === "tree") { const trees = [...(e.trees ?? [])]; trees[m.index] = m.at; setEdits({ ...e, trees }); }
     else setEdits({ ...e, [m.part === "lawn" ? "lawnAt" : m.part === "shade" ? "shadeAt" : "windAt"]: m.at });
   };
@@ -662,7 +671,7 @@ function SimBar({ sim, when, arranging, edited, best, only, canOnly, onArrange, 
       {(sim.finds?.length ?? 0) > 0 && <p className="text-sm text-muted-foreground">Rilevati con la fotocamera AI: {findsCountText(sim.finds ?? [])}{sim.kind === "piazza" && sim.finds?.some((f) => f.kind === "tree") ? ". Gli alberi rilevati contano come già presenti." : "."} Trascinali sulla mappa 2D se la posizione non è precisa.</p>}
       {sim.kind === "piazza" && (sim.real?.length ?? 0) > 0 && <p className="text-sm text-muted-foreground">Già nell’area: {realCountText(sim.real ?? [])}. Gli interventi non ci vanno sopra (contorni tratteggiati sulla mappa 2D).</p>}
       <p className="text-sm text-muted-foreground">{arranging
-        ? sim.kind === "piazza" ? `Trascina gli alberi, o le etichette Aiuole e Ombra.${(sim.inner ?? []).length ? " Le etichette con ✥ spostano le tue zone con tutto quello che contengono; \"✥ Tutte le zone\" le sposta insieme." : ""}` : `Trascina l’etichetta Frangivento verso il lato dove lo vuoi.${(sim.inner ?? []).length ? " Le etichette con ✥ spostano le tue zone; \"✥ Tutte le zone\" le sposta insieme." : ""}`
+        ? sim.kind === "piazza" ? `Trascina gli alberi, o le etichette Aiuole e Ombra. Il cerchio ⟳ accanto ruota liberamente vele, aiuole e zone: l’orientamento è quello dove lo lasci.${(sim.inner ?? []).length ? " Le etichette con ✥ spostano le tue zone con tutto quello che contengono; \"✥ Tutte le zone\" le sposta insieme." : ""}` : `Trascina l’etichetta Frangivento verso il lato dove lo vuoi.${(sim.inner ?? []).length ? " Le etichette con ✥ spostano le tue zone e il cerchio ⟳ le ruota liberamente; \"✥ Tutte le zone\" le sposta insieme." : ""}`
         : only
           ? sim.kind === "piazza" ? "Solo quello disegnato da te: aiuole e vele sono le tue zone, gli alberi stanno nelle zone Alberi. Le leve della simulazione seguono le zone; se ne cambi una torna la disposizione automatica." : "Solo quello disegnato da te: irrigazione, teli e frangivento stanno nelle tue zone. Le leve della simulazione seguono le zone; se ne cambi una torna la disposizione automatica."
         : best

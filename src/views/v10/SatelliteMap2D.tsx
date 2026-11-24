@@ -2,13 +2,14 @@ import { moveFind } from "@/models/field-finds";
 import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap, Marker } from "maplibre-gl";
 import type { Ring } from "@/models/place-area";
-import { MAX_PINS } from "@/models/drawn-area";
-import { addAreaLayers, addSimLayers, findElement, handleElement, misterElement, placePinElement, ringCentre, tagElement, zoneTag, pinElement, setAreaData, setOutlineData, setSimData, setBedData, setSimGhost, type SimLayout, MAP_LOCALE } from "@/views/v10/map-area";
+import { MAX_PINS, initialRingAngle } from "@/models/drawn-area";
+import { addAreaLayers, addSimLayers, findElement, handleElement, rotateHandleElement, misterElement, placePinElement, ringCentre, tagElement, zoneTag, pinElement, setAreaData, setOutlineData, setSimData, setBedData, setSimGhost, type SimLayout, MAP_LOCALE } from "@/views/v10/map-area";
 import { ringContains } from "@/models/place-area";
 import type { LatLng } from "@/models/area-layout";
 
 /** Something moved by hand on the map: a tree (its index) or the lawn's, the shade's or the windbreak's handle. */
-export type MovedPart = { part: "tree"; index: number; at: LatLng } | { part: "lawn" | "shade" | "wind"; at: LatLng } | { part: "zones"; ids: string[]; from: LatLng; at: LatLng };
+export type MovedPart = { part: "tree"; index: number; at: LatLng } | { part: "lawn" | "shade" | "wind"; at: LatLng } | { part: "zones"; ids: string[]; from: LatLng; at: LatLng }
+  | { part: "lawnAngle" | "shadeAngle"; angle: number } | { part: "zoneAngle"; id: string; angle: number };
 import { Crosshair, LoaderCircle, Navigation2 } from "lucide-react";
 import { isKeyRejected, loadGoogleMaps, onKeyRejected } from "@/lib/google-maps-js";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -251,17 +252,35 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
       m.on("dragend", () => { const p = m.getLngLat(); done([p.lat, p.lng]); });
       handles.current.push(m);
     };
+    // Orientation is free, never automatic: beside each block and zone a turning handle, dragged round its centre,
+    // sets its direction (radians, 0 = east, counter-clockwise) to wherever it is let go.
+    const kLng = (la: number) => 111_195 * Math.cos((la * Math.PI) / 180);
+    const reach = (c: LatLng, rings: LatLng[][]) => Math.max(4, ...rings.flat().map(([la, ln]) => Math.hypot((ln - c[1]) * kLng(c[0]), (la - c[0]) * 111_195))) + 1.5;
+    const addRot = (c: LatLng, angle: number, r: number, label: string, done: (angle: number) => void) => {
+      const at: LatLng = [c[0] + (Math.sin(angle) * r) / 111_195, c[1] + (Math.cos(angle) * r) / kLng(c[0])];
+      const m = new lib.Marker({ element: rotateHandleElement(label), draggable: true }).setLngLat([at[1], at[0]]).addTo(map);
+      m.on("dragend", () => { const p = m.getLngLat(); done(Math.atan2((p.lat - c[0]) * 111_195, (p.lng - c[1]) * kLng(c[0]))); });
+      handles.current.push(m);
+    };
     // The zones drawn by hand move as a group, with all they hold: a handle on each, and one for all of them together.
     const inner = (sim.inner ?? []).filter((z) => z.ring.length >= 3);
-    for (const z of inner) { const c = ringCentre(z.ring); add(c, `✥ ${zoneTag(z)}`, (to) => moveRef.current?.({ part: "zones", ids: [z.id], from: c, at: to })); }
+    for (const z of inner) {
+      const c = ringCentre(z.ring);
+      add(c, `✥ ${zoneTag(z)}`, (to) => moveRef.current?.({ part: "zones", ids: [z.id], from: c, at: to }));
+      addRot(c, z.angle ?? initialRingAngle(z.ring), reach(c, [z.ring]), zoneTag(z), (angle) => moveRef.current?.({ part: "zoneAngle", id: z.id, angle }));
+    }
     if (inner.length >= 2) {
       const all = ringCentre(inner.flatMap((z) => z.ring));
       add(all, "✥ Tutte le zone", (to) => moveRef.current?.({ part: "zones", ids: inner.map((z) => z.id), from: all, at: to }));
     }
     if (sim.kind === "piazza") {
       sim.data.trees.forEach((t, index) => add(t, null, (to) => moveRef.current?.({ part: "tree", index, at: to })));
+      const free = (k: "lawn" | "shade") => sim.data.patches.filter((p) => p.kind === k && !p.exact);
+      const lawn = free("lawn"), shade = free("shade");
       if (sim.data.patches.some((p) => p.kind === "lawn")) add(sim.data.lawnAt, "Aiuole", (to) => moveRef.current?.({ part: "lawn", at: to }));
       if (sim.data.patches.some((p) => p.kind === "shade")) add(sim.data.shadeAt, "Ombra", (to) => moveRef.current?.({ part: "shade", at: to }));
+      if (lawn.length) addRot(sim.data.lawnAt, sim.data.lawnAngle ?? 0, reach(sim.data.lawnAt, lawn.map((p) => p.ring)), "Aiuole", (angle) => moveRef.current?.({ part: "lawnAngle", angle }));
+      if (shade.length) addRot(sim.data.shadeAt, sim.data.shadeAngle ?? 0, reach(sim.data.shadeAt, shade.map((p) => p.ring)), "Ombra", (angle) => moveRef.current?.({ part: "shadeAngle", angle }));
     } else if (sim.data.lines.some((l) => l.kind === "wind")) {
       add(sim.data.windAt, "Frangivento", (to) => moveRef.current?.({ part: "wind", at: to }));
     }

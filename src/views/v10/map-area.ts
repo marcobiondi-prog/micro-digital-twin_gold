@@ -4,7 +4,7 @@ import { ringContains, type Ring } from "@/models/place-area";
 import type { RealObject } from "@/models/real-objects";
 import { clipBox } from "@/models/drape";
 import { ZONE_LABEL, type SubArea, type ZoneKind } from "@/models/drawn-area";
-import { papillonsOf, shadeBlocks, bedParts, BEDS_3D, SOD, crownRing, hedgeParts, netParts, vineRowParts, PERGOLA_COLORS, pergolaParts, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
+import { papillonsOf, shadePatchBlocks, bedParts, BEDS_3D, SOD, crownRing, hedgeParts, netParts, vineRowParts, PERGOLA_COLORS, pergolaParts, treeParts, type PiazzaLayout, type VineLayout } from "@/models/area-layout";
 
 /** The drawn area on a maplibre map: a turquoise fill and a white outline, from a ring of [lat, lng] pins. */
 export const AREA_SOURCE = "drawn-area";
@@ -89,7 +89,7 @@ const poly = (ring: Ring, props: Record<string, unknown>) => ({ type: "Feature",
 const lineF = (ring: Ring, props: Record<string, unknown>) => ({ type: "Feature", properties: props, geometry: { type: "LineString", coordinates: ring.map(([la, ln]) => [ln, la]) } });
 const fc = (features: unknown[]) => ({ type: "FeatureCollection", features }) as unknown as Parameters<GeoJSONSource["setData"]>[0];
 
-const SAIL_FABRICS = ["#f1ebdd", "#dcc59b"];
+const SAIL_FABRICS = ["#d6cdbd", "#cbc1b0"];
 /** The flat parts (lawn, shade, zones, cloth, drip lines, windbreak) and, in 2D, the trees as points. */
 export function simFeatures(sim: SimLayout | null, withTreePoints: boolean) {
   if (!sim) return fc([]);
@@ -100,11 +100,10 @@ export function simFeatures(sim: SimLayout | null, withTreePoints: boolean) {
     for (const p of sim.data.patches) if (p.kind === "lawn" || withTreePoints) out.push(poly(p.ring, p.kind === "lawn"
       ? { kind: "lawn", color: SIM_COLORS.lawn, opacity: 0.55 }
       : { kind: "shade", color: SIM_COLORS.shade, opacity: 0.9 }));
-    // Shade sails seen from above (2D): each shade patch split into sails of at most 6 m, their edges cut concave,
-    // off-white and sand in turn, with the steel posts at their corners.
-    if (withTreePoints) for (const ring of shadeBlocks(sim.data.patches.filter((p) => p.kind === "shade").map((p) => p.ring))) {
-      // Side-pole sails seen from above: each fan of fabric as open as the simulation's sun says, its ribs and its pole.
-      const { fans, poles, ribs } = papillonsOf(ring, sim.shadeOpen ?? 1);
+    // Shade sails seen from above (2D): each shade block's four-pointed sail with its concave edges, the warm tortora
+    // fabric of the 3D model, its two wooden posts and its corner cords — turned as set by hand when it was turned.
+    if (withTreePoints) for (const b of shadePatchBlocks(sim.data.patches.filter((p) => p.kind === "shade"))) {
+      const { fans, poles, ribs } = papillonsOf(b.ring, sim.shadeOpen ?? 1, b.angle);
       fans.forEach((r, i) => out.push(poly(r, { kind: "sail", color: SAIL_FABRICS[i % 2] })));
       for (const r of ribs) out.push(lineF(r, { kind: "sailrib" }));
       for (const q of poles) out.push({ type: "Feature", properties: { kind: "sailpost" }, geometry: { type: "Point", coordinates: [q[1], q[0]] } });
@@ -217,7 +216,7 @@ export const ringCentre = (ring: Ring): [number, number] => [ring.reduce((a, p) 
 
 /** What stands up in 3D: each tree and a wooden pergola over each shade strip; in the vineyard the hedge and the shade nets. */
 export const treeCrowns = (sim: SimLayout | null) => fc(!sim ? [] : (sim.kind === "piazza"
-  ? [...bedParts(sim.data.patches.filter((p) => p.kind === "lawn").map((p) => p.ring)).parts.map((p) => ({ ...p, base: p.base - 0.55, height: p.height - 0.55 })), ...sim.data.misters.flatMap((m) => [{ ring: crownRing(m, 0.08, 6), base: 0, height: 3, color: "#cbd5e1" }, { ring: crownRing(m, 0.32, 10), base: 2.95, height: 3.08, color: "#f8fafc" }]), ...sim.data.trees.flatMap((t) => treeParts(t)), ...sim.data.patches.filter((p) => p.kind === "shade").flatMap((p) => pergolaParts(p.ring, false, sim.shadeOpen ?? 1))]
+  ? [...bedParts(sim.data.patches.filter((p) => p.kind === "lawn").map((p) => p.ring)).parts.map((p) => ({ ...p, base: p.base - 0.55, height: p.height - 0.55 })), ...sim.data.misters.flatMap((m) => [{ ring: crownRing(m, 0.08, 6), base: 0, height: 3, color: "#cbd5e1" }, { ring: crownRing(m, 0.32, 10), base: 2.95, height: 3.08, color: "#f8fafc" }]), ...sim.data.trees.flatMap((t) => treeParts(t)), ...sim.data.patches.filter((p) => p.kind === "shade").flatMap((p) => pergolaParts(p.ring, false, sim.shadeOpen ?? 1, p.angle))]
   : [...vineRowParts(sim.data.patches.filter((p) => p.kind === "zone").map((p) => p.ring), 400), ...sim.data.lines.filter((l) => l.kind === "wind").flatMap((l) => hedgeParts(l.line, l.strength ?? 0)), ...sim.data.patches.filter((p) => p.kind === "cloth").flatMap((p) => netParts(p.ring))]
 ).map((p) => poly(p.ring, { kind: "raised", base: p.base, height: p.height, color: p.color })));
 
@@ -475,6 +474,16 @@ export function handleElement(label: string | null): HTMLElement {
   } else {
     el.style.cssText = `width:24px;height:24px;border-radius:9999px;background:${SIM_COLORS.tree};box-shadow:0 0 0 2px #fff,0 2px 8px rgb(0 0 0/.45);touch-action:none;cursor:grab`;
   }
+  return el;
+}
+
+/** A handle to turn by hand (Aiuole, Ombra, a drawn zone): a white disc with a turning arrow, dragged round its block. */
+export function rotateHandleElement(label: string): HTMLElement {
+  const el = document.createElement("div");
+  el.setAttribute("aria-hidden", "true");
+  el.title = `Ruota ${label}`;
+  el.textContent = "⟳";
+  el.style.cssText = "width:30px;height:30px;border-radius:9999px;display:grid;place-items:center;background:#fff;color:#0b0f15;font:700 18px/1 system-ui,sans-serif;box-shadow:0 0 0 2px #2dd4bf,0 2px 8px rgb(0 0 0/.45);touch-action:none;cursor:grab";
   return el;
 }
 

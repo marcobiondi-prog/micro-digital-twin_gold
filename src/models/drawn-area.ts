@@ -12,7 +12,7 @@ import type { LayoutEdits } from "./area-layout";
  * its own surface and share of the cost).
  */
 export type ZoneKind = "libera" | "alberi" | "prato" | "ombra" | "nebulizzatori" | "irrigazione" | "teli" | "frangivento" | "lotto";
-export type SubArea = { id: string; kind: ZoneKind; ring: Ring; name?: string };
+export type SubArea = { id: string; kind: ZoneKind; ring: Ring; name?: string; angle?: number };
 export const ZONE_LABEL: Record<ZoneKind, string> = { libera: "Da lasciare libera", alberi: "Alberi", prato: "Aiuole", ombra: "Vele", nebulizzatori: "Nebulizzatori", irrigazione: "Irrigazione", teli: "Teli d’ombra", frangivento: "Frangivento", lotto: "Lotto" };
 /** Which kinds each simulation offers: the piazza its trees, aiuole, pergolas and misters; the vineyard its drip lines, shade cloth and windbreak. */
 export const ZONE_KINDS = { piazza: ["libera", "alberi", "prato", "ombra", "nebulizzatori", "lotto"], vigneto: ["libera", "irrigazione", "teli", "frangivento", "lotto"] } as const;
@@ -179,4 +179,38 @@ export function moveZones(a: DrawnArea, ids: readonly string[], dLat: number, dL
   // Trees placed by hand inside a moved zone go with it.
   const trees = a.edits?.trees?.map((t) => (t && moving.some((z) => ringContains(z.ring, t[0], t[1])) ? [t[0] + dLat, t[1] + dLng] as [number, number] : t));
   return { ...a, zones: moved, ...(a.edits ? { edits: { ...a.edits, ...(trees ? { trees } : {}) } } : {}) };
+}
+
+/** The direction (radians, 0 = east, counter-clockwise) of the first edge Pin 1 → Pin 2 drawn by the user. */
+export function initialRingAngle(ring: Ring): number {
+  if (ring.length < 2) return 0;
+  const a = ring[0]!, b = ring[1]!;
+  const k = Math.cos((((a[0] + b[0]) / 2) * Math.PI) / 180);
+  return Math.atan2((b[0] - a[0]) * 111_195, (b[1] - a[1]) * 111_195 * k);
+}
+
+/**
+ * Freely rotates zone `id` to `angle` (radians, 0 = east, counter-clockwise) around its centre: when the turned polygon
+ * fits inside the drawn area its outline turns too; if turning the outline would reach past the area's edge, the zone's
+ * `angle` still updates so the sails / beds inside it orient freely without being refused.
+ */
+export function rotateZone(a: DrawnArea, id: string, angle: number): DrawnArea {
+  const zones = zonesOf(a);
+  const next = zones.map((z) => {
+    if (z.id !== id) return z;
+    const prev = z.angle ?? initialRingAngle(z.ring);
+    const dAng = angle - prev;
+    const cLat = z.ring.reduce((s, p) => s + p[0], 0) / z.ring.length;
+    const cLng = z.ring.reduce((s, p) => s + p[1], 0) / z.ring.length;
+    const k = 111_195 * Math.cos((cLat * Math.PI) / 180);
+    const cs = Math.cos(dAng), sn = Math.sin(dAng);
+    const turned: Ring = z.ring.map(([la, ln]) => {
+      const dx = (ln - cLng) * k, dy = (la - cLat) * 111_195;
+      const rx = dx * cs - dy * sn, ry = dx * sn + dy * cs;
+      return [cLat + ry / 111_195, cLng + rx / k] as [number, number];
+    });
+    const fits = turned.every(([la, ln]) => ringContains(a.ring, la, ln));
+    return { ...z, ...(fits ? { ring: turned } : {}), angle };
+  });
+  return { ...a, zones: next };
 }
