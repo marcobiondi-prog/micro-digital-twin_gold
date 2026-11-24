@@ -3,15 +3,13 @@ export type Camera = {
   range: number;
   tilt: number;
   heading: number;
-  altitudeMode?: "ABSOLUTE" | "RELATIVE_TO_GROUND";
 };
 
 /**
  * Oblique view centred on the reference point, so buildings and trees read in depth; a taller panel
  * sits a little closer. `altitude` is the ground elevation in metres above sea level: Map3DElement
  * centres are absolute, so a sea-level centre under a 700 m town looks underground and, tilted,
- * frames a spot more than a kilometre away from the place. When altitude is unknown or 0,
- * altitudeMode RELATIVE_TO_GROUND targets the actual ground surface instead of diving into the void.
+ * frames a spot more than a kilometre away from the place.
  */
 export function frameCamera(lat: number, lng: number, height: number, altitude = 0): Camera {
   return {
@@ -19,7 +17,6 @@ export function frameCamera(lat: number, lng: number, height: number, altitude =
     range: height >= 260 ? 300 : 380,
     tilt: 62,
     heading: 20,
-    altitudeMode: altitude > 0 ? "ABSOLUTE" : "RELATIVE_TO_GROUND",
   };
 }
 
