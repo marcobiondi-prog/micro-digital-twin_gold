@@ -793,7 +793,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
           ) : (
             uploads.length === 0 && (
               <div className="mt-3 flex flex-col gap-3">
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-2.5 max-sm:hidden sm:grid-cols-2">
                   <button
                     type="button"
                     disabled={busy}
