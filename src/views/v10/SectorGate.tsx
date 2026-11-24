@@ -255,10 +255,87 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
     const el = row.current, card = el?.children[i] as HTMLElement | undefined;
     if (el && card) el.scrollTo({ left: card.offsetLeft - (el.clientWidth - card.offsetWidth) / 2, behavior: "smooth" });
   };
+
+  // Mouse pan/drag on desktop devices without touch
+  const isDraggingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startScrollLeftRef = useRef(0);
+  const hasMovedRef = useRef(false);
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const el = row.current;
+    if (!el) return;
+    isDraggingRef.current = true;
+    startXRef.current = e.clientX;
+    startScrollLeftRef.current = el.scrollLeft;
+    hasMovedRef.current = false;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* none */ }
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingRef.current) return;
+    const el = row.current;
+    if (!el) return;
+    const dx = e.clientX - startXRef.current;
+    if (Math.abs(dx) > 4) {
+      if (!hasMovedRef.current) {
+        hasMovedRef.current = true;
+        el.style.scrollSnapType = "none";
+        el.style.scrollBehavior = "auto";
+        el.classList.add("cursor-grabbing");
+      }
+      el.scrollLeft = startScrollLeftRef.current - dx;
+    }
+  };
+
+  const finishDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
+    const el = row.current;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* none */ }
+    if (!el) return;
+    el.classList.remove("cursor-grabbing");
+    el.style.scrollSnapType = "";
+    el.style.scrollBehavior = "";
+    if (hasMovedRef.current) {
+      const mid = el.scrollLeft + el.clientWidth / 2;
+      let best = 0, bestD = Infinity;
+      Array.from(el.children).forEach((c, i) => {
+        const card = c as HTMLElement;
+        const d = Math.abs(card.offsetLeft + card.offsetWidth / 2 - mid);
+        if (d < bestD) { bestD = d; best = i; }
+      });
+      go(best);
+      setTimeout(() => { hasMovedRef.current = false; }, 60);
+    }
+  };
+
+  const onClickCapture = (e: React.MouseEvent) => {
+    if (hasMovedRef.current) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  };
+
   return (
     <div className="space-y-3">
-      <div ref={row} role="list" aria-label="Profili registrati" data-map-gestures=""
-        className={`no-scrollbar -mx-6 flex snap-x snap-mandatory overflow-x-auto py-4 touch-pan-x [scrollbar-width:none] sm:-mx-0 ${wide ? "!mx-[calc(50%-min(50vw-2rem,36rem))] gap-6 px-[calc(min(50vw-2rem,36rem)-12.5rem)] [mask-image:linear-gradient(90deg,transparent,#000_12%,#000_88%,transparent)]" : "gap-3 px-[11%]"}`}>
+      <div
+        ref={row}
+        role="list"
+        aria-label="Profili registrati"
+        data-map-gestures=""
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={finishDrag}
+        onPointerCancel={finishDrag}
+        onClickCapture={onClickCapture}
+        className={`no-scrollbar -mx-6 flex snap-x snap-mandatory overflow-x-auto py-4 touch-pan-x cursor-grab select-none [scrollbar-width:none] sm:-mx-0 ${
+          wide
+            ? "!mx-[calc(50%-min(50vw-2rem,36rem))] 2k:!mx-[calc(50%-min(50vw-2rem,48rem))] gap-6 px-[calc(min(50vw-2rem,36rem)-12.5rem)] 2k:px-[calc(min(50vw-2rem,48rem)-16rem)] 4k:px-[calc(min(50vw-2rem,56rem)-18rem)] [mask-image:linear-gradient(90deg,transparent,#000_12%,#000_88%,transparent)]"
+            : "gap-3 px-[11%]"
+        }`}
+      >
         {known.map((k, i) => {
           const pic = resolveProfilePic(k, avatar);
           return (
@@ -339,8 +416,34 @@ function ProfileCarousel({ known, foreign, onPick, onAdd }: { known: KnownProId[
           </div>
         </div>
       </div>
-      <div className="flex justify-center gap-1.5" aria-hidden="true">
-        {[...known.map(keyOf), "add"].map((key, i) => <button key={key} type="button" tabIndex={-1} onClick={() => go(i)} className={`h-1.5 rounded-full transition-all ${i === active ? "w-5 bg-brand-turquoise" : "w-1.5 bg-white/30"}`} />)}
+      <div className="relative mx-auto h-1.5" style={{ width: `${(known.length + 1) * 24 - 4}px` }} role="tablist" aria-label="Indicatori profilo">
+        {/* Track dots */}
+        {Array.from({ length: known.length + 1 }).map((_, i) => (
+          <span
+            key={i}
+            className="absolute top-0 size-1.5 rounded-full bg-white/30"
+            style={{ left: `${i * 24 + 7}px` }}
+            aria-hidden="true"
+          />
+        ))}
+        {/* Sliding turquoise pill / blue cursor */}
+        <span
+          className="absolute top-0 h-1.5 w-5 rounded-full bg-brand-turquoise shadow-[0_0_12px_rgba(45,212,191,0.7)] transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none"
+          style={{ transform: `translateX(${active * 24}px)` }}
+          aria-hidden="true"
+        />
+        {/* Invisible hit areas for clicking dots */}
+        {Array.from({ length: known.length + 1 }).map((_, i) => (
+          <button
+            key={i}
+            type="button"
+            tabIndex={-1}
+            aria-label={`Vai alla scheda ${i + 1}`}
+            onClick={() => go(i)}
+            className="absolute -top-3 h-7 w-6 cursor-pointer rounded-full outline-none focus-visible:ring-1 focus-visible:ring-brand-turquoise"
+            style={{ left: `${i * 24}px` }}
+          />
+        ))}
       </div>
     </div>
   );
