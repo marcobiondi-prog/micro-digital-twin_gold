@@ -831,6 +831,13 @@ function ProposalPill({ text, constrained, onApply, onDismiss }: { text: string;
  * headset (views/v10/vr-view, loaded on the first tap).
  */
 function VrButton({ kind, area, guest = false }: { kind: SimKind; area: DrawnArea; guest?: boolean }) {
+  if (typeof navigator !== "undefined") {
+    const ua = navigator.userAgent || "";
+    const isHeadset = /OculusBrowser|Quest|Pico|ViveFocus/i.test(ua);
+    if (!isHeadset && (/Android|iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1))) {
+      return null;
+    }
+  }
   const [ok, setOk] = useState(false);
   const [busy, setBusy] = useState(false);
   const [hint, setHint] = useState(false);

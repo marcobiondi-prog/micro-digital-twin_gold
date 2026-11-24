@@ -13,6 +13,9 @@ export default defineConfig({
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },
   resolve: {
-    alias: { "@": path.resolve(__dirname, "./src") },
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+      "ez-tree-src": path.resolve(__dirname, "node_modules/@dgreenheck/ez-tree/src/lib/index.js"),
+    },
   },
 });
