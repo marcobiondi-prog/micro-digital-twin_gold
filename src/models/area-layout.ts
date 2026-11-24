@@ -528,17 +528,17 @@ export const PERGOLA_COLORS = { post: "#9aa3ab", beam: "#3b4148", slat: "#ece3cf
  * (3.1–3.25 m), leaving light between them. Built as slabs like the trees.
  */
 export function pergolaParts(strip: Ring, lite = false, open = 1): TreePart[] {
-  // Round shades in their simple shape: each a slim central pole and its round canopy as one sheet, 3–3,08 m up,
-  // as open as the sun says (the realistic ones are views/ar-papillon).
+  // Retractable shade sails in their simple shape: corner masts and concave sail wings, 3–3,08 m up,
+  // as unrolled as the sun says (the realistic ones are views/ar-papillon).
   if (strip.length < 3) return [];
   const R = rectFrameOf(strip), vy: [number, number] = [-R.ux[1], R.ux[0]];
   const ll = (x: number, z: number) => toLL(R.f, R.cx + R.ux[0] * x + vy[0] * z, R.cy + R.ux[1] * x + vy[1] * z);
   const parts: TreePart[] = [];
   for (const u of papillonUnits(R.w, R.d)) {
-    const sq = (r: number): Ring => [[-r, -r], [r, -r], [r, r], [-r, r]].map(([a, b]) => ll(u.x + a!, u.z + b!));
-    const circle = (r: number, n = 16): Ring => Array.from({ length: n }, (_, i) => ll(u.x + Math.sin((2 * Math.PI * i) / n) * r, u.z + Math.cos((2 * Math.PI * i) / n) * r));
-    parts.push({ ring: circle(Math.max(1.1, Math.min(1.7, u.r * 0.55)), lite ? 10 : 16), base: 0, height: 0.12, color: "#a8784c" });
-    parts.push({ ring: sq(0.08), base: 0, height: 3.2, color: PERGOLA_COLORS.post });
+    const s = u.r * 0.88;
+    const sq = (cx: number, cz: number, r: number): Ring => [[-r, -r], [r, -r], [r, r], [-r, r]].map(([a, b]) => ll(cx + a!, cz + b!));
+    parts.push({ ring: sq(u.x - s, u.z - s, 0.06), base: 0, height: 3.3, color: PERGOLA_COLORS.post });
+    parts.push({ ring: sq(u.x + s, u.z + s, 0.06), base: 0, height: 2.45, color: PERGOLA_COLORS.post });
     parts.push({ ring: papillonFan(u, open, lite ? 12 : 20).map(([x, z]) => ll(x, z)), base: 3, height: 3.08, color: lite ? `${PERGOLA_COLORS.slat}d9` : PERGOLA_COLORS.slat });
   }
   return parts;
@@ -887,12 +887,31 @@ export function canopyReach(r: number, open: number): number {
   const o = Math.max(0, Math.min(1, open));
   return r * (0.12 + 0.88 * o);
 }
-/** The round canopy of one unit seen from above, in its rectangle's frame: a ring of `seg` points round the pole. */
+/** Concave four-corner retractable sail seen from above, unrolling from the diagonal boom (−s,−s)→(+s,+s) out to (−s,+s) and (+s,−s). */
 export function papillonFan(u: PapillonUnit, open: number, seg = 24): Array<[number, number]> {
-  const R = canopyReach(u.r, open), pts: Array<[number, number]> = [];
-  for (let i = 0; i < seg; i++) {
-    const a = (2 * Math.PI * i) / seg;
-    pts.push([u.x + Math.sin(a) * R, u.z + Math.cos(a) * R]);
+  const o = Math.max(0, Math.min(1, open));
+  const s = u.r * 0.88;
+  const reach = 0.08 + 0.92 * o;
+  // Corners in local unit coordinates: A (−s,−s), Hi (−s·reach, +s·reach) mirrored across diagonal, C (+s,+s), Lo (+s·reach, −s·reach).
+  const corners: Array<[number, number]> = [
+    [-s, -s],
+    [-s * reach, s * reach],
+    [s, s],
+    [s * reach, -s * reach],
+  ];
+  const perEdge = Math.max(2, Math.round(seg / 4));
+  const sag = 0.14 * o;
+  const pts: Array<[number, number]> = [];
+  for (let e = 0; e < 4; e++) {
+    const a = corners[e]!, b = corners[(e + 1) % 4]!;
+    for (let k = 0; k < perEdge; k++) {
+      const t = k / perEdge;
+      const px = a[0] + (b[0] - a[0]) * t;
+      const pz = a[1] + (b[1] - a[1]) * t;
+      // Pull each catenary edge gently towards the sail's centre (0,0).
+      const pull = 1 - sag * 4 * t * (1 - t);
+      pts.push([u.x + px * pull, u.z + pz * pull]);
+    }
   }
   return pts;
 }
@@ -910,18 +929,28 @@ export function rectFrameOf(ring: Ring): { f: Frame; cx: number; cy: number; ux:
   const cs = (s0 + s1) / 2, ct = (t0 + t1) / 2;
   return { f, cx: ux[0] * cs + vy[0] * ct, cy: ux[1] * cs + vy[1] * ct, ux, w: s1 - s0, d: t1 - t0 };
 }
-/** The side-pole sails of a shade ring on the map: their fans (lat/lng) and poles, open as the sun says. */
+/** Retractable sails on the 2D map: concave sail wings, diagonal roller boom + traction cables, and corner masts. */
 export function papillonsOf(ring: Ring, open = 1): { fans: Ring[]; poles: LatLng[]; ribs: Ring[] } {
   if (ring.length < 3) return { fans: [], poles: [], ribs: [] };
   const R = rectFrameOf(ring), vy: [number, number] = [-R.ux[1], R.ux[0]];
-  // Rectangle frame: x along ux (w), z along vy (d).
   const ll = (x: number, z: number) => toLL(R.f, R.cx + R.ux[0] * x + vy[0] * z, R.cy + R.ux[1] * x + vy[1] * z);
   const fans: Ring[] = [], poles: LatLng[] = [], ribs: Ring[] = [];
+  const seen = new Set<string>();
+  const addPole = (x: number, z: number) => {
+    const k = `${Math.round(x * 4)}:${Math.round(z * 4)}`;
+    if (!seen.has(k)) { seen.add(k); poles.push(ll(x, z)); }
+  };
   for (const u of papillonUnits(R.w, R.d)) {
-    const fan = papillonFan(u, open);
-    fans.push(fan.map(([x, z]) => ll(x, z)));
-    poles.push(ll(u.x, u.z));
-    for (let k = 0; k < fan.length; k += 3) { const q = fan[k]!; ribs.push([ll(u.x, u.z), ll(q[0], q[1])]); }
+    const s = u.r * 0.88;
+    fans.push(papillonFan(u, open).map(([x, z]) => ll(x, z)));
+    addPole(u.x - s, u.z - s);
+    addPole(u.x + s, u.z + s);
+    addPole(u.x - s, u.z + s);
+    addPole(u.x + s, u.z - s);
+    // Diagonal roller boom + cross traction cables to the two wing masts.
+    ribs.push([ll(u.x - s, u.z - s), ll(u.x + s, u.z + s)]);
+    ribs.push([ll(u.x, u.z), ll(u.x - s, u.z + s)]);
+    ribs.push([ll(u.x, u.z), ll(u.x + s, u.z - s)]);
   }
   return { fans, poles, ribs };
 }
