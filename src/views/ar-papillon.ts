@@ -3,51 +3,53 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { papillonUnits } from "@/models/area-layout";
 
 /**
- * Architectural motorised retractable shade sails ("vele ombreggianti retrattili") for the 3D maps, VR and AR views:
- * each bay stands on four inclined powder-coated anthracite steel masts with brushed stainless steel base flanges,
- * collars and masthead pulley blocks (perimeter wing masts guyed with stainless tie-rods). Across the diagonal between
- * the two main masts runs a motorised satin-steel furling roller boom with a tubular motor head and a warm underside
- * LED strip. Two asymmetric-height triangular hypar sail wings (one pulled up to the high corner mast, one sloped down
- * to the low runoff mast) unfurl from the roller boom along taut stainless traction cables, with concave catenary
- * leech edges, tailored seam lines, dark reinforced border webbing and stainless clew rings.
- *
- * `open` (0–1) controls how far the sails are unrolled: at 1 both wings are taut out to the corner masts; at 0.5 they
- * are half-furled with the traction cables visible; at 0 the fabric is neatly rolled around the diagonal boom.
- * Adjacent bays in a multi-sail block share corner masts cleanly without duplicate poles; `joined` spans the whole
- * footprint with one continuous retractable double-wing sail.
+ * Four-point hyperbolic-paraboloid ("hypar" / saddle) retractable shade sail on two outward-leaning warm wooden posts
+ * and two low ground-anchored guy lines (modelled directly after the user's reference photo):
+ * - Two opposite diagonal corners soar high towards two square-chamfered chestnut/teak timber posts leaning outward
+ *   (~18°), each post braced behind by a taut external guy wire to a ground stake, with a twin white V-cord bridle
+ *   connecting the sail's corner D-ring to the post top.
+ * - The other two opposite corners sweep dramatically downward (~1.35–1.45 m) with no posts, pulled taut by guy cords
+ *   angled down to discreet ground stakes outside the footprint.
+ * - The continuous warm taupe ("tortora") technical sail cloth has deep concave catenary edges on all four sides with
+ *   a matching stitched webbing hem, subtle corner tension pleats, and casts the signature four-pointed star shadow.
+ * - Retractable (`open` 0–1): as `open` decreases, the two low corners release along their guy lines and furl smoothly
+ *   inward into a slim taut sleeve suspended between the two inclined wooden posts.
  */
 
 type Mats = {
-  pole: THREE.Material;
+  wood: THREE.Material;
   satin: THREE.Material;
-  cable: THREE.Material;
-  stone: THREE.Material;
+  cord: THREE.Material;
+  wire: THREE.Material;
   fabric: THREE.Material;
-  trim: THREE.Material;
-  led: THREE.Material;
+  hem: THREE.Material;
   shadow: THREE.Material;
 };
 
 let sailTex: THREE.CanvasTexture | null = null;
+let woodTex: THREE.CanvasTexture | null = null;
+
+function isTestDom(): boolean {
+  return typeof document === "undefined" || (typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent));
+}
+
 function sailFabricTexture(): THREE.CanvasTexture | null {
   if (sailTex) return sailTex;
-  if (typeof document === "undefined" || (typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent))) return null;
+  if (isTestDom()) return null;
   const c = document.createElement("canvas");
   c.width = c.height = 256;
   const g = c.getContext("2d");
   if (!g) return null;
-  g.fillStyle = "#f5f0e6";
+  // Warm taupe / tortora canvas weave with subtle panel seams.
+  g.fillStyle = "#aba294";
   g.fillRect(0, 0, 256, 256);
-  // Subtle micro-perforated technical weave + stitched panel seams parallel to the roller boom (along u).
-  g.fillStyle = "rgba(130, 120, 105, 0.055)";
-  for (let y = 0; y < 256; y += 4) g.fillRect(0, y, 256, 1);
-  g.fillStyle = "rgba(120, 110, 96, 0.045)";
-  for (let x = 0; x < 256; x += 4) g.fillRect(x, 0, 1, 256);
-  for (let y = 32; y < 256; y += 32) {
-    g.fillStyle = "rgba(115, 106, 92, 0.16)";
-    g.fillRect(0, y, 256, 2);
-    g.fillStyle = "rgba(255, 255, 255, 0.35)";
-    g.fillRect(0, y + 2, 256, 1);
+  g.fillStyle = "rgba(75, 68, 58, 0.055)";
+  for (let y = 0; y < 256; y += 3) g.fillRect(0, y, 256, 1);
+  g.fillStyle = "rgba(255, 250, 242, 0.045)";
+  for (let x = 0; x < 256; x += 3) g.fillRect(x, 0, 1, 256);
+  for (let y = 64; y < 256; y += 64) {
+    g.fillStyle = "rgba(78, 71, 61, 0.11)";
+    g.fillRect(0, y, 256, 1.5);
   }
   sailTex = new THREE.CanvasTexture(c);
   sailTex.colorSpace = THREE.SRGBColorSpace;
@@ -55,13 +57,34 @@ function sailFabricTexture(): THREE.CanvasTexture | null {
   return sailTex;
 }
 
+function timberTexture(): THREE.CanvasTexture | null {
+  if (woodTex) return woodTex;
+  if (isTestDom()) return null;
+  const c = document.createElement("canvas");
+  c.width = 128;
+  c.height = 256;
+  const g = c.getContext("2d");
+  if (!g) return null;
+  g.fillStyle = "#aa5e27";
+  g.fillRect(0, 0, 128, 256);
+  for (let x = 0; x < 128; x += 3) {
+    const d = Math.sin(x * 0.27) * 12 + Math.cos(x * 0.73) * 6;
+    g.fillStyle = d > 0 ? `rgba(218, 146, 78, ${(d / 85).toFixed(3)})` : `rgba(92, 44, 14, ${(-d / 95).toFixed(3)})`;
+    g.fillRect(x, 0, 2, 256);
+  }
+  woodTex = new THREE.CanvasTexture(c);
+  woodTex.colorSpace = THREE.SRGBColorSpace;
+  woodTex.wrapS = woodTex.wrapT = THREE.RepeatWrapping;
+  return woodTex;
+}
+
 function tube(points: THREE.Vector3[], r: number, radial = 6, closed = false): THREE.BufferGeometry {
   const curve = new THREE.CatmullRomCurve3(points, closed);
   return new THREE.TubeGeometry(curve, Math.max(2, points.length * 3), r, radial, closed);
 }
 
-/** A round rod (tapering r0 → r1) from a to b, always carrying UVs so it can merge into any material bin. */
-function rodBetween(a: THREE.Vector3, b: THREE.Vector3, r0: number, r1: number, radial = 16): THREE.BufferGeometry {
+/** A round rod (tapering r0 → r1) from a to b. */
+function rodBetween(a: THREE.Vector3, b: THREE.Vector3, r0: number, r1: number, radial = 12): THREE.BufferGeometry {
   const len = Math.max(1e-4, a.distanceTo(b));
   const geo = new THREE.CylinderGeometry(r1, r0, len, radial, 1);
   geo.translate(0, len / 2, 0);
@@ -72,7 +95,20 @@ function rodBetween(a: THREE.Vector3, b: THREE.Vector3, r0: number, r1: number, 
   return geo;
 }
 
-/** Kept exported for backwards compatibility with any caller checking footprint sizing. */
+/** A square-section chamfered wooden post tapering slightly from foot to tip, oriented along foot → top. */
+function woodPostBetween(foot: THREE.Vector3, top: THREE.Vector3, w0 = 0.082, w1 = 0.064): THREE.BufferGeometry {
+  const len = Math.max(1e-4, foot.distanceTo(top));
+  // 4-sided cylinder rotated 45° gives a crisp square timber beam with UV mapping along its length.
+  const geo = new THREE.CylinderGeometry(w1 * 0.72, w0 * 0.72, len, 4, 1);
+  geo.rotateY(Math.PI / 4);
+  geo.translate(0, len / 2, 0);
+  const dir = top.clone().sub(foot).normalize();
+  geo.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir));
+  geo.translate(foot.x, foot.y, foot.z);
+  return geo;
+}
+
+/** Kept exported for compatibility. */
 export function platformRadius(r: number): number {
   return Math.max(1.1, Math.min(1.7, r * 0.55));
 }
@@ -80,68 +116,76 @@ export function platformRadius(r: number): number {
 type Put = (m: THREE.Material, g: THREE.BufferGeometry) => void;
 
 /**
- * One triangular retractable hypar sail wing with concave catenary leech edges:
- * - `p0 → p1`: luff attached along the diagonal roller boom
- * - `clew`: current movable corner pulled along the traction cable towards the masthead pulley
+ * Continuous 4-point hyperbolic paraboloid ("hypar") saddle sail with deep concave catenary edges and subtle tension
+ * pleats radiating from the pulled corners:
+ * - c00, c11: high corners (attached via twin V-cords to the two inclined wooden posts)
+ * - c10, c01: low corners (pulled down toward ground anchor stakes; retract smoothly toward the c00–c11 ridge as open → 0)
  */
-function sailWingGeo(p0: THREE.Vector3, p1: THREE.Vector3, clew: THREE.Vector3, open: number) {
-  const N = 14;
-  const mid = p0.clone().add(p1).multiplyScalar(0.5);
-  const span = p0.distanceTo(p1);
-  const reach = mid.distanceTo(clew);
-  // Inward directions in the wing's plane for the two concave catenary edges (p0→clew and p1→clew).
-  const centroid = p0.clone().add(p1).add(clew).multiplyScalar(1 / 3);
-  const inDir0 = centroid.clone().sub(p0.clone().add(clew).multiplyScalar(0.5));
-  const inDir1 = centroid.clone().sub(p1.clone().add(clew).multiplyScalar(0.5));
-  const catScale = Math.min(0.34, reach * 0.13) * (0.35 + 0.65 * open);
-  if (inDir0.lengthSq() > 1e-6) inDir0.normalize().multiplyScalar(catScale);
-  if (inDir1.lengthSq() > 1e-6) inDir1.normalize().multiplyScalar(catScale);
-  const belly = Math.min(0.14, span * 0.022) * open;
+function hyparSailGeo(
+  c00: THREE.Vector3,
+  c10: THREE.Vector3,
+  c01: THREE.Vector3,
+  c11: THREE.Vector3,
+  open: number,
+) {
+  const N = 26;
+  const scoop = 0.215 * (0.3 + 0.7 * open); // deep concave catenary inward pull on all 4 edges
+  const diagSpan = c00.distanceTo(c11);
+  const ridgeDip = Math.min(0.32, diagSpan * 0.042) * open;
 
-  const evalPt = (a: number, b: number, c: number) => {
-    // a at p0, b at p1, c at clew (a + b + c = 1).
+  const evalPt = (s: number, t: number) => {
+    // Map (s, t) ∈ [0,1]^2 inward along smooth catenary arcs so all 4 edges curve deeply in while the 4 tips stay sharp.
+    const sp = s + scoop * (0.5 - s) * 4 * t * (1 - t);
+    const tp = t + scoop * (0.5 - t) * 4 * s * (1 - s);
+
+    const w00 = (1 - sp) * (1 - tp);
+    const w10 = sp * (1 - tp);
+    const w01 = (1 - sp) * tp;
+    const w11 = sp * tp;
+
     const p = new THREE.Vector3(
-      p0.x * a + p1.x * b + clew.x * c,
-      p0.y * a + p1.y * b + clew.y * c,
-      p0.z * a + p1.z * b + clew.z * c,
+      c00.x * w00 + c10.x * w10 + c01.x * w01 + c11.x * w11,
+      c00.y * w00 + c10.y * w10 + c01.y * w01 + c11.y * w11,
+      c00.z * w00 + c10.z * w10 + c01.z * w01 + c11.z * w11,
     );
-    // Concave catenary scoop along the two free leech edges (strongest at each edge, fading smoothly inward).
-    const w0 = (1 - Math.min(1, b * 3.2)) ** 2 * (4 * a * c);
-    const w1 = (1 - Math.min(1, a * 3.2)) ** 2 * (4 * b * c);
-    p.addScaledVector(inDir0, w0);
-    p.addScaledVector(inDir1, w1);
-    // Slight hypar tension sag across the middle of the cloth.
-    p.y -= belly * 4 * (a + b) * c * (1 - 0.35 * Math.abs(a - b));
+
+    // Gentle natural gravity sag across the interior so the high ridge sweeps in a smooth catenary arc.
+    const interior = 16 * sp * (1 - sp) * tp * (1 - tp);
+    const diagMid = 4 * ((sp + tp) * 0.5) * (1 - (sp + tp) * 0.5);
+    p.y -= ridgeDip * (0.45 * diagMid * (1 - Math.abs(sp - tp)) + 0.55 * interior);
+
+    // Subtle radial corner tension pleats (like the real taut fabric creases near the pulled corners in the photo).
+    if (open > 0.35) {
+      const cornerPleat = (du: number, dv: number) => {
+        const dist = Math.hypot(du, dv);
+        if (dist < 0.03 || dist > 0.65) return 0;
+        const ang = Math.atan2(dv, du);
+        const env = Math.sin(Math.PI * ((dist - 0.03) / 0.62)) ** 2 * (1 - dist / 0.7);
+        return Math.sin(ang * 14) * 0.011 * env * open;
+      };
+      p.y += cornerPleat(sp, tp) + cornerPleat(1 - sp, 1 - tp) - 0.6 * (cornerPleat(1 - sp, tp) + cornerPleat(sp, 1 - tp));
+    }
     return p;
   };
 
-  // Grid indexed by row i (0 at boom, N at clew) and column j (0..N-i from p0 to p1).
   const pos: number[] = [];
   const uvs: number[] = [];
-  const rowStart: number[] = [];
-  let vertCount = 0;
-  for (let i = 0; i <= N; i++) {
-    rowStart.push(vertCount);
-    const c = i / N;
-    const cols = N - i;
-    for (let j = 0; j <= cols; j++) {
-      const rem = 1 - c;
-      const b = cols === 0 ? 0 : (j / cols) * rem;
-      const a = rem - b;
-      const p = evalPt(a, b, c);
+  for (let j = 0; j <= N; j++) {
+    const t = j / N;
+    for (let i = 0; i <= N; i++) {
+      const s = i / N;
+      const p = evalPt(s, t);
       pos.push(p.x, p.y, p.z);
-      // UVs: v runs from boom to clew (seam stripes parallel to the boom!), u runs along the boom.
-      uvs.push(cols === 0 ? 0.5 : j / cols, c * Math.max(0.4, reach / 2.6));
-      vertCount++;
+      uvs.push(s * 2, t * 2);
     }
   }
   const idx: number[] = [];
-  for (let i = 0; i < N; i++) {
-    const r0 = rowStart[i]!, r1 = rowStart[i + 1]!;
-    const cols = N - i;
-    for (let j = 0; j < cols; j++) {
-      idx.push(r0 + j, r0 + j + 1, r1 + j);
-      if (j + 1 < cols) idx.push(r0 + j + 1, r1 + j + 1, r1 + j);
+  const row = N + 1;
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const a = j * row + i, b = a + 1, c = a + row, d = c + 1;
+      // Split along the high diagonal (a → d) so the hypar ridge is smooth and crease-free.
+      idx.push(a, b, d, a, d, c);
     }
   }
   const geo = new THREE.BufferGeometry();
@@ -150,194 +194,139 @@ function sailWingGeo(p0: THREE.Vector3, p1: THREE.Vector3, clew: THREE.Vector3, 
   geo.setIndex(idx);
   geo.computeVertexNormals();
 
-  const edge0: THREE.Vector3[] = [];
-  const edge1: THREE.Vector3[] = [];
-  for (let i = 0; i <= N; i++) {
-    const c = i / N;
-    edge0.push(evalPt(1 - c, 0, c));
-    edge1.push(evalPt(0, 1 - c, c));
+  const edges: THREE.Vector3[][] = [[], [], [], []];
+  for (let k = 0; k <= N; k++) {
+    const u = k / N;
+    edges[0]!.push(evalPt(u, 0));
+    edges[1]!.push(evalPt(1, u));
+    edges[2]!.push(evalPt(1 - u, 1));
+    edges[3]!.push(evalPt(0, 1 - u));
   }
-  return { geo, edge0, edge1 };
+  return { geo, edges };
 }
 
-type Role = "boomA" | "boomC" | "high" | "low";
-type MastNode = {
-  x: number;
-  z: number;
-  h: number;
-  leanX: number;
-  leanZ: number;
-  touches: number;
-  wingMast: boolean;
-  top: THREE.Vector3;
+type PostNode = {
   foot: THREE.Vector3;
+  top: THREE.Vector3;
+  outX: number;
+  outZ: number;
+  guyed: boolean;
 };
 
-type BaySpec = {
-  mA: MastNode;
-  mC: MastNode;
-  mHi: MastNode;
-  mLo: MastNode;
-  joined: boolean;
+type SailBay = {
+  postA: PostNode;
+  postC: PostNode;
+  lowBAnchor: THREE.Vector3; // ground stake for low corner B
+  lowDAnchor: THREE.Vector3; // ground stake for low corner D
+  lowBFull: THREE.Vector3;   // low sail tip B when 100% open
+  lowDFull: THREE.Vector3;   // low sail tip D when 100% open
+  hiAFull: THREE.Vector3;    // high sail tip A (inset from postA.top by twin V-cord bridle)
+  hiCFull: THREE.Vector3;    // high sail tip C (inset from postC.top by twin V-cord bridle)
 };
 
-function buildMast(m: MastNode, mats: Mats, out: THREE.Group, put: Put) {
-  const { foot, top } = m;
-  // Low stone plinth + brushed steel anchor flange with 4 anchor bolts.
-  const plinth = new THREE.CylinderGeometry(0.17, 0.19, 0.035, 24);
-  plinth.translate(foot.x, 0.0175, foot.z);
-  put(mats.stone, plinth);
+function buildWoodPost(p: PostNode, mats: Mats, out: THREE.Group, put: Put) {
+  const { foot, top } = p;
+  // Subtle concealed ground socket collar at soil/paving level + outward-leaning warm wooden post.
+  const socket = new THREE.CylinderGeometry(0.052, 0.062, 0.05, 12);
+  socket.translate(foot.x, 0.025, foot.z);
+  put(mats.satin, socket);
 
-  const plate = new THREE.CylinderGeometry(0.135, 0.145, 0.02, 24);
-  plate.translate(foot.x, 0.045, foot.z);
-  put(mats.satin, plate);
+  put(mats.wood, woodPostBetween(foot, top, 0.086, 0.066));
 
-  for (let k = 0; k < 4; k++) {
-    const a = (Math.PI / 2) * k + Math.PI / 4;
-    const bolt = new THREE.CylinderGeometry(0.011, 0.011, 0.018, 8);
-    bolt.translate(foot.x + Math.cos(a) * 0.1, 0.06, foot.z + Math.sin(a) * 0.1);
-    put(mats.pole, bolt);
-  }
-
-  // Tapered structural steel mast + brushed stainless collar + machined masthead cap.
-  put(mats.pole, rodBetween(foot, top, 0.056, 0.039, 18));
-
+  // Small stainless eye-cap at the top of the wooden post.
   const dir = top.clone().sub(foot).normalize();
-  const collarAt = foot.clone().lerp(top, 0.11);
-  const collar = new THREE.CylinderGeometry(0.06, 0.062, 0.055, 20);
-  collar.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir));
-  collar.translate(collarAt.x, collarAt.y, collarAt.z);
-  put(mats.satin, collar);
-
-  const head = new THREE.CylinderGeometry(0.048, 0.044, 0.09, 18);
-  head.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir));
-  head.translate(top.x, top.y, top.z);
-  put(mats.satin, head);
-
-  const cap = new THREE.SphereGeometry(0.044, 14, 10);
-  cap.scale(1, 0.55, 1);
-  cap.translate(top.x + dir.x * 0.045, top.y + dir.y * 0.045, top.z + dir.z * 0.045);
+  const cap = new THREE.CylinderGeometry(0.036, 0.042, 0.035, 12);
+  cap.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir));
+  cap.translate(top.x, top.y, top.z);
   put(mats.satin, cap);
 
-  // Wing masts carry a stainless pulley block at the top and, on outer perimeter masts, an external stainless guy rod.
-  if (m.wingMast) {
-    const sheave = new THREE.CylinderGeometry(0.038, 0.038, 0.022, 16);
-    sheave.rotateZ(Math.PI / 2);
-    sheave.translate(top.x - m.leanX * 0.22, top.y - 0.02, top.z - m.leanZ * 0.22);
-    put(mats.satin, sheave);
-
-    // Cleat / tensioner 1.1 m up the mast for the return line.
-    const cleatAt = foot.clone().lerp(top, 0.34);
-    const cleat = new THREE.CylinderGeometry(0.048, 0.048, 0.04, 14);
-    cleat.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir));
-    cleat.translate(cleatAt.x, cleatAt.y, cleatAt.z);
-    put(mats.satin, cleat);
-
-    if (m.touches === 1) {
-      const len = Math.hypot(m.leanX, m.leanZ) || 1;
-      const ux = m.leanX / len, uz = m.leanZ / len;
-      const anchor = new THREE.Vector3(foot.x + ux * 0.36, 0.03, foot.z + uz * 0.36);
-      const anchorPad = new THREE.CylinderGeometry(0.055, 0.065, 0.02, 14);
-      anchorPad.translate(anchor.x, 0.02, anchor.z);
-      put(mats.satin, anchorPad);
-      const tieTop = foot.clone().lerp(top, 0.88);
-      put(mats.cable, rodBetween(anchor, tieTop, 0.008, 0.008, 8));
-      // Turnbuckle barrel near the bottom of the tie-rod.
-      const tbA = anchor.clone().lerp(tieTop, 0.12), tbB = anchor.clone().lerp(tieTop, 0.24);
-      put(mats.satin, rodBetween(tbA, tbB, 0.017, 0.017, 10));
-    }
+  // External counterbalance guy wire from near the post top down to a discreet ground peg behind the post.
+  if (p.guyed) {
+    const guyTop = foot.clone().lerp(top, 0.96);
+    const stake = new THREE.Vector3(foot.x + p.outX * 1.15, 0.02, foot.z + p.outZ * 1.15);
+    put(mats.wire, rodBetween(stake, guyTop, 0.0045, 0.0045, 6));
+    const peg = new THREE.CylinderGeometry(0.022, 0.016, 0.05, 8);
+    peg.translate(stake.x, 0.025, stake.z);
+    put(mats.satin, peg);
   }
 
-  const disc = new THREE.Mesh(new THREE.CircleGeometry(0.38, 24), mats.shadow);
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(0.24, 20), mats.shadow);
   disc.rotation.x = -Math.PI / 2;
   disc.position.set(foot.x, 0.004, foot.z);
   out.add(disc);
 }
 
-function buildBayFixed(bay: BaySpec, mats: Mats, put: Put): (open: number, put: Put) => void {
-  const { mA, mC, mHi, mLo, joined } = bay;
-  const boomDir = mC.top.clone().sub(mA.top).normalize();
-  const aEnd = mA.top.clone().addScaledVector(boomDir, 0.07);
-  const cEnd = mC.top.clone().addScaledVector(boomDir, -0.07);
+function buildSailBay(bay: SailBay, mats: Mats, putFixed: Put): (open: number, putDyn: Put) => void {
+  const { postA, postC, lowBAnchor, lowDAnchor, lowBFull, lowDFull, hiAFull, hiCFull } = bay;
 
-  // Diagonal furling roller boom (anodised satin axle + anthracite tubular motor head at A + end bracket at C).
-  put(mats.satin, rodBetween(aEnd, cEnd, 0.032, 0.032, 16));
-  const motorEnd = aEnd.clone().addScaledVector(boomDir, 0.34);
-  put(mats.pole, rodBetween(mA.top, motorEnd, 0.052, 0.048, 16));
-  const motorRing = motorEnd.clone().addScaledVector(boomDir, 0.025);
-  put(mats.satin, rodBetween(motorEnd, motorRing, 0.051, 0.051, 16));
-  const idlerStart = cEnd.clone().addScaledVector(boomDir, -0.1);
-  put(mats.pole, rodBetween(idlerStart, mC.top, 0.045, 0.048, 16));
+  // Discreet ground stakes at the two low guy-line anchor points.
+  for (const st of [lowBAnchor, lowDAnchor]) {
+    const peg = new THREE.CylinderGeometry(0.022, 0.016, 0.045, 8);
+    peg.translate(st.x, 0.022, st.z);
+    putFixed(mats.satin, peg);
+  }
 
-  // Slim warm LED profile suspended just below the middle of the boom.
-  const ledA = aEnd.clone().lerp(cEnd, 0.16); ledA.y -= 0.058;
-  const ledB = aEnd.clone().lerp(cEnd, 0.84); ledB.y -= 0.058;
-  put(mats.pole, rodBetween(ledA, ledB, 0.014, 0.014, 10));
-  const ledGlowA = ledA.clone(); ledGlowA.y -= 0.012;
-  const ledGlowB = ledB.clone(); ledGlowB.y -= 0.012;
-  put(mats.led, rodBetween(ledGlowA, ledGlowB, 0.009, 0.009, 8));
+  // Twin V-bridle anchor points near the top of each wooden post (top tip and 24 cm further down the post),
+  // matching the two white tension cords visible at the top-left of the reference photo.
+  const aTop1 = postA.foot.clone().lerp(postA.top, 0.985);
+  const aTop2 = postA.foot.clone().lerp(postA.top, 0.91);
+  const cTop1 = postC.foot.clone().lerp(postC.top, 0.985);
+  const cTop2 = postC.foot.clone().lerp(postC.top, 0.91);
 
-  // Attachment span along the roller boom where the sail fabric rolls up.
-  const luffA = aEnd.clone().addScaledVector(boomDir, 0.28);
-  const luffC = cEnd.clone().addScaledVector(boomDir, -0.12);
-  const boomMid = luffA.clone().add(luffC).multiplyScalar(0.5);
-
-  const pulleyHi = mHi.top.clone(); pulleyHi.y -= 0.02;
-  const pulleyLo = mLo.top.clone(); pulleyLo.y -= 0.02;
-  const cleatHi = mHi.foot.clone().lerp(mHi.top, 0.34);
-  const cleatLo = mLo.foot.clone().lerp(mLo.top, 0.34);
-
-  // Full-open clew reach: 96% when joined so the canopy spans almost mast-to-mast; 90% on individual bays so the
-  // stainless turnbuckle/traction cable gap to each corner pulley reads crisp and realistic.
-  const maxReach = joined ? 0.965 : 0.9;
-  const fullHi = boomMid.clone().lerp(pulleyHi, maxReach);
-  const fullLo = boomMid.clone().lerp(pulleyLo, maxReach);
+  const diagMid = hiAFull.clone().add(hiCFull).multiplyScalar(0.5);
+  diagMid.y -= 0.14;
 
   return (open: number, putDyn: Put) => {
     const o = Math.max(0, Math.min(1, open));
-    // Fabric roll wrapped around the diagonal boom: thick when retracted (o = 0), slim when unrolled (o = 1).
-    const rRoll = 0.036 + 0.048 * (1 - o);
-    putDyn(mats.fabric, rodBetween(luffA, luffC, rRoll, rRoll, 20));
-    // Dark webbing end-bands on the rolled fabric.
-    const bandA2 = luffA.clone().addScaledVector(boomDir, 0.035);
-    const bandC1 = luffC.clone().addScaledVector(boomDir, -0.035);
-    putDyn(mats.trim, rodBetween(luffA, bandA2, rRoll + 0.004, rRoll + 0.004, 16));
-    putDyn(mats.trim, rodBetween(bandC1, luffC, rRoll + 0.004, rRoll + 0.004, 16));
 
-    const wings: Array<{ full: THREE.Vector3; pulley: THREE.Vector3; cleat: THREE.Vector3 }> = [
-      { full: fullHi, pulley: pulleyHi, cleat: cleatHi },
-      { full: fullLo, pulley: pulleyLo, cleat: cleatLo },
-    ];
+    // Twin light V-bridle cords from each wooden post top to the high sail corners.
+    putDyn(mats.cord, rodBetween(aTop1, hiAFull, 0.006, 0.006, 6));
+    putDyn(mats.cord, rodBetween(aTop2, hiAFull, 0.0055, 0.0055, 6));
+    putDyn(mats.cord, rodBetween(cTop1, hiCFull, 0.006, 0.006, 6));
+    putDyn(mats.cord, rodBetween(cTop2, hiCFull, 0.0055, 0.0055, 6));
 
-    for (const w of wings) {
-      const toPulley = w.pulley.clone().sub(boomMid);
-      const sideDir = toPulley.lengthSq() > 1e-6 ? toPulley.clone().normalize() : new THREE.Vector3(1, 0, 0);
-      // Retracted clew sits right against the rolled cylinder on the boom; opening pulls it smoothly along the cable.
-      const parked = boomMid.clone().addScaledVector(sideDir, rRoll + 0.035);
-      const clew = parked.clone().lerp(w.full, o);
-
-      // Taut stainless traction cable from the sail's clew ring to the masthead pulley, plus return line down the mast.
-      putDyn(mats.cable, rodBetween(clew, w.pulley, 0.0065, 0.0065, 8));
-      putDyn(mats.cable, rodBetween(w.pulley, w.cleat, 0.005, 0.005, 6));
-
-      // Stainless clew ring / corner hardware.
-      const ring = new THREE.TorusGeometry(0.032, 0.008, 8, 18);
-      ring.rotateX(Math.PI / 2);
-      ring.translate(clew.x, clew.y, clew.z);
+    // Stainless D-rings at the two high sail tips.
+    for (const tip of [hiAFull, hiCFull]) {
+      const ring = new THREE.TorusGeometry(0.026, 0.006, 6, 14);
+      ring.translate(tip.x, tip.y, tip.z);
       putDyn(mats.satin, ring);
+    }
 
-      if (o >= 0.04) {
-        const p0 = luffA.clone().addScaledVector(sideDir, rRoll * 0.72);
-        const p1 = luffC.clone().addScaledVector(sideDir, rRoll * 0.72);
-        const wing = sailWingGeo(p0, p1, clew, o);
-        putDyn(mats.fabric, wing.geo);
-        // Dark reinforced perimeter webbing along both concave catenary leech edges.
-        putDyn(mats.trim, tube(wing.edge0, 0.011, 5));
-        putDyn(mats.trim, tube(wing.edge1, 0.011, 5));
-        // Triangular stainless corner reinforcement patch at the clew.
-        const cPatch = clew.clone().lerp(boomMid, Math.min(0.18, 0.09 / Math.max(0.12, o)));
-        putDyn(mats.satin, rodBetween(cPatch, clew, 0.022, 0.012, 8));
+    if (o < 0.05) {
+      // Retracted / furled: a slim taut taupe fabric sleeve suspended in a gentle catenary between the two high tips,
+      // with the two low guy cords slackened neatly to the ground stakes.
+      const pts: THREE.Vector3[] = [];
+      for (let k = 0; k <= 12; k++) {
+        const t = k / 12;
+        const p = hiAFull.clone().lerp(hiCFull, t);
+        p.y -= 0.16 * 4 * t * (1 - t);
+        pts.push(p);
       }
+      putDyn(mats.fabric, tube(pts, 0.058, 12));
+      putDyn(mats.wire, rodBetween(diagMid, lowBAnchor, 0.004, 0.004, 6));
+      putDyn(mats.wire, rodBetween(diagMid, lowDAnchor, 0.004, 0.004, 6));
+      return;
+    }
+
+    // Current positions of the two retractable low corners: sweep smoothly from the high ridge down to their low taut points.
+    const lowB = diagMid.clone().lerp(lowBFull, o);
+    const lowD = diagMid.clone().lerp(lowDFull, o);
+
+    // Taut guy cords from the two low sail tips down to their ground anchor stakes (as in the photo's lower corners).
+    putDyn(mats.cord, rodBetween(lowB, lowBAnchor, 0.0055, 0.0055, 6));
+    putDyn(mats.cord, rodBetween(lowD, lowDAnchor, 0.0055, 0.0055, 6));
+
+    for (const tip of [lowB, lowD]) {
+      const ring = new THREE.TorusGeometry(0.024, 0.0055, 6, 14);
+      ring.translate(tip.x, tip.y, tip.z);
+      putDyn(mats.satin, ring);
+    }
+
+    // The continuous 4-point hypar saddle sail and its stitched matching-taupe catenary edge hem.
+    const sail = hyparSailGeo(hiAFull, lowB, lowD, hiCFull, o);
+    putDyn(mats.fabric, sail.geo);
+    for (const edge of sail.edges) {
+      putDyn(mats.hem, tube(edge, 0.0085, 5));
     }
   };
 }
@@ -373,24 +362,34 @@ type PapillonState = { open: number; built: number; target: number; build: (o: n
 export function realPapillons(def: { w: number; d: number; h?: number; open?: number; joined?: boolean }): THREE.Group {
   const out = new THREE.Group();
   const W = Math.max(1, def.w), D = Math.max(1, def.d), H = def.h ?? 3.2;
-  const tex = sailFabricTexture();
+  const sTex = sailFabricTexture();
+  const wTex = timberTexture();
+
   const mats: Mats = {
-    pole: new THREE.MeshStandardMaterial({ color: "#262a30", roughness: 0.36, metalness: 0.62 }),
-    satin: new THREE.MeshStandardMaterial({ color: "#d0d5dc", roughness: 0.24, metalness: 0.88 }),
-    cable: new THREE.MeshStandardMaterial({ color: "#b6bec7", roughness: 0.28, metalness: 0.85 }),
-    stone: new THREE.MeshStandardMaterial({ color: "#cdc6ba", roughness: 0.88 }),
+    wood: new THREE.MeshStandardMaterial({
+      // A texture already carries the timber's colour: the base stays white so the two do not multiply into black.
+      color: wTex ? "#ffffff" : "#b8682b",
+      ...(wTex ? { map: wTex } : {}),
+      emissive: "#522a0d",
+      emissiveIntensity: 0.28,
+      roughness: 0.64,
+      metalness: 0.03,
+    }),
+    satin: new THREE.MeshStandardMaterial({ color: "#d5dae0", roughness: 0.28, metalness: 0.82 }),
+    cord: new THREE.MeshStandardMaterial({ color: "#f0eee8", emissive: "#5e5c56", emissiveIntensity: 0.22, roughness: 0.55, metalness: 0.06 }),
+    wire: new THREE.MeshStandardMaterial({ color: "#c2c7ce", roughness: 0.34, metalness: 0.72 }),
     fabric: new THREE.MeshStandardMaterial({
-      color: "#f6f1e7",
-      ...(tex ? { map: tex } : {}),
-      emissive: "#8c8475",
-      emissiveIntensity: 0.45,
-      roughness: 0.78,
+      color: sTex ? "#ffffff" : "#b8afa0",
+      ...(sTex ? { map: sTex } : {}),
+      // The light through the cloth: its shaded underside stays a warm tortora, never a dark brown.
+      emissive: "#7a7266",
+      emissiveIntensity: 0.6,
+      roughness: 0.82,
       metalness: 0,
       side: THREE.DoubleSide,
     }),
-    trim: new THREE.MeshStandardMaterial({ color: "#353940", roughness: 0.58 }),
-    led: new THREE.MeshStandardMaterial({ color: "#fff3d6", emissive: "#ffd39a", emissiveIntensity: 1.05, roughness: 0.38 }),
-    shadow: new THREE.MeshBasicMaterial({ color: "#000", transparent: true, opacity: 0.24, depthWrite: false }),
+    hem: new THREE.MeshStandardMaterial({ color: "#9c9384", emissive: "#544e44", emissiveIntensity: 0.34, roughness: 0.8, metalness: 0 }),
+    shadow: new THREE.MeshBasicMaterial({ color: "#000", transparent: true, opacity: 0.2, depthWrite: false }),
   };
 
   const units = papillonUnits(W, D);
@@ -398,78 +397,92 @@ export function realPapillons(def: { w: number; d: number; h?: number; open?: nu
   const sCell = Math.min(6, Math.max(1.6, Math.min(W, D)));
   const nx = joinAll ? 1 : Math.max(1, Math.round(W / sCell));
   const nz = joinAll ? 1 : Math.max(1, Math.round(D / sCell));
-  const inset = joinAll ? 0.06 : Math.min(0.14, Math.min(W, D) * 0.04);
-  const xStart = -W / 2 + inset, xSpan = W - inset * 2;
-  const zStart = -D / 2 + inset, zSpan = D - inset * 2;
-  const cw = xSpan / nx, cd = zSpan / nz;
+  const cw = W / nx, cd = D / nz;
 
-  const hOf = (role: Role) =>
-    role === "high" ? H + 0.46 : role === "low" ? Math.max(2.25, H - 0.54) : H + 0.12;
-
-  const masts = new Map<string, MastNode>();
-  const getMast = (x: number, z: number, role: Role, cx: number, cz: number): MastNode => {
-    const key = `${Math.round(x * 100)}:${Math.round(z * 100)}`;
-    const dx = x - cx, dz = z - cz, dl = Math.hypot(dx, dz) || 1;
-    let m = masts.get(key);
-    if (!m) {
-      m = {
-        x,
-        z,
-        h: hOf(role),
-        leanX: dx / dl,
-        leanZ: dz / dl,
+  const posts = new Map<string, PostNode & { touches: number }>();
+  const getPost = (ix: number, iz: number, topH: number, cx: number, cz: number, lean: number) => {
+    const key = `${ix}:${iz}`;
+    const gx = -W / 2 + cw * ix;
+    const gz = -D / 2 + cd * iz;
+    const footIn = joinAll ? 0.36 : 0.34;
+    const footX = ix === 0 ? gx + footIn : ix === nx ? gx - footIn : gx;
+    const footZ = iz === 0 ? gz + footIn : iz === nz ? gz - footIn : gz;
+    const dx = gx - cx, dz = gz - cz, dl = Math.hypot(dx, dz) || 1;
+    const ux = dx / dl, uz = dz / dl;
+    let p = posts.get(key);
+    if (!p) {
+      p = {
+        foot: new THREE.Vector3(footX, 0, footZ),
+        top: new THREE.Vector3(footX + ux * lean, topH, footZ + uz * lean),
+        outX: ux,
+        outZ: uz,
+        guyed: true,
         touches: 1,
-        wingMast: role === "high" || role === "low",
-        foot: new THREE.Vector3(x, 0.045, z),
-        top: new THREE.Vector3(x, hOf(role), z),
       };
-      masts.set(key, m);
+      posts.set(key, p);
     } else {
-      m.leanX += dx / dl;
-      m.leanZ += dz / dl;
-      m.touches++;
-      if (role === "high" || role === "low") m.wingMast = true;
+      p.outX += ux;
+      p.outZ += uz;
+      p.touches++;
+      const ol = Math.hypot(p.outX, p.outZ);
+      if (ol > 1e-3) {
+        p.outX /= ol;
+        p.outZ /= ol;
+        p.top.set(p.foot.x + p.outX * (lean * 0.62), Math.max(p.top.y, topH), p.foot.z + p.outZ * (lean * 0.62));
+      } else {
+        p.top.set(p.foot.x, Math.max(p.top.y, topH), p.foot.z);
+        p.guyed = false;
+      }
     }
-    return m;
+    return p;
   };
 
-  const rawBays: Array<{ mA: MastNode; mC: MastNode; mHi: MastNode; mLo: MastNode; joined: boolean }> = [];
+  const bays: SailBay[] = [];
   for (let j = 0; j < nz; j++) {
     for (let i = 0; i < nx; i++) {
-      const x0 = xStart + cw * i, x1 = x0 + cw;
-      const z0 = zStart + cd * j, z1 = z0 + cd;
+      const x0 = -W / 2 + cw * i, x1 = x0 + cw;
+      const z0 = -D / 2 + cd * j, z1 = z0 + cd;
       const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-      // Alternating mirror across adjacent bays so shared corner masts always agree on role and height.
-      const xa = i % 2 === 0 ? x0 : x1, xb = i % 2 === 0 ? x1 : x0;
-      const za = j % 2 === 0 ? z0 : z1, zb = j % 2 === 0 ? z1 : z0;
-      rawBays.push({
-        mA: getMast(xa, za, "boomA", cx, cz),
-        mC: getMast(xb, zb, "boomC", cx, cz),
-        mHi: getMast(xa, zb, "high", cx, cz),
-        mLo: getMast(xb, za, "low", cx, cz),
-        joined: joinAll,
-      });
-    }
-  }
 
-  // Finalise outward masthead lean once all touching bays are registered.
-  for (const m of masts.values()) {
-    const ll = Math.hypot(m.leanX, m.leanZ);
-    const amp = joinAll ? 0.12 : m.touches === 1 ? 0.22 : 0.1;
-    const ox = ll > 1e-4 ? (m.leanX / ll) * amp : 0;
-    const oz = ll > 1e-4 ? (m.leanZ / ll) * amp : 0;
-    m.leanX = ll > 1e-4 ? m.leanX / ll : 0;
-    m.leanZ = ll > 1e-4 ? m.leanZ / ll : 0;
-    m.top.set(m.x + ox, m.h, m.z + oz);
+      // Alternating mirror on grid indices so adjacent bays meet at the exact shared grid vertex (ix, iz).
+      const iA = i % 2 === 0 ? i : i + 1;
+      const iB = i % 2 === 0 ? i + 1 : i;
+      const jA = j % 2 === 0 ? j : j + 1;
+      const jB = j % 2 === 0 ? j + 1 : j;
+
+      const xa = -W / 2 + cw * iA, xb = -W / 2 + cw * iB;
+      const za = -D / 2 + cd * jA, zb = -D / 2 + cd * jB;
+
+      // Strong outward lean (~18°, ~0.72 m horizontal lean over 3.3 m height) on the two wooden posts, just like the photo.
+      const lean = joinAll ? 0.56 : 0.72;
+      const postA = getPost(iA, jA, H + 0.28, cx, cz, lean);
+      const postC = getPost(iB, jB, H + 0.08, cx, cz, lean);
+
+      // High sail corners sit ~38 cm inside each post's top along the pull line (held by the twin white V-bridle cords).
+      const centerHi = new THREE.Vector3(cx, H * 0.72, cz);
+      const bridleFrac = joinAll ? 0.96 : 0.86;
+      const hiAFull = centerHi.clone().lerp(postA.top, bridleFrac);
+      const hiCFull = centerHi.clone().lerp(postC.top, bridleFrac);
+
+      // Low corners sweep down low (~1.38–1.48 m) with taut guy cords continuing outward to ground stakes.
+      const lowReachX = joinAll ? 0.94 : 0.88;
+      const lowBFull = new THREE.Vector3(cx + (xb - cx) * lowReachX, Math.max(1.28, H * 0.43), cz + (za - cz) * lowReachX);
+      const lowDFull = new THREE.Vector3(cx + (xa - cx) * lowReachX, Math.max(1.36, H * 0.46), cz + (zb - cz) * lowReachX);
+
+      const stakeOut = joinAll ? 0.98 : 1.12;
+      const lowBAnchor = new THREE.Vector3(cx + (xb - cx) * stakeOut, 0.02, cz + (za - cz) * stakeOut);
+      const lowDAnchor = new THREE.Vector3(cx + (xa - cx) * stakeOut, 0.02, cz + (zb - cz) * stakeOut);
+
+      bays.push({ postA, postC, lowBAnchor, lowDAnchor, lowBFull, lowDFull, hiAFull, hiCFull });
+    }
   }
 
   const fixed = new Map<THREE.Material, THREE.BufferGeometry[]>();
   const putFixed = binner(fixed);
-  for (const m of masts.values()) buildMast(m, mats, out, putFixed);
-  const drawers = rawBays.map((b) => buildBayFixed(b, mats, putFixed));
+  for (const p of posts.values()) buildWoodPost(p, mats, out, putFixed);
+  const drawers = bays.map((b) => buildSailBay(b, mats, putFixed));
   MERGE(fixed, out);
 
-  // Dynamic group rebuilt smoothly as `open` changes.
   const canopy = new THREE.Group();
   canopy.name = "papillon-canopy";
   out.add(canopy);
@@ -502,10 +515,6 @@ function stepPapillon(s: PapillonState) {
   s.onFrame?.();
 }
 
-/**
- * Makes every sail under `root` unroll or furl towards `target` (0 retracted – 1 open), moving smoothly
- * (about 4 s the whole way). onFrame is called at each step (the map's 3D asks for a repaint there).
- */
 export function setShadeTarget(root: THREE.Object3D, target: number, onFrame?: () => void): number {
   let n = 0;
   const t = Math.max(0, Math.min(1, target));
@@ -519,7 +528,6 @@ export function setShadeTarget(root: THREE.Object3D, target: number, onFrame?: (
   return n;
 }
 
-/** The sails' openness under the real sun now over (lat, lng): open from 15° of sun, closed under 5° and in winter. */
 export function realShadeOpen(lat: number, lng: number, date = new Date()): number {
   const rad = Math.PI / 180;
   const start = Date.UTC(date.getUTCFullYear(), 0, 0);
@@ -533,17 +541,13 @@ export function realShadeOpen(lat: number, lng: number, date = new Date()): numb
   return winter ? 0 : Math.max(0, Math.min(1, (sun - 5) / 10));
 }
 
-/**
- * How much light there is, 0 (dark) – 1 (bright), turned into the sails' openness with some hysteresis: they open
- * above `on` and close below `off`, so a shadow passing by does not make them flap. `was` is the last target.
- */
 export function lightTarget(level: number, was: number): number {
   const on = 0.34, off = 0.2;
   if (level >= on) return 1;
   if (level <= off) return 0;
   return was;
 }
-/** ARCore's light estimate (primary light and ambient, HDR) as a 0–1 light level. */
+
 export function arLightLevel(primary: number, ambient: number): number {
   return 1 - Math.exp(-(Math.max(0, primary) + Math.max(0, ambient) * 2) / 1.2);
 }

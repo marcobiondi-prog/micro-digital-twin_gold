@@ -4,9 +4,9 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import type { LatLng } from "@/models/area-layout";
 import { arObject, recognisedPlants } from "@/models/ar-objects";
 import { currentScans } from "@/models/ar-scan-log";
-import { planTreeDefs, rectOf } from "@/views/ar-plan";
+import { planTreeDefs, rectOf, xzAngleOf } from "@/views/ar-plan";
 import { realPapillons } from "@/views/ar-papillon";
-import { shadeBlocks } from "@/models/area-layout";
+import { shadePatchBlocks } from "@/models/area-layout";
 import { realBed } from "@/views/ar-bed";
 import { realMister } from "@/views/ar-mister";
 import { realSprinkler } from "@/views/ar-sprinkler";
@@ -201,10 +201,11 @@ export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number },
   };
   if (sim.kind === "piazza") {
     const L = sim.data;
-    // The shade strips joined into blocks first (shadeBlocks), so the side-pole sails stand along each block's edge.
-    const shadeRings = shadeBlocks(L.patches.filter((p) => p.kind === "shade").map((p) => p.ring));
-    for (const p of [...L.patches.filter((q) => q.kind !== "shade"), ...shadeRings.map((ring) => ({ kind: "shade" as const, ring }))]) {
-      const r = rectOf(p.ring.map(xz));
+    // The shade strips joined into blocks first (shadePatchBlocks), so the sails stand along each block's edge; a
+    // block or bed turned by hand on the map keeps that orientation.
+    const shadeRings = shadePatchBlocks(L.patches.filter((p) => p.kind === "shade"));
+    for (const p of [...L.patches.filter((q) => q.kind !== "shade"), ...shadeRings.map((b) => ({ kind: "shade" as const, ring: b.ring, angle: b.angle }))]) {
+      const r = rectOf(p.ring.map(xz), xzAngleOf(p.ring, p.angle, xz));
       if (p.kind === "lawn" && r.w >= 0.8 && r.d >= 0.8) {
         const w = half(r.w), d = half(r.d);
         add(`bed:${w}x${d}`, r.cx, r.cz, r.yaw, () => realBed({ w, d }, { far: true }), 0.1);

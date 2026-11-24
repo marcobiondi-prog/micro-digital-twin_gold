@@ -110,12 +110,16 @@ export function footprintRing(o: PlacedObject, def: ArObjectDef, a: Alignment, o
   });
 }
 
-/** «Riporta sulla mappa»: every placed object becomes a zone of its kind inside the area, as drawn by hand. */
+/** «Riporta sulla mappa»: every placed object becomes a zone of its kind inside the area, keeping its free orientation. */
 export function objectsToZones(kind: ArKind, objs: readonly PlacedObject[], a: Alignment, origin: { lat: number; lng: number }, now = Date.now()): SubArea[] {
   return objs.map((o, i) => {
     const base = o.def ?? arObject(kind, o.id), k = o.scale ?? 1;
     const def = k === 1 ? base : { ...base, w: base.w * k, d: base.d * k, h: base.h * k };
-    return { id: `ar-${now.toString(36)}-${i}`, kind: def.zone, ring: footprintRing(o, def, a, origin) };
+    const ring = footprintRing(o, def, a, origin);
+    const p0 = arToEn({ x: o.x, z: o.z }, a);
+    const p1 = arToEn({ x: o.x + Math.cos(o.yaw), z: o.z + Math.sin(o.yaw) }, a);
+    const angle = Math.atan2(p1.n - p0.n, p1.e - p0.e);
+    return { id: `ar-${now.toString(36)}-${i}`, kind: def.zone, ring, angle };
   });
 }
 

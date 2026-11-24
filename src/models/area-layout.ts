@@ -13,10 +13,10 @@ export type LatLng = [number, number];
  * `onlyDrawn`: only what was drawn by hand — the Prato and Pergolato zones, the trees in the Alberi zones — and nothing
  * placed automatically around them.
  */
-export type LayoutEdits = { trees?: Array<LatLng | null>; lawnAt?: LatLng | null; shadeAt?: LatLng | null; windAt?: LatLng | null; best?: boolean; onlyDrawn?: boolean };
+export type LayoutEdits = { trees?: Array<LatLng | null>; lawnAt?: LatLng | null; shadeAt?: LatLng | null; lawnAngle?: number | null; shadeAngle?: number | null; windAt?: LatLng | null; best?: boolean; onlyDrawn?: boolean };
 
-/** `exact`: the very ring of a zone drawn by hand (a Prato or Pergolato zone), not a strip of grid cells. */
-export type Patch = { ring: Ring; kind: "lawn" | "shade" | "zone" | "cloth"; zone?: number; exact?: boolean };
+/** `exact`: the very ring of a zone drawn by hand (a Prato or Pergolato zone), not a strip of grid cells. `angle`: explicit free orientation (radians, 0 = east, counter-clockwise). */
+export type Patch = { ring: Ring; kind: "lawn" | "shade" | "zone" | "cloth"; zone?: number; exact?: boolean; angle?: number };
 export type Line = { line: Ring; kind: "drip" | "main" | "wind" | "seam"; zone?: number; strength?: number };
 /**
  * `sunny`: with `best`, the share of the area in the summer sun for most of the day (0–1), to say why. `lawnM2` /
@@ -24,7 +24,7 @@ export type Line = { line: Ring; kind: "drip" | "main" | "wind" | "seam"; zone?:
  * (the lever's share of the usable surface), so the map can say when there is no room for all of it.
  */
 /** `misters`: every misting pole, those in the zones drawn for them first (`mistersInZones` of them), then the ones the app places. */
-export type PiazzaLayout = { misters: LatLng[]; mistersInZones: number; sprinklers: LatLng[]; trees: LatLng[]; patches: Patch[]; lawnAt: LatLng; shadeAt: LatLng; cell: number; sunny?: number; lawnM2: number; shadeM2: number; lawnTarget: number; shadeTarget: number };
+export type PiazzaLayout = { misters: LatLng[]; mistersInZones: number; sprinklers: LatLng[]; trees: LatLng[]; patches: Patch[]; lawnAt: LatLng; shadeAt: LatLng; lawnAngle?: number; shadeAngle?: number; cell: number; sunny?: number; lawnM2: number; shadeM2: number; lawnTarget: number; shadeTarget: number };
 export type VineLayout = { patches: Patch[]; lines: Line[]; windAt: LatLng; zones: LatLng[] };
 
 /** The shade one tree gives in the simulation (m², models/project-summary) and so its crown on the map: about 6,2 m wide. */
@@ -83,6 +83,54 @@ function strips(f: Frame, c: number, cells: Cell[], kind: Patch["kind"], zone?: 
   return out;
 }
 
+/** Cells gathered and merged into rectangular strips in a frame freely rotated by `angle` (radians) around `center`. */
+function rotatedBlockStrips(
+  ring: Ring, f: Frame, xy: Array<[number, number]>, c: number,
+  center: [number, number], need: number, angle: number,
+  allow: (x: number, y: number) => boolean, kind: "lawn" | "shade",
+): { cells: Cell[]; patches: Patch[] } {
+  if (need <= 0) return { cells: [], patches: [] };
+  const cs = Math.cos(angle), sn = Math.sin(angle), h = c / 2;
+  const toWorld = (u: number, v: number): [number, number] => [center[0] + u * cs - v * sn, center[1] + u * sn + v * cs];
+  const us = xy.map(([x, y]) => (x - center[0]) * cs + (y - center[1]) * sn);
+  const vs = xy.map(([x, y]) => -(x - center[0]) * sn + (y - center[1]) * cs);
+  const minU = Math.min(...us), maxU = Math.max(...us), minV = Math.min(...vs), maxV = Math.max(...vs);
+  const au = Math.max(1, (maxU - minU) / 2), av = Math.max(1, (maxV - minV) / 2);
+  type RCell = Cell & { u: number; v: number };
+  const cand: RCell[] = [];
+  for (let j = Math.floor(minV / c); (j + 0.5) * c <= maxV; j++) {
+    for (let i = Math.floor(minU / c); (i + 0.5) * c <= maxU; i++) {
+      const u = (i + 0.5) * c, v = (j + 0.5) * c;
+      const [x, y] = toWorld(u, v);
+      const ok = [[0, 0], [-h, -h], [h, -h], [h, h], [-h, h]].every(([du, dv]) => {
+        const [wx, wy] = toWorld(u + du!, v + dv!);
+        return inside(ring, f, wx, wy) && allow(wx, wy);
+      });
+      if (ok) cand.push({ i, j, x, y, u, v });
+    }
+  }
+  cand.sort((a, b) => Math.max(Math.abs(a.u) / au, Math.abs(a.v) / av) - Math.max(Math.abs(b.u) / au, Math.abs(b.v) / av) || Math.hypot(a.u, a.v) - Math.hypot(b.u, b.v));
+  const picked = cand.slice(0, need);
+  const rows = new Map<number, RCell[]>();
+  for (const cell of picked) rows.set(cell.j, [...(rows.get(cell.j) ?? []), cell]);
+  const patches: Patch[] = [];
+  for (const row of rows.values()) {
+    row.sort((a, b) => a.i - b.i);
+    let start = row[0]!, prev = row[0]!;
+    const flush = () => {
+      const u0 = start.u - h, u1 = prev.u + h, v0 = prev.v - h, v1 = prev.v + h;
+      const pts: Array<[number, number]> = [toWorld(u0, v0), toWorld(u1, v0), toWorld(u1, v1), toWorld(u0, v1)];
+      patches.push({ kind, angle, ring: pts.map(([wx, wy]) => toLL(f, wx, wy)) });
+    };
+    for (const cell of row.slice(1)) {
+      if (cell.i !== prev.i + 1) { flush(); start = cell; }
+      prev = cell;
+    }
+    flush();
+  }
+  return { cells: picked, patches };
+}
+
 const dist = (a: [number, number], b: [number, number]) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const nearestCell = (cells: Cell[], p: [number, number]) => cells.reduce((b, c) => (dist([c.x, c.y], p) < dist([b.x, b.y], p) ? c : b), cells[0]!);
 
@@ -128,8 +176,8 @@ function treeSpots(ring: Ring, f: Frame, n: number, box: { minX: number; maxX: n
   return { spots: Array.from({ length: n }, (_, i) => spots[Math.floor(((i + 0.5) * spots.length) / n) % spots.length]!), fits };
 }
 
-/** A smaller area inside the big one (models/drawn-area SubArea, its kind only matters here). */
-export type InnerZone = { kind: string; ring: Ring };
+/** A smaller area inside the big one (models/drawn-area SubArea, its kind and optional free angle matter here). */
+export type InnerZone = { kind: string; ring: Ring; angle?: number };
 
 const inZone = (f: Frame, zones: InnerZone[], kind: string) => {
   const rings = zones.filter((z) => z.kind === kind && z.ring.length >= 3).map((z) => z.ring);
@@ -143,7 +191,7 @@ const inZone = (f: Frame, zones: InnerZone[], kind: string) => {
  * `real` (the objects already standing there) is kept clear of new trees, beds, pergolas and misting poles.
  */
 const exactRings = (zones: InnerZone[], kind: string, as: "lawn" | "shade"): Patch[] =>
-  zones.filter((z) => z.kind === kind && z.ring.length >= 3).map((z) => ({ ring: z.ring, kind: as, exact: true }));
+  zones.filter((z) => z.kind === kind && z.ring.length >= 3).map((z) => ({ ring: z.ring, kind: as, exact: true, ...(z.angle !== undefined ? { angle: z.angle } : {}) }));
 
 export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: number, edits: LayoutEdits = {}, zones: InnerZone[] = [], misters = 0, real: Ring[] = [], sprinklers = 0): PiazzaLayout | null {
   if (ring.length < 3) return null;
@@ -197,15 +245,31 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
   const bySun = (a: Cell, b: Cell) => sunOf(b) - sunOf(a) || a.y - b.y;
   const shadeNeed = Math.max(0, nShade - fixedShade.length);
   const lawnNeed = Math.max(0, nLawn - fixedLawn.length);
+  const lawnAng = typeof edits.lawnAngle === "number" && Number.isFinite(edits.lawnAngle) ? edits.lawnAngle : undefined;
+  const shadeAng = typeof edits.shadeAngle === "number" && Number.isFinite(edits.shadeAngle) ? edits.shadeAngle : undefined;
   let lawnCells: Cell[], shadeCells: Cell[];
+  let rotLawnPatches: Patch[] | null = null, rotShadePatches: Patch[] | null = null;
   if (best) {
     shadeCells = [...fixedShade, ...pool(reserved, shadeNeed).sort(bySun).slice(0, shadeNeed)];
     const takenB = new Set([...shadeCells, ...fixedLawn]);
     lawnCells = [...fixedLawn, ...pool(takenB, lawnNeed).sort(bySun).slice(0, lawnNeed)];
   } else {
-    lawnCells = [...fixedLawn, ...pool(reserved, lawnNeed).sort(byDist(lawnAt)).slice(0, lawnNeed)];
-    const taken = new Set([...lawnCells, ...fixedShade]);
-    shadeCells = [...fixedShade, ...pool(taken, shadeNeed).sort(byDist(shadeAt)).slice(0, shadeNeed)];
+    if (lawnAng !== undefined && lawnNeed > 0) {
+      const rotL = rotatedBlockStrips(ring, f, ptsM, c, lawnAt, lawnNeed, lawnAng, (wx, wy) => !isFree(wx, wy) && !isReal(wx, wy) && !isLawn(wx, wy) && !isShade(wx, wy) && !isTrees(wx, wy), "lawn");
+      lawnCells = [...fixedLawn, ...rotL.cells];
+      rotLawnPatches = rotL.patches;
+    } else {
+      lawnCells = [...fixedLawn, ...pool(reserved, lawnNeed).sort(byDist(lawnAt)).slice(0, lawnNeed)];
+    }
+    if (shadeAng !== undefined && shadeNeed > 0) {
+      const autoLawnOnly = lawnCells.filter((lc) => !fixedLawn.includes(lc));
+      const rotS = rotatedBlockStrips(ring, f, ptsM, c, shadeAt, shadeNeed, shadeAng, (wx, wy) => !isFree(wx, wy) && !isReal(wx, wy) && !isLawn(wx, wy) && !isShade(wx, wy) && !isTrees(wx, wy) && autoLawnOnly.every((lc) => Math.hypot(lc.x - wx, lc.y - wy) > c * 0.85), "shade");
+      shadeCells = [...fixedShade, ...rotS.cells];
+      rotShadePatches = rotS.patches;
+    } else {
+      const taken = new Set([...lawnCells, ...fixedShade]);
+      shadeCells = [...fixedShade, ...pool(taken, shadeNeed).sort(byDist(shadeAt)).slice(0, shadeNeed)];
+    }
   }
   // Trees stand outside the pergolas and the free zones, inside the "alberi" zones when there are any; spots under a
   // shade cell are skipped (looked for on a finer grid), unless there is no room.
@@ -268,15 +332,17 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
     trees: placed, cell: c,
     lawnM2: Math.round((fixedLawn.length ? zoneM2("prato") : 0) + autoLawn * c * c), shadeM2: Math.round((fixedShade.length ? zoneM2("ombra") : 0) + autoShade * c * c),
     lawnTarget: Math.round(lawnTarget), shadeTarget: Math.round(shadeTarget),
+    ...(lawnAng !== undefined ? { lawnAngle: lawnAng } : {}),
+    ...(shadeAng !== undefined ? { shadeAngle: shadeAng } : {}),
     ...(best ? { sunny: cells.filter((x) => sunOf(x) >= 0.6).length / cells.length } : {}),
     // A Prato or Pergolato zone is drawn as its own outline, exactly as big as it was drawn; only the rest of the
     // lever's share is made of grid strips.
     patches: [
-      ...(fixedLawn.length ? exactRings(zones, "prato", "lawn") : []), ...strips(f, c, lawnCells.filter((x) => !fixedLawn.includes(x)), "lawn"),
-      ...(fixedShade.length ? exactRings(zones, "ombra", "shade") : []), ...strips(f, c, shadeCells.filter((x) => !fixedShade.includes(x)), "shade"),
+      ...(fixedLawn.length ? exactRings(zones, "prato", "lawn") : []), ...(rotLawnPatches ?? strips(f, c, lawnCells.filter((x) => !fixedLawn.includes(x)), "lawn")),
+      ...(fixedShade.length ? exactRings(zones, "ombra", "shade") : []), ...(rotShadePatches ?? strips(f, c, shadeCells.filter((x) => !fixedShade.includes(x)), "shade")),
     ],
-    lawnAt: toLL(f, ...(best ? (() => { const m = nearestCell(lawnCells.length ? lawnCells : cells, centre(lawnCells, lawnAt)); return [m.x, m.y] as [number, number]; })() : nLawn ? (() => { const m = nearestCell(cells, lawnAt); return [m.x, m.y] as [number, number]; })() : lawnAt)),
-    shadeAt: toLL(f, ...(best ? (() => { const m = nearestCell(shadeCells.length ? shadeCells : cells, centre(shadeCells, shadeAt)); return [m.x, m.y] as [number, number]; })() : nShade ? (() => { const m = nearestCell(rest.length ? rest : cells, shadeAt); return [m.x, m.y] as [number, number]; })() : shadeAt)),
+    lawnAt: toLL(f, ...(best ? (() => { const m = nearestCell(lawnCells.length ? lawnCells : cells, centre(lawnCells, lawnAt)); return [m.x, m.y] as [number, number]; })() : lawnAng !== undefined ? centre(lawnCells.filter((x) => !fixedLawn.includes(x)), lawnAt) : nLawn ? (() => { const m = nearestCell(cells, lawnAt); return [m.x, m.y] as [number, number]; })() : lawnAt)),
+    shadeAt: toLL(f, ...(best ? (() => { const m = nearestCell(shadeCells.length ? shadeCells : cells, centre(shadeCells, shadeAt)); return [m.x, m.y] as [number, number]; })() : shadeAng !== undefined ? centre(shadeCells.filter((x) => !fixedShade.includes(x)), shadeAt) : nShade ? (() => { const m = nearestCell(rest.length ? rest : cells, shadeAt); return [m.x, m.y] as [number, number]; })() : shadeAt)),
   };
 }
 
@@ -518,20 +584,16 @@ function tint(hex: string, f: number): string {
   return `#${ch(n >> 16)}${ch((n >> 8) & 255)}${ch(n & 255)}`;
 }
 
-/** Pergola wood: posts and beams darker, the slats of the roof lighter. */
-/** The shade sails' colours (the names stay from the pergolas they replaced): steel posts, dark hem, off-white fabric. */
-export const PERGOLA_COLORS = { post: "#9aa3ab", beam: "#3b4148", slat: "#ece3cf" } as const;
+/** The shade sails' colours (the names stay from the pergolas they replaced): warm chestnut wood posts, taupe hem and tortora sail cloth. */
+export const PERGOLA_COLORS = { post: "#b8682b", beam: "#8f8678", slat: "#cfc6b5" } as const;
 
 /**
- * A pergola over a shade strip (a row rectangle from piazzaLayout) for the 3D views: posts about every 4 m along both
- * long sides (0–2.9 m), a beam on top of each long side (2.8–3.1 m) and a roof of slats across it every 0.7 m
- * (3.1–3.25 m), leaving light between them. Built as slabs like the trees.
+ * Four-point hypar shade sails in their simple slab shape for light 3D views: two opposite diagonal wooden posts per bay
+ * and the concave four-pointed sail 3–3,08 m up, oriented by `angle` when set by hand (the realistic ones are views/ar-papillon).
  */
-export function pergolaParts(strip: Ring, lite = false, open = 1): TreePart[] {
-  // Retractable shade sails in their simple shape: corner masts and concave sail wings, 3–3,08 m up,
-  // as unrolled as the sun says (the realistic ones are views/ar-papillon).
+export function pergolaParts(strip: Ring, lite = false, open = 1, angle?: number): TreePart[] {
   if (strip.length < 3) return [];
-  const R = rectFrameOf(strip), vy: [number, number] = [-R.ux[1], R.ux[0]];
+  const R = rectFrameOf(strip, angle), vy: [number, number] = [-R.ux[1], R.ux[0]];
   const ll = (x: number, z: number) => toLL(R.f, R.cx + R.ux[0] * x + vy[0] * z, R.cy + R.ux[1] * x + vy[1] * z);
   const parts: TreePart[] = [];
   for (const u of papillonUnits(R.w, R.d)) {
@@ -544,9 +606,9 @@ export function pergolaParts(strip: Ring, lite = false, open = 1): TreePart[] {
   return parts;
 }
 
-/** The same side-pole sails over a shade zone drawn by hand, laid along its longest edge. */
-export function pergolaRingParts(ring: Ring, lite = false, open = 1): TreePart[] {
-  return pergolaParts(ring, lite, open);
+/** The same sails over a shade zone drawn by hand, keeping its free orientation when set. */
+export function pergolaRingParts(ring: Ring, lite = false, open = 1, angle?: number): TreePart[] {
+  return pergolaParts(ring, lite, open, angle);
 }
 
 /**
@@ -849,21 +911,27 @@ export function shadeBlocks(rings: Ring[]): Ring[] {
   return out;
 }
 
-/* ---------------- Shade sails on a side pole, opening like butterfly wings ---------------- */
+/** Shade patches joined into blocks per orientation group, keeping any explicit free `angle` set by hand. */
+export function shadePatchBlocks(patches: Patch[]): Array<{ ring: Ring; angle?: number }> {
+  const byAng = new Map<string, { angle?: number; rings: Ring[] }>();
+  for (const p of patches) {
+    if (p.kind !== "shade") continue;
+    const key = p.exact ? `exact:${byAng.size}` : p.angle !== undefined ? `ang:${p.angle.toFixed(5)}` : "auto";
+    const entry = byAng.get(key) ?? { ...(p.angle !== undefined ? { angle: p.angle } : {}), rings: [] };
+    entry.rings.push(p.ring);
+    byAng.set(key, entry);
+  }
+  const out: Array<{ ring: Ring; angle?: number }> = [];
+  for (const g of byAng.values()) {
+    for (const ring of shadeBlocks(g.rings)) out.push({ ring, ...(g.angle !== undefined ? { angle: g.angle } : {}) });
+  }
+  return out;
+}
 
-/**
- * The shade is made of sails on a single side pole whose two fabric wings open horizontally like a butterfly's and
- * close back under their arm (the kind of shade the user pointed to): each unit is a pole on one edge of the shade
- * with a fan of fabric reaching into it. In a w×d rectangle centred on 0 (x along w, z along d) the poles stand on
- * the long side's edge, in rows of at most 4 m deep, one every ≤ 2·r along the row; r (the wings' reach) covers both
- * the row's depth and half the spacing, at most 4,2 m. yaw: the direction the wings face (radians, 0 = +z).
- */
+/* ---------------- Four-point hypar shade sails on two inclined wooden posts ---------------- */
+
 export type PapillonUnit = { x: number; z: number; yaw: number; r: number };
-/**
- * Round shades on a central pole (the canopy all round the pole, as asked): the w×d rectangle is cut into cells as
- * square as possible, at most 6 m a side, a pole in the middle of each and a round canopy of radius r reaching half
- * the cell's shorter side (at most 3,3 m), so neighbours meet without overlapping. yaw is kept for older callers (0).
- */
+
 export function papillonUnits(w: number, d: number): PapillonUnit[] {
   if (w < 0.8 || d < 0.8) return [];
   const s = Math.min(6, Math.max(1.6, Math.min(w, d)));
@@ -875,24 +943,23 @@ export function papillonUnits(w: number, d: number): PapillonUnit[] {
   return out;
 }
 /**
- * How open the wings are (0–1) at the simulation's sun: they open with the day's heat and close at dusk, at night and
- * in winter (motorised, with sun and wind sensors): fully open from 15° of sun, closed under 5°.
+ * How open the sails are (0–1) at the simulation's sun: they open with the day's heat and close at dusk, at night and
+ * in winter: fully open from 15° of sun, closed under 5°.
  */
 export function shadeOpenness(sunHeight: number | null | undefined, season?: string): number {
   if (season === "inverno" || sunHeight == null) return season === "inverno" ? 0 : 1;
   return Math.max(0, Math.min(1, (sunHeight - 5) / 10));
 }
-/** How far a canopy reaches when `open` (0–1): folded towards the pole when closed. */
+/** How far a canopy reaches when `open` (0–1): furled between the two posts when closed. */
 export function canopyReach(r: number, open: number): number {
   const o = Math.max(0, Math.min(1, open));
   return r * (0.12 + 0.88 * o);
 }
-/** Concave four-corner retractable sail seen from above, unrolling from the diagonal boom (−s,−s)→(+s,+s) out to (−s,+s) and (+s,−s). */
+/** Concave four-corner retractable hypar sail seen from above, furling smoothly toward the two-post ridge as `open` → 0. */
 export function papillonFan(u: PapillonUnit, open: number, seg = 24): Array<[number, number]> {
   const o = Math.max(0, Math.min(1, open));
   const s = u.r * 0.88;
   const reach = 0.08 + 0.92 * o;
-  // Corners in local unit coordinates: A (−s,−s), Hi (−s·reach, +s·reach) mirrored across diagonal, C (+s,+s), Lo (+s·reach, −s·reach).
   const corners: Array<[number, number]> = [
     [-s, -s],
     [-s * reach, s * reach],
@@ -900,7 +967,7 @@ export function papillonFan(u: PapillonUnit, open: number, seg = 24): Array<[num
     [s * reach, -s * reach],
   ];
   const perEdge = Math.max(2, Math.round(seg / 4));
-  const sag = 0.14 * o;
+  const sag = 0.16 * o;
   const pts: Array<[number, number]> = [];
   for (let e = 0; e < 4; e++) {
     const a = corners[e]!, b = corners[(e + 1) % 4]!;
@@ -908,20 +975,24 @@ export function papillonFan(u: PapillonUnit, open: number, seg = 24): Array<[num
       const t = k / perEdge;
       const px = a[0] + (b[0] - a[0]) * t;
       const pz = a[1] + (b[1] - a[1]) * t;
-      // Pull each catenary edge gently towards the sail's centre (0,0).
       const pull = 1 - sag * 4 * t * (1 - t);
       pts.push([u.x + px * pull, u.z + pz * pull]);
     }
   }
   return pts;
 }
-/** A shade ring (a four-cornered strip or block, else its box along its longest edge) as a centred rectangle frame. */
-export function rectFrameOf(ring: Ring): { f: Frame; cx: number; cy: number; ux: [number, number]; w: number; d: number } {
+/** A shade ring as a centred rectangle frame; honours `angle` when set freely by the user instead of auto-snapping to the longest edge. */
+export function rectFrameOf(ring: Ring, angle?: number): { f: Frame; cx: number; cy: number; ux: [number, number]; w: number; d: number } {
   const f = frameOf(ring), pts = ring.map((p) => toXY(f, p));
-  let best = 0, ux: [number, number] = [1, 0];
-  for (let i = 0; i < pts.length; i++) {
-    const a = pts[i]!, b = pts[(i + 1) % pts.length]!, L = Math.hypot(b[0] - a[0], b[1] - a[1]);
-    if (L > best) { best = L; ux = [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; }
+  let ux: [number, number] = [1, 0];
+  if (angle !== undefined && Number.isFinite(angle)) {
+    ux = [Math.cos(angle), Math.sin(angle)];
+  } else {
+    let best = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i]!, b = pts[(i + 1) % pts.length]!, L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (L > best) { best = L; ux = [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; }
+    }
   }
   const vy: [number, number] = [-ux[1], ux[0]];
   const ss = pts.map((p) => p[0] * ux[0] + p[1] * ux[1]), ts = pts.map((p) => p[0] * vy[0] + p[1] * vy[1]);
@@ -929,10 +1000,10 @@ export function rectFrameOf(ring: Ring): { f: Frame; cx: number; cy: number; ux:
   const cs = (s0 + s1) / 2, ct = (t0 + t1) / 2;
   return { f, cx: ux[0] * cs + vy[0] * ct, cy: ux[1] * cs + vy[1] * ct, ux, w: s1 - s0, d: t1 - t0 };
 }
-/** Retractable sails on the 2D map: concave sail wings, diagonal roller boom + traction cables, and corner masts. */
-export function papillonsOf(ring: Ring, open = 1): { fans: Ring[]; poles: LatLng[]; ribs: Ring[] } {
+/** Retractable 4-point hypar sails on the 2D map: concave sail cloth, 2 opposite diagonal wooden posts, and corner tension cords. */
+export function papillonsOf(ring: Ring, open = 1, angle?: number): { fans: Ring[]; poles: LatLng[]; ribs: Ring[] } {
   if (ring.length < 3) return { fans: [], poles: [], ribs: [] };
-  const R = rectFrameOf(ring), vy: [number, number] = [-R.ux[1], R.ux[0]];
+  const R = rectFrameOf(ring, angle), vy: [number, number] = [-R.ux[1], R.ux[0]];
   const ll = (x: number, z: number) => toLL(R.f, R.cx + R.ux[0] * x + vy[0] * z, R.cy + R.ux[1] * x + vy[1] * z);
   const fans: Ring[] = [], poles: LatLng[] = [], ribs: Ring[] = [];
   const seen = new Set<string>();
@@ -942,15 +1013,14 @@ export function papillonsOf(ring: Ring, open = 1): { fans: Ring[]; poles: LatLng
   };
   for (const u of papillonUnits(R.w, R.d)) {
     const s = u.r * 0.88;
+    const reach = 0.08 + 0.92 * Math.max(0, Math.min(1, open));
     fans.push(papillonFan(u, open).map(([x, z]) => ll(x, z)));
+    // Only the two opposite high wooden posts per sail bay.
     addPole(u.x - s, u.z - s);
     addPole(u.x + s, u.z + s);
-    addPole(u.x - s, u.z + s);
-    addPole(u.x + s, u.z - s);
-    // Diagonal roller boom + cross traction cables to the two wing masts.
-    ribs.push([ll(u.x - s, u.z - s), ll(u.x + s, u.z + s)]);
-    ribs.push([ll(u.x, u.z), ll(u.x - s, u.z + s)]);
-    ribs.push([ll(u.x, u.z), ll(u.x + s, u.z - s)]);
+    // Short corner tension cords at the two low guyed tips.
+    ribs.push([ll(u.x - s * reach, u.z + s * reach), ll(u.x - s * 1.06, u.z + s * 1.06)]);
+    ribs.push([ll(u.x + s * reach, u.z - s * reach), ll(u.x + s * 1.06, u.z - s * 1.06)]);
   }
   return { fans, poles, ribs };
 }

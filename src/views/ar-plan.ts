@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { LabState } from "@/models/lab-store";
 import { zonesOfArea, type DrawnArea } from "@/models/drawn-area";
-import { piazzaLayout, vineLayout, TREE_RADIUS_M, type LatLng, type PiazzaLayout, type VineLayout, shadeBlocks } from "@/models/area-layout";
+import { piazzaLayout, vineLayout, TREE_RADIUS_M, type LatLng, type PiazzaLayout, type VineLayout, shadePatchBlocks } from "@/models/area-layout";
 import { arObject, arToEn, enToAr, fromEN, insideRing, toEN, type Alignment, type ArObjectDef } from "@/models/ar-objects";
 import { vineMixOf, zoneMixOf } from "@/models/vine-interventions";
 import { objectMesh } from "@/views/ar-object-meshes";
@@ -21,10 +21,14 @@ import { realDrip } from "@/views/ar-drip";
  */
 type XZ = { x: number; z: number };
 
-/** An oriented box of a patch in AR metres: its longest edge sets the direction. */
-export function rectOf(pts: XZ[]): { cx: number; cz: number; w: number; d: number; yaw: number } {
+/**
+ * An oriented box of a patch in AR metres: its longest edge sets the direction, unless `dirAng` (the box's long axis
+ * as an angle in these x/z metres, set freely by hand on the map) is given — then the box keeps that orientation.
+ */
+export function rectOf(pts: XZ[], dirAng?: number): { cx: number; cz: number; w: number; d: number; yaw: number } {
   let best = 0, ang = 0;
-  for (let i = 0; i < pts.length; i++) {
+  if (dirAng !== undefined && Number.isFinite(dirAng)) ang = dirAng;
+  else for (let i = 0; i < pts.length; i++) {
     const a = pts[i]!, b = pts[(i + 1) % pts.length]!, l = Math.hypot(b.x - a.x, b.z - a.z);
     if (l > best) { best = l; ang = Math.atan2(b.z - a.z, b.x - a.x); }
   }
@@ -44,11 +48,24 @@ function extent(pts: XZ[], yaw: number) {
 }
 
 /**
- * Shade patches joined into blocks: two patches belong together when, in the larger one's direction, their boxes
- * overlap or lie within 0,6 m; each block becomes one box turned like its largest patch.
+ * A free map angle (radians, 0 = east, counter-clockwise, as models/drawn-area keeps it) turned into the x/z metres
+ * of `at` (the AR's alignment or the 3D map's local metres), measured at the ring's centre. Undefined stays undefined.
  */
-export function pergolaBlocks(patches: XZ[][], gap = 0.6, fits?: (corners: XZ[]) => boolean): Array<{ cx: number; cz: number; w: number; d: number; yaw: number }> {
-  const rects = patches.map((p) => ({ pts: p, r: rectOf(p) }));
+export function xzAngleOf(ring: LatLng[], angle: number | undefined, at: (p: LatLng) => XZ): number | undefined {
+  if (angle === undefined || !Number.isFinite(angle) || !ring.length) return undefined;
+  const lat = ring.reduce((s, p) => s + p[0], 0) / ring.length, lng = ring.reduce((s, p) => s + p[1], 0) / ring.length;
+  const k = 1 / 111_320, kc = k / Math.max(0.1, Math.cos((lat * Math.PI) / 180));
+  const a = at([lat, lng]), b = at([lat + Math.sin(angle) * k * 5, lng + Math.cos(angle) * kc * 5]);
+  return Math.atan2(b.z - a.z, b.x - a.x);
+}
+
+/**
+ * Shade patches joined into blocks: two patches belong together when, in the larger one's direction, their boxes
+ * overlap or lie within 0,6 m; each block becomes one box turned like its largest patch. `dirs`: each patch's free
+ * orientation set by hand (x/z angle), kept instead of its longest edge.
+ */
+export function pergolaBlocks(patches: XZ[][], gap = 0.6, fits?: (corners: XZ[]) => boolean, dirs?: Array<number | undefined>): Array<{ cx: number; cz: number; w: number; d: number; yaw: number }> {
+  const rects = patches.map((p, i) => ({ pts: p, r: rectOf(p, dirs?.[i]) }));
   const parent = rects.map((_, i) => i);
   const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i]!)));
   for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) {
@@ -134,8 +151,9 @@ export function layoutPlan(
     // for one, the plain green ground.
     // With «Unisci» for the aiuole, the beds that touch or nearly touch (the grid's row strips of one block, a zone and
     // the strips round it) become one bed covering them all, like the pergolas.
-    const lawn = L.patches.filter((q) => q.kind === "lawn").map((q) => q.ring.map(ar));
-    const lawnPieces = joinBeds ? pergolaBlocks(lawn, 0.6, fits?.lawn).map((r) => ({ r, pts: null as XZ[] | null })) : lawn.map((pts) => ({ r: rectOf(pts), pts }));
+    const lawnP = L.patches.filter((q) => q.kind === "lawn");
+    const lawn = lawnP.map((q) => q.ring.map(ar)), lawnDirs = lawnP.map((q) => xzAngleOf(q.ring, q.angle, ar));
+    const lawnPieces = joinBeds ? pergolaBlocks(lawn, 0.6, fits?.lawn, lawnDirs).map((r) => ({ r, pts: null as XZ[] | null })) : lawn.map((pts, i) => ({ r: rectOf(pts, lawnDirs[i]), pts }));
     for (const { r, pts } of lawnPieces) {
       if (r.w >= 0.8 && r.d >= 0.8) {
         const bed = realBed({ w: r.w, d: r.d }, { far });
@@ -147,8 +165,12 @@ export function layoutPlan(
     // Pergolas: the shade patches that touch or nearly touch (the grid's row strips of one block, a zone and the strips
     // round it) are joined into one pergola covering them all, so a block of shade is one structure, not a row of them.
     // With «Pergolati separati» chosen, each shade patch is its own pergola as on the map.
-    const shade = L.patches.filter((q) => q.kind === "shade").map((q) => q.ring.map(ar));
-    for (const r of merge ? pergolaBlocks(shade, 0.6, fits?.shade) : shadeBlocks(L.patches.filter((q) => q.kind === "shade").map((q) => q.ring)).map((q) => rectOf(q.map(ar)))) {
+    const shadeP = L.patches.filter((q) => q.kind === "shade");
+    const shade = shadeP.map((q) => q.ring.map(ar)), shadeDirs = shadeP.map((q) => xzAngleOf(q.ring, q.angle, ar));
+    const sails = merge
+      ? pergolaBlocks(shade, 0.6, fits?.shade, shadeDirs)
+      : shadePatchBlocks(shadeP).map((q) => rectOf(q.ring.map(ar), xzAngleOf(q.ring, q.angle, ar)));
+    for (const r of sails) {
       if (r.w < 1 || r.d < 1) continue;
       const pg = realPapillons({ w: r.w, d: r.d, h: 3.2, open: plan.open ?? 1 });
       pg.rotation.y = r.yaw;
