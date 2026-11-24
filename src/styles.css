@@ -821,10 +821,10 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
   .account-panel[data-state="open"] {
-    animation: account-unfold-mobile 520ms cubic-bezier(0.22, 1, 0.36, 1) both !important;
+    animation: account-unfold-mobile 780ms cubic-bezier(0.16, 1, 0.3, 1) both !important;
   }
   .account-panel[data-state="open"] > * {
-    animation: account-content-in 230ms ease-out 150ms both;
+    animation: account-content-in 320ms ease-out 220ms both;
   }
   /* Closing animation: quick and responsive (240ms) */
   .account-panel[data-state="closed"] {
@@ -858,7 +858,7 @@
   to { opacity: 0; }
 }
 @keyframes account-unfold-mobile {
-  from { clip-path: circle(18px at var(--account-x, 90%) var(--account-y, 40px)); }
+  from { clip-path: circle(22px at var(--account-x, 90%) var(--account-y, 40px)); }
   to { clip-path: circle(150vmax at var(--account-x, 90%) var(--account-y, 40px)); }
 }
 @media (prefers-reduced-motion: reduce) {
