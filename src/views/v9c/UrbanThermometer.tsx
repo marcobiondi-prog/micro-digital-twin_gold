@@ -436,7 +436,7 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
 
       {/* Labels under the two numbers at the arc's ends: the coolest it can get, and on the right the exact seasonal
           average of the place at this hour without interventions (the arc itself keeps its small margins, unnumbered). */}
-      <div className="mx-auto -mt-3 flex w-full max-w-[21rem] md:portrait:max-w-[27rem] lg:max-w-[27rem] justify-between px-3 text-[10px] font-semibold uppercase md:portrait:text-xs lg:text-xs tracking-wide text-muted-foreground" aria-hidden="true">
+      <div data-sim-focus="" className="mx-auto -mt-3 flex w-full max-w-[21rem] md:portrait:max-w-[27rem] lg:max-w-[27rem] justify-between px-3 text-[10px] font-semibold uppercase md:portrait:text-xs lg:text-xs tracking-wide text-muted-foreground" aria-hidden="true">
         {/* The label the white dot is near lights up, the other dims: near the seasonal average the right one turns warm,
             near the coolest the left one turns bright blue. */}
         <span className={cn("whitespace-nowrap rounded-full px-2 py-0.5 transition-[background-color,color,opacity] duration-300 motion-reduce:transition-none", near === "left" ? "bg-sky-500/20 text-sky-800 dark:bg-sky-400/30 dark:text-sky-200" : "bg-sky-500/10 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300", near === "right" && "opacity-50 dark:opacity-35")}>Minimo raggiungibile</span>
