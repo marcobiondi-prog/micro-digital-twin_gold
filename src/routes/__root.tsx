@@ -198,7 +198,7 @@ const PS_LIGHT: Record<number, { left: string; top: string; tilt: string }> = {
 const ARC: Record<number, { y: number; tilt: number }> = { 0: { y: 6, tilt: -6 }, 1: { y: 0, tilt: -3 }, 3: { y: 0, tilt: 3 }, 4: { y: 6, tilt: 6 } };
 
 /** Elements a tap belongs to, so it never lowers the bottom bar. */
-const TAP_OWNERS = "a,button,input,select,textarea,label,summary,option,video,canvas,gmp-map-3d,[contenteditable],[role=button],[role=link],[role=slider],[role=tab],[role=radio],[role=checkbox],[role=switch],[role=menuitem],[role=option],[role=combobox],[role=dialog],[role=alertdialog],[data-map-gestures],[data-sys-camera-root],[data-no-nav-tap],nav,.maplibregl-map";
+const TAP_OWNERS = "a,button,input,select,textarea,label,summary,option,video,canvas,gmp-map-3d,[contenteditable],[role=button],[role=link],[role=slider],[role=tab],[role=radio],[role=checkbox],[role=switch],[role=menuitem],[role=option],[role=combobox],[role=dialog],[role=alertdialog],[data-map-gestures],[data-no-tab-swipe],[data-no-swipe-back],[data-sys-camera-root],[data-no-nav-tap],nav,.maplibregl-map";
 /** True when a tap landed on an empty part of the page: no control, field, map or dialog under it, nothing clickable. */
 function emptyTap(target: EventTarget | null): boolean {
   if (!(target instanceof Element) || target.closest(TAP_OWNERS)) return false;

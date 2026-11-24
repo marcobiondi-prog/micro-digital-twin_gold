@@ -1079,12 +1079,12 @@
   /* Pinch-zoom and double-tap zoom off on every element (scroll containers do not inherit
      touch-action), while panning keeps working; touch-* utilities still override it. */
   *, *::before, *::after { touch-action: pan-x pan-y; }
-  [data-map-gestures],
-  [data-map-gestures] *,
   gmp-map-3d,
   gmp-map-3d *,
   .maplibregl-map,
-  .maplibregl-map * {
+  .maplibregl-map *,
+  [data-map-gestures].touch-none,
+  [data-map-gestures].touch-none * {
     touch-action: none !important;
   }
   gmp-model-3d,
@@ -1093,6 +1093,23 @@
   gmp-marker-3d {
     pointer-events: none !important;
     touch-action: none !important;
+  }
+  /* Explicit touch panning overrides for scrollable carousels and lists */
+  .touch-pan-x,
+  [class*="touch-pan-x"] {
+    touch-action: pan-x !important;
+  }
+  .touch-pan-y,
+  [class*="touch-pan-y"] {
+    touch-action: pan-y !important;
+  }
+  .touch-auto,
+  [class*="touch-auto"] {
+    touch-action: auto !important;
+  }
+  .touch-manipulation,
+  [class*="touch-manipulation"] {
+    touch-action: manipulation !important;
   }
   html {
     overscroll-behavior-y: none;

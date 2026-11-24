@@ -25,11 +25,11 @@ export function useSwipeBack(ref: RefObject<HTMLElement | null>, onBack: (() => 
       if (e.touches.length !== 1 || !t) { start = null; return; }
       const target = e.target as Element | null;
       if (typeof e.composedPath === "function") {
-        if (e.composedPath().some((el) => el instanceof Element && (el.hasAttribute("data-map-gestures") || el.tagName.toLowerCase() === "gmp-map-3d" || el.matches("input[type=range], [role=slider]")))) {
+        if (e.composedPath().some((el) => el instanceof Element && (el.hasAttribute("data-map-gestures") || el.hasAttribute("data-no-tab-swipe") || el.hasAttribute("data-no-swipe-back") || el.tagName.toLowerCase() === "gmp-map-3d" || el.matches("input[type=range], [role=slider]")))) {
           start = null; return;
         }
       }
-      if (target?.closest("[data-map-gestures], gmp-map-3d, input[type=range], [role=slider]")) { start = null; return; }
+      if (target?.closest("[data-map-gestures], [data-no-tab-swipe], [data-no-swipe-back], gmp-map-3d, input[type=range], [role=slider]")) { start = null; return; }
       start = { x: t.clientX, y: t.clientY, t: performance.now() }; axis = null; dx = 0;
     };
     const tm = (e: TouchEvent) => {
