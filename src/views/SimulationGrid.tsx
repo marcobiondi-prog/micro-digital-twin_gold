@@ -160,6 +160,8 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
   const [paused, setPaused] = useState(false);
   const pausedRef = useRef(false); pausedRef.current = paused;
   const lastFix = useRef<{ lat: number; lng: number } | null>(null);
+  const lastAcc = useRef(9999);
+  const [fixAcc, setFixAcc] = useState<number | null>(null);
   // How precise the fix that set the place was (metres).
   const appliedAcc = useRef(Infinity);
   const pauseFollow = () => { if (gpsRef.current) { setPaused(true); saveGpsPaused(true); } };
@@ -191,7 +193,7 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
       const here = { lat: coords.latitude, lng: coords.longitude };
       // The first fix of each switch-on is said once: the GPS is on and following.
       if (!lastFix.current) toast.success("GPS attivo", { description: pausedRef.current ? "Hai scelto tu la zona: il GPS resta acceso ma non la sposta." : "La mappa ti segue passo passo in tempo reale.", id: "gps-state" });
-      lastFix.current = here;
+      lastFix.current = here; lastAcc.current = coords.accuracy || 9999; setFixAcc(Math.round(coords.accuracy || 0) || null);
       setLocating(false);
       setError(null); // a fix came: any earlier "not available" is over
       if (pausedRef.current) return;
@@ -243,21 +245,38 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
     }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 });
     return () => { live = false; lastFix.current = null; appliedAcc.current = Infinity; navigator.geolocation.clearWatch(id); };
   }, [gps, reverseGoogle, reverseOsm]);
-  // Back to following the phone: at once to the last position known, then on with every move.
-  const resume = () => {
+  // Ricalibra: a fresh fix asked now (no cached position), the place put exactly there whatever the distance, and the
+  // GPS following again. Also what "Seguimi di nuovo" does.
+  const [calibrating, setCalibrating] = useState(false);
+  const recalibrate = () => {
+    if (!guardUse("posizione")) return;
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) return;
     setPaused(false); saveGpsPaused(false);
-    const here = lastFix.current;
-    if (!here) { setLocating(true); return; }
-    const fallback = { label: `La mia posizione (${here.lat.toFixed(5)}, ${here.lng.toFixed(5)})`, ...here };
-    if (metresBetween(placeRef.current, here) < 2) return;
-    void reverseGoogle({ data: here }).then(
-      (r) => {
-        if (r?.location) selectRef.current(r.location);
-        else void reverseOsm({ data: here }).then((osm) => selectRef.current(osm?.location ?? fallback), () => selectRef.current(fallback));
-      },
-      () => void reverseOsm({ data: here }).then((osm) => selectRef.current(osm?.location ?? fallback), () => selectRef.current(fallback)),
-    );
+    if (!gpsRef.current) { setGps(true); saveGps(true); }
+    setCalibrating(true); setError(null);
+    // Whichever comes first: a fresh fix, or after 6 s the newest fix the watch already has (some phones answer a
+    // second request only once they move).
+    let applied = false;
+    const apply = (here: { lat: number; lng: number }, acc: number) => {
+      if (applied) return; applied = true; window.clearTimeout(fallbackTimer);
+      lastFix.current = here; lastAcc.current = acc; setFixAcc(Math.round(acc) || null);
+      const done = (loc: SearchedLocation) => {
+        placeAccuracy.set(accKey(loc), acc); selectRef.current({ ...loc, lat: here.lat, lng: here.lng }); setCalibrating(false);
+        toast.success("Posizione ricalibrata", { description: `Precisione ±${Math.max(1, Math.round(acc))} m.${acc > 50 ? " Al chiuso il GPS è meno preciso: all’aperto torna più esatto." : ""}`, id: "gps-state" });
+      };
+      const fallback = { label: `La mia posizione (${here.lat.toFixed(4)}, ${here.lng.toFixed(4)})`, ...here };
+      void reverseGoogle({ data: here }).then((r) => r?.location ? done(r.location) : reverseOsm({ data: here }).then((o) => done(o?.location ? { ...o.location, ...here } : fallback), () => done(fallback)), () => reverseOsm({ data: here }).then((o) => done(o?.location ? { ...o.location, ...here } : fallback), () => done(fallback)));
+    };
+    const fallbackTimer = window.setTimeout(() => { if (lastFix.current) apply(lastFix.current, lastAcc.current); }, 6000);
+    navigator.geolocation.getCurrentPosition(({ coords }) => apply({ lat: coords.latitude, lng: coords.longitude }, coords.accuracy || 9999), (e) => {
+      if (applied) return;
+      setCalibrating(false);
+      // No fresh fix in time: the last one of the watch, if any.
+      if (lastFix.current && e.code !== 1) { apply(lastFix.current, lastAcc.current); return; }
+      setError(e.code === 1 ? "Permesso di posizione negato. Abilitalo nelle impostazioni del browser." : "Posizione non trovata ora: riprova all’aperto o vicino a una finestra.");
+    }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
   };
+  const resume = recalibrate;
   const locate = () => {
     if (gps && paused) { resume(); return; }
     if (gps) {
@@ -322,7 +341,7 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
       if (found.location) { pauseFollow(); onSelect(found.location); setQuery(""); } else setError(result.error ?? found.error ?? "Zona non trovata.");
     } catch (searchError) { console.error(searchError); setError("Ricerca della zona non disponibile. Riprova tra poco."); } finally { setLoading(false); }
   };
-  return <div className="location-search min-w-0 md:col-span-full"><form onSubmit={submit} className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2" role="search"><div className="relative min-w-0"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cerca una località" aria-label="Cerca una località" className="h-11 rounded-lg bg-lab-surface pl-9 pr-3 font-mono" autoComplete="off" aria-autocomplete="list" aria-controls="location-suggestions" />{suggestions.length > 0 && <ul id="location-suggestions" role="listbox" className="absolute inset-x-0 top-12 z-50 overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-lg">{suggestions.map((item) => <li key={item.placeId} role="option" aria-selected={false}><Button variant="ghost" type="button" onClick={() => pick(item)} className="flex h-auto min-h-11 w-full items-center justify-start gap-2 rounded-none px-3 py-2 text-left text-sm"><MapPin className="size-4 shrink-0 text-primary" /><span className="min-w-0 whitespace-normal break-words">{item.text}</span></Button></li>)}</ul>}</div><Button type="submit" size="icon" disabled={loading || query.trim().length < 3} aria-label="Cerca zona" className="size-11 shrink-0 rounded-lg">{loading ? <LoaderCircle className="animate-spin" /> : <Search />}</Button><Button type="button" variant="secondary" onClick={locate} aria-pressed={gps} aria-label={gps ? (paused ? "GPS in pausa sulla zona scelta: tocca per farti seguire di nuovo" : "GPS attivo: tocca per spegnerlo") : "Usa la mia posizione e tieni attivo il GPS"} className={`h-11 shrink-0 rounded-lg px-3 ${gps ? (paused ? "bg-transparent text-brand-turquoise ring-2 ring-inset ring-brand-turquoise hover:bg-brand-turquoise/10" : "bg-brand-turquoise text-black hover:bg-brand-turquoise/90") : ""}`}>{locating ? <LoaderCircle className="animate-spin" /> : gps ? <Satellite /> : <LocateFixed />}<span className="hidden sm:inline">{gps ? (paused ? "GPS in pausa" : "GPS attivo") : "La mia posizione"}</span></Button></form>{previous && <button type="button" onClick={() => { pauseFollow(); onSelect(previous); toast.success("Sei tornato all’ultima posizione", { description: `${splitLocation(previous.label).name}: con i suoi interventi e l’area disegnata.` }); }} className="mt-2 flex w-full min-w-0 items-center gap-2 rounded-lg bg-foreground/[0.06] px-3 py-2 text-left text-sm transition-colors hover:bg-foreground/[0.1]"><Undo2 className="size-4 shrink-0 text-brand-turquoise" aria-hidden="true" /><span className="min-w-0 flex-1 truncate"><span className="text-muted-foreground">Torna all’ultima posizione · </span><span className="font-semibold">{splitLocation(previous.label).name}</span></span></button>}{gps && paused && <div role="status" className="mt-2 flex items-center gap-2 rounded-lg bg-brand-turquoise/10 px-3 py-2 text-xs"><span className="min-w-0 flex-1">Hai scelto tu la zona: il GPS resta acceso ma non la sposta.</span><button type="button" onClick={resume} className="shrink-0 rounded-full bg-brand-turquoise px-3 py-1.5 font-semibold text-black">Seguimi di nuovo</button></div>}{!bare && <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-[minmax(7rem,12rem)_minmax(0,1fr)] sm:items-center md:grid-cols-1 md:items-start lg:grid-cols-[minmax(7rem,12rem)_minmax(0,1fr)] lg:items-center"><div className="flex min-w-0 items-start gap-1.5 text-xs text-muted-foreground"><MapPin className="mt-0.5 size-3.5 shrink-0 text-primary" /><div className="min-w-0"><span className="block break-words font-medium text-foreground">{splitLocation(initial.label).name}</span>{splitLocation(initial.label).sub && <span className="block break-words">{splitLocation(initial.label).sub}</span>}<span className="mt-1 block font-mono text-[10px]">{initial.lat.toFixed(4)}, {initial.lng.toFixed(4)}</span></div></div><LocationMapPreview location={initial} /></div>}{noSuggestions && !error && query.trim().length >= 2 && <p role="status" className="mt-2 text-xs text-muted-foreground">Nessun suggerimento: premi Cerca per trovare la zona.</p>}{error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}</div>;
+  return <div className="location-search min-w-0 md:col-span-full"><form onSubmit={submit} className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2" role="search"><div className="relative min-w-0"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cerca una località" aria-label="Cerca una località" className="h-11 rounded-lg bg-lab-surface pl-9 pr-3 font-mono" autoComplete="off" aria-autocomplete="list" aria-controls="location-suggestions" />{suggestions.length > 0 && <ul id="location-suggestions" role="listbox" className="absolute inset-x-0 top-12 z-50 overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-lg">{suggestions.map((item) => <li key={item.placeId} role="option" aria-selected={false}><Button variant="ghost" type="button" onClick={() => pick(item)} className="flex h-auto min-h-11 w-full items-center justify-start gap-2 rounded-none px-3 py-2 text-left text-sm"><MapPin className="size-4 shrink-0 text-primary" /><span className="min-w-0 whitespace-normal break-words">{item.text}</span></Button></li>)}</ul>}</div><Button type="submit" size="icon" disabled={loading || query.trim().length < 3} aria-label="Cerca zona" className="size-11 shrink-0 rounded-lg">{loading ? <LoaderCircle className="animate-spin" /> : <Search />}</Button><Button type="button" variant="secondary" onClick={locate} aria-pressed={gps} aria-label={gps ? (paused ? "GPS in pausa sulla zona scelta: tocca per farti seguire di nuovo" : "GPS attivo: tocca per spegnerlo") : "Usa la mia posizione e tieni attivo il GPS"} className={`h-11 shrink-0 rounded-lg px-3 ${gps ? (paused ? "bg-transparent text-brand-turquoise ring-2 ring-inset ring-brand-turquoise hover:bg-brand-turquoise/10" : "bg-brand-turquoise text-black hover:bg-brand-turquoise/90") : ""}`}>{locating ? <LoaderCircle className="animate-spin" /> : gps ? <Satellite /> : <LocateFixed />}<span className="hidden sm:inline">{gps ? (paused ? "GPS in pausa" : "GPS attivo") : "La mia posizione"}</span></Button></form>{previous && <button type="button" onClick={() => { pauseFollow(); onSelect(previous); toast.success("Sei tornato all’ultima posizione", { description: `${splitLocation(previous.label).name}: con i suoi interventi e l’area disegnata.` }); }} className="mt-2 flex w-full min-w-0 items-center gap-2 rounded-lg bg-foreground/[0.06] px-3 py-2 text-left text-sm transition-colors hover:bg-foreground/[0.1]"><Undo2 className="size-4 shrink-0 text-brand-turquoise" aria-hidden="true" /><span className="min-w-0 flex-1 truncate"><span className="text-muted-foreground">Torna all’ultima posizione · </span><span className="font-semibold">{splitLocation(previous.label).name}</span></span></button>}{gps && !paused && <div className="mt-2 flex items-center gap-2 rounded-lg bg-foreground/[0.06] px-3 py-2 text-xs"><Satellite className="size-3.5 shrink-0 text-brand-turquoise" aria-hidden="true" /><span className="min-w-0 flex-1 text-muted-foreground">{fixAcc ? `GPS attivo · precisione ±${fixAcc} m` : "GPS attivo · cerco la posizione…"}</span><button type="button" onClick={recalibrate} disabled={calibrating} className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-brand-turquoise px-3 py-1.5 font-semibold text-black disabled:opacity-60">{calibrating ? <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" /> : <LocateFixed className="size-3.5" aria-hidden="true" />}Ricalibra</button></div>}{gps && paused && <div role="status" className="mt-2 flex items-center gap-2 rounded-lg bg-brand-turquoise/10 px-3 py-2 text-xs"><span className="min-w-0 flex-1">Hai scelto tu la zona: il GPS resta acceso ma non la sposta.</span><button type="button" onClick={resume} className="shrink-0 rounded-full bg-brand-turquoise px-3 py-1.5 font-semibold text-black">Seguimi di nuovo</button></div>}{!bare && <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-[minmax(7rem,12rem)_minmax(0,1fr)] sm:items-center md:grid-cols-1 md:items-start lg:grid-cols-[minmax(7rem,12rem)_minmax(0,1fr)] lg:items-center"><div className="flex min-w-0 items-start gap-1.5 text-xs text-muted-foreground"><MapPin className="mt-0.5 size-3.5 shrink-0 text-primary" /><div className="min-w-0"><span className="block break-words font-medium text-foreground">{splitLocation(initial.label).name}</span>{splitLocation(initial.label).sub && <span className="block break-words">{splitLocation(initial.label).sub}</span>}<span className="mt-1 block font-mono text-[10px]">{initial.lat.toFixed(4)}, {initial.lng.toFixed(4)}</span></div></div><LocationMapPreview location={initial} /></div>}{noSuggestions && !error && query.trim().length >= 2 && <p role="status" className="mt-2 text-xs text-muted-foreground">Nessun suggerimento: premi Cerca per trovare la zona.</p>}{error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}</div>;
 }
 
 const MAP_RESIZE_MS = 300;
