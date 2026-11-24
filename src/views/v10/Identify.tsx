@@ -328,48 +328,48 @@ export function AccountSectorLock({ kind, account, email }: { kind: ProKind; acc
     const mine = k === account;
     const Icon = k === "agronomo" ? Grape : Building2;
     return (
-      <div key={k} className={cn("relative flex flex-1 flex-col items-start gap-2 rounded-2xl p-3.5 ring-1", mine ? `${SECTOR_TONE_UI[k].card} ring-white/15` : "bg-white/[0.03] ring-white/[0.06]")}>
-        <span className={cn("grid size-9 place-items-center rounded-xl", mine ? SECTOR_TONE_UI[k].chip : "bg-white/[0.05] text-foreground/35")}><Icon className="size-[18px]" aria-hidden="true" /></span>
-        <span className={cn("text-[15px] font-semibold leading-tight", !mine && "text-foreground/40")}>Settore {SECTOR_NAME[k]}</span>
-        <span className={cn("inline-flex items-center gap-1 text-xs font-semibold", mine ? SECTOR_TONE_UI[k].text : "text-foreground/40")}>
-          {mine ? <><Check className="size-3.5" aria-hidden="true" />Il suo settore</> : <><Lock className="size-3.5" aria-hidden="true" />Bloccato</>}
+      <div key={k} className={cn("relative flex flex-1 flex-col items-start gap-2 rounded-2xl p-3.5 ring-1 2k:rounded-3xl 2k:p-6 2k:gap-3 4k:p-8 4k:gap-4", mine ? `${SECTOR_TONE_UI[k].card} ring-white/15` : "bg-white/[0.03] ring-white/[0.06]")}>
+        <span className={cn("grid size-9 place-items-center rounded-xl 2k:size-14 2k:rounded-2xl 4k:size-16", mine ? SECTOR_TONE_UI[k].chip : "bg-white/[0.05] text-foreground/35")}><Icon className="size-[18px] 2k:size-7 4k:size-8" aria-hidden="true" /></span>
+        <span className={cn("text-[15px] font-semibold leading-tight 2k:text-xl 4k:text-2xl", !mine && "text-foreground/40")}>Settore {SECTOR_NAME[k]}</span>
+        <span className={cn("inline-flex items-center gap-1 text-xs font-semibold 2k:text-base 4k:text-lg", mine ? SECTOR_TONE_UI[k].text : "text-foreground/40")}>
+          {mine ? <><Check className="size-3.5 2k:size-5 4k:size-6" aria-hidden="true" />Il suo settore</> : <><Lock className="size-3.5 2k:size-5 4k:size-6" aria-hidden="true" />Bloccato</>}
         </span>
       </div>
     );
   });
   const page = (
-    <div role="dialog" aria-modal="true" aria-labelledby="sector-lock-title" className="dark fixed inset-0 z-[1000000010] isolate overflow-y-auto overscroll-contain bg-background px-6 text-foreground [color-scheme:dark] sm:px-12">
+    <div role="dialog" aria-modal="true" aria-labelledby="sector-lock-title" className="dark fixed inset-0 z-[1000000010] isolate overflow-y-auto overscroll-contain bg-background px-6 text-foreground [color-scheme:dark] sm:px-12 2k:px-20 4k:px-32">
       <Suspense fallback={null}><Backdrop /></Suspense>
-      <div className="relative mx-auto flex min-h-full max-w-md flex-col pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]">
-        <button type="button" disabled={busy} onClick={() => void back()} className="inline-flex h-11 items-center gap-2 self-start rounded-full bg-white/[0.06] pl-3 pr-4 text-[15px] font-semibold text-foreground/90 ring-1 ring-white/10 backdrop-blur-md outline-none hover:bg-white/[0.1] focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">
-          <ArrowLeft className="size-5" aria-hidden="true" />Indietro
+      <div className="relative mx-auto flex min-h-full max-w-md 2k:max-w-2xl 4k:max-w-3xl flex-col pb-[max(2rem,env(safe-area-inset-bottom))] 2k:pb-16 4k:pb-20 pt-[max(1.5rem,env(safe-area-inset-top))] 2k:pt-12 4k:pt-16">
+        <button type="button" disabled={busy} onClick={() => void back()} className="inline-flex h-11 2k:h-14 4k:h-16 items-center gap-2 2k:gap-3 self-start rounded-full bg-white/[0.06] pl-3 2k:pl-5 pr-4 2k:pr-6 text-[15px] 2k:text-lg 4k:text-xl font-semibold text-foreground/90 ring-1 ring-white/10 backdrop-blur-md outline-none hover:bg-white/[0.1] focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">
+          <ArrowLeft className="size-5 2k:size-6 4k:size-7" aria-hidden="true" />Indietro
         </button>
-        <div className="my-auto flex flex-col items-center py-8 text-center">
+        <div className="my-auto flex flex-col items-center py-8 2k:py-12 4k:py-16 text-center">
           {/* The account, with the badge of the sector it belongs to. */}
           <div className={cn("relative", fade)}>
-            <span aria-hidden="true" className={cn("absolute -inset-6 rounded-full opacity-60 blur-2xl", tone.glow)} />
-            <span className={cn("relative grid size-24 place-items-center overflow-hidden rounded-full bg-white/[0.06] p-[3px] ring-2", tone.ring)}>
-              {pic ? <img src={pic} alt="" referrerPolicy="no-referrer" className="size-full rounded-full object-cover" /> : <UserRound className="size-10 text-foreground/70" aria-hidden="true" />}
+            <span aria-hidden="true" className={cn("absolute -inset-6 2k:-inset-10 rounded-full opacity-60 blur-2xl 2k:blur-3xl", tone.glow)} />
+            <span className={cn("relative grid size-24 2k:size-36 4k:size-44 place-items-center overflow-hidden rounded-full bg-white/[0.06] p-[3px] 2k:p-[4px] ring-2 2k:ring-3", tone.ring)}>
+              {pic ? <img src={pic} alt="" referrerPolicy="no-referrer" className="size-full rounded-full object-cover" /> : <UserRound className="size-10 2k:size-16 4k:size-20 text-foreground/70" aria-hidden="true" />}
             </span>
-            <span className={cn("absolute -bottom-1 -right-1 grid size-9 place-items-center rounded-full ring-4 ring-background", tone.solid)}><OwnIcon className="size-[18px] text-black" aria-hidden="true" /></span>
+            <span className={cn("absolute -bottom-1 -right-1 2k:-bottom-2 2k:-right-2 grid size-9 2k:size-13 4k:size-16 place-items-center rounded-full ring-4 2k:ring-6 ring-background", tone.solid)}><OwnIcon className="size-[18px] 2k:size-7 4k:size-8 text-black" aria-hidden="true" /></span>
           </div>
-          <p className={cn("mt-7 inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-300", fade, "delay-75")}>
-            <ShieldCheck className="size-3.5" aria-hidden="true" />Un account, un settore
+          <p className={cn("mt-7 2k:mt-10 inline-flex items-center gap-1.5 2k:gap-2.5 text-[11px] 2k:text-sm 4k:text-base font-semibold uppercase tracking-[0.22em] 2k:tracking-[0.26em] text-amber-300", fade, "delay-75")}>
+            <ShieldCheck className="size-3.5 2k:size-5 4k:size-6" aria-hidden="true" />Un account, un settore
           </p>
-          <h1 id="sector-lock-title" className={cn("mt-3 font-display text-[2.15rem] font-extralight leading-[1.08] tracking-tight sm:text-5xl", fade, "delay-100")}>
+          <h1 id="sector-lock-title" className={cn("mt-3 2k:mt-5 font-display text-[2.15rem] font-extralight leading-[1.08] tracking-tight sm:text-5xl 2k:text-6xl 4k:text-7xl", fade, "delay-100")}>
             Questo account è del settore <span className={cn("font-light", tone.text)}>{SECTOR_NAME[account]}</span>
           </h1>
           {email && (
-            <p className={cn("mt-5 inline-flex max-w-full items-center gap-2 rounded-full bg-white/[0.06] px-4 py-2 text-sm font-medium ring-1 ring-white/10 backdrop-blur-md", fade, "delay-150")}>
-              <Mail className="size-4 shrink-0 text-foreground/60" aria-hidden="true" /><span className="min-w-0 [overflow-wrap:anywhere]">{email}</span>
+            <p className={cn("mt-5 2k:mt-7 inline-flex max-w-full items-center gap-2 2k:gap-3 rounded-full bg-white/[0.06] px-4 2k:px-6 4k:px-8 py-2 2k:py-3 4k:py-4 text-sm 2k:text-lg 4k:text-xl font-medium ring-1 ring-white/10 backdrop-blur-md", fade, "delay-150")}>
+              <Mail className="size-4 2k:size-5 4k:size-6 shrink-0 text-foreground/60" aria-hidden="true" /><span className="min-w-0 [overflow-wrap:anywhere]">{email}</span>
             </p>
           )}
-          <div className={cn("mt-7 flex w-full gap-3 text-left", fade, "delay-200")}>{sectors}</div>
-          <p className={cn("mt-6 text-[15px] leading-relaxed text-foreground/70", fade, "delay-300")}>
+          <div className={cn("mt-7 2k:mt-10 flex w-full gap-3 2k:gap-5 4k:gap-6 text-left", fade, "delay-200")}>{sectors}</div>
+          <p className={cn("mt-6 2k:mt-9 text-[15px] 2k:text-xl 4k:text-2xl leading-relaxed 2k:leading-relaxed text-foreground/70", fade, "delay-300")}>
             È legato {SECTOR_TO[account]}: ogni account personale vale per un solo settore. Per il settore {SECTOR_NAME[kind]} accedi con un altro account, o creane uno nuovo.
           </p>
         </div>
-        <div className={cn("space-y-3", fade, "delay-300")}>
+        <div className={cn("space-y-3 2k:space-y-5 4k:space-y-6", fade, "delay-300")}>
           {LOCK_ENTER_OWN && own && (
             <button type="button" disabled={busy} onClick={() => void enterOwn()}
               className="flex w-full items-center gap-3 rounded-2xl bg-white p-3 pl-4 text-left text-black outline-none disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-brand-turquoise">
@@ -381,10 +381,10 @@ export function AccountSectorLock({ kind, account, email }: { kind: ProKind; acc
             </button>
           )}
           <button type="button" disabled={busy} onClick={() => void other()}
-            className={`inline-flex h-14 w-full items-center justify-center gap-2 rounded-full text-base font-semibold shadow-[0_10px_40px_-10px_rgba(255,255,255,0.35)] outline-none transition-transform active:scale-[0.98] disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-ring ${LOCK_ENTER_OWN && own ? "bg-foreground/[0.08]" : "bg-white text-black"}`}>
-            <LogOut className="size-5" aria-hidden="true" />Esci e usa un altro account
+            className={`inline-flex h-14 2k:h-18 4k:h-20 w-full items-center justify-center gap-2 2k:gap-3 rounded-full text-base 2k:text-xl 4k:text-2xl font-semibold shadow-[0_10px_40px_-10px_rgba(255,255,255,0.35)] outline-none transition-transform active:scale-[0.98] disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-ring ${LOCK_ENTER_OWN && own ? "bg-foreground/[0.08]" : "bg-white text-black"}`}>
+            <LogOut className="size-5 2k:size-7 4k:size-8" aria-hidden="true" />Esci e usa un altro account
           </button>
-          <p className="text-center text-xs text-foreground/50">Il profilo di questo account resta salvato: lo ritrovi quando rientri.</p>
+          <p className="text-center text-xs 2k:text-base 4k:text-lg text-foreground/50">Il profilo di questo account resta salvato: lo ritrovi quando rientri.</p>
         </div>
       </div>
     </div>
@@ -467,10 +467,10 @@ export function IdentifyPage({ kind }: { kind: ProKind }) {
   const pageRef = useRef<HTMLDivElement>(null);
   useSwipeBack(pageRef, back);
   return (
-    <div ref={pageRef} className="mx-auto max-w-xl space-y-6">
+    <div ref={pageRef} className="mx-auto max-w-xl 2k:max-w-3xl 4k:max-w-4xl space-y-6 2k:space-y-8">
       <Ambient tone={SECTION_TONE[p.section]} />
-      <button type="button" onClick={back} className="-mb-2 inline-flex h-10 items-center gap-1.5 rounded-full pr-3 text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
-        <ArrowLeft className="size-5" aria-hidden="true" />Indietro
+      <button type="button" onClick={back} className="-mb-2 inline-flex h-10 2k:h-12 items-center gap-1.5 2k:gap-2 rounded-full pr-3 text-sm 2k:text-base font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+        <ArrowLeft className="size-5 2k:size-6" aria-hidden="true" />Indietro
       </button>
       <PageHero kicker="Identificazione" kickerIcon={ShieldCheck} title={p.title} />
       {mine ? (
