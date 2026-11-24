@@ -198,7 +198,7 @@ const PS_LIGHT: Record<number, { left: string; top: string; tilt: string }> = {
 const ARC: Record<number, { y: number; tilt: number }> = { 0: { y: 6, tilt: -6 }, 1: { y: 0, tilt: -3 }, 3: { y: 0, tilt: 3 }, 4: { y: 6, tilt: 6 } };
 
 /** Elements a tap belongs to, so it never lowers the bottom bar. */
-const TAP_OWNERS = "a,button,input,select,textarea,label,summary,option,video,canvas,[contenteditable],[role=button],[role=link],[role=slider],[role=tab],[role=radio],[role=checkbox],[role=switch],[role=menuitem],[role=option],[role=combobox],[role=dialog],[role=alertdialog],[data-map-gestures],[data-sys-camera-root],[data-no-nav-tap],nav,.maplibregl-map";
+const TAP_OWNERS = "a,button,input,select,textarea,label,summary,option,video,canvas,gmp-map-3d,[contenteditable],[role=button],[role=link],[role=slider],[role=tab],[role=radio],[role=checkbox],[role=switch],[role=menuitem],[role=option],[role=combobox],[role=dialog],[role=alertdialog],[data-map-gestures],[data-sys-camera-root],[data-no-nav-tap],nav,.maplibregl-map";
 /** True when a tap landed on an empty part of the page: no control, field, map or dialog under it, nothing clickable. */
 function emptyTap(target: EventTarget | null): boolean {
   if (!(target instanceof Element) || target.closest(TAP_OWNERS)) return false;
@@ -604,7 +604,18 @@ function RootComponent() {
     // here: iOS gesture events, iOS two-finger scale moves, and the ctrl+wheel that touchpad and
     // touchscreen pinch produce on touch devices (styles.css adds touch-action: pan-x pan-y).
     // Interactive maps ([data-map-gestures], the 3D view) keep their own pinch and rotate.
-    const inMap = (e: Event) => e.target instanceof Element && e.target.closest("[data-map-gestures]") !== null;
+    const inMap = (e: Event) => {
+      if (typeof e.composedPath === "function") {
+        const path = e.composedPath();
+        for (let i = 0; i < path.length; i++) {
+          const el = path[i];
+          if (el instanceof Element && (el.hasAttribute("data-map-gestures") || el.tagName.toLowerCase() === "gmp-map-3d" || el.classList.contains("maplibregl-map"))) {
+            return true;
+          }
+        }
+      }
+      return e.target instanceof Element && e.target.closest("[data-map-gestures], gmp-map-3d, .maplibregl-map") !== null;
+    };
     const block = (e: Event) => { if (!inMap(e)) e.preventDefault(); };
     const scaleMove = (e: TouchEvent) => { const scale = (e as TouchEvent & { scale?: number }).scale; if (!inMap(e) && e.touches.length > 1 && scale !== undefined && scale !== 1) e.preventDefault(); };
     const pinchWheel = (e: WheelEvent) => { if (e.ctrlKey && isTouchDevice()) e.preventDefault(); };

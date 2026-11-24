@@ -7,10 +7,19 @@ export function simTabSwipeStep(index: number, total: number, dx: number, dy: nu
   return Math.min(total - 1, Math.max(0, index + (dx < 0 ? 1 : -1)));
 }
 
-const OWN_GESTURE = "input, textarea, select, canvas, iframe, [role='slider'], [data-map-gestures], [data-no-tab-swipe], [role='dialog'], [role='alertdialog'], [role='menu'], [role='listbox']";
+const OWN_GESTURE = "input, textarea, select, canvas, iframe, gmp-map-3d, [role='slider'], [data-map-gestures], [data-no-tab-swipe], [role='dialog'], [role='alertdialog'], [role='menu'], [role='listbox']";
 
 /** True when a touch started on something that uses sideways moves itself (sliders, maps, rows that scroll sideways). */
 export function startsOnOwnGesture(target: EventTarget | null, boundary: Element): boolean {
+  if (target && typeof (target as any).composedPath === "function") {
+    const path = (target as any).composedPath() as EventTarget[];
+    for (const item of path) {
+      if (item instanceof Element) {
+        if (item.matches(OWN_GESTURE) || item.hasAttribute("data-map-gestures") || item.tagName.toLowerCase() === "gmp-map-3d") return true;
+        if (item === boundary) break;
+      }
+    }
+  }
   let el = target instanceof Element ? target : null;
   if (el?.closest(OWN_GESTURE)) return true;
   while (el && el !== boundary) {

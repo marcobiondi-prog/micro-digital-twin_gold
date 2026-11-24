@@ -317,11 +317,20 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
       altitude.current = ground;
       libs.current = lib;
       const cam = frameCamera(lat, lng, el.clientHeight, ground);
-      const map = new lib.Map3DElement({ ...cam, mode: "HYBRID" }) as Map3D;
+      const map = new lib.Map3DElement({ ...cam, mode: "HYBRID", gestureHandling: "greedy" }) as Map3D;
       map.style.cssText = "display:block;width:100%;height:100%;touch-action:none";
-      // GREEDY: one finger moves the camera; the AUTO default turns cooperative inside a
-      // scrollable page and asks for two fingers. Set as a property so older builds ignore it.
-      map.gestureHandling = "GREEDY";
+      // greedy: one finger moves the camera; the auto default turns cooperative inside a
+      // scrollable page and asks for two fingers. Set both attribute and property so the
+      // Web Component observer and internal getters recognize greedy mode.
+      map.setAttribute("gesture-handling", "greedy");
+      map.setAttribute("data-map-gestures", "");
+      try {
+        const maps3d = (window as any).google?.maps?.maps3d;
+        const greedyVal = maps3d?.GestureHandling?.GREEDY ?? "greedy";
+        (map as any).gestureHandling = greedyVal;
+      } catch {
+        (map as any).gestureHandling = "greedy";
+      }
       // On top of the 3D mesh (roofs, trees) and drawn even when occluded: a ground pin in a street disappears behind buildings.
       const marker = new lib.Marker3DElement({ position: { lat, lng, altitude: 0 }, altitudeMode: "RELATIVE_TO_MESH", drawsWhenOccluded: true, label });
       map.append(marker);
