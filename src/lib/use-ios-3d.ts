@@ -1,14 +1,15 @@
 import { useSyncExternalStore } from "react";
-import { iosRealModels, isIOS, subscribeIosRealModels } from "@/lib/ios";
+import { isIOS, isMobileDevice, iosRealModels, subscribeIosRealModels } from "@/lib/ios";
 
-/** How the 3D maps draw the simulation's objects on this device: "real" (the realistic models), "lite" (the light
- *  realistic models, an iPhone that turned them on) or "shapes" (the plain shapes, an iPhone by default). */
+/** How the 3D maps draw the simulation's objects on this device: "real" (the realistic models on desktop),
+ *  "lite" (light realistic models on iOS when opted in) or "shapes" (the light performant shapes on mobile and tablets). */
 export type Models3D = "real" | "lite" | "shapes";
 export function models3D(): Models3D {
-  if (!isIOS()) return "real";
-  return iosRealModels() ? "lite" : "shapes";
+  if (isIOS()) return iosRealModels() ? "lite" : "shapes";
+  if (isMobileDevice()) return "shapes";
+  return "real";
 }
 export function useModels3D(): Models3D {
-  return useSyncExternalStore(subscribeIosRealModels, models3D, () => "real");
+  return useSyncExternalStore(subscribeIosRealModels, models3D, () => "shapes");
 }
 
