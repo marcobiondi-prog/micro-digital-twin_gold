@@ -1057,7 +1057,7 @@ const CUBE_MS = 380;
  * shot as on the face of a cube (the faces follow the finger, past a quarter of the width or a flick it turns, else it
  * springs back; no animation with reduced motion); a swipe down closes, as do the dialog's ✕ and the phone's Back.
  * On top the day, hour, place and Gruppo n; at the foot the shot's label, zone and the intervention nearest to it;
- * Condividi, Archivia (Ripristina for an archived one) and Elimina (asked in place) on the right; the day's thumbnails to jump.
+ * Condividi, Archivia (Ripristina for an archived one) and Elimina (asked in place) on the right.
  */
 function StoryPlayer({ shots: given, start, onClose }: { shots: Shot[]; start: number; onClose: () => void }) {
   const [open, setOpen] = useState(false);
@@ -1247,12 +1247,12 @@ function StoryPlayer({ shots: given, start, onClose }: { shots: Shot[]; start: n
             </span>
             <span className="shrink-0 rounded-full bg-black/40 px-2.5 py-1 text-xs tabular-nums">{g + 1} / {list.length}</span>
           </div>
-          <div className="absolute bottom-[calc(7.5rem+env(safe-area-inset-bottom))] right-3 flex flex-col items-center gap-3 text-[11px]">
+          <div className="absolute bottom-[calc(2rem+env(safe-area-inset-bottom))] right-3 flex flex-col items-center gap-3 text-[11px]">
             <button type="button" onClick={() => void share()} className={side} aria-label="Condividi"><Share2 className="size-5" aria-hidden="true" /></button><span className="-mt-2">Condividi</span>
             <button type="button" onClick={shelve} className={side} aria-label={isArchived ? "Ripristina" : "Archivia"}>{isArchived ? <ArchiveRestore className="size-5" aria-hidden="true" /> : <Archive className="size-5" aria-hidden="true" />}</button><span className="-mt-2">{isArchived ? "Ripristina" : "Archivia"}</span>
             <button type="button" onClick={() => setAsk(true)} className={side} aria-label="Elimina"><Trash2 className="size-5 text-red-300" aria-hidden="true" /></button><span className="-mt-2">Elimina</span>
           </div>
-          <div className="pointer-events-none absolute bottom-[calc(7.5rem+env(safe-area-inset-bottom))] left-4 right-20">
+          <div className="pointer-events-none absolute bottom-[calc(2rem+env(safe-area-inset-bottom))] left-4 right-20">
             <div className="flex flex-wrap gap-1.5">
               <span className="rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-bold ring-1 ring-white/25">{shotLabel(s)}</span>
               {zone && <span className="rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-bold ring-1 ring-white/25">{zone}</span>}
@@ -1260,14 +1260,8 @@ function StoryPlayer({ shots: given, start, onClose }: { shots: Shot[]; start: n
             {nearText && <p className="mt-2 text-[14px] leading-snug">{nearText}</p>}
             {note && <p role="status" className="mt-2 text-[13px] text-brand-turquoise">{note}</p>}
           </div>
-          <div className="no-scrollbar absolute inset-x-3 bottom-[calc(1rem+env(safe-area-inset-bottom))] flex gap-1.5 overflow-x-auto touch-pan-x" data-map-gestures="">
-            {dayShots.map((x, k) => (
-              <button key={x.id} type="button" onClick={() => { setG(dayRange[0] + k); setProgress(0); }} aria-label={`Vai a ${k + 1}`} aria-current={dayRange[0] + k === g}
-                className={cn("relative aspect-[3/4] w-14 shrink-0 overflow-hidden rounded-lg bg-white/10 outline-none transition-opacity", dayRange[0] + k === g ? "opacity-100 ring-2 ring-white" : "opacity-60")}><ShotMedia s={x} /></button>
-            ))}
-          </div>
           {ask && (
-            <div role="alertdialog" aria-label="Conferma eliminazione" className="absolute inset-x-4 bottom-[calc(8rem+env(safe-area-inset-bottom))] rounded-2xl bg-zinc-900/95 p-4 text-center ring-1 ring-white/15">
+            <div role="alertdialog" aria-label="Conferma eliminazione" className="absolute inset-x-4 bottom-[calc(2.5rem+env(safe-area-inset-bottom))] rounded-2xl bg-zinc-900/95 p-4 text-center ring-1 ring-white/15">
               <p className="text-[15px] font-medium">Eliminare {s.kind === "video" ? "questo video" : "questa foto"}? Non si può recuperare.</p>
               <div className="mt-3 flex gap-2">
                 <button type="button" onClick={() => setAsk(false)} disabled={busy} className="h-11 flex-1 rounded-full bg-white/10 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-white">Annulla</button>
