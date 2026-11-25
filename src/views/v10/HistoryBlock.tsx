@@ -4,7 +4,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { getLastSection } from "@/lib/last-section";
 import { openSimTab } from "@/views/v8/console";
 import { toast } from "sonner";
-import { ArrowRight, Building2, CalendarDays, Check, Share2, ChevronDown, Clock3, Cloud, Smartphone, Grape, History, Archive, ArchiveRestore, Camera, FolderClosed, Layers, Play, Sparkles, Trash2, Video, Download, Images, ClipboardList } from "lucide-react";
+import { ArrowRight, Building2, CalendarDays, Check, Share2, ChevronDown, ChevronLeft, ChevronRight, Clock3, Cloud, Smartphone, Grape, History, Archive, ArchiveRestore, Camera, FolderClosed, Layers, Play, Sparkles, Trash2, Video, Download, Images, ClipboardList } from "lucide-react";
 import { currentMedia, refreshMedia, removeMedia, useLabMedia, useMediaListError, type MediaItem } from "@/models/lab-media-store";
 import { mediaTime } from "@/models/media-time";
 import { uploadGroups } from "@/models/media-groups";
@@ -1142,17 +1142,295 @@ function TagPills({ shots, entries, value, onChange }: { shots: Shot[]; entries:
   );
 }
 
+
+/** The shots of each calendar day, the days newest first and each day's shots in the order they were taken. */
+function shotDays(shots: Shot[]): Array<{ key: string; label: string; shots: Shot[] }> {
+  const days = new Map<string, Shot[]>();
+  for (const x of shots) { if (x.at == null) continue; const k = dayKey(x.at); (days.get(k) ?? days.set(k, []).get(k)!).push(x); }
+  return [...days.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .map(([key, list]) => { const sorted = [...list].sort((a, b) => (a.at ?? 0) - (b.at ?? 0)); return { key, label: dayWord(sorted[0]!.at!), shots: sorted }; });
+}
+const photosText = (n: number) => (n === 1 ? "1 foto o video" : `${n} foto e video`);
+const MONTHS = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+
+/**
+ * Calendario: a month at a time, Monday first; a day with photos shows its latest one as a cover with how many,
+ * a day with interventions only a turquoise dot. A tap opens the day under the month: its photos in a grid (the viewer
+ * on a tap) and "Guarda come storia".
+ */
+function CalendarView({ shots, entries }: { shots: Shot[]; entries: SourcedEntry[] }) {
+  const days = useMemo(() => new Map(shotDays(shots).map((d) => [d.key, d])), [shots]);
+  const withEntries = useMemo(() => { const n = new Map<string, number>(); for (const e of entries) { const k = dayKey(Date.parse(e.at)); n.set(k, (n.get(k) ?? 0) + 1); } return n; }, [entries]);
+  const newest = [...days.keys()][0];
+  const [month, setMonth] = useState(() => { const d = newest ? new Date(newest) : new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
+  const [picked, setPicked] = useState<string | null>(newest ?? null);
+  const [viewing, setViewing] = useState<number | null>(null);
+  const [story, setStory] = useState(false);
+  const first = new Date(month.y, month.m, 1), count = new Date(month.y, month.m + 1, 0).getDate();
+  const lead = (first.getDay() + 6) % 7;
+  const step = (n: number) => setMonth(({ y, m }) => { const d = new Date(y, m + n, 1); return { y: d.getFullYear(), m: d.getMonth() }; });
+  const day = picked ? days.get(picked) : undefined;
+  const pickedEntries = picked ? withEntries.get(picked) ?? 0 : 0;
+  const two = (n: number) => String(n).padStart(2, "0");
+  return (
+    <div className="space-y-3" data-guide="history-calendar">
+      <div className="flex items-center justify-between px-1">
+        <button type="button" onClick={() => step(-1)} aria-label="Mese prima" className="grid size-9 place-items-center rounded-full bg-foreground/[0.07] outline-none focus-visible:ring-2 focus-visible:ring-ring"><ChevronLeft className="size-5" aria-hidden="true" /></button>
+        <h3 className="text-[17px] font-semibold">{MONTHS[month.m]} {month.y}</h3>
+        <button type="button" onClick={() => step(1)} aria-label="Mese dopo" className="grid size-9 place-items-center rounded-full bg-foreground/[0.07] outline-none focus-visible:ring-2 focus-visible:ring-ring"><ChevronRight className="size-5" aria-hidden="true" /></button>
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-center text-[11px] text-muted-foreground" aria-hidden="true">{["L", "M", "M", "G", "V", "S", "D"].map((w, i) => <span key={i}>{w}</span>)}</div>
+      <div role="grid" aria-label={`${MONTHS[month.m]} ${month.y}`} className="grid grid-cols-7 gap-1 sm:max-w-xl">
+        {Array.from({ length: lead }, (_, i) => <span key={`l${i}`} />)}
+        {Array.from({ length: count }, (_, i) => {
+          const n = i + 1, key = `${month.y}-${two(month.m + 1)}-${two(n)}`;
+          const d = days.get(key), ent = withEntries.get(key) ?? 0, on = picked === key;
+          const cover = d?.shots[d.shots.length - 1];
+          const label = `${n} ${MONTHS[month.m]}${d ? `, ${photosText(d.shots.length)}` : ""}${ent ? `, ${entriesText(ent)}` : ""}`;
+          return (
+            <button key={key} type="button" role="gridcell" aria-selected={on} aria-label={label} disabled={!d && !ent} onClick={() => { setPicked(key); setViewing(null); }}
+              className={cn("relative aspect-square overflow-hidden rounded-xl bg-foreground/[0.05] text-[11px] outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60", on && "ring-2 ring-brand-turquoise")}>
+              {cover && <ShotMedia s={cover} />}
+              {cover && <span aria-hidden="true" className="absolute inset-0 bg-gradient-to-b from-black/45 via-transparent to-black/40" />}
+              <span className={cn("absolute left-1.5 top-1 tabular-nums", cover ? "font-bold text-white" : "text-muted-foreground")}>{n}</span>
+              {d && <span className="absolute bottom-1 right-1 rounded-full bg-black/70 px-1.5 text-[10px] font-bold tabular-nums text-white">{d.shots.length}</span>}
+              {!d && ent > 0 && <span aria-hidden="true" className="absolute bottom-1.5 left-1.5 size-1.5 rounded-full bg-brand-turquoise" />}
+            </button>
+          );
+        })}
+      </div>
+      {picked && (day || pickedEntries > 0) && (
+        <div className="space-y-3 rounded-2xl bg-card/70 p-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1">
+            <h4 className="min-w-0 flex-1 text-sm font-semibold">{dayWord(new Date(picked).getTime())}<span className="ml-2 font-medium text-muted-foreground">{[day ? photosText(day.shots.length) : "", pickedEntries ? entriesText(pickedEntries) : ""].filter(Boolean).join(" · ")}</span></h4>
+            {day && <button type="button" onClick={() => setStory(true)} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-white px-3.5 text-sm font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-ring"><Play className="size-4" aria-hidden="true" />Guarda come storia</button>}
+          </div>
+          {day ? (
+            <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6">
+              {day.shots.map((x, i) => (
+                <button key={x.id} type="button" onClick={() => setViewing(i)} aria-label={`Apri ${x.kind === "video" ? "il video" : "la foto"} ${i + 1} di ${day.shots.length}`}
+                  className="relative aspect-square overflow-hidden rounded-xl bg-foreground/[0.08] outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <ShotMedia s={x} />
+                  {x.kind === "video" && <span className="absolute inset-0 grid place-items-center"><Play className="size-5 text-white drop-shadow" aria-hidden="true" /></span>}
+                  <KindDot s={x} />
+                </button>
+              ))}
+            </div>
+          ) : <p className="px-1 text-sm text-muted-foreground">Nessuna foto questo giorno: solo interventi, nella Linea del tempo.</p>}
+        </div>
+      )}
+      {!days.size && <p className="px-1 py-6 text-center text-sm text-muted-foreground">Niente foto da mostrare con questa etichetta.</p>}
+      {viewing !== null && day && <ShotViewer shots={day.shots} start={viewing} onClose={() => setViewing(null)} />}
+      {story && day && <StoryPlayer days={[day]} start={0} onClose={() => setStory(false)} />}
+    </div>
+  );
+}
+
+/** Storie: every day with photos as a cover card; a tap plays that day full screen, then the days before it. */
+function StoriesView({ shots }: { shots: Shot[] }) {
+  const days = useMemo(() => shotDays(shots), [shots]);
+  const [open, setOpen] = useState<number | null>(null);
+  if (!days.length) return <p className="px-1 py-6 text-center text-sm text-muted-foreground">Niente foto da mostrare con questa etichetta.</p>;
+  return (
+    <div className="space-y-3" data-guide="history-stories">
+      <button type="button" onClick={() => setOpen(0)} className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-white text-sm font-semibold text-black outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-auto sm:px-6"><Play className="size-4" aria-hidden="true" />Guarda tutte le storie · {days.length === 1 ? "1 giorno" : `${days.length} giorni`}</button>
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+        {days.map((d, k) => {
+          const cover = d.shots[d.shots.length - 1]!;
+          return (
+            <button key={d.key} type="button" onClick={() => setOpen(k)} aria-label={`Storia di ${d.label}, ${photosText(d.shots.length)}`}
+              className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-foreground/[0.08] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <ShotMedia s={cover} />
+              <span aria-hidden="true" className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/75" />
+              <span aria-hidden="true" className="absolute inset-x-2 top-2 flex gap-0.5">{d.shots.slice(0, 12).map((x) => <i key={x.id} className="h-0.5 flex-1 rounded-full bg-white/70" />)}</span>
+              <span className="absolute inset-x-2.5 bottom-2.5 text-white">
+                <span className="block text-[15px] font-semibold leading-tight">{d.label}</span>
+                <span className="block text-xs text-white/80">{tagCountText(d.shots)}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {open !== null && <StoryPlayer days={days} start={open} onClose={() => setOpen(null)} />}
+    </div>
+  );
+}
+
+const STORY_MS = 5000;
+/**
+ * A day's photos and videos full screen like stories: a bar per shot filling as it plays (5 s a photo, a video to its
+ * end), a tap on the right third or more goes on, on the left back, holding pauses, a swipe down closes; the day's
+ * hour, place and group on top, its label, zone and the intervention nearest to it at the foot, Condividi, Archivia and
+ * Elimina (asked in place) on the right and the day's thumbnails to jump. At the end of a day the next one (older) starts.
+ */
+function StoryPlayer({ days: given, start, onClose }: { days: Array<{ key: string; label: string; shots: Shot[] }>; start: number; onClose: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [days, setDays] = useState(given);
+  const [d, setD] = useState(start);
+  const [i, setI] = useState(0);
+  const [progress, setProgressState] = useState(0);
+  // The photo's progress also kept outside React, so a pause resumes where it stopped.
+  const progressRef = useRef(0);
+  const setProgress = (v: number) => { if (v === 0) progressRef.current = 0; setProgressState(v); };
+  const [paused, setPaused] = useState(false);
+  const [ask, setAsk] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+  const video = useRef<HTMLVideoElement>(null);
+  const press = useRef<{ x: number; y: number; t: number; dy: number } | null>(null);
+  const [drag, setDrag] = useState(0);
+  const lab = useLab();
+  const { entries: history } = useHistory();
+  const numbers = useGroupNumbers();
+  useEffect(() => { setOpen(true); }, []);
+  const day = days[d];
+  const s = day?.shots[Math.min(i, (day?.shots.length ?? 1) - 1)];
+  const close = () => { setOpen(false); setTimeout(onClose, 200); };
+  const next = () => {
+    if (!day) return;
+    if (i < day.shots.length - 1) { setI(i + 1); setProgress(0); return; }
+    if (d < days.length - 1) { setD(d + 1); setI(0); setProgress(0); return; }
+    close();
+  };
+  const prev = () => {
+    if (i > 0) { setI(i - 1); setProgress(0); return; }
+    if (d > 0) { setD(d - 1); setI(Math.max(0, days[d - 1]!.shots.length - 1)); setProgress(0); return; }
+    setProgress(0);
+  };
+  const hold = paused || ask || !open;
+  // Photos fill their bar in 5 s; a video follows its own time (onTimeUpdate) and moves on at its end.
+  useEffect(() => {
+    if (!s || s.kind === "video" || hold) return;
+    let raf = 0, last = performance.now(), p = progressRef.current;
+    const tick = (now: number) => {
+      p += (now - last) / STORY_MS; last = now;
+      if (p >= 1) { progressRef.current = 0; setProgress(1); next(); return; }
+      progressRef.current = p; setProgress(p);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s, hold]);
+  useEffect(() => { const v = video.current; if (!v) return; if (hold) v.pause(); else void v.play().catch(() => {}); }, [hold, s]);
+  useEffect(() => { setAsk(false); setNote(""); }, [s]);
+  if (!day || !s) return null;
+  const flowKey = s.flow === "piazza" ? "urban" : "vineyard";
+  const placeName = lab[flowKey].location.label.split(/[,·]/)[0]!.trim();
+  const n = numbers.get(`${s.flow}-${s.id}`);
+  const zone = zoneOfName(s.name);
+  const t = s.at ? new Date(s.at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : "";
+  // The intervention of that project nearest the shot within three hours: before it, "dopo l'intervento delle …".
+  const near = s.at ? history.filter((e) => e.flow === s.flow).map((e) => ({ e, d: Date.parse(e.at) - s.at! })).filter((x) => Math.abs(x.d) < 3 * 3600_000).sort((a, b) => Math.abs(a.d) - Math.abs(b.d))[0] : undefined;
+  const nearText = near ? `${near.d <= 0 ? "Dopo" : "Prima del"}l’intervento delle ${time(near.e)}: ${plainText(near.e)}` : "";
+  const onDown = (e: React.PointerEvent) => { press.current = { x: e.clientX, y: e.clientY, t: performance.now(), dy: 0 }; setPaused(true); };
+  const onMove = (e: React.PointerEvent) => { const p = press.current; if (!p) return; const dy = e.clientY - p.y; p.dy = dy; if (dy > 0 && Math.abs(dy) > Math.abs(e.clientX - p.x)) setDrag(dy); };
+  const onUp = (e: React.PointerEvent) => {
+    const p = press.current; press.current = null; setPaused(false); setDrag(0);
+    if (!p) return;
+    if (p.dy > 90) { close(); return; }
+    const moved = Math.hypot(e.clientX - p.x, e.clientY - p.y);
+    if (moved > 12 || performance.now() - p.t > 350) return;
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    if (e.clientX - r.left < r.width / 3) prev(); else next();
+  };
+  const share = async () => {
+    try {
+      const blob = await (await fetch(s.url)).blob();
+      const file = forShare(s.name, blob);
+      if (file && typeof navigator.share === "function") { try { await navigator.share({ files: [file], title: s.name }); } catch (e) { if ((e as Error)?.name !== "AbortError") setNote("Il telefono non ha aperto la condivisione: tocca di nuovo."); } return; }
+      const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = file?.name ?? s.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+      setNote("Salvato in Download.");
+    } catch { setNote("File non raggiungibile: controlla la connessione."); }
+  };
+  const drop = (gone: Shot) => {
+    const left = days.map((x) => ({ ...x, shots: x.shots.filter((y) => y !== gone) })).filter((x) => x.shots.length);
+    if (!left.length) { close(); return; }
+    const dd = Math.min(d, left.length - 1);
+    setDays(left); setD(dd); setI((k) => Math.min(k, left[dd]!.shots.length - 1)); setProgress(0);
+  };
+  const archive = () => { archiveMedia([`${s.flow}-${s.id}`]); toast.success(s.kind === "video" ? "Video in Archivio" : "Foto in Archivio"); drop(s); };
+  const del = async () => {
+    setBusy(true);
+    try { await removeMedia(flowKey, [s]); toast.success(s.kind === "video" ? "Video eliminato" : "Foto eliminata"); drop(s); }
+    catch { setNote("Eliminazione non riuscita: controlla la connessione e riprova."); }
+    finally { setBusy(false); setAsk(false); }
+  };
+  const side = "grid size-11 place-items-center rounded-full bg-black/45 ring-1 ring-white/25 backdrop-blur-sm outline-none focus-visible:ring-2 focus-visible:ring-white";
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) close(); }}>
+      <DialogContent overlayClassName="bg-black" className="!left-0 !top-0 h-[100dvh] w-full max-w-none !translate-x-0 !translate-y-0 overflow-hidden rounded-none border-0 bg-black p-0 text-white sm:max-h-none sm:rounded-none">
+        <DialogTitle className="sr-only">Storia di {day.label}: {s.kind === "video" ? "video" : "foto"} {i + 1} di {day.shots.length}</DialogTitle>
+        <DialogDescription className="sr-only">{placeName}{t ? `, ore ${t}` : ""}</DialogDescription>
+        <div className="absolute inset-0 transition-transform duration-150 motion-reduce:transition-none" style={{ transform: drag ? `translateY(${drag}px) scale(${1 - Math.min(drag, 300) / 1500})` : undefined }}>
+          {readyThumb(`${s.flow}-${s.id}`) && <img src={readyThumb(`${s.flow}-${s.id}`)!} alt="" aria-hidden="true" className="absolute inset-0 size-full scale-125 object-cover opacity-50 blur-2xl" />}
+          <div className="absolute inset-0 flex items-center justify-center touch-none select-none" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { press.current = null; setPaused(false); setDrag(0); }}>
+            {s.kind === "video"
+              ? <video key={s.id} ref={video} src={s.url} playsInline autoPlay className="max-h-full max-w-full" onTimeUpdate={(e) => { const v = e.currentTarget; if (v.duration) setProgress(v.currentTime / v.duration); }} onEnded={next} />
+              : <img key={s.id} src={s.url} alt={`Foto ${i + 1} di ${day.shots.length}`} draggable={false} className="max-h-full max-w-full object-contain" />}
+          </div>
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-black/70 to-transparent" />
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-black/85 to-transparent" />
+          <div className="absolute inset-x-3 top-[calc(0.75rem+env(safe-area-inset-top))] flex gap-1" aria-hidden="true">
+            {day.shots.map((x, k) => (
+              <span key={x.id} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/30"><span className="block h-full rounded-full bg-white" style={{ width: `${k < i ? 100 : k > i ? 0 : progress * 100}%` }} /></span>
+            ))}
+          </div>
+          <div className="absolute inset-x-3 top-[calc(1.6rem+env(safe-area-inset-top))] flex items-center gap-2.5">
+            <span className={cn("grid size-9 shrink-0 place-items-center rounded-full text-sm font-extrabold text-black", s.flow === "piazza" ? "bg-brand-turquoise" : "bg-lime-400")} aria-hidden="true">{s.flow === "piazza" ? "P" : "V"}</span>
+            <span className="min-w-0 flex-1 leading-tight">
+              <span className="block text-[15px] font-semibold">{day.label}{t ? ` · ${t}` : ""}</span>
+              <span className="block truncate text-xs text-white/80">{[placeName, n ? `Gruppo ${n}` : ""].filter(Boolean).join(" · ")}</span>
+            </span>
+            {days.length > 1 && <span className="shrink-0 rounded-full bg-black/40 px-2.5 py-1 text-xs tabular-nums">{d + 1} / {days.length}</span>}
+            {/* The shared dialog's own ✕ closes it, top right. */}
+            <span className="w-11 shrink-0" aria-hidden="true" />
+          </div>
+          <div className="absolute bottom-[calc(7.5rem+env(safe-area-inset-bottom))] right-3 flex flex-col items-center gap-3 text-[11px]">
+            <button type="button" onClick={() => void share()} className={side} aria-label="Condividi"><Share2 className="size-5" aria-hidden="true" /></button><span className="-mt-2">Condividi</span>
+            <button type="button" onClick={archive} className={side} aria-label="Archivia"><Archive className="size-5" aria-hidden="true" /></button><span className="-mt-2">Archivia</span>
+            <button type="button" onClick={() => setAsk(true)} className={side} aria-label="Elimina"><Trash2 className="size-5 text-red-300" aria-hidden="true" /></button><span className="-mt-2">Elimina</span>
+          </div>
+          <div className="absolute bottom-[calc(7.5rem+env(safe-area-inset-bottom))] left-4 right-20">
+            <div className="flex flex-wrap gap-1.5">
+              <span className="rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-bold ring-1 ring-white/25">{shotLabel(s)}</span>
+              {zone && <span className="rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-bold ring-1 ring-white/25">{zone}</span>}
+            </div>
+            {nearText && <p className="mt-2 text-[14px] leading-snug">{nearText}</p>}
+            {note && <p role="status" className="mt-2 text-[13px] text-brand-turquoise">{note}</p>}
+          </div>
+          <div className="no-scrollbar absolute inset-x-3 bottom-[calc(1rem+env(safe-area-inset-bottom))] flex gap-1.5 overflow-x-auto touch-pan-x" data-map-gestures="">
+            {day.shots.map((x, k) => (
+              <button key={x.id} type="button" onClick={() => { setI(k); setProgress(0); }} aria-label={`Vai a ${k + 1}`} aria-current={k === i}
+                className={cn("relative aspect-[3/4] w-14 shrink-0 overflow-hidden rounded-lg bg-white/10 outline-none transition-opacity", k === i ? "opacity-100 ring-2 ring-white" : "opacity-60")}><ShotMedia s={x} /></button>
+            ))}
+          </div>
+          {ask && (
+            <div role="alertdialog" aria-label="Conferma eliminazione" className="absolute inset-x-4 bottom-[calc(8rem+env(safe-area-inset-bottom))] rounded-2xl bg-zinc-900/95 p-4 text-center ring-1 ring-white/15">
+              <p className="text-[15px] font-medium">Eliminare {s.kind === "video" ? "questo video" : "questa foto"}? Non si può recuperare.</p>
+              <div className="mt-3 flex gap-2">
+                <button type="button" onClick={() => setAsk(false)} disabled={busy} className="h-11 flex-1 rounded-full bg-white/10 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-white">Annulla</button>
+                <button type="button" onClick={() => void del()} disabled={busy} className="h-11 flex-1 rounded-full bg-destructive text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-60">{busy ? "Elimino…" : "Elimina"}</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 const LINE_VIEW_KEY = "mdt-history-view-v1";
-type LineView = "linea" | "pile";
+type LineView = "linea" | "pile" | "calendario" | "storie";
 /** Linea del tempo | Pile: photos on the time line among the interventions, or apart as piles (by group or by day). */
 function LineViewSwitch({ value, onChange }: { value: LineView; onChange: (v: LineView) => void }) {
   const opt = (v: LineView, label: string) => (
     <button type="button" role="radio" aria-checked={value === v} onClick={() => onChange(v)}
-      className={cn("h-8 flex-1 rounded-full px-3 text-[13px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", value === v ? "bg-secondary text-secondary-foreground" : "text-foreground/75")}>{label}</button>
+      className={cn("h-8 flex-1 rounded-full px-2 text-[12.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", value === v ? "bg-secondary text-secondary-foreground" : "text-foreground/75")}>{label}</button>
   );
   return (
-    <div role="radiogroup" aria-label="Come vedere la cronologia" data-guide="history-view" className="flex max-w-xs gap-1 rounded-full bg-foreground/[0.06] p-1">
-      {opt("linea", "Linea del tempo")}{opt("pile", "Pile di foto")}
+    <div role="radiogroup" aria-label="Come vedere la cronologia" data-guide="history-view" className="flex max-w-md gap-1 rounded-full bg-foreground/[0.06] p-1">
+      {opt("linea", "Linea")}{opt("pile", "Pile")}{opt("calendario", "Calendario")}{opt("storie", "Storie")}
     </div>
   );
 }
@@ -1494,7 +1772,7 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
   const choosePileView = (v: PileView) => { setPileView(v); try { localStorage.setItem(PILE_VIEW_KEY, v); } catch { /* this time only */ } };
   // Linea del tempo (photos among the interventions, by label) or Pile di foto, kept on this device.
   const [lineView, setLineView] = useState<LineView>("linea");
-  useEffect(() => { try { if (localStorage.getItem(LINE_VIEW_KEY) === "pile") setLineView("pile"); } catch { /* default */ } }, []);
+  useEffect(() => { try { const v = localStorage.getItem(LINE_VIEW_KEY); if (v === "pile" || v === "calendario" || v === "storie") setLineView(v); } catch { /* default */ } }, []);
   const chooseLineView = (v: LineView) => { setLineView(v); try { localStorage.setItem(LINE_VIEW_KEY, v); } catch { /* this time only */ } };
   const [show, setShow] = useState<LineShow>("tutto");
   const numbers = useGroupNumbers();
@@ -1535,6 +1813,9 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
     const visibleShots = compact ? shots.slice(0, COMPACT_SHOTS) : ofKind;
     const activeError = (flow !== "vigneto" && hasUrbanError) ? urbanError : (flow !== "piazza" && hasVineError) ? vineError : null;
     const line = compact || lineView === "linea";
+    // Calendario and Storie: the photos alone (filtered by label), by day.
+    const photoMode = !compact && (lineView === "calendario" || lineView === "storie");
+    const tagged = show === "interventi" ? [] : show === "tutto" ? shots : shots.filter((x) => shotTag(x) === show);
     // The time line: interventions and stops of photos by day, filtered by label.
     const lineShots = !line || show === "interventi" ? [] : show === "tutto" ? shots : shots.filter((x) => shotTag(x) === show);
     const lineEntries = line && (show === "tutto" || show === "interventi") ? inTab : [];
@@ -1551,7 +1832,7 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
         {(shots.length > 0 || inTab.length > 0) && (
           <div className="space-y-2">
             {!compact && shots.length > 0 && <LineViewSwitch value={lineView} onChange={chooseLineView} />}
-            {line && shots.length > 0 && <TagPills shots={shots} entries={inTab.length} value={show} onChange={setShow} />}
+            {(line || photoMode) && shots.length > 0 && <TagPills shots={shots} entries={inTab.length} value={show} onChange={setShow} />}
           </div>
         )}
         {activeError && (
@@ -1560,7 +1841,7 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
             <button type="button" onClick={() => void retryMedia()} disabled={retrying} className="h-9 shrink-0 rounded-full bg-foreground/10 px-3 text-sm font-semibold disabled:opacity-60">{retrying ? "Riprovo…" : "Riprova"}</button>
           </div>
         )}
-        {shots.length > 0 && !line && (
+        {shots.length > 0 && !line && !photoMode && (
           <div className="space-y-2">
             <h3 className="px-1 text-sm font-medium text-muted-foreground">Foto e video{compact && shots.length > visibleShots.length ? ` · ultimi ${visibleShots.length} di ${shots.length}` : ` · ${countText(shots)}`}</h3>
             {!compact && <KindPills shots={shots} value={shotFilter} onChange={setShotFilter} />}
@@ -1585,6 +1866,9 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
             <ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />
           </Link>
         )}
+        {photoMode && (lineView === "calendario"
+          ? <CalendarView shots={tagged} entries={show === "tutto" || show === "interventi" ? inTab : []} />
+          : <StoriesView shots={tagged} />)}
         {line ? (lineDays.length > 0 ? compact ? lineDays.slice(0, COMPACT_DAYS).map((d) => {
           const [y, mo, da] = d.key.split("-");
           return <DayTab key={d.key} label={`${da}/${mo}/${y}`} items={d.items} moments={d.moments} numbers={numbers} />;
@@ -1593,7 +1877,7 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
         ) : show !== "tutto" ? (
           <p className="px-1 py-6 text-center text-sm text-muted-foreground">Niente da mostrare con questa etichetta.</p>
         ) : null) : null}
-        {line && lineDays.length > 0 ? null : line && show !== "tutto" ? null : groups.length === 0 ? visibleShots.length > 0 ? null : (
+        {photoMode ? null : line && lineDays.length > 0 ? null : line && show !== "tutto" ? null : groups.length === 0 ? visibleShots.length > 0 ? null : (
           <DashCard className="flex flex-col items-center gap-2 py-8 text-center">
             <History className="size-7 text-muted-foreground" aria-hidden="true" />
             <p className="text-[15px] font-medium">{loading ? "Carico la cronologia…" : archivedEntries.length ? "Gli interventi sono tutti nell’archivio" : f === "tutti" ? "Ancora nessun intervento" : `Ancora nessun intervento ${f === "piazza" ? "nella piazza" : "nel vigneto"}`}</p>
@@ -1634,7 +1918,7 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
           Apri la cronologia{entries.length > 0 ? ` · ${entries.length} ${entries.length === 1 ? "intervento" : "interventi"}` : ""}<ArrowRight className="size-4" aria-hidden="true" />
         </Link>
       )}
-      {!compact && entries.length > 0 && (
+      {!compact && entries.length > 0 && lineView !== "calendario" && lineView !== "storie" && (
         // Only where this tab lists interventions, and it empties just those (all of them on Tutti).
         // Asks once in place (no browser dialog): the account's history is gone for good.
         <div className="flex flex-wrap items-center justify-center gap-2 pt-2" role={confirm ? "alertdialog" : undefined} aria-label={confirm ? "Cancellare la cronologia?" : undefined}>
