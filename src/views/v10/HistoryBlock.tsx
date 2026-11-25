@@ -89,214 +89,6 @@ function Thumb({ s, onOpen }: { s: Shot; onOpen: () => void }) {
   );
 }
 
-/**
- * The photos and videos of a day opened inside the app, on a black full-screen page: one at a time, fitted whole,
- * slid sideways to the next (a snapping row of its own, so the page's tabs stay put; ‹ › on larger screens), with
- * "n di N", the place and the date; videos play with their controls. The phone's Back or ✕ closes it.
- */
-function ShotViewer({ shots, start, onClose }: { shots: Shot[]; start: number; onClose: () => void }) {
-  const [open, setOpen] = useState(false);
-  // Its own copy: a photo deleted here leaves at once, without waiting for the pile behind to change.
-  const [list, setList] = useState(shots);
-  const [i, setI] = useState(start);
-  const [ask, setAsk] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState("");
-  const row = useRef<HTMLDivElement>(null);
-  // Each photo's file, fetched as soon as it is shown, so the share opens straight from the tap.
-  const files = useRef(new Map<string, Blob>());
-  const lab = useLab();
-  const { entries: history } = useHistory();
-  // Mounted closed, then opened (the shared dialog's history step), at the photo that was tapped.
-  useEffect(() => { setOpen(true); }, []);
-  useEffect(() => {
-    if (!open) return;
-    requestAnimationFrame(() => { const r = row.current; if (r) r.scrollLeft = start * r.clientWidth; });
-  }, [open, start]);
-  const s = list[Math.min(i, list.length - 1)] ?? list[0]!;
-  useEffect(() => {
-    setAsk(false); setNote("");
-    if (!s || files.current.has(s.url)) return;
-    void fetch(s.url).then((r) => r.blob()).then((b) => { files.current.set(s.url, b); }, () => {});
-  }, [s]);
-  const onScroll = () => {
-    const r = row.current; if (!r) return;
-    const n = Math.round(r.scrollLeft / Math.max(1, r.clientWidth));
-    if (n !== i) {
-      setI(n);
-      // A video slid away stops playing.
-      Array.from(r.children).forEach((slide, k) => { if (k !== n) slide.querySelectorAll("video").forEach((v) => v.pause()); });
-    }
-  };
-  const go = (n: number) => { const r = row.current; if (r) r.scrollTo({ left: n * r.clientWidth, behavior: "smooth" }); };
-  const close = () => { setOpen(false); setTimeout(onClose, 200); };
-  const when = s?.at ? new Date(s.at).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
-  const what = s?.kind === "video" ? "questo video" : "questa foto";
-
-  /** The phone's own share window with this file (WhatsApp, Telegram, Gmail…); else it is saved in Download. */
-  const share = async () => {
-    setNote("");
-    try {
-      const blob = files.current.get(s.url) ?? (await (await fetch(s.url)).blob());
-      const file = forShare(s.name, blob);
-      if (file && typeof navigator.share === "function") {
-        try { await navigator.share({ files: [file], title: s.name }); return; }
-        catch (e) {
-          if ((e as Error)?.name === "AbortError") return;
-          setNote("Il telefono non ha aperto la condivisione: tocca di nuovo.");
-          return;
-        }
-      }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a"); a.href = url; a.download = file?.name ?? s.name;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-      setNote(file ? "Qui la condivisione non c’è: salvata in Download." : "Il telefono non condivide questo tipo di file: salvato in Download.");
-    } catch { setNote("File non raggiungibile: controlla la connessione."); }
-  };
-  /** Deleted for good, from the account or from this device; the viewer moves on to the next one, or closes. */
-  const del = async () => {
-    const gone = s;
-    setBusy(true);
-    try {
-      if (list.length === 1) close();
-      await removeMedia(gone.flow === "piazza" ? "urban" : "vineyard", [gone]);
-      toast.success(gone.kind === "video" ? "Video eliminato" : "Foto eliminata");
-      setList((l) => l.filter((x) => x !== gone));
-      setI((k) => Math.max(0, Math.min(k, list.length - 2)));
-    } catch {
-      setNote("Eliminazione non riuscita: controlla la connessione e riprova.");
-    } finally { setBusy(false); setAsk(false); }
-  };
-  if (!s) return null;
-  const flowKey = s.flow === "piazza" ? "urban" : "vineyard";
-  const place = lab[flowKey].location;
-  const area = drawnAreaFor(lab[flowKey].area, place);
-  const zone = zoneOfName(s.name);
-  // The simulation as it was set nearest to the shot (within three hours), from the history of that project.
-  const near = s.at ? history.filter((e) => e.flow === s.flow && whenOf(e)).map((e) => ({ e, d: Math.abs(new Date(e.at).getTime() - s.at!) })).filter((x) => x.d < 3 * 3600_000).sort((x, y) => x.d - y.d)[0]?.e : undefined;
-  const nearWhen = near ? whenOf(near) : null;
-  const [placeName, placeSub] = [place.label.split(/[,·]/)[0]!.trim(), place.label.split(/[,·]/).slice(1).map((x) => x.trim()).filter(Boolean).join(" · ")];
-  return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) close(); }}>
-      <DialogContent overlayClassName="bg-black" className="!left-0 !top-0 flex h-[100dvh] w-full max-w-none !translate-x-0 !translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 bg-background p-0 text-foreground sm:max-h-none sm:rounded-none">
-        <DialogTitle className="sr-only">{s.kind === "video" ? "Video" : "Foto"} {i + 1} di {list.length}</DialogTitle>
-        <DialogDescription className="sr-only">{placeName}{when ? `, ${when}` : ""}</DialogDescription>
-        {/* The photo on top, fitted whole over a blurred copy of itself; sideways to the next one. */}
-        <div className="relative h-[54dvh] shrink-0 overflow-hidden bg-black">
-          {/* The blurred backdrop is drawn from the small thumbnail: blurring the whole photo was heavy on phones. */}
-          {readyThumb(`${s.flow}-${s.id}`) && <img src={readyThumb(`${s.flow}-${s.id}`)!} alt="" aria-hidden="true" className="absolute inset-0 size-full scale-125 object-cover opacity-60 blur-2xl" />}
-          <div ref={row} onScroll={onScroll} data-map-gestures="" className="no-scrollbar relative flex h-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden touch-pan-x">
-            {list.map((x, k) => (
-              <div key={`${x.flow}-${x.id}`} className="relative flex h-full w-full shrink-0 snap-center items-center justify-center">
-                {Math.abs(k - i) <= 2 && (x.kind === "video"
-                  ? (k === i ? <VideoPlayer src={x.url} /> : <video src={`${x.url}#t=0.1`} playsInline preload="metadata" muted className="max-h-full max-w-full" />)
-                  : <img src={x.url} alt={`Foto ${k + 1} di ${list.length}`} className="max-h-full max-w-full object-contain" />)}
-              </div>
-            ))}
-          </div>
-          <span className="absolute left-4 top-[calc(0.9rem+env(safe-area-inset-top))] rounded-full bg-black/40 px-3 py-1.5 text-[13px] font-semibold tabular-nums text-white backdrop-blur-md">{Math.min(i, list.length - 1) + 1} / {list.length}</span>
-          <span className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-b from-transparent to-background" />
-        </div>
-        {/* What the photo is about: the place, when, where on the drawn area, the simulation of that moment. */}
-        <div className="relative -mt-6 min-h-0 flex-1 overflow-y-auto rounded-t-[1.6rem] bg-background px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-5">
-          <h3 className="font-display text-[22px] font-light leading-tight">{placeName}</h3>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">{[placeSub, when].filter(Boolean).join(" · ") || "Data non registrata"}</p>
-          <MiniMap center={place} area={area} highlight={zone} />
-          <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto touch-pan-x" data-map-gestures="">
-            {zone && <span className="shrink-0 rounded-full bg-foreground/[0.07] px-3 py-1.5 text-[12.5px]">Zona: {zone}</span>}
-            {nearWhen && <span className="shrink-0 rounded-full bg-foreground/[0.07] px-3 py-1.5 text-[12.5px]">{SEASON_LABEL[nearWhen.season]} · {whenClock(nearWhen)}</span>}
-            <span className="shrink-0 rounded-full bg-foreground/[0.07] px-3 py-1.5 text-[12.5px]">{s.flow === "piazza" ? "Piazza" : "Vigneto"} · {({ foto: "foto", multiplo: "scatto multiplo", ai: s.kind === "video" ? "video con l’AI" : "foto con l’AI", video: "video" } as const)[shotKind(s)]}</span>
-          </div>
-          {note && <p role="status" className="mt-3 text-center text-[13px] text-brand-turquoise">{note}</p>}
-          {ask ? (
-            <div role="alertdialog" aria-label="Conferma eliminazione" className="mt-4 rounded-2xl bg-destructive/10 p-4 text-center">
-              <p className="text-[15px] font-medium">Eliminare {what}? Non si può recuperare.</p>
-              <div className="mt-3 flex gap-2">
-                <button type="button" onClick={() => setAsk(false)} disabled={busy} className="h-12 flex-1 rounded-full bg-foreground/10 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">Annulla</button>
-                <button type="button" onClick={() => void del()} disabled={busy} className="h-12 flex-1 rounded-full bg-destructive text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60">{busy ? "Elimino…" : "Elimina"}</button>
-              </div>
-            </div>
-          ) : (
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => void share()} className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-foreground/[0.08] text-[15px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"><Share2 className="size-5" aria-hidden="true" />Condividi</button>
-              <button type="button" onClick={() => setAsk(true)} className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-foreground/[0.08] text-[15px] font-semibold text-red-400 outline-none focus-visible:ring-2 focus-visible:ring-ring"><Trash2 className="size-5" aria-hidden="true" />Elimina</button>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-const TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile";
-const MAP_H = 190;
-/** Web Mercator pixel of a point at zoom z. */
-const worldPx = (lat: number, lng: number, z: number): [number, number] => {
-  const size = 256 * 2 ** z, r = (lat * Math.PI) / 180;
-  return [((lng + 180) / 360) * size, ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * size];
-};
-
-/**
- * A small still map under the photo: the satellite picture of the place, the drawn area in white, its zones dashed in
- * their colours (the photo's own zone stronger, the others faded) and the place's pin. Without a drawn area, the place
- * alone; without connection, a dark ground with the same drawing.
- */
-function MiniMap({ center, area, highlight }: { center: { lat: number; lng: number }; area: DrawnArea | null; highlight: string | null }) {
-  const box = useRef<HTMLDivElement>(null);
-  const [w, setW] = useState(340);
-  useEffect(() => {
-    const el = box.current; if (!el) return;
-    const ro = new ResizeObserver(() => setW(el.clientWidth || 340));
-    ro.observe(el); setW(el.clientWidth || 340);
-    return () => ro.disconnect();
-  }, []);
-  const ring = area?.ring ?? null;
-  const zones = (area?.zones ?? []).filter((z) => Array.isArray(z.ring) && z.ring.length >= 3);
-  // The zoom that fits the area with a margin, fractional (the tiles of the zoom below, scaled up); the place alone at 17.
-  let zf = 17;
-  if (ring && ring.length >= 3) {
-    const ps = ring.map(([la, ln]) => worldPx(la, ln, 0));
-    const dx = Math.max(...ps.map((q) => q[0])) - Math.min(...ps.map((q) => q[0])), dy = Math.max(...ps.map((q) => q[1])) - Math.min(...ps.map((q) => q[1]));
-    zf = Math.min(19, Math.max(12, Math.log2(Math.min((w * 0.86) / Math.max(dx, 1e-9), (MAP_H * 0.8) / Math.max(dy, 1e-9)))));
-  }
-  const z = Math.floor(zf), k = 2 ** (zf - z), T = 256 * k;
-  const at = (lat: number, lng: number): [number, number] => { const [x, y] = worldPx(lat, lng, z); return [x * k, y * k]; };
-  let cx: number, cy: number;
-  if (ring && ring.length >= 3) {
-    const ps = ring.map(([la, ln]) => at(la, ln));
-    cx = (Math.min(...ps.map((q) => q[0])) + Math.max(...ps.map((q) => q[0]))) / 2; cy = (Math.min(...ps.map((q) => q[1])) + Math.max(...ps.map((q) => q[1]))) / 2;
-  } else [cx, cy] = at(center.lat, center.lng);
-  const ox = cx - w / 2, oy = cy - MAP_H / 2;
-  const tiles: Array<[number, number]> = [];
-  for (let tx = Math.floor(ox / T); tx <= Math.floor((ox + w) / T); tx++)
-    for (let ty = Math.floor(oy / T); ty <= Math.floor((oy + MAP_H) / T); ty++) tiles.push([tx, ty]);
-  const pts = (r: Ring) => r.map(([la, ln]) => { const [x, y] = at(la, ln); return `${(x - ox).toFixed(1)},${(y - oy).toFixed(1)}`; }).join(" ");
-  const [px, py] = at(center.lat, center.lng);
-  const label = (zn: SubArea) => zn.name ?? ZONE_LABEL[zn.kind];
-  return (
-    <div ref={box} className="relative mt-4 h-[190px] overflow-hidden rounded-2xl bg-[#2a332d]" aria-label={`Mappa del luogo${highlight ? `, zona ${highlight}` : ""}`} role="img">
-      {tiles.map(([tx, ty]) => (
-        <img key={`${tx}-${ty}`} src={`${TILES}/${z}/${ty}/${tx}`} alt="" aria-hidden="true" loading="lazy" draggable={false}
-          onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
-          className="absolute max-w-none select-none" style={{ left: tx * T - ox, top: ty * T - oy, width: T, height: T }} />
-      ))}
-      <span className="absolute inset-0 bg-black/15" aria-hidden="true" />
-      <svg className="absolute inset-0" width={w} height={MAP_H} aria-hidden="true">
-        {ring && ring.length >= 3 && <polygon points={pts(ring)} fill="rgb(45 212 191 / 0.14)" stroke="#fff" strokeWidth="1.6" />}
-        {zones.map((zn) => {
-          const on = highlight !== null && label(zn) === highlight;
-          const color = ZONE_COLORS[zn.kind];
-          return <polygon key={zn.id} points={pts(zn.ring)} fill={color} fillOpacity={on ? 0.35 : 0.14} stroke={color} strokeWidth={on ? 3 : 1.5} strokeDasharray="5 4" opacity={highlight && !on ? 0.5 : 1} />;
-        })}
-      </svg>
-      <span className="absolute grid size-6 -translate-x-1/2 -translate-y-full place-items-center" style={{ left: px - ox, top: py - oy }} aria-hidden="true">
-        <span className="size-5 rotate-45 rounded-[50%_50%_0_50%] border-[3px] border-white bg-brand-turquoise shadow-md" />
-      </span>
-    </div>
-  );
-}
-
 /** Photos and videos of one day, as a pile. */
 type Pile = { key: string; label: string; shots: Shot[]; group?: boolean };
 function pilesOf(shots: Shot[]): Pile[] {
@@ -637,7 +429,7 @@ function OpenPile({ pile, onClose, archived = false }: { pile: Pile; onClose: ()
       </div></div>
       </section>
       ))}
-      {viewing !== null && <ShotViewer shots={pile.shots} start={viewing} onClose={() => setViewing(null)} />}
+      {viewing !== null && <StoryPlayer shots={pile.shots} start={viewing} onClose={() => setViewing(null)} />}
       {selecting && (ask ? (
         <div role="alertdialog" aria-label="Conferma eliminazione" className="rounded-xl bg-destructive/10 p-3">
           <p className="text-sm font-medium">{chosen.length === 1 ? "Eliminare questo file?" : `Eliminare ${chosen.length} file?`} Non si possono recuperare.</p>
@@ -1083,7 +875,7 @@ function MomentRow({ m, numbers }: { m: Moment<Shot>; numbers: Map<string, numbe
           </div>
         )}
       </div>
-      {viewing !== null && <ShotViewer shots={m.shots} start={viewing} onClose={() => setViewing(null)} />}
+      {viewing !== null && <StoryPlayer shots={m.shots} start={viewing} onClose={() => setViewing(null)} />}
     </li>
   );
 }
@@ -1220,8 +1012,8 @@ function CalendarView({ shots, entries }: { shots: Shot[]; entries: SourcedEntry
         </div>
       )}
       {!days.size && <p className="px-1 py-6 text-center text-sm text-muted-foreground">Niente foto da mostrare con questa etichetta.</p>}
-      {viewing !== null && day && <ShotViewer shots={day.shots} start={viewing} onClose={() => setViewing(null)} />}
-      {story && day && <StoryPlayer days={[day]} start={0} onClose={() => setStory(false)} />}
+      {viewing !== null && day && <StoryPlayer shots={day.shots} start={viewing} onClose={() => setViewing(null)} />}
+      {story && day && <StoryPlayer shots={day.shots} start={0} onClose={() => setStory(false)} />}
     </div>
   );
 }
@@ -1251,23 +1043,26 @@ function StoriesView({ shots }: { shots: Shot[] }) {
           );
         })}
       </div>
-      {open !== null && <StoryPlayer days={days} start={open} onClose={() => setOpen(null)} />}
+      {open !== null && <StoryPlayer shots={days.flatMap((x) => x.shots)} start={days.slice(0, open).reduce((t, x) => t + x.shots.length, 0)} onClose={() => setOpen(null)} />}
     </div>
   );
 }
 
 const STORY_MS = 5000;
+const CUBE_MS = 380;
 /**
- * A day's photos and videos full screen like stories: a bar per shot filling as it plays (5 s a photo, a video to its
- * end), a tap on the right third or more goes on, on the left back, holding pauses, a swipe down closes; the day's
- * hour, place and group on top, its label, zone and the intervention nearest to it at the foot, Condividi, Archivia and
- * Elimina (asked in place) on the right and the day's thumbnails to jump. At the end of a day the next one (older) starts.
+ * The viewer of every photo and video (the old photo-and-map page is gone): full screen like stories, the shots of
+ * one day after another in the order given. A bar per shot of the day fills as it plays (5 s a photo, a video to its
+ * end); a tap on the left third goes back, elsewhere on; holding pauses; a swipe sideways turns to the next or previous
+ * shot as on the face of a cube (the faces follow the finger, past a quarter of the width or a flick it turns, else it
+ * springs back; no animation with reduced motion); a swipe down closes, as do the dialog's ✕ and the phone's Back.
+ * On top the day, hour, place and Gruppo n; at the foot the shot's label, zone and the intervention nearest to it;
+ * Condividi, Archivia (Ripristina for an archived one) and Elimina (asked in place) on the right; the day's thumbnails to jump.
  */
-function StoryPlayer({ days: given, start, onClose }: { days: Array<{ key: string; label: string; shots: Shot[] }>; start: number; onClose: () => void }) {
+function StoryPlayer({ shots: given, start, onClose }: { shots: Shot[]; start: number; onClose: () => void }) {
   const [open, setOpen] = useState(false);
-  const [days, setDays] = useState(given);
-  const [d, setD] = useState(start);
-  const [i, setI] = useState(0);
+  const [list, setList] = useState(given);
+  const [g, setG] = useState(Math.max(0, Math.min(start, given.length - 1)));
   const [progress, setProgressState] = useState(0);
   // The photo's progress also kept outside React, so a pause resumes where it stopped.
   const progressRef = useRef(0);
@@ -1276,36 +1071,48 @@ function StoryPlayer({ days: given, start, onClose }: { days: Array<{ key: strin
   const [ask, setAsk] = useState(false);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
+  const [rot, setRot] = useState(0);
+  const [turning, setTurning] = useState(false);
+  const [dropY, setDropY] = useState(0);
+  const stage = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
-  const press = useRef<{ x: number; y: number; t: number; dy: number } | null>(null);
-  const [drag, setDrag] = useState(0);
+  const press = useRef<{ x: number; y: number; t: number; mode: "" | "x" | "y"; last: Array<[number, number]> } | null>(null);
   const lab = useLab();
   const { entries: history } = useHistory();
   const numbers = useGroupNumbers();
+  const archived = useMediaArchive();
+  const reduce = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   useEffect(() => { setOpen(true); }, []);
-  const day = days[d];
-  const s = day?.shots[Math.min(i, (day?.shots.length ?? 1) - 1)];
+  const s = list[g];
+  // The day of the shot: the run of shots of the same calendar day around it.
+  const dayRange = useMemo(() => {
+    if (!s) return [0, 0] as const;
+    const k = s.at != null ? dayKey(s.at) : "";
+    let a = g, b = g;
+    while (a > 0 && (list[a - 1]!.at != null ? dayKey(list[a - 1]!.at!) : "") === k) a--;
+    while (b < list.length - 1 && (list[b + 1]!.at != null ? dayKey(list[b + 1]!.at!) : "") === k) b++;
+    return [a, b] as const;
+  }, [list, g, s]);
   const close = () => { setOpen(false); setTimeout(onClose, 200); };
-  const next = () => {
-    if (!day) return;
-    if (i < day.shots.length - 1) { setI(i + 1); setProgress(0); return; }
-    if (d < days.length - 1) { setD(d + 1); setI(0); setProgress(0); return; }
-    close();
+  /** To another shot: within the day at once, to another day (or by a swipe) turning the cube. */
+  const goTo = (n: number, cube: boolean) => {
+    if (n < 0) { setProgress(0); return; }
+    if (n >= list.length) { close(); return; }
+    if (!cube || reduce) { setG(n); setProgress(0); setRot(0); return; }
+    const dir = n > g ? 1 : -1;
+    setTurning(true); setRot(-dir * 90);
+    window.setTimeout(() => { setTurning(false); setRot(0); setG(n); setProgress(0); }, CUBE_MS);
   };
-  const prev = () => {
-    if (i > 0) { setI(i - 1); setProgress(0); return; }
-    if (d > 0) { setD(d - 1); setI(Math.max(0, days[d - 1]!.shots.length - 1)); setProgress(0); return; }
-    setProgress(0);
-  };
-  const hold = paused || ask || !open;
-  // Photos fill their bar in 5 s; a video follows its own time (onTimeUpdate) and moves on at its end.
+  const next = () => goTo(g + 1, g + 1 > dayRange[1]);
+  const prev = () => goTo(g - 1, g - 1 < dayRange[0]);
+  const hold = paused || ask || !open || turning || rot !== 0;
   useEffect(() => {
     if (!s || s.kind === "video" || hold) return;
     let raf = 0, last = performance.now(), p = progressRef.current;
     const tick = (now: number) => {
       p += (now - last) / STORY_MS; last = now;
-      if (p >= 1) { progressRef.current = 0; setProgress(1); next(); return; }
-      progressRef.current = p; setProgress(p);
+      if (p >= 1) { progressRef.current = 0; setProgressState(1); next(); return; }
+      progressRef.current = p; setProgressState(p);
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -1314,23 +1121,54 @@ function StoryPlayer({ days: given, start, onClose }: { days: Array<{ key: strin
   }, [s, hold]);
   useEffect(() => { const v = video.current; if (!v) return; if (hold) v.pause(); else void v.play().catch(() => {}); }, [hold, s]);
   useEffect(() => { setAsk(false); setNote(""); }, [s]);
-  if (!day || !s) return null;
+  if (!s) return null;
+  const width = () => stage.current?.clientWidth ?? window.innerWidth;
   const flowKey = s.flow === "piazza" ? "urban" : "vineyard";
   const placeName = lab[flowKey].location.label.split(/[,·]/)[0]!.trim();
   const n = numbers.get(`${s.flow}-${s.id}`);
   const zone = zoneOfName(s.name);
   const t = s.at ? new Date(s.at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : "";
-  // The intervention of that project nearest the shot within three hours: before it, "dopo l'intervento delle …".
+  const dayLabel = s.at ? dayWord(s.at) : "Data non registrata";
+  const isArchived = !!archived[`${s.flow}-${s.id}`];
+  // The intervention of that project nearest the shot within three hours.
   const near = s.at ? history.filter((e) => e.flow === s.flow).map((e) => ({ e, d: Date.parse(e.at) - s.at! })).filter((x) => Math.abs(x.d) < 3 * 3600_000).sort((a, b) => Math.abs(a.d) - Math.abs(b.d))[0] : undefined;
   const nearText = near ? `${near.d <= 0 ? "Dopo" : "Prima del"}l’intervento delle ${time(near.e)}: ${plainText(near.e)}` : "";
-  const onDown = (e: React.PointerEvent) => { press.current = { x: e.clientX, y: e.clientY, t: performance.now(), dy: 0 }; setPaused(true); };
-  const onMove = (e: React.PointerEvent) => { const p = press.current; if (!p) return; const dy = e.clientY - p.y; p.dy = dy; if (dy > 0 && Math.abs(dy) > Math.abs(e.clientX - p.x)) setDrag(dy); };
+
+  const onDown = (e: React.PointerEvent) => {
+    if (turning) return;
+    press.current = { x: e.clientX, y: e.clientY, t: performance.now(), mode: "", last: [[performance.now(), e.clientX]] };
+    setPaused(true);
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+  };
+  const onMove = (e: React.PointerEvent) => {
+    const p = press.current; if (!p) return;
+    const dx = e.clientX - p.x, dy = e.clientY - p.y;
+    if (!p.mode && Math.hypot(dx, dy) > 10) p.mode = Math.abs(dx) > Math.abs(dy) ? "x" : dy > 0 ? "y" : "";
+    p.last.push([performance.now(), e.clientX]); if (p.last.length > 6) p.last.shift();
+    if (p.mode === "x") {
+      let r = (dx / width()) * 90;
+      // Nothing beyond the ends: the cube only gives a little.
+      if ((r < 0 && g >= list.length - 1) || (r > 0 && g <= 0)) r *= 0.25;
+      setRot(Math.max(-90, Math.min(90, r)));
+    } else if (p.mode === "y") setDropY(Math.max(0, dy));
+  };
   const onUp = (e: React.PointerEvent) => {
-    const p = press.current; press.current = null; setPaused(false); setDrag(0);
+    const p = press.current; press.current = null; setPaused(false);
     if (!p) return;
-    if (p.dy > 90) { close(); return; }
-    const moved = Math.hypot(e.clientX - p.x, e.clientY - p.y);
-    if (moved > 12 || performance.now() - p.t > 350) return;
+    if (p.mode === "y") { if (dropY > 90) close(); setDropY(0); return; }
+    if (p.mode === "x") {
+      const dx = e.clientX - p.x, [t0, x0] = p.last[0]!;
+      const v = (e.clientX - x0) / Math.max(1, performance.now() - t0);
+      const dir = dx < 0 ? 1 : -1;
+      const target = g + dir;
+      if ((Math.abs(dx) > width() * 0.25 || Math.abs(v) > 0.5) && target >= 0 && target < list.length) {
+        if (reduce) { setRot(0); setG(target); setProgress(0); return; }
+        setTurning(true); setRot(-dir * 90);
+        window.setTimeout(() => { setTurning(false); setRot(0); setG(target); setProgress(0); }, CUBE_MS);
+      } else { setTurning(true); setRot(0); window.setTimeout(() => setTurning(false), CUBE_MS); }
+      return;
+    }
+    if (performance.now() - p.t > 350) return;
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     if (e.clientX - r.left < r.width / 3) prev(); else next();
   };
@@ -1338,60 +1176,83 @@ function StoryPlayer({ days: given, start, onClose }: { days: Array<{ key: strin
     try {
       const blob = await (await fetch(s.url)).blob();
       const file = forShare(s.name, blob);
-      if (file && typeof navigator.share === "function") { try { await navigator.share({ files: [file], title: s.name }); } catch (e) { if ((e as Error)?.name !== "AbortError") setNote("Il telefono non ha aperto la condivisione: tocca di nuovo."); } return; }
+      if (file && typeof navigator.share === "function") { try { await navigator.share({ files: [file], title: s.name }); } catch (err) { if ((err as Error)?.name !== "AbortError") setNote("Il telefono non ha aperto la condivisione: tocca di nuovo."); } return; }
       const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = file?.name ?? s.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
-      setNote("Salvato in Download.");
+      setNote(file ? "Qui la condivisione non c’è: salvato in Download." : "Il telefono non condivide questo tipo di file: salvato in Download.");
     } catch { setNote("File non raggiungibile: controlla la connessione."); }
   };
   const drop = (gone: Shot) => {
-    const left = days.map((x) => ({ ...x, shots: x.shots.filter((y) => y !== gone) })).filter((x) => x.shots.length);
+    const left = list.filter((x) => x !== gone);
     if (!left.length) { close(); return; }
-    const dd = Math.min(d, left.length - 1);
-    setDays(left); setD(dd); setI((k) => Math.min(k, left[dd]!.shots.length - 1)); setProgress(0);
+    setList(left); setG((k) => Math.min(k, left.length - 1)); setProgress(0);
   };
-  const archive = () => { archiveMedia([`${s.flow}-${s.id}`]); toast.success(s.kind === "video" ? "Video in Archivio" : "Foto in Archivio"); drop(s); };
+  const shelve = () => {
+    const key = `${s.flow}-${s.id}`;
+    if (isArchived) { restoreMedia([key]); toast.success(s.kind === "video" ? "Video di nuovo in Foto e video" : "Foto di nuovo in Foto e video"); }
+    else { archiveMedia([key]); toast.success(s.kind === "video" ? "Video in Archivio" : "Foto in Archivio"); }
+    drop(s);
+  };
   const del = async () => {
     setBusy(true);
     try { await removeMedia(flowKey, [s]); toast.success(s.kind === "video" ? "Video eliminato" : "Foto eliminata"); drop(s); }
     catch { setNote("Eliminazione non riuscita: controlla la connessione e riprova."); }
     finally { setBusy(false); setAsk(false); }
   };
+  const media = (x: Shot, live: boolean) => x.kind === "video"
+    ? (live ? <video key={x.id} ref={video} src={x.url} playsInline autoPlay className="max-h-full max-w-full" onTimeUpdate={(ev) => { const v = ev.currentTarget; if (v.duration) setProgressState(v.currentTime / v.duration); }} onEnded={next} />
+      : readyThumb(`${x.flow}-${x.id}`) ? <img src={readyThumb(`${x.flow}-${x.id}`)!} alt="" className="max-h-full max-w-full object-contain" /> : <span className="grid size-full place-items-center"><Play className="size-10 text-white/70" aria-hidden="true" /></span>)
+    : <img key={x.id} src={x.url} alt={live ? `Foto ${g - dayRange[0] + 1} di ${dayRange[1] - dayRange[0] + 1}` : ""} draggable={false} className="max-h-full max-w-full object-contain" />;
+  // The cube: the shot in front and its neighbours on the side faces, turned with the finger.
+  const half = "calc(var(--story-w, 100vw) / 2)";
+  const face = (k: -1 | 0 | 1) => {
+    const x = list[g + k];
+    if (!x) return null;
+    return (
+      <div key={`${k}-${x.flow}-${x.id}`} className="absolute inset-0 flex items-center justify-center overflow-hidden bg-black [backface-visibility:hidden]"
+        style={{ transform: `rotateY(${k * 90}deg) translateZ(${half})` }}>
+        {readyThumb(`${x.flow}-${x.id}`) && <img src={readyThumb(`${x.flow}-${x.id}`)!} alt="" aria-hidden="true" className="absolute inset-0 size-full scale-125 object-cover opacity-50 blur-2xl" />}
+        <div className="relative flex size-full items-center justify-center">{media(x, k === 0)}</div>
+        {k !== 0 && <span aria-hidden="true" className="absolute inset-0 bg-black" style={{ opacity: Math.max(0, 0.55 - Math.abs(rot) / 160) }} />}
+      </div>
+    );
+  };
   const side = "grid size-11 place-items-center rounded-full bg-black/45 ring-1 ring-white/25 backdrop-blur-sm outline-none focus-visible:ring-2 focus-visible:ring-white";
+  const dayShots = list.slice(dayRange[0], dayRange[1] + 1);
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) close(); }}>
       <DialogContent overlayClassName="bg-black" className="!left-0 !top-0 h-[100dvh] w-full max-w-none !translate-x-0 !translate-y-0 overflow-hidden rounded-none border-0 bg-black p-0 text-white sm:max-h-none sm:rounded-none">
-        <DialogTitle className="sr-only">Storia di {day.label}: {s.kind === "video" ? "video" : "foto"} {i + 1} di {day.shots.length}</DialogTitle>
-        <DialogDescription className="sr-only">{placeName}{t ? `, ore ${t}` : ""}</DialogDescription>
-        <div className="absolute inset-0 transition-transform duration-150 motion-reduce:transition-none" style={{ transform: drag ? `translateY(${drag}px) scale(${1 - Math.min(drag, 300) / 1500})` : undefined }}>
-          {readyThumb(`${s.flow}-${s.id}`) && <img src={readyThumb(`${s.flow}-${s.id}`)!} alt="" aria-hidden="true" className="absolute inset-0 size-full scale-125 object-cover opacity-50 blur-2xl" />}
-          <div className="absolute inset-0 flex items-center justify-center touch-none select-none" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { press.current = null; setPaused(false); setDrag(0); }}>
-            {s.kind === "video"
-              ? <video key={s.id} ref={video} src={s.url} playsInline autoPlay className="max-h-full max-w-full" onTimeUpdate={(e) => { const v = e.currentTarget; if (v.duration) setProgress(v.currentTime / v.duration); }} onEnded={next} />
-              : <img key={s.id} src={s.url} alt={`Foto ${i + 1} di ${day.shots.length}`} draggable={false} className="max-h-full max-w-full object-contain" />}
+        <DialogTitle className="sr-only">{dayLabel}: {s.kind === "video" ? "video" : "foto"} {g - dayRange[0] + 1} di {dayShots.length}</DialogTitle>
+        <DialogDescription className="sr-only">{placeName}{t ? `, ore ${t}` : ""}. Scorri di lato per passare alla foto successiva o precedente.</DialogDescription>
+        <div ref={stage} className="absolute inset-0 transition-transform duration-150 motion-reduce:transition-none"
+          style={{ transform: dropY ? `translateY(${dropY}px) scale(${1 - Math.min(dropY, 300) / 1500})` : undefined, ["--story-w" as string]: `${stage.current?.clientWidth ?? 0}px`, perspective: "1100px" }}>
+          <div className="absolute inset-0 touch-none select-none" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
+            onPointerCancel={() => { press.current = null; setPaused(false); setDropY(0); setRot(0); }}>
+            <div className="absolute inset-0 [transform-style:preserve-3d]"
+              style={{ transform: `translateZ(calc(${half} * -1)) rotateY(${rot}deg)`, transition: turning ? `transform ${CUBE_MS}ms cubic-bezier(0.22, 1, 0.36, 1)` : "none" }}>
+              {face(-1)}{face(0)}{face(1)}
+            </div>
           </div>
           <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-black/70 to-transparent" />
           <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-black/85 to-transparent" />
-          <div className="absolute inset-x-3 top-[calc(0.75rem+env(safe-area-inset-top))] flex gap-1" aria-hidden="true">
-            {day.shots.map((x, k) => (
-              <span key={x.id} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/30"><span className="block h-full rounded-full bg-white" style={{ width: `${k < i ? 100 : k > i ? 0 : progress * 100}%` }} /></span>
+          <div className="pointer-events-none absolute left-3 right-16 top-[calc(0.75rem+env(safe-area-inset-top))] flex gap-1" aria-hidden="true">
+            {dayShots.map((x, k) => (
+              <span key={x.id} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/30"><span className="block h-full rounded-full bg-white" style={{ width: `${k + dayRange[0] < g ? 100 : k + dayRange[0] > g ? 0 : progress * 100}%` }} /></span>
             ))}
           </div>
-          <div className="absolute inset-x-3 top-[calc(1.6rem+env(safe-area-inset-top))] flex items-center gap-2.5">
+          <div className="pointer-events-none absolute left-3 right-16 top-[calc(1.6rem+env(safe-area-inset-top))] flex items-center gap-2.5">
             <span className={cn("grid size-9 shrink-0 place-items-center rounded-full text-sm font-extrabold text-black", s.flow === "piazza" ? "bg-brand-turquoise" : "bg-lime-400")} aria-hidden="true">{s.flow === "piazza" ? "P" : "V"}</span>
             <span className="min-w-0 flex-1 leading-tight">
-              <span className="block text-[15px] font-semibold">{day.label}{t ? ` · ${t}` : ""}</span>
+              <span className="block text-[15px] font-semibold">{dayLabel}{t ? ` · ${t}` : ""}</span>
               <span className="block truncate text-xs text-white/80">{[placeName, n ? `Gruppo ${n}` : ""].filter(Boolean).join(" · ")}</span>
             </span>
-            {days.length > 1 && <span className="shrink-0 rounded-full bg-black/40 px-2.5 py-1 text-xs tabular-nums">{d + 1} / {days.length}</span>}
-            {/* The shared dialog's own ✕ closes it, top right. */}
-            <span className="w-11 shrink-0" aria-hidden="true" />
+            <span className="shrink-0 rounded-full bg-black/40 px-2.5 py-1 text-xs tabular-nums">{g + 1} / {list.length}</span>
           </div>
           <div className="absolute bottom-[calc(7.5rem+env(safe-area-inset-bottom))] right-3 flex flex-col items-center gap-3 text-[11px]">
             <button type="button" onClick={() => void share()} className={side} aria-label="Condividi"><Share2 className="size-5" aria-hidden="true" /></button><span className="-mt-2">Condividi</span>
-            <button type="button" onClick={archive} className={side} aria-label="Archivia"><Archive className="size-5" aria-hidden="true" /></button><span className="-mt-2">Archivia</span>
+            <button type="button" onClick={shelve} className={side} aria-label={isArchived ? "Ripristina" : "Archivia"}>{isArchived ? <ArchiveRestore className="size-5" aria-hidden="true" /> : <Archive className="size-5" aria-hidden="true" />}</button><span className="-mt-2">{isArchived ? "Ripristina" : "Archivia"}</span>
             <button type="button" onClick={() => setAsk(true)} className={side} aria-label="Elimina"><Trash2 className="size-5 text-red-300" aria-hidden="true" /></button><span className="-mt-2">Elimina</span>
           </div>
-          <div className="absolute bottom-[calc(7.5rem+env(safe-area-inset-bottom))] left-4 right-20">
+          <div className="pointer-events-none absolute bottom-[calc(7.5rem+env(safe-area-inset-bottom))] left-4 right-20">
             <div className="flex flex-wrap gap-1.5">
               <span className="rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-bold ring-1 ring-white/25">{shotLabel(s)}</span>
               {zone && <span className="rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-bold ring-1 ring-white/25">{zone}</span>}
@@ -1400,9 +1261,9 @@ function StoryPlayer({ days: given, start, onClose }: { days: Array<{ key: strin
             {note && <p role="status" className="mt-2 text-[13px] text-brand-turquoise">{note}</p>}
           </div>
           <div className="no-scrollbar absolute inset-x-3 bottom-[calc(1rem+env(safe-area-inset-bottom))] flex gap-1.5 overflow-x-auto touch-pan-x" data-map-gestures="">
-            {day.shots.map((x, k) => (
-              <button key={x.id} type="button" onClick={() => { setI(k); setProgress(0); }} aria-label={`Vai a ${k + 1}`} aria-current={k === i}
-                className={cn("relative aspect-[3/4] w-14 shrink-0 overflow-hidden rounded-lg bg-white/10 outline-none transition-opacity", k === i ? "opacity-100 ring-2 ring-white" : "opacity-60")}><ShotMedia s={x} /></button>
+            {dayShots.map((x, k) => (
+              <button key={x.id} type="button" onClick={() => { setG(dayRange[0] + k); setProgress(0); }} aria-label={`Vai a ${k + 1}`} aria-current={dayRange[0] + k === g}
+                className={cn("relative aspect-[3/4] w-14 shrink-0 overflow-hidden rounded-lg bg-white/10 outline-none transition-opacity", dayRange[0] + k === g ? "opacity-100 ring-2 ring-white" : "opacity-60")}><ShotMedia s={x} /></button>
             ))}
           </div>
           {ask && (
