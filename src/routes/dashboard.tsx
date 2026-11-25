@@ -34,7 +34,7 @@ import { openAccount } from "@/lib/camera-dock";
 const ExportSheetLazy = lazy(() => import("@/views/v10/ExportSheetLazy"));
 import { SEND_PROJECT_EVENT } from "@/lib/send-project";
 import { DashCard, DashSection, PiazzaDashboard, PremiumPart, SendProject, URBAN_LOCKED, VINE_LOCKED, VineDashboard, getDashSeason, piazzaDash } from "@/views/v10/Dashboard";
-import { getPiazzaReading } from "@/models/sim-reading";
+import { getPiazzaReading, placeKey } from "@/models/sim-reading";
 import { useQueryClient } from "@tanstack/react-query";
 import { heatStep, heatWords, piazzaMix, piazzaSummary, thirstStep, thirstWords, vineMixRows, vineSummary } from "@/models/project-summary";
 import { SEASON_LABEL, type Season } from "@/models/season-climate";
@@ -437,14 +437,14 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   const areaOf = (key: unknown[]) => (qc.getQueryData(key) as { m2: number | null } | undefined)?.m2 ?? null;
   const yearOf = qc.getQueryData(["season-climate", u.location.lat, u.location.lng]) as { profile: Record<Season, Array<number | null>> } | undefined;
   // The same reading as the dashboard's arc: the simulation's season and hour (its very numbers), else that hour of the season picked.
-  const pd = piazzaDash(u, season, yearOf?.profile, areaOf(["place-area", u.location.lat, u.location.lng]), getPiazzaReading());
+  const pd = piazzaDash(u, season, yearOf?.profile, areaOf(["place-area", u.location.lat, u.location.lng]), getPiazzaReading(placeKey(u.location.lat, u.location.lng)));
   const ps = { ...pd.sum, before: pd.before, after: pd.after };
   const vs = vineSummary(v, areaOf(["vine-area", v.location.lat, v.location.lng]));
   // People at the simulation's season and hour, and the place's constraints: the same reading as the dashboard's cards.
   const siteLoc = ctx === "Urbano" ? u : v;
   const [sLat, sLng] = siteCenter(siteLoc.location, siteLoc.area);
   const site = useSiteContext(sLat, sLng, !drawnAreaFor(siteLoc.area, siteLoc.location), drawnAreaFor(siteLoc.area, siteLoc.location)?.ring).data;
-  const crowdR: [string, string][] = ctx === "Urbano" && site ? crowdRows(crowdEstimate(site.draws, pd.sum.m2, getPiazzaReading()?.season ?? season, pd.sum.hour), getPiazzaReading()?.season ?? season, pd.sum.hour, Math.floor(pd.sum.shadeM2 / 2)) : [];
+  const crowdR: [string, string][] = ctx === "Urbano" && site ? crowdRows(crowdEstimate(site.draws, pd.sum.m2, getPiazzaReading(placeKey(u.location.lat, u.location.lng))?.season ?? season, pd.sum.hour), getPiazzaReading(placeKey(u.location.lat, u.location.lng))?.season ?? season, pd.sum.hour, Math.floor(pd.sum.shadeM2 / 2)) : [];
   const constraintR: [string, string][] = site ? constraintRows(siteConstraints(site, siteLoc.location.label ?? ""), ctx === "Urbano" ? "piazza" : "vigneto") : [];
   const notes = useNotes();
   const f1 = (n: number) => n.toLocaleString("it-IT", { maximumFractionDigits: 1, minimumFractionDigits: 1 });

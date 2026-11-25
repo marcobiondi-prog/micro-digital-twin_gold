@@ -12,7 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ArrowRight, CloudDrizzle, CloudRain, Sprout, Droplets, Leaf, Lock, Mail, MapPin, Send, ShieldCheck, Sparkles, Sun, TreePine, Umbrella, Wind, type LucideIcon } from "lucide-react";
 import { useLab, type LabState } from "@/models/lab-store";
-import { getPiazzaReading, usePiazzaReading, type PiazzaReading } from "@/models/sim-reading";
+import { getPiazzaReading, placeKey, usePiazzaReading, type PiazzaReading } from "@/models/sim-reading";
 import { heatStep, heatWords, piazzaMix, piazzaSummary, thirstStep, thirstWords, vineMixRows, vineSummary } from "@/models/project-summary";
 import { euroRange, grouped } from "@/models/intervention-cost";
 import { SEASONS, SEASON_LABEL, coolingShare, type Season } from "@/models/season-climate";
@@ -289,7 +289,7 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
   const reduce = useReducedMotion();
   const { lat, lng } = urban.location;
   const picked = useDashSeason();
-  const reading = usePiazzaReading();
+  const reading = usePiazzaReading(placeKey(lat, lng));
   // With the simulation's reading the season is the simulation's (the other pills are off); a season picked
   // before the simulation was opened gives way to it.
   const season = reading?.season ?? picked ?? "estate";
