@@ -313,7 +313,7 @@ export function VineThirst({ onImportWeather }: { onImportWeather?: (() => Promi
       {/* Fine-tuning by hand: always open, one line each. */}
       <div className="space-y-3" role="group" aria-label={`Interventi, ${scopeName}`}>
         <Lever icon={Droplets} label="Irrigazione" value={mix.irrigation} step={2} max={VINE_MAX.irrigation} color="text-water" swatch="bg-water" shown={`+${mix.irrigation}%`} onChange={(v) => change({ irrigation: v })} />
-        <Lever icon={Umbrella} label="Teli d’ombra" value={mix.shade} step={10} max={VINE_MAX.shade} color="text-urban" swatch="bg-urban" onChange={(v) => change({ shade: v })} />
+        <Lever icon={Umbrella} label="Teli d’ombra" shown={`${grouped(Math.round(((all ? m2 : m2 / 3) * mix.shade) / 100))} m²`} value={mix.shade} step={10} max={VINE_MAX.shade} color="text-urban" swatch="bg-urban" onChange={(v) => change({ shade: v })} />
         <Lever icon={Wind} label="Frangivento" value={mix.windbreak} step={10} max={VINE_MAX.windbreak} color="text-ok" swatch="bg-ok" onChange={(v) => change({ windbreak: v })} />
       </div>
 

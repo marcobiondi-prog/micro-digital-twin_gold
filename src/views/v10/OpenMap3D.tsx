@@ -18,6 +18,12 @@ const STYLE = "https://tiles.openfreemap.org/styles/liberty";
 type Camera = { center: [number, number]; zoom: number; pitch: number; bearing: number };
 
 export function OpenMap3D({ lat, lng, label, zoom, area = [], sim = null }: { lat: number; lng: number; label: string; zoom: number; area?: Ring; sim?: SimLayout | null }) {
+  // Built once per place: a GPS fix of a few metres moves the pin, it no longer rebuilds the whole 3D map.
+  const anchor = useRef({ lat, lng });
+  if (Math.hypot((anchor.current.lat - lat) * 111_320, (anchor.current.lng - lng) * 111_320 * Math.cos((lat * Math.PI) / 180)) > 30) anchor.current = { lat, lng };
+  const { lat: aLat, lng: aLng } = anchor.current;
+  const markerRef = useRef<{ setLngLat: (p: [number, number]) => unknown } | null>(null);
+  const areaKey = JSON.stringify(area);
   const host = useRef<HTMLDivElement>(null);
   const mapRef = useRef<{ easeTo: (c: Camera & { duration: number }) => void } | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -46,14 +52,14 @@ export function OpenMap3D({ lat, lng, label, zoom, area = [], sim = null }: { la
         addAreaLayers(map);
         setAreaData(map, area);
         // The simulation inside it: lawn, shade, zones and lines on the ground, the trees raised as crowns.
-        addSimLayers(map, lat, true);
+        addSimLayers(map, aLat, true);
         let three: SimThreeLayer | null = null;
         // iPhone and iPad: the light extruded shapes, unless the light realistic models were turned on (the full ones
         // froze the 3D on a change).
         if (models === "shapes") { engine.current = { map, three: null }; setState("ready"); return; }
         void import("@/views/v10/three-layer").then(({ simThreeLayer }) => {
           if (cancelled) return;
-          three = simThreeLayer(maplibregl, [lng, lat], models === "lite");
+          three = simThreeLayer(maplibregl, [aLng, aLat], models === "lite");
           map.addLayer(three);
           engine.current = { map, three };
           setState("ready");
@@ -65,13 +71,20 @@ export function OpenMap3D({ lat, lng, label, zoom, area = [], sim = null }: { la
         console.warn("[OpenMap3D] non-fatal map error:", e);
       });
       map.on("webglcontextlost", () => { if (!cancelled) setState("error"); });
-      new maplibregl.Marker({ element: placePinElement(), anchor: "bottom" }).setLngLat([lng, lat]).setPopup(new maplibregl.Popup({ offset: 38 }).setText(label)).addTo(map);
+      markerRef.current = new maplibregl.Marker({ element: placePinElement(), anchor: "bottom" }).setLngLat([lng, lat]).setPopup(new maplibregl.Popup({ offset: 38 }).setText(label)).addTo(map);
       mapRef.current = map;
       remove = () => map.remove();
     }).catch(() => { if (!cancelled) setState("error"); });
-    return () => { cancelled = true; mapRef.current = null; engine.current = null; remove?.(); };
+    return () => { cancelled = true; mapRef.current = null; markerRef.current = null; engine.current = null; remove?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lat, lng, zoom, label, JSON.stringify(area), models]);
+  }, [aLat, aLng, zoom, models]);
+  // The pin and the drawn area follow without rebuilding the map.
+  useEffect(() => { markerRef.current?.setLngLat([lng, lat]); }, [lat, lng, state]);
+  useEffect(() => {
+    const e = engine.current;
+    if (state === "ready" && e) setAreaData(e.map, area);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, areaKey]);
   // The levers and the clock: the ground shapes on the map's own layers, the objects (and, without three.js, the old
   // extruded slabs) and the sun in the three.js layer — no rebuilding of the map.
   useEffect(() => {
