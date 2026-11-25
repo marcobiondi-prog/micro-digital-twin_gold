@@ -6,6 +6,7 @@ import { openSimTab } from "@/views/v8/console";
 import { ArrowLeft, ArrowRight, Building2, Grape, ScanLine, X } from "lucide-react";
 import { openAccount, setCameraSheetOpen } from "@/lib/camera-dock";
 import { AI_STANDBY } from "@/lib/ai-standby";
+import { VINE_STANDBY, VINE_STANDBY_TEXT } from "@/lib/vine-standby";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { useInstalledApp } from "@/lib/installed-app";
 import aiLogo from "@/assets/ai-logo.png";
@@ -376,7 +377,7 @@ export function Choice() {
         </div>
         <div role="list" aria-label="Da dove vuoi iniziare" className="mt-10 space-y-3 2k:mt-8 2k:space-y-5 4k:mt-10 4k:space-y-6">
           {items.map((it) => {
-            const off = it.id === "camera" && AI_STANDBY;
+            const off = (it.id === "camera" && AI_STANDBY) || (it.id === "vine" && VINE_STANDBY);
             const mine = it.id !== "camera" && proId?.kind === KIND_OF[it.id];
             const body = (
               <>
@@ -389,8 +390,8 @@ export function Choice() {
                     {off && <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] 2k:text-xs font-semibold uppercase tracking-wide text-amber-300 ring-1 ring-amber-300/30">In sviluppo</span>}
                     {mine && <span className="rounded-full bg-brand-turquoise/15 px-2 py-0.5 text-[11px] 2k:text-xs font-semibold uppercase tracking-wide text-brand-turquoise">Il tuo profilo</span>}
                   </span>
-                  {it.who && <span className="block text-sm 2k:text-base 2k:mt-1 4k:text-lg text-foreground/70">{it.who}</span>}
-                  <span className="mt-1 block text-xs 2k:text-sm 2k:mt-1.5 4k:text-base text-foreground/55">{mine ? `Entra ${it.id === "urban" ? "nella piazza" : "nel vigneto"}: ${it.desc.replace(/^Si apre [^:]+: /, "")}` : it.desc}</span>
+                  {it.who && !off && <span className="block text-sm 2k:text-base 2k:mt-1 4k:text-lg text-foreground/70">{it.who}</span>}
+                  <span className="mt-1 block text-xs 2k:text-sm 2k:mt-1.5 4k:text-base text-foreground/55">{off && it.id === "vine" ? VINE_STANDBY_TEXT : mine ? `Entra ${it.id === "urban" ? "nella piazza" : "nel vigneto"}: ${it.desc.replace(/^Si apre [^:]+: /, "")}` : it.desc}</span>
                 </span>
                 {!off && <ArrowRight className="size-5 2k:size-7 4k:size-8 shrink-0 text-foreground/60" aria-hidden="true" />}
               </>
