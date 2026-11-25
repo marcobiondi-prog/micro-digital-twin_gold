@@ -884,6 +884,8 @@ function MomentRow({ m, numbers }: { m: Moment<Shot>; numbers: Map<string, numbe
  * A day of the time line: "Oggi" / "Ieri" / the date, what it holds, a small Archivia (its interventions and its photos),
  * then its interventions and its stops of photos and videos on one line, newest first.
  */
+const DAY_GROUP_MS = 24 * 3600_000;
+
 function TimelineDay({ items, moments = [], numbers, archivable = true }: { items: SourcedEntry[]; moments?: Moment<Shot>[]; numbers?: Map<string, number> | undefined; archivable?: boolean }) {
   const [open, setOpen] = useState<string | null>(null);
   const label = dayWord(items[0]?.at ?? moments[0]!.at);
@@ -897,10 +899,36 @@ function TimelineDay({ items, moments = [], numbers, archivable = true }: { item
     if (shots.length) archiveMedia(shots.map((x) => `${x.flow}-${x.id}`));
     toast.success(`${dayCount(items.length, shots)} in Archivio · ${label}`);
   };
+  const times = rows.map((r) => r.t).filter((t) => Number.isFinite(t));
+  const newest = times.length ? Math.max(...times) : Date.now();
+  const oldest = times.length ? Math.min(...times) : newest;
+  // Older than 24 hours: the day folds into one dated group, opened by a tap.
+  const [expanded, setExpanded] = useState(() => !archivable || Date.now() - newest <= DAY_GROUP_MS);
+  const hhmm = (t: number) => new Date(t).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+  const span = times.length ? (hhmm(oldest) === hhmm(newest) ? hhmm(newest) : `${hhmm(oldest)}–${hhmm(newest)}`) : "";
+  if (archivable && !expanded) {
+    return (
+      <div className="flex items-center gap-2 rounded-2xl bg-foreground/[0.05] px-3 py-3 ring-1 ring-foreground/10">
+        <button type="button" aria-expanded={false} onClick={() => setExpanded(true)}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left outline-none focus-visible:underline">
+          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-foreground/10"><CalendarDays className="size-4" aria-hidden="true" /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-foreground/90">{label}</span>
+            <span className="block text-xs text-muted-foreground">{dayCount(items.length, shots)}{span ? ` · ${span}` : ""}</span>
+          </span>
+          <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        </button>
+        <button type="button" aria-label={`Archivia ${label.toLowerCase()}`} onClick={archive}
+          className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:underline"><Archive className="size-3.5" aria-hidden="true" />Archivia</button>
+      </div>
+    );
+  }
   return (
     <div className="space-y-2">
       {archivable && <div className="flex items-center gap-3 px-1">
         <h3 className="min-w-0 flex-1 text-sm font-semibold text-foreground/90">{label}<span className="ml-2 font-medium text-muted-foreground">{moments.length ? dayCount(items.length, shots) : items.length}</span></h3>
+        {Date.now() - newest > DAY_GROUP_MS && <button type="button" aria-expanded={true} aria-label={`Chiudi ${label.toLowerCase()}`} onClick={() => setExpanded(false)}
+          className="inline-flex items-center text-muted-foreground outline-none hover:text-foreground"><ChevronDown className="size-4 rotate-180" aria-hidden="true" /></button>}
         {archivable && <button type="button" aria-label={`Archivia ${label.toLowerCase()}`} onClick={archive}
           className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:underline"><Archive className="size-3.5" aria-hidden="true" />Archivia</button>}
       </div>}
