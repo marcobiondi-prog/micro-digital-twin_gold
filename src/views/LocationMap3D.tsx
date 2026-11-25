@@ -2,7 +2,7 @@ import { isKeyRejected, loadGoogleMaps, onKeyRejected } from "@/lib/google-maps-
 import { useModels3D } from "@/lib/use-ios-3d";
 import { densify, tileRing } from "@/models/drape";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { bedParts, BEDS_3D, crownRing, hedgeParts, netParts, vineRowParts, PERGOLA_COLORS, pergolaParts, treeParts } from "@/models/area-layout";
+import { bedParts, BEDS_3D, crownRing, hedgeParts, netParts, vineRowParts, PERGOLA_COLORS, pergolaParts, shadePatchBlocks, treeParts } from "@/models/area-layout";
 import { MIST_RADIUS_M, SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, LoaderCircle, Minus, Move, Plus, RotateCcw, X } from "lucide-react";
 import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camera";
@@ -175,9 +175,9 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
         if (flat) out.push(absPoly({ fillColor: "rgba(11,15,21,0.4)", strokeColor: "rgba(0,0,0,0)", strokeWidth: 0 }, r, 0.74));
         else ground(r, "rgba(11,15,21,0.4)");
       }
-      for (const pt of sim.data.patches) {
-        if (pt.kind !== "shade" || models) continue;
-        for (const p of pergolaParts(pt.ring, true, sim.shadeOpen ?? 1)) {
+      // One sail per shade block, as big as the block (never repeated as the m² grow).
+      for (const pt of models ? [] : shadePatchBlocks(sim.data.patches.filter((q) => q.kind === "shade"))) {
+        for (const p of pergolaParts(pt.ring, true, sim.shadeOpen ?? 1, pt.angle)) {
           // The pole in steel, the fan of fabric with a dark hem.
           if (p.base === 0) part(p);
           else part(p, p.height, PERGOLA_COLORS.beam, 2);

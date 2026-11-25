@@ -609,10 +609,10 @@ export function pergolaParts(strip: Ring, lite = false, open = 1, angle?: number
   const ll = (x: number, z: number) => toLL(R.f, R.cx + R.ux[0] * x + vy[0] * z, R.cy + R.ux[1] * x + vy[1] * z);
   const parts: TreePart[] = [];
   for (const u of papillonUnits(R.w, R.d)) {
-    const s = u.r * 0.88;
+    const sx = u.rx * 0.88, sz = u.rz * 0.88;
     const sq = (cx: number, cz: number, r: number): Ring => [[-r, -r], [r, -r], [r, r], [-r, r]].map(([a, b]) => ll(cx + a!, cz + b!));
-    parts.push({ ring: sq(u.x - s, u.z - s, 0.06), base: 0, height: 3.3, color: PERGOLA_COLORS.post });
-    parts.push({ ring: sq(u.x + s, u.z + s, 0.06), base: 0, height: 2.45, color: PERGOLA_COLORS.post });
+    parts.push({ ring: sq(u.x - sx, u.z - sz, 0.06), base: 0, height: 3.3, color: PERGOLA_COLORS.post });
+    parts.push({ ring: sq(u.x + sx, u.z + sz, 0.06), base: 0, height: 2.45, color: PERGOLA_COLORS.post });
     parts.push({ ring: papillonFan(u, open, lite ? 12 : 20).map(([x, z]) => ll(x, z)), base: 3, height: 3.08, color: lite ? `${PERGOLA_COLORS.slat}d9` : PERGOLA_COLORS.slat });
   }
   return parts;
@@ -942,17 +942,14 @@ export function shadePatchBlocks(patches: Patch[]): Array<{ ring: Ring; angle?: 
 
 /* ---------------- Four-point hypar shade sails on two inclined wooden posts ---------------- */
 
-export type PapillonUnit = { x: number; z: number; yaw: number; r: number };
-
+export type PapillonUnit = { x: number; z: number; yaw: number; r: number; rx: number; rz: number };
+/**
+ * One sail per shade block, as big as the block: the sail grows with the m² of shade instead of being repeated
+ * (rx, rz its half-extents; r the smaller one, kept for the round helpers).
+ */
 export function papillonUnits(w: number, d: number): PapillonUnit[] {
   if (w < 0.8 || d < 0.8) return [];
-  const s = Math.min(6, Math.max(1.6, Math.min(w, d)));
-  const nx = Math.max(1, Math.round(w / s)), nz = Math.max(1, Math.round(d / s));
-  const cw = w / nx, cd = d / nz;
-  const r = Math.min(3.3, Math.max(0.6, 0.5 * Math.min(cw, cd) * 1.02));
-  const out: PapillonUnit[] = [];
-  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) out.push({ x: -w / 2 + cw * (i + 0.5), z: -d / 2 + cd * (j + 0.5), yaw: 0, r });
-  return out;
+  return [{ x: 0, z: 0, yaw: 0, r: Math.min(w, d) / 2, rx: w / 2, rz: d / 2 }];
 }
 /**
  * How open the sails are (0–1) at the simulation's sun: they open with the day's heat and close at dusk, at night and
@@ -970,13 +967,13 @@ export function canopyReach(r: number, open: number): number {
 /** Concave four-corner retractable hypar sail seen from above, furling smoothly toward the two-post ridge as `open` → 0. */
 export function papillonFan(u: PapillonUnit, open: number, seg = 24): Array<[number, number]> {
   const o = Math.max(0, Math.min(1, open));
-  const s = u.r * 0.88;
+  const sx = u.rx * 0.88, sz = u.rz * 0.88;
   const reach = 0.08 + 0.92 * o;
   const corners: Array<[number, number]> = [
-    [-s, -s],
-    [-s * reach, s * reach],
-    [s, s],
-    [s * reach, -s * reach],
+    [-sx, -sz],
+    [-sx * reach, sz * reach],
+    [sx, sz],
+    [sx * reach, -sz * reach],
   ];
   const perEdge = Math.max(2, Math.round(seg / 4));
   const sag = 0.16 * o;
@@ -1024,15 +1021,15 @@ export function papillonsOf(ring: Ring, open = 1, angle?: number): { fans: Ring[
     if (!seen.has(k)) { seen.add(k); poles.push(ll(x, z)); }
   };
   for (const u of papillonUnits(R.w, R.d)) {
-    const s = u.r * 0.88;
+    const sx = u.rx * 0.88, sz = u.rz * 0.88;
     const reach = 0.08 + 0.92 * Math.max(0, Math.min(1, open));
     fans.push(papillonFan(u, open).map(([x, z]) => ll(x, z)));
     // Only the two opposite high wooden posts per sail bay.
-    addPole(u.x - s, u.z - s);
-    addPole(u.x + s, u.z + s);
+    addPole(u.x - sx, u.z - sz);
+    addPole(u.x + sx, u.z + sz);
     // Short corner tension cords at the two low guyed tips.
-    ribs.push([ll(u.x - s * reach, u.z + s * reach), ll(u.x - s * 1.06, u.z + s * 1.06)]);
-    ribs.push([ll(u.x + s * reach, u.z - s * reach), ll(u.x + s * 1.06, u.z - s * 1.06)]);
+    ribs.push([ll(u.x - sx * reach, u.z + sz * reach), ll(u.x - sx * 1.06, u.z + sz * 1.06)]);
+    ribs.push([ll(u.x + sx * reach, u.z - sz * reach), ll(u.x + sx * 1.06, u.z - sz * 1.06)]);
   }
   return { fans, poles, ribs };
 }

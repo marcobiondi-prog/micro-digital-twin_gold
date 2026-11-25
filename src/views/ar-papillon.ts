@@ -402,10 +402,10 @@ export function realPapillons(
   };
 
   const units = papillonUnits(W, D);
-  const joinAll = Boolean(def.joined && units.length > 1);
-  const sCell = Math.min(6, Math.max(1.6, Math.min(W, D)));
-  const nx = joinAll ? 1 : Math.max(1, Math.round(W / sCell));
-  const nz = joinAll ? 1 : Math.max(1, Math.round(D / sCell));
+  // A single sail over the block: always laid out to stay inside its footprint, like the joined ones.
+  const joinAll = units.length > 0;
+  // One sail over the whole block, as big as its m² (never repeated).
+  const nx = 1, nz = 1;
   const cw = W / nx, cd = D / nz;
 
   const posts = new Map<string, PostNode & { touches: number }>();

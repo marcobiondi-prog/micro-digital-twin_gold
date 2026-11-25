@@ -121,10 +121,11 @@ describe("side-pole sails", () => {
     expect(shadeOpenness(-10, "estate")).toBe(0);
     expect(shadeOpenness(10, "estate")).toBeCloseTo(0.5);
     expect(shadeOpenness(40, "inverno")).toBe(0);
-    // A 12 × 4 m block: three round shades in a row, each pole in the middle of its cell, neighbours not overlapping.
+    // One sail per block, as big as the block: more m² make it bigger, never more sails.
     const u = papillonUnits(12, 4);
-    expect(u.length).toBe(3);
-    expect(u.every((p) => p.z === 0 && p.r <= 2.05 && p.r >= 1.9)).toBe(true);
-    expect(u[1]!.x - u[0]!.x).toBeGreaterThanOrEqual(2 * u[0]!.r - 0.1);
+    expect(u.length).toBe(1);
+    expect(u[0]!.rx).toBe(6);
+    expect(u[0]!.rz).toBe(2);
+    expect(papillonUnits(30, 20).length).toBe(1);
   });
 });
