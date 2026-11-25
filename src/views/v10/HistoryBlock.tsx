@@ -1042,7 +1042,7 @@ function MomentRow({ m, numbers }: { m: Moment<Shot>; numbers: Map<string, numbe
  * A day of the time line: "Oggi" / "Ieri" / the date, what it holds, a small Archivia (its interventions and its photos),
  * then its interventions and its stops of photos and videos on one line, newest first.
  */
-function TimelineDay({ items, moments = [], numbers, archivable = true }: { items: SourcedEntry[]; moments?: Moment<Shot>[]; numbers?: Map<string, number>; archivable?: boolean }) {
+function TimelineDay({ items, moments = [], numbers, archivable = true }: { items: SourcedEntry[]; moments?: Moment<Shot>[]; numbers?: Map<string, number> | undefined; archivable?: boolean }) {
   const [open, setOpen] = useState<string | null>(null);
   const label = dayWord(items[0]?.at ?? moments[0]!.at);
   const shots = moments.flatMap((m) => m.shots);
@@ -1057,11 +1057,11 @@ function TimelineDay({ items, moments = [], numbers, archivable = true }: { item
   };
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-3 px-1">
+      {archivable && <div className="flex items-center gap-3 px-1">
         <h3 className="min-w-0 flex-1 text-sm font-semibold text-foreground/90">{label}<span className="ml-2 font-medium text-muted-foreground">{moments.length ? dayCount(items.length, shots) : items.length}</span></h3>
         {archivable && <button type="button" aria-label={`Archivia ${label.toLowerCase()}`} onClick={archive}
           className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:underline"><Archive className="size-3.5" aria-hidden="true" />Archivia</button>}
-      </div>
+      </div>}
       <ol className="relative space-y-2 before:absolute before:bottom-3 before:left-[8px] before:top-3 before:w-0.5 before:bg-foreground/10">
         {rows.map((r) => r.e
           ? <TimelineRow key={r.e.id} e={r.e} open={open === r.e.id} onToggle={() => setOpen((o) => (o === r.e!.id ? null : r.e!.id))} />
@@ -1132,11 +1132,14 @@ function EntryRow({ e }: { e: SourcedEntry }) {
  * Benvenuto: one tab per day, closed, with its date (gg/mm/aaaa), how many interventions, how many in the piazza and
  * in the vineyard and the span of hours; a tap opens that day's interventions under it.
  */
-function DayTab({ label, items }: { label: string; items: SourcedEntry[] }) {
+function DayTab({ label, items, moments = [], numbers }: { label: string; items: SourcedEntry[]; moments?: Moment<Shot>[]; numbers?: Map<string, number> }) {
   const [open, setOpen] = useState(false);
   const piazza = items.filter((e) => e.flow === "piazza").length, vigneto = items.length - piazza;
-  const first = time(items[items.length - 1]!), last = time(items[0]!);
-  const parts = [piazza ? `Piazza ${piazza}` : "", vigneto ? `Vigneto ${vigneto}` : ""].filter(Boolean).join(" · ");
+  const times = [...items.map((e) => Date.parse(e.at)), ...moments.flatMap((m) => [m.at, m.first])].sort((a, b) => a - b);
+  const hm = (t: number) => new Date(t).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+  const first = hm(times[0]!), last = hm(times[times.length - 1]!);
+  const shots = moments.flatMap((m) => m.shots);
+  const parts = [items.length ? entriesText(items.length) : "", piazza && vigneto ? `Piazza ${piazza} · Vigneto ${vigneto}` : "", shots.length ? tagCountText(shots) : ""].filter(Boolean).join(" · ");
   return (
     <DashCard className="py-1 sm:py-1">
       <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)}
@@ -1144,11 +1147,11 @@ function DayTab({ label, items }: { label: string; items: SourcedEntry[] }) {
         <CalendarDays className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
         <span className="min-w-0 flex-1">
           <span className="block text-[15px] font-semibold tabular-nums">{label}</span>
-          <span className="block truncate text-xs text-muted-foreground">{items.length === 1 ? "1 intervento" : `${items.length} interventi`} · {parts} · {first === last ? first : `${first}–${last}`}</span>
+          <span className="block text-xs text-muted-foreground">{parts} · {first === last ? first : `${first}–${last}`}</span>
         </span>
         <ChevronDown className={`size-5 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none ${open ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
-      {open && <div className="border-t border-foreground/10 pb-2 pt-3"><TimelineDay items={items} archivable={false} /></div>}
+      {open && <div className="border-t border-foreground/10 pb-2 pt-3"><TimelineDay items={items} moments={moments} numbers={numbers} archivable={false} /></div>}
     </DashCard>
   );
 }
@@ -1481,7 +1484,7 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
     const ofKind = compact || shotFilter === "tutti" ? shots : shots.filter((s) => shotKind(s) === shotFilter);
     const visibleShots = compact ? shots.slice(0, COMPACT_SHOTS) : ofKind;
     const activeError = (flow !== "vigneto" && hasUrbanError) ? urbanError : (flow !== "piazza" && hasVineError) ? vineError : null;
-    const line = !compact && lineView === "linea";
+    const line = compact || lineView === "linea";
     // The time line: interventions and stops of photos by day, filtered by label.
     const lineShots = !line || show === "interventi" ? [] : show === "tutto" ? shots : shots.filter((x) => shotTag(x) === show);
     const lineEntries = line && (show === "tutto" || show === "interventi") ? inTab : [];
@@ -1495,9 +1498,9 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
     })();
     return (
       <>
-        {!compact && (shots.length > 0 || inTab.length > 0) && (
+        {(shots.length > 0 || inTab.length > 0) && (
           <div className="space-y-2">
-            {shots.length > 0 && <LineViewSwitch value={lineView} onChange={chooseLineView} />}
+            {!compact && shots.length > 0 && <LineViewSwitch value={lineView} onChange={chooseLineView} />}
             {line && shots.length > 0 && <TagPills shots={shots} entries={inTab.length} value={show} onChange={setShow} />}
           </div>
         )}
@@ -1532,7 +1535,10 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
             <ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />
           </Link>
         )}
-        {line ? (lineDays.length > 0 ? (
+        {line ? (lineDays.length > 0 ? compact ? lineDays.slice(0, COMPACT_DAYS).map((d) => {
+          const [y, mo, da] = d.key.split("-");
+          return <DayTab key={d.key} label={`${da}/${mo}/${y}`} items={d.items} moments={d.moments} numbers={numbers} />;
+        }) : (
           <div className="space-y-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">{lineDays.map((d) => <TimelineDay key={d.key} items={d.items} moments={d.moments} numbers={numbers} />)}</div>
         ) : show !== "tutto" ? (
           <p className="px-1 py-6 text-center text-sm text-muted-foreground">Niente da mostrare con questa etichetta.</p>
