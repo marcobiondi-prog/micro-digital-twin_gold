@@ -30,7 +30,7 @@ import { SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v1
 import type { MovedPart } from "@/views/v10/SatelliteMap2D";
 import { drawnAreaFor, freeM2, initialRingAngle, leversForZones, vineLeversForZones, vineLeversOfZones, VINE_ZONE_KINDS, leversOfZones, lotsOf, MAX_PINS, moveZones, pinsM2, rotateZone, surfaceText, usableM2, ZONE_KINDS, ZONE_LABEL, zoneName, zonesOfArea, type DrawnArea, type SubArea, type ZoneKind } from "@/models/drawn-area";
 import type { Ring } from "@/models/place-area";
-import { openSimTab, type SimKind } from "@/views/v8/console";
+import { openSimTab, openSimAt, openSimAtArc, type SimKind } from "@/views/v8/console";
 import { PlaceSearch, gpsFollowing } from "@/views/SimulationGrid";
 import { loadRealObjects } from "@/lib/real-objects-client";
 import { circleRing, realCountText, type RealObject } from "@/models/real-objects";
@@ -150,7 +150,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
       if (kind === "urban") setUrban({ trees: 0, permeable: 0, shade: 0, misters: 0, sprinklers: 0, treeCells: null, permeableCells: null, shadeCells: null });
       else setVineyard((v) => ({ zones: v.zones.map((z) => ({ ...z, irrigation: 0, shade: 0, windbreak: 0 })) }));
       if (guest) toast.success("Area salvata", { description: `${surfaceText(pinsM2(draft))}: apri Simula per provare gli interventi.` });
-      else toast.success("Area salvata · libera da interventi", { description: `${surfaceText(pinsM2(draft))}. Prima guarda la fattibilità dell’area in Simula, poi scegli gli interventi.`, duration: 9000, action: { label: "Fattibilità", onClick: () => openSimTab(kind, "simula") } });
+      else toast.success("Area salvata · libera da interventi", { description: `${surfaceText(pinsM2(draft))}. Prima guarda la fattibilità dell’area in Simula, poi scegli gli interventi.`, duration: 9000, action: { label: "Fattibilità", onClick: () => openSimAt(kind, "[data-sim-site]") } });
       return;
     }
     toast.success("Area salvata", { description: `${surfaceText(pinsM2(draft))}: la usano i costi e i benefici.` });
@@ -191,7 +191,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   const applySuggestion = (sg: { piazza?: PiazzaSuggestion | undefined; vine?: VineSuggestion | undefined }) => {
     if (sg.piazza) setUrban({ ...sg.piazza, treeCells: null, permeableCells: null, shadeCells: null });
     if (sg.vine) { const vine = sg.vine; setVineyard((v) => ({ zones: v.zones.map((z) => ({ ...z, ...vine })) })); }
-    toast.success("Interventi consigliati messi", { description: "Li vedi sulla mappa; in Simula leggi l’effetto e li regoli.", action: { label: "Simula", onClick: () => openSimTab(kind, "simula") } });
+    toast.success("Interventi consigliati messi", { description: "Li vedi sulla mappa; in Simula leggi l’effetto e li regoli.", action: { label: "Simula", onClick: () => openSimAtArc(kind) } });
   };
   const sim = useMemo<SimLayout | null>(() => {
     if (!saved) return null;
