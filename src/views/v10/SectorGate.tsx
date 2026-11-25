@@ -1,3 +1,4 @@
+import { VINE_STANDBY, VINE_STANDBY_TEXT } from "@/lib/vine-standby";
 import { goInApp } from "@/lib/app-nav";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { SIDE_BY_SIDE_QUERY } from "@/lib/use-desktop";
@@ -586,18 +587,29 @@ function SectorPage({ start }: { start: ProKind | null }) {
             <h1 className="font-display text-[3.2rem] font-extralight leading-[0.95] tracking-tight sm:text-7xl 2k:text-8xl 2k:leading-[0.9] 4k:text-9xl">Da dove<br />vuoi usarmi?</h1>
             <p className="max-w-xs text-[15px] leading-relaxed text-foreground/60 2xl:max-w-md 2k:max-w-2xl 2k:text-xl 2k:leading-relaxed 4k:text-2xl">Scegli il tuo settore e identificati: si apre la tua simulazione.</p>
             <div role="radiogroup" aria-label="Settore" className="mt-4 space-y-3 2k:mt-8 2k:space-y-5 4k:mt-10 4k:space-y-6">
-              {SECTORS.map((s) => (
-                <button key={s.kind} type="button" role="radio" aria-checked={false} onClick={() => { hapticTick(); setKind(s.kind); rememberWantedSector(s.kind); rememberAddingSector(s.kind); document.querySelector('[aria-label="Scegli il settore"]')?.scrollTo({ top: 0 }); }}
-                  className="flex w-full items-center gap-4 rounded-3xl bg-foreground/[0.07] p-5 text-left outline-none ring-1 ring-foreground/10 transition-colors hover:bg-foreground/[0.11] focus-visible:ring-2 focus-visible:ring-foreground 2k:gap-6 2k:p-7 2k:rounded-[2rem] 4k:p-9 4k:gap-8">
-                  <s.Icon className="size-8 shrink-0 text-brand-turquoise 2k:size-12 4k:size-14" strokeWidth={1.5} aria-hidden="true" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-xl font-semibold 2k:text-2xl 4k:text-3xl">{s.name}</span>
-                    <span className="block text-sm text-foreground/70 2k:text-base 2k:mt-1 4k:text-lg">{s.who}</span>
-                    <span className="mt-1 block text-xs text-foreground/55 2k:text-sm 2k:mt-1.5 4k:text-base">{s.opens}</span>
-                  </span>
-                  <ArrowRight className="size-5 shrink-0 text-foreground/60 2k:size-7 4k:size-8" aria-hidden="true" />
-                </button>
-              ))}
+              {SECTORS.map((s) => {
+                const off = s.kind === "agronomo" && VINE_STANDBY;
+                const body = (
+                  <>
+                    <s.Icon className={`size-8 shrink-0 2k:size-12 4k:size-14 ${off ? "text-foreground/40" : "text-brand-turquoise"}`} strokeWidth={1.5} aria-hidden="true" />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-center gap-2 text-xl font-semibold 2k:text-2xl 4k:text-3xl">
+                        {s.name}
+                        {off && <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-300 ring-1 ring-amber-300/30 2k:text-xs">In sviluppo</span>}
+                      </span>
+                      {!off && <span className="block text-sm text-foreground/70 2k:text-base 2k:mt-1 4k:text-lg">{s.who}</span>}
+                      <span className="mt-1 block text-xs text-foreground/55 2k:text-sm 2k:mt-1.5 4k:text-base">{off ? VINE_STANDBY_TEXT : s.opens}</span>
+                    </span>
+                    {!off && <ArrowRight className="size-5 shrink-0 text-foreground/60 2k:size-7 4k:size-8" aria-hidden="true" />}
+                  </>
+                );
+                const card = "flex w-full items-center gap-4 rounded-3xl p-5 text-left ring-1 2k:gap-6 2k:p-7 2k:rounded-[2rem] 4k:p-9 4k:gap-8";
+                // Not ready yet: shown like the AI camera, but it opens nothing.
+                return off
+                  ? <div key={s.kind} role="radio" aria-checked={false} aria-disabled="true" className={`${card} bg-foreground/[0.04] text-foreground/60 ring-foreground/[0.06]`}>{body}</div>
+                  : <button key={s.kind} type="button" role="radio" aria-checked={false} onClick={() => { hapticTick(); setKind(s.kind); rememberWantedSector(s.kind); rememberAddingSector(s.kind); document.querySelector('[aria-label="Scegli il settore"]')?.scrollTo({ top: 0 }); }}
+                      className={`${card} bg-foreground/[0.07] outline-none ring-foreground/10 transition-colors hover:bg-foreground/[0.11] focus-visible:ring-2 focus-visible:ring-foreground`}>{body}</button>;
+              })}
             </div>
             <div className="mt-auto space-y-3 pt-6 2k:mt-8 2k:space-y-4 2k:pt-0 4k:mt-10 4k:space-y-5">
               {signIn}
