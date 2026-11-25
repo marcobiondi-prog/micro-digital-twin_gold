@@ -1423,14 +1423,14 @@ function StoryPlayer({ days: given, start, onClose }: { days: Array<{ key: strin
 const LINE_VIEW_KEY = "mdt-history-view-v1";
 type LineView = "linea" | "pile" | "calendario" | "storie";
 /** Linea del tempo | Pile: photos on the time line among the interventions, or apart as piles (by group or by day). */
-function LineViewSwitch({ value, onChange }: { value: LineView; onChange: (v: LineView) => void }) {
+function LineViewSwitch({ value, onChange, compact = false }: { value: LineView; onChange: (v: LineView) => void; compact?: boolean }) {
   const opt = (v: LineView, label: string) => (
     <button type="button" role="radio" aria-checked={value === v} onClick={() => onChange(v)}
       className={cn("h-8 flex-1 rounded-full px-2 text-[12.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", value === v ? "bg-secondary text-secondary-foreground" : "text-foreground/75")}>{label}</button>
   );
   return (
     <div role="radiogroup" aria-label="Come vedere la cronologia" data-guide="history-view" className="flex max-w-md gap-1 rounded-full bg-foreground/[0.06] p-1">
-      {opt("linea", "Linea")}{opt("pile", "Pile")}{opt("calendario", "Calendario")}{opt("storie", "Storie")}
+      {opt("linea", "Linea")}{!compact && opt("pile", "Pile")}{opt("calendario", "Calendario")}{opt("storie", "Storie")}
     </div>
   );
 }
@@ -1812,9 +1812,9 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
     const ofKind = compact || shotFilter === "tutti" ? shots : shots.filter((s) => shotKind(s) === shotFilter);
     const visibleShots = compact ? shots.slice(0, COMPACT_SHOTS) : ofKind;
     const activeError = (flow !== "vigneto" && hasUrbanError) ? urbanError : (flow !== "piazza" && hasVineError) ? vineError : null;
-    const line = compact || lineView === "linea";
-    // Calendario and Storie: the photos alone (filtered by label), by day.
-    const photoMode = !compact && (lineView === "calendario" || lineView === "storie");
+    // Calendario and Storie: the photos alone (filtered by label), by day; Benvenuto and the dashboard have them too (no Pile there).
+    const photoMode = lineView === "calendario" || lineView === "storie";
+    const line = compact ? !photoMode : lineView === "linea";
     const tagged = show === "interventi" ? [] : show === "tutto" ? shots : shots.filter((x) => shotTag(x) === show);
     // The time line: interventions and stops of photos by day, filtered by label.
     const lineShots = !line || show === "interventi" ? [] : show === "tutto" ? shots : shots.filter((x) => shotTag(x) === show);
@@ -1831,7 +1831,7 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
       <>
         {(shots.length > 0 || inTab.length > 0) && (
           <div className="space-y-2">
-            {!compact && shots.length > 0 && <LineViewSwitch value={lineView} onChange={chooseLineView} />}
+            {shots.length > 0 && <LineViewSwitch value={compact && lineView === "pile" ? "linea" : lineView} onChange={chooseLineView} compact={compact} />}
             {(line || photoMode) && shots.length > 0 && <TagPills shots={shots} entries={inTab.length} value={show} onChange={setShow} />}
           </div>
         )}
