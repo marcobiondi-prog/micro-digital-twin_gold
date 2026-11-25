@@ -19,6 +19,17 @@ type Map3D = HTMLElement & Partial<Camera> & { gestureHandling?: string; flyCame
 // window.gm_authFailure (lib/google-maps-js). From then on the 3D view hands over to its fallback instead of showing the provider's error.
 const useKeyRejected = () => useSyncExternalStore(onKeyRejected, isKeyRejected, () => false);
 
+const metresBetween = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) =>
+  Math.hypot((a.lat - b.lat) * 111_320, (a.lng - b.lng) * 111_320 * Math.cos((a.lat * Math.PI) / 180));
+/** Google's 3D needs WebGL 2: without it (an old phone, a lost context, a blocked GPU) the simplified map shows at once. */
+function webglOk(): boolean {
+  try { const c = document.createElement("canvas"); const gl = c.getContext("webgl2"); (gl?.getExtension("WEBGL_lose_context"))?.loseContext(); return !!gl; } catch { return false; }
+}
+/** A load that never answers (a slow network, a stuck script) ends as an error instead of a spinner for ever. */
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => { const t = window.setTimeout(() => reject(new Error("timeout")), ms); p.then((v) => { window.clearTimeout(t); resolve(v); }, (e) => { window.clearTimeout(t); reject(e); }); });
+}
+
 function loadMaps3D(key: string): Promise<Maps3D> {
   return loadGoogleMaps(key).then((g) => g.maps.importLibrary("maps3d") as Promise<Maps3D>);
 }
@@ -293,6 +304,13 @@ function applyCamera(map: Map3D, camera: Camera, animate: boolean) {
 
 export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], sim = null }: { lat: number; lng: number; label: string; apiKey: string; fallback?: ReactNode; area?: Array<[number, number]>; sim?: SimLayout | null }) {
   const rejected = useKeyRejected();
+  // The map is built for a place, not for each GPS fix: the pin can follow the phone metre by metre, and rebuilding the
+  // photographic 3D at every fix left it blank half the time. A new place (over 30 m away) builds a new map.
+  const anchor = useRef({ lat, lng });
+  if (metresBetween(anchor.current, { lat, lng }) > 30) anchor.current = { lat, lng };
+  const { lat: aLat, lng: aLng } = anchor.current;
+  const [attempt, setAttempt] = useState(0);
+  const markerRef = useRef<HTMLElement & { position?: unknown; label?: string } | null>(null);
   const host = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map3D | null>(null);
   const altitude = useRef(0);
@@ -307,13 +325,13 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
   // The drawing's height over Google's ground, set by hand (− / +), per place.
   const [adj, setAdjState] = useState<Adjust>(NO_ADJUST);
   const [adjusting, setAdjusting] = useState(false);
-  useEffect(() => { setAdjState(readAdjust(lat, lng)); setAdjusting(false); }, [lat, lng]);
+  useEffect(() => { setAdjState(readAdjust(aLat, aLng)); setAdjusting(false); }, [aLat, aLng]);
   const half = (v: number, lo: number, hi: number) => Math.round(Math.max(lo, Math.min(hi, v)) * 2) / 2;
   const nudge = (d: Partial<Adjust>) => {
     const next = { h: half(adj.h + (d.h ?? 0), LIFT_MIN, LIFT_MAX), n: half(adj.n + (d.n ?? 0), -SHIFT_MAX, SHIFT_MAX), e: half(adj.e + (d.e ?? 0), -SHIFT_MAX, SHIFT_MAX) };
-    setAdjState(next); writeAdjust(lat, lng, next);
+    setAdjState(next); writeAdjust(aLat, aLng, next);
   };
-  const resetAdj = () => { setAdjState(NO_ADJUST); writeAdjust(lat, lng, NO_ADJUST); };
+  const resetAdj = () => { setAdjState(NO_ADJUST); writeAdjust(aLat, aLng, NO_ADJUST); };
   const adjKey = `${adj.h},${adj.n},${adj.e}`;
   // The map is built once per place: the drawn area and the simulation are laid over it by the next effect, so moving a
   // lever never reloads the photorealistic tiles nor resets the camera.
@@ -321,11 +339,12 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
     let cancelled = false;
     const el = host.current;
     setState("loading");
-    Promise.all([loadMaps3D(apiKey), groundElevation(lat, lng)]).then(([lib, ground]) => {
+    if (!webglOk()) { setState("error"); return; }
+    Promise.all([withTimeout(loadMaps3D(apiKey), 20_000), groundElevation(aLat, aLng)]).then(([lib, ground]) => {
       if (cancelled || !el) return;
       altitude.current = ground;
       libs.current = lib;
-      const cam = frameCamera(lat, lng, el.clientHeight, ground);
+      const cam = frameCamera(anchor.current.lat, anchor.current.lng, el.clientHeight, ground);
       let map: Map3D;
       try {
         map = new lib.Map3DElement({ ...cam, mode: "HYBRID", gestureHandling: "GREEDY" }) as Map3D;
@@ -352,8 +371,9 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
       setTimeout(fixShadow, 50);
       setTimeout(fixShadow, 300);
       // On top of the 3D mesh (roofs, trees) and drawn even when occluded: a ground pin in a street disappears behind buildings.
-      const marker = new lib.Marker3DElement({ position: { lat, lng, altitude: 0 }, altitudeMode: "RELATIVE_TO_MESH", drawsWhenOccluded: true, label });
+      const marker = new lib.Marker3DElement({ position: { lat: anchor.current.lat, lng: anchor.current.lng, altitude: 0 }, altitudeMode: "RELATIVE_TO_MESH", drawsWhenOccluded: true, label });
       map.append(marker);
+      markerRef.current = marker;
       // Google's own red pin, like the 2D one.
       el.replaceChildren(map);
       mapRef.current = map;
@@ -362,8 +382,14 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
       console.error("[LocationMap3D] Failed to load 3D map:", err);
       if (!cancelled) setState("error");
     });
-    return () => { cancelled = true; mapRef.current = null; badges.current.clear(); el?.replaceChildren(); };
-  }, [lat, lng, label, apiKey]);
+    return () => { cancelled = true; mapRef.current = null; markerRef.current = null; badges.current.clear(); el?.replaceChildren(); };
+  }, [aLat, aLng, apiKey, attempt]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The pin follows the place (a GPS fix, a pin moved by hand) and its name without rebuilding the map.
+  useEffect(() => {
+    const m = markerRef.current;
+    if (!m || state !== "ready") return;
+    try { m.position = { lat, lng, altitude: 0 }; m.label = label; } catch { /* older build */ }
+  }, [lat, lng, label, state]);
   // Three layers, each laid again only when its own content changes: the drawing (area, zones, ground shapes), the
   // shadows (they move with the simulation's clock) and the realistic models (kept on the map and only added or taken
   // away where they change). Before, any change — a minute of the clock, a save — took everything away and laid it again,
@@ -405,8 +431,8 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
     const timer = window.setTimeout(() => {
       void import("@/views/v10/g3d-models").then(({ modelSpots }) => {
         if (cancelled) return;
-        const { spots, ensure } = modelSpots(sim, { lat, lng }, models === "lite");
-        const dLat = floor.n / 111_320, dLng = floor.e / (111_320 * Math.cos((lat * Math.PI) / 180));
+        const { spots, ensure } = modelSpots(sim, { lat: aLat, lng: aLng }, models === "lite");
+        const dLat = floor.n / 111_320, dLng = floor.e / (111_320 * Math.cos((aLat * Math.PI) / 180));
         const want = new Map(spots.map((sp) => [`${sp.key}@${(sp.lat + dLat).toFixed(7)},${(sp.lng + dLng).toFixed(7)},${sp.heading.toFixed(1)},${floor.h}`, sp]));
         for (const [id, node] of pool) if (!want.has(id)) { node.remove(); pool.delete(id); }
         for (const [id, sp] of want) {
@@ -427,7 +453,7 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [state, areaKey, simKey, adjKey, models]); // eslint-disable-line react-hooks/exhaustive-deps
   // The models go with the map (a new place builds a new map).
-  useEffect(() => () => { modelPool.current.forEach((n) => n.remove()); modelPool.current.clear(); }, [lat, lng]);
+  useEffect(() => () => { modelPool.current.forEach((n) => n.remove()); modelPool.current.clear(); }, [aLat, aLng, attempt]);
   // The panel grows when 3D opens (and on rotation): re-frame the place once the size settles.
   useEffect(() => {
     const el = host.current;
@@ -450,8 +476,9 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
   if (rejected || state === "error") return fallback ? (
     <div data-map-gestures="" className="relative h-full w-full touch-none">
       {fallback}
-      <p role="status" className="pointer-events-none absolute inset-x-0 bottom-3 z-[3] mx-auto w-fit max-w-[92%] rounded-full bg-black/60 px-3 py-1.5 text-center text-[12px] font-semibold text-white ring-1 ring-white/15 backdrop-blur-sm">
-        Vista 3D fotografica non disponibile ora: mostro la mappa semplificata
+      <p role="status" className="absolute inset-x-0 bottom-3 z-[3] mx-auto flex w-fit max-w-[92%] items-center gap-2 rounded-full bg-black/60 py-1.5 pl-3 pr-1.5 text-center text-[12px] font-semibold text-white ring-1 ring-white/15 backdrop-blur-sm">
+        <span>Vista 3D fotografica non disponibile ora: mostro la mappa semplificata</span>
+        {!rejected && <button type="button" onClick={() => { setState("loading"); setAttempt((n) => n + 1); }} className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-black">Riprova</button>}
       </p>
     </div>
   ) : <p role="status" className="grid h-full w-full place-items-center bg-lab-surface px-3 text-center text-xs text-muted-foreground">Vista 3D non disponibile in questo momento.</p>;
