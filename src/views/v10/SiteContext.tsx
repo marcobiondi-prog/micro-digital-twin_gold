@@ -112,7 +112,7 @@ export function CrowdCard({ lat, lng, pending, ring, m2, season, hour, shadePlac
   ].filter(Boolean) as string[] : [];
   const covered = crowd && crowd.people > 0 ? Math.min(100, Math.round((shadePlaces / crowd.people) * 100)) : 0;
   return (
-    <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4" aria-label="Persone nella piazza">
+    <div data-sim-site="" className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4" aria-label="Persone nella piazza">
       <div className="flex items-center gap-2"><Users className="size-5 text-brand-turquoise" aria-hidden="true" /><p className="text-[15px] font-semibold">Persone nella piazza</p><span className="ml-auto rounded-full bg-foreground/[0.08] px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">stima</span></div>
       {pending ? <DrawFirst sim="urban" />
         : ctx.isPending ? <Searching on text="Guardo cosa c’è intorno alla piazza…" />
@@ -147,7 +147,7 @@ export function ConstraintsCard({ lat, lng, pending, ring, placeName, kind }: { 
   if (guest) return <GuestLock kind={kind === "piazza" ? "funzionario" : "agronomo"} title="Fattibilità dell’area" line="I vincoli paesaggistici e culturali attorno all’area e le indicazioni sugli interventi si vedono dopo esserti identificato." />;
   const probable = cs?.some((c) => c.level === "probabile");
   return (
-    <div className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4" aria-label="Vincoli dell'area">
+    <div data-sim-site="" className="space-y-3 rounded-3xl bg-foreground/[0.05] p-4" aria-label="Vincoli dell'area">
       <div className="flex items-center gap-2">{cs && cs.length ? <ShieldAlert className="size-5 text-amber-500" aria-hidden="true" /> : <ShieldCheck className="size-5 text-brand-turquoise" aria-hidden="true" />}<p className="text-[15px] font-semibold">Vincoli dell’area</p><span className="ml-auto rounded-full bg-foreground/[0.08] px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">indicativo</span></div>
       {pending ? <DrawFirst sim={kind === "piazza" ? "urban" : "vineyard"} />
         : ctx.isPending ? <Searching on text="Cerco beni tutelati e aree vincolate intorno…" />

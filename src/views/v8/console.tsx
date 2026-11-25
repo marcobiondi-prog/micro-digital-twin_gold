@@ -48,14 +48,17 @@ export function openSimTab(kind: SimKind, tab: SimTab) {
  * with the reading, the "when" chip and the levers below. Used by the "Simula" of the toast after the suggested
  * interventions are put in; retried while the lazy arc loads (about 1 s).
  */
-export function openSimAtArc(kind: SimKind) {
+export function openSimAtArc(kind: SimKind) { openSimAt(kind, "[data-sim-focus]", 56); }
+
+/** Opens Simula and scrolls the first visible element matching `selector` just under the sticky tabs (retried while lazy parts load). */
+export function openSimAt(kind: SimKind, selector: string, gap = 12) {
   openSimTab(kind, "simula");
   const tryScroll = (left: number) => {
-    const el = document.querySelector<HTMLElement>("[data-sim-focus]");
-    if (!el || !el.offsetParent) { if (left > 0) window.setTimeout(() => tryScroll(left - 1), 80); return; }
+    const el = [...document.querySelectorAll<HTMLElement>(selector)].find((e) => e.offsetParent);
+    if (!el) { if (left > 0) window.setTimeout(() => tryScroll(left - 1), 80); return; }
     const bar = document.querySelector<HTMLElement>("[data-sim-tabs]");
     const under = bar ? bar.getBoundingClientRect().height + (parseFloat(getComputedStyle(bar).top) || 0) : 120;
-    const top = el.getBoundingClientRect().top + window.scrollY - under - 56;
+    const top = el.getBoundingClientRect().top + window.scrollY - under - gap;
     window.scrollTo({ top: Math.max(0, top), behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   };
   window.setTimeout(() => tryScroll(12), 60);
