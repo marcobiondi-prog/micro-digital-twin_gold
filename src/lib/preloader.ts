@@ -50,7 +50,7 @@ const HTML = `<style>${CSS}</style><div class="glow"></div><div class="box" role
   + `<path class="real" d="M 65 170 L 65 120 M 65 140 L 50 125 M 65 132 L 82 118 M 65 120 C 25 120 20 80 40 66 C 30 40 60 22 72 34 C 90 18 112 40 104 62 C 122 78 108 120 65 120"/>`
   + `${treePoints()}<line class="scan" x1="130" y1="20" x2="130" y2="175"/>`
   + `<text class="lbl" x="65" y="188">REALE</text><text class="lbl" x="195" y="188">DIGITALE</text></svg>`
-  + `<div class="name">Micro Digital <b>Twin</b><span class="alpha">ALPHA</span></div><div class="sub">Creo il gemello digitale del luogo…</div>`
+  + `<div class="name">Micro Digital <b>Twin</b><span class="alpha">ALPHA TESTING</span></div><div class="sub">Creo il gemello digitale del luogo…</div>`
   + `<span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Caricamento…</span></div>`;
 
 /**
