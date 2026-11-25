@@ -1,5 +1,6 @@
 import { FormEvent, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from "react";
 import { appAllowed, guardUse, useAppAllowed } from "@/lib/app-permissions";
+import { setLivePos } from "@/lib/live-position";
 import { useServerFn } from "@tanstack/react-start";
 import { CloudSun, Droplets, Grape, LoaderCircle, LocateFixed, Lock, Satellite, MapPin, Search, Sprout, Thermometer, TreePine, TrendingDown, Umbrella, Undo2 } from "lucide-react";
 import { Card, StatusBadge } from "@/views/health";
@@ -80,6 +81,8 @@ const osmCache = new Map<string, OsmSuggestion[]>();
 
 /** Below this the phone has not really moved: the place stays as it is. */
 const GPS_STEP_M = 15;
+/** The phone has gone to another place (not a few steps round the same piazza): the simulation's place moves there. */
+const PLACE_STEP_M = 150;
 /**
  * How precise the fix was that set each place (by its coordinates), kept for the whole session: before, each opening of
  * the map started from "unknown" and the next fix, a little sharper, moved the place by some tens of metres — standing
@@ -201,13 +204,15 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
       if (pausedRef.current) return;
 
       const acc = coords.accuracy || 9999, moved = metresBetween(placeRef.current, here);
-      // Suppress micro-jitter under 0.8m when still, but update step-by-step as soon as user takes a step
-      if (!placeRef.current.pending && moved < Math.max(0.8, Math.min(2.5, acc * 0.1))) return;
+      // Every fix moves only the live position (the map's pin and camera follow it, nothing is saved, nothing rebuilt),
+      // like a car's navigation map. The simulation's place moves only on the first fix, or once the phone has really
+      // gone somewhere else (PLACE_STEP_M, and more than twice the fix's error): then it is a new place, with its own
+      // interventions, saved and named.
+      setLivePos({ lat: here.lat, lng: here.lng, acc, at: Date.now() });
+      if (!placeRef.current.pending && moved < Math.max(PLACE_STEP_M, acc * 2)) return;
 
       placeAccuracy.set(accKey(here), acc);
       appliedAcc.current = acc;
-
-      // Real-time synchronous position dispatch: zero network lag, follows each step immediately
       const updated: SearchedLocation = {
         ...placeRef.current,
         lat: here.lat,
@@ -245,7 +250,7 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
       if (geoError.code === 1) { setGps(false); saveGps(false); setError("Permesso di posizione negato. Abilitalo nelle impostazioni del browser."); }
       else if (!lastFix.current && placeRef.current.pending) setError("Sto ancora cercando la posizione: il GPS resta attivo e riprova da solo.");
     }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 });
-    return () => { live = false; lastFix.current = null; appliedAcc.current = Infinity; navigator.geolocation.clearWatch(id); };
+    return () => { live = false; lastFix.current = null; appliedAcc.current = Infinity; setLivePos(null); navigator.geolocation.clearWatch(id); };
   }, [gps, reverseGoogle, reverseOsm]);
   // Ricalibra: a fresh fix asked now (no cached position), the place put exactly there whatever the distance, and the
   // GPS following again. Also what "Seguimi di nuovo" does.

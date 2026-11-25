@@ -17,10 +17,10 @@ const STYLE = "https://tiles.openfreemap.org/styles/liberty";
 
 type Camera = { center: [number, number]; zoom: number; pitch: number; bearing: number };
 
-export function OpenMap3D({ lat, lng, label, zoom, area = [], sim = null }: { lat: number; lng: number; label: string; zoom: number; area?: Ring; sim?: SimLayout | null }) {
+export function OpenMap3D({ lat, lng, label, zoom, area = [], sim = null, follow = false }: { lat: number; lng: number; label: string; zoom: number; area?: Ring; sim?: SimLayout | null; follow?: boolean }) {
   // Built once per place: a GPS fix of a few metres moves the pin, it no longer rebuilds the whole 3D map.
   const anchor = useRef({ lat, lng });
-  if (Math.hypot((anchor.current.lat - lat) * 111_320, (anchor.current.lng - lng) * 111_320 * Math.cos((lat * Math.PI) / 180)) > 30) anchor.current = { lat, lng };
+  if (!follow && Math.hypot((anchor.current.lat - lat) * 111_320, (anchor.current.lng - lng) * 111_320 * Math.cos((lat * Math.PI) / 180)) > 30) anchor.current = { lat, lng };
   const { lat: aLat, lng: aLng } = anchor.current;
   const markerRef = useRef<{ setLngLat: (p: [number, number]) => unknown } | null>(null);
   const areaKey = JSON.stringify(area);
@@ -79,7 +79,11 @@ export function OpenMap3D({ lat, lng, label, zoom, area = [], sim = null }: { la
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aLat, aLng, zoom, models]);
   // The pin and the drawn area follow without rebuilding the map.
-  useEffect(() => { markerRef.current?.setLngLat([lng, lat]); }, [lat, lng, state]);
+  useEffect(() => {
+    markerRef.current?.setLngLat([lng, lat]);
+    // Following the phone: the camera glides after the pin, keeping the person's zoom, tilt and turn.
+    if (follow && state === "ready") (mapRef.current as unknown as { easeTo: (o: Record<string, unknown>) => void } | null)?.easeTo({ center: [lng, lat], duration: 900 });
+  }, [lat, lng, state, follow]);
   useEffect(() => {
     const e = engine.current;
     if (state === "ready" && e) setAreaData(e.map, area);
