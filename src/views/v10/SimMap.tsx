@@ -32,6 +32,7 @@ import { drawnAreaFor, freeM2, initialRingAngle, leversForZones, vineLeversForZo
 import type { Ring } from "@/models/place-area";
 import { openSimTab, openSimAt, openSimAtArc, type SimKind } from "@/views/v8/console";
 import { PlaceSearch, gpsFollowing } from "@/views/SimulationGrid";
+import { useLivePos } from "@/lib/live-position";
 import { loadRealObjects } from "@/lib/real-objects-client";
 import { circleRing, realCountText, type RealObject } from "@/models/real-objects";
 import { findsCountText, useFieldFinds, type FieldFind } from "@/models/field-finds";
@@ -103,8 +104,10 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   const drawnCentre = saved && saved.ring.length >= 3 ? ringCentroid(saved.ring) : null;
   // While the GPS follows the phone the pin stands on the fix itself (the live position, not the map's anchor nor the
   // centre of the nearest mapped square or field, which put it tens of metres away from where one stands).
+  // The live fix (lib/live-position) moves the pin and the camera fix by fix, saving nothing.
+  const livePos = useLivePos();
   const following = !liveLoc.pending && !saved && gpsFollowing();
-  const at = following ? [liveLoc.lat, liveLoc.lng] as [number, number] : pinFix ?? drawnCentre ?? centre ?? null;
+  const at = following ? [livePos?.lat ?? liveLoc.lat, livePos?.lng ?? liveLoc.lng] as [number, number] : pinFix ?? drawnCentre ?? centre ?? null;
   const pin = at ? { lat: at[0], lng: at[1] } : { lat: loc.lat, lng: loc.lng };
   const movePin = (lat: number, lng: number) => { setPinFix(loc.lat, loc.lng, [lat, lng]); toast.success("Pin spostato", { description: "Resta qui per questo luogo, anche in 3D." }); };
   const [drawing, setDrawing] = useState(false);
@@ -419,9 +422,9 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         {!drawing && !drawingZone && proposalPill}
         {show3d
           ? <Suspense fallback={<div className="h-full w-full bg-card" />}><MapLight kind={kind} lat={pin.lat} lng={pin.lng}>{key
-            ? <LocationMap3D key={`map3d-${kind}`} lat={pin.lat} lng={pin.lng} label={name ?? ""} apiKey={key} area={ring} sim={sim}
-              fallback={<OpenMap3D lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />} />
-            : <OpenMap3D key={`openmap3d-${kind}`} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />}</MapLight></Suspense>
+            ? <LocationMap3D key={`map3d-${kind}`} follow={following} lat={pin.lat} lng={pin.lng} label={name ?? ""} apiKey={key} area={ring} sim={sim}
+              fallback={<OpenMap3D follow={following} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />} />
+            : <OpenMap3D key={`openmap3d-${kind}`} follow={following} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />}</MapLight></Suspense>
           : <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`map2d-${kind}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} drawing={drawing || drawingZone}
             onAreaChange={drawingZone ? setZoneDraft : setDraft} sim={editingZone && sim ? { ...sim, inner: (sim.inner ?? []).filter((z) => z.id !== editingZone) } : sim} arranging={arranging} onMove={moved} proposal={proposal}
             outline={drawingZone ? saved?.ring ?? null : null} onOutside={() => toast("La zona va dentro l’area disegnata")} onPinMove={arranging ? undefined : movePin} /></Suspense>}

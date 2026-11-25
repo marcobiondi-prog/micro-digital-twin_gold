@@ -302,12 +302,14 @@ function applyCamera(map: Map3D, camera: Camera, animate: boolean) {
   Object.assign(map, camera);
 }
 
-export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], sim = null }: { lat: number; lng: number; label: string; apiKey: string; fallback?: ReactNode; area?: Array<[number, number]>; sim?: SimLayout | null }) {
+export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], sim = null, follow = false }: { lat: number; lng: number; label: string; apiKey: string; fallback?: ReactNode; area?: Array<[number, number]>; sim?: SimLayout | null; follow?: boolean }) {
   const rejected = useKeyRejected();
   // The map is built for a place, not for each GPS fix: the pin can follow the phone metre by metre, and rebuilding the
   // photographic 3D at every fix left it blank half the time. A new place (over 30 m away) builds a new map.
+  // While the GPS follows the phone the map is never rebuilt at all: the camera glides after the pin (below), like a car's
+  // navigation map; the drawing's origin stays where the place is.
   const anchor = useRef({ lat, lng });
-  if (metresBetween(anchor.current, { lat, lng }) > 30) anchor.current = { lat, lng };
+  if (!follow && metresBetween(anchor.current, { lat, lng }) > 30) anchor.current = { lat, lng };
   const { lat: aLat, lng: aLng } = anchor.current;
   const [attempt, setAttempt] = useState(0);
   const markerRef = useRef<HTMLElement & { position?: unknown; label?: string } | null>(null);
@@ -390,6 +392,18 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
     if (!m || state !== "ready") return;
     try { m.position = { lat, lng, altitude: 0 }; m.label = label; } catch { /* older build */ }
   }, [lat, lng, label, state]);
+  // Following the phone: the camera glides to the pin once it has moved a couple of metres, keeping its tilt, range and
+  // heading (the person's own turn and zoom), never rebuilding the map.
+  const followedAt = useRef({ lat, lng });
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!follow || state !== "ready" || !map) return;
+    if (metresBetween(followedAt.current, { lat, lng }) < 2) return;
+    followedAt.current = { lat, lng };
+    const c = map.center as { altitude?: number } | undefined;
+    const endCamera = { center: { lat, lng, altitude: c?.altitude ?? altitude.current }, tilt: map.tilt, range: map.range, heading: map.heading } as Camera;
+    try { if (map.flyCameraTo) map.flyCameraTo({ endCamera, durationMillis: 900 }); else (map as unknown as { center: unknown }).center = endCamera.center; } catch { /* older build */ }
+  }, [lat, lng, follow, state]);
   // Three layers, each laid again only when its own content changes: the drawing (area, zones, ground shapes), the
   // shadows (they move with the simulation's clock) and the realistic models (kept on the map and only added or taken
   // away where they change). Before, any change — a minute of the clock, a save — took everything away and laid it again,
