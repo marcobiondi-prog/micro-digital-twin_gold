@@ -10,7 +10,8 @@ import { mediaTime } from "@/models/media-time";
 import { uploadGroups } from "@/models/media-groups";
 import { mediaThumb, readyThumb } from "@/lib/media-thumbs";
 import { unhide, useSimHidden } from "@/models/sim-hidden";
-import { SHOT_KINDS, kindCountText, shotKind, shotLabel, type ShotKind } from "@/models/shot-kind";
+import { SHOT_KINDS, SHOT_TAGS, kindCountText, tagCountText, shotKind, shotLabel, shotTag, type ShotKind, type ShotTag } from "@/models/shot-kind";
+import { dayKey, momentsOf, type Moment } from "@/models/shot-moments";
 import { TabRow } from "@/views/v8/console";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { forShare, zoneOfName } from "@/lib/share-files";
@@ -371,6 +372,17 @@ function KindMark({ s }: { s: Shot }) {
   return (
     <span className="absolute left-1.5 top-1.5 z-[1] inline-flex h-6 items-center gap-1 rounded-full bg-black/65 px-2 text-[11px] font-semibold text-white ring-1 ring-white/25">
       <Icon className="size-3.5" aria-hidden="true" />{shotLabel(s)}
+    </span>
+  );
+}
+
+/** The label of a small tile as its icon only, in a round dark badge. */
+function KindDot({ s }: { s: Shot }) {
+  const t = shotTag(s);
+  const Icon = t === "multiplo" ? Layers : t === "ai" || t === "ar" ? Sparkles : t === "video" ? Video : Camera;
+  return (
+    <span className="absolute left-1 top-1 z-[1] inline-flex h-5 items-center gap-0.5 rounded-full bg-black/65 px-1.5 text-[10px] font-semibold text-white ring-1 ring-white/25" aria-label={shotLabel(s)}>
+      <Icon className="size-3" aria-hidden="true" />{t === "ar" ? "AR" : t === "ai" ? "AI" : null}
     </span>
   );
 }
@@ -909,8 +921,8 @@ function OfficeScopePills({ value, office, offices }: { value: OfficeScope; offi
 }
 
 /** "Oggi", "Ieri", else the weekday and date ("sabato 22/11"; the year only when it is not this one). */
-function dayWord(items: HistoryEntry[]): string {
-  const d = new Date(items[0]!.at), now = new Date();
+function dayWord(at: number | string): string {
+  const d = new Date(at), now = new Date();
   const start = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const diff = Math.round((start(now) - start(d)) / 86400000);
   if (diff === 0) return "Oggi";
@@ -967,20 +979,130 @@ function TimelineRow({ e, open, onToggle }: { e: SourcedEntry; open: boolean; on
   );
 }
 
-/** A day of the time line: "Oggi" / "Ieri" / the date, how many, a small Archivia, then its interventions on the line. */
-function TimelineDay({ items, archivable = true }: { items: SourcedEntry[]; archivable?: boolean }) {
+/** "3 interventi · 9 foto", only what there is. */
+function dayCount(entries: number, shots: Shot[]): string {
+  return [entries ? entriesText(entries) : "", shots.length ? (shots.length === 1 ? "1 foto o video" : `${shots.length} foto e video`) : ""].filter(Boolean).join(" · ");
+}
+
+/**
+ * A stop of photos and videos on the time line: a hollow dot, the hour of its latest shot, what was shot ("6 foto · 1 video"),
+ * its simulation group and zone, and a small mosaic (one big, two small, "+n" on the last); the chevron spreads them all
+ * in a grid. A tap on a picture opens the viewer on that moment.
+ */
+function MomentRow({ m, numbers }: { m: Moment<Shot>; numbers: Map<string, number> }) {
+  const [all, setAll] = useState(false);
+  const [viewing, setViewing] = useState<number | null>(null);
+  const t = new Date(m.at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+  const from = new Date(m.first).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+  const first = m.shots[0]!;
+  const n = numbers.get(`${first.flow}-${first.id}`);
+  const zones = [...new Set(m.shots.map((x) => zoneOfName(x.name)).filter(Boolean))];
+  const sub = [n ? `Gruppo ${n}` : "", zones.length === 1 ? zones[0]! : zones.length > 1 ? `${zones.length} zone` : "", from !== t ? `dalle ${from}` : ""].filter(Boolean).join(" · ");
+  const shown = all ? m.shots : m.shots.slice(0, 3);
+  const extra = m.shots.length - 3;
+  const pic = (x: Shot, i: number, cls: string, more = 0) => (
+    <button key={x.id} type="button" onClick={() => setViewing(i)} aria-label={`Apri ${x.kind === "video" ? "il video" : "la foto"} ${i + 1} di ${m.shots.length}`}
+      className={cn("relative block overflow-hidden rounded-xl bg-foreground/[0.08] outline-none focus-visible:ring-2 focus-visible:ring-ring", cls)}>
+      <ShotMedia s={x} />
+      {x.kind === "video" && <span className="absolute inset-0 grid place-items-center"><Play className="size-6 text-white drop-shadow" aria-hidden="true" /></span>}
+      {more > 0 ? null : cls.includes("row-span-2") || cls.includes("w-full") ? <KindMark s={x} /> : <KindDot s={x} />}
+      {more > 0 && <span className="absolute inset-0 grid place-items-center bg-black/55 text-lg font-semibold text-white">+{more}</span>}
+    </button>
+  );
+  return (
+    <li className="relative pl-7">
+      <span aria-hidden="true" className={cn("absolute left-[2px] top-[0.95rem] size-3.5 rounded-full border-2 bg-background", first.flow === "piazza" ? "border-brand-turquoise" : "border-lime-400")} />
+      <button type="button" aria-expanded={all} onClick={() => setAll((v) => !v)} className="flex w-full items-start gap-3 rounded-2xl px-1 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <span className="w-11 shrink-0 pt-px text-sm tabular-nums text-muted-foreground" aria-label={`alle ${t}`}>{t}</span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5 text-[15px] leading-snug text-foreground/90"><Camera className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />{tagCountText(m.shots)}</span>
+          {sub && <span className="mt-0.5 block text-xs text-muted-foreground">{sub}</span>}
+        </span>
+        <ChevronDown className={cn("mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", all && "rotate-180")} aria-hidden="true" />
+      </button>
+      <div className="ml-[3.25rem] mt-1 pb-1">
+        {all || m.shots.length === 2 ? (
+          <div className={cn("grid gap-1.5", m.shots.length === 2 && !all ? "grid-cols-2 max-w-[15rem]" : "grid-cols-3")}>{shown.map((x, i) => pic(x, i, "aspect-square"))}</div>
+        ) : m.shots.length === 1 ? (
+          <div className="max-w-[13rem]">{pic(first, 0, "aspect-[4/3] w-full")}</div>
+        ) : (
+          <div className="grid h-36 grid-cols-[2fr_1fr] grid-rows-2 gap-1.5">
+            {pic(shown[0]!, 0, "row-span-2")}
+            {pic(shown[1]!, 1, "")}
+            {pic(shown[2]!, 2, "", extra > 0 && !all ? extra : 0)}
+          </div>
+        )}
+      </div>
+      {viewing !== null && <ShotViewer shots={m.shots} start={viewing} onClose={() => setViewing(null)} />}
+    </li>
+  );
+}
+
+/**
+ * A day of the time line: "Oggi" / "Ieri" / the date, what it holds, a small Archivia (its interventions and its photos),
+ * then its interventions and its stops of photos and videos on one line, newest first.
+ */
+function TimelineDay({ items, moments = [], numbers, archivable = true }: { items: SourcedEntry[]; moments?: Moment<Shot>[]; numbers?: Map<string, number>; archivable?: boolean }) {
   const [open, setOpen] = useState<string | null>(null);
-  const label = dayWord(items);
+  const label = dayWord(items[0]?.at ?? moments[0]!.at);
+  const shots = moments.flatMap((m) => m.shots);
+  const rows = [
+    ...items.map((e) => ({ t: Date.parse(e.at), e, m: null as Moment<Shot> | null })),
+    ...moments.map((m) => ({ t: m.at, e: null as SourcedEntry | null, m })),
+  ].sort((a, b) => b.t - a.t);
+  const archive = () => {
+    if (items.length) archiveHistory(items.map((e) => e.id));
+    if (shots.length) archiveMedia(shots.map((x) => `${x.flow}-${x.id}`));
+    toast.success(`${dayCount(items.length, shots)} in Archivio · ${label}`);
+  };
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-3 px-1">
-        <h3 className="min-w-0 flex-1 text-sm font-semibold text-foreground/90">{label}<span className="ml-2 font-medium text-muted-foreground">{items.length}</span></h3>
-        {archivable && <button type="button" aria-label={`Archivia ${label.toLowerCase()}`} onClick={() => { archiveHistory(items.map((e) => e.id)); toast.success(`${entriesText(items.length)} in Archivio · ${label}`); }}
+        <h3 className="min-w-0 flex-1 text-sm font-semibold text-foreground/90">{label}<span className="ml-2 font-medium text-muted-foreground">{moments.length ? dayCount(items.length, shots) : items.length}</span></h3>
+        {archivable && <button type="button" aria-label={`Archivia ${label.toLowerCase()}`} onClick={archive}
           className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:underline"><Archive className="size-3.5" aria-hidden="true" />Archivia</button>}
       </div>
       <ol className="relative space-y-2 before:absolute before:bottom-3 before:left-[8px] before:top-3 before:w-0.5 before:bg-foreground/10">
-        {items.map((e) => <TimelineRow key={e.id} e={e} open={open === e.id} onToggle={() => setOpen((o) => (o === e.id ? null : e.id))} />)}
+        {rows.map((r) => r.e
+          ? <TimelineRow key={r.e.id} e={r.e} open={open === r.e.id} onToggle={() => setOpen((o) => (o === r.e!.id ? null : r.e!.id))} />
+          : <MomentRow key={r.m!.key} m={r.m!} numbers={numbers ?? new Map()} />)}
       </ol>
+    </div>
+  );
+}
+
+/** What the Cronologia's time line shows: everything, the interventions only, or one label of photos and videos. */
+type LineShow = "tutto" | "interventi" | ShotTag;
+function TagPills({ shots, entries, value, onChange }: { shots: Shot[]; entries: number; value: LineShow; onChange: (v: LineShow) => void }) {
+  const counts = useMemo(() => { const n: Record<ShotTag, number> = { foto: 0, multiplo: 0, ai: 0, ar: 0, video: 0 }; for (const x of shots) n[shotTag(x)]++; return n; }, [shots]);
+  const pill = (on: boolean) => `inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 ${on ? "bg-foreground text-background" : "bg-foreground/[0.07] text-foreground/85"}`;
+  const opts: Array<{ id: LineShow; label: string; n: number }> = [
+    { id: "tutto", label: "Tutto", n: entries + shots.length },
+    { id: "interventi", label: "Interventi", n: entries },
+    ...SHOT_TAGS.map((k) => ({ id: k.id as LineShow, label: k.label, n: counts[k.id] })),
+  ];
+  return (
+    <div role="radiogroup" aria-label="Cosa mostrare nella cronologia" data-guide="history-tags" data-map-gestures className="-mx-1 flex touch-pan-x gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+      {opts.map((o) => (
+        <button key={o.id} type="button" role="radio" aria-checked={value === o.id} disabled={!o.n && value !== o.id} onClick={() => onChange(o.id)} className={pill(value === o.id)}>
+          {o.label}<span className="tabular-nums opacity-70">{o.n}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const LINE_VIEW_KEY = "mdt-history-view-v1";
+type LineView = "linea" | "pile";
+/** Linea del tempo | Pile: photos on the time line among the interventions, or apart as piles (by group or by day). */
+function LineViewSwitch({ value, onChange }: { value: LineView; onChange: (v: LineView) => void }) {
+  const opt = (v: LineView, label: string) => (
+    <button type="button" role="radio" aria-checked={value === v} onClick={() => onChange(v)}
+      className={cn("h-8 flex-1 rounded-full px-3 text-[13px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", value === v ? "bg-secondary text-secondary-foreground" : "text-foreground/75")}>{label}</button>
+  );
+  return (
+    <div role="radiogroup" aria-label="Come vedere la cronologia" data-guide="history-view" className="flex max-w-xs gap-1 rounded-full bg-foreground/[0.06] p-1">
+      {opt("linea", "Linea del tempo")}{opt("pile", "Pile di foto")}
     </div>
   );
 }
@@ -1317,6 +1439,12 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
   const [pileView, setPileView] = useState<PileView>("gruppo");
   useEffect(() => { try { if (localStorage.getItem(PILE_VIEW_KEY) === "giorno") setPileView("giorno"); } catch { /* default */ } }, []);
   const choosePileView = (v: PileView) => { setPileView(v); try { localStorage.setItem(PILE_VIEW_KEY, v); } catch { /* this time only */ } };
+  // Linea del tempo (photos among the interventions, by label) or Pile di foto, kept on this device.
+  const [lineView, setLineView] = useState<LineView>("linea");
+  useEffect(() => { try { if (localStorage.getItem(LINE_VIEW_KEY) === "pile") setLineView("pile"); } catch { /* default */ } }, []);
+  const chooseLineView = (v: LineView) => { setLineView(v); try { localStorage.setItem(LINE_VIEW_KEY, v); } catch { /* this time only */ } };
+  const [show, setShow] = useState<LineShow>("tutto");
+  const numbers = useGroupNumbers();
   useEffect(() => { setConfirm(false); }, [filter]);
   const urban = useLabMedia("urban"), vineyard = useLabMedia("vineyard");
   const archive = useMediaArchive();
@@ -1353,15 +1481,33 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
     const ofKind = compact || shotFilter === "tutti" ? shots : shots.filter((s) => shotKind(s) === shotFilter);
     const visibleShots = compact ? shots.slice(0, COMPACT_SHOTS) : ofKind;
     const activeError = (flow !== "vigneto" && hasUrbanError) ? urbanError : (flow !== "piazza" && hasVineError) ? vineError : null;
+    const line = !compact && lineView === "linea";
+    // The time line: interventions and stops of photos by day, filtered by label.
+    const lineShots = !line || show === "interventi" ? [] : show === "tutto" ? shots : shots.filter((x) => shotTag(x) === show);
+    const lineEntries = line && (show === "tutto" || show === "interventi") ? inTab : [];
+    const lineDays = (() => {
+      if (!line) return [];
+      const days = new Map<string, { items: SourcedEntry[]; moments: Moment<Shot>[] }>();
+      const day = (k: string) => { let d = days.get(k); if (!d) { d = { items: [], moments: [] }; days.set(k, d); } return d; };
+      for (const e of sortNewest(lineEntries)) day(dayKey(Date.parse(e.at))).items.push(e);
+      for (const m of momentsOf(lineShots)) day(dayKey(m.at)).moments.push(m);
+      return [...days.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)).map(([key, d]) => ({ key, ...d }));
+    })();
     return (
       <>
+        {!compact && (shots.length > 0 || inTab.length > 0) && (
+          <div className="space-y-2">
+            {shots.length > 0 && <LineViewSwitch value={lineView} onChange={chooseLineView} />}
+            {line && shots.length > 0 && <TagPills shots={shots} entries={inTab.length} value={show} onChange={setShow} />}
+          </div>
+        )}
         {activeError && (
           <div role="alert" className="flex items-center gap-3 rounded-2xl bg-amber-500/10 px-4 py-3 text-sm ring-1 ring-amber-500/30">
             <span className="flex-1">Non riesco a leggere le foto e i video del tuo account<span className="block text-xs text-muted-foreground">{activeError} · riprovo da solo tra poco</span></span>
             <button type="button" onClick={() => void retryMedia()} disabled={retrying} className="h-9 shrink-0 rounded-full bg-foreground/10 px-3 text-sm font-semibold disabled:opacity-60">{retrying ? "Riprovo…" : "Riprova"}</button>
           </div>
         )}
-        {shots.length > 0 && (
+        {shots.length > 0 && !line && (
           <div className="space-y-2">
             <h3 className="px-1 text-sm font-medium text-muted-foreground">Foto e video{compact && shots.length > visibleShots.length ? ` · ultimi ${visibleShots.length} di ${shots.length}` : ` · ${countText(shots)}`}</h3>
             {!compact && <KindPills shots={shots} value={shotFilter} onChange={setShotFilter} />}
@@ -1386,7 +1532,12 @@ export function HistoryBlock({ compact = false, flow: asked }: { compact?: boole
             <ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />
           </Link>
         )}
-        {groups.length === 0 ? visibleShots.length > 0 ? null : (
+        {line ? (lineDays.length > 0 ? (
+          <div className="space-y-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">{lineDays.map((d) => <TimelineDay key={d.key} items={d.items} moments={d.moments} numbers={numbers} />)}</div>
+        ) : show !== "tutto" ? (
+          <p className="px-1 py-6 text-center text-sm text-muted-foreground">Niente da mostrare con questa etichetta.</p>
+        ) : null) : null}
+        {line && lineDays.length > 0 ? null : line && show !== "tutto" ? null : groups.length === 0 ? visibleShots.length > 0 ? null : (
           <DashCard className="flex flex-col items-center gap-2 py-8 text-center">
             <History className="size-7 text-muted-foreground" aria-hidden="true" />
             <p className="text-[15px] font-medium">{loading ? "Carico la cronologia…" : archivedEntries.length ? "Gli interventi sono tutti nell’archivio" : f === "tutti" ? "Ancora nessun intervento" : `Ancora nessun intervento ${f === "piazza" ? "nella piazza" : "nel vigneto"}`}</p>

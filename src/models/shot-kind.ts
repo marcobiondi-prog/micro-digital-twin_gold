@@ -37,3 +37,28 @@ export function shotLabel(item: { name: string; kind: "image" | "video" }): stri
   }
   return k === "foto" ? "Foto" : k === "multiplo" ? "Multiplo" : "Video";
 }
+
+/** The label a photo or video is filed under on the Cronologia's time line: the AR view's, the AI scans', a multiple shot, a video or a single photo. */
+export type ShotTag = "foto" | "multiplo" | "ai" | "ar" | "video";
+
+export const SHOT_TAGS: Array<{ id: ShotTag; label: string }> = [
+  { id: "foto", label: "Foto" },
+  { id: "multiplo", label: "Scatto multiplo" },
+  { id: "ai", label: "AI" },
+  { id: "ar", label: "AR" },
+  { id: "video", label: "Video" },
+];
+
+export function shotTag(item: { name: string; kind: "image" | "video" }): ShotTag {
+  const k = shotKind(item);
+  if (k === "ai") return /(^|[^a-z])foto-ar-prova/.test(item.name.toLowerCase()) ? "ar" : "ai";
+  return k;
+}
+
+/** "2 foto · 2 scatti multipli · 1 AI · 1 AR", by label, only the labels there are. */
+export function tagCountText(items: Array<{ name: string; kind: "image" | "video" }>): string {
+  const n: Record<ShotTag, number> = { foto: 0, multiplo: 0, ai: 0, ar: 0, video: 0 };
+  for (const i of items) n[shotTag(i)]++;
+  const word: Record<ShotTag, [string, string]> = { foto: ["foto", "foto"], multiplo: ["scatto multiplo", "scatti multipli"], ai: ["AI", "AI"], ar: ["AR", "AR"], video: ["video", "video"] };
+  return SHOT_TAGS.filter((k) => n[k.id]).map((k) => `${n[k.id]} ${word[k.id][n[k.id] === 1 ? 0 : 1]}`).join(" · ");
+}
