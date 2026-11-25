@@ -992,6 +992,26 @@ function dayCount(entries: number, shots: Shot[]): string {
 function MomentRow({ m, numbers }: { m: Moment<Shot>; numbers: Map<string, number> }) {
   const [all, setAll] = useState(false);
   const [viewing, setViewing] = useState<number | null>(null);
+  // Deleting for good, the whole stop or the ones picked, asked once in place.
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [ask, setAsk] = useState<Shot[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const keyOf = (x: Shot) => `${x.flow}-${x.id}`;
+  const flip = (x: Shot) => setPicked((p) => { const n = new Set(p); if (n.has(keyOf(x))) n.delete(keyOf(x)); else n.add(keyOf(x)); return n; });
+  const stopSel = () => { setSelecting(false); setPicked(new Set()); setAsk(null); };
+  const del = async (items: Shot[]) => {
+    setBusy(true);
+    try {
+      const urban = items.filter((x) => x.flow === "piazza"), vine = items.filter((x) => x.flow === "vigneto");
+      if (urban.length) await removeMedia("urban", urban);
+      if (vine.length) await removeMedia("vineyard", vine);
+      toast.success(items.length === 1 ? (items[0]!.kind === "video" ? "Video eliminato" : "Foto eliminata") : `${items.length} foto e video eliminati`);
+      stopSel();
+    } catch {
+      toast.error("Eliminazione non riuscita: controlla la connessione e riprova");
+    } finally { setBusy(false); setAsk(null); }
+  };
   const t = new Date(m.at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
   const from = new Date(m.first).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
   const first = m.shots[0]!;
@@ -1000,7 +1020,13 @@ function MomentRow({ m, numbers }: { m: Moment<Shot>; numbers: Map<string, numbe
   const sub = [n ? `Gruppo ${n}` : "", zones.length === 1 ? zones[0]! : zones.length > 1 ? `${zones.length} zone` : "", from !== t ? `dalle ${from}` : ""].filter(Boolean).join(" · ");
   const shown = all ? m.shots : m.shots.slice(0, 3);
   const extra = m.shots.length - 3;
-  const pic = (x: Shot, i: number, cls: string, more = 0) => (
+  const pic = (x: Shot, i: number, cls: string, more = 0) => selecting ? (
+    <button key={x.id} type="button" role="checkbox" aria-checked={picked.has(keyOf(x))} aria-label={`${x.kind === "video" ? "Video" : "Foto"} ${i + 1} di ${m.shots.length}`} onClick={() => flip(x)}
+      className={cn("relative block overflow-hidden rounded-xl bg-foreground/[0.08] outline-none transition focus-visible:ring-2 focus-visible:ring-ring", cls, picked.has(keyOf(x)) ? "ring-2 ring-destructive" : "opacity-80")}>
+      <ShotMedia s={x} />
+      <span className={cn("absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full border-2", picked.has(keyOf(x)) ? "border-destructive bg-destructive text-white" : "border-white bg-black/35")}>{picked.has(keyOf(x)) && <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />}</span>
+    </button>
+  ) : (
     <button key={x.id} type="button" onClick={() => setViewing(i)} aria-label={`Apri ${x.kind === "video" ? "il video" : "la foto"} ${i + 1} di ${m.shots.length}`}
       className={cn("relative block overflow-hidden rounded-xl bg-foreground/[0.08] outline-none focus-visible:ring-2 focus-visible:ring-ring", cls)}>
       <ShotMedia s={x} />
@@ -1012,7 +1038,7 @@ function MomentRow({ m, numbers }: { m: Moment<Shot>; numbers: Map<string, numbe
   return (
     <li className="relative pl-7">
       <span aria-hidden="true" className={cn("absolute left-[2px] top-[0.95rem] size-3.5 rounded-full border-2 bg-background", first.flow === "piazza" ? "border-brand-turquoise" : "border-lime-400")} />
-      <button type="button" aria-expanded={all} onClick={() => setAll((v) => !v)} className="flex w-full items-start gap-3 rounded-2xl px-1 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <button type="button" aria-expanded={all} onClick={() => { if (all) stopSel(); setAll((v) => !v); }} className="flex w-full items-start gap-3 rounded-2xl px-1 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <span className="w-11 shrink-0 pt-px text-sm tabular-nums text-muted-foreground" aria-label={`alle ${t}`}>{t}</span>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5 text-[15px] leading-snug text-foreground/90"><Camera className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />{tagCountText(m.shots)}</span>
@@ -1021,6 +1047,30 @@ function MomentRow({ m, numbers }: { m: Moment<Shot>; numbers: Map<string, numbe
         <ChevronDown className={cn("mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", all && "rotate-180")} aria-hidden="true" />
       </button>
       <div className="ml-[3.25rem] mt-1 pb-1">
+        {all && (
+          ask ? (
+            <div role="alertdialog" aria-label="Conferma eliminazione" className="mb-2 space-y-2 rounded-2xl bg-destructive/10 p-3 ring-1 ring-destructive/30">
+              <p className="text-sm font-semibold">{ask.length === 1 ? (ask[0]!.kind === "video" ? "Eliminare questo video?" : "Eliminare questa foto?") : `Eliminare ${ask.length} foto e video?`}</p>
+              <p className="text-xs text-muted-foreground">Vengono eliminati per sempre, anche dalla simulazione. Non si possono recuperare.</p>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setAsk(null)} disabled={busy} className="inline-flex h-9 flex-1 items-center justify-center rounded-full bg-foreground/[0.08] text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">Annulla</button>
+                <button type="button" onClick={() => void del(ask)} disabled={busy} className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full bg-destructive text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"><Trash2 className="size-4" aria-hidden="true" />{busy ? "Elimino…" : `Elimina ${ask.length}`}</button>
+              </div>
+            </div>
+          ) : (
+            <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-semibold">
+              {selecting ? <>
+                <span className="text-muted-foreground">{picked.size ? `${picked.size} scelti` : "Tocca per scegliere"}</span>
+                <button type="button" onClick={() => setPicked(picked.size === m.shots.length ? new Set() : new Set(m.shots.map(keyOf)))} className="outline-none focus-visible:underline">{picked.size === m.shots.length ? "Nessuna" : "Tutte"}</button>
+                <button type="button" disabled={!picked.size} onClick={() => setAsk(m.shots.filter((x) => picked.has(keyOf(x))))} className="inline-flex items-center gap-1 text-destructive outline-none focus-visible:underline disabled:opacity-40"><Trash2 className="size-4" aria-hidden="true" />Elimina {picked.size || ""}</button>
+                <button type="button" onClick={stopSel} className="text-muted-foreground outline-none focus-visible:underline">Annulla</button>
+              </> : <>
+                <button type="button" onClick={() => setSelecting(true)} className="outline-none focus-visible:underline">Seleziona</button>
+                <button type="button" onClick={() => setAsk(m.shots)} className="inline-flex items-center gap-1 text-destructive outline-none focus-visible:underline"><Trash2 className="size-4" aria-hidden="true" />{m.shots.length === 1 ? "Elimina" : `Elimina tutte · ${m.shots.length}`}</button>
+              </>}
+            </div>
+          )
+        )}
         {all || m.shots.length === 2 ? (
           <div className={cn("grid gap-1.5", m.shots.length === 2 && !all ? "grid-cols-2 max-w-[15rem]" : "grid-cols-3")}>{shown.map((x, i) => pic(x, i, "aspect-square"))}</div>
         ) : m.shots.length === 1 ? (

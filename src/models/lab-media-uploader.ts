@@ -197,12 +197,16 @@ async function runQueue(
       description: "Li porto nel tuo account appena torna la connessione.",
     });
   else if (done > 0)
-    toast.success(done === 1 ? "File caricato" : `${done} file caricati`, {
-      description:
-        done === 1
-          ? "Il file è nell’elenco e finirà nel report."
-          : "I file sono nell’elenco e finiranno nel report.",
-    });
+    {
+      const ok = batch.filter((b) => statusOf(b.id) === "done");
+      const videos = ok.filter((b) => b.kind === "video").length, photos = ok.length - videos;
+      const title = !videos ? (photos === 1 ? "Foto inserita" : `${photos} foto inserite`)
+        : !photos ? (videos === 1 ? "Video inserito" : `${videos} video inseriti`)
+        : `Foto inserite · ${photos} foto e ${videos} video`;
+      toast.success(title, {
+        description: done === 1 ? "La trovi nelle foto della simulazione e nella Cronologia." : "Le trovi nelle foto della simulazione e nella Cronologia.",
+      });
+    }
 
   // Le righe di stato restano visibili un attimo, poi spariscono da sole.
   setTimeout(() => {
