@@ -15,7 +15,7 @@ import { useLab, type LabState } from "@/models/lab-store";
 import { getPiazzaReading, placeKey, usePiazzaReading, type PiazzaReading } from "@/models/sim-reading";
 import { heatStep, heatWords, piazzaMix, piazzaSummary, thirstStep, thirstWords, vineMixRows, vineSummary } from "@/models/project-summary";
 import { euroRange, grouped } from "@/models/intervention-cost";
-import { SEASONS, SEASON_LABEL, coolingShare, type Season } from "@/models/season-climate";
+import { SEASONS, SEASON_LABEL, coolingShare, seasonOfMonth, type Season } from "@/models/season-climate";
 import { clockText } from "@/models/sim-when";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { zoneSummaryRows } from "@/models/drawn-area";
@@ -42,9 +42,9 @@ const useReducedMotion = () => {
 // shared with the PDF report, so it prints what is on screen.
 let dashSeason: Season | null = null;
 const seasonSubs = new Set<() => void>();
-export const getDashSeason = (): Season => getPiazzaReading()?.season ?? dashSeason ?? "estate";
+// The dashboard never chooses the season: the simulation's, else the one the simulation opens on (today's).
+export const getDashSeason = (): Season => getPiazzaReading()?.season ?? seasonOfMonth(new Date().getMonth());
 const setDashSeason = (s: Season) => { dashSeason = s === getPiazzaReading()?.season ? null : s; seasonSubs.forEach((f) => f()); };
-const useDashSeason = () => useSyncExternalStore((f) => { seasonSubs.add(f); return () => { seasonSubs.delete(f); }; }, () => dashSeason, () => dashSeason);
 
 /**
  * The piazza as the dashboard and the report read it: on the simulation's season and hour, the very numbers and arc
@@ -288,11 +288,10 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
   const urban = useLab().urban;
   const reduce = useReducedMotion();
   const { lat, lng } = urban.location;
-  const picked = useDashSeason();
   const reading = usePiazzaReading(placeKey(lat, lng));
   // With the simulation's reading the season is the simulation's (the other pills are off); a season picked
   // before the simulation was opened gives way to it.
-  const season = reading?.season ?? picked ?? "estate";
+  const season = reading?.season ?? seasonOfMonth(new Date().getMonth());
   const profile = useSeasonProfile(lat, lng);
   const fetchArea = useServerFn(getPlaceArea);
   const area = useQuery({ queryKey: ["place-area", lat, lng], queryFn: () => loadPlaceArea((d) => fetchArea({ data: d }), lat, lng), staleTime: Infinity, retry: 1 });
@@ -308,7 +307,7 @@ export function PiazzaDashboard({ records }: { records: ReactNode }) {
       {/* Desktop: the result and its day (or zones) on the left, what it gives, costs and records on the right. */}
       <div className="min-w-0 space-y-8">
       <ResultCard kind="urban" place={place.name}
-        when={<SeasonPills value={season} onChange={setDashSeason} only={reading?.season} />}>
+        when={<SeasonPills value={season} onChange={setDashSeason} only={season} />}>
         <p className="text-center text-sm text-muted-foreground">{dash.sim ? "Come nella simulazione" : dash.fromSim ? "Alla stessa ora della simulazione" : "Nell’ora più calda"} · {dash.when.toLowerCase()}</p>
         <ResultArc before={before} after={after} min={dash.min} max={dash.max} unit="°"
           value={`${fmt1(after)}°`} words={heatWords(after)} step={heatStep(after)} bg={after < 10 ? "bg-urban" : after < 18 ? "bg-water" : undefined} level={sum.level} cost={empty ? "0 €" : euroRange(sum.cost)} />
