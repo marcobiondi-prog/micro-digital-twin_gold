@@ -14,7 +14,7 @@ import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { useSeasonClock, WhenPicker } from "@/views/v10/when";
 import { ConstraintsCard, CrowdCard, FeasibilityStrip } from "@/views/v10/SiteContext";
 import { coolingShare, estimatedTemp, SEASON_LABEL } from "@/models/season-climate";
-import { setPiazzaReading } from "@/models/sim-reading";
+import { placeKey, setPiazzaReading } from "@/models/sim-reading";
 import { loadAirTemperature } from "@/views/air-temp-client";
 import { useMySensors } from "@/lib/use-my-sensors";
 import { useGuestOnly } from "@/views/v10/ProfileGate";
@@ -338,8 +338,8 @@ export function UrbanThermometer({ onImportWeather }: { onImportWeather?: (() =>
   const near: "left" | "right" | null = pos >= 0.66 ? "right" : pos <= 0.34 ? "left" : null;
   // The map and the dashboard show this very reading, on the same arc.
   useEffect(() => {
-    setPiazzaReading({ before: +before.toFixed(1), after: +after.toFixed(1), when: `${SEASON_LABEL[season] ?? season}, ore ${clockText(hour, clock.minute ?? 0)}`, season, hour, min: dialMin, max: dialMax });
-  }, [before, after, season, hour, clock.minute, dialMin, dialMax]);
+    setPiazzaReading({ before: +before.toFixed(1), after: +after.toFixed(1), when: `${SEASON_LABEL[season] ?? season}, ore ${clockText(hour, clock.minute ?? 0)}`, season, hour, min: dialMin, max: dialMax, place: placeKey(urban.location.lat, urban.location.lng) });
+  }, [before, after, season, hour, clock.minute, dialMin, dialMax, urban.location.lat, urban.location.lng]);
   // The real temperature of the place right now, written under the arc beside the reading without interventions.
   const [rLat, rLng] = [cLat, cLng];
   const guest = useGuestOnly();

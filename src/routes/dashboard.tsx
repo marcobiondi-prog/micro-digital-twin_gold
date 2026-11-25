@@ -29,10 +29,12 @@ import { LabSyncIndicator } from "@/views/LabSyncIndicator";
 import { Fold, FoldTabs } from "@/views/Fold";
 import { Ambient, PageHero, TabRow } from "@/views/v8/console";
 import { FieldAI } from "@/views/FieldAI";
+import { Approvals, EMPTY_APPROVAL, type Approval, type ApprovalStatus } from "@/views/v10/Approvals";
+import { openAccount } from "@/lib/camera-dock";
 const ExportSheetLazy = lazy(() => import("@/views/v10/ExportSheetLazy"));
 import { SEND_PROJECT_EVENT } from "@/lib/send-project";
 import { DashCard, DashSection, PiazzaDashboard, PremiumPart, SendProject, URBAN_LOCKED, VINE_LOCKED, VineDashboard, getDashSeason, piazzaDash } from "@/views/v10/Dashboard";
-import { getPiazzaReading } from "@/models/sim-reading";
+import { getPiazzaReading, placeKey } from "@/models/sim-reading";
 import { useQueryClient } from "@tanstack/react-query";
 import { heatStep, heatWords, piazzaMix, piazzaSummary, thirstStep, thirstWords, vineMixRows, vineSummary } from "@/models/project-summary";
 import { SEASON_LABEL, type Season } from "@/models/season-climate";
@@ -114,14 +116,6 @@ function Kpi({ value, max, color, center, unit, label, children }: { value: numb
 
 const STAGES = ["In valutazione", "Progettazione", "Approvato", "Realizzato"] as const;
 const EXTERNAL = ["Comune · Giunta", "Soprintendenza", "Ufficio tecnico"] as const;
-type ApprovalStatus = "attesa" | "approvato" | "respinto";
-type Approval = { status: ApprovalStatus; ref: string; sent: string; date: string };
-const EMPTY_APPROVAL: Approval = { status: "attesa", ref: "", sent: "", date: "" };
-const APPROVAL_STATES: [ApprovalStatus, string, string][] = [
-  ["attesa", "In attesa", "border-warn bg-warn/20 text-foreground"],
-  ["approvato", "Approvato", "border-ok bg-ok/20 text-foreground"],
-  ["respinto", "Respinto", "border-danger bg-danger/20 text-foreground"],
-];
 // Compatibile con il vecchio formato (stringa = data di approvazione)
 function normalizeApprovals(raw: Record<string, unknown>): Record<string, Approval> {
   const out: Record<string, Approval> = {};
@@ -149,9 +143,12 @@ const DEFAULT_LOG: { d: string; t: string }[] = [
   { d: "28/09", t: "Scenario condiviso con l’ufficio tecnico" },
 ];
 
+const FREE_APPROVALS_KEY = "mdt-approvals-free-v1";
+
 /** Premium records of the piazza: the approval cycle with the public bodies, the log of interventions and the AI plan. */
 function UrbanRecords({ history }: { history?: ReactNode }) {
   const lab = useLab().urban, m = urbanMetrics(lab);
+  const guest = useGuestOnly();
   const [stage, setStage] = useState(0);
   const [approvals, setApprovals] = useState<Record<string, Approval>>({});
   const [draft, setDraft] = useState("");
@@ -180,9 +177,14 @@ function UrbanRecords({ history }: { history?: ReactNode }) {
           if (Array.isArray(row.log)) setLog(row.log as { d: string; t: string }[]);
           if (row.approvals && typeof row.approvals === "object" && !Array.isArray(row.approvals)) setApprovals(normalizeApprovals(row.approvals as Record<string, unknown>));
         }
-      } else if (hadUser) {
-        // Signing out must not leave the previous account's data on screen.
-        setStage(0); setApprovals({}); setLog(DEFAULT_LOG.map((n) => ({ ...n })));
+      } else {
+        // Free plan: the approvals marked by hand stay on this device. Signing out never shows the account's data.
+        if (hadUser) { setStage(0); setLog(DEFAULT_LOG.map((n) => ({ ...n }))); }
+        try {
+          const raw = JSON.parse(localStorage.getItem(FREE_APPROVALS_KEY) ?? "null") as { stage?: number; approvals?: Record<string, unknown> } | null;
+          setApprovals(raw?.approvals ? normalizeApprovals(raw.approvals) : {});
+          if (typeof raw?.stage === "number") setStage(raw.stage);
+        } catch { setApprovals({}); }
       }
       setLoaded(true);
     };
@@ -190,6 +192,10 @@ function UrbanRecords({ history }: { history?: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => { void sync(session?.user?.id ?? null); });
     return () => { alive = false; sub.subscription.unsubscribe(); };
   }, []);
+  useEffect(() => {
+    if (uid || !loaded) return;
+    try { localStorage.setItem(FREE_APPROVALS_KEY, JSON.stringify({ stage, approvals })); } catch { /* storage optional */ }
+  }, [uid, loaded, stage, approvals]);
   useEffect(() => {
     if (!uid || !loaded) return;
     const h = setTimeout(() => {
@@ -316,52 +322,12 @@ function UrbanRecords({ history }: { history?: ReactNode }) {
       </DashSection>
       <SendProject flow="piazza" />
       </div>
-      <div className="min-w-0 lg:col-span-2"><PremiumPart locked={URBAN_LOCKED} kind="funzionario">
+      {!guest && <div className="min-w-0 lg:col-span-2"><Approvals entities={EXTERNAL} approvals={approvals} stage={displayedStage} premium={!!uid}
+        onStatus={setApprovalStatus} onEdit={editApproval} onSend={(e) => void sendRequest(e)}
+        onRealized={stage === 2 && approvedCount === EXTERNAL.length ? confirmRealized : null}
+        onUpgrade={openAccount} /></div>}
+      <div className="min-w-0 lg:col-span-2"><PremiumPart locked={guest ? URBAN_LOCKED : URBAN_LOCKED.filter((l) => !/enti|Iter/.test(l.title))} kind="funzionario">
         <div className="space-y-8">
-          <DashSection title="Approvazioni degli enti" hint={STAGES[displayedStage]}>
-        <DashCard>
-            <div className="mt-4 flex items-center justify-between text-xs font-semibold text-muted-foreground"><span>Ciclo di approvazione</span><span className="text-foreground">{progress}%</span></div>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Avanzamento approvazione" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
-              <div className={`h-full rounded-full transition-[width] duration-500 motion-reduce:transition-none ${STAGE_TONES[displayedStage]?.dot}`} style={{ width: `${progress}%` }} />
-            </div>
-            <ol className="mt-2 grid grid-cols-4 gap-1 text-center text-[10px] leading-tight sm:text-[11px]" aria-label="Stadi di approvazione">
-              {STAGES.map((s, i) => <li key={s} aria-current={i === displayedStage ? "step" : undefined} className={i === displayedStage ? "font-semibold text-foreground" : "text-muted-foreground"}>{s}</li>)}
-            </ol>
-            {!uid && <Button type="button" variant="ghost" onClick={simulateEmail} disabled={simBusy} className="mt-2 h-9 w-full rounded-full bg-urban/15 px-3 text-xs font-semibold text-urban"><Mail />{simBusy ? "Ricezione in corso…" : simUnits === null ? "Simula arrivo parere via email" : "Reinvia email simulata"}</Button>}
-           <div className="dashboard-external-section">
-           {(<>
-             <div className="mt-3 text-xs font-semibold text-muted-foreground md:mt-0">Approvazioni esterne</div>
-             <ul className="mt-2 space-y-2 md:grid md:grid-cols-2 md:gap-3 md:space-y-0 lg:grid-cols-3">
-              {EXTERNAL.map((e) => {
-                const a = approvals[e] ?? EMPTY_APPROVAL;
-                return (
-                   <li key={e} className="dashboard-tile min-w-0 rounded-xl bg-muted/40 p-2.5 text-xs" data-testid="external-approval">
-                     <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
-                       <span className="min-w-0 font-semibold">{e}</span>
-                      <span className={`font-semibold ${a.status === "approvato" ? "text-ok" : a.status === "respinto" ? "text-danger" : "text-muted-foreground"}`}>
-                        {a.status === "approvato" ? `Approvato${a.date ? ` ${a.date}` : ""}` : a.status === "respinto" ? `Respinto${a.date ? ` ${a.date}` : ""}` : "In attesa"}
-                      </span>
-                    </div>
-                     <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-1.5 md:grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto]">
-                      <input aria-label={`Referente ${e}`} placeholder="Referente" value={a.ref} onChange={(ev) => editApproval(e, { ref: ev.target.value })} className="h-9 min-w-0 rounded-lg border border-border bg-background px-2" />
-                       <input aria-label={`Data di invio ${e}`} type="date" value={a.sent} onChange={(ev) => editApproval(e, { sent: ev.target.value })} className="h-9 min-w-0 max-w-full rounded-lg border border-border bg-background px-2" />
-                    </div>
-                    <div className="mt-1.5 grid grid-cols-3 gap-1" role="group" aria-label={`Stato ${e}`}>
-                      {APPROVAL_STATES.map(([v, l, tone]) => (
-                        <Button key={v} type="button" variant="ghost" aria-pressed={a.status === v} onClick={() => setApprovalStatus(e, v)} className={`h-8 rounded-full border px-1 text-[11px] font-semibold ${a.status === v ? tone : "border-border bg-background text-muted-foreground"}`}>{l}</Button>
-                      ))}
-                    </div>
-                    {a.status !== "approvato" && <button type="button" onClick={() => void sendRequest(e)} className="mt-1.5 h-8 w-full rounded-full border border-urban/40 text-[11px] font-semibold text-urban">✉️ Invia richiesta via email</button>}
-                  </li>
-                );
-              })}
-            </ul>
-            <p className="mt-2 text-[11px] text-muted-foreground">Per passare ad “Approvato” servono tutte le approvazioni esterne.</p>
-            {stage === 2 && approvedCount === EXTERNAL.length && <Button type="button" variant="outline" onClick={confirmRealized} className="mt-2 w-full border-ok/40 text-xs text-ok">Conferma intervento realizzato</Button>}
-          </>)}
-           </div>
-        </DashCard>
-      </DashSection>
           <DashSection title="Piano suggerito dall’AI"><FieldAI kind="urban" onAdd={addLog} /></DashSection>
         </div>
       </PremiumPart></div>
@@ -471,14 +437,14 @@ function ExportReport({ ctx }: { ctx: "Urbano" | "Vitivinicolo" }) {
   const areaOf = (key: unknown[]) => (qc.getQueryData(key) as { m2: number | null } | undefined)?.m2 ?? null;
   const yearOf = qc.getQueryData(["season-climate", u.location.lat, u.location.lng]) as { profile: Record<Season, Array<number | null>> } | undefined;
   // The same reading as the dashboard's arc: the simulation's season and hour (its very numbers), else that hour of the season picked.
-  const pd = piazzaDash(u, season, yearOf?.profile, areaOf(["place-area", u.location.lat, u.location.lng]), getPiazzaReading());
+  const pd = piazzaDash(u, season, yearOf?.profile, areaOf(["place-area", u.location.lat, u.location.lng]), getPiazzaReading(placeKey(u.location.lat, u.location.lng)));
   const ps = { ...pd.sum, before: pd.before, after: pd.after };
   const vs = vineSummary(v, areaOf(["vine-area", v.location.lat, v.location.lng]));
   // People at the simulation's season and hour, and the place's constraints: the same reading as the dashboard's cards.
   const siteLoc = ctx === "Urbano" ? u : v;
   const [sLat, sLng] = siteCenter(siteLoc.location, siteLoc.area);
   const site = useSiteContext(sLat, sLng, !drawnAreaFor(siteLoc.area, siteLoc.location), drawnAreaFor(siteLoc.area, siteLoc.location)?.ring).data;
-  const crowdR: [string, string][] = ctx === "Urbano" && site ? crowdRows(crowdEstimate(site.draws, pd.sum.m2, getPiazzaReading()?.season ?? season, pd.sum.hour), getPiazzaReading()?.season ?? season, pd.sum.hour, Math.floor(pd.sum.shadeM2 / 2)) : [];
+  const crowdR: [string, string][] = ctx === "Urbano" && site ? crowdRows(crowdEstimate(site.draws, pd.sum.m2, getPiazzaReading(placeKey(u.location.lat, u.location.lng))?.season ?? season, pd.sum.hour), getPiazzaReading(placeKey(u.location.lat, u.location.lng))?.season ?? season, pd.sum.hour, Math.floor(pd.sum.shadeM2 / 2)) : [];
   const constraintR: [string, string][] = site ? constraintRows(siteConstraints(site, siteLoc.location.label ?? ""), ctx === "Urbano" ? "piazza" : "vigneto") : [];
   const notes = useNotes();
   const f1 = (n: number) => n.toLocaleString("it-IT", { maximumFractionDigits: 1, minimumFractionDigits: 1 });

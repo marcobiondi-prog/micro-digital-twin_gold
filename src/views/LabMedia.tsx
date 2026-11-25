@@ -27,6 +27,7 @@ import { AI_STANDBY } from "@/lib/ai-standby";
 import { PREVIEW_BUILD } from "@/lib/demo-login";
 import { galleryMultiple, openSystemCamera, prepareSystemCamera, supportsSystemCapture } from "@/lib/system-camera";
 import { guardUse } from "@/lib/app-permissions";
+import { showSimMedia } from "@/views/v8/console";
 import { useRegisteredEmail } from "@/lib/use-signed-in";
 import { openSectorGate, useGuest, useProId } from "@/lib/use-pro-id";
 import { useLab } from "@/models/lab-store";
@@ -168,7 +169,8 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
   const cameraVideo = useRef<HTMLInputElement>(null);
   const [systemCamera, setSystemCamera] = useState<"photo" | "video" | "burst" | null>(null);
   const bodyId = `lab-media-body-${kind}`;
-  const closeSystemCamera = useCallback(() => setSystemCamera(null), []);
+  // Closing a camera brings the simulation back on its photos, where the shots are being added.
+  const closeSystemCamera = useCallback(() => { setSystemCamera(null); showSimMedia(kind); }, [kind]);
   // Loaded on its first opening (kept mounted afterwards).
   const [camUsed, setCamUsed] = useState(false);
   useEffect(() => { if (systemCamera) setCamUsed(true); }, [systemCamera]);
@@ -465,7 +467,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
         kind={kind}
         context={context}
         onCapture={(f) => void add(f)}
-        onClose={() => setAr(null)}
+        onClose={() => { setAr(null); showSimMedia(kind); }}
         onFallback={(m) => {
           setAr(null);
           openCamera(m);
