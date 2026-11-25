@@ -3,7 +3,9 @@ import { useSwipeBack } from "@/lib/use-swipe-back";
 import { useNavigate } from "@tanstack/react-router";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, BadgeCheck, Building2, Check, Grape, Lock, LogOut, Mail, ShieldCheck, UserRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, BadgeCheck, Building2, Check, Grape, Loader2, Lock, LogOut, Mail, Share2, ShieldCheck, UserRound } from "lucide-react";
+import { shareProfileCard } from "@/lib/share-profile-card";
+import { regionCrest, townCrest } from "@/lib/town-crest";
 import { useAccountAvatar } from "@/lib/account-avatar";
 import { clearLockAsk, dropProIdOnDevice, keepProIdInAccount, rememberWantedSector, saveProId, useAccountSector, useProId, openSectorGate } from "@/lib/use-pro-id";
 import { supabase } from "@/integrations/supabase/client";
@@ -405,7 +407,24 @@ export function ProfileCard({ kind, go }: { kind: ProKind; go?: () => void }) {
   // The office's official email (from the public administrations' register), else the usual pattern, marked indicative.
   const town = mine?.kind === "funzionario" ? mine : null;
   const officeMail = useOfficeEmail(town?.comune ?? "", town?.office ?? "", town?.istat);
+  const [sharing, setSharing] = useState(false);
   if (!mine) return null;
+  // The card shared as a picture (and its text) through the phone's own share window.
+  const share = async () => {
+    if (sharing) return;
+    setSharing(true);
+    try {
+      const crest = mine.kind === "funzionario" ? (mine.istat ? await townCrest(mine.istat) : null) : await regionCrest(mine.region);
+      const res = await shareProfileCard({
+        title: KIND_LABEL[kind],
+        place: mine.kind === "funzionario" ? `Comune di ${mine.comune}` : mine.region ? `Regione ${mine.region}` : null,
+        crest,
+        rows: profileRows(mine, town ? officeMail : undefined, accountEmail),
+        name: mine.name,
+      });
+      if (res === "saved") toast.success("Scheda salvata in Download", { description: "Il testo della scheda è anche copiato: incollalo dove vuoi." });
+    } finally { setSharing(false); }
+  };
   // Leaving the profile signs out of its personal account too and returns to the gate.
   const leave = () => leaveProfile();
   return (
@@ -428,6 +447,9 @@ export function ProfileCard({ kind, go }: { kind: ProKind; go?: () => void }) {
           <Icon className="size-5" aria-hidden="true" />Vai {kind === "agronomo" ? "al vigneto" : "alla piazza"}
         </button>
       )}
+      <button type="button" onClick={() => void share()} disabled={sharing} className="flex h-12 w-full items-center justify-center gap-2 rounded-full border border-foreground/20 text-[15px] font-semibold outline-none hover:bg-foreground/[0.06] focus-visible:ring-4 focus-visible:ring-ring/50 disabled:opacity-70">
+        {sharing ? <Loader2 className="size-5 animate-spin" aria-hidden="true" /> : <Share2 className="size-5" aria-hidden="true" />}Condividi la scheda
+      </button>
       <ProfileBioRow id={mine} />
       <button type="button" onClick={() => void leave()} className="flex h-11 w-full items-center justify-center gap-2 rounded-full text-sm font-semibold text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
         <LogOut className="size-4" aria-hidden="true" />Esci dal profilo
