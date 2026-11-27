@@ -407,6 +407,8 @@ export function addSimLayers(map: MlMap, _lat: number, raised = false) {
     map.addSource(SIM_TREES_3D, { type: "geojson", data: fc([]) });
     map.addLayer({ id: "sim-trees-3d", type: "fill-extrusion", source: SIM_TREES_3D, paint: { "fill-extrusion-color": ["get", "color"], "fill-extrusion-base": ["get", "base"], "fill-extrusion-height": ["get", "height"], "fill-extrusion-opacity": 1, "fill-extrusion-vertical-gradient": true } });
   } else {
+    // Two rings of spray widening from each sprinkler and fading (animateSprinklers), under its dot.
+    for (const id of ["sim-sprinkler-wave-a", "sim-sprinkler-wave-b"]) map.addLayer({ id, type: "circle", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "sprinkler"], paint: { "circle-color": "rgba(0,0,0,0)", "circle-radius": 6, "circle-stroke-color": "#5eead4", "circle-stroke-width": 2, "circle-stroke-opacity": 0.6 } }, before);
     map.addLayer({ id: "sim-sprinklers", type: "circle", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "sprinkler"], paint: { "circle-color": "#2dd4bf", "circle-opacity": 0.9, "circle-radius": 5, "circle-stroke-color": "#f0fdfa", "circle-stroke-width": 1.5 } }, before);
     map.addLayer({ id: "sim-misters", type: "circle", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "mister"], paint: { "circle-color": "#7dd3fc", "circle-opacity": 0.85, "circle-radius": 6, "circle-stroke-color": "#e0f2fe", "circle-stroke-width": 2 } }, before);
     map.addLayer({ id: "sim-trees", type: "circle", source: SIM_SOURCE, filter: ["==", ["get", "kind"], "tree"], paint: {
@@ -557,3 +559,24 @@ export const MAP_LOCALE: Record<string, string> = {
   "FullscreenControl.Enter": "Schermo intero",
   "FullscreenControl.Exit": "Esci dallo schermo intero",
 };
+
+/**
+ * The sprinklers animated on the 2D map (asked "anima gli innaffiatoi"): two rings of spray widening from each sprinkler
+ * to about 26 px and fading, half a cycle apart, about 12 times a second while the page is in front; none with reduced
+ * motion. Returns the stop.
+ */
+export function animateSprinklers(map: MlMap): () => void {
+  if (typeof window === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return () => {};
+  const id = window.setInterval(() => {
+    try {
+      if (document.visibilityState !== "visible" || !map.getLayer("sim-sprinkler-wave-a")) return;
+      const t = performance.now() / 1400;
+      for (const [layer, off] of [["sim-sprinkler-wave-a", 0], ["sim-sprinkler-wave-b", 0.5]] as const) {
+        const p = (t + off) % 1;
+        map.setPaintProperty(layer, "circle-radius", 6 + 20 * p);
+        map.setPaintProperty(layer, "circle-stroke-opacity", 0.7 * (1 - p));
+      }
+    } catch { window.clearInterval(id); } // the map was removed
+  }, 80);
+  return () => window.clearInterval(id);
+}

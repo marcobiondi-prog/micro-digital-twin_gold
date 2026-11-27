@@ -205,9 +205,7 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
         if (flat) out.push(absPoly({ fillColor: "rgba(45,212,191,0.24)", strokeColor: "rgba(45,212,191,0.7)", strokeWidth: 1 }, crownRing(sp, 3, 18), 0.24));
         else ground(crownRing(sp, 3, 18), "rgba(45,212,191,0.24)");
         if (!models) part({ ring: crownRing(sp, 0.12, 8), base: 0, height: 0.25, color: "#1f2937" });
-        part({ ring: crownRing(sp, 1.2, 14), base: 0.75, height: 0.79, color: "rgba(204,251,241,0.3)" }, 0.79, "rgba(45,212,191,0.6)", 1);
-        part({ ring: crownRing(sp, 2.2, 16), base: 0.5, height: 0.53, color: "rgba(204,251,241,0.2)" }, 0.53, "rgba(45,212,191,0.4)", 1);
-        part({ ring: crownRing(sp, 2.9, 18), base: 0.2, height: 0.22, color: "rgba(204,251,241,0.14)" }, 0.22, "rgba(45,212,191,0.3)", 1);
+        // The water itself is animated apart (the sprinklers effect in LocationMap3D): rings of spray and a turning jet.
       }
       // Each tree: a dark trunk, then three crown discs each ringed a deeper green, so the layers read as foliage.
       if (!models) for (const t of sim.data.trees) {
@@ -492,6 +490,47 @@ export function LocationMap3D({ lat, lng, label, apiKey, area = [], sim = null, 
     added.forEach((node) => map.append(node));
     return () => added.forEach((node) => node.remove());
   }, [state, areaKey, shadowKey, adjKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The sprinklers animated (asked "anima gli innaffiatoi"): per sprinkler, rings of spray leaving the head in an arc
+  // and widening to its 3 m circle as they fade, and a jet of water turning round once every 6 s — a few shapes moved
+  // about 10 times a second, only while the page is in front; still with reduced motion.
+  const sprKey = sim?.kind === "piazza" ? JSON.stringify(sim.data.sprinklers ?? []) : "";
+  useEffect(() => {
+    const map = mapRef.current, lib = libs.current;
+    if (state !== "ready" || !map || !lib?.Polygon3DElement || !sprKey || sim?.kind !== "piazza") return;
+    const spots = sim.data.sprinklers ?? [];
+    if (!spots.length) return;
+    const floor = adj, k = 111_320, RINGS = 3;
+    const at = (c: [number, number], dx: number, dz: number, h: number) => ({ lat: c[0] + floor.n / k - dz / k, lng: c[1] + (floor.e + dx) / (k * Math.cos((c[0] * Math.PI) / 180)), altitude: floor.h + h });
+    const circle = (c: [number, number], r: number, h: number) => Array.from({ length: 16 }, (_, i) => { const a = (i / 16) * Math.PI * 2; return at(c, Math.cos(a) * r, Math.sin(a) * r, h); });
+    type El = HTMLElement & { outerCoordinates?: unknown; coordinates?: unknown; fillColor?: string; strokeColor?: string };
+    const rings: Array<{ c: [number, number]; i: number; el: El }> = [], jets: Array<{ c: [number, number]; el: El }> = [];
+    for (const c of spots as Array<[number, number]>) {
+      for (let i = 0; i < RINGS; i++) {
+        const el = new lib.Polygon3DElement({ altitudeMode: "RELATIVE_TO_GROUND", fillColor: "rgba(204,251,241,0.25)", strokeColor: "rgba(94,234,212,0.6)", strokeWidth: 1, drawsOccludedSegments: true }) as El;
+        map.append(el); rings.push({ c, i, el });
+      }
+      if (lib.Polyline3DElement) {
+        const el = new lib.Polyline3DElement({ altitudeMode: "RELATIVE_TO_GROUND", strokeColor: "rgba(224,255,250,0.85)", strokeWidth: 3, drawsOccludedSegments: true }) as El;
+        map.append(el); jets.push({ c, el });
+      }
+    }
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const paint = (t: number) => {
+      for (const r of rings) {
+        const p = ((t / 1600) + r.i / RINGS) % 1, rad = 0.3 + 2.7 * p, h = 0.15 + 0.9 * Math.sin(Math.PI * p);
+        r.el.outerCoordinates = circle(r.c, rad, h);
+        r.el.fillColor = `rgba(204,251,241,${(0.3 * (1 - p)).toFixed(2)})`;
+        r.el.strokeColor = `rgba(94,234,212,${(0.7 * (1 - p)).toFixed(2)})`;
+      }
+      for (const j of jets) {
+        const a = (t / 6000) * Math.PI * 2;
+        j.el.coordinates = Array.from({ length: 9 }, (_, n) => { const q = n / 8, d = 2.9 * q; return at(j.c, Math.cos(a) * d, Math.sin(a) * d, 0.25 + 1.3 * q * (1 - q)); });
+      }
+    };
+    paint(0);
+    const id = still ? 0 : window.setInterval(() => { if (document.visibilityState === "visible") paint(performance.now()); }, 100);
+    return () => { window.clearInterval(id); rings.forEach((r) => r.el.remove()); jets.forEach((j) => j.el.remove()); };
+  }, [state, sprKey, adjKey]); // eslint-disable-line react-hooks/exhaustive-deps
   // The realistic models (views/v10/g3d-models): each placed model is kept by what it is and where it stands, so a
   // change lays only the ones that changed and leaves the others where they are.
   useEffect(() => {

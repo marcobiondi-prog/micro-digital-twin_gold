@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap, Marker } from "maplibre-gl";
 import type { Ring } from "@/models/place-area";
 import { MAX_PINS, initialRingAngle } from "@/models/drawn-area";
-import { addAreaLayers, addSimLayers, addTrailLayers, setTrails, liftWhileDragged, findElement, handleElement, personElement, rotateHandleElement, misterElement, placePinElement, ringCentre, tagElement, zoneTag, pinElement, setAreaData, setOutlineData, setSimData, setBedData, setSimGhost, type SimLayout, MAP_LOCALE } from "@/views/v10/map-area";
+import { addAreaLayers, addSimLayers, addTrailLayers, animateSprinklers, setTrails, liftWhileDragged, findElement, handleElement, personElement, rotateHandleElement, misterElement, placePinElement, ringCentre, tagElement, zoneTag, pinElement, setAreaData, setOutlineData, setSimData, setBedData, setSimGhost, type SimLayout, MAP_LOCALE } from "@/views/v10/map-area";
 import { ringContains } from "@/models/place-area";
 import type { LatLng } from "@/models/area-layout";
 
@@ -158,7 +158,7 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
         offKey = onKeyRejected(() => { setGoogleOn(false); for (const l of ["imagery", "places"]) if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "visible"); });
       }
       libRef.current = maplibregl;
-      map.on("load", () => { addAreaLayers(map); addSimLayers(map, lat); addTrailLayers(map); if (!cancelled) setState("ready"); });
+      map.on("load", () => { addAreaLayers(map); addSimLayers(map, lat); addTrailLayers(map); const stopSpr = animateSprinklers(map); map.once("remove", stopSpr); if (!cancelled) setState("ready"); });
       // The aiuole keep their stripes the same size on screen: laid again for the new zoom once it settles.
       // …and during the zoom too, so the grass never swells under the fingers.
       // Once per frame at most: only the aiuole's own light source is laid again.
