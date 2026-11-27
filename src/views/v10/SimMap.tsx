@@ -34,9 +34,10 @@ import { SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v1
 import type { MovedPart } from "@/views/v10/SatelliteMap2D";
 import { drawnAreaFor, freeM2, initialRingAngle, leversForZones, vineLeversForZones, vineLeversOfZones, VINE_ZONE_KINDS, leversOfZones, lotsOf, MAX_PINS, moveZones, pinsM2, rotateZone, surfaceText, usableM2, ZONE_KINDS, ZONE_LABEL, zoneName, zonesOfArea, type DrawnArea, type SubArea, type ZoneKind } from "@/models/drawn-area";
 import type { Ring } from "@/models/place-area";
-import { openSimTab, openSimAt, openSimAtArc, type SimKind } from "@/views/v8/console";
+import { openSimTab, openSimAt, openSimAtArc, useSimTab, type SimKind } from "@/views/v8/console";
 import { PlaceSearch, gpsFollowing, setGpsHold } from "@/views/SimulationGrid";
 import { useLivePosIf } from "@/lib/live-position";
+import { useWakeLock } from "@/lib/use-wake-lock";
 import { loadRealObjects } from "@/lib/real-objects-client";
 import { circleRing, realCountText, type RealObject } from "@/models/real-objects";
 import { findsCountText, useFieldFinds, type FieldFind } from "@/models/field-finds";
@@ -127,6 +128,9 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   const liveEdit = useLiveEdit(kind === "urban" ? "piazza" : "vigneto");
   // Drags in real time: this map's drags go to the colleagues, theirs come back as moving badges with fading trails.
   const remoteDrags = useRemoteDrags(kind === "urban" ? "piazza" : "vigneto");
+  // On the map the phone does not go to standby (asked): the screen stays on while the Mappa tab is open.
+  const simTab = useSimTab(kind);
+  useWakeLock(!preview && simTab === "mappa");
   useEffect(() => {
     if (preview) return;
     const on = (e: Event) => sendDrag(kind === "urban" ? "piazza" : "vigneto", (e as CustomEvent<MapDrag>).detail);

@@ -271,7 +271,7 @@ export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number },
         const ang = -r.yaw, c = Math.cos(ang), s = Math.sin(ang);
         for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
           const u = -r.w / 2 + (i + 0.5) * tw, v = -r.d / 2 + (j + 0.5) * td;
-          add(`bedtile:${kw}x${kd}`, r.cx + u * c - v * s, r.cz + u * s + v * c, r.yaw, () => realBed({ w: kw, d: kd }, { tile: true }), 0.1, 0.25);
+          add(`bedtile:${kw}x${kd}`, r.cx + u * c - v * s, r.cz + u * s + v * c, r.yaw, () => realBed({ w: kw, d: kd }, { tile: true }), 0.1, 0.55);
         }
       } else if (p.kind === "shade" && r.w >= 1 && r.d >= 1) {
         const w = half(r.w), d = half(r.d);

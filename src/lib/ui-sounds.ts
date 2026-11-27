@@ -168,3 +168,29 @@ export function installUiClicks(): () => void {
     document.removeEventListener("pointercancel", cancel, { capture: true });
   };
 }
+
+/**
+ * A water drop (synthesized, no file): a short sine falling quickly in pitch with a soft second "plip", for a shared
+ * project coming back in real time (lib/project-share). Never blocks: without audio it does nothing.
+ */
+export function playDrop(volume = 0.5): void {
+  try {
+    const ctx = audioContext();
+    if (!ctx) return;
+    if (ctx.state === "suspended") void ctx.resume();
+    const t = ctx.currentTime + 0.01;
+    const blip = (at: number, from: number, to: number, gain: number, len: number) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = "sine";
+      o.frequency.setValueAtTime(from, at);
+      o.frequency.exponentialRampToValueAtTime(to, at + len * 0.6);
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(gain * volume, at + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + len);
+      o.connect(g).connect(ctx.destination);
+      o.start(at); o.stop(at + len + 0.02);
+    };
+    blip(t, 1500, 520, 0.9, 0.16);
+    blip(t + 0.09, 1900, 900, 0.35, 0.1);
+  } catch { /* no audio */ }
+}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { playDrop } from "@/lib/ui-sounds";
 import type { ProjectKind } from "@/models/project-state";
 
 /**
@@ -102,7 +103,7 @@ export function usePresence(projectId: string | null, me: { id: string; name: st
     if (!projectId || !meId) { setOnline([]); publish(null, []); return; }
     const ch = supabase.channel(`project:${projectId}`, { config: { presence: { key: meId } } });
     chRef.current = ch;
-    let seen: Set<string> | null = null, retry: ReturnType<typeof setTimeout> | null = null;
+    let seen: Set<string> | null = null, retry: ReturnType<typeof setTimeout> | null = null, dropped = false;
     const read = () => {
       const st = ch.presenceState() as Record<string, Array<Partial<Online>>>;
       const list: Online[] = Object.entries(st).map(([id, metas]) => {
@@ -112,6 +113,8 @@ export function usePresence(projectId: string | null, me: { id: string; name: st
       // Dev only: the screenshot scripts add colleagues here (window.__mdtPresence), as Realtime cannot be mocked there.
       const fake = import.meta.env.DEV && typeof window !== "undefined" ? ((window as unknown as { __mdtPresence?: Online[] }).__mdtPresence ?? []) : [];
       const all = [...list, ...fake.filter((f) => !list.some((l) => l.user_id === f.user_id))];
+      // A colleague comes (back) in, or this device is back in after a drop: a water drop sound.
+      if (seen && all.some((o) => o.user_id !== meId && !seen!.has(o.user_id))) playDrop();
       if (seen) for (const o of all) if (o.user_id !== meId && !seen.has(o.user_id)) toast(`${o.name || "Un collaboratore"} è entrato nel progetto`, { id: `mdt-join-${o.user_id}`, description: `In diretta ${o.where || "nell’app"}.` });
       seen = new Set(all.map((o) => o.user_id));
       setOnline(all);
@@ -119,9 +122,14 @@ export function usePresence(projectId: string | null, me: { id: string; name: st
     };
     if (import.meta.env.DEV) setTimeout(read, 300);
     ch.on("presence", { event: "sync" }, read).subscribe((status) => {
-      if (status === "SUBSCRIBED") { ready.current = true; sent.current = ""; send(); return; }
+      if (status === "SUBSCRIBED") {
+        ready.current = true; sent.current = ""; send();
+        if (round > 0 || dropped) playDrop(); // back in the shared project after the connection dropped
+        dropped = false;
+        return;
+      }
       if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-        ready.current = false;
+        ready.current = false; dropped = true;
         if (!retry) retry = setTimeout(() => setRound((n) => n + 1), 15000);
       }
     });
