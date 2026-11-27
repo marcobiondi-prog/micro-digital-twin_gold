@@ -22,6 +22,7 @@ import { setUrban, setVineyard, useLab, useLabReadOnly, vineMetrics } from "@/mo
 import { projectSpots, useColleagues } from "@/lib/colleagues";
 import { sendDrag, useCurrentProject, useLiveEdit, useRemoteDrags, type LiveEdit } from "@/lib/project-sync";
 import { MAP_DRAG_EVENT, type MapDrag } from "@/views/v10/map-area";
+import { focusProjectArea, followGpsAgain } from "@/lib/gps-hold";
 import { initials, useProjectPeople, type Online, type Person } from "@/lib/project-share";
 import { shadeOpenness, piazzaLayout, piazzaShadows, vineShadows, TREE_SHADE_M2, vineLayout, type LayoutEdits, type PiazzaLayout } from "@/models/area-layout";
 import { dayLight, solarHour, sunAt, sunHeightDeg } from "@/models/sun-shadow";
@@ -73,6 +74,17 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   // Every account of a shared project shows on the 2D and 3D maps: by its GPS, else round the area's middle (projectSpots).
   const project = useCurrentProject(kind === "urban" ? "piazza" : "vigneto");
   const share = useProjectPeople(project.id, project.user);
+  // Not the administrator and the administrator is not connected (asked): on one's own — no project people on the map
+  // nor the project pill, and the GPS follows the phone where it really is (the project's place is never moved by it).
+  const myRole = share.people.find((p) => p.user_id === project.user)?.role;
+  const ownerId = share.people.find((p) => p.role === "owner")?.user_id;
+  const solo = !!myRole && myRole !== "owner" && !(ownerId && colleagues.some((o) => o.user_id === ownerId));
+  const [, setGpsTick] = useState(0);
+  useEffect(() => {
+    if (preview || !myRole || myRole === "owner") return;
+    if (solo) followGpsAgain(); else focusProjectArea();
+    setGpsTick((n) => n + 1);
+  }, [solo, preview, myRole]);
   const liveLoc = kind === "urban" ? lab.urban.location : lab.vineyard.location;
   // The maps follow the place, not every metre of it: a GPS fix settling a few metres away, or the same place saved again
   // under its street's name, rebuilt every map from scratch (each was keyed and built on the exact coordinates and
@@ -119,7 +131,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   // The live fix (lib/live-position) moves the pin and the camera fix by fix, saving nothing.
   // Drawing the area or a zone, or arranging: the GPS holds still (setGpsHold) and the map stops following the phone.
   const [drawHold, setDrawHold] = useState(false);
-  const following = !liveLoc.pending && !saved && gpsFollowing() && !drawHold;
+  const following = !liveLoc.pending && (!saved || solo) && gpsFollowing() && !drawHold;
   // Read only while following: a GPS fix (sent to the colleagues also while paused) never redraws the map otherwise.
   const livePos = useLivePosIf(following);
   const at = following ? [livePos?.lat ?? liveLoc.lat, livePos?.lng ?? liveLoc.lng] as [number, number] : pinFix ?? drawnCentre ?? centre ?? null;
@@ -139,6 +151,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   }, [kind, preview]);
   const trails = useMemo(() => remoteDrags.map((d) => d.path), [remoteDrags]);
   const people = useMemo(() => {
+    if (solo) return gpsPeople;
     const base = [...gpsPeople, ...projectSpots(share.people, colleagues, gpsPeople, project.user, drawnCentre ? { lat: drawnCentre[0], lng: drawnCentre[1] } : pin)]
       // The one changing something stands where the change is, not also in the middle of the area.
       .filter((p) => !(liveEdit && p.id.startsWith(`${liveEdit.by}|`)) && !remoteDrags.some((d) => p.id.startsWith(`${d.by}|`)));
@@ -151,7 +164,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
     return [...base, { id: `edit:${liveEdit.by}:${liveEdit.what}`, name: liveEdit.name, avatar: null, lat: at[0], lng: at[1], note: `✎ ${liveEdit.what}` }];
   },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [gpsPeople, share.people, colleagues, project.user, drawnCentre?.[0], drawnCentre?.[1], pin.lat, pin.lng, liveEdit, remoteDrags]);
+    [gpsPeople, share.people, colleagues, project.user, drawnCentre?.[0], drawnCentre?.[1], pin.lat, pin.lng, liveEdit, remoteDrags, solo]);
   const movePin = (lat: number, lng: number) => { setPinFix(loc.lat, loc.lng, [lat, lng]); toast.success("Pin spostato", { description: "Resta qui per questo luogo, anche in 3D." }); };
   const [drawing, setDrawing] = useState(false);
   const [draft, setDraft] = useState<Ring>([]);
@@ -459,7 +472,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
       <div data-sim-map-box="" data-map-gestures={show3d ? "" : undefined} className="relative -mx-4 h-[52vh] min-h-72 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
         {/* The temperature the interventions bring, on the map itself (2D and 3D), following the levers live. */}
         <MapReading kind={kind} lat={pin.lat} lng={pin.lng} />
-        <LiveColleagues me={project.user} people={share.people} list={colleagues} spots={gpsPeople} edit={remoteDrags[0] ? { kind: kind === "urban" ? "piazza" : "vigneto", by: remoteDrags[0].by, name: remoteDrags[0].name, what: `sposta ${remoteDrags[0].label}`, at: null, time: remoteDrags[0].time } : liveEdit} />
+        {!solo && <LiveColleagues me={project.user} people={share.people} list={colleagues} spots={gpsPeople} edit={remoteDrags[0] ? { kind: kind === "urban" ? "piazza" : "vigneto", by: remoteDrags[0].by, name: remoteDrags[0].name, what: `sposta ${remoteDrags[0].label}`, at: null, time: remoteDrags[0].time } : liveEdit} />}
         {/* How many misting poles the map shows, exactly: those in the zones drawn for them and those the app placed. */}
         {sim?.kind === "piazza" && sim.data.misters.length > 0 && !drawing && (
           <p role="status" className="pointer-events-none absolute left-1/2 top-12 z-[3] -translate-x-1/2 whitespace-nowrap rounded-full bg-black/45 px-3 py-1 text-[12px] font-semibold text-white ring-1 ring-white/15 backdrop-blur-sm [text-shadow:0_1px_2px_rgb(0_0_0/.6)]">
@@ -475,7 +488,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
           ? <Suspense fallback={<div className="h-full w-full bg-card" />}><MapLight kind={kind} lat={pin.lat} lng={pin.lng}>{key
             ? <LocationMap3D key={`map3d-${kind}`} people={people} follow={following} lat={pin.lat} lng={pin.lng} label={name ?? ""} apiKey={key} area={ring} sim={sim} />
             : <OpenMap3D key={`openmap3d-${kind}`} people={people} follow={following} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />}</MapLight></Suspense>
-          : <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`map2d-${kind}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} people={people} trails={trails} drawing={drawing || drawingZone}
+          : <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`map2d-${kind}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} people={people} trails={trails} follow={following} drawing={drawing || drawingZone}
             onAreaChange={drawingZone ? setZoneDraft : setDraft} sim={editingZone && sim ? { ...sim, inner: (sim.inner ?? []).filter((z) => z.id !== editingZone) } : sim} arranging={arranging} onMove={moved} proposal={proposal}
             outline={drawingZone ? saved?.ring ?? null : null} onOutside={() => toast("La zona va dentro l’area disegnata")} onPinMove={arranging ? undefined : movePin} /></Suspense>}
       </div>

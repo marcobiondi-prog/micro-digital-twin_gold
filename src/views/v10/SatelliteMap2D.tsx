@@ -44,7 +44,7 @@ type MaxZoom = { getMaxZoomAtLatLng: (at: { lat: number; lng: number }) => Promi
 /** Until the service answers: a closeness Google has nearly everywhere, so the map never opens on its grey "no imagery" tiles. */
 const GOOGLE_SAFE = 19;
 
-export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawing = false, onAreaChange, sim = null, arranging = false, onMove, outline = null, onOutside, onPinMove, still = false, proposal = false, people = [], trails = [] }: {
+export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawing = false, onAreaChange, sim = null, arranging = false, onMove, outline = null, onOutside, onPinMove, still = false, proposal = false, people = [], trails = [], follow = false }: {
   /** The browser key: with it the 2D map uses Google's satellite imagery, like the 3D view. */
   apiKey?: string | undefined;
   lat: number; lng: number; label: string; zoom: number; area?: Ring; drawing?: boolean; onAreaChange?: (ring: Ring) => void;
@@ -58,6 +58,8 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
   proposal?: boolean; still?: boolean;
   /** Progetti condivisi: colleagues connected now, shown where they stand (their GPS) as named dots. */
   people?: Array<{ id: string; name: string; avatar: string | null; lat: number; lng: number; note?: string; away?: boolean }>;
+  /** The map follows the phone's GPS (the pin is the live fix): it opens on the pin, not framed on the area. */
+  follow?: boolean;
   /** The colleagues' drags now (shared project), each a path of [lng, lat]: drawn as fading trails. */
   trails?: Array<Array<[number, number]>>;
 }) {
@@ -276,6 +278,7 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
   const framed = useRef(false);
   useEffect(() => {
     if (still || drawing || state !== "ready" || framed.current) return;
+    if (follow) { framed.current = true; mapRef.current?.jumpTo({ center: [lng, lat] }); return; }
     if (frameArea(0)) framed.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [still, drawing, state, area.length >= 3]);

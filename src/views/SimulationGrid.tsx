@@ -2,7 +2,7 @@ import { FormEvent, Suspense, lazy, useEffect, useRef, useState, type ReactNode 
 import { appAllowed, guardUse, useAppAllowed } from "@/lib/app-permissions";
 import { setLivePos } from "@/lib/live-position";
 import { sharedNow } from "@/lib/project-sync";
-import { FOCUS_AREA_EVENT, FOLLOW_GPS_EVENT, GPS_PAUSE_KEY } from "@/lib/gps-hold";
+import { FOCUS_AREA_EVENT, FOLLOW_GPS_EVENT, GPS_PAUSE_KEY, gpsFollowWanted } from "@/lib/gps-hold";
 import { useServerFn } from "@tanstack/react-start";
 import { CloudSun, Droplets, Grape, LoaderCircle, LocateFixed, Lock, Satellite, MapPin, Search, Sprout, Thermometer, TreePine, TrendingDown, Umbrella, Undo2 } from "lucide-react";
 import { Card, StatusBadge } from "@/views/health";
@@ -194,7 +194,8 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
   // drawn stays put (the GPS on but paused, "Seguimi di nuovo" to follow), so opening the map never takes the
   // simulation away from the piazza or vineyard being designed.
   const keepRef = useRef(keepPlace); keepRef.current = keepPlace;
-  useEffect(() => { if (readGps() && appAllowed("posizione")) { const keep = keepRef.current; saveGpsPaused(keep); setLocating(true); setGps(true); setPaused(keep); } }, []);
+  const sharedRef = useRef(shared); sharedRef.current = shared;
+  useEffect(() => { if (readGps() && appAllowed("posizione")) { const keep = keepRef.current && !(sharedRef.current && gpsFollowWanted()); saveGpsPaused(keep); setLocating(true); setGps(true); setPaused(keep); } }, []);
   // Position revoked inside the app (Account → Autorizzazioni): the GPS goes off at once.
   const positionAllowed = useAppAllowed("posizione");
   useEffect(() => {
@@ -224,6 +225,8 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
       // The map's own pin and camera use it only while following (SimMap gpsFollowing).
       setLivePos({ lat: here.lat, lng: here.lng, acc, at: Date.now() });
       if (pausedRef.current || gpsHold) return;
+      // A project shared with this account: the GPS shows where the phone is but never moves the project's place.
+      if (sharedRef.current) return;
 
       // Every fix moves only the live position (the map's pin and camera follow it, nothing is saved, nothing rebuilt),
       // like a car's navigation map. The simulation's place moves only on the first fix, or once the phone has really
