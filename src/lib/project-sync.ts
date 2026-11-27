@@ -225,6 +225,8 @@ function setLiveEdit(e: LiveEdit | null) {
   if (e) liveTimer = setTimeout(() => setLiveEdit(null), LIVE_SHOW_MS);
 }
 const LIVE_SHOW_MS = 7000;
+// Dev only: window.__mdtDrag(kind, payload) shows a colleague's drag.
+if (import.meta.env.DEV && typeof window !== "undefined") (window as unknown as { __mdtDrag?: (k: ProjectKind, p: unknown) => void }).__mdtDrag = (k, p) => onRemoteDrag(k, p as Parameters<typeof onRemoteDrag>[1]);
 // Dev only: the screenshot scripts show a colleague's change (Realtime cannot be mocked there).
 if (import.meta.env.DEV && typeof window !== "undefined") (window as unknown as { __mdtLiveEdit?: typeof setLiveEdit }).__mdtLiveEdit = setLiveEdit;
 export function useLiveEdit(kind: ProjectKind): LiveEdit | null {
@@ -259,7 +261,8 @@ async function refreshLive() {
       setLiveEdit({ kind, by: payload.by.id, name: payload.by.name, what: change.what, at: change.at, time: Date.now() });
       // The first change after a while brings the map to the area of intervention (not at every drag).
       if (Date.now() - focusedAt > 60_000) { focusedAt = Date.now(); focusProjectArea(); }
-    }).subscribe((status) => { live.ready = status === "SUBSCRIBED"; });
+    }).on("broadcast", { event: "drag" }, ({ payload }: { payload: Parameters<typeof onRemoteDrag>[1] }) => onRemoteDrag(kind, payload))
+      .subscribe((status) => { live.ready = status === "SUBSCRIBED"; });
   }
 }
 
@@ -278,3 +281,40 @@ function broadcastEdit(kind: ProjectKind) {
   else if (!sendTimers[kind]) sendTimers[kind] = setTimeout(go, wait);
 }
 const isLabReadOnlyKind = (kind: ProjectKind) => isLabReadOnly(kind);
+
+/**
+ * Drags in real time: while someone drags an element on the 2D map of a shared project (map-area MAP_DRAG_EVENT, sent
+ * by SimMap), its spot goes to the others about 8 times a second; they see the person's badge move there with a fading
+ * trail behind it (useRemoteDrags), until let go.
+ */
+export type RemoteDrag = { by: string; name: string; label: string; path: Array<[number, number]>; end: boolean; time: number };
+const drags = new Map<string, RemoteDrag>();
+let dragList: RemoteDrag[] = [];
+const dragSubs = new Set<() => void>();
+const dragKind = new Map<string, ProjectKind>();
+function publishDrags() { dragList = [...drags.values()]; dragSubs.forEach((f) => f()); }
+export function useRemoteDrags(kind: ProjectKind): RemoteDrag[] {
+  const all = useSyncExternalStore((f) => { dragSubs.add(f); return () => { dragSubs.delete(f); }; }, () => dragList, () => dragList);
+  return all.filter((d) => dragKind.get(d.by) === kind);
+}
+function onRemoteDrag(kind: ProjectKind, p: { by?: { id: string; name: string }; label?: string; lat?: number; lng?: number; end?: boolean }) {
+  if (!p.by || p.by.id === me?.id || typeof p.lat !== "number" || typeof p.lng !== "number") return;
+  const prev = drags.get(p.by.id);
+  const path = prev && !prev.end && Date.now() - prev.time < 4000 ? [...prev.path, [p.lng, p.lat] as [number, number]].slice(-40) : [[p.lng, p.lat] as [number, number]];
+  drags.set(p.by.id, { by: p.by.id, name: p.by.name, label: p.label ?? "un elemento", path, end: !!p.end, time: Date.now() });
+  dragKind.set(p.by.id, kind);
+  publishDrags();
+  const id = p.by.id, at = Date.now();
+  // Let go (or silent): the trail stays a moment, then goes.
+  setTimeout(() => { const d = drags.get(id); if (d && d.time === at) { drags.delete(id); publishDrags(); } }, p.end ? 1500 : 4000);
+}
+const dragSentAt: Partial<Record<ProjectKind, number>> = {};
+const dragTimers: Partial<Record<ProjectKind, ReturnType<typeof setTimeout>>> = {};
+export function sendDrag(kind: ProjectKind, d: { label: string; lat: number; lng: number; end: boolean }) {
+  const live = lives[kind];
+  if (!live?.ready || !me || isLabReadOnly(kind)) return;
+  const go = () => { delete dragTimers[kind]; dragSentAt[kind] = Date.now(); void live.ch.send({ type: "broadcast", event: "drag", payload: { by: me, ...d } }); };
+  if (dragTimers[kind]) { clearTimeout(dragTimers[kind]); delete dragTimers[kind]; }
+  const wait = 120 - (Date.now() - (dragSentAt[kind] ?? 0));
+  if (d.end || wait <= 0) go(); else dragTimers[kind] = setTimeout(go, wait);
+}

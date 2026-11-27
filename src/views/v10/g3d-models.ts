@@ -194,9 +194,12 @@ export function modelUrl(key: string, build: () => THREE.Object3D | Promise<THRE
 const half = (v: number) => Math.max(0.5, Math.round(v * 2) / 2);
 // Pieces of vine row and of pipe, each a model at its own ground height. Fewer vine pieces than before (400 froze the
 // photographic 3D on phones: it would not pan); the pipes in short pieces so a drip line follows a hilly ground.
-const VINE_PIECE_M = 6, MAX_VINE_PIECES = 200, DRIP_PIECE_M = 1.5, MAX_DRIP_PIECES = 320;
+const VINE_PIECE_M = 6, MAX_VINE_PIECES = 140, DRIP_PIECE_M = 1.5, MAX_DRIP_PIECES = 140;
 /** The side of the bed tiles (m): small enough to follow a hilly ground, large enough to keep the models few. */
 export const BED_TILE_M = 1;
+// At most this many bed tiles in all: 2.000 m² of aiuole made 2.000 models and froze Google's 3D (it stopped drawing and
+// would not pan). Past it the tiles grow, so a large lawn stays a few hundred models.
+const MAX_BED_TILES = 160;
 const deg = (yaw: number) => ((-yaw * 180) / Math.PI + 360) % 360;
 
 /**
@@ -219,12 +222,14 @@ export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number },
     // The shade strips joined into blocks first (shadePatchBlocks), so the sails stand along each block's edge; a
     // block or bed turned by hand on the map keeps that orientation.
     const shadeRings = shadePatchBlocks(L.patches.filter((p) => p.kind === "shade"));
+    const lawnM2 = L.patches.filter((p) => p.kind === "lawn").reduce((sum, p) => { const r = rectOf(p.ring.map(xz), xzAngleOf(p.ring, p.angle, xz)); return sum + r.w * r.d; }, 0);
+    const tileM = Math.max(BED_TILE_M, Math.sqrt(lawnM2 / (lite ? MAX_BED_TILES / 2 : MAX_BED_TILES)));
     for (const p of [...L.patches.filter((q) => q.kind !== "shade"), ...shadeRings.map((b) => ({ kind: "shade" as const, ring: b.ring, angle: b.angle }))]) {
       const r = rectOf(p.ring.map(xz), xzAngleOf(p.ring, p.angle, xz));
       if (p.kind === "lawn" && r.w >= 0.8 && r.d >= 0.8) {
         // Laid in small tiles, each at its own ground height: one flat bed many metres long sat at the ground's height
         // under its middle and the waves of a hilly ground covered it. The tiles of one size share one light model.
-        const nx = Math.max(1, Math.ceil(r.w / BED_TILE_M)), ny = Math.max(1, Math.ceil(r.d / BED_TILE_M));
+        const nx = Math.max(1, Math.ceil(r.w / tileM)), ny = Math.max(1, Math.ceil(r.d / tileM));
         const tw = r.w / nx, td = r.d / ny, kw = half(tw), kd = half(td);
         const ang = -r.yaw, c = Math.cos(ang), s = Math.sin(ang);
         for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {

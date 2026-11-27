@@ -42,12 +42,41 @@ export function setAreaData(map: MlMap, ring: Ring, closed = true) {
 }
 
 /**
- * What is being dragged on the 2D map is lifted (a little larger, a soft turquoise glow) until let go: a CSS class on the
- * marker's own element, nothing drawn on the map (the dashed trail it replaced redrew a line at every move).
+ * Trails (scie) on the 2D map: behind what is being dragged — here, or by a colleague on another device — a solid line
+ * fading from nothing at its tail to a bright turquoise head (line-gradient), no dashes. One source holds every trail.
  */
-export function liftWhileDragged(m: { on: (e: string, f: () => void) => unknown; getElement: () => HTMLElement }) {
-  m.on("dragstart", () => m.getElement().classList.add("map-dragging"));
-  m.on("dragend", () => m.getElement().classList.remove("map-dragging"));
+export const TRAIL_SOURCE = "drag-trails";
+export function addTrailLayers(map: MlMap) {
+  if (map.getSource(TRAIL_SOURCE)) return;
+  map.addSource(TRAIL_SOURCE, { type: "geojson", lineMetrics: true, data: { type: "FeatureCollection", features: [] } });
+  const fade = ["interpolate", ["linear"], ["line-progress"], 0, "rgba(45,212,191,0)", 0.6, "rgba(45,212,191,0.45)", 1, "rgba(153,246,228,0.95)"];
+  map.addLayer({ id: "drag-trail-glow", type: "line", source: TRAIL_SOURCE, layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-width": 12, "line-blur": 6, "line-gradient": fade as never, "line-opacity": 0.55 } });
+  map.addLayer({ id: "drag-trail-core", type: "line", source: TRAIL_SOURCE, layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-width": 4, "line-gradient": fade as never } });
+}
+/** Every trail now (each a path of [lng, lat], oldest first). */
+export function setTrails(map: MlMap, paths: Array<Array<[number, number]>>) {
+  const features = paths.filter((p) => p.length >= 2).map((coordinates) => ({ type: "Feature" as const, properties: {}, geometry: { type: "LineString" as const, coordinates } }));
+  (map.getSource(TRAIL_SOURCE) as GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features });
+}
+
+/** A drag on the 2D map, said to the page (SimMap sends it to the colleagues of a shared project). */
+export const MAP_DRAG_EVENT = "mdt-map-drag";
+export type MapDrag = { label: string; lat: number; lng: number; end: boolean };
+
+/**
+ * What is being dragged on the 2D map is lifted (a little larger, a soft turquoise glow, on top) and leaves a fading
+ * trail behind it until let go; every move is also said as MAP_DRAG_EVENT so a shared project shows it live elsewhere.
+ */
+export function liftWhileDragged(m: { on: (e: string, f: () => void) => unknown; getElement: () => HTMLElement; getLngLat: () => { lng: number; lat: number } }, label = "un elemento", trail?: (path: Array<[number, number]> | null) => void) {
+  let path: Array<[number, number]> = [];
+  const say = (end: boolean) => { const p = m.getLngLat(); window.dispatchEvent(new CustomEvent<MapDrag>(MAP_DRAG_EVENT, { detail: { label, lat: p.lat, lng: p.lng, end } })); };
+  m.on("dragstart", () => { m.getElement().classList.add("map-dragging"); const p = m.getLngLat(); path = [[p.lng, p.lat]]; say(false); });
+  m.on("drag", () => {
+    const p = m.getLngLat(), last = path[path.length - 1];
+    if (!last || Math.hypot(p.lng - last[0], p.lat - last[1]) > 0.000004) { path.push([p.lng, p.lat]); if (path.length > 40) path.shift(); trail?.(path); }
+    say(false);
+  });
+  m.on("dragend", () => { m.getElement().classList.remove("map-dragging"); say(true); trail?.(null); });
 }
 
 /** A pin of the area: a white dot with a dark ring and its number, big enough to grab with a finger. */

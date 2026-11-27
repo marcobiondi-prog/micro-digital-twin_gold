@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap, Marker } from "maplibre-gl";
 import type { Ring } from "@/models/place-area";
 import { MAX_PINS, initialRingAngle } from "@/models/drawn-area";
-import { addAreaLayers, addSimLayers, liftWhileDragged, findElement, handleElement, personElement, rotateHandleElement, misterElement, placePinElement, ringCentre, tagElement, zoneTag, pinElement, setAreaData, setOutlineData, setSimData, setBedData, setSimGhost, type SimLayout, MAP_LOCALE } from "@/views/v10/map-area";
+import { addAreaLayers, addSimLayers, addTrailLayers, setTrails, liftWhileDragged, findElement, handleElement, personElement, rotateHandleElement, misterElement, placePinElement, ringCentre, tagElement, zoneTag, pinElement, setAreaData, setOutlineData, setSimData, setBedData, setSimGhost, type SimLayout, MAP_LOCALE } from "@/views/v10/map-area";
 import { ringContains } from "@/models/place-area";
 import type { LatLng } from "@/models/area-layout";
 
@@ -44,7 +44,7 @@ type MaxZoom = { getMaxZoomAtLatLng: (at: { lat: number; lng: number }) => Promi
 /** Until the service answers: a closeness Google has nearly everywhere, so the map never opens on its grey "no imagery" tiles. */
 const GOOGLE_SAFE = 19;
 
-export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawing = false, onAreaChange, sim = null, arranging = false, onMove, outline = null, onOutside, onPinMove, still = false, proposal = false, people = [] }: {
+export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawing = false, onAreaChange, sim = null, arranging = false, onMove, outline = null, onOutside, onPinMove, still = false, proposal = false, people = [], trails = [] }: {
   /** The browser key: with it the 2D map uses Google's satellite imagery, like the 3D view. */
   apiKey?: string | undefined;
   lat: number; lng: number; label: string; zoom: number; area?: Ring; drawing?: boolean; onAreaChange?: (ring: Ring) => void;
@@ -58,6 +58,8 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
   proposal?: boolean; still?: boolean;
   /** Progetti condivisi: colleagues connected now, shown where they stand (their GPS) as named dots. */
   people?: Array<{ id: string; name: string; avatar: string | null; lat: number; lng: number; note?: string; away?: boolean }>;
+  /** The colleagues' drags now (shared project), each a path of [lng, lat]: drawn as fading trails. */
+  trails?: Array<Array<[number, number]>>;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const under = useRef<HTMLDivElement>(null);
@@ -79,6 +81,11 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
   // The latest pins, mode and callback for the map's own handlers.
   const live = useRef({ area, drawing, onAreaChange, outline, onOutside });
   live.current = { area, drawing, onAreaChange, outline, onOutside };
+  // The trails: the one behind what is dragged here, and the colleagues' ones (trails prop), drawn together.
+  const myTrail = useRef<Array<[number, number]> | null>(null);
+  const otherTrails = useRef(trails); otherTrails.current = trails;
+  const paintTrails = () => { const map = mapRef.current; if (map?.getSource("drag-trails")) setTrails(map, [...(myTrail.current ? [myTrail.current] : []), ...otherTrails.current]); };
+  const trailOf = (path: Array<[number, number]> | null) => { myTrail.current = path ? [...path] : null; paintTrails(); };
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [googleOn, setGoogleOn] = useState(false);
   // The map turned away from north (Google's own credits are then outside the box: said in a corner instead).
@@ -151,7 +158,7 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
         offKey = onKeyRejected(() => { setGoogleOn(false); for (const l of ["imagery", "places"]) if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "visible"); });
       }
       libRef.current = maplibregl;
-      map.on("load", () => { addAreaLayers(map); addSimLayers(map, lat); if (!cancelled) setState("ready"); });
+      map.on("load", () => { addAreaLayers(map); addSimLayers(map, lat); addTrailLayers(map); if (!cancelled) setState("ready"); });
       // The aiuole keep their stripes the same size on screen: laid again for the new zoom once it settles.
       // …and during the zoom too, so the grass never swells under the fingers.
       // Once per frame at most: only the aiuole's own light source is laid again.
@@ -169,7 +176,7 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
       });
       // A tile that does not arrive leaves a gap, not an error: the map stays usable.
       const pinMarker = new maplibregl.Marker({ element: placePinElement(), anchor: "bottom", draggable: !!pinMoveRef.current && !live.current.drawing }).setLngLat([lng, lat]).setPopup(new maplibregl.Popup({ offset: 38 }).setText(label)).addTo(map);
-      liftWhileDragged(pinMarker);
+      liftWhileDragged(pinMarker, "il pin del luogo", trailOf);
       pinMarker.on("dragend", () => {
         const p = pinMarker.getLngLat();
         draggedTo.current = `${p.lat},${p.lng}`;
@@ -210,7 +217,7 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
     pins.current.forEach((m) => m.remove());
     pins.current = (still ? [] : area).map(([pLat, pLng], i) => {
       const m = new lib.Marker({ element: pinElement(i + 1, drawing), draggable: drawing }).setLngLat([pLng, pLat]).addTo(map);
-      liftWhileDragged(m);
+      liftWhileDragged(m, `il punto ${i + 1} dell’area`, trailOf);
       m.on("drag", () => {
         const p = m.getLngLat();
         const next = live.current.area.map((q, j): [number, number] => (j === i ? [p.lat, p.lng] : q));
@@ -264,6 +271,8 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
     return () => window.removeEventListener(FOCUS_AREA_EVENT, focus);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [still, area]);
+  const trailsKey = trails.map((t) => t.length && t[t.length - 1]!.join(",")).join("|");
+  useEffect(() => { if (state === "ready") paintTrails(); }, [state, trailsKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const framed = useRef(false);
   useEffect(() => {
     if (still || drawing || state !== "ready" || framed.current) return;
@@ -288,14 +297,14 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
     // The AI camera's finds, draggable to put their spot right.
     if (sim && !drawing) for (const f of sim.finds ?? []) {
       const m = new lib.Marker({ element: findElement(f), draggable: true }).setLngLat([f.lng, f.lat]).addTo(map);
-      liftWhileDragged(m);
+      liftWhileDragged(m, "un rilevamento", trailOf);
       m.on("dragend", () => { const q = m.getLngLat(); moveFind(f.id, q.lat, q.lng); });
       handles.current.push(m);
     }
     if (!arranging || drawing || !sim) return;
     const add = (at: LatLng, label: string | null, done: (to: LatLng) => void) => {
       const m = new lib.Marker({ element: handleElement(label), draggable: true }).setLngLat([at[1], at[0]]).addTo(map);
-      liftWhileDragged(m);
+      liftWhileDragged(m, label ? label.replace(/^✥\s*/, "") : "un albero", trailOf);
       m.on("dragend", () => { const p = m.getLngLat(); done([p.lat, p.lng]); });
       handles.current.push(m);
     };
@@ -306,7 +315,7 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
     const addRot = (c: LatLng, angle: number, r: number, label: string, done: (angle: number) => void) => {
       const at: LatLng = [c[0] + (Math.sin(angle) * r) / 111_195, c[1] + (Math.cos(angle) * r) / kLng(c[0])];
       const m = new lib.Marker({ element: rotateHandleElement(label), draggable: true }).setLngLat([at[1], at[0]]).addTo(map);
-      liftWhileDragged(m);
+      liftWhileDragged(m, `l’orientamento di ${label.toLowerCase()}`, trailOf);
       m.on("dragend", () => { const p = m.getLngLat(); done(Math.atan2((p.lat - c[0]) * 111_195, (p.lng - c[1]) * kLng(c[0]))); });
       handles.current.push(m);
     };
