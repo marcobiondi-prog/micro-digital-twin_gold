@@ -23,7 +23,8 @@ import { simOnly, useSimMedia } from "@/models/sim-hidden";
 import { scanReportRows, useArScans } from "@/models/ar-scan-log";
 import { noise } from "@/models/data";
 import { splitLocation } from "@/views/SimulationGrid";
-import { ChevronRight, MapPin } from "lucide-react";
+import { ChevronRight, MapPin, Users } from "lucide-react";
+import { useSharedOpen } from "@/lib/project-sync";
 import { setVineyard, splitLabel, urbanMetrics, useLab, vineMetrics } from "@/models/lab-store";
 import { LabSyncIndicator } from "@/views/LabSyncIndicator";
 import { Fold, FoldTabs } from "@/views/Fold";
@@ -883,16 +884,25 @@ function Dashboard() {
   const proId = useProId();
   // Identified, the dashboard is that profile's project only: the piazza for the municipal officer, the vineyard for the agronomist.
   const own: "Piazza" | "Vigneto" | null = proId ? (proId.kind === "funzionario" ? "Piazza" : "Vigneto") : null;
-  const t = own ?? asked;
-  const setT = (v: "Piazza" | "Vigneto") =>
-    navigate({ search: (prev) => ({ ...prev, tab: v }), replace: true, resetScroll: false });
+  // Progetti condivisi: a project of the other sector shared with this account (an officer invited to a vineyard) shows
+  // here too, as a second tab beside the profile's own.
+  const other: "Piazza" | "Vigneto" | null = own ? (own === "Piazza" ? "Vigneto" : "Piazza") : null;
+  const sharedOther = useSharedOpen(other === "Vigneto" ? "vigneto" : "piazza") === true && !!other;
+  // The shared one only when asked by name (?tab=…): the profile's own stays the default.
+  const askedByName = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === other;
+  const [pick, setPick] = useState<"Piazza" | "Vigneto" | null>(null);
+  const t = own ? (sharedOther && (pick ?? (askedByName ? other : own)) === other ? other! : own) : asked;
+  const setT = (v: "Piazza" | "Vigneto") => {
+    setPick(v);
+    void navigate({ search: (prev) => ({ ...prev, tab: v }), replace: true, resetScroll: false });
+  };
   // One project: no tabs to swipe (the swipe listens to a ref that stays empty).
   const noSwipe = useRef<HTMLDivElement>(null);
-  const swipe = useTabSwipe(["Piazza", "Vigneto"] as const, t, setT, own ? noSwipe : undefined);
+  const swipe = useTabSwipe(["Piazza", "Vigneto"] as const, t, setT, own && !sharedOther ? noSwipe : undefined);
   const loading = useDashboardLoading(t);
   // Each project shows only to its profile (the piazza to the municipal officer, the vineyard to the agronomist).
   const guestOnly = useGuestOnly();
-  const sectionOpen = useSectionOpen(t === "Piazza" ? "urban" : "vineyard") !== false;
+  const sectionOpen = useSectionOpen(t === "Piazza" ? "urban" : "vineyard") !== false || (sharedOther && t === other);
   return (
     <div className="min-w-0">
       <Ambient tone={t === "Piazza" ? "rgb(28 112 210 / 0.38)" : "rgb(150 36 110 / 0.38)"} />
@@ -909,7 +919,16 @@ function Dashboard() {
           </span>
           <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
         </Link>
-      ) : (
+      ) : null}
+      {proId && sharedOther ? (
+        // The profile's own project and the one of the other sector shared with this account.
+        <div className="sticky top-[var(--nav-h)] z-[999999998] isolate -mt-2 mb-5 min-w-0 bg-transparent py-2 backdrop-blur-xl sm:mb-6">
+          <TabRow fill label="Progetti" value={t} onChange={setT} items={[
+            { id: own!, label: own === "Piazza" ? "La tua piazza" : "Il tuo vigneto", icon: own === "Piazza" ? Building2 : Grape },
+            { id: other!, label: other === "Piazza" ? "Piazza condivisa" : "Vigneto condiviso", icon: Users },
+          ]} />
+        </div>
+      ) : proId ? null : (
         <div className="sticky top-[var(--nav-h)] transition-[top] duration-300 z-[999999998] isolate mx-[calc(50%-50vw)] mb-5 mt-3 min-w-0 bg-transparent px-0 py-2 sm:px-[calc(50vw-50%)] md:mx-[calc(50%-var(--page-w,100vw)/2+2.5rem)] md:px-[calc(var(--page-w,100vw)/2-2.5rem-50%)] lg:mx-[calc(50%-var(--page-w,100vw)/2+7.5rem)] lg:px-[calc(var(--page-w,100vw)/2-7.5rem-50%)] backdrop-blur-xl slate-bleed sm:mb-6">
           <TabRow fill label="Dashboard" items={[{ id: "Piazza", label: "Piazza", icon: Building2 }, { id: "Vigneto", label: "Vigneto", icon: Grape }]} value={t} onChange={setT} />
         </div>
