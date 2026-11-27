@@ -177,7 +177,7 @@ async function toDataUrl(obj: THREE.Object3D, glow: number, lite = false): Promi
  * done once per device; the next openings lay the models straight away. Builds wait for an idle moment and run one at
  * a time, with a pause between them (longer on phones), so the map keeps moving under the finger.
  */
-const MODEL_STORE_V = 1;
+const MODEL_STORE_V = 2; // 2: high-poly bed tiles
 let dbP: Promise<IDBDatabase | null> | null = null;
 function db(): Promise<IDBDatabase | null> {
   if (dbP) return dbP;

@@ -493,10 +493,9 @@ export function LocationMap3D({ lat, lng, label, apiKey, area = [], sim = null, 
         const lite = models === "lite";
         const built = modelSpots(sim, { lat: aLat, lng: aLng }, lite);
         const dLat = floor.n / 111_320, dLng = floor.e / (111_320 * Math.cos((aLat * Math.PI) / 180));
-        // Phones and tablets: every copy of a model in one model (merged), so 20 trees load as one; computers: one each.
-        const spots = lite
-          ? built.merged().map((m) => ({ key: m.id, lat: m.lat, lng: m.lng, heading: 0, up: m.up, get: m.ensure }))
-          : built.spots.map((sp) => ({ ...sp, get: () => built.ensure(sp.key) }));
+        // Every copy of a model in one model per ground tile (merged), on phones and computers alike: 20 trees load as
+        // a few models instead of 20, and the high-poly beds stay light enough.
+        const spots = built.merged().map((m) => ({ key: m.id, lat: m.lat, lng: m.lng, heading: 0, up: m.up, get: m.ensure }));
         const want = new Map(spots.map((sp) => [`${sp.key}@${(sp.lat + dLat).toFixed(7)},${(sp.lng + dLng).toFixed(7)},${sp.heading.toFixed(1)},${floor.h}`, sp]));
         for (const [id, node] of pool) if (!want.has(id)) { node.remove(); pool.delete(id); }
         for (const [id, sp] of want) {

@@ -181,9 +181,10 @@ function bedTile(g: THREE.Group, W: number, D: number): THREE.Group {
   ground.rotation.x = -Math.PI / 2; ground.position.y = 0.008;
   ground.receiveShadow = true;
   g.add(ground);
+  // High-poly (asked "usa i modelli high-poly"): dense tufts of three crossed blades, flowers on stems, round pebbles.
   const blade = new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0);
-  const tuftGeo = mergeGeometries([blade.clone(), blade.clone().rotateY(Math.PI / 2)])!;
-  const n = Math.min(110, Math.round(W * D * 14));
+  const tuftGeo = mergeGeometries([blade.clone(), blade.clone().rotateY(Math.PI / 3), blade.clone().rotateY((2 * Math.PI) / 3)])!;
+  const n = Math.min(420, Math.round(W * D * 22));
   const grass = new THREE.InstancedMesh(tuftGeo, new THREE.MeshStandardMaterial({ map: grassTexture(), alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9 }), n);
   for (let i = 0; i < n; i++) {
     const s = 0.18 + rnd() * 0.14;
@@ -195,17 +196,21 @@ function bedTile(g: THREE.Group, W: number, D: number): THREE.Group {
     grass.setColorAt(i, col.setHSL(0.25 + rnd() * 0.06, 0.5 + rnd() * 0.2, 0.42 + rnd() * 0.18));
   }
   g.add(grass);
-  const nf = Math.max(2, Math.min(14, Math.round(W * D * 1.6)));
-  const heads = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.7 }), nf);
+  const nf = Math.max(3, Math.min(24, Math.round(W * D * 2)));
+  const heads = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.7 }), nf);
   const petals = ["#f472b6", "#facc15", "#ffffff", "#a78bfa", "#fb923c", "#f87171"];
+  const tileStems = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.004, 0.005, 1, 4).translate(0, 0.5, 0), new THREE.MeshStandardMaterial({ color: "#3f7a2c", roughness: 0.9 }), nf);
   for (let i = 0; i < nf; i++) {
     const r = 0.045 + rnd() * 0.02;
+    const x = (rnd() - 0.5) * W, z = (rnd() - 0.5) * D, y = 0.22 + rnd() * 0.1;
     dummy.rotation.set(0, rnd() * 3, 0);
-    dummy.position.set((rnd() - 0.5) * W, 0.22 + rnd() * 0.1, (rnd() - 0.5) * D); dummy.scale.set(r, r * 0.4, r); dummy.updateMatrix();
+    dummy.position.set(x, y, z); dummy.scale.set(r, r * 0.4, r); dummy.updateMatrix();
     heads.setMatrixAt(i, dummy.matrix);
     heads.setColorAt(i, col.set(petals[Math.floor(rnd() * petals.length)]!));
+    dummy.rotation.set(0, 0, 0); dummy.position.set(x, 0, z); dummy.scale.set(1, y, 1); dummy.updateMatrix();
+    tileStems.setMatrixAt(i, dummy.matrix);
   }
-  g.add(heads);
+  g.add(heads, tileStems);
   // A path of pebbles along one side of the tile (its −x edge): laid side by side the tiles make beds of grass
   // parted by pebble paths, like the 2D map. A gravel band under round pebbles in white, sand, grey and brown.
   const band = Math.min(0.24, W * 0.22);
@@ -213,7 +218,7 @@ function bedTile(g: THREE.Group, W: number, D: number): THREE.Group {
   gravel.rotation.x = -Math.PI / 2; gravel.position.set(-W / 2 + band / 2, 0.012, 0);
   gravel.receiveShadow = true;
   g.add(gravel);
-  const np = Math.max(8, Math.min(36, Math.round(D * band * 150)));
+  const np = Math.max(12, Math.min(90, Math.round(D * band * 160)));
   const peb = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.6 }), np);
   const pebColors = ["#e7e2d7", "#cfc5b2", "#a39a8a", "#8c7b66", "#d9cdb4", "#b7b3ac"];
   for (let i = 0; i < np; i++) {
