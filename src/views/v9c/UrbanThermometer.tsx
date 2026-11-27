@@ -209,7 +209,7 @@ export function Gauge({ before, after, lowest, min: MIN, max: MAX, stops, onSlid
       {!disabled && <span className={cn("absolute -translate-x-1/2 -translate-y-1/2 rounded-full", Math.abs(Math.cos(angle(shown))) > 0.6 ? "touch-none" : "touch-pan-y")} style={{ ...pct(a), width: GRAB_RADIUS * 2, height: GRAB_RADIUS * 2 }} aria-hidden="true" />}
       {/* The levels, written just outside the arc where their stop is: one touch moves the dot there. */}
       {!disabled && stops.map((s) => (
-        <button key={s.id} type="button" tabIndex={-1} aria-pressed={s.on} onPointerDown={(e) => e.stopPropagation()} onClick={() => onStop(s.id)}
+        <button key={s.id} type="button" data-gauge-stop="" tabIndex={-1} aria-pressed={s.on} onPointerDown={(e) => e.stopPropagation()} onClick={() => onStop(s.id)}
           style={pct(at(s.t, R + 24))}
           className={cn("absolute w-max max-w-[5rem] -translate-x-1/2 -translate-y-1/2 rounded-xl px-2 py-1 text-center text-[11px] font-semibold leading-tight outline-none transition-[background-color,color,box-shadow,left,top] duration-200 active:scale-95 motion-reduce:transition-none",
             s.on ? "bg-foreground text-background shadow-[0_0_14px_rgb(255_255_255/0.35)]" : s.near ? "bg-foreground/[0.12] text-foreground ring-1 ring-foreground/40" : "bg-foreground/[0.06] text-foreground/80 hover:bg-foreground/[0.1]")}>

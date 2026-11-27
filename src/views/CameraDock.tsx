@@ -12,7 +12,7 @@ import { deliverFiles, openAccount, requestCapture, setCameraSheetOpen, useCamer
 import { galleryMultiple, openSystemCamera, supportsSystemCapture } from "@/lib/system-camera";
 import { cn } from "@/lib/utils";
 import { openSectorGate, useGuest, useProId } from "@/lib/use-pro-id";
-import { useLab } from "@/models/lab-store";
+import { useLab, useLabReadOnly } from "@/models/lab-store";
 import { splitLocation } from "@/views/SimulationGrid";
 import aiLogo from "@/assets/ai-logo.png";
 import { AI_STANDBY } from "@/lib/ai-standby";
@@ -96,6 +96,8 @@ export function CameraSheet() {
   // A guest (no profile) shoots for the simulation in view, the piazza elsewhere.
   const guest = useGuest() && !proId;
   const kind: Kind | null = proId ? (proId.kind === "funzionario" ? "urban" : "vineyard") : guest ? kindOf(pathname) ?? "urban" : null;
+  // Progetti condivisi · Solo visione: no photos nor videos for the shared project, only looking.
+  const viewOnly = useLabReadOnly(kind === "vineyard" ? "vigneto" : "piazza") && !!kind;
   const page = kind === "urban" ? "/urbano" : "/vigneto";
   const here = kind !== null && kindOf(pathname) === kind;
   const place = kind ? splitLocation((kind === "urban" ? lab.urban : lab.vineyard).location.label).name : "";
@@ -230,7 +232,9 @@ export function CameraSheet() {
           <DialogTitle className="md:portrait:text-2xl">Fotocamera</DialogTitle>
           <DialogDescription>{kind ? (guest ? (kind === "urban" ? "Foto e video della piazza" : "Foto e video del vigneto") : kind === "urban" ? "Foto e video della tua piazza" : "Foto e video del tuo vigneto") : "Per scattare, dicci chi sei"}</DialogDescription>
         </DialogHeader>
-        {!kind ? (
+        {viewOnly ? (
+          <p role="status" className="rounded-2xl border border-sky-400/30 bg-sky-400/[0.08] p-4 text-sm"><b className="font-semibold">Solo visione.</b> Il progetto è condiviso con te per guardarlo: foto e video li aggiunge chi può modificare.</p>
+        ) : !kind ? (
           <>
             <div className="grid grid-cols-2 gap-2">
               <LockedSection icon={Building2} label="Piazza" hint="Per i funzionari del Comune" tone="bg-urban" onClick={() => identify("/identificazione/funzionario")} />

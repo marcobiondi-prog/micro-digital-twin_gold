@@ -62,8 +62,25 @@ function load() {
 
 // Changing place keeps what the place left had and brings back what the place reached had (models/place-memory); a
 // place never seen keeps the current interventions, without the area drawn elsewhere.
+/**
+ * Progetti condivisi: a project of which this account is a viewer ("Solo visione") is only looked at — the person's own
+ * edits are refused (lib/project-sync sets it from the account's role, and is told so it can say it); the project read
+ * back from the account still comes in (applyProjectState).
+ */
+const readOnly = { piazza: false, vigneto: false };
+let onRefused: ((kind: "piazza" | "vigneto") => void) | null = null;
+export function setLabReadOnly(kind: "piazza" | "vigneto", on: boolean) { if (readOnly[kind] !== on) { readOnly[kind] = on; roSubs.forEach((f) => f()); } }
+export function onReadOnlyRefused(f: ((kind: "piazza" | "vigneto") => void) | null) { onRefused = f; }
+const roSubs = new Set<() => void>();
+export const isLabReadOnly = (kind: "piazza" | "vigneto") => readOnly[kind];
+export function useLabReadOnly(kind: "piazza" | "vigneto"): boolean {
+  return useSyncExternalStore((f) => { roSubs.add(f); return () => { roSubs.delete(f); }; }, () => readOnly[kind], () => false);
+}
+const refuse = (kind: "piazza" | "vigneto") => { if (!readOnly[kind]) return false; onRefused?.(kind); return true; };
+
 export function setUrban(patch: Partial<LabState["urban"]>) {
   if (unchanged(state.urban, patch)) return;
+  if (refuse("piazza")) return;
   const quiet = onlyNearMove(state.urban.location, patch);
   let base = state.urban;
   const to = patch.location;
@@ -77,6 +94,8 @@ export function setUrban(patch: Partial<LabState["urban"]>) {
 export function setVineyard(patch: Partial<LabState["vineyard"]> | ((v: LabState["vineyard"]) => Partial<LabState["vineyard"]>)) {
   const p = typeof patch === "function" ? patch(state.vineyard) : patch;
   if (unchanged(state.vineyard, p)) return;
+  // The clock's season air on the zones is the device's own reading, not an edit: it still applies.
+  if (!("climateKey" in p) && refuse("vigneto")) return;
   // The season's air laid on the zones by the clock (climateKey) is not the person's work, nor a GPS step within the place.
   const quiet = "climateKey" in p || onlyNearMove(state.vineyard.location, p);
   let base = state.vineyard;
@@ -92,8 +111,8 @@ export function setVineyard(patch: Partial<LabState["vineyard"]> | ((v: LabState
   state = { ...state, vineyard: { ...base, ...p } }; emit("vineyard", quiet);
 }
 /** Restore the default scenario (keeps the chosen location). */
-export function resetUrban() { const d = defaults().urban; state = { ...state, urban: { ...d, location: state.urban.location, realTemp: state.urban.realTemp ?? null, area: state.urban.area ?? null, places: state.urban.places ?? [] } }; emit("urban"); }
-export function resetVineyard() { const d = defaults().vineyard; state = { ...state, vineyard: { ...d, location: state.vineyard.location, area: state.vineyard.area ?? null, places: state.vineyard.places ?? [] } }; emit("vineyard"); }
+export function resetUrban() { if (refuse("piazza")) return; const d = defaults().urban; state = { ...state, urban: { ...d, location: state.urban.location, realTemp: state.urban.realTemp ?? null, area: state.urban.area ?? null, places: state.urban.places ?? [] } }; emit("urban"); }
+export function resetVineyard() { if (refuse("vigneto")) return; const d = defaults().vineyard; state = { ...state, vineyard: { ...d, location: state.vineyard.location, area: state.vineyard.area ?? null, places: state.vineyard.places ?? [] } }; emit("vineyard"); }
 /** Urban edits refresh Urbana + Esecutivo; vineyard edits refresh Vitivinicola + Esecutivo. */
 const SYNC_TARGETS = { urban: ["Urbana", "Esecutivo"], vineyard: ["Vitivinicola", "Esecutivo"] } as const;
 /**

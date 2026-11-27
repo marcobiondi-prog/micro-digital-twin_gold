@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { ProjectKind } from "@/models/project-state";
 
@@ -10,7 +11,7 @@ import type { ProjectKind } from "@/models/project-state";
 export type ProjectRole = "owner" | "editor" | "viewer";
 export type Person = { user_id: string; role: ProjectRole; email: string; name: string; avatar: string | null; added_at: string };
 export type Invite = { id: string; email: string; role: Exclude<ProjectRole, "owner">; token: string; created_at: string; accepted_at: string | null };
-export type Online = { user_id: string; name: string; avatar: string | null; where: string; at: number };
+export type Online = { user_id: string; name: string; avatar: string | null; where: string; at: number; pos?: { lat: number; lng: number } };
 
 const db = () => supabase as unknown as { from: (t: string) => any; rpc: (f: string, a: Record<string, unknown>) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -56,29 +57,66 @@ export async function removePerson(projectId: string, userId: string) {
   if (!(data ?? []).length) throw new Error("not-removed");
 }
 
-/** Who has the project open now, this person included (tracked with their name, picture and the page they are on). */
-export function usePresence(projectId: string | null, me: { id: string; name: string; avatar: string | null } | null, where: string): Online[] {
+/** Who has the project open now, published for the maps too (the named dots), with the project it belongs to. */
+let onlineNow: { project: string | null; list: Online[] } = { project: null, list: [] };
+const onlineSubs = new Set<() => void>();
+function publish(project: string | null, list: Online[]) { onlineNow = { project, list }; onlineSubs.forEach((f) => f()); }
+export function useOnline(): { project: string | null; list: Online[] } {
+  return useSyncExternalStore((f) => { onlineSubs.add(f); return () => { onlineSubs.delete(f); }; }, () => onlineNow, () => onlineNow);
+}
+
+/**
+ * Who has the project open now, this person included (tracked with their name, picture, the page they are on and,
+ * while the map's GPS follows them, where they stand). One channel per project; the tracked state is sent again when
+ * the page or the position changes (the position at most every 4 s). A colleague who comes in is said once.
+ */
+export function usePresence(projectId: string | null, me: { id: string; name: string; avatar: string | null } | null, where: string, pos: { lat: number; lng: number } | null = null): Online[] {
   const [online, setOnline] = useState<Online[]>([]);
   const meId = me?.id ?? null, meName = me?.name ?? "", meAvatar = me?.avatar ?? null;
+  const chRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const ready = useRef(false);
+  const state = useRef({ where, pos });
+  state.current = { where, pos };
   useEffect(() => {
-    if (!projectId || !meId) { setOnline([]); return; }
+    if (!projectId || !meId) { setOnline([]); publish(null, []); return; }
     const ch = supabase.channel(`project:${projectId}`, { config: { presence: { key: meId } } });
+    chRef.current = ch;
+    let seen: Set<string> | null = null;
     const read = () => {
-      const state = ch.presenceState() as Record<string, Array<Partial<Online>>>;
-      const list = Object.entries(state).map(([id, metas]) => {
+      const st = ch.presenceState() as Record<string, Array<Partial<Online>>>;
+      const list: Online[] = Object.entries(st).map(([id, metas]) => {
         const m = metas[metas.length - 1] ?? {};
-        return { user_id: id, name: m.name ?? "", avatar: m.avatar ?? null, where: m.where ?? "", at: m.at ?? 0 };
+        return { user_id: id, name: m.name ?? "", avatar: m.avatar ?? null, where: m.where ?? "", at: m.at ?? 0, ...(m.pos ? { pos: m.pos } : {}) };
       });
       // Dev only: the screenshot scripts add colleagues here (window.__mdtPresence), as Realtime cannot be mocked there.
       const fake = import.meta.env.DEV && typeof window !== "undefined" ? ((window as unknown as { __mdtPresence?: Online[] }).__mdtPresence ?? []) : [];
-      setOnline([...list, ...fake.filter((f) => !list.some((l) => l.user_id === f.user_id))]);
+      const all = [...list, ...fake.filter((f) => !list.some((l) => l.user_id === f.user_id))];
+      if (seen) for (const o of all) if (o.user_id !== meId && !seen.has(o.user_id)) toast(`${o.name || "Un collaboratore"} è entrato nel progetto`, { id: `mdt-join-${o.user_id}`, description: `In diretta ${o.where || "nell’app"}.` });
+      seen = new Set(all.map((o) => o.user_id));
+      setOnline(all);
+      publish(projectId, all);
     };
     if (import.meta.env.DEV) setTimeout(read, 300);
     ch.on("presence", { event: "sync" }, read).subscribe((status) => {
-      if (status === "SUBSCRIBED") void ch.track({ name: meName, avatar: meAvatar, where, at: Date.now() });
+      if (status !== "SUBSCRIBED") return;
+      ready.current = true;
+      void ch.track({ name: meName, avatar: meAvatar, where: state.current.where, pos: state.current.pos, at: Date.now() });
     });
-    return () => { void supabase.removeChannel(ch); };
-  }, [projectId, meId, meName, meAvatar, where]);
+    return () => { ready.current = false; chRef.current = null; publish(null, []); void supabase.removeChannel(ch); };
+  }, [projectId, meId, meName, meAvatar]);
+  // The page or the position changed: tracked again (the position at most every 4 s).
+  const lastPosAt = useRef(0);
+  const posKey = pos ? `${pos.lat},${pos.lng}` : "";
+  useEffect(() => {
+    const ch = chRef.current;
+    if (!ch || !ready.current) return;
+    const wait = Math.max(0, 4000 - (Date.now() - lastPosAt.current));
+    const t = setTimeout(() => {
+      lastPosAt.current = Date.now();
+      void ch.track({ name: meName, avatar: meAvatar, where: state.current.where, pos: state.current.pos, at: Date.now() });
+    }, posKey ? wait : 0);
+    return () => clearTimeout(t);
+  }, [where, posKey, meName, meAvatar]);
   return online;
 }
 

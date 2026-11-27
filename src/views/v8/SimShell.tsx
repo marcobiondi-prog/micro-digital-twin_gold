@@ -1,12 +1,13 @@
 import { setLastSection } from "@/lib/last-section";
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
-import { Map as MapIcon, MapPin, EllipsisVertical, Radar, Scale, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import { Eye, Map as MapIcon, MapPin, EllipsisVertical, Radar, Scale, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import { setCameraSheetOpen } from "@/lib/camera-dock";
 import { useTabSwipe } from "@/lib/use-tab-swipe";
 import { useAutoHistory } from "@/lib/use-auto-history";
 import { SimMap } from "@/views/v10/SimMap";
 import { useSideBySide } from "@/lib/use-desktop";
 import { useGuest, useProId } from "@/lib/use-pro-id";
+import { useLabReadOnly } from "@/models/lab-store";
 import { Ambient, HeroButton, PageHero, Panels, TabRow, openSimTab, showSimMedia, startOnMap, simMediaId, useSimTab, type SimKind, type SimTab } from "./console";
 
 const loadMenu = () => import("@/views/v8/SimMenu");
@@ -78,6 +79,7 @@ function useHideOnScroll(bar: RefObject<HTMLDivElement | null>, root: RefObject<
  * Simula shows the simulation with its photos and videos below it.
  */
 export function SimShell({ kind, place, onCompare, onReset, onSend, simula, media, sensori }: { kind: SimKind; place: string; onCompare?: (() => void) | undefined; onReset: () => void; onSend?: (() => void) | undefined; simula: ReactNode; media: ReactNode; sensori: ReactNode }) {
+  const readOnly = useLabReadOnly(kind === "urban" ? "piazza" : "vigneto");
   const tab = useSimTab(kind);
   useEffect(() => { setLastSection(kind === "urban" ? "piazza" : "vigneto"); }, [kind]);
   // Desktop: Mappa and Simula are one tab with the map on the left (kept in view) and the simulation on the right.
@@ -123,7 +125,8 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, medi
         <TabRow label="Sezioni" items={tabItems} value={desk && tab === "simula" ? "mappa" : tab} onChange={go} />
       </div>
       {/* The open tab follows the finger and the next slides in once it turns; nothing peeks beside it. */}
-      <div ref={swipe.ref} style={swipe.style} className="relative">
+      {readOnly && <p role="status" className="mb-3 flex items-center gap-2 rounded-2xl border border-sky-400/30 bg-sky-400/[0.08] px-4 py-2.5 text-sm"><Eye className="size-4 shrink-0 text-sky-300" aria-hidden="true" /><span><b className="font-semibold">Solo visione</b> · guardi il progetto condiviso con te, non lo modifichi.</span></p>}
+      <div ref={swipe.ref} style={swipe.style} className="relative" data-readonly={readOnly ? "" : undefined}>
       {desk ? <Panels value={tab === "sensori" ? "sensori" : "mappa"} panels={[
         { id: "mappa", always: true, content: (
           <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] items-start gap-6">

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "@tanstack/react-router";
-import { Check, Copy, Link2, Loader2, LogOut, Radio, Send, Share2, Trash2, UserPlus, Users, X } from "lucide-react";
+import { Check, Copy, Link2, Loader2, LogOut, Mail, Radio, Send, Share2, Trash2, UserPlus, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,7 +12,10 @@ import {
   ROLE_LABEL, cancelInvite, createInvite, initials, inviteLink, kindWord, removePerson, setRole,
   useProjectPeople, usePresence, type Invite, type Online, type Person, type ProjectRole,
 } from "@/lib/project-share";
-import type { ProjectKind } from "@/models/project-state";
+import { placeOf, projectName as nameOfPlace, type ProjectKind } from "@/models/project-state";
+import { useLab } from "@/models/lab-store";
+import { useLivePos } from "@/lib/live-position";
+import { useSimTab } from "@/views/v8/console";
 
 /**
  * Progetti condivisi in the header, beside the "i": a round badge with the faces of the people in the project — a
@@ -30,8 +33,8 @@ function useKind(): ProjectKind {
   return getLastSection();
 }
 
-function whereOf(path: string): string {
-  if (path.startsWith("/urbano") || path.startsWith("/vigneto")) return "nella simulazione";
+function whereOf(path: string, tab: string): string {
+  if (path.startsWith("/urbano") || path.startsWith("/vigneto")) return tab === "mappa" ? "sulla mappa" : tab === "sensori" ? "nei sensori" : "nella simulazione";
   if (path.startsWith("/dashboard")) return "nella dashboard";
   if (path.startsWith("/cronologia") || path.startsWith("/benvenuto")) return "nella cronologia";
   return "nell’app";
@@ -65,25 +68,31 @@ export function ShareControl() {
     return () => { alive = false; };
   }, [user, avatar]);
   const share = useProjectPeople(id, user);
-  const online = usePresence(id, me, whereOf(path));
+  const tab = useSimTab(kind === "piazza" ? "urban" : "vineyard");
+  const lab = useLab();
+  const projectName = nameOfPlace(placeOf(kind, lab).label);
+  // Where this person is on the ground (the map's GPS, while it follows): the colleagues see a named dot there.
+  const live = useLivePos();
+  const pos = live ? { lat: Math.round(live.lat * 1e5) / 1e5, lng: Math.round(live.lng * 1e5) / 1e5 } : null;
+  const online = usePresence(id, me, whereOf(path, tab), pos);
   if (!user) return null;
   const others = online.filter((o) => o.user_id !== user);
   const count = share.people.length;
-  const live = others.length > 0;
-  const faces = (live ? others : share.people.filter((p) => p.user_id !== user)).slice(0, 2);
-  const label = !id ? "Condivisione · progetto non ancora nel cloud" : `Condivisione · ${count} ${count === 1 ? "persona" : "persone"}${live ? `, ${others.length} connesse ora` : ""}`;
+  const liveNow = others.length > 0;
+  const faces = (liveNow ? others : share.people.filter((p) => p.user_id !== user)).slice(0, 2);
+  const label = !id ? "Condivisione · progetto non ancora nel cloud" : `Condivisione · ${count} ${count === 1 ? "persona" : "persone"}${liveNow ? `, ${others.length} connesse ora` : ""}`;
   return (
     <>
       <button type="button" onClick={() => { setOpen(true); void share.reload(); }} aria-label={label} title="Chi è in condivisione"
-        className="share-badge relative grid size-9 shrink-0 place-items-center rounded-full border border-foreground/15 bg-foreground/[0.06] text-foreground outline-none transition-colors hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring sm:size-10" data-live={live ? "" : undefined}>
-        {live && <span className="share-badge-ring pointer-events-none absolute -inset-[3px] rounded-full" aria-hidden="true" />}
+        className="share-badge relative grid size-9 shrink-0 place-items-center rounded-full border border-foreground/15 bg-foreground/[0.06] text-foreground outline-none transition-colors hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring sm:size-10" data-live={liveNow ? "" : undefined}>
+        {liveNow && <span className="share-badge-ring pointer-events-none absolute -inset-[3px] rounded-full" aria-hidden="true" />}
         {faces.length ? (
           <span className="flex -space-x-2.5" aria-hidden="true">
             {faces.map((f) => <Face key={f.user_id} name={f.name} avatar={f.avatar} size={faces.length > 1 ? 22 : 26} ring="ring-2 ring-background" />)}
           </span>
         ) : <Users className="size-4 sm:size-[1.15rem]" aria-hidden="true" />}
         {count > 1 && <span className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[oklch(0.78_0.13_185)] px-1 text-[10px] font-bold leading-none text-[oklch(0.2_0.03_240)] ring-2 ring-background" aria-hidden="true">{count}</span>}
-        {live && <span className="share-badge-dot absolute -bottom-0.5 -right-0.5 size-3 rounded-full bg-emerald-400 ring-2 ring-background" aria-hidden="true" />}
+        {liveNow && <span className="share-badge-dot absolute -bottom-0.5 -right-0.5 size-3 rounded-full bg-emerald-400 ring-2 ring-background" aria-hidden="true" />}
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent overlayClassName="bg-black/45 backdrop-blur-md sm:!fixed sm:!inset-0 sm:!h-auto sm:!min-h-0" className="max-h-[88dvh] grid-cols-[minmax(0,1fr)] gap-4 overflow-y-auto overflow-x-hidden overscroll-contain border-foreground/20 bg-card p-5 shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_-24px_60px_rgb(0_0_0/0.6)] dark:bg-[oklch(0.25_0.016_258)] max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-[1.75rem] max-sm:border-x-0 max-sm:border-b-0 max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-sm:data-[state=open]:slide-in-from-bottom-1/2 max-sm:data-[state=closed]:slide-out-to-bottom-1/2 sm:w-[min(480px,calc(100vw-1.5rem))] sm:rounded-2xl">
@@ -97,7 +106,7 @@ export function ShareControl() {
               Scegli un luogo nella simulazione: {kindWord(kind)} va nel tuo account e da lì puoi invitare altre persone.
             </p>
           ) : (
-            <SharePanel projectId={id} me={user} kind={kind} online={online} share={share} onLeft={() => setOpen(false)} />
+            <SharePanel projectId={id} me={user} kind={kind} online={online} share={share} onLeft={() => setOpen(false)} project={projectName} />
           )}
         </DialogContent>
       </Dialog>
@@ -105,7 +114,7 @@ export function ShareControl() {
   );
 }
 
-function SharePanel({ projectId, me, kind, online, share, onLeft }: { projectId: string; me: string; kind: ProjectKind; online: Online[]; share: ReturnType<typeof useProjectPeople>; onLeft: () => void }) {
+function SharePanel({ projectId, me, kind, online, share, onLeft, project }: { projectId: string; me: string; kind: ProjectKind; online: Online[]; share: ReturnType<typeof useProjectPeople>; onLeft: () => void; project: string }) {
   const owner = share.myRole === "owner";
   const onlineIds = useMemo(() => new Set(online.map((o) => o.user_id)), [online]);
   const others = online.filter((o) => o.user_id !== me);
@@ -149,7 +158,7 @@ function SharePanel({ projectId, me, kind, online, share, onLeft }: { projectId:
         </ul>
       </section>
 
-      {owner ? <InviteBox projectId={projectId} invites={share.invites} busy={busy} onDone={share.reload}
+      {owner ? <InviteBox projectId={projectId} invites={share.invites} busy={busy} onDone={share.reload} kind={kind} project={project}
         onCancel={(i) => act(`i${i.id}`, () => cancelInvite(i.id), "Invito annullato")} /> : share.myRole ? (
         <button type="button" disabled={busy === "leave"} onClick={() => act("leave", async () => { await removePerson(projectId, me); onLeft(); }, `Sei uscito dal progetto`)}
           className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-red-400/40 text-sm font-semibold text-red-300 hover:bg-red-400/10">
@@ -193,7 +202,7 @@ function RoleChip({ role }: { role: ProjectRole }) {
   return <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${tone}`}>{ROLE_LABEL[role]}</span>;
 }
 
-function InviteBox({ projectId, invites, busy, onDone, onCancel }: { projectId: string; invites: Invite[]; busy: string | null; onDone: () => Promise<void>; onCancel: (i: Invite) => void }) {
+function InviteBox({ projectId, invites, busy, onDone, onCancel, kind, project }: { projectId: string; invites: Invite[]; busy: string | null; onDone: () => Promise<void>; onCancel: (i: Invite) => void; kind: ProjectKind; project: string }) {
   const [email, setEmail] = useState("");
   const [role, setRoleChoice] = useState<"editor" | "viewer">("editor");
   const [sending, setSending] = useState(false);
@@ -222,13 +231,14 @@ function InviteBox({ projectId, invites, busy, onDone, onCancel }: { projectId: 
           {sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />} Crea l’invito
         </button>
       </form>
-      {made && <InviteLink inv={made} onClose={() => setMade(null)} fresh />}
+      {made && <InviteLink inv={made} onClose={() => setMade(null)} fresh kind={kind} project={project} />}
       {invites.length > 0 && (
         <div className="grid gap-2">
           <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">In attesa · {invites.length}</h4>
           {invites.map((i) => (
             <div key={i.id} className="flex items-center gap-2 rounded-2xl border border-dashed border-foreground/15 p-2.5 pl-3">
               <span className="min-w-0 flex-1"><span className="block truncate text-sm">{i.email}</span><span className="text-xs text-muted-foreground">{ROLE_LABEL[i.role]} · non ancora accettato</span></span>
+              <button type="button" onClick={() => mailInvite(i, kind, project)} aria-label={`Manda di nuovo l’invito per email a ${i.email}`} className="grid size-8 place-items-center rounded-full border border-foreground/15 hover:bg-foreground/10"><Mail className="size-4" /></button>
               <CopyButton text={inviteLink(i.token)} label={`Copia il link dell’invito per ${i.email}`} />
               <button type="button" disabled={busy === `i${i.id}`} onClick={() => onCancel(i)} aria-label={`Annulla l’invito per ${i.email}`} className="grid size-8 place-items-center rounded-full text-red-300 hover:bg-red-400/10"><X className="size-4" /></button>
             </div>
@@ -239,7 +249,15 @@ function InviteBox({ projectId, invites, busy, onDone, onCancel }: { projectId: 
   );
 }
 
-function InviteLink({ inv, onClose, fresh }: { inv: Invite; onClose: () => void; fresh?: boolean }) {
+/** The invite as an email to its address: the person's own email app opens with the message and the link written. */
+export function mailInvite(inv: Invite, kind: ProjectKind, project: string) {
+  const link = inviteLink(inv.token);
+  const subject = `Invito a lavorare su ${kind === "piazza" ? "la piazza" : "il vigneto"} ${project}`.trim();
+  const body = `Ciao,\n\nti invito a lavorare con me su ${kind === "piazza" ? "la piazza" : "il vigneto"}${project ? ` «${project}»` : ""} in Micro Digital Twin (${ROLE_LABEL[inv.role].toLowerCase()}).\n\nApri questo link ed entra con il tuo account (${inv.email}) per accettare:\n${link}\n\nA presto`;
+  window.location.href = `mailto:${encodeURIComponent(inv.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+function InviteLink({ inv, onClose, fresh, kind, project }: { inv: Invite; onClose: () => void; fresh?: boolean; kind: ProjectKind; project: string }) {
   const link = inviteLink(inv.token);
   const share = async () => {
     const text = `Ti invito a lavorare con me su Micro Digital Twin (${ROLE_LABEL[inv.role].toLowerCase()}): ${link}`;
@@ -248,10 +266,11 @@ function InviteLink({ inv, onClose, fresh }: { inv: Invite; onClose: () => void;
   };
   return (
     <div className="grid gap-2 rounded-2xl border border-[oklch(0.78_0.13_185/0.4)] bg-[oklch(0.78_0.13_185/0.08)] p-3">
-      {fresh && <p className="text-sm"><Check className="mr-1 inline size-4 text-emerald-300" />Invito pronto per <b>{inv.email}</b>. Mandagli il link: entrando con quell’account lo accetta.</p>}
+      {fresh && <p className="text-sm"><Check className="mr-1 inline size-4 text-emerald-300" />Invito pronto per <b>{inv.email}</b>. Mandaglielo per email: entrando con quell’account lo accetta.</p>}
+      <button type="button" onClick={() => mailInvite(inv, kind, project)} className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[oklch(0.78_0.13_185)] text-sm font-semibold text-[oklch(0.2_0.03_240)]"><Mail className="size-4" /> Invia per email a {inv.email}</button>
       <div className="flex items-center gap-2 rounded-full bg-background/60 px-3 py-2 text-xs"><Link2 className="size-3.5 shrink-0" /><span className="min-w-0 flex-1 truncate">{link}</span></div>
       <div className="flex gap-2">
-        <button type="button" onClick={() => void share()} className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-full bg-foreground text-sm font-semibold text-background"><Share2 className="size-4" /> Condividi</button>
+        <button type="button" onClick={() => void share()} className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-full border border-foreground/15 text-sm font-semibold hover:bg-foreground/10"><Share2 className="size-4" /> Condividi</button>
         <CopyButton text={link} label="Copia il link" wide />
         <button type="button" onClick={onClose} aria-label="Chiudi" className="grid size-10 place-items-center rounded-full hover:bg-foreground/10"><X className="size-4" /></button>
       </div>

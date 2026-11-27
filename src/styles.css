@@ -2556,3 +2556,22 @@ html[data-slate] .nav-orb-glow {
   .share-badge-ring, .share-badge[data-live], .share-badge-dot, .share-live-icon { animation: none; }
   .share-badge-ring { background: oklch(0.78 0.13 185); }
 }
+
+/* Progetti condivisi · Solo visione: the simulation's controls are shown but cannot be used (lab-store refuses edits too). */
+[data-readonly] [role="group"] > button,
+[data-readonly] [role="slider"],
+[data-readonly] [data-gauge-stop],
+[data-readonly] section[aria-label="Foto e video"] button,
+[data-readonly] section[aria-label="Foto e video"] input,
+[data-readonly] section[aria-label="Foto e video"] label {
+  pointer-events: none;
+  opacity: 0.45;
+}
+
+/* Progetti condivisi: a colleague on the map, a named pill pointing at where they stand, with a pulse round it. */
+.map-person { position: relative; display: flex; align-items: center; gap: 6px; padding: 3px 10px 3px 3px; border-radius: 9999px; background: oklch(0.25 0.016 258 / 0.92); color: #fff; font: 600 12px/1 system-ui, sans-serif; box-shadow: 0 0 0 2px oklch(0.8 0.16 160), 0 4px 12px rgb(0 0 0 / 0.45); white-space: nowrap; pointer-events: none; margin-bottom: 8px; }
+.map-person::after { content: ""; position: absolute; left: 50%; bottom: -7px; width: 10px; height: 10px; transform: translateX(-50%) rotate(45deg); background: oklch(0.8 0.16 160); border-radius: 2px; }
+.map-person::before { content: ""; position: absolute; inset: -2px; border-radius: 9999px; box-shadow: 0 0 0 0 oklch(0.8 0.16 160 / 0.6); animation: map-person-pulse 2s ease-out infinite; }
+.map-person-face { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 9999px; background: oklch(0.45 0.08 200) center/cover no-repeat; font-size: 10px; }
+@keyframes map-person-pulse { to { box-shadow: 0 0 0 10px oklch(0.8 0.16 160 / 0); } }
+@media (prefers-reduced-motion: reduce) { .map-person::before { animation: none; } }

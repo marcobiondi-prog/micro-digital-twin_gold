@@ -515,6 +515,23 @@ export function findElement(f: FieldFind): HTMLElement {
   return el;
 }
 
+/** Progetti condivisi: a colleague connected now, where they stand — their picture (or initials) and first name in a pill. */
+export function personElement(name: string, avatar: string | null): HTMLElement {
+  const el = document.createElement("div");
+  el.setAttribute("role", "img");
+  el.setAttribute("aria-label", `${name || "Collaboratore"} è qui adesso`);
+  el.className = "map-person";
+  const face = document.createElement("span");
+  face.className = "map-person-face";
+  if (avatar) face.style.backgroundImage = `url("${avatar}")`;
+  else face.textContent = (name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "?");
+  const label = document.createElement("span");
+  label.className = "map-person-name";
+  label.textContent = (name.split(/\s+/)[0] || "Collaboratore");
+  el.append(face, label);
+  return el;
+}
+
 /** A handle to move by hand: a tree (green dot) or a labelled pill (Aiuole, Ombra). */
 export function handleElement(label: string | null): HTMLElement {
   const el = document.createElement("div");

@@ -96,3 +96,8 @@ aperti insieme per vedere gli aggiornamenti in diretta. Poi la prova vera sul te
 ## Ordine consigliato
 Fase 0 → Fase 1 → Fase 2 → Fase 3 → (Fase 4). Ogni fase è utilizzabile da sola e va pubblicata e provata
 prima della successiva.
+
+
+## Stato al 27/11/2026 (sera)
+
+Fatti: invito per email (mailto dal telefono del proprietario), nomi dei collaboratori sulla mappa 2D dalla loro posizione GPS, solo visione reale per i "viewer". Aperto: chi è del settore urbano e apre un vigneto condiviso viene rimandato alla sua sezione dal blocco del profilo; commenti più avanti.

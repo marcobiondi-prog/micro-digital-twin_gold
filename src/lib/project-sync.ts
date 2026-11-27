@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { applyProjectState, getLab, onLabEdit } from "@/models/lab-store";
+import { applyProjectState, getLab, onLabEdit, onReadOnlyRefused, setLabReadOnly } from "@/models/lab-store";
 import { placeOf, projectName, projectSlice, syncStep, type ProjectKind, type SyncMeta } from "@/models/project-state";
 
 /**
@@ -62,7 +62,7 @@ async function userId(): Promise<string | null> {
 export async function syncProject(kind: ProjectKind, opts: { announce?: boolean; by?: "colleague" } = {}): Promise<void> {
   if (missing || busy.has(kind) || (typeof navigator !== "undefined" && navigator.onLine === false)) return;
   const user = await userId();
-  if (!user) return;
+  if (!user) { setLabReadOnly(kind, false); return; }
   busy.add(kind);
   try {
     const meta = metaOf(user, kind);
@@ -77,6 +77,13 @@ export async function syncProject(kind: ProjectKind, opts: { announce?: boolean;
       if (error) return void checkMissing(error);
       row = (data as Row[] | null)?.[0] ?? null;
     }
+    // The account's role in it: a viewer only looks (its edits are refused and nothing goes up).
+    let viewer = false;
+    if (row) {
+      const { data: role } = await (supabase as unknown as { rpc: (f: string, a: Record<string, unknown>) => Promise<{ data: unknown }> }).rpc("project_role", { p: row.id });
+      viewer = role === "viewer";
+    }
+    setLabReadOnly(kind, viewer);
     const lab = getLab();
     const place = placeOf(kind, lab);
     const known = row && meta?.id === row.id ? meta : undefined;
@@ -86,6 +93,10 @@ export async function syncProject(kind: ProjectKind, opts: { announce?: boolean;
       if (error) return void checkMissing(error);
       setMeta(user, kind, { id: data.id, known: data.updated_at, syncedAt: Date.now() });
       if (opts.announce !== false) toast.success(kind === "piazza" ? "La piazza ora è nel tuo account" : "Il vigneto ora è nel tuo account", { description: "La ritrovi su ogni telefono o computer con cui entri." });
+    } else if (step === "push" && row && viewer) {
+      // Edits made here before becoming a viewer never go up: the project comes down instead.
+      if (row.state && Object.keys(row.state).length) applyProjectState(kind, row.state);
+      setMeta(user, kind, { id: row.id, known: row.updated_at, syncedAt: Date.now() });
     } else if (step === "push" && row) {
       const { data, error } = await table().update({ name: projectName(place.label), place, state: projectSlice(kind, lab) }).eq("id", row.id).select("updated_at").single();
       if (error) return void checkMissing(error);
@@ -114,6 +125,12 @@ export function syncAllProjects(announce = true) { for (const k of KINDS) void s
 export function useProjectSync() {
   useEffect(() => {
     const timers: Partial<Record<ProjectKind, number>> = {};
+    let saidAt = 0;
+    onReadOnlyRefused((kind) => {
+      if (Date.now() - saidAt < 4000) return;
+      saidAt = Date.now();
+      toast(kind === "piazza" ? "Piazza in solo visione" : "Vigneto in solo visione", { id: "mdt-viewer", description: "Puoi guardare il progetto ma non modificarlo: chiedi al proprietario di poter modificare." });
+    });
     const offEdit = onLabEdit((kind) => {
       markEdited(kind);
       window.clearTimeout(timers[kind]);
@@ -135,7 +152,7 @@ export function useProjectSync() {
     document.addEventListener("visibilitychange", back);
     window.addEventListener("online", online);
     return () => {
-      offEdit(); window.clearTimeout(start); data.subscription.unsubscribe(); void supabase.removeChannel(live);
+      onReadOnlyRefused(null); offEdit(); window.clearTimeout(start); data.subscription.unsubscribe(); void supabase.removeChannel(live);
       Object.values(timers).forEach((t) => window.clearTimeout(t));
       document.removeEventListener("visibilitychange", back); window.removeEventListener("online", online);
     };

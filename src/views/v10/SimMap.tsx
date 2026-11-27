@@ -12,13 +12,15 @@ import { ringTag, type PiazzaSuggestion, type VineSuggestion } from "@/models/si
 import { useServerFn } from "@tanstack/react-start";
 import { getPlaceArea } from "@/controllers/osm-geo.functions";
 import { toast } from "sonner";
-import { Check, Hand, Lock, Map as MapIcon, MapPin, Moon, Navigation, PenLine, RotateCcw, Sun, Sunrise, Sunset, Trash2, Undo2, X } from "lucide-react";
+import { Check, Eye, Hand, Lock, Map as MapIcon, MapPin, Moon, Navigation, PenLine, RotateCcw, Sun, Sunrise, Sunset, Trash2, Undo2, X } from "lucide-react";
 import { useSignedIn } from "@/lib/use-signed-in";
 import { openSectorGate, useGuest, useProId } from "@/lib/use-pro-id";
 import { openAccount } from "@/lib/camera-dock";
 import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn } from "@/lib/demo-login";
 import { cn } from "@/lib/utils";
-import { setUrban, setVineyard, useLab, vineMetrics } from "@/models/lab-store";
+import { setUrban, setVineyard, useLab, useLabReadOnly, vineMetrics } from "@/models/lab-store";
+import { useCurrentProject } from "@/lib/project-sync";
+import { useOnline } from "@/lib/project-share";
 import { shadeOpenness, piazzaLayout, piazzaShadows, vineShadows, TREE_SHADE_M2, vineLayout, type LayoutEdits, type PiazzaLayout } from "@/models/area-layout";
 import { dayLight, solarHour, sunAt, sunHeightDeg } from "@/models/sun-shadow";
 import { getSimWhen, useSimWhen } from "@/models/sim-when";
@@ -61,6 +63,13 @@ function keepSeeded(seen: Set<string>) {
  */
 export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boolean }) {
   const lab = useLab();
+  // Progetti condivisi: in "Solo visione" the map is only looked at — no place search, drawing, zones nor proposals.
+  const readOnly = useLabReadOnly(kind === "urban" ? "piazza" : "vigneto");
+  // Progetti condivisi: the colleagues connected now on this project — named dots where they stand, a line over the map.
+  const project = useCurrentProject(kind === "urban" ? "piazza" : "vigneto");
+  const onlineNow = useOnline();
+  const colleagues = project.id && onlineNow.project === project.id ? onlineNow.list.filter((o) => o.user_id !== project.user) : [];
+  const people = colleagues.filter((o) => o.pos).map((o) => ({ id: o.user_id, name: o.name, avatar: o.avatar, lat: o.pos!.lat, lng: o.pos!.lng }));
   const liveLoc = kind === "urban" ? lab.urban.location : lab.vineyard.location;
   // The maps follow the place, not every metre of it: a GPS fix settling a few metres away, or the same place saved again
   // under its street's name, rebuilt every map from scratch (each was keyed and built on the exact coordinates and
@@ -189,7 +198,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
     : lab.vineyard.zones.every((z) => { const m = zoneMixOf(z, vineMixOf(lab.vineyard)); return !m.irrigation && !m.shade && !m.windbreak; });
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set(readDismissed()));
   const areaTag = saved ? ringTag(saved.ring) : "";
-  const proposal = !!saved && empty && !!suggestionText(suggestion) && !dismissed.has(areaTag) && !saved.edits?.onlyDrawn;
+  const proposal = !readOnly && !!saved && empty && !!suggestionText(suggestion) && !dismissed.has(areaTag) && !saved.edits?.onlyDrawn;
   const dismissProposal = () => { const next = new Set(dismissed).add(areaTag); setDismissed(next); writeDismissed([...next]); };
   const applySuggestion = (sg: { piazza?: PiazzaSuggestion | undefined; vine?: VineSuggestion | undefined }) => {
     if (sg.piazza) setUrban({ ...sg.piazza, treeCells: null, permeableCells: null, shadeCells: null });
@@ -255,7 +264,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   // down by hand later stays down.
   const zoneSig = saved ? zonesOfArea(saved).map((z) => `${z.id}:${z.kind}:${z.ring.length}`).join("|") : "";
   useEffect(() => {
-    if (preview || !saved) return;
+    if (preview || !saved || readOnly) return;
     // The vineyard: an Irrigazione, Teli d'ombra or Frangivento zone raises that lever on every vineyard zone (once per zone).
     if (kind === "vineyard") {
       // "Solo quello disegnato": the levers follow the zones exactly.
@@ -358,7 +367,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         <DayNight kind={kind} lat={pin.lat} lng={pin.lng} />
         {/* Still: the map under the button takes no gesture; the page scrolls over it. */}
         <ParallaxLayer>
-          <Suspense fallback={<div className="h-full w-full" />}><SatelliteMap2D key={`preview-${kind}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} sim={sim} still proposal={proposal} /></Suspense>
+          <Suspense fallback={<div className="h-full w-full" />}><SatelliteMap2D key={`preview-${kind}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} sim={sim} still proposal={proposal} people={people} /></Suspense>
         </ParallaxLayer>
       </div>
       {kind === "vineyard" && !proposal && <div className="absolute inset-x-0 top-12 z-[3] flex justify-center px-3"><Suspense fallback={null}><VineZonePicker /></Suspense></div>}
@@ -405,10 +414,11 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         </p>
       ))}
       {/* The place is chosen here: search it or use the device position; the map follows. */}
-      <PlaceSearch kind={kind} />
+      {readOnly ? <ViewerNote /> : <PlaceSearch kind={kind} />}
       <div data-sim-map-box="" data-map-gestures={show3d ? "" : undefined} className="relative -mx-4 h-[52vh] min-h-72 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
         {/* The temperature the interventions bring, on the map itself (2D and 3D), following the levers live. */}
         <MapReading kind={kind} lat={pin.lat} lng={pin.lng} />
+        <LiveColleagues list={colleagues} />
         {/* How many misting poles the map shows, exactly: those in the zones drawn for them and those the app placed. */}
         {sim?.kind === "piazza" && sim.data.misters.length > 0 && !drawing && (
           <p role="status" className="pointer-events-none absolute left-1/2 top-12 z-[3] -translate-x-1/2 whitespace-nowrap rounded-full bg-black/45 px-3 py-1 text-[12px] font-semibold text-white ring-1 ring-white/15 backdrop-blur-sm [text-shadow:0_1px_2px_rgb(0_0_0/.6)]">
@@ -425,7 +435,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
             ? <LocationMap3D key={`map3d-${kind}`} follow={following} lat={pin.lat} lng={pin.lng} label={name ?? ""} apiKey={key} area={ring} sim={sim}
               fallback={<OpenMap3D follow={following} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />} />
             : <OpenMap3D key={`openmap3d-${kind}`} follow={following} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />}</MapLight></Suspense>
-          : <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`map2d-${kind}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} drawing={drawing || drawingZone}
+          : <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`map2d-${kind}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} people={people} drawing={drawing || drawingZone}
             onAreaChange={drawingZone ? setZoneDraft : setDraft} sim={editingZone && sim ? { ...sim, inner: (sim.inner ?? []).filter((z) => z.id !== editingZone) } : sim} arranging={arranging} onMove={moved} proposal={proposal}
             outline={drawingZone ? saved?.ring ?? null : null} onOutside={() => toast("La zona va dentro l’area disegnata")} onPinMove={arranging ? undefined : movePin} /></Suspense>}
       </div>
@@ -439,7 +449,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
           {pinFix && <button type="button" onClick={() => { setPinFix(loc.lat, loc.lng, null); toast("Pin automatico di nuovo"); }} className="font-semibold text-foreground underline decoration-foreground/30 underline-offset-4">Rimetti automatico</button>}
         </p>
       )}
-      {drawingZone ? (
+      {readOnly ? null : drawingZone ? (
         <ZoneDrawBar kind={zoneKind!} pins={zoneDraft.length} m2={zoneDraft.length >= 3 ? pinsM2(zoneDraft) : null} editing={editingZone !== null}
           kinds={ZONE_KINDS[kind === "urban" ? "piazza" : "vigneto"]} onKind={setZoneKind}
           onUndo={() => setZoneDraft((d) => d.slice(0, -1))} onCancel={closeZone} onFinish={finishZone} />
@@ -478,6 +488,29 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
       {saved && !drawing && <ZonesBar area={saved} flow={kind === "urban" ? "piazza" : "vigneto"} onAdd={startZone} onEdit={editZone} onRemove={(id) => setZones(zonesOfArea(saved).filter((z) => z.id !== id))} />}
       </>}
     </div>
+  );
+}
+
+/** Progetti condivisi: who else is in the project right now and where, in one pill at the map's foot. */
+function LiveColleagues({ list }: { list: Array<{ user_id: string; name: string; where: string }> }) {
+  if (!list.length) return null;
+  const first = (n: string) => n.split(/\s+/)[0] || "Un collaboratore";
+  const text = list.length === 1 ? `${first(list[0]!.name)} è ${list[0]!.where || "nell’app"}` : list.length === 2 ? `${first(list[0]!.name)} e ${first(list[1]!.name)} sono qui` : `${first(list[0]!.name)} e altri ${list.length - 1} sono qui`;
+  return (
+    <p role="status" className="pointer-events-none absolute bottom-3 left-3 z-[3] flex max-w-[calc(100%-6rem)] items-center gap-2 rounded-full bg-black/45 px-3 py-1.5 text-[13px] font-medium text-white shadow-[0_2px_10px_rgb(0_0_0/0.4)] ring-1 ring-white/15 backdrop-blur-sm">
+      <span className="share-badge-dot size-2 shrink-0 rounded-full bg-emerald-400" aria-hidden="true" />
+      <span className="truncate">In diretta · {text}</span>
+    </p>
+  );
+}
+
+/** Solo visione: what the person can do here, said once over the map. */
+function ViewerNote() {
+  return (
+    <p role="status" className="flex items-start gap-2 rounded-2xl border border-sky-400/30 bg-sky-400/[0.08] px-4 py-3 text-sm">
+      <Eye className="mt-0.5 size-4 shrink-0 text-sky-300" aria-hidden="true" />
+      <span><b className="font-semibold">Solo visione.</b> Guardi il progetto condiviso con te: il luogo, l’area e gli interventi li cambia chi può modificare.</span>
+    </p>
   );
 }
 

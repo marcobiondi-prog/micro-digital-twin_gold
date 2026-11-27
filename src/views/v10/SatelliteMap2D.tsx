@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap, Marker } from "maplibre-gl";
 import type { Ring } from "@/models/place-area";
 import { MAX_PINS, initialRingAngle } from "@/models/drawn-area";
-import { addAreaLayers, addSimLayers, addTrailLayers, setTrailData, findElement, handleElement, rotateHandleElement, misterElement, placePinElement, ringCentre, tagElement, zoneTag, pinElement, setAreaData, setOutlineData, setSimData, setBedData, setSimGhost, type SimLayout, MAP_LOCALE } from "@/views/v10/map-area";
+import { addAreaLayers, addSimLayers, addTrailLayers, setTrailData, findElement, handleElement, personElement, rotateHandleElement, misterElement, placePinElement, ringCentre, tagElement, zoneTag, pinElement, setAreaData, setOutlineData, setSimData, setBedData, setSimGhost, type SimLayout, MAP_LOCALE } from "@/views/v10/map-area";
 import { ringContains } from "@/models/place-area";
 import type { LatLng } from "@/models/area-layout";
 
@@ -43,7 +43,7 @@ type MaxZoom = { getMaxZoomAtLatLng: (at: { lat: number; lng: number }) => Promi
 /** Until the service answers: a closeness Google has nearly everywhere, so the map never opens on its grey "no imagery" tiles. */
 const GOOGLE_SAFE = 19;
 
-export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawing = false, onAreaChange, sim = null, arranging = false, onMove, outline = null, onOutside, onPinMove, still = false, proposal = false }: {
+export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawing = false, onAreaChange, sim = null, arranging = false, onMove, outline = null, onOutside, onPinMove, still = false, proposal = false, people = [] }: {
   /** The browser key: with it the 2D map uses Google's satellite imagery, like the 3D view. */
   apiKey?: string | undefined;
   lat: number; lng: number; label: string; zoom: number; area?: Ring; drawing?: boolean; onAreaChange?: (ring: Ring) => void;
@@ -55,6 +55,8 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
   sim?: SimLayout | null; arranging?: boolean; onMove?: (moved: MovedPart) => void;
   /** A still preview: framed on the drawn area, without its corner pins nor the recenter button. */
   proposal?: boolean; still?: boolean;
+  /** Progetti condivisi: colleagues connected now, shown where they stand (their GPS) as named dots. */
+  people?: Array<{ id: string; name: string; avatar: string | null; lat: number; lng: number }>;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const under = useRef<HTMLDivElement>(null);
@@ -62,6 +64,7 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
   const libRef = useRef<typeof import("maplibre-gl") | null>(null);
   const pins = useRef<Marker[]>([]);
   const handles = useRef<Marker[]>([]);
+  const peopleMarks = useRef(new Map<string, Marker>());
   const moveRef = useRef(onMove);
   // The simulation as last drawn, so a zoom can lay the aiuole again at a fixed width on screen.
   const simNow = useRef(sim);
@@ -245,6 +248,22 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
     map.fitBounds([[Math.min(...ln), Math.min(...la)], [Math.max(...ln), Math.max(...la)]], { padding: { top: Math.round(h * 0.24), bottom: Math.round(h * 0.2), left: Math.round(w * 0.26), right: Math.round(w * 0.26) }, maxZoom: 20, duration });
     return true;
   };
+  // The colleagues connected now, each a named dot where their GPS puts them; moved, not rebuilt, as they walk.
+  const peopleKey = people.map((p) => `${p.id}:${p.lat},${p.lng}:${p.name}`).join("|");
+  useEffect(() => {
+    const map = mapRef.current, lib = libRef.current;
+    if (state !== "ready" || !map || !lib) return;
+    const marks = peopleMarks.current, keep = new Set<string>();
+    for (const p of people) {
+      keep.add(p.id);
+      const m = marks.get(p.id);
+      if (m) m.setLngLat([p.lng, p.lat]);
+      else marks.set(p.id, new lib.Marker({ element: personElement(p.name, p.avatar), anchor: "bottom" }).setLngLat([p.lng, p.lat]).addTo(map));
+    }
+    for (const [id, m] of marks) if (!keep.has(id)) { m.remove(); marks.delete(id); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, peopleKey]);
+  useEffect(() => () => { peopleMarks.current.forEach((m) => m.remove()); peopleMarks.current.clear(); }, []);
   const framed = useRef(false);
   useEffect(() => {
     if (still || drawing || state !== "ready" || framed.current) return;
