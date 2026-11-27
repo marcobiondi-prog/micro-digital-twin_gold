@@ -20,34 +20,9 @@ export function createSupabaseFetch(supabaseKey: string): typeof fetch {
 
     headers.set('apikey', supabaseKey);
 
-    const rawUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input?.url ?? '';
-    const authHeader = headers.get('Authorization');
-
-    // Storage list, download, and sign endpoints do not require user Bearer tokens on the public bucket.
-    // If a legacy session has a bloated JWT (> 2000 chars), sending it causes Cloudflare / Kong 431 errors.
-    const isStorageRead = rawUrl.includes('/storage/v1/object/list/') ||
-      rawUrl.includes('/storage/v1/object/sign/') ||
-      (!init?.method || init.method.toUpperCase() === 'GET') && rawUrl.includes('/storage/v1/object/');
-
-    if (isStorageRead && authHeader && authHeader.length > 2000) {
-      headers.delete('Authorization');
-    }
-
-    try {
-      let res = await fetch(input, { ...init, headers, credentials: 'omit' });
-      // If server returns 431 (Header Too Large), strip Authorization and retry with apikey only
-      if (res.status === 431 && headers.has('Authorization')) {
-        headers.delete('Authorization');
-        res = await fetch(input, { ...init, headers, credentials: 'omit' });
-      }
-      return res;
-    } catch (err) {
-      // If fetch failed completely due to header error, retry once without Authorization
-      if (headers.has('Authorization')) {
-        headers.delete('Authorization');
-        return fetch(input, { ...init, headers, credentials: 'omit' });
-      }
-      throw err;
-    }
+    // The user's token is always sent: the buckets are private, and without it the storage answers as the anonymous
+    // role — an empty list and "Object not found" — so the account's photos read as none (the cloud bar at 0 B).
+    // A token too big for the headers (431) is a problem to fix at its source (the account's user data), not here.
+    return fetch(input, { ...init, headers, credentials: 'omit' });
   };
 }

@@ -296,6 +296,29 @@ export function useProId(): ProId | null | undefined {
  * was identified, or picked again, while signed in to it. A profile that reached the account any other way — an older
  * sign-in uploaded the one this device had, a guest's try, someone else's — is not its own and never comes back by itself.
  */
+/**
+ * What goes into the account's user data: the profiles without their acct (the personal account's email and a copy of
+ * its picture, kept only on this phone). The user data rides in every request's token, and a picture in it made the
+ * token so long that storage calls went out without it — read as the anonymous role, the cloud showed no photos.
+ */
+function slimProfile(p: unknown): unknown {
+  if (!p || typeof p !== "object" || !("acct" in p)) return p;
+  const { acct: _a, ...rest } = p as Record<string, unknown>;
+  return rest;
+}
+function forAccount<T extends Record<string, unknown>>(data: T): T {
+  const out: Record<string, unknown> = { ...data };
+  if ("pro_id" in out) out["pro_id"] = slimProfile(out["pro_id"]);
+  if (out["pro_last"] && typeof out["pro_last"] === "object") out["pro_last"] = Object.fromEntries(Object.entries(out["pro_last"] as Record<string, unknown>).map(([k, v]) => [k, slimProfile(v)]));
+  return out as T;
+}
+/** Whether the account's user data still carries a profile's picture copy (written before forAccount). */
+function heavyMeta(meta: unknown): boolean {
+  const m = meta as { pro_id?: unknown; pro_last?: Record<string, unknown> } | null;
+  const has = (p: unknown) => !!p && typeof p === "object" && "acct" in p;
+  return has(m?.pro_id) || Object.values(m?.pro_last ?? {}).some(has);
+}
+
 type Meta = { pro_id?: unknown; pro_last?: Record<string, unknown>; pro_left?: unknown; pro_own?: unknown } | null;
 const KINDS = ["agronomo", "funzionario"] as const;
 const ownOf = (meta: unknown): ProKind[] | null => {
@@ -373,7 +396,7 @@ export async function switchAccountSector(kind: ProKind): Promise<boolean> {
   pickedAt = Date.now();
   set(id);
   setAccountSector({ kind, email: user.email ?? null, name: nameOf(user.user_metadata) });
-  const { error } = await supabase.auth.updateUser({ data: { pro_sector: kind, pro_id: id, pro_left: false } });
+  const { error } = await supabase.auth.updateUser({ data: forAccount({ pro_sector: kind, pro_id: id, pro_left: false }) });
   return !error;
 }
 /** Whether the signed-in account may use a profile of this kind (always, signed out or with no sector yet). */
@@ -405,7 +428,7 @@ export async function saveProId(id: ProId | null): Promise<boolean> {
   const proSector = sector ?? id?.kind ?? null;
   if (proSector) setAccountSector({ kind: proSector, email: data.session.user.email ?? null, name: nameOf(meta) });
   // pro_left: the profile was left on purpose ("Esci dal profilo"), so the next sign-in does not bring it back by itself.
-  await supabase.auth.updateUser({ data: { pro_id: id, pro_last: accountLast(meta, id, own), pro_own: own, pro_left: id === null, ...(proSector ? { pro_sector: proSector } : {}) } }).catch(() => undefined);
+  await supabase.auth.updateUser({ data: forAccount({ pro_id: id, pro_last: accountLast(meta, id, own), pro_own: own, pro_left: id === null, ...(proSector ? { pro_sector: proSector } : {}) }) }).catch(() => undefined);
   return true;
 }
 
@@ -419,7 +442,7 @@ export async function keepProIdInAccount(): Promise<void> {
   if (sector && sector !== id.kind) return;
   // Every kind the account registered stays owned (a sector switched back finds its profile again).
   const own = withKind(ownOf(meta) ?? [], id);
-  await supabase.auth.updateUser({ data: { pro_id: id, pro_last: accountLast(meta, id, own), pro_own: own, pro_left: false } }).catch(() => undefined);
+  await supabase.auth.updateUser({ data: forAccount({ pro_id: id, pro_last: accountLast(meta, id, own), pro_own: own, pro_left: false }) }).catch(() => undefined);
 }
 
 /**
@@ -615,12 +638,12 @@ export function useSyncProId() {
       // The other sector's registered profile stays saved in the account (pro_own and pro_last keep every kind owned),
       // only unused while the account is of this sector.
       const clean = { pro_id: back, pro_last: accountLast({ ...(meta as object), pro_last: prev }, back, ownedClean), pro_own: ownedClean, pro_sector: sector, pro_left: false };
-      const dirty = ownedClean.length !== owned.length || legacy || KNOWN_KINDS.some((k) => !!tied[k] && !isProId(prev0[k])) || (saved != null && !mine(saved)) || KINDS.some((k) => prev[k] != null && !owned.includes(k)) || rawSector !== sector || staleLeft || !!autoMade;
+      const dirty = ownedClean.length !== owned.length || legacy || KNOWN_KINDS.some((k) => !!tied[k] && !isProId(prev0[k])) || (saved != null && !mine(saved)) || KINDS.some((k) => prev[k] != null && !owned.includes(k)) || rawSector !== sector || staleLeft || !!autoMade || heavyMeta(meta);
       if (back) {
         clearAddingSector();
         rememberWantedSector(null);
         set(back);
-        if (dirty || !mine(saved)) await supabase.auth.updateUser({ data: clean }).catch(() => undefined);
+        if (dirty || !mine(saved)) await supabase.auth.updateUser({ data: forAccount(clean) }).catch(() => undefined);
         if (autoMade) toast.success(`Account aggiunto: ${email ?? back.name}`, { description: `Ho creato il suo profilo ${back.kind === "agronomo" ? "da agricoltore" : "da funzionario"}: lo trovi tra i profili. I dettagli li completi quando vuoi dal profilo.` });
         else if (!mine(saved)) toast(`Bentornato, ${back.name}`, { description: "Sei entrato con il tuo profilo professionale." });
         return;
@@ -628,7 +651,7 @@ export function useSyncProId() {
       // The account never registered a profile of its own: none is given to it (not even this device's); the sector
       // page asks to choose the sector and identify, or to enter as a guest.
       set(null);
-      if (dirty) await supabase.auth.updateUser({ data: clean }).catch(() => undefined);
+      if (dirty) await supabase.auth.updateUser({ data: forAccount(clean) }).catch(() => undefined);
       // The sector the person was entering opens on its form (a new account adds its profile there), not the choice.
       if (!left && !guestSnap()) openSectorGate(entering ?? null);
       // An account just added from a sector's form: it is in, its profile of that sector is the next step.
