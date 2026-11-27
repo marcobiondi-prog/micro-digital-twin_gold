@@ -103,7 +103,7 @@ export function usePresence(projectId: string | null, me: { id: string; name: st
     if (!projectId || !meId) { setOnline([]); publish(null, []); return; }
     const ch = supabase.channel(`project:${projectId}`, { config: { presence: { key: meId } } });
     chRef.current = ch;
-    let seen: Set<string> | null = null, retry: ReturnType<typeof setTimeout> | null = null, dropped = false;
+    let seen: Set<string> | null = null, retry: ReturnType<typeof setTimeout> | null = null, dropped = false, droppedAt = 0;
     const read = () => {
       const st = ch.presenceState() as Record<string, Array<Partial<Online>>>;
       const list: Online[] = Object.entries(st).map(([id, metas]) => {
@@ -114,8 +114,12 @@ export function usePresence(projectId: string | null, me: { id: string; name: st
       const fake = import.meta.env.DEV && typeof window !== "undefined" ? ((window as unknown as { __mdtPresence?: Online[] }).__mdtPresence ?? []) : [];
       const all = [...list, ...fake.filter((f) => !list.some((l) => l.user_id === f.user_id))];
       // A colleague comes (back) in, or this device is back in after a drop: a water drop sound.
-      if (seen && all.some((o) => o.user_id !== meId && !seen!.has(o.user_id))) playDrop();
-      if (seen) for (const o of all) if (o.user_id !== meId && !seen.has(o.user_id)) toast(`${o.name || "Un collaboratore"} è entrato nel progetto`, { id: `mdt-join-${o.user_id}`, description: `In diretta ${o.where || "nell’app"}.` });
+      // Only someone really arriving (not seen in the last 3 minutes): a flapping connection is not an arrival.
+      const now = Date.now();
+      const arrived = seen ? all.filter((o) => o.user_id !== meId && !seen!.has(o.user_id) && now - (lastSeenAt.get(o.user_id) ?? 0) > 180_000) : [];
+      for (const o of all) lastSeenAt.set(o.user_id, now);
+      if (arrived.length) playDrop();
+      for (const o of arrived) toast(`${o.name || "Un collaboratore"} è entrato nel progetto`, { id: `mdt-join-${o.user_id}`, description: `In diretta ${o.where || "nell’app"}.` });
       seen = new Set(all.map((o) => o.user_id));
       setOnline(all);
       publish(projectId, all);
@@ -124,12 +128,13 @@ export function usePresence(projectId: string | null, me: { id: string; name: st
     ch.on("presence", { event: "sync" }, read).subscribe((status) => {
       if (status === "SUBSCRIBED") {
         ready.current = true; sent.current = ""; send();
-        if (round > 0 || dropped) playDrop(); // back in the shared project after the connection dropped
+        // Back in after a real drop (more than 20 s away), once.
+        if ((round > 0 || dropped) && Date.now() - droppedAt > 20_000) playDrop();
         dropped = false;
         return;
       }
       if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-        ready.current = false; dropped = true;
+        ready.current = false; if (!dropped) droppedAt = Date.now(); dropped = true;
         if (!retry) retry = setTimeout(() => setRound((n) => n + 1), 15000);
       }
     });
@@ -143,6 +148,8 @@ export function usePresence(projectId: string | null, me: { id: string; name: st
 }
 
 const TRACK_GAP_MS = 12000;
+/** When each colleague was last seen connected (for the arrival sound and notice). */
+const lastSeenAt = new Map<string, number>();
 
 export const initials = (name: string) => name.split(/\s+|@/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "?";
 export const kindWord = (k: ProjectKind) => (k === "piazza" ? "la piazza" : "il vigneto");

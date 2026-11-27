@@ -173,7 +173,12 @@ export function installUiClicks(): () => void {
  * A water drop (synthesized, no file): a short sine falling quickly in pitch with a soft second "plip", for a shared
  * project coming back in real time (lib/project-share). Never blocks: without audio it does nothing.
  */
+let lastDropAt = 0;
+/** At most one drop a minute (DROP_GAP_MS): a channel rejoining or a colleague's connection flapping played it on and on. */
+const DROP_GAP_MS = 60_000;
 export function playDrop(volume = 0.5): void {
+  if (Date.now() - lastDropAt < DROP_GAP_MS) return;
+  lastDropAt = Date.now();
   try {
     const ctx = audioContext();
     if (!ctx) return;

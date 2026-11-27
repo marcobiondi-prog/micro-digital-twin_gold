@@ -106,16 +106,16 @@ export function ShareControl() {
   return (
     <>
       <button type="button" onClick={() => { setOpen(true); void share.reload(); }} aria-label={label} title="Chi è in condivisione"
-        className="share-badge relative grid size-9 shrink-0 place-items-center rounded-full border border-foreground/15 bg-foreground/[0.06] text-foreground outline-none transition-colors hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring sm:size-10" data-live={liveNow ? "" : undefined}>
-        {liveNow && !outOf && <span className="share-badge-ring pointer-events-none absolute -inset-[3px] rounded-full" aria-hidden="true" />}
-        {outOf ? <Unlink className="size-4 text-amber-300 sm:size-[1.15rem]" aria-hidden="true" /> : faces.length ? (
+        className="share-badge relative grid size-8 shrink-0 place-items-center rounded-full border border-foreground/15 bg-foreground/[0.06] text-foreground outline-none transition-colors hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring sm:size-9" data-live={liveNow ? "" : undefined}>
+        {liveNow && !outOf && <span className="share-badge-ring pointer-events-none absolute -inset-[2px] rounded-full" aria-hidden="true" />}
+        {outOf ? <Unlink className="size-3.5 text-amber-300 sm:size-4" aria-hidden="true" /> : faces.length ? (
           <span className="flex -space-x-2.5" aria-hidden="true">
-            {faces.map((f) => <Face key={f.user_id} name={f.name} avatar={f.avatar} size={faces.length > 1 ? 22 : 26} ring="ring-2 ring-background" />)}
+            {faces.map((f) => <Face key={f.user_id} name={f.name} avatar={f.avatar} size={faces.length > 1 ? 18 : 22} ring="ring-2 ring-background" />)}
           </span>
-        ) : <Users className="size-4 sm:size-[1.15rem]" aria-hidden="true" />}
+        ) : <Users className="size-3.5 sm:size-4" aria-hidden="true" />}
         {outOf && <span className="absolute -inset-px rounded-full ring-2 ring-amber-300/60" aria-hidden="true" />}
-        {!outOf && count > 1 && <span className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[oklch(0.78_0.13_185)] px-1 text-[10px] font-bold leading-none text-[oklch(0.2_0.03_240)] ring-2 ring-background" aria-hidden="true">{count}</span>}
-        {liveNow && !outOf && <span className="share-badge-dot absolute -bottom-0.5 -right-0.5 size-3 rounded-full bg-emerald-400 ring-2 ring-background" aria-hidden="true" />}
+        {!outOf && count > 1 && <span className="absolute -right-1 -top-1 grid h-[15px] min-w-[15px] place-items-center rounded-full bg-[oklch(0.78_0.13_185)] px-0.5 text-[9px] font-bold leading-none text-[oklch(0.2_0.03_240)] ring-2 ring-background" aria-hidden="true">{count}</span>}
+        {liveNow && !outOf && <span className="share-badge-dot absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-400 ring-2 ring-background" aria-hidden="true" />}
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent onOpenAutoFocus={(e) => e.preventDefault()} overlayClassName="bg-black/45 backdrop-blur-md sm:!fixed sm:!inset-0 sm:!h-auto sm:!min-h-0" className="max-h-[88dvh] grid-cols-[minmax(0,1fr)] gap-4 overflow-y-auto overflow-x-hidden overscroll-contain border-foreground/20 bg-card p-5 shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_-24px_60px_rgb(0_0_0/0.6)] dark:bg-[oklch(0.25_0.016_258)] max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-[1.75rem] max-sm:border-x-0 max-sm:border-b-0 max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-sm:data-[state=open]:slide-in-from-bottom-1/2 max-sm:data-[state=closed]:slide-out-to-bottom-1/2 sm:w-[min(480px,calc(100vw-1.5rem))] sm:rounded-2xl">
