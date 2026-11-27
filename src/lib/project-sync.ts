@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { focusProjectArea } from "@/lib/gps-hold";
 import { applyProjectState, getLab, onLabEdit, onReadOnlyRefused, setLabReadOnly } from "@/models/lab-store";
 import { placeOf, projectName, projectSlice, syncStep, type ProjectKind, type SyncMeta } from "@/models/project-state";
 
@@ -145,7 +146,11 @@ export async function syncProject(kind: ProjectKind, opts: { announce?: boolean;
       if (row.state && Object.keys(row.state).length) applyProjectState(kind, row.state);
       setMeta(user, kind, { id: row.id, known: row.updated_at, syncedAt: Date.now(), shared });
       if (changed && opts.announce !== false) {
-        if (opts.by === "colleague") toast(kind === "piazza" ? "Piazza aggiornata da un collaboratore" : "Vigneto aggiornato da un collaboratore", { id: `mdt-colleague-${kind}`, description: "Vedi le sue modifiche in diretta." });
+        if (opts.by === "colleague") {
+          // Whoever is working on it, the others' maps come to the area of intervention to see the changes.
+          focusProjectArea();
+          toast(kind === "piazza" ? "Piazza aggiornata da un collaboratore" : "Vigneto aggiornato da un collaboratore", { id: `mdt-colleague-${kind}`, description: "Ti porto sull’area d’intervento: vedi le sue modifiche in diretta." });
+        }
         else toast(kind === "piazza" ? "Piazza aggiornata dal tuo account" : "Vigneto aggiornato dal tuo account", { description: "Hai ritrovato le modifiche fatte su un altro dispositivo." });
       }
     } else if (row && !known) {

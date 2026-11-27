@@ -2575,3 +2575,27 @@ html[data-slate] .nav-orb-glow {
 .map-person-face { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 9999px; background: oklch(0.45 0.08 200) center/cover no-repeat; font-size: 10px; }
 @keyframes map-person-pulse { to { box-shadow: 0 0 0 10px oklch(0.8 0.16 160 / 0); } }
 @media (prefers-reduced-motion: reduce) { .map-person::before { animation: none; } }
+.map-person-note { font-weight: 500; font-size: 11px; color: rgb(255 255 255 / 0.7); }
+.map-person-away { box-shadow: 0 0 0 2px #94a3b8, 0 4px 12px rgb(0 0 0 / 0.45); opacity: 0.9; }
+.map-person-away::after { background: #94a3b8; }
+.map-person-away::before { animation: none; }
+
+/* Map pin's name (maplibre popup, 2D and open 3D): a dark glass label with white text, readable over any imagery. */
+.maplibregl-map .maplibregl-popup-content {
+  background: rgb(15 20 28 / 0.86);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  padding: 7px 12px;
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.45);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.maplibregl-map .maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color: rgb(15 20 28 / 0.86); }
+.maplibregl-map .maplibregl-popup-anchor-top .maplibregl-popup-tip { border-bottom-color: rgb(15 20 28 / 0.86); }
+.maplibregl-map .maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: rgb(15 20 28 / 0.86); }
+.maplibregl-map .maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: rgb(15 20 28 / 0.86); }
+.maplibregl-map .maplibregl-popup-close-button { color: #fff; font-size: 16px; padding: 0 6px; top: 50%; transform: translateY(-50%); border: 0; background: transparent; }
+.maplibregl-map .maplibregl-popup-content:has(.maplibregl-popup-close-button) { padding-right: 30px; }

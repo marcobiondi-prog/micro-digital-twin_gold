@@ -19,9 +19,9 @@ import { openAccount } from "@/lib/camera-dock";
 import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn } from "@/lib/demo-login";
 import { cn } from "@/lib/utils";
 import { setUrban, setVineyard, useLab, useLabReadOnly, vineMetrics } from "@/models/lab-store";
-import { useColleagues } from "@/lib/colleagues";
+import { projectSpots, useColleagues } from "@/lib/colleagues";
 import { useCurrentProject } from "@/lib/project-sync";
-import { initials, useProjectPeople, type Online } from "@/lib/project-share";
+import { initials, useProjectPeople, type Online, type Person } from "@/lib/project-share";
 import { shadeOpenness, piazzaLayout, piazzaShadows, vineShadows, TREE_SHADE_M2, vineLayout, type LayoutEdits, type PiazzaLayout } from "@/models/area-layout";
 import { dayLight, solarHour, sunAt, sunHeightDeg } from "@/models/sun-shadow";
 import { getSimWhen, useSimWhen } from "@/models/sim-when";
@@ -67,7 +67,10 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   // Progetti condivisi: in "Solo visione" the map is only looked at — no place search, drawing, zones nor proposals.
   const readOnly = useLabReadOnly(kind === "urban" ? "piazza" : "vigneto");
   // Progetti condivisi: the colleagues connected now on this project — named dots where they stand, a line over the map.
-  const { list: colleagues, spots: people } = useColleagues(kind === "urban" ? "piazza" : "vigneto");
+  const { list: colleagues, spots: gpsPeople } = useColleagues(kind === "urban" ? "piazza" : "vigneto");
+  // Every account of a shared project shows on the 2D and 3D maps: by its GPS, else round the area's middle (projectSpots).
+  const project = useCurrentProject(kind === "urban" ? "piazza" : "vigneto");
+  const share = useProjectPeople(project.id, project.user);
   const liveLoc = kind === "urban" ? lab.urban.location : lab.vineyard.location;
   // The maps follow the place, not every metre of it: a GPS fix settling a few metres away, or the same place saved again
   // under its street's name, rebuilt every map from scratch (each was keyed and built on the exact coordinates and
@@ -118,6 +121,9 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   const following = !liveLoc.pending && !saved && gpsFollowing() && !drawHold;
   const at = following ? [livePos?.lat ?? liveLoc.lat, livePos?.lng ?? liveLoc.lng] as [number, number] : pinFix ?? drawnCentre ?? centre ?? null;
   const pin = at ? { lat: at[0], lng: at[1] } : { lat: loc.lat, lng: loc.lng };
+  const people = useMemo(() => [...gpsPeople, ...projectSpots(share.people, colleagues, gpsPeople, project.user, drawnCentre ? { lat: drawnCentre[0], lng: drawnCentre[1] } : pin)],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [gpsPeople, share.people, colleagues, project.user, drawnCentre?.[0], drawnCentre?.[1], pin.lat, pin.lng]);
   const movePin = (lat: number, lng: number) => { setPinFix(loc.lat, loc.lng, [lat, lng]); toast.success("Pin spostato", { description: "Resta qui per questo luogo, anche in 3D." }); };
   const [drawing, setDrawing] = useState(false);
   const [draft, setDraft] = useState<Ring>([]);
@@ -425,7 +431,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
       <div data-sim-map-box="" data-map-gestures={show3d ? "" : undefined} className="relative -mx-4 h-[52vh] min-h-72 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
         {/* The temperature the interventions bring, on the map itself (2D and 3D), following the levers live. */}
         <MapReading kind={kind} lat={pin.lat} lng={pin.lng} />
-        <LiveColleagues kind={kind === "urban" ? "piazza" : "vigneto"} list={colleagues} spots={people} />
+        <LiveColleagues me={project.user} people={share.people} list={colleagues} spots={gpsPeople} />
         {/* How many misting poles the map shows, exactly: those in the zones drawn for them and those the app placed. */}
         {sim?.kind === "piazza" && sim.data.misters.length > 0 && !drawing && (
           <p role="status" className="pointer-events-none absolute left-1/2 top-12 z-[3] -translate-x-1/2 whitespace-nowrap rounded-full bg-black/45 px-3 py-1 text-[12px] font-semibold text-white ring-1 ring-white/15 backdrop-blur-sm [text-shadow:0_1px_2px_rgb(0_0_0/.6)]">
@@ -502,9 +508,8 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
  * Progetti condivisi: over the map (2D and 3D), who the project belongs to or is shared with and who is in it right now —
  * also those whose GPS is off (they are not on the map), so the people of the project are always said here.
  */
-function LiveColleagues({ kind, list, spots }: { kind: "piazza" | "vigneto"; list: Online[]; spots: Array<{ id: string }> }) {
-  const project = useCurrentProject(kind);
-  const share = useProjectPeople(project.id, project.user);
+function LiveColleagues({ me, people, list, spots }: { me: string | null; people: Person[]; list: Online[]; spots: Array<{ id: string }> }) {
+  const share = { people }, project = { user: me };
   const others = share.people.filter((p) => p.user_id !== project.user);
   if (!list.length && !others.length) return null;
   const first = (n: string) => n.split(/\s+|@/)[0] || "Un collaboratore";

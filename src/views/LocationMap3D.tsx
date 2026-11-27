@@ -288,9 +288,10 @@ function personBadges(lib: Maps3D, map: HTMLElement, pool: Map<string, HTMLEleme
     try {
       const mk = new lib.Marker3DElement({ position: { lat: p.lat, lng: p.lng, altitude: 2.5 }, altitudeMode: "RELATIVE_TO_GROUND", drawsWhenOccluded: true, sizePreserved: true, extruded: true });
       const name = firstName(p.name).replace(/[<&>"]/g, ""), ini = personInitials(p.name).replace(/[<&>"]/g, "");
-      const w = 44 + Math.min(14, name.length) * 8.4;
+      const note = (p.note ?? "").replace(/[<&>"]/g, ""), ring = p.away ? "#94a3b8" : "#2dd4bf";
+      const w = 44 + Math.min(14, name.length) * 8.4 + (note ? note.length * 6.2 + 10 : 0);
       const tpl = document.createElement("template");
-      tpl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="34" viewBox="0 0 ${w} 34"><rect x="1.5" y="1.5" width="${w - 3}" height="31" rx="15.5" fill="#0b0f15" fill-opacity="0.85" stroke="#2dd4bf" stroke-width="2"/><circle cx="17" cy="17" r="12" fill="#2dd4bf"/><text x="17" y="21" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" font-weight="700" fill="#0b0f15">${ini}</text><text x="35" y="22" font-family="system-ui,sans-serif" font-size="14" font-weight="600" fill="#ffffff">${name}</text></svg>`;
+      tpl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="34" viewBox="0 0 ${w} 34"><rect x="1.5" y="1.5" width="${w - 3}" height="31" rx="15.5" fill="#0b0f15" fill-opacity="0.85" stroke="${ring}" stroke-width="2"/><circle cx="17" cy="17" r="12" fill="${ring}"/><text x="17" y="21" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" font-weight="700" fill="#0b0f15">${ini}</text><text x="35" y="22" font-family="system-ui,sans-serif" font-size="14" font-weight="600" fill="#ffffff">${name}${note ? `<tspan font-size="11" font-weight="500" fill="#cbd5e1"> · ${note}</tspan>` : ""}</text></svg>`;
       mk.append(tpl);
       map.append(mk);
       pool.set(id, mk);

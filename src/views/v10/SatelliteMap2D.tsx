@@ -1,3 +1,4 @@
+import { FOCUS_AREA_EVENT } from "@/lib/gps-hold";
 import { moveFind } from "@/models/field-finds";
 import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap, Marker } from "maplibre-gl";
@@ -56,7 +57,7 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
   /** A still preview: framed on the drawn area, without its corner pins nor the recenter button. */
   proposal?: boolean; still?: boolean;
   /** Progetti condivisi: colleagues connected now, shown where they stand (their GPS) as named dots. */
-  people?: Array<{ id: string; name: string; avatar: string | null; lat: number; lng: number }>;
+  people?: Array<{ id: string; name: string; avatar: string | null; lat: number; lng: number; note?: string; away?: boolean }>;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const under = useRef<HTMLDivElement>(null);
@@ -258,12 +259,20 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
       keep.add(p.id);
       const m = marks.get(p.id);
       if (m) m.setLngLat([p.lng, p.lat]);
-      else marks.set(p.id, new lib.Marker({ element: personElement(p.name, p.avatar), anchor: "bottom" }).setLngLat([p.lng, p.lat]).addTo(map));
+      else marks.set(p.id, new lib.Marker({ element: personElement(p.name, p.avatar, p.note, p.away), anchor: "bottom" }).setLngLat([p.lng, p.lat]).addTo(map));
     }
     for (const [id, m] of marks) if (!keep.has(id)) { m.remove(); marks.delete(id); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, peopleKey]);
   useEffect(() => () => { peopleMarks.current.forEach((m) => m.remove()); peopleMarks.current.clear(); }, []);
+  // A colleague changed the shared project: the map comes back to the area of intervention.
+  useEffect(() => {
+    if (still) return;
+    const focus = () => { if (!live.current.drawing) frameArea(window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 900); };
+    window.addEventListener(FOCUS_AREA_EVENT, focus);
+    return () => window.removeEventListener(FOCUS_AREA_EVENT, focus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [still, area]);
   const framed = useRef(false);
   useEffect(() => {
     if (still || drawing || state !== "ready" || framed.current) return;

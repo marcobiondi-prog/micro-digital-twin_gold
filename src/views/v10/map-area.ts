@@ -516,11 +516,11 @@ export function findElement(f: FieldFind): HTMLElement {
 }
 
 /** Progetti condivisi: a colleague connected now, where they stand — their picture (or initials) and first name in a pill. */
-export function personElement(name: string, avatar: string | null): HTMLElement {
+export function personElement(name: string, avatar: string | null, note?: string, away?: boolean): HTMLElement {
   const el = document.createElement("div");
   el.setAttribute("role", "img");
-  el.setAttribute("aria-label", `${name || "Collaboratore"} è qui adesso`);
-  el.className = "map-person";
+  el.setAttribute("aria-label", note ? `${name || "Collaboratore"}, ${note}` : `${name || "Collaboratore"} è qui adesso`);
+  el.className = away ? "map-person map-person-away" : "map-person";
   const face = document.createElement("span");
   face.className = "map-person-face";
   if (avatar) face.style.backgroundImage = `url("${avatar}")`;
@@ -529,6 +529,7 @@ export function personElement(name: string, avatar: string | null): HTMLElement 
   label.className = "map-person-name";
   label.textContent = (name.split(/\s+/)[0] || "Collaboratore");
   el.append(face, label);
+  if (note) { const n = document.createElement("span"); n.className = "map-person-note"; n.textContent = note; el.append(n); }
   return el;
 }
 

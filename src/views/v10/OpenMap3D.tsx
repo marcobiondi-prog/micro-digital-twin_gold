@@ -99,7 +99,7 @@ export function OpenMap3D({ lat, lng, label, zoom, area = [], sim = null, follow
       keep.add(p.id);
       const m = marks.get(p.id);
       if (m) m.setLngLat([p.lng, p.lat]);
-      else marks.set(p.id, new lib.Marker({ element: personElement(p.name, p.avatar), anchor: "bottom" }).setLngLat([p.lng, p.lat]).addTo(map));
+      else marks.set(p.id, new lib.Marker({ element: personElement(p.name, p.avatar, p.note, p.away), anchor: "bottom" }).setLngLat([p.lng, p.lat]).addTo(map));
     }
     for (const [id, m] of marks) if (!keep.has(id)) { m.remove(); marks.delete(id); }
     // eslint-disable-next-line react-hooks/exhaustive-deps

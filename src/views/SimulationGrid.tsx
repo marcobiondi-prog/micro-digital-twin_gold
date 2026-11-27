@@ -2,6 +2,7 @@ import { FormEvent, Suspense, lazy, useEffect, useRef, useState, type ReactNode 
 import { appAllowed, guardUse, useAppAllowed } from "@/lib/app-permissions";
 import { setLivePos } from "@/lib/live-position";
 import { sharedNow } from "@/lib/project-sync";
+import { FOCUS_AREA_EVENT, GPS_PAUSE_KEY } from "@/lib/gps-hold";
 import { useServerFn } from "@tanstack/react-start";
 import { CloudSun, Droplets, Grape, LoaderCircle, LocateFixed, Lock, Satellite, MapPin, Search, Sprout, Thermometer, TreePine, TrendingDown, Umbrella, Undo2 } from "lucide-react";
 import { Card, StatusBadge } from "@/views/health";
@@ -96,7 +97,6 @@ const GPS_KEY = "mdt-gps-v1";
 function readGps() { try { return typeof localStorage !== "undefined" && localStorage.getItem(GPS_KEY) !== "off"; } catch { return false; } }
 function saveGps(on: boolean) { try { localStorage.setItem(GPS_KEY, on ? "on" : "off"); } catch { /* storage unavailable */ } }
 /** A place chosen by hand while the GPS is on pauses the following (kept across openings) until "Seguimi di nuovo". */
-const GPS_PAUSE_KEY = "mdt-gps-paused-v1";
 function readGpsPaused() { try { return typeof localStorage !== "undefined" && localStorage.getItem(GPS_PAUSE_KEY) === "1"; } catch { return false; } }
 /**
  * While an area or a zone is being drawn (or the elements arranged) on the map the GPS holds still: it keeps running but
@@ -178,6 +178,12 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
   const appliedAcc = useRef(Infinity);
   const pauseFollow = () => { if (gpsRef.current) { setPaused(true); saveGpsPaused(true); } };
   const gpsRef = useRef(false); gpsRef.current = gps;
+  // A colleague changed the shared project: the GPS stops moving the map and the place, which stay on the project's area.
+  useEffect(() => {
+    const hold = () => { if (gpsRef.current) setPaused(true); };
+    window.addEventListener(FOCUS_AREA_EVENT, hold);
+    return () => window.removeEventListener(FOCUS_AREA_EVENT, hold);
+  }, []);
   // Read after mounting, so the server's page and the first render agree.
   // Every opening switches the GPS on and follows the phone, except where there is work to keep: a place with an area
   // drawn stays put (the GPS on but paused, "Seguimi di nuovo" to follow), so opening the map never takes the
