@@ -200,6 +200,9 @@ export function LicensesPage() {
           <li>Posizione del telefono (tasto GPS della mappa): i sistemi di navigazione satellitare GPS (Stati Uniti), Galileo (Unione europea), GLONASS (Russia), BeiDou (Cina), QZSS (Giappone) e NavIC (India), secondo quelli che il telefono riceve. L’app legge solo la posizione che il telefono le passa, con il tuo permesso.
             <LogoTiles items={GNSS_TILES} cacheKey="mdt-gnss-logo-v1" label="Sistemi satellitari" />
           </li>
+          <li>Cosa c’è intorno all’area disegnata (beni culturali e storici, fiumi, coste, boschi, parchi, alberi e fontane esistenti, luoghi che richiamano persone) letto dai dati di OpenStreetMap attraverso i server pubblici di Overpass API (overpass-api.de, Kumi Systems, maps.mail.ru, overpass.osm.jp).</li>
+          <li>Vincoli dell’area: stima indicativa secondo il Codice dei beni culturali e del paesaggio (D.Lgs. 42/2004); le mappe ufficiali sono Vincoli in Rete e SITAP del Ministero della Cultura, collegate dalla scheda.</li>
+          <li>Quota del luogo e previsioni a 7 giorni del vigneto: Open-Meteo, licenza CC BY 4.0.</li>
           <li>Elenco dei comuni italiani: dati ISTAT (2020) da comuni-json di Matteo Contrini, licenza MIT.</li>
           <li>Email degli uffici comunali: Indice dei domicili digitali della Pubblica Amministrazione (IPA), AgID, dati aperti con licenza CC BY 4.0.</li>
           <li>Stemmi dei comuni e delle regioni e loghi dei sistemi satellitari da Wikimedia Commons (trovati tramite Wikidata): autore e licenza nella pagina di ogni file. I loghi appartengono ai rispettivi titolari e sono mostrati solo come riconoscimento.</li>
@@ -208,7 +211,8 @@ export function LicensesPage() {
       <InfoCard title="Permessi del telefono">
         <p>L’app usa queste funzioni del telefono solo con il tuo permesso, e solo mentre la usi:</p>
         <ul>
-          <li>Posizione: per trovare il luogo sulla mappa e per il GPS che ti segue. La posizione arriva dai sistemi satellitari qui sopra e non viene condivisa con altri.</li>
+          <li>Posizione: per trovare il luogo sulla mappa e per il GPS che ti segue. La posizione arriva dai sistemi satellitari qui sopra. Non viene condivisa con altri, tranne che con le persone di un progetto condiviso mentre siete connessi insieme: vedono il tuo nome dove ti trovi sulla mappa, in 3D, in AR e nel visore.</li>
+          <li>Realtà aumentata e sensori di movimento: per la modalità AR della fotocamera AI (con Google ARCore dove il telefono lo offre, altrimenti un’anteprima che legge l’inclinazione del telefono). Le immagini della fotocamera restano sul telefono, tranne le foto che scatti.</li>
           <li>Fotocamera e microfono: per scattare foto, lo scatto multiplo e i video con l’audio. Foto e video restano nella tua simulazione, sul telefono o nel tuo account.</li>
           <li>Notifiche: per avvisarti del cambio dell’ora, anche con l’app in sottofondo.</li>
           <li>Riconoscimento biometrico (Face ID o Touch ID su iPhone, impronta digitale o volto su Android, Windows Hello sul computer): solo se lo attivi su un profilo professionale, per rientrare in quel profilo e nel suo account senza password. Il riconoscimento lo fa il telefono: impronta e volto non escono mai dal telefono e l’app riceve solo il «sì» o il «no». Lo spegni quando vuoi dal profilo o dal pannello account.</li>
@@ -218,6 +222,13 @@ export function LicensesPage() {
       <InfoCard title="Riconoscimento biometrico">
         <p>L’accesso con Face ID, Touch ID, impronta o volto usa le passkey, lo standard aperto Web Authentication (WebAuthn) del W3C e della FIDO Alliance, attraverso il riconoscimento già presente nel telefono o nel computer. L’app conserva solo un codice della chiave, su questo dispositivo.</p>
         <p>Face ID e Touch ID sono marchi di Apple Inc.; Windows Hello è un marchio di Microsoft Corporation; i marchi appartengono ai loro titolari.</p>
+      </InfoCard>
+      <InfoCard title="Realtà aumentata e virtuale">
+        <p>La modalità AR usa lo standard aperto WebXR Device API del W3C e, sui telefoni Android, Google Play Services per AR (ARCore) per trovare il pavimento, la luce e la profondità della stanza. Il visore VR sul computer (Windows Mixed Reality, Meta Quest con Link, SteamVR) usa lo stesso standard.</p>
+        <p>Gli alberi realistici sono generati con EZ-Tree o costruiti dall’app; ARCore e Google Play Services sono marchi di Google LLC.</p>
+      </InfoCard>
+      <InfoCard title="Progetti condivisi">
+        <p>Quando lavori su un progetto condiviso, chi è connesso nello stesso momento vede il tuo nome, la tua immagine, in che parte dell’app sei e, se il GPS è acceso, dove ti trovi. Questi dati passano solo tra le persone del progetto e non vengono salvati: spariscono quando chiudi l’app.</p>
       </InfoCard>
       <InfoCard title="Software">
         <p>Le librerie open source con cui è fatta l’app, con la loro licenza.</p>

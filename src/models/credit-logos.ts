@@ -14,9 +14,12 @@ const item = (id: string, name: string, sub: string, icon?: BrandIcon, articles?
 
 export const SERVICES: CreditItem[] = [
   item("osm", "OpenStreetMap", "Mappe, luoghi e superfici", si("openstreetmap")),
+  item("overpass", "Overpass API", "Cosa c’è intorno: vincoli, persone, alberi e fontane", undefined, ["Overpass API"]),
   item("esri", "Esri", "Immagini satellitari della mappa", si("esri")),
-  item("gmaps", "Google Maps", "Ricerca dei luoghi e mappa 3D", si("googlemaps")),
-  item("openmeteo", "Open-Meteo", "Meteo e clima dell’anno", undefined, ["Open-Meteo"]),
+  item("gmaps", "Google Maps", "Ricerca dei luoghi, mappa 2D e 3D fotografica", si("googlemaps")),
+  item("arcore", "Google ARCore", "Realtà aumentata sul telefono", undefined, ["ARCore"]),
+  item("webxr", "WebXR", "Realtà aumentata e visore VR", undefined, ["WebXR"]),
+  item("openmeteo", "Open-Meteo", "Meteo, previsioni, clima dell’anno e quota", undefined, ["Open-Meteo"]),
   item("nasa", "NASA POWER", "Dati climatici", si("nasa")),
   item("copernicus", "Copernicus", "Dati dai satelliti", undefined, ["Copernicus Programme"]),
   item("sensor", "Sensor.Community", "Sensori dell’aria vicini", undefined, ["Sensor.Community", "Luftdaten.info"]),
@@ -27,6 +30,8 @@ export const SERVICES: CreditItem[] = [
   item("gbif", "GBIF", "Foto e nomi delle specie", undefined, ["Global Biodiversity Information Facility"]),
   item("col", "Catalogue of Life", "Verifica dei nomi delle specie", undefined, ["Catalogue of Life"]),
   item("istat", "ISTAT", "Elenco dei comuni", undefined, ["Istat", "Italian National Institute of Statistics"]),
+  item("agid", "AgID · IPA", "Email degli uffici comunali", undefined, ["Agency for Digital Italy", "AgID"]),
+  item("mic", "Ministero della Cultura", "Mappe dei beni tutelati e dei vincoli", undefined, ["Ministry of Culture (Italy)"]),
   item("wikidata", "Wikidata", "Stemmi e loghi", si("wikidata")),
   item("commons", "Wikimedia Commons", "Immagini di stemmi e loghi", si("wikimediacommons")),
 ];
@@ -53,6 +58,8 @@ export const LIBRARIES: CreditItem[] = [
   item("cva", "class-variance-authority", "Apache-2.0"),
   item("rhf", "React Hook Form", "MIT"),
   item("embla", "Embla Carousel", "MIT"),
+  item("twanimate", "tw-animate-css", "MIT"),
+  item("clsx", "clsx e tailwind-merge", "MIT"),
   item("tzlookup", "tz-lookup", "CC0-1.0 · fusi orari"),
   item("simpleicons", "Simple Icons", "CC0-1.0 · loghi"),
 ];
