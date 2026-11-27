@@ -359,11 +359,26 @@ export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number },
  * tree (1,2 MB) instead of 20 (24 MB) — Google's 3D froze loading them one by one. The group stands at the copies'
  * middle, at its ground height: on a slope a copy can sit a little over or under the ground.
  */
+const MERGE_CELL_M = 8, MERGE_TILES = 6;
 export type MergedSpot = { id: string; lat: number; lng: number; up: number; ensure: () => Promise<string | null> };
 function mergeSpots(spots: ModelSpot[], ll: (x: number, z: number) => { lat: number; lng: number }, builders: Map<string, () => THREE.Object3D | Promise<THREE.Object3D | null> | null>, glows: Map<string, number>, lite: boolean): MergedSpot[] {
-  const groups = new Map<string, ModelSpot[]>();
-  for (const sp of spots) { const g = groups.get(sp.key); if (g) g.push(sp); else groups.set(sp.key, [sp]); }
-  return [...groups].map(([key, list]) => {
+  // The copies of a kind are cut into tiles like the ground shapes (models/drape tileRing: cells of at least 8 m,
+  // growing to keep at most MERGE_TILES per kind), each tile one model at its own ground height, so the groups follow a
+  // hilly ground while staying few.
+  const byKey = new Map<string, ModelSpot[]>();
+  for (const sp of spots) { const g = byKey.get(sp.key); if (g) g.push(sp); else byKey.set(sp.key, [sp]); }
+  const groups = new Map<string, { key: string; list: ModelSpot[] }>();
+  for (const [key, all] of byKey) {
+    const xs = all.map((p) => p.x ?? 0), zs = all.map((p) => p.z ?? 0);
+    const minX = Math.min(...xs), minZ = Math.min(...zs), w = Math.max(...xs) - minX, d = Math.max(...zs) - minZ;
+    let cell = Math.max(MERGE_CELL_M, Math.sqrt((w * d) / MERGE_TILES));
+    while (Math.ceil((w + 0.01) / cell) * Math.ceil((d + 0.01) / cell) > MERGE_TILES) cell *= 1.2;
+    for (const p of all) {
+      const gk = `${key}#${Math.floor(((p.x ?? 0) - minX) / cell)},${Math.floor(((p.z ?? 0) - minZ) / cell)}`;
+      const g = groups.get(gk); if (g) g.list.push(p); else groups.set(gk, { key, list: [p] });
+    }
+  }
+  return [...groups.values()].map(({ key, list }) => {
     const cx = list.reduce((t, p) => t + (p.x ?? 0), 0) / list.length, cz = list.reduce((t, p) => t + (p.z ?? 0), 0) / list.length;
     const places = list.map((p) => ({ x: (p.x ?? 0) - cx, z: (p.z ?? 0) - cz, yaw: p.yaw ?? 0 }));
     const sig = places.map((p) => `${p.x.toFixed(2)},${p.z.toFixed(2)},${p.yaw.toFixed(2)}`).join(";");
