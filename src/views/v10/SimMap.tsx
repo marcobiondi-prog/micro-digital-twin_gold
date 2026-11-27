@@ -23,7 +23,7 @@ import { projectSpots, useColleagues } from "@/lib/colleagues";
 import { sendDrag, useCurrentProject, useLiveEdit, useRemoteDrags, type LiveEdit } from "@/lib/project-sync";
 import { MAP_DRAG_EVENT, type MapDrag } from "@/views/v10/map-area";
 import { focusProjectArea, followGpsAgain, isExploring } from "@/lib/gps-hold";
-import { askToRejoin, cancelRejoin, useLeftProject } from "@/lib/project-rejoin";
+import { askToRejoin, useLeftProject } from "@/lib/project-rejoin";
 import { initials, useProjectPeople, type Online, type Person } from "@/lib/project-share";
 import { shadeOpenness, piazzaLayout, piazzaShadows, vineShadows, TREE_SHADE_M2, vineLayout, type LayoutEdits, type PiazzaLayout } from "@/models/area-layout";
 import { dayLight, solarHour, sunAt, sunHeightDeg } from "@/models/sun-shadow";
@@ -620,14 +620,6 @@ function RejoinPill({ kind, current }: { kind: "piazza" | "vigneto"; current: st
         }} className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-black disabled:opacity-60">
           {left.status === "denied" ? "Chiedi di nuovo" : "Chiedi di rientrare"}
         </button>
-      )}
-      {waiting && (
-        <button type="button" disabled={busy} onClick={async () => {
-          setBusy(true);
-          try { await cancelRejoin(kind); toast("Richiesta revocata", { description: `${left.owner} non la vede più.` }); }
-          catch (e) { toast.error("Richiesta non revocata", { description: (e as Error).message }); }
-          finally { setBusy(false); }
-        }} className="shrink-0 rounded-full border border-white/40 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60">Revoca</button>
       )}
     </div>
   );
