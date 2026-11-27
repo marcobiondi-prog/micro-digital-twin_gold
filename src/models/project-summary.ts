@@ -55,7 +55,7 @@ export function piazzaSummary(urban: LabState["urban"], season: Season, profile:
 /** What was put in the piazza, one line each with its unit cost (shared by the dashboard rows and the report). */
 export const piazzaMix = (urban: LabState["urban"], s: PiazzaSummary) => [
   { label: "Alberi", value: `${urban.trees}`, cost: `${euroRange(UNIT_COST.tree)} l’uno` },
-  { label: "Aiuole e ciottoli", value: `${urban.permeable}%`, cost: `${grouped(s.lawnM2)} m² · ${euroRange(UNIT_COST.lawnM2)} al m²` },
+  { label: "Aiuole e ciottoli", value: `${grouped(s.lawnM2)} m²`, cost: `${urban.permeable}% della piazza · ${euroRange(UNIT_COST.lawnM2)} al m²` },
   { label: "Coperture ombreggianti", value: `${grouped(s.shadeArea)} m²`, cost: `${urban.shade}% della piazza · ${euroRange(UNIT_COST.shadeM2)} al m²` },
   { label: "Nebulizzatori", value: `${urban.misters ?? 0}`, cost: `${euroRange(UNIT_COST.mister)} l’uno` },
   { label: "Innaffiatoi", value: `${urban.sprinklers ?? 0}`, cost: `${euroRange(UNIT_COST.sprinkler)} l’uno` },
