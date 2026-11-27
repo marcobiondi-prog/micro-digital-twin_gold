@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { isMobileDevice, setIosRealModels } from "@/lib/ios";
+import { isIOS, setIosRealModels } from "@/lib/ios";
 import { useModels3D } from "@/lib/use-ios-3d";
 const VineZonePicker = lazy(() => import("@/views/v10/VineThirst").then((m) => ({ default: m.VineZonePicker })));
 import { setPinFix, usePinFix } from "@/models/pin-fix";
@@ -96,7 +96,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   // Always both: with the browser key 3D is the photorealistic view, without it an open map with the buildings raised.
   const show3d = view === "3d" && can3d;
   const [iosDevice, setIosDevice] = useState(false);
-  useEffect(() => { setIosDevice(isMobileDevice()); }, []);
+  useEffect(() => { setIosDevice(isIOS()); }, []);
   const zoom3d = kind === "urban" ? 17 : 15;
   // The area drawn with pins for this place (kept with the simulation), and the pins being placed while drawing.
   const saved = drawnAreaFor(kind === "urban" ? lab.urban.area : lab.vineyard.area, loc);
@@ -891,17 +891,17 @@ function ZonesBar({ area, flow, onAdd, onEdit, onRemove }: { area: DrawnArea; fl
   );
 }
 
-/** Phones and tablets: the 3D's realistic models in their light version, off by default (they froze Google's 3D). */
+/** iPhone and iPad: the 3D's realistic models in their light version, off by default (the full ones froze Safari). */
 function IosModelsSwitch() {
   const on = useModels3D() === "lite";
   return (
     <label className="mx-auto flex w-fit max-w-full cursor-pointer items-center gap-3 rounded-full bg-card px-3 py-1.5 text-xs ring-1 ring-border">
       <span className="min-w-0">
         <span className="font-semibold text-foreground">Modelli realistici</span>
-        <span className="text-muted-foreground"> · {on ? "versione leggera" : "spenti: forme semplici, più veloce"}</span>
+        <span className="text-muted-foreground"> · {on ? "versione leggera per iPhone" : "spenti: forme semplici"}</span>
       </span>
       <button type="button" role="switch" aria-checked={on} aria-label="Modelli realistici nel 3D"
-        onClick={() => { setIosRealModels(!on); toast(on ? "Modelli realistici spenti" : "Modelli realistici accesi", { description: on ? "Il 3D torna alle forme semplici." : "Versione leggera per telefono e tablet: se il 3D si blocca, spegnili di nuovo." }); }}
+        onClick={() => { setIosRealModels(!on); toast(on ? "Modelli realistici spenti" : "Modelli realistici accesi", { description: on ? "Il 3D torna alle forme semplici." : "Versione leggera per iPhone: se il 3D si blocca, spegnili di nuovo." }); }}
         className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${on ? "bg-teal-400" : "bg-foreground/25"}`}>
         <span className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition-[left] ${on ? "left-[1.125rem]" : "left-0.5"}`} />
       </button>
