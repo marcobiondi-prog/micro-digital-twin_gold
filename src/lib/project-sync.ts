@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { describeChange } from "@/models/live-edit";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { focusProjectArea } from "@/lib/gps-hold";
-import { applyProjectState, getLab, onLabEdit, onReadOnlyRefused, setLabReadOnly } from "@/models/lab-store";
+import { applyProjectState, getLab, isLabReadOnly, onLabEdit, onReadOnlyRefused, setLabReadOnly } from "@/models/lab-store";
 import { placeOf, projectName, projectSlice, syncStep, type ProjectKind, type SyncMeta } from "@/models/project-state";
 
 /**
@@ -175,7 +176,12 @@ export function useProjectSync() {
       saidAt = Date.now();
       toast(kind === "piazza" ? "Piazza in solo visione" : "Vigneto in solo visione", { id: "mdt-viewer", description: "Puoi guardare il progetto ma non modificarlo: chiedi al proprietario di poter modificare." });
     });
+    // The live channels follow the projects in use (a project made, an invite accepted, a sign-in).
+    void refreshLive();
+    const onMeta = () => void refreshLive();
+    metaSubs.add(onMeta);
     const offEdit = onLabEdit((kind) => {
+      broadcastEdit(kind);
       markEdited(kind);
       window.clearTimeout(timers[kind]);
       timers[kind] = window.setTimeout(() => void syncProject(kind), 1000);
@@ -190,15 +196,85 @@ export function useProjectSync() {
       if (metaOf(me, row.kind)?.id !== row.id) return;
       void syncProject(row.kind, { announce: true, by: "colleague" });
     }).subscribe();
-    const { data } = supabase.auth.onAuthStateChange((event) => { if (event === "SIGNED_IN") { missing = false; window.setTimeout(() => syncAllProjects(), 800); } });
+    const { data } = supabase.auth.onAuthStateChange((event) => { if (event === "SIGNED_IN") { missing = false; window.setTimeout(() => syncAllProjects(), 800); } void refreshLive(); });
     const back = () => { if (document.visibilityState === "visible") syncAllProjects(); };
     const online = () => syncAllProjects();
     document.addEventListener("visibilitychange", back);
     window.addEventListener("online", online);
     return () => {
-      onReadOnlyRefused(null); offEdit(); window.clearTimeout(start); data.subscription.unsubscribe(); void supabase.removeChannel(live);
+      onReadOnlyRefused(null); offEdit(); metaSubs.delete(onMeta); for (const k of KINDS) { const l = lives[k]; if (l) { void supabase.removeChannel(l.ch); delete lives[k]; } } window.clearTimeout(start); data.subscription.unsubscribe(); void supabase.removeChannel(live);
       Object.values(timers).forEach((t) => window.clearTimeout(t));
       document.removeEventListener("visibilitychange", back); window.removeEventListener("online", online);
     };
   }, []);
 }
+
+/**
+ * In tempo reale: each edit to a shared project also goes at once (at most every 350 ms) to the others connected to it
+ * through a Realtime broadcast on "live:<project>", so they see the interventions change on their map as they happen —
+ * the saved project follows 1 s later as before. Who changed what, and where on the map, is kept for a few seconds
+ * (useLiveEdit) for the map to show it.
+ */
+export type LiveEdit = { kind: ProjectKind; by: string; name: string; what: string; at: [number, number] | null; time: number };
+let liveEdit: LiveEdit | null = null;
+const liveSubs = new Set<() => void>();
+let liveTimer: ReturnType<typeof setTimeout> | null = null;
+function setLiveEdit(e: LiveEdit | null) {
+  liveEdit = e; liveSubs.forEach((f) => f());
+  if (liveTimer) clearTimeout(liveTimer);
+  if (e) liveTimer = setTimeout(() => setLiveEdit(null), LIVE_SHOW_MS);
+}
+const LIVE_SHOW_MS = 7000;
+// Dev only: the screenshot scripts show a colleague's change (Realtime cannot be mocked there).
+if (import.meta.env.DEV && typeof window !== "undefined") (window as unknown as { __mdtLiveEdit?: typeof setLiveEdit }).__mdtLiveEdit = setLiveEdit;
+export function useLiveEdit(kind: ProjectKind): LiveEdit | null {
+  const e = useSyncExternalStore((f) => { liveSubs.add(f); return () => { liveSubs.delete(f); }; }, () => liveEdit, () => null);
+  return e && e.kind === kind ? e : null;
+}
+
+type Live = { id: string; ch: ReturnType<typeof supabase.channel>; ready: boolean };
+const lives: Partial<Record<ProjectKind, Live>> = {};
+let me: { id: string; name: string } | null = null;
+let focusedAt = 0;
+
+async function refreshLive() {
+  const { data } = await supabase.auth.getSession();
+  const u = data.session?.user;
+  me = u ? { id: u.id, name: String((u.user_metadata ?? {})["full_name"] ?? (u.user_metadata ?? {})["name"] ?? (u.email ?? "").split("@")[0] ?? "") } : null;
+  for (const kind of KINDS) {
+    const id = u ? metaOf(u.id, kind)?.id ?? null : null;
+    const cur = lives[kind];
+    if (cur && cur.id === id) continue;
+    if (cur) { void supabase.removeChannel(cur.ch); delete lives[kind]; }
+    if (!id) continue;
+    const ch = supabase.channel(`live:${id}`, { config: { broadcast: { self: false } } });
+    const live: Live = { id, ch, ready: false };
+    lives[kind] = live;
+    ch.on("broadcast", { event: "state" }, ({ payload }: { payload: { by?: { id: string; name: string }; state?: Record<string, unknown> } }) => {
+      if (!payload?.state || !payload.by || payload.by.id === me?.id) return;
+      const before = projectSlice(kind, getLab());
+      const change = describeChange(before, payload.state);
+      applyProjectState(kind, payload.state);
+      if (!change) return;
+      setLiveEdit({ kind, by: payload.by.id, name: payload.by.name, what: change.what, at: change.at, time: Date.now() });
+      // The first change after a while brings the map to the area of intervention (not at every drag).
+      if (Date.now() - focusedAt > 60_000) { focusedAt = Date.now(); focusProjectArea(); }
+    }).subscribe((status) => { live.ready = status === "SUBSCRIBED"; });
+  }
+}
+
+const sendTimers: Partial<Record<ProjectKind, ReturnType<typeof setTimeout>>> = {};
+const sentAt: Partial<Record<ProjectKind, number>> = {};
+function broadcastEdit(kind: ProjectKind) {
+  const live = lives[kind];
+  if (!live?.ready || !me || isLabReadOnlyKind(kind)) return;
+  const go = () => {
+    delete sendTimers[kind]; sentAt[kind] = Date.now();
+    const { places: _p, ...state } = projectSlice(kind, getLab()) as Record<string, unknown> & { places?: unknown };
+    void live.ch.send({ type: "broadcast", event: "state", payload: { by: me, state } });
+  };
+  const wait = 350 - (Date.now() - (sentAt[kind] ?? 0));
+  if (wait <= 0) go();
+  else if (!sendTimers[kind]) sendTimers[kind] = setTimeout(go, wait);
+}
+const isLabReadOnlyKind = (kind: ProjectKind) => isLabReadOnly(kind);

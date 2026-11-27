@@ -20,7 +20,7 @@ import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn } from "@/lib/demo-login";
 import { cn } from "@/lib/utils";
 import { setUrban, setVineyard, useLab, useLabReadOnly, vineMetrics } from "@/models/lab-store";
 import { projectSpots, useColleagues } from "@/lib/colleagues";
-import { useCurrentProject } from "@/lib/project-sync";
+import { useCurrentProject, useLiveEdit, type LiveEdit } from "@/lib/project-sync";
 import { initials, useProjectPeople, type Online, type Person } from "@/lib/project-share";
 import { shadeOpenness, piazzaLayout, piazzaShadows, vineShadows, TREE_SHADE_M2, vineLayout, type LayoutEdits, type PiazzaLayout } from "@/models/area-layout";
 import { dayLight, solarHour, sunAt, sunHeightDeg } from "@/models/sun-shadow";
@@ -122,9 +122,18 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   const livePos = useLivePosIf(following);
   const at = following ? [livePos?.lat ?? liveLoc.lat, livePos?.lng ?? liveLoc.lng] as [number, number] : pinFix ?? drawnCentre ?? centre ?? null;
   const pin = at ? { lat: at[0], lng: at[1] } : { lat: loc.lat, lng: loc.lng };
-  const people = useMemo(() => [...gpsPeople, ...projectSpots(share.people, colleagues, gpsPeople, project.user, drawnCentre ? { lat: drawnCentre[0], lng: drawnCentre[1] } : pin)],
+  // In tempo reale: who is changing the project and where (a tree moved, the sails dragged), a named "✎" badge there.
+  const liveEdit = useLiveEdit(kind === "urban" ? "piazza" : "vigneto");
+  const people = useMemo(() => {
+    const base = [...gpsPeople, ...projectSpots(share.people, colleagues, gpsPeople, project.user, drawnCentre ? { lat: drawnCentre[0], lng: drawnCentre[1] } : pin)]
+      // The one changing something stands where the change is, not also in the middle of the area.
+      .filter((p) => !liveEdit || !p.id.startsWith(`${liveEdit.by}|`));
+    if (!liveEdit) return base;
+    const at = liveEdit.at ?? (drawnCentre ?? [pin.lat, pin.lng]);
+    return [...base, { id: `edit:${liveEdit.by}:${liveEdit.what}`, name: liveEdit.name, avatar: null, lat: at[0], lng: at[1], note: `✎ ${liveEdit.what}` }];
+  },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [gpsPeople, share.people, colleagues, project.user, drawnCentre?.[0], drawnCentre?.[1], pin.lat, pin.lng]);
+    [gpsPeople, share.people, colleagues, project.user, drawnCentre?.[0], drawnCentre?.[1], pin.lat, pin.lng, liveEdit]);
   const movePin = (lat: number, lng: number) => { setPinFix(loc.lat, loc.lng, [lat, lng]); toast.success("Pin spostato", { description: "Resta qui per questo luogo, anche in 3D." }); };
   const [drawing, setDrawing] = useState(false);
   const [draft, setDraft] = useState<Ring>([]);
@@ -432,7 +441,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
       <div data-sim-map-box="" data-map-gestures={show3d ? "" : undefined} className="relative -mx-4 h-[52vh] min-h-72 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
         {/* The temperature the interventions bring, on the map itself (2D and 3D), following the levers live. */}
         <MapReading kind={kind} lat={pin.lat} lng={pin.lng} />
-        <LiveColleagues me={project.user} people={share.people} list={colleagues} spots={gpsPeople} />
+        <LiveColleagues me={project.user} people={share.people} list={colleagues} spots={gpsPeople} edit={liveEdit} />
         {/* How many misting poles the map shows, exactly: those in the zones drawn for them and those the app placed. */}
         {sim?.kind === "piazza" && sim.data.misters.length > 0 && !drawing && (
           <p role="status" className="pointer-events-none absolute left-1/2 top-12 z-[3] -translate-x-1/2 whitespace-nowrap rounded-full bg-black/45 px-3 py-1 text-[12px] font-semibold text-white ring-1 ring-white/15 backdrop-blur-sm [text-shadow:0_1px_2px_rgb(0_0_0/.6)]">
@@ -509,10 +518,10 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
  * Progetti condivisi: over the map (2D and 3D), who the project belongs to or is shared with and who is in it right now —
  * also those whose GPS is off (they are not on the map), so the people of the project are always said here.
  */
-function LiveColleagues({ me, people, list, spots }: { me: string | null; people: Person[]; list: Online[]; spots: Array<{ id: string }> }) {
+function LiveColleagues({ me, people, list, spots, edit }: { me: string | null; people: Person[]; list: Online[]; spots: Array<{ id: string }>; edit: LiveEdit | null }) {
   const share = { people }, project = { user: me };
   const others = share.people.filter((p) => p.user_id !== project.user);
-  if (!list.length && !others.length) return null;
+  if (!list.length && !others.length && !edit) return null;
   const first = (n: string) => n.split(/\s+|@/)[0] || "Un collaboratore";
   const mine = share.people.find((p) => p.user_id === project.user)?.role === "owner";
   const owner = share.people.find((p) => p.role === "owner");
@@ -537,7 +546,7 @@ function LiveColleagues({ me, people, list, spots }: { me: string | null; people
         <span className="block truncate text-[11px] text-white/70">{head}</span>
         <span className="flex items-start gap-1.5 text-[13px] font-medium">
           {list.length > 0 && <span className="share-badge-dot mt-1.5 size-2 shrink-0 rounded-full bg-emerald-400" aria-hidden="true" />}
-          <span className="line-clamp-2">{list.length > 0 ? `In diretta · ${live}` : live}</span>
+          <span className="line-clamp-2">{edit ? `${(edit.name.split(/\s+|@/)[0] || "Un collaboratore")} ${edit.what.match(/^[A-Z]/) ? `cambia ${edit.what}` : edit.what}` : list.length > 0 ? `In diretta · ${live}` : live}</span>
         </span>
       </span>
     </div>

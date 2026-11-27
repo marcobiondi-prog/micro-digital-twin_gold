@@ -534,16 +534,17 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
     observer.observe(el);
     return () => { observer.disconnect(); window.clearTimeout(timer); };
   });
-  // The photographic 3D refused (key, quota, WebGL or loading error): show the fallback simplified map instead.
-  if (rejected || state === "error") return fallback ? (
-    <div data-map-gestures="" className="relative h-full w-full touch-none">
-      {fallback}
-      <p role="status" className="absolute inset-x-0 bottom-3 z-[3] mx-auto flex w-fit max-w-[92%] items-center gap-2 rounded-full bg-black/60 py-1.5 pl-3 pr-1.5 text-center text-[12px] font-semibold text-white ring-1 ring-white/15 backdrop-blur-sm">
-        <span>Vista 3D fotografica non disponibile ora: mostro la mappa semplificata</span>
-        {!rejected && <button type="button" onClick={() => { setState("loading"); setAttempt((n) => n + 1); }} className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-black">Riprova</button>}
-      </p>
+  // The photographic 3D refused or not drawing (key, quota, WebGL, loading): no simplified map (asked), a plain notice with
+  // Riprova, which builds the photographic map again.
+  if (rejected || state === "error") return (
+    <div role="status" data-map-gestures="" className="grid h-full w-full touch-none place-items-center bg-lab-surface px-6 text-center">
+      <div className="grid justify-items-center gap-3">
+        <p className="text-sm font-semibold">Vista 3D fotografica non disponibile ora</p>
+        <p className="max-w-xs text-xs text-muted-foreground">{rejected ? "Google non ha accettato la richiesta della mappa 3D: riprova più tardi o usa la 2D." : "La mappa 3D non si è caricata: può dipendere dalla rete o dal limite giornaliero delle mappe."}</p>
+        {!rejected && <button type="button" onClick={() => { setState("loading"); setAttempt((n) => n + 1); }} className="rounded-full bg-foreground px-4 py-2 text-xs font-semibold text-background">Riprova</button>}
+      </div>
     </div>
-  ) : <p role="status" className="grid h-full w-full place-items-center bg-lab-surface px-3 text-center text-xs text-muted-foreground">Vista 3D non disponibile in questo momento.</p>;
+  );
   return <div data-map-gestures="" className="relative h-full w-full overflow-hidden bg-lab-surface touch-none">
     {/* touch-none + data-map-gestures: drag, pinch and rotate belong to the 3D map, not to the page. */}
     <div ref={host} data-map-gestures="" style={{ filter: "var(--map-light-filter, none)" }} className="absolute inset-0 touch-none transition-[filter] duration-700 motion-reduce:transition-none" aria-label={`Vista 3D di ${label}`} />
