@@ -196,7 +196,7 @@ const exactRings = (zones: InnerZone[], kind: string, as: "lawn" | "shade"): Pat
 export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: number, edits: LayoutEdits = {}, zones: InnerZone[] = [], misters = 0, real: Ring[] = [], sprinklers = 0): PiazzaLayout | null {
   if (ring.length < 3) return null;
   const grid = cellsOf(ring), { f, c, minX, maxX, minY, maxY } = grid;
-  const isFree = inZone(f, zones, "libera"), isLawn = inZone(f, zones, "prato"), isShade = inZone(f, zones, "ombra"), isTrees = inZone(f, zones, "alberi"), isMist = inZone(f, zones, "nebulizzatori");
+  const isFree = inZone(f, zones, "libera"), isLawn = inZone(f, zones, "prato"), isShade = inZone(f, zones, "ombra"), isTrees = inZone(f, zones, "alberi"), isMist = inZone(f, zones, "nebulizzatori"), isSprink = inZone(f, zones, "innaffiatoi");
   // What already stands there (models/real-objects: existing trees, fountains, buildings, monuments) is kept clear like a
   // free zone, without changing the surface the costs count.
   const isReal = inZone(f, real.filter((r) => r.length >= 3).map((r) => ({ kind: "real", ring: r })), "real");
@@ -326,7 +326,15 @@ export function piazzaLayout(ring: Ring, trees: number, lawn: number, shade: num
   const autoMisters = misterSpots(f, c, trunks, shadeCells.filter((x) => !isMist(x.x, x.y)), cells.filter((x) => !lawnCells.includes(x) && !isLawn(x.x, x.y) && !isMist(x.x, x.y)), nMist - zoneMisters.length);
   // Sprinklers: spread evenly over the aiuole they water (never within 2 m of a trunk while there is room); with no
   // aiuole, over the paving left free of pergolas.
-  const sprinklerSpots = misterSpots(f, c, trunks, lawnCells, lawnCells.length ? lawnCells : rest.filter((x) => !shadeCells.includes(x)), Math.max(0, Math.round(sprinklers)));
+  // The zones drawn for sprinklers hold about one every 30 m² each (at least one a zone) first; the rest of the lever
+  // goes over the aiuole as before.
+  const nSpr = Math.max(0, Math.round(sprinklers));
+  const sprZones = zones.filter((z) => z.kind === "innaffiatoi" && z.ring.length >= 3), sprCells = cells.filter((x) => isSprink(x.x, x.y));
+  const sprInZones = Math.min(nSpr, sprZones.reduce((t, z) => t + Math.max(1, Math.round(ringAreaM2(z.ring) / 30)), 0));
+  const zoneSprinklers: LatLng[] = !sprInZones ? [] : sprCells.length
+    ? misterSpots(f, c, trunks, sprCells, sprCells, sprInZones)
+    : sprZones.slice(0, sprInZones).map((z) => { const xy = z.ring.map((p) => toXY(f, p)); return toLL(f, xy.reduce((s2, p) => s2 + p[0], 0) / xy.length, xy.reduce((s2, p) => s2 + p[1], 0) / xy.length); });
+  const sprinklerSpots = [...zoneSprinklers, ...misterSpots(f, c, trunks, lawnCells.filter((x) => !isSprink(x.x, x.y)), lawnCells.length ? lawnCells.filter((x) => !isSprink(x.x, x.y)) : rest.filter((x) => !shadeCells.includes(x) && !isSprink(x.x, x.y)), nSpr - zoneSprinklers.length)];
   return {
     misters: [...zoneMisters, ...autoMisters], mistersInZones: zoneMisters.length, sprinklers: sprinklerSpots,
     trees: placed, cell: c,

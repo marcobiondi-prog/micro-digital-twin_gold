@@ -11,11 +11,11 @@ import type { LayoutEdits } from "./area-layout";
  * off the costs), given one intervention (trees, lawn or pergola go there first) or a lot (a part of the project with
  * its own surface and share of the cost).
  */
-export type ZoneKind = "libera" | "alberi" | "prato" | "ombra" | "nebulizzatori" | "irrigazione" | "teli" | "frangivento" | "lotto";
+export type ZoneKind = "libera" | "alberi" | "prato" | "ombra" | "nebulizzatori" | "innaffiatoi" | "irrigazione" | "teli" | "frangivento" | "lotto";
 export type SubArea = { id: string; kind: ZoneKind; ring: Ring; name?: string; angle?: number };
-export const ZONE_LABEL: Record<ZoneKind, string> = { libera: "Da lasciare libera", alberi: "Alberi", prato: "Aiuole", ombra: "Vele", nebulizzatori: "Nebulizzatori", irrigazione: "Irrigazione", teli: "Teli d’ombra", frangivento: "Frangivento", lotto: "Lotto" };
+export const ZONE_LABEL: Record<ZoneKind, string> = { libera: "Da lasciare libera", alberi: "Alberi", prato: "Aiuole", ombra: "Vele", nebulizzatori: "Nebulizzatori", innaffiatoi: "Innaffiatoi", irrigazione: "Irrigazione", teli: "Teli d’ombra", frangivento: "Frangivento", lotto: "Lotto" };
 /** Which kinds each simulation offers: the piazza its trees, aiuole, pergolas and misters; the vineyard its drip lines, shade cloth and windbreak. */
-export const ZONE_KINDS = { piazza: ["libera", "alberi", "prato", "ombra", "nebulizzatori", "lotto"], vigneto: ["libera", "irrigazione", "teli", "frangivento", "lotto"] } as const;
+export const ZONE_KINDS = { piazza: ["libera", "alberi", "prato", "ombra", "nebulizzatori", "innaffiatoi", "lotto"], vigneto: ["libera", "irrigazione", "teli", "frangivento", "lotto"] } as const;
 /** The vineyard's interventions as zones: drip lines, shade cloth and a windbreak go where they are drawn. */
 export const VINE_ZONE_KINDS = ["irrigazione", "teli", "frangivento"] as const;
 
@@ -92,10 +92,13 @@ export function zoneSummaryRows(area: DrawnArea | null | undefined, place: { lat
 }
 
 /** The piazza's levers: trees (count), lawn and shade (% of the usable surface), misting poles (count). */
-export type PiazzaLevers = { trees: number; permeable: number; shade: number; misters: number };
+export type PiazzaLevers = { trees: number; permeable: number; shade: number; misters: number; sprinklers?: number };
 /** About one misting pole every 40 m² of a misters zone (its mist reaches 3,5 m round), 1 to 20. */
 export const M2_PER_MISTER = 40;
 const mistersFor = (m2: number) => (m2 > 0 ? Math.min(20, Math.max(1, Math.round(m2 / M2_PER_MISTER))) : 0);
+/** About one sprinkler every 30 m² of a sprinklers zone (it waters a 6 m circle), 1 to 20. */
+export const M2_PER_SPRINKLER = 30;
+const sprinklersFor = (m2: number) => (m2 > 0 ? Math.min(20, Math.max(1, Math.round(m2 / M2_PER_SPRINKLER))) : 0);
 /** About one tree every 60 m² of a trees zone (crowns 4 m across, room between them). */
 export const M2_PER_TREE = 60;
 /**
@@ -109,7 +112,8 @@ export function leversOfZones(a: DrawnArea): PiazzaLevers {
   const pct = (k: ZoneKind) => (usable > 0 ? Math.min(100, Math.round((100 * m2(k)) / usable)) : 0);
   const trees = zones.filter((z) => z.kind === "alberi").reduce((s, z) => s + Math.max(1, Math.round(pinsM2(z.ring) / M2_PER_TREE)), 0);
   const misters = zones.filter((z) => z.kind === "nebulizzatori").reduce((s, z) => s + mistersFor(pinsM2(z.ring)), 0);
-  return { trees: Math.min(30, trees), permeable: pct("prato"), shade: pct("ombra"), misters: Math.min(20, misters) };
+  const sprinklers = zones.filter((z) => z.kind === "innaffiatoi").reduce((s, z) => s + sprinklersFor(pinsM2(z.ring)), 0);
+  return { trees: Math.min(30, trees), permeable: pct("prato"), shade: pct("ombra"), misters: Math.min(20, misters), sprinklers: Math.min(20, sprinklers) };
 }
 
 /**
@@ -129,8 +133,9 @@ export function leversForZones(a: DrawnArea, now: PiazzaLevers, only?: ReadonlyS
     permeable: Math.max(now.permeable, pct("prato")),
     shade: Math.max(now.shade, pct("ombra")),
     misters: Math.max(now.misters, mistersFor(m2("nebulizzatori"))),
+    sprinklers: Math.max(now.sprinklers ?? 0, sprinklersFor(m2("innaffiatoi"))),
   };
-  return next.trees === now.trees && next.permeable === now.permeable && next.shade === now.shade && next.misters === now.misters ? null : next;
+  return next.trees === now.trees && next.permeable === now.permeable && next.shade === now.shade && next.misters === now.misters && next.sprinklers === (now.sprinklers ?? 0) ? null : next;
 }
 
 /**

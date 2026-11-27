@@ -337,18 +337,18 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
     // "Solo quello disegnato": the levers follow the zones exactly, whenever a zone is drawn, changed or removed.
     if (saved.edits?.onlyDrawn) {
       const u = lab.urban, next = leversOfZones(saved);
-      if (next.trees !== u.trees || next.permeable !== u.permeable || next.shade !== u.shade || next.misters !== (u.misters ?? 0)) setUrban({ ...next, treeCells: null, permeableCells: null, shadeCells: null });
+      if (next.trees !== u.trees || next.permeable !== u.permeable || next.shade !== u.shade || next.misters !== (u.misters ?? 0) || (next.sprinklers ?? 0) !== (u.sprinklers ?? 0)) setUrban({ ...next, treeCells: null, permeableCells: null, shadeCells: null });
       return;
     }
     const seen = seededZones(), fresh = new Set<string>();
-    for (const z of zonesOfArea(saved)) if (["alberi", "prato", "ombra", "nebulizzatori"].includes(z.kind) && !seen.has(`${z.id}:${z.kind}`)) fresh.add(z.id);
+    for (const z of zonesOfArea(saved)) if (["alberi", "prato", "ombra", "nebulizzatori", "innaffiatoi"].includes(z.kind) && !seen.has(`${z.id}:${z.kind}`)) fresh.add(z.id);
     if (!fresh.size) return;
-    const u = lab.urban, next = leversForZones(saved, { trees: u.trees, permeable: u.permeable, shade: u.shade, misters: u.misters ?? 0 }, fresh);
+    const u = lab.urban, next = leversForZones(saved, { trees: u.trees, permeable: u.permeable, shade: u.shade, misters: u.misters ?? 0, sprinklers: u.sprinklers ?? 0 }, fresh);
     for (const z of zonesOfArea(saved)) if (fresh.has(z.id)) seen.add(`${z.id}:${z.kind}`);
     keepSeeded(seen);
     if (!next) return;
     // Never put by itself: the zone is offered, so the area's feasibility (Vincoli dell'area in Simula) is seen first.
-    const said = [next.trees !== u.trees && `Alberi ${next.trees}`, next.permeable !== u.permeable && `Aiuole ${next.permeable} %`, next.shade !== u.shade && `Ombra ${next.shade} %`, next.misters !== (u.misters ?? 0) && `Nebulizzatori ${next.misters}`].filter(Boolean).join(" · ");
+    const said = [next.trees !== u.trees && `Alberi ${next.trees}`, next.permeable !== u.permeable && `Aiuole ${next.permeable} %`, next.shade !== u.shade && `Ombra ${next.shade} %`, next.misters !== (u.misters ?? 0) && `Nebulizzatori ${next.misters}`, (next.sprinklers ?? 0) !== (u.sprinklers ?? 0) && `Innaffiatoi ${next.sprinklers}`].filter(Boolean).join(" · ");
     toast("Zona disegnata: interventi non ancora messi", { description: guest ? `${said}. Tocca per metterli.` : `Proposta: ${said}. Prima guarda i vincoli dell’area in Simula, poi mettili con un tocco.`, duration: 15000, action: { label: "Mettili", onClick: () => setUrban(next) } });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind, zoneSig, !!saved?.edits?.onlyDrawn]);
@@ -497,7 +497,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
       <AreaBar drawing={drawing} pins={ring.length} m2={ring.length >= 3 ? pinsM2(ring) : null} saved={!!saved} vineyard={kind === "vineyard"}
         onStart={() => { setArranging(false); startDrawing(); }} onUndo={() => setDraft((d) => d.slice(0, -1))} onCancel={() => setDrawing(false)} onFinish={finish} onRemove={remove} />
       {sim && !drawing && <SimBar sim={sim} when={reading?.when} arranging={arranging} edited={!!saved?.edits && Object.keys(saved.edits).length > 0} best={!!saved?.edits?.best}
-        only={!!saved?.edits?.onlyDrawn} canOnly={!!saved && zonesOfArea(saved).some((z) => (kind === "urban" ? ["alberi", "prato", "ombra", "nebulizzatori"] : [...VINE_ZONE_KINDS] as string[]).includes(z.kind))}
+        only={!!saved?.edits?.onlyDrawn} canOnly={!!saved && zonesOfArea(saved).some((z) => (kind === "urban" ? ["alberi", "prato", "ombra", "nebulizzatori", "innaffiatoi"] : [...VINE_ZONE_KINDS] as string[]).includes(z.kind))}
         onOnly={() => {
           if (!saved) return;
           if (saved.edits?.onlyDrawn) { setEdits({}); toast("Torna la disposizione automatica", { description: kind === "urban" ? "Le leve tornano a mettere aiuole, vele e alberi anche fuori dalle zone." : "Le leve tornano a mettere irrigazione, teli e frangivento anche fuori dalle zone." }); return; }
@@ -511,7 +511,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
           const next = leversOfZones(saved);
           setUrban({ ...next, treeCells: null, permeableCells: null, shadeCells: null, area: { ...saved, edits: { onlyDrawn: true } } });
           setArranging(false);
-          toast.success("Solo quello disegnato da te", { description: `Alberi ${next.trees} · Aiuole ${next.permeable} % · Ombra ${next.shade} % · Nebulizzatori ${next.misters}: temperatura e costi contano solo le tue zone.` });
+          toast.success("Solo quello disegnato da te", { description: `Alberi ${next.trees} · Aiuole ${next.permeable} % · Ombra ${next.shade} % · Nebulizzatori ${next.misters} · Innaffiatoi ${next.sprinklers ?? 0}: temperatura e costi contano solo le tue zone.` });
         }}
         onArrange={() => { setView("2d"); setArranging((a) => !a); }} onAuto={() => { setEdits({}); toast("Disposizione automatica ripristinata"); }}
         onBest={() => {
@@ -813,6 +813,7 @@ const ZONE_HINT: Record<ZoneKind, string> = {
   prato: "Qui ci sono aiuole e ciottoli, poi il resto della percentuale dove c’è posto.",
   ombra: "Qui ci sono le vele, poi il resto della percentuale dove c’è posto.",
   nebulizzatori: "I nebulizzatori vanno qui dentro: circa uno ogni 40 m².",
+  innaffiatoi: "Gli innaffiatoi vanno qui dentro: circa uno ogni 30 m², bagnano un cerchio di 6 m.",
   irrigazione: "Qui le viti hanno l’irrigazione a goccia su ogni filare, con il tubo principale lungo il bordo.",
   teli: "Qui le viti stanno sotto i teli d’ombra.",
   frangivento: "Qui va la siepe frangivento, lungo il lato più lungo della zona.",

@@ -198,6 +198,17 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
         part({ ring: crownRing(m, 1.7, 16), base: 1.85, height: 1.9, color: "rgba(224,242,254,0.2)" }, 1.9, "rgba(125,211,252,0.35)", 1);
         part({ ring: crownRing(m, 2.5, 18), base: 1.1, height: 1.14, color: "rgba(224,242,254,0.12)" }, 1.14, "rgba(125,211,252,0.22)", 1);
       }
+      // Each sprinkler (innaffiatoio): the wet circle it waters (3 m round, teal), the water thrown in a low dome of
+      // see-through rings, and with plain shapes a small dark head; its number is a teal badge (misterBadges). The
+      // realistic head alone sits flush in the ground and was not seen from above.
+      for (const sp of sim.data.sprinklers ?? []) {
+        if (flat) out.push(absPoly({ fillColor: "rgba(45,212,191,0.24)", strokeColor: "rgba(45,212,191,0.7)", strokeWidth: 1 }, crownRing(sp, 3, 18), 0.24));
+        else ground(crownRing(sp, 3, 18), "rgba(45,212,191,0.24)");
+        if (!models) part({ ring: crownRing(sp, 0.12, 8), base: 0, height: 0.25, color: "#1f2937" });
+        part({ ring: crownRing(sp, 1.2, 14), base: 0.75, height: 0.79, color: "rgba(204,251,241,0.3)" }, 0.79, "rgba(45,212,191,0.6)", 1);
+        part({ ring: crownRing(sp, 2.2, 16), base: 0.5, height: 0.53, color: "rgba(204,251,241,0.2)" }, 0.53, "rgba(45,212,191,0.4)", 1);
+        part({ ring: crownRing(sp, 2.9, 18), base: 0.2, height: 0.22, color: "rgba(204,251,241,0.14)" }, 0.22, "rgba(45,212,191,0.3)", 1);
+      }
       // Each tree: a dark trunk, then three crown discs each ringed a deeper green, so the layers read as foliage.
       if (!models) for (const t of sim.data.trees) {
         for (const p of treeParts(t, undefined, 2.85)) {
@@ -245,14 +256,15 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
  * away stayed on the 3D view: unused badges are sent under the ground and not drawn when hidden.
  */
 function misterBadges(lib: Maps3D, map: HTMLElement, pool: Map<string, HTMLElement>, sim: SimLayout | null, adj: Adjust = NO_ADJUST) {
-  const mode = "RELATIVE_TO_GROUND", up = adj.h + 3.9;
+  const mode = "RELATIVE_TO_GROUND", up = adj.h + 3.9, upSpr = adj.h + 1.6;
   const want = new Map<string, [number, number]>();
   const kLng = 111_320 * Math.cos(((sim?.kind === "piazza" ? sim.data.misters[0]?.[0] ?? 0 : 0) * Math.PI) / 180) || 1;
   if (sim?.kind === "piazza") sim.data.misters.forEach((m, i) => want.set(`${i}:${i < sim.data.mistersInZones ? "z" : "a"}`, [m[0] + adj.n / 111_320, m[1] + adj.e / kLng]));
+  if (sim?.kind === "piazza") (sim.data.sprinklers ?? []).forEach((m, i) => want.set(`${i}:s`, [m[0] + adj.n / 111_320, m[1] + adj.e / kLng]));
   for (const [key, mk] of pool) {
     const at = want.get(key) as [number, number] | undefined;
     const m = mk as HTMLElement & { position: unknown; drawsWhenOccluded: boolean; altitudeMode: string };
-    if (at) { m.altitudeMode = mode; m.position = { lat: at[0], lng: at[1], altitude: up }; m.drawsWhenOccluded = true; want.delete(key); }
+    if (at) { m.altitudeMode = mode; m.position = { lat: at[0], lng: at[1], altitude: key.endsWith(":s") ? upSpr : up }; m.drawsWhenOccluded = true; want.delete(key); }
     else {
       // Its lat and lng are getters of Google's LatLngAltitude, lost by a spread (which threw and left the badge on show).
       const p = m.position as { lat: number; lng: number };
@@ -261,10 +273,10 @@ function misterBadges(lib: Maps3D, map: HTMLElement, pool: Map<string, HTMLEleme
   }
   for (const [key, at] of want) {
     try {
-      const [n, z] = key.split(":"), inZone = z === "z", i = Number(n);
-      const mk = new lib.Marker3DElement({ position: { lat: at[0], lng: at[1], altitude: up }, altitudeMode: mode, drawsWhenOccluded: true, sizePreserved: true });
+      const [n, z] = key.split(":"), inZone = z === "z", spr = z === "s", i = Number(n);
+      const mk = new lib.Marker3DElement({ position: { lat: at[0], lng: at[1], altitude: spr ? upSpr : up }, altitudeMode: mode, drawsWhenOccluded: true, sizePreserved: true });
       const tpl = document.createElement("template");
-      tpl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="11" fill="${inZone ? "#38bdf8" : "#f8fafc"}" stroke="${inZone ? "#e0f2fe" : "#38bdf8"}" stroke-width="2.5"/><text x="13" y="17.5" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="700" fill="${inZone ? "#0b0f15" : "#0369a1"}">${i + 1}</text></svg>`;
+      tpl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="11" fill="${spr ? "#2dd4bf" : inZone ? "#38bdf8" : "#f8fafc"}" stroke="${spr ? "#ccfbf1" : inZone ? "#e0f2fe" : "#38bdf8"}" stroke-width="2.5"/><text x="13" y="17.5" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="700" fill="${spr || inZone ? "#0b0f15" : "#0369a1"}">${i + 1}</text></svg>`;
       mk.append(tpl);
       map.append(mk);
       pool.set(key, mk);
