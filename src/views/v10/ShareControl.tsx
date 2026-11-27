@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, Check, Copy, Link2, Loader2, LogOut, Mail, Radio, RefreshCw, Send, Share2, Trash2, UserPlus, Users, X } from "lucide-react";
+import { ArrowRight, Check, Copy, Unlink, Link2, Loader2, LogOut, Mail, Radio, RefreshCw, Send, Share2, Trash2, UserPlus, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { openAccount } from "@/lib/camera-dock";
 import { cn } from "@/lib/utils";
@@ -10,7 +10,7 @@ import { useAccountAvatar } from "@/lib/account-avatar";
 import { getLastSection } from "@/lib/last-section";
 import { useProId } from "@/lib/use-pro-id";
 import { syncProject, useCurrentProject, useSharedOpen } from "@/lib/project-sync";
-import { leaveSharedProject, useRejoinRequests } from "@/lib/project-rejoin";
+import { askToRejoin, leaveSharedProject, useLeftProject, useRejoinRequests } from "@/lib/project-rejoin";
 import {
   ROLE_LABEL, cancelInvite, createInvite, initials, inviteLink, kindWord, removePerson, setRole,
   useProjectPeople, usePresence, type Invite, type Online, type Person, type ProjectRole,
@@ -78,6 +78,7 @@ export function ShareControl() {
   const share = useProjectPeople(id, user);
   // Requests to come back into a project: answered here by the owner, awaited here by the one who left.
   useRejoinRequests(user);
+  const { left } = useLeftProject(kind);
   const tab = useSimTab(kind === "piazza" ? "urban" : "vineyard");
   const lab = useLab();
   const projectName = nameOfPlace(placeOf(kind, lab).label);
@@ -95,23 +96,26 @@ export function ShareControl() {
     return () => window.removeEventListener(SHARE_EVENT, ask);
   }, [user, share]);
   if (!user) return null;
+  // Out of a shared project (left it, not back in): the badge says so — a broken link, amber, "Sei uscito dal progetto".
+  const outOf = left && left.id !== id ? left : null;
   const others = online.filter((o) => o.user_id !== user);
   const count = share.people.length;
   const liveNow = others.length > 0;
   const faces = (liveNow ? others : share.people.filter((p) => p.user_id !== user)).slice(0, 2);
-  const label = !id ? "Condivisione · progetto non ancora nel cloud" : `Condivisione · ${count} ${count === 1 ? "persona" : "persone"}${liveNow ? `, ${others.length} connesse ora` : ""}`;
+  const label = outOf ? `Sei uscito dal progetto di ${outOf.owner}: tocca per chiedere di rientrare` : !id ? "Condivisione · progetto non ancora nel cloud" : `Condivisione · ${count} ${count === 1 ? "persona" : "persone"}${liveNow ? `, ${others.length} connesse ora` : ""}`;
   return (
     <>
       <button type="button" onClick={() => { setOpen(true); void share.reload(); }} aria-label={label} title="Chi è in condivisione"
         className="share-badge relative grid size-9 shrink-0 place-items-center rounded-full border border-foreground/15 bg-foreground/[0.06] text-foreground outline-none transition-colors hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring sm:size-10" data-live={liveNow ? "" : undefined}>
-        {liveNow && <span className="share-badge-ring pointer-events-none absolute -inset-[3px] rounded-full" aria-hidden="true" />}
-        {faces.length ? (
+        {liveNow && !outOf && <span className="share-badge-ring pointer-events-none absolute -inset-[3px] rounded-full" aria-hidden="true" />}
+        {outOf ? <Unlink className="size-4 text-amber-300 sm:size-[1.15rem]" aria-hidden="true" /> : faces.length ? (
           <span className="flex -space-x-2.5" aria-hidden="true">
             {faces.map((f) => <Face key={f.user_id} name={f.name} avatar={f.avatar} size={faces.length > 1 ? 22 : 26} ring="ring-2 ring-background" />)}
           </span>
         ) : <Users className="size-4 sm:size-[1.15rem]" aria-hidden="true" />}
-        {count > 1 && <span className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[oklch(0.78_0.13_185)] px-1 text-[10px] font-bold leading-none text-[oklch(0.2_0.03_240)] ring-2 ring-background" aria-hidden="true">{count}</span>}
-        {liveNow && <span className="share-badge-dot absolute -bottom-0.5 -right-0.5 size-3 rounded-full bg-emerald-400 ring-2 ring-background" aria-hidden="true" />}
+        {outOf && <span className="absolute -inset-px rounded-full ring-2 ring-amber-300/60" aria-hidden="true" />}
+        {!outOf && count > 1 && <span className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[oklch(0.78_0.13_185)] px-1 text-[10px] font-bold leading-none text-[oklch(0.2_0.03_240)] ring-2 ring-background" aria-hidden="true">{count}</span>}
+        {liveNow && !outOf && <span className="share-badge-dot absolute -bottom-0.5 -right-0.5 size-3 rounded-full bg-emerald-400 ring-2 ring-background" aria-hidden="true" />}
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent onOpenAutoFocus={(e) => e.preventDefault()} overlayClassName="bg-black/45 backdrop-blur-md sm:!fixed sm:!inset-0 sm:!h-auto sm:!min-h-0" className="max-h-[88dvh] grid-cols-[minmax(0,1fr)] gap-4 overflow-y-auto overflow-x-hidden overscroll-contain border-foreground/20 bg-card p-5 shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_-24px_60px_rgb(0_0_0/0.6)] dark:bg-[oklch(0.25_0.016_258)] max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-[1.75rem] max-sm:border-x-0 max-sm:border-b-0 max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-sm:data-[state=open]:slide-in-from-bottom-1/2 max-sm:data-[state=closed]:slide-out-to-bottom-1/2 sm:w-[min(480px,calc(100vw-1.5rem))] sm:rounded-2xl">
@@ -121,6 +125,7 @@ export function ShareControl() {
             <DialogDescription>{kind === "piazza" ? "Il progetto della piazza" : "Il progetto del vigneto"}: chi ci lavora, chi è connesso adesso e gli inviti.</DialogDescription>
           </DialogHeader>
           <OtherShared kind={kind} onGo={() => setOpen(false)} />
+          {outOf && <RejoinCard kind={kind} left={outOf} />}
           {id && <SyncNow kind={kind} />}
           {!id ? (
             <p className="rounded-2xl border border-foreground/10 bg-foreground/[0.04] p-4 text-sm text-muted-foreground">
@@ -346,5 +351,25 @@ function SyncNow({ kind }: { kind: ProjectKind }) {
     }} className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-foreground/10 px-4 text-sm font-semibold hover:bg-foreground/15 disabled:opacity-60">
       <RefreshCw className={busy ? "size-4 animate-spin" : "size-4"} aria-hidden="true" /> Sincronizza gli interventi
     </button>
+  );
+}
+
+/** Out of a shared project: whose it was and "Chiedi di rientrare" (the admin answers in the app). */
+function RejoinCard({ kind, left }: { kind: ProjectKind; left: { owner: string; name: string; status?: "pending" | "denied" | null } }) {
+  const [busy, setBusy] = useState(false);
+  const waiting = left.status === "pending";
+  return (
+    <div className="grid gap-2 rounded-2xl border border-amber-300/30 bg-amber-300/10 p-4">
+      <p className="flex items-center gap-2 text-sm font-semibold text-amber-200"><Unlink className="size-4" aria-hidden="true" /> Sei uscito dal progetto di {left.owner}</p>
+      <p className="text-sm text-muted-foreground">{waiting ? `Hai chiesto di rientrare in ${left.name}: aspetta che ${left.owner} ti accetti.` : left.status === "denied" ? `${left.owner} ha negato la richiesta. Puoi chiedere di nuovo.` : `${left.name}: per lavorarci di nuovo chiedi a ${left.owner} di farti rientrare.`}</p>
+      {!waiting && (
+        <button type="button" disabled={busy} onClick={async () => {
+          setBusy(true);
+          try { await askToRejoin(kind); toast.success("Richiesta inviata", { description: `${left.owner} la vede nell’app e può accettarla o negarla.` }); }
+          catch (e) { toast.error("Richiesta non inviata", { description: (e as Error).message }); }
+          finally { setBusy(false); }
+        }} className="h-10 rounded-full bg-foreground px-4 text-sm font-semibold text-background disabled:opacity-60">{left.status === "denied" ? "Chiedi di nuovo" : "Chiedi di rientrare"}</button>
+      )}
+    </div>
   );
 }
