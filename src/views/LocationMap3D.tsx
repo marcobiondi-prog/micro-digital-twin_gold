@@ -286,7 +286,7 @@ function personBadges(lib: Maps3D, map: HTMLElement, pool: Map<string, HTMLEleme
   }
   for (const [id, p] of want) {
     try {
-      const mk = new lib.Marker3DElement({ position: { lat: p.lat, lng: p.lng, altitude: 2.5 }, altitudeMode: "RELATIVE_TO_GROUND", drawsWhenOccluded: true, sizePreserved: true, extruded: true });
+      const mk = new lib.Marker3DElement({ position: { lat: p.lat, lng: p.lng, altitude: 2.5 }, altitudeMode: "RELATIVE_TO_GROUND", drawsWhenOccluded: true, sizePreserved: true });
       const name = firstName(p.name).replace(/[<&>"]/g, ""), ini = personInitials(p.name).replace(/[<&>"]/g, "");
       const note = (p.note ?? "").replace(/[<&>"]/g, ""), ring = p.away ? "#94a3b8" : "#2dd4bf";
       const w = 44 + Math.min(14, name.length) * 8.4 + (note ? note.length * 6.2 + 10 : 0);
@@ -414,6 +414,12 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
       el.replaceChildren(map);
       mapRef.current = map;
       setState("ready");
+      // A map that never draws (tiles refused by the key's quota, WebGL lost on a phone short of memory) stays black or
+      // frozen: if it has not settled once within 25 s, or reports an error, the simplified 3D takes over (with Riprova).
+      let steady = false;
+      map.addEventListener("gmp-steadychange", (e) => { if ((e as unknown as { isSteady?: boolean; detail?: { isSteady?: boolean } }).isSteady ?? (e as CustomEvent).detail?.isSteady ?? true) steady = true; });
+      map.addEventListener("gmp-error", () => { if (!cancelled) setState("error"); });
+      window.setTimeout(() => { if (!cancelled && !steady && mapRef.current === map) setState("error"); }, 25_000);
     }).catch((err) => {
       console.error("[LocationMap3D] Failed to load 3D map:", err);
       if (!cancelled) setState("error");
