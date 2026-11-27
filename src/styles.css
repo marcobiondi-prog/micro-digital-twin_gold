@@ -2599,3 +2599,7 @@ html[data-slate] .nav-orb-glow {
 .maplibregl-map .maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: rgb(15 20 28 / 0.86); }
 .maplibregl-map .maplibregl-popup-close-button { color: #fff; font-size: 16px; padding: 0 6px; top: 50%; transform: translateY(-50%); border: 0; background: transparent; }
 .maplibregl-map .maplibregl-popup-content:has(.maplibregl-popup-close-button) { padding-right: 30px; }
+
+/* A marker being dragged on the 2D map: lifted, nothing drawn behind it. */
+.map-dragging > * { transform: scale(1.18); filter: drop-shadow(0 0 6px rgb(45 212 191 / 0.9)) drop-shadow(0 4px 8px rgb(0 0 0 / 0.5)); transition: transform 120ms ease-out; }
+.map-dragging { z-index: 10; }

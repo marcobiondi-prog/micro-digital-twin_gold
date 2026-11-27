@@ -2,7 +2,7 @@ import { isKeyRejected, loadGoogleMaps, onKeyRejected } from "@/lib/google-maps-
 import { useModels3D } from "@/lib/use-ios-3d";
 import { firstName, personInitials, spotsKey, type ColleagueSpot } from "@/lib/colleagues";
 import { densify, tileRing } from "@/models/drape";
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { bedParts, BEDS_3D, crownRing, hedgeParts, netParts, vineRowParts, PERGOLA_COLORS, pergolaParts, shadePatchBlocks, treeParts } from "@/models/area-layout";
 import { MIST_RADIUS_M, SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } from "@/views/v10/map-area";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, LoaderCircle, Minus, Move, Plus, RotateCcw, X } from "lucide-react";
@@ -334,7 +334,7 @@ function applyCamera(map: Map3D, camera: Camera, animate: boolean) {
   Object.assign(map, camera);
 }
 
-export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], sim = null, follow = false, people = [] }: { lat: number; lng: number; label: string; apiKey: string; fallback?: ReactNode; area?: Array<[number, number]>; sim?: SimLayout | null; follow?: boolean; people?: ColleagueSpot[] }) {
+export function LocationMap3D({ lat, lng, label, apiKey, area = [], sim = null, follow = false, people = [] }: { lat: number; lng: number; label: string; apiKey: string; area?: Array<[number, number]>; sim?: SimLayout | null; follow?: boolean; people?: ColleagueSpot[] }) {
   const rejected = useKeyRejected();
   // The map is built for a place, not for each GPS fix: the pin can follow the phone metre by metre, and rebuilding the
   // photographic 3D at every fix left it blank half the time. A new place (over 30 m away) builds a new map.
@@ -414,12 +414,9 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
       el.replaceChildren(map);
       mapRef.current = map;
       setState("ready");
-      // A map that never draws (tiles refused by the key's quota, WebGL lost on a phone short of memory) stays black or
-      // frozen: if it has not settled once within 25 s, or reports an error, the simplified 3D takes over (with Riprova).
-      let steady = false;
-      map.addEventListener("gmp-steadychange", (e) => { if ((e as unknown as { isSteady?: boolean; detail?: { isSteady?: boolean } }).isSteady ?? (e as CustomEvent).detail?.isSteady ?? true) steady = true; });
+      // A map that reports an error shows the notice with Riprova (a timer on gmp-steadychange was tried and dropped:
+      // some builds never send it, and a working map was taken away).
       map.addEventListener("gmp-error", () => { if (!cancelled) setState("error"); });
-      window.setTimeout(() => { if (!cancelled && !steady && mapRef.current === map) setState("error"); }, 25_000);
     }).catch((err) => {
       console.error("[LocationMap3D] Failed to load 3D map:", err);
       if (!cancelled) setState("error");

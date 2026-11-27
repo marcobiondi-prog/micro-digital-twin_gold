@@ -455,8 +455,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         {!drawing && !drawingZone && proposalPill}
         {show3d
           ? <Suspense fallback={<div className="h-full w-full bg-card" />}><MapLight kind={kind} lat={pin.lat} lng={pin.lng}>{key
-            ? <LocationMap3D key={`map3d-${kind}`} people={people} follow={following} lat={pin.lat} lng={pin.lng} label={name ?? ""} apiKey={key} area={ring} sim={sim}
-              fallback={<OpenMap3D people={people} follow={following} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />} />
+            ? <LocationMap3D key={`map3d-${kind}`} people={people} follow={following} lat={pin.lat} lng={pin.lng} label={name ?? ""} apiKey={key} area={ring} sim={sim} />
             : <OpenMap3D key={`openmap3d-${kind}`} people={people} follow={following} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />}</MapLight></Suspense>
           : <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`map2d-${kind}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} people={people} drawing={drawing || drawingZone}
             onAreaChange={drawingZone ? setZoneDraft : setDraft} sim={editingZone && sim ? { ...sim, inner: (sim.inner ?? []).filter((z) => z.id !== editingZone) } : sim} arranging={arranging} onMove={moved} proposal={proposal}

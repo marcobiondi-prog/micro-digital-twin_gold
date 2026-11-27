@@ -41,53 +41,13 @@ export function setAreaData(map: MlMap, ring: Ring, closed = true) {
   (map.getSource(AREA_SOURCE) as GeoJSONSource | undefined)?.setData(areaGeoJson(ring, closed));
 }
 
-/** Motion trail (scia) shown while dragging objects/handles on the 2D map. */
-export const TRAIL_SOURCE = "drag-motion-trail";
-
-export function addTrailLayers(map: MlMap) {
-  if (map.getSource(TRAIL_SOURCE)) return;
-  map.addSource(TRAIL_SOURCE, {
-    type: "geojson",
-    data: { type: "FeatureCollection", features: [] },
-  });
-  map.addLayer({
-    id: "drag-trail-glow",
-    type: "line",
-    source: TRAIL_SOURCE,
-    filter: ["==", ["geometry-type"], "LineString"],
-    paint: { "line-color": "#2dd4bf", "line-width": 8, "line-opacity": 0.55, "line-blur": 3 },
-    layout: { "line-join": "round", "line-cap": "round" },
-  });
-  map.addLayer({
-    id: "drag-trail-core",
-    type: "line",
-    source: TRAIL_SOURCE,
-    filter: ["==", ["geometry-type"], "LineString"],
-    paint: { "line-color": "#ffffff", "line-width": 2.5, "line-opacity": 0.95, "line-dasharray": [2, 1.5] },
-    layout: { "line-join": "round", "line-cap": "round" },
-  });
-  map.addLayer({
-    id: "drag-trail-points",
-    type: "circle",
-    source: TRAIL_SOURCE,
-    filter: ["==", ["geometry-type"], "Point"],
-    paint: { "circle-radius": 4.5, "circle-color": "#2dd4bf", "circle-stroke-width": 2, "circle-stroke-color": "#ffffff", "circle-opacity": 0.9 },
-  });
-}
-
-export function setTrailData(map: MlMap, coords: [number, number][]) {
-  const src = map.getSource(TRAIL_SOURCE) as GeoJSONSource | undefined;
-  if (!src) return;
-  if (coords.length < 2) {
-    src.setData({ type: "FeatureCollection", features: [] });
-    return;
-  }
-  const features: Array<Record<string, unknown>> = [
-    { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: coords } },
-    { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: coords[0]! } },
-    { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: coords[coords.length - 1]! } },
-  ];
-  src.setData({ type: "FeatureCollection", features } as unknown as Parameters<GeoJSONSource["setData"]>[0]);
+/**
+ * What is being dragged on the 2D map is lifted (a little larger, a soft turquoise glow) until let go: a CSS class on the
+ * marker's own element, nothing drawn on the map (the dashed trail it replaced redrew a line at every move).
+ */
+export function liftWhileDragged(m: { on: (e: string, f: () => void) => unknown; getElement: () => HTMLElement }) {
+  m.on("dragstart", () => m.getElement().classList.add("map-dragging"));
+  m.on("dragend", () => m.getElement().classList.remove("map-dragging"));
 }
 
 /** A pin of the area: a white dot with a dark ring and its number, big enough to grab with a finger. */
