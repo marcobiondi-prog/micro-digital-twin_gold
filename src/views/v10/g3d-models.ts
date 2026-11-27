@@ -32,11 +32,10 @@ export type ModelSpot = { key: string; lat: number; lng: number; heading: number
 
 const cache = new Map<string, Promise<string | null>>();
 
-/** The light version (an iPhone that turned the realistic models on): at most this many copies of each instanced part
- *  (leaves, pebbles, flowers), the ones kept a little bigger to cover the gaps, and pictures at most 256 px. */
-const LITE_INSTANCES = 220;
+/** The light version (phones and tablets): the same high-poly models, pictures at most 256 px and fewer of them laid
+ *  (bed tiles, vine and pipe pieces). */
 
-function bake(root: THREE.Object3D, lite = false) {
+function bake(root: THREE.Object3D) {
   const repl: Array<[THREE.Object3D, THREE.Object3D]> = [];
   root.updateMatrixWorld(true);
   root.traverse((o) => {
@@ -44,12 +43,10 @@ function bake(root: THREE.Object3D, lite = false) {
     if (im.isInstancedMesh) {
       const geos: THREE.BufferGeometry[] = [];
       const m = new THREE.Matrix4(), col = new THREE.Color();
-      const step = lite ? Math.max(1, Math.ceil(im.count / LITE_INSTANCES)) : 1;
-      const grow = new THREE.Matrix4().makeScale(1, 1, 1);
-      if (step > 1) { const k = Math.min(1.6, 1 + (step - 1) * 0.12); grow.makeScale(k, k, k); }
-      for (let i = 0; i < im.count; i += step) {
+      // Every leaf, pebble and flower is kept (high-poly, as asked): the light version is lighter in pictures and in how
+      // many models are laid, never in polygons.
+      for (let i = 0; i < im.count; i++) {
         im.getMatrixAt(i, m);
-        if (step > 1) m.multiply(grow);
         const g = im.geometry.clone().applyMatrix4(m);
         if (im.instanceColor) {
           im.getColorAt(i, col);
@@ -159,7 +156,7 @@ async function toDataUrl(obj: THREE.Object3D, glow: number, lite = false): Promi
   await waitTextures(obj);
   trimMaps(obj);
   brighten(obj, glow);
-  bake(obj, lite);
+  bake(obj);
   const buf = (await new GLTFExporter().parseAsync(flatten(obj), { binary: true, maxTextureSize: lite ? 256 : 512 })) as ArrayBuffer;
   if (typeof FileReader !== "undefined") {
     const blob = new Blob([buf], { type: "model/gltf-binary" });
@@ -223,7 +220,7 @@ export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number },
     // block or bed turned by hand on the map keeps that orientation.
     const shadeRings = shadePatchBlocks(L.patches.filter((p) => p.kind === "shade"));
     const lawnM2 = L.patches.filter((p) => p.kind === "lawn").reduce((sum, p) => { const r = rectOf(p.ring.map(xz), xzAngleOf(p.ring, p.angle, xz)); return sum + r.w * r.d; }, 0);
-    const tileM = Math.max(BED_TILE_M, Math.sqrt(lawnM2 / (lite ? MAX_BED_TILES / 2 : MAX_BED_TILES)));
+    const tileM = Math.max(BED_TILE_M, Math.sqrt(lawnM2 / (lite ? MAX_BED_TILES / 4 : MAX_BED_TILES)));
     for (const p of [...L.patches.filter((q) => q.kind !== "shade"), ...shadeRings.map((b) => ({ kind: "shade" as const, ring: b.ring, angle: b.angle }))]) {
       const r = rectOf(p.ring.map(xz), xzAngleOf(p.ring, p.angle, xz));
       if (p.kind === "lawn" && r.w >= 0.8 && r.d >= 0.8) {
@@ -267,7 +264,7 @@ export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number },
     // in a light version seen from afar; pieces grow longer while there would be more than MAX_VINE_PIECES.
     const rows = vineRowSegments(L.patches.filter((p) => p.kind === "zone").map((p) => p.ring), 160).map(([a, b]) => [xz(a), xz(b)] as const);
     const total = rows.reduce((t, [a, b]) => t + Math.hypot(b.x - a.x, b.z - a.z), 0);
-    const piece = Math.max(VINE_PIECE_M, total / (lite ? MAX_VINE_PIECES / 2 : MAX_VINE_PIECES));
+    const piece = Math.max(VINE_PIECE_M, total / (lite ? MAX_VINE_PIECES / 3 : MAX_VINE_PIECES));
     let n = 0;
     for (const [a, b] of rows) {
       const len = Math.hypot(b.x - a.x, b.z - a.z);
@@ -287,7 +284,7 @@ export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number },
       return out;
     });
     const pipeLen = pipes.reduce((t, { a, b }) => t + Math.hypot(b.x - a.x, b.z - a.z), 0);
-    const pipePiece = Math.max(DRIP_PIECE_M, pipeLen / (lite ? MAX_DRIP_PIECES / 2 : MAX_DRIP_PIECES));
+    const pipePiece = Math.max(DRIP_PIECE_M, pipeLen / (lite ? MAX_DRIP_PIECES / 3 : MAX_DRIP_PIECES));
     for (const { a, b, main } of pipes) {
       const len = Math.hypot(b.x - a.x, b.z - a.z);
       if (len < 0.3) continue;
