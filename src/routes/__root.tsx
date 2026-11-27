@@ -30,6 +30,7 @@ import { useSyncMediaArchive } from "@/models/media-archive";
 import { useSyncHistoryArchive } from "@/models/history-archive";
 import { useSyncSimHidden } from "@/models/sim-hidden";
 import { useRegisterDevice } from "@/lib/account-devices";
+import { useProjectSync } from "@/lib/project-sync";
 import { useMediaSync } from "@/lib/use-media-sync";
 import { useDstNotice } from "@/lib/dst-notice";
 import { installAppPermissionGuards, usePermissions } from "@/lib/app-permissions";
@@ -529,6 +530,7 @@ function RootComponent() {
   useMediaSync();
   // This device registers itself in the account's "Dispositivi collegati".
   useRegisterDevice();
+  useProjectSync();
   useDstNotice();
   // A permission changed in the phone's settings is said once on return to the app.
   usePermissions(true);

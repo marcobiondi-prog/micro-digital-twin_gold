@@ -111,6 +111,7 @@ function onlyNearMove(cur: Loc, patch: { location?: Loc }): boolean {
 /** quiet: kept on the device without the "Salvataggio… Salvato" notice (savedAt untouched). */
 function emit(target: keyof typeof SYNC_TARGETS, quiet = false) {
   const now = Date.now();
+  if (!quiet) edits.forEach((f) => f(target === "urban" ? "piazza" : "vigneto"));
   state = quiet ? state : { ...state, savedAt: now, syncedAt: now, syncedTargets: [...SYNC_TARGETS[target]] };
   try { window.localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* ignore */ }
   listeners.forEach((l) => l());
@@ -123,7 +124,19 @@ function subscribe(l: () => void) {
 }
 
 /** The current state outside React (tests, one-off reads). */
-export const getLab = () => state;
+export const getLab = () => { load(); return state; };
+
+/** The person's own edits (not quiet ones, not a project read back from the account): lib/project-sync pushes them. */
+const edits = new Set<(kind: "piazza" | "vigneto") => void>();
+export function onLabEdit(f: (kind: "piazza" | "vigneto") => void) { edits.add(f); return () => { edits.delete(f); }; }
+
+/** A project's simulation read from the account put in place, without counting as an edit nor showing "Salvato". */
+export function applyProjectState(kind: "piazza" | "vigneto", slice: Record<string, unknown>) {
+  load();
+  if (kind === "piazza") state = { ...state, urban: { ...state.urban, ...(slice as Partial<LabState["urban"]>) } };
+  else state = { ...state, vineyard: { ...state.vineyard, ...(slice as Partial<LabState["vineyard"]>) } };
+  emit(kind === "piazza" ? "urban" : "vineyard", true);
+}
 export function useLab() { return useSyncExternalStore(subscribe, () => state, () => serverState); }
 
 /** Derived indicators shared by the Decision Lab and the dashboards. */

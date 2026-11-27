@@ -1,6 +1,6 @@
 # Piano · Progetti condivisi
 
-Stato: **da fare** (piano scritto il 07/11/2026, messo da parte per un altro giorno).
+Stato: **in corso** (piano scritto il 07/11/2026, ripreso il 27/11/2026). Fase 0 fatta nel codice; tabelle delle fasi 0–1 in `supabase/migrations/20261127000000_projects.sql`, da applicare nel SQL Editor.
 Bozza grafica: `docs/progetti-condivisi/mock.html` (aprila nel browser: 5 schermate).
 
 ## L'idea in una riga
@@ -86,12 +86,12 @@ Da qui non si raggiunge Supabase né il vero Google: si usa il metodo già prova
 cioè Playwright con le risposte di Supabase simulate (`oauth*.cjs` nello scratchpad), più due browser
 aperti insieme per vedere gli aggiornamenti in diretta. Poi la prova vera sul telefono e sul PC.
 
-## Domande aperte (da decidere quel giorno)
-1. I pallini con i nomi sulla mappa servono, o basta "Laura sta modificando"?
-2. I commenti (fase 4) servono subito?
-3. Un invitato in "Solo visione" può scattare foto?
-4. La regola "un account, un settore" resta?
-5. Gli enti (Soprintendenza…) entrano come "Solo visione" al posto dell'email di approvazione, o in aggiunta?
+## Decisioni (27/11/2026)
+1. In diretta: **l'avviso "Laura sta modificando la mappa" e i pallini con i nomi sulla mappa**.
+2. Commenti (fase 4): **dopo**.
+3. Chi è in "Solo visione" **guarda soltanto**: niente foto né video, niente leve né disegno.
+4. "Un account, un settore" **resta per il profilo, non per gli inviti**: si può essere invitati a un progetto dell'altro settore.
+5. Ancora aperta: gli enti (Soprintendenza…) entrano come "Solo visione" al posto dell'email di approvazione, o in aggiunta?
 
 ## Ordine consigliato
 Fase 0 → Fase 1 → Fase 2 → Fase 3 → (Fase 4). Ogni fase è utilizzabile da sola e va pubblicata e provata
