@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, Check, Copy, Link2, Loader2, LogOut, Mail, Radio, Send, Share2, Trash2, UserPlus, Users, X } from "lucide-react";
+import { ArrowRight, Check, Copy, Link2, Loader2, LogOut, Mail, Radio, RefreshCw, Send, Share2, Trash2, UserPlus, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { openAccount } from "@/lib/camera-dock";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAccountAvatar } from "@/lib/account-avatar";
 import { getLastSection } from "@/lib/last-section";
 import { useProId } from "@/lib/use-pro-id";
-import { useCurrentProject, useSharedOpen } from "@/lib/project-sync";
+import { syncProject, useCurrentProject, useSharedOpen } from "@/lib/project-sync";
 import {
   ROLE_LABEL, cancelInvite, createInvite, initials, inviteLink, kindWord, removePerson, setRole,
   useProjectPeople, usePresence, type Invite, type Online, type Person, type ProjectRole,
@@ -117,6 +117,7 @@ export function ShareControl() {
             <DialogDescription>{kind === "piazza" ? "Il progetto della piazza" : "Il progetto del vigneto"}: chi ci lavora, chi è connesso adesso e gli inviti.</DialogDescription>
           </DialogHeader>
           <OtherShared kind={kind} onGo={() => setOpen(false)} />
+          {id && <SyncNow kind={kind} />}
           {!id ? (
             <p className="rounded-2xl border border-foreground/10 bg-foreground/[0.04] p-4 text-sm text-muted-foreground">
               Scegli un luogo nella simulazione: {kindWord(kind)} va nel tuo account e da lì puoi invitare altre persone.
@@ -320,6 +321,21 @@ function CopyButton({ text, label, wide }: { text: string; label: string; wide?:
     <button type="button" aria-label={label} onClick={() => { void navigator.clipboard?.writeText(text).then(() => { setDone(true); setTimeout(() => setDone(false), 1500); }, () => toast.error("Non posso copiare qui")); }}
       className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-foreground/15 text-sm hover:bg-foreground/10 ${wide ? "h-10 px-4" : "size-8"}`}>
       {done ? <Check className="size-4 text-emerald-300" /> : <Copy className="size-4" />}{wide ? (done ? "Copiato" : "Copia") : null}
+    </button>
+  );
+}
+
+/** Sincronizza adesso: the project read from the account (and this device's changes sent) at once, with a word on it. */
+function SyncNow({ kind }: { kind: ProjectKind }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <button type="button" disabled={busy} onClick={async () => {
+      setBusy(true);
+      await syncProject(kind, { announce: false });
+      setBusy(false);
+      toast.success("Interventi sincronizzati", { id: "mdt-sync-now", description: "Il progetto è allineato con il cloud e con i collaboratori." });
+    }} className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-foreground/10 px-4 text-sm font-semibold hover:bg-foreground/15 disabled:opacity-60">
+      <RefreshCw className={busy ? "size-4 animate-spin" : "size-4"} aria-hidden="true" /> Sincronizza gli interventi
     </button>
   );
 }

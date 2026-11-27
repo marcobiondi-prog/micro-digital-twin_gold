@@ -70,6 +70,8 @@ export function useSharedOpen(kind: ProjectKind): boolean | undefined {
 
 let missing = false;
 const busy = new Set<ProjectKind>();
+// A sync asked while one was running (a colleague's save arriving mid-push) was lost until the next return to the app.
+const again = new Map<ProjectKind, { announce?: boolean; by?: "colleague" }>();
 type Row = { id: string; state: Record<string, unknown>; updated_at: string };
 
 let lastUser: string | null = null;
@@ -99,7 +101,8 @@ function storedUser(): string | null {
 
 /** Brings one kind in step with the account. */
 export async function syncProject(kind: ProjectKind, opts: { announce?: boolean; by?: "colleague" } = {}): Promise<void> {
-  if (missing || busy.has(kind) || (typeof navigator !== "undefined" && navigator.onLine === false)) return;
+  if (busy.has(kind)) { again.set(kind, opts); return; } // asked while one runs: run once more right after it
+  if (missing || (typeof navigator !== "undefined" && navigator.onLine === false)) return;
   const user = await userId();
   if (!user) { setLabReadOnly(kind, false); return; }
   busy.add(kind);
@@ -157,7 +160,11 @@ export async function syncProject(kind: ProjectKind, opts: { announce?: boolean;
     } else if (row && !known) {
       setMeta(user, kind, { id: row.id, known: row.updated_at, syncedAt: Date.now(), shared });
     }
-  } catch { /* offline or refused: tried again later */ } finally { busy.delete(kind); }
+  } catch { /* offline or refused: tried again later */ } finally {
+    busy.delete(kind);
+    const next = again.get(kind);
+    if (next) { again.delete(kind); void syncProject(kind, next); }
+  }
 }
 
 function checkMissing(error: { code?: string; message?: string }) {
@@ -190,19 +197,33 @@ export function useProjectSync() {
     // In diretta: a colleague's save to one of this account's projects comes down by itself (RLS: members only).
     let me: string | null = null;
     void userId().then((u) => { me = u; });
+    // A safety net under the live channels: every 20 s, while the app is in front, only the projects' update times are
+    // read (a few bytes); a project changed elsewhere and not yet here comes down.
+    const poll = window.setInterval(async () => {
+      if (document.visibilityState !== "visible" || missing || navigator.onLine === false) return;
+      const user = await userId();
+      if (!user) return;
+      for (const kind of KINDS) {
+        const m = metaOf(user, kind);
+        if (!m?.id || busy.has(kind)) continue;
+        const { data } = await table().select("updated_at").eq("id", m.id).maybeSingle();
+        const at = (data as { updated_at?: string } | null)?.updated_at;
+        if (at && at !== m.known) void syncProject(kind, { announce: true, by: "colleague" });
+      }
+    }, 20_000);
     const live = supabase.channel("mdt-projects-live").on("postgres_changes" as never, { event: "UPDATE", schema: "public", table: "projects" } as never, (payload: { new?: { id?: string; kind?: ProjectKind; updated_by?: string } }) => {
       const row = payload.new;
       if (!row?.id || !row.kind || !me || row.updated_by === me) return;
       if (metaOf(me, row.kind)?.id !== row.id) return;
       void syncProject(row.kind, { announce: true, by: "colleague" });
     }).subscribe();
-    const { data } = supabase.auth.onAuthStateChange((event) => { if (event === "SIGNED_IN") { missing = false; window.setTimeout(() => syncAllProjects(), 800); } void refreshLive(); });
+    const { data } = supabase.auth.onAuthStateChange((event) => { if (event === "SIGNED_IN") { missing = false; window.setTimeout(() => syncAllProjects(), 800); } void userId().then((u) => { me = u; }); void refreshLive(); });
     const back = () => { if (document.visibilityState === "visible") syncAllProjects(); };
     const online = () => syncAllProjects();
     document.addEventListener("visibilitychange", back);
     window.addEventListener("online", online);
     return () => {
-      onReadOnlyRefused(null); offEdit(); metaSubs.delete(onMeta); for (const k of KINDS) { const l = lives[k]; if (l) { void supabase.removeChannel(l.ch); delete lives[k]; } } window.clearTimeout(start); data.subscription.unsubscribe(); void supabase.removeChannel(live);
+      onReadOnlyRefused(null); offEdit(); metaSubs.delete(onMeta); for (const k of KINDS) { const l = lives[k]; if (l) { void supabase.removeChannel(l.ch); delete lives[k]; } } window.clearTimeout(start); window.clearInterval(poll); data.subscription.unsubscribe(); void supabase.removeChannel(live);
       Object.values(timers).forEach((t) => window.clearTimeout(t));
       document.removeEventListener("visibilitychange", back); window.removeEventListener("online", online);
     };
