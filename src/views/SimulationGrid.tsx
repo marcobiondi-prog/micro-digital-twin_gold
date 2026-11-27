@@ -2,7 +2,7 @@ import { FormEvent, Suspense, lazy, useEffect, useRef, useState, type ReactNode 
 import { appAllowed, guardUse, useAppAllowed } from "@/lib/app-permissions";
 import { setLivePos } from "@/lib/live-position";
 import { sharedNow } from "@/lib/project-sync";
-import { FOCUS_AREA_EVENT, GPS_PAUSE_KEY } from "@/lib/gps-hold";
+import { FOCUS_AREA_EVENT, FOLLOW_GPS_EVENT, GPS_PAUSE_KEY } from "@/lib/gps-hold";
 import { useServerFn } from "@tanstack/react-start";
 import { CloudSun, Droplets, Grape, LoaderCircle, LocateFixed, Lock, Satellite, MapPin, Search, Sprout, Thermometer, TreePine, TrendingDown, Umbrella, Undo2 } from "lucide-react";
 import { Card, StatusBadge } from "@/views/health";
@@ -178,11 +178,16 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
   const appliedAcc = useRef(Infinity);
   const pauseFollow = () => { if (gpsRef.current) { setPaused(true); saveGpsPaused(true); } };
   const gpsRef = useRef(false); gpsRef.current = gps;
+  // Bumped to start the GPS watch again (a fresh first fix), e.g. after leaving a shared project.
+  const [watchRound, setWatchRound] = useState(0);
   // A colleague changed the shared project: the GPS stops moving the map and the place, which stay on the project's area.
   useEffect(() => {
     const hold = () => { if (gpsRef.current) setPaused(true); };
     window.addEventListener(FOCUS_AREA_EVENT, hold);
-    return () => window.removeEventListener(FOCUS_AREA_EVENT, hold);
+    // Signed out, off the project: the GPS follows the phone again and puts the place where the person really is.
+    const follow = () => { setPaused(false); if (gpsRef.current) { setLocating(true); setWatchRound((n) => n + 1); } };
+    window.addEventListener(FOLLOW_GPS_EVENT, follow);
+    return () => { window.removeEventListener(FOCUS_AREA_EVENT, hold); window.removeEventListener(FOLLOW_GPS_EVENT, follow); };
   }, []);
   // Read after mounting, so the server's page and the first render agree.
   // Every opening switches the GPS on and follows the phone, except where there is work to keep: a place with an area
@@ -269,7 +274,7 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
       else if (!lastFix.current && placeRef.current.pending) setError("Sto ancora cercando la posizione: il GPS resta attivo e riprova da solo.");
     }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 });
     return () => { live = false; lastFix.current = null; appliedAcc.current = Infinity; setLivePos(null); navigator.geolocation.clearWatch(id); };
-  }, [gps, reverseGoogle, reverseOsm]);
+  }, [gps, reverseGoogle, reverseOsm, watchRound]);
   // Ricalibra: a fresh fix asked now (no cached position), the place put exactly there whatever the distance, and the
   // GPS following again. Also what "Seguimi di nuovo" does.
   const [calibrating, setCalibrating] = useState(false);

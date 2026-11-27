@@ -2,7 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { describeChange } from "@/models/live-edit";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { focusProjectArea } from "@/lib/gps-hold";
+import { focusProjectArea, followGpsAgain } from "@/lib/gps-hold";
 import { applyProjectState, dropProjectState, getLab, isLabReadOnly, onLabEdit, onReadOnlyRefused, setLabReadOnly } from "@/models/lab-store";
 import { placeOf, projectName, projectSlice, syncStep, type ProjectKind, type SyncMeta } from "@/models/project-state";
 
@@ -189,6 +189,8 @@ function leaveProjects(me: string) {
   }
   if (left.length) {
     write(EDIT_KEY, {});
+    // The GPS no longer held on the project's area: it puts the place where the phone really is.
+    followGpsAgain();
     toast(wasShared ? "Sei uscito dal progetto condiviso" : "Il progetto resta nel tuo account", { id: "mdt-left-project", description: "Su questo dispositivo la simulazione riparte vuota: rientra con il tuo account per ritrovarla." });
   }
 }

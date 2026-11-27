@@ -10,3 +10,10 @@ export function focusProjectArea() {
   try { localStorage.setItem(GPS_PAUSE_KEY, "1"); } catch { /* storage unavailable */ }
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(FOCUS_AREA_EVENT));
 }
+
+/** The GPS follows the phone again (signed out, off the project): the pause dropped and the map's search told. */
+export const FOLLOW_GPS_EVENT = "mdt-gps-follow";
+export function followGpsAgain() {
+  try { localStorage.removeItem(GPS_PAUSE_KEY); } catch { /* storage unavailable */ }
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(FOLLOW_GPS_EVENT));
+}
