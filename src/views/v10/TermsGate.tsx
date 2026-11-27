@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useLocation } from "@tanstack/react-router";
 import { Check, FileText, LoaderCircle, ShieldCheck } from "lucide-react";
 import { introSeen } from "@/lib/intro-seen";
+import { getProId, openSectorGate } from "@/lib/use-pro-id";
 import { acceptTerms, installTermsSync, useTermsAcceptedAt } from "@/lib/terms";
 import { InfoNav, type InfoPath } from "@/views/v10/InfoPage";
 import { Backdrop, useDarkChrome } from "@/views/v10/intro";
@@ -46,6 +47,8 @@ function TermsScreen() {
     if (!ok || busy) return;
     setBusy(true);
     await acceptTerms();
+    // Straight on to the sector choice ("Da dove vuoi usarmi?"), unless a profile is already in use.
+    if (!getProId()) openSectorGate(null);
   };
   const open = (to: InfoPath) => {
     if (to === "/legale/termini" || to === "/privacy/informativa" || to === "/privacy/cookie") setReading(to);
