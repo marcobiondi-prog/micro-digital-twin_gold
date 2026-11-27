@@ -110,7 +110,7 @@ export function ShareControl() {
         {liveNow && <span className="share-badge-dot absolute -bottom-0.5 -right-0.5 size-3 rounded-full bg-emerald-400 ring-2 ring-background" aria-hidden="true" />}
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent overlayClassName="bg-black/45 backdrop-blur-md sm:!fixed sm:!inset-0 sm:!h-auto sm:!min-h-0" className="max-h-[88dvh] grid-cols-[minmax(0,1fr)] gap-4 overflow-y-auto overflow-x-hidden overscroll-contain border-foreground/20 bg-card p-5 shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_-24px_60px_rgb(0_0_0/0.6)] dark:bg-[oklch(0.25_0.016_258)] max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-[1.75rem] max-sm:border-x-0 max-sm:border-b-0 max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-sm:data-[state=open]:slide-in-from-bottom-1/2 max-sm:data-[state=closed]:slide-out-to-bottom-1/2 sm:w-[min(480px,calc(100vw-1.5rem))] sm:rounded-2xl">
+        <DialogContent onOpenAutoFocus={(e) => e.preventDefault()} overlayClassName="bg-black/45 backdrop-blur-md sm:!fixed sm:!inset-0 sm:!h-auto sm:!min-h-0" className="max-h-[88dvh] grid-cols-[minmax(0,1fr)] gap-4 overflow-y-auto overflow-x-hidden overscroll-contain border-foreground/20 bg-card p-5 shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_-24px_60px_rgb(0_0_0/0.6)] dark:bg-[oklch(0.25_0.016_258)] max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-[1.75rem] max-sm:border-x-0 max-sm:border-b-0 max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-sm:data-[state=open]:slide-in-from-bottom-1/2 max-sm:data-[state=closed]:slide-out-to-bottom-1/2 sm:w-[min(480px,calc(100vw-1.5rem))] sm:rounded-2xl">
           <span className="mx-auto -mt-1 h-1.5 w-10 rounded-full bg-foreground/20 sm:hidden" aria-hidden="true" />
           <DialogHeader className="text-left">
             <DialogTitle>Chi è in condivisione</DialogTitle>
@@ -254,7 +254,7 @@ function InviteBox({ projectId, invites, busy, onDone, onCancel, kind, project }
   return (
     <section className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3" aria-label="Invita">
       <h3 className="flex items-center gap-2 text-sm font-semibold"><UserPlus className="size-4" aria-hidden="true" /> Invita una persona</h3>
-      <form className="grid gap-2" onSubmit={(e) => { e.preventDefault(); void send(); }}>
+      <form className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2" onSubmit={(e) => { e.preventDefault(); void send(); }}>
         <input type="email" inputMode="email" autoComplete="email" placeholder="email@esempio.it" value={email} onChange={(e) => setEmail(e.target.value)}
           className="h-11 rounded-full border border-foreground/15 bg-background/60 px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Email della persona da invitare" />
         <div role="radiogroup" aria-label="Cosa può fare" className="grid grid-cols-2 gap-1 rounded-full border border-foreground/15 p-1">
@@ -269,14 +269,14 @@ function InviteBox({ projectId, invites, busy, onDone, onCancel, kind, project }
       </form>
       {made && <InviteLink inv={made} onClose={() => setMade(null)} fresh kind={kind} project={project} />}
       {invites.length > 0 && (
-        <div className="grid gap-2">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
           <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">In attesa · {invites.length}</h4>
           {invites.map((i) => (
-            <div key={i.id} className="flex items-center gap-2 rounded-2xl border border-dashed border-foreground/15 p-2.5 pl-3">
+            <div key={i.id} className="flex min-w-0 items-center gap-2 rounded-2xl border border-dashed border-foreground/15 p-2.5 pl-3">
               <span className="min-w-0 flex-1"><span className="block truncate text-sm">{i.email}</span><span className="text-xs text-muted-foreground">{ROLE_LABEL[i.role]} · non ancora accettato</span></span>
-              <button type="button" onClick={() => mailInvite(i, kind, project)} aria-label={`Manda di nuovo l’invito per email a ${i.email}`} className="grid size-8 place-items-center rounded-full border border-foreground/15 hover:bg-foreground/10"><Mail className="size-4" /></button>
+              <button type="button" onClick={() => mailInvite(i, kind, project)} aria-label={`Manda di nuovo l’invito per email a ${i.email}`} className="grid size-8 shrink-0 place-items-center rounded-full border border-foreground/15 hover:bg-foreground/10"><Mail className="size-4" /></button>
               <CopyButton text={inviteLink(i.token)} label={`Copia il link dell’invito per ${i.email}`} />
-              <button type="button" disabled={busy === `i${i.id}`} onClick={() => onCancel(i)} aria-label={`Annulla l’invito per ${i.email}`} className="grid size-8 place-items-center rounded-full text-red-300 hover:bg-red-400/10"><X className="size-4" /></button>
+              <button type="button" disabled={busy === `i${i.id}`} onClick={() => onCancel(i)} aria-label={`Annulla l’invito per ${i.email}`} className="grid size-8 shrink-0 place-items-center rounded-full text-red-300 hover:bg-red-400/10"><X className="size-4" /></button>
             </div>
           ))}
         </div>
@@ -301,14 +301,14 @@ function InviteLink({ inv, onClose, fresh, kind, project }: { inv: Invite; onClo
     try { await navigator.clipboard.writeText(link); toast.success("Link copiato"); } catch { /* not allowed */ }
   };
   return (
-    <div className="grid gap-2 rounded-2xl border border-[oklch(0.78_0.13_185/0.4)] bg-[oklch(0.78_0.13_185/0.08)] p-3">
-      {fresh && <p className="text-sm"><Check className="mr-1 inline size-4 text-emerald-300" />Invito pronto per <b>{inv.email}</b>. Mandaglielo per email: entrando con quell’account lo accetta.</p>}
-      <button type="button" onClick={() => mailInvite(inv, kind, project)} className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[oklch(0.78_0.13_185)] text-sm font-semibold text-[oklch(0.2_0.03_240)]"><Mail className="size-4" /> Invia per email a {inv.email}</button>
-      <div className="flex items-center gap-2 rounded-full bg-background/60 px-3 py-2 text-xs"><Link2 className="size-3.5 shrink-0" /><span className="min-w-0 flex-1 truncate">{link}</span></div>
-      <div className="flex gap-2">
-        <button type="button" onClick={() => void share()} className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-full border border-foreground/15 text-sm font-semibold hover:bg-foreground/10"><Share2 className="size-4" /> Condividi</button>
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2 rounded-2xl border border-[oklch(0.78_0.13_185/0.4)] bg-[oklch(0.78_0.13_185/0.08)] p-3">
+      {fresh && <p className="min-w-0 text-sm [overflow-wrap:anywhere]"><Check className="mr-1 inline size-4 text-emerald-300" />Invito pronto per <b>{inv.email}</b>. Mandaglielo per email: entrando con quell’account lo accetta.</p>}
+      <button type="button" onClick={() => mailInvite(inv, kind, project)} className="inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-full bg-[oklch(0.78_0.13_185)] px-4 py-2 text-sm font-semibold text-[oklch(0.2_0.03_240)]"><Mail className="size-4 shrink-0" /><span className="min-w-0 truncate">Invia per email a {inv.email}</span></button>
+      <div className="flex min-w-0 items-center gap-2 rounded-full bg-background/60 px-3 py-2 text-xs"><Link2 className="size-3.5 shrink-0" /><span className="min-w-0 flex-1 truncate">{link}</span></div>
+      <div className="flex min-w-0 gap-2">
+        <button type="button" onClick={() => void share()} className="inline-flex h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-full border border-foreground/15 text-sm font-semibold hover:bg-foreground/10"><Share2 className="size-4 shrink-0" /> Condividi</button>
         <CopyButton text={link} label="Copia il link" wide />
-        <button type="button" onClick={onClose} aria-label="Chiudi" className="grid size-10 place-items-center rounded-full hover:bg-foreground/10"><X className="size-4" /></button>
+        <button type="button" onClick={onClose} aria-label="Chiudi" className="grid size-10 shrink-0 place-items-center rounded-full hover:bg-foreground/10"><X className="size-4" /></button>
       </div>
     </div>
   );
@@ -318,7 +318,7 @@ function CopyButton({ text, label, wide }: { text: string; label: string; wide?:
   const [done, setDone] = useState(false);
   return (
     <button type="button" aria-label={label} onClick={() => { void navigator.clipboard?.writeText(text).then(() => { setDone(true); setTimeout(() => setDone(false), 1500); }, () => toast.error("Non posso copiare qui")); }}
-      className={`inline-flex items-center justify-center gap-1.5 rounded-full border border-foreground/15 text-sm hover:bg-foreground/10 ${wide ? "h-10 px-4" : "size-8"}`}>
+      className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-foreground/15 text-sm hover:bg-foreground/10 ${wide ? "h-10 px-4" : "size-8"}`}>
       {done ? <Check className="size-4 text-emerald-300" /> : <Copy className="size-4" />}{wide ? (done ? "Copiato" : "Copia") : null}
     </button>
   );
