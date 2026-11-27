@@ -218,7 +218,7 @@ export function useProjectSync() {
     onReadOnlyRefused((kind) => {
       if (Date.now() - saidAt < 4000) return;
       saidAt = Date.now();
-      toast(kind === "piazza" ? "Piazza in solo visione" : "Vigneto in solo visione", { id: "mdt-viewer", description: "Puoi guardare il progetto ma non modificarlo: chiedi al proprietario di poter modificare." });
+      toast(kind === "piazza" ? "Piazza in solo visione" : "Vigneto in solo visione", { id: "mdt-viewer", description: "Puoi guardare il progetto ma non modificarlo: chiedi all’admin di poter modificare." });
     });
     // The live channels follow the projects in use (a project made, an invite accepted, a sign-in).
     void refreshLive();

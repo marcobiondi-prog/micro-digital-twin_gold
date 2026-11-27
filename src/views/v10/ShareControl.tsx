@@ -203,7 +203,7 @@ function SharePanel({ projectId, me, kind, online, share, onLeft, project }: { p
         onCancel={(i) => act(`i${i.id}`, () => cancelInvite(i.id), "Invito annullato")} /> : share.myRole ? (
         <button type="button" disabled={busy === "leave"} onClick={() => act("leave", async () => {
             const ownerName = share.people.find((p) => p.role === "owner");
-            await leaveSharedProject(kind, projectId, { name: project, owner: (ownerName?.name || ownerName?.email || "il proprietario").split(/\s+|@/)[0]! });
+            await leaveSharedProject(kind, projectId, { name: project, owner: (ownerName?.name || ownerName?.email || "l’admin").split(/\s+|@/)[0]! });
             onLeft();
           }, "Sei uscito dal progetto · Per rientrare, tocca «Chiedi di rientrare» sulla mappa")}
           className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-red-400/40 text-sm font-semibold text-red-300 hover:bg-red-400/10">

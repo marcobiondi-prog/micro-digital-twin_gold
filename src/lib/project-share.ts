@@ -16,7 +16,7 @@ export type Online = { user_id: string; name: string; avatar: string | null; whe
 
 const db = () => supabase as unknown as { from: (t: string) => any; rpc: (f: string, a: Record<string, unknown>) => any }; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-export const ROLE_LABEL: Record<ProjectRole, string> = { owner: "Proprietario", editor: "Può modificare", viewer: "Solo visione" };
+export const ROLE_LABEL: Record<ProjectRole, string> = { owner: "Admin", editor: "Può modificare", viewer: "Solo visione" };
 export const inviteLink = (token: string) => `${typeof window === "undefined" ? "" : window.location.origin}/invito/${token}`;
 
 export function useProjectPeople(projectId: string | null, me: string | null) {
