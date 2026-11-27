@@ -10,6 +10,7 @@ import { useGuest, useProId } from "@/lib/use-pro-id";
 import { useLabReadOnly } from "@/models/lab-store";
 import { Ambient, HeroButton, PageHero, Panels, TabRow, openSimTab, showSimMedia, startOnMap, simMediaId, useSimTab, type SimKind, type SimTab } from "./console";
 
+import { openSharePanel } from "@/views/v10/ShareControl";
 const loadMenu = () => import("@/views/v8/SimMenu");
 const SimMenu = lazy(loadMenu);
 const MENU_BUTTON = "grid size-11 place-items-center rounded-full bg-foreground/10 text-foreground outline-none backdrop-blur transition-colors hover:bg-foreground/[0.16] focus-visible:ring-2 focus-visible:ring-ring";
@@ -118,7 +119,7 @@ export function SimShell({ kind, place, onCompare, onReset, onSend, simula, medi
           {menu === "none"
             ? <button type="button" aria-label="Altre azioni" aria-haspopup="menu" className={MENU_BUTTON} onClick={() => setMenu("open")}><EllipsisVertical className="size-6" aria-hidden="true" /></button>
             : <Suspense fallback={<span className={MENU_BUTTON} aria-hidden="true"><EllipsisVertical className="size-6" /></span>}>
-                <SimMenu open={menu === "open"} guest={guest} onCamera={() => setCameraSheetOpen(true)} onMedia={() => showSimMedia(kind)} onSensors={() => go("sensori")} onMap={toMap} onSend={onSend} onReset={onReset} />
+                <SimMenu open={menu === "open"} guest={guest} onShare={() => openSharePanel()} onCamera={() => setCameraSheetOpen(true)} onMedia={() => showSimMedia(kind)} onSensors={() => go("sensori")} onMap={toMap} onSend={onSend} onReset={onReset} />
               </Suspense>}
         </>} />
       <div ref={barRef} data-sim-tabs="" className="sticky top-[var(--nav-h)] z-[999999997] -mx-4 bg-transparent px-4 py-2 md:mx-[calc(50%-var(--page-w,100vw)/2+2.5rem)] md:px-[calc(var(--page-w,100vw)/2-2.5rem-50%)] lg:mx-[calc(50%-var(--page-w,100vw)/2+7.5rem)] lg:px-[calc(var(--page-w,100vw)/2-7.5rem-50%)] backdrop-blur-xl slate-bleed will-change-transform data-[hidden]:pointer-events-none">

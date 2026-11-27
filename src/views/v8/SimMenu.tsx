@@ -1,4 +1,4 @@
-import { Camera, Images, Lock, MapPin, EllipsisVertical, Radar, RotateCcw, Send, type LucideIcon } from "lucide-react";
+import { Camera, Images, Lock, MapPin, EllipsisVertical, Radar, RotateCcw, Send, Users, type LucideIcon } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 /** The ⋮ button's look, shared with the plain button SimShell shows until this menu's code has come. */
@@ -12,8 +12,8 @@ function Item({ icon: Icon, label, locked, onSelect }: { icon: LucideIcon; label
  * The simulation's ⋮ context menu (radix's dropdown and its positioning, about 40 kB): loaded with the first tap on ⋮,
  * which it opens at once (defaultOpen), or once the page is idle.
  */
-export default function SimMenu({ open, guest, onCamera, onMedia, onSensors, onMap, onSend, onReset }: {
-  open: boolean; guest?: boolean | undefined; onCamera: () => void; onMedia: () => void; onSensors: () => void; onMap: () => void; onSend?: (() => void) | undefined; onReset: () => void;
+export default function SimMenu({ open, guest, onShare, onCamera, onMedia, onSensors, onMap, onSend, onReset }: {
+  open: boolean; guest?: boolean | undefined; onShare: () => void; onCamera: () => void; onMedia: () => void; onSensors: () => void; onMap: () => void; onSend?: (() => void) | undefined; onReset: () => void;
 }) {
   return (
     <DropdownMenu defaultOpen={open}>
@@ -23,6 +23,7 @@ export default function SimMenu({ open, guest, onCamera, onMedia, onSensors, onM
         <Item icon={Images} label="Foto e video salvati" onSelect={onMedia} />
         <Item icon={Radar} label="Dove mettere i sensori" locked={guest} onSelect={onSensors} />
         <Item icon={MapPin} label="Cambia luogo" onSelect={onMap} />
+        <Item icon={Users} label="Condivisione" locked={guest} onSelect={onShare} />
         <DropdownMenuSeparator />
         {onSend && <Item icon={Send} label="Invia all’agronomo" onSelect={onSend} />}
         <Item icon={RotateCcw} label="Ricomincia" onSelect={onReset} />

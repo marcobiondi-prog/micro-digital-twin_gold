@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { ArrowRight, Check, Copy, Link2, Loader2, LogOut, Mail, Radio, Send, Share2, Trash2, UserPlus, Users, X } from "lucide-react";
 import { toast } from "sonner";
+import { openAccount } from "@/lib/camera-dock";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccountAvatar } from "@/lib/account-avatar";
@@ -49,6 +50,10 @@ function Face({ name, avatar, size = 28, ring }: { name: string; avatar: string 
   );
 }
 
+/** Opens the "Chi è in condivisione" panel from elsewhere (the simulation's ⋮ menu). */
+export const SHARE_EVENT = "mdt-open-share";
+export const openSharePanel = () => window.dispatchEvent(new CustomEvent(SHARE_EVENT));
+
 export function ShareControl() {
   const kind = useKind();
   const { user, id } = useCurrentProject(kind);
@@ -76,6 +81,15 @@ export function ShareControl() {
   const live = useLivePos();
   const pos = live ? { lat: Math.round(live.lat * 1e5) / 1e5, lng: Math.round(live.lng * 1e5) / 1e5 } : null;
   const online = usePresence(id, me, whereOf(path, tab), pos);
+  // The simulation's ⋮ menu asks for this panel by name ("Condivisione"): signed out, the account panel opens instead.
+  useEffect(() => {
+    const ask = () => {
+      if (!user) { toast("Accedi per condividere il progetto", { description: "La condivisione con i colleghi è per gli account Premium." }); openAccount(); return; }
+      setOpen(true); void share.reload();
+    };
+    window.addEventListener(SHARE_EVENT, ask);
+    return () => window.removeEventListener(SHARE_EVENT, ask);
+  }, [user, share]);
   if (!user) return null;
   const others = online.filter((o) => o.user_id !== user);
   const count = share.people.length;
