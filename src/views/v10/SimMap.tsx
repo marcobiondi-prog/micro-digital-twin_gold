@@ -23,6 +23,7 @@ import { projectSpots, useColleagues } from "@/lib/colleagues";
 import { sendDrag, useCurrentProject, useLiveEdit, useRemoteDrags, type LiveEdit } from "@/lib/project-sync";
 import { MAP_DRAG_EVENT, type MapDrag } from "@/views/v10/map-area";
 import { focusProjectArea, followGpsAgain } from "@/lib/gps-hold";
+import { askToRejoin, useLeftProject } from "@/lib/project-rejoin";
 import { initials, useProjectPeople, type Online, type Person } from "@/lib/project-share";
 import { shadeOpenness, piazzaLayout, piazzaShadows, vineShadows, TREE_SHADE_M2, vineLayout, type LayoutEdits, type PiazzaLayout } from "@/models/area-layout";
 import { dayLight, solarHour, sunAt, sunHeightDeg } from "@/models/sun-shadow";
@@ -472,6 +473,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
       <div data-sim-map-box="" data-map-gestures={show3d ? "" : undefined} className="relative -mx-4 h-[52vh] min-h-72 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
         {/* The temperature the interventions bring, on the map itself (2D and 3D), following the levers live. */}
         <MapReading kind={kind} lat={pin.lat} lng={pin.lng} />
+        <RejoinPill kind={kind === "urban" ? "piazza" : "vigneto"} current={project.id} />
         {!solo && <LiveColleagues me={project.user} people={share.people} list={colleagues} spots={gpsPeople} edit={remoteDrags[0] ? { kind: kind === "urban" ? "piazza" : "vigneto", by: remoteDrags[0].by, name: remoteDrags[0].name, what: `sposta ${remoteDrags[0].label}`, at: null, time: remoteDrags[0].time } : liveEdit} />}
         {/* How many misting poles the map shows, exactly: those in the zones drawn for them and those the app placed. */}
         {sim?.kind === "piazza" && sim.data.misters.length > 0 && !drawing && (
@@ -579,6 +581,35 @@ function LiveColleagues({ me, people, list, spots, edit }: { me: string | null; 
           <span className="line-clamp-2">{edit ? `${(edit.name.split(/\s+|@/)[0] || "Un collaboratore")} ${edit.what.match(/^[A-Z]/) ? `cambia ${edit.what}` : edit.what}` : list.length > 0 ? `In diretta · ${live}` : live}</span>
         </span>
       </span>
+    </div>
+  );
+}
+
+/**
+ * After leaving a shared project: over the map, whose project it was and "Chiedi di rientrare" — a request the owner
+ * accepts or denies in the app (lib/project-rejoin); then "In attesa di …", or "… ha negato · Chiedi di nuovo".
+ */
+function RejoinPill({ kind, current }: { kind: "piazza" | "vigneto"; current: string | null }) {
+  const { left } = useLeftProject(kind);
+  const [busy, setBusy] = useState(false);
+  if (!left || current === left.id) return null;
+  const waiting = left.status === "pending";
+  return (
+    <div className="absolute bottom-3 left-3 z-[4] flex max-w-[calc(100%-6rem)] items-center gap-2 rounded-2xl bg-black/55 py-1.5 pl-3 pr-1.5 text-white shadow-[0_2px_10px_rgb(0_0_0/0.4)] ring-1 ring-white/15 backdrop-blur-sm">
+      <span className="min-w-0 leading-tight">
+        <span className="block truncate text-[11px] text-white/70">Progetto di {left.owner} · {left.name}</span>
+        <span className="block truncate text-[13px] font-medium">{waiting ? `In attesa che ${left.owner} ti accetti` : left.status === "denied" ? `${left.owner} ha negato` : "Sei uscito dal progetto"}</span>
+      </span>
+      {!waiting && (
+        <button type="button" disabled={busy} onClick={async () => {
+          setBusy(true);
+          try { await askToRejoin(kind); toast.success("Richiesta inviata", { description: `${left.owner} la vede nell’app e può accettarla o negarla.` }); }
+          catch (e) { toast.error("Richiesta non inviata", { description: (e as Error).message }); }
+          finally { setBusy(false); }
+        }} className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-black disabled:opacity-60">
+          {left.status === "denied" ? "Chiedi di nuovo" : "Chiedi di rientrare"}
+        </button>
+      )}
     </div>
   );
 }

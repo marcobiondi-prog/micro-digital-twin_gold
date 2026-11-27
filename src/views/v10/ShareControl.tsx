@@ -9,6 +9,7 @@ import { useAccountAvatar } from "@/lib/account-avatar";
 import { getLastSection } from "@/lib/last-section";
 import { useProId } from "@/lib/use-pro-id";
 import { syncProject, useCurrentProject, useSharedOpen } from "@/lib/project-sync";
+import { leaveSharedProject, useRejoinRequests } from "@/lib/project-rejoin";
 import {
   ROLE_LABEL, cancelInvite, createInvite, initials, inviteLink, kindWord, removePerson, setRole,
   useProjectPeople, usePresence, type Invite, type Online, type Person, type ProjectRole,
@@ -74,6 +75,8 @@ export function ShareControl() {
     return () => { alive = false; };
   }, [user, avatar]);
   const share = useProjectPeople(id, user);
+  // Requests to come back into a project: answered here by the owner, awaited here by the one who left.
+  useRejoinRequests(user);
   const tab = useSimTab(kind === "piazza" ? "urban" : "vineyard");
   const lab = useLab();
   const projectName = nameOfPlace(placeOf(kind, lab).label);
@@ -197,7 +200,11 @@ function SharePanel({ projectId, me, kind, online, share, onLeft, project }: { p
 
       {owner ? <InviteBox projectId={projectId} invites={share.invites} busy={busy} onDone={share.reload} kind={kind} project={project}
         onCancel={(i) => act(`i${i.id}`, () => cancelInvite(i.id), "Invito annullato")} /> : share.myRole ? (
-        <button type="button" disabled={busy === "leave"} onClick={() => act("leave", async () => { await removePerson(projectId, me); onLeft(); }, `Sei uscito dal progetto`)}
+        <button type="button" disabled={busy === "leave"} onClick={() => act("leave", async () => {
+            const ownerName = share.people.find((p) => p.role === "owner");
+            await leaveSharedProject(kind, projectId, { name: project, owner: (ownerName?.name || ownerName?.email || "il proprietario").split(/\s+|@/)[0]! });
+            onLeft();
+          }, "Sei uscito dal progetto · Per rientrare, tocca «Chiedi di rientrare» sulla mappa")}
           className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-red-400/40 text-sm font-semibold text-red-300 hover:bg-red-400/10">
           <LogOut className="size-4" aria-hidden="true" /> Esci dal progetto
         </button>

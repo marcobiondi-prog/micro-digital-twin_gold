@@ -29,6 +29,19 @@ function markEdited(kind: ProjectKind) { write(EDIT_KEY, { ...read(EDIT_KEY, {})
 /** The project in use for a kind, for other modules (phase 1: sharing). */
 export function currentProjectId(user: string, kind: ProjectKind): string | undefined { return metaOf(user, kind)?.id; }
 
+/**
+ * Left a shared project (Esci dal progetto): this device forgets it — the simulation of that kind back to empty, no
+ * project in use for it (the next sync finds the account's own, if any, and never makes a copy of the one left), the
+ * pending edits dropped and the GPS following the phone again.
+ */
+export async function forgetProject(kind: ProjectKind): Promise<void> {
+  const user = await userId();
+  dropProjectState(kind);
+  if (user) { const s = read<Store>(META_KEY, {}); if (s[user]) { delete s[user][kind]; write(META_KEY, s); metaSubs.forEach((f) => f()); } }
+  const e = read<Partial<Record<ProjectKind, number>>>(EDIT_KEY, {}); delete e[kind]; write(EDIT_KEY, e);
+  followGpsAgain();
+}
+
 /** Switches a kind to a project shared with this account (an invite accepted): its simulation comes down at once. */
 export async function openSharedProject(kind: ProjectKind, id: string): Promise<void> {
   const user = await userId();
