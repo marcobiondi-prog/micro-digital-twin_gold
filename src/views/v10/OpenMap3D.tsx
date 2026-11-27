@@ -1,3 +1,4 @@
+import { exploringMap } from "@/lib/gps-hold";
 import { useEffect, useRef, useState } from "react";
 import { useModels3D } from "@/lib/use-ios-3d";
 import { Crosshair, LoaderCircle } from "lucide-react";
@@ -46,6 +47,8 @@ export function OpenMap3D({ lat, lng, label, zoom, area = [], sim = null, follow
     void import("maplibre-gl").then(({ default: maplibregl }) => {
       if (cancelled || !host.current) return;
       const map = new maplibregl.Map({ container: host.current, style: STYLE, locale: MAP_LOCALE, ...camera, maxPitch: 75, attributionControl: false, dragPan: true, touchZoomRotate: true, touchPitch: true });
+      // Moved by hand: exploring, the GPS stops following.
+      map.on("movestart", (e: { originalEvent?: unknown }) => { if (e.originalEvent) exploringMap(); });
       map.on("load", () => {
         // The style already raises buildings only at close zoom: make sure they stand up wherever there are heights.
         if (!map.getLayer("building-3d") && map.getSource("openmaptiles")) {

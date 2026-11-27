@@ -22,7 +22,7 @@ import { setUrban, setVineyard, useLab, useLabReadOnly, vineMetrics } from "@/mo
 import { projectSpots, useColleagues } from "@/lib/colleagues";
 import { sendDrag, useCurrentProject, useLiveEdit, useRemoteDrags, type LiveEdit } from "@/lib/project-sync";
 import { MAP_DRAG_EVENT, type MapDrag } from "@/views/v10/map-area";
-import { focusProjectArea, followGpsAgain } from "@/lib/gps-hold";
+import { focusProjectArea, followGpsAgain, isExploring } from "@/lib/gps-hold";
 import { askToRejoin, useLeftProject } from "@/lib/project-rejoin";
 import { initials, useProjectPeople, type Online, type Person } from "@/lib/project-share";
 import { shadeOpenness, piazzaLayout, piazzaShadows, vineShadows, TREE_SHADE_M2, vineLayout, type LayoutEdits, type PiazzaLayout } from "@/models/area-layout";
@@ -135,7 +135,10 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   const following = !liveLoc.pending && (!saved || solo) && gpsFollowing() && !drawHold;
   // Read only while following: a GPS fix (sent to the colleagues also while paused) never redraws the map otherwise.
   const livePos = useLivePosIf(following);
-  const at = following ? [livePos?.lat ?? liveLoc.lat, livePos?.lng ?? liveLoc.lng] as [number, number] : pinFix ?? drawnCentre ?? centre ?? null;
+  // Exploring by hand (the map dragged while following): the pin stays where the phone last was, the map where it was put.
+  const lastFollowed = useRef<[number, number] | null>(null);
+  if (following && livePos) lastFollowed.current = [livePos.lat, livePos.lng];
+  const at = following ? [livePos?.lat ?? liveLoc.lat, livePos?.lng ?? liveLoc.lng] as [number, number] : (isExploring() && lastFollowed.current) || (pinFix ?? drawnCentre ?? centre ?? null);
   const pin = at ? { lat: at[0], lng: at[1] } : { lat: loc.lat, lng: loc.lng };
   // In tempo reale: who is changing the project and where (a tree moved, the sails dragged), a named "✎" badge there.
   const liveEdit = useLiveEdit(kind === "urban" ? "piazza" : "vigneto");

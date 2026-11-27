@@ -8,6 +8,7 @@ import { MIST_RADIUS_M, SIM_COLORS, thirstColor, ZONE_COLORS, type SimLayout } f
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, LoaderCircle, Minus, Move, Plus, RotateCcw, X } from "lucide-react";
 import { frameCamera, groundElevation, type Camera } from "@/models/map-3d-camera";
 import { heightAt, loadHeights } from "@/lib/ground-heights";
+import { exploringMap } from "@/lib/gps-hold";
 
 /**
  * Photorealistic 3D view of the selected place (Google Maps JavaScript API, `maps3d`
@@ -400,6 +401,9 @@ export function LocationMap3D({ lat, lng, label, apiKey, area = [], sim = null, 
       }
       map.style.cssText = "display:block;width:100%;height:100%;touch-action:none";
       map.setAttribute("data-map-gestures", "");
+      // A finger, the mouse or the wheel on the 3D map: exploring, the GPS stops following.
+      map.addEventListener("pointerdown", () => exploringMap(), { passive: true });
+      map.addEventListener("wheel", () => exploringMap(), { passive: true });
       try {
         (map as any).gestureHandling = "GREEDY";
         map.setAttribute("gesture-handling", "GREEDY");

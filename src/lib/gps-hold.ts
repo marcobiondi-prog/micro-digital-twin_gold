@@ -10,7 +10,7 @@ export const FOCUS_AREA_EVENT = "mdt-focus-area";
 let followWanted = false;
 export const gpsFollowWanted = () => followWanted;
 export function focusProjectArea() {
-  followWanted = false;
+  followWanted = false; exploringNow = false;
   try { localStorage.setItem(GPS_PAUSE_KEY, "1"); } catch { /* storage unavailable */ }
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(FOCUS_AREA_EVENT));
 }
@@ -18,7 +18,15 @@ export function focusProjectArea() {
 /** The GPS follows the phone again (signed out, off the project): the pause dropped and the map's search told. */
 export const FOLLOW_GPS_EVENT = "mdt-gps-follow";
 export function followGpsAgain() {
-  followWanted = true;
+  followWanted = true; exploringNow = false;
   try { localStorage.removeItem(GPS_PAUSE_KEY); } catch { /* storage unavailable */ }
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(FOLLOW_GPS_EVENT));
 }
+
+/** The person moved the map by hand (a drag, a pinch, a wheel): the GPS stops following so the map can be explored. */
+export const EXPLORE_MAP_EVENT = "mdt-map-explore";
+let exploringNow = false;
+/** Exploring by hand right now (until the GPS follows again or the project's area is brought back). */
+export const isExploring = () => exploringNow;
+export const stopExploring = () => { exploringNow = false; };
+export function exploringMap() { exploringNow = true; if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(EXPLORE_MAP_EVENT)); }

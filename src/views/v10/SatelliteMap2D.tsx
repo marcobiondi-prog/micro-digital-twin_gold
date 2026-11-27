@@ -1,4 +1,4 @@
-import { FOCUS_AREA_EVENT } from "@/lib/gps-hold";
+import { exploringMap, FOCUS_AREA_EVENT } from "@/lib/gps-hold";
 import { moveFind } from "@/models/field-finds";
 import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap, Marker } from "maplibre-gl";
@@ -160,6 +160,8 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
         offKey = onKeyRejected(() => { setGoogleOn(false); for (const l of ["imagery", "places"]) if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "visible"); });
       }
       libRef.current = maplibregl;
+      // A drag, pinch, turn or wheel by hand (an originalEvent; not the map's own easing to the GPS) means exploring.
+      map.on("movestart", (e: { originalEvent?: unknown }) => { if (e.originalEvent && !still) exploringMap(); });
       map.on("load", () => { addAreaLayers(map); addSimLayers(map, lat); addTrailLayers(map); const stopSpr = animateSprinklers(map); map.once("remove", stopSpr); if (!cancelled) setState("ready"); });
       // The aiuole keep their stripes the same size on screen: laid again for the new zoom once it settles.
       // …and during the zoom too, so the grass never swells under the fingers.
