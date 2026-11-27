@@ -1,4 +1,4 @@
-import { isKeyRejected, loadGoogleMaps, onKeyRejected } from "@/lib/google-maps-js";
+import { isKeyRejected, keyRejectedReason, loadGoogleMaps, onKeyRejected } from "@/lib/google-maps-js";
 import { useModels3D } from "@/lib/use-ios-3d";
 import { firstName, personInitials, spotsKey, type ColleagueSpot } from "@/lib/colleagues";
 import { densify, tileRing } from "@/models/drape";
@@ -21,6 +21,18 @@ type Map3D = HTMLElement & Partial<Camera> & { gestureHandling?: string; flyCame
 // The browser key can be refused for this address (its allowed sites do not include it): the API then calls
 // window.gm_authFailure (lib/google-maps-js). From then on the 3D view hands over to its fallback instead of showing the provider's error.
 const useKeyRejected = () => useSyncExternalStore(onKeyRejected, isKeyRejected, () => false);
+const useKeyReason = () => useSyncExternalStore(onKeyRejected, keyRejectedReason, () => "");
+/** What Google's refusal means, in words (the error names are Google's: developers.google.com/maps/documentation/javascript/error-messages). */
+const REASON: Record<string, string> = {
+  RefererNotAllowedMapError: "la chiave non è autorizzata per questo indirizzo del sito: aggiungilo tra i siti consentiti della chiave su Google Cloud.",
+  ApiNotActivatedMapError: "un’API necessaria non è attiva sul progetto Google Cloud (Maps JavaScript API e Map Tiles API).",
+  ApiTargetBlockedMapError: "la chiave è limitata ad altre API: consenti anche Maps JavaScript API e Map Tiles API.",
+  BillingNotEnabledMapError: "la fatturazione del progetto Google Cloud non è attiva.",
+  OverQuotaMapError: "è finito il limite giornaliero delle mappe: torna disponibile più tardi.",
+  ExpiredKeyMapError: "la chiave è scaduta o non è più valida.",
+  InvalidKeyMapError: "la chiave non è valida.",
+  DeletedApiProjectMapError: "il progetto Google Cloud della chiave è stato eliminato.",
+};
 
 const metresBetween = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) =>
   Math.hypot((a.lat - b.lat) * 111_320, (a.lng - b.lng) * 111_320 * Math.cos((a.lat * Math.PI) / 180));
@@ -348,6 +360,7 @@ function applyCamera(map: Map3D, camera: Camera, animate: boolean) {
 
 export function LocationMap3D({ lat, lng, label, apiKey, area = [], sim = null, follow = false, people = [] }: { lat: number; lng: number; label: string; apiKey: string; area?: Array<[number, number]>; sim?: SimLayout | null; follow?: boolean; people?: ColleagueSpot[] }) {
   const rejected = useKeyRejected();
+  const reason = useKeyReason();
   // The map is built for a place, not for each GPS fix: the pin can follow the phone metre by metre, and rebuilding the
   // photographic 3D at every fix left it blank half the time. A new place (over 30 m away) builds a new map.
   // While the GPS follows the phone the map is never rebuilt at all: the camera glides after the pin (below), like a car's
@@ -601,8 +614,10 @@ export function LocationMap3D({ lat, lng, label, apiKey, area = [], sim = null, 
     <div role="status" data-map-gestures="" className="grid h-full w-full touch-none place-items-center bg-lab-surface px-6 text-center">
       <div className="grid justify-items-center gap-3">
         <p className="text-sm font-semibold">Vista 3D fotografica non disponibile ora</p>
-        <p className="max-w-xs text-xs text-muted-foreground">{rejected ? "Google non ha accettato la richiesta della mappa 3D: riprova più tardi o usa la 2D." : "La mappa 3D non si è caricata: può dipendere dalla rete o dal limite giornaliero delle mappe."}</p>
-        {!rejected && <button type="button" onClick={() => { setState("loading"); setAttempt((n) => n + 1); }} className="rounded-full bg-foreground px-4 py-2 text-xs font-semibold text-background">Riprova</button>}
+        <p className="max-w-xs text-xs text-muted-foreground">{rejected ? `Google non ha accettato la richiesta della mappa 3D${reason ? `: ${REASON[reason] ?? reason}` : ". Riprova o usa la 2D."}` : "La mappa 3D non si è caricata: può dipendere dalla rete o dal limite giornaliero delle mappe."}</p>
+        {rejected && reason && <p className="font-mono text-[10px] text-muted-foreground/70">{reason}</p>}
+        {/* A refused key cannot be asked again in the same page (Google loads once): Riprova reloads it. */}
+        <button type="button" onClick={() => { if (rejected) { window.location.reload(); return; } setState("loading"); setAttempt((n) => n + 1); }} className="rounded-full bg-foreground px-4 py-2 text-xs font-semibold text-background">Riprova</button>
       </div>
     </div>
   );

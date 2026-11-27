@@ -6,11 +6,21 @@
 type GoogleNs = { maps: { importLibrary: (name: string) => Promise<unknown> } };
 let loader: Promise<GoogleNs> | undefined;
 let keyRejected = false;
+/** Google's own name for the refusal (RefererNotAllowedMapError, ApiNotActivatedMapError, ...), read from its console message. */
+let keyError = "";
 const rejectedSubs = new Set<() => void>();
 if (typeof window !== "undefined") {
   (window as typeof window & { gm_authFailure?: () => void }).gm_authFailure = () => { keyRejected = true; rejectedSubs.forEach((f) => f()); };
+  // The API says why only in the console: keep the error's name so the 3D notice can show it.
+  const error = console.error.bind(console);
+  console.error = (...args: unknown[]) => {
+    const m = typeof args[0] === "string" ? /Google Maps JavaScript API (?:error|warning): (\w+)/.exec(args[0]) : null;
+    if (m?.[1] && !keyError) { keyError = m[1]; rejectedSubs.forEach((f) => f()); }
+    error(...args);
+  };
 }
 export const isKeyRejected = () => keyRejected;
+export const keyRejectedReason = () => keyError;
 export function onKeyRejected(f: () => void): () => void { rejectedSubs.add(f); return () => { rejectedSubs.delete(f); }; }
 
 export function loadGoogleMaps(key: string): Promise<GoogleNs> {
