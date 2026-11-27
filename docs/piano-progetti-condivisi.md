@@ -1,6 +1,6 @@
 # Piano · Progetti condivisi
 
-Stato: **in corso** (piano scritto il 07/11/2026, ripreso il 27/11/2026). Fase 0 fatta nel codice; tabelle delle fasi 0–1 in `supabase/migrations/20261127000000_projects.sql`, da applicare nel SQL Editor.
+Stato: **in corso** (piano scritto il 07/11/2026, ripreso il 27/11/2026). Fase 0 fatta nel codice; tabelle delle fasi 0–1 in `supabase/migrations/20261127000000_projects.sql`, applicata su Supabase il 27/11/2026.
 Bozza grafica: `docs/progetti-condivisi/mock.html` (aprila nel browser: 5 schermate).
 
 ## L'idea in una riga

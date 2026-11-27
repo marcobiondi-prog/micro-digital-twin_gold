@@ -1,7 +1,7 @@
 -- Progetti condivisi · fasi 0 e 1: ogni piazza o vigneto ha il suo posto nel cloud (projects), le persone che ci
 -- lavorano (project_members: owner | editor | viewer) e gli inviti (project_invites).
 -- Vede un progetto chi ne è membro; lo modifica owner o editor; solo l'owner invita, cambia i ruoli e toglie persone.
--- Si applica incollandola nel SQL Editor di Supabase.
+-- Applicata il 27/11/2026 (strumento Supabase).
 
 CREATE TABLE IF NOT EXISTS public.projects (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -43,6 +43,7 @@ CREATE OR REPLACE FUNCTION public.project_role(p uuid) RETURNS text
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT role FROM public.project_members WHERE project_id = p AND user_id = auth.uid()
 $$;
+REVOKE EXECUTE ON FUNCTION public.project_role(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.project_role(uuid) TO authenticated;
 
 -- Chi crea il progetto ne è l'owner; ogni modifica segna quando e chi.
@@ -56,7 +57,7 @@ DROP TRIGGER IF EXISTS projects_owner_member ON public.projects;
 CREATE TRIGGER projects_owner_member AFTER INSERT ON public.projects FOR EACH ROW EXECUTE FUNCTION public.projects_after_insert();
 
 CREATE OR REPLACE FUNCTION public.projects_before_update() RETURNS trigger
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql SET search_path = public AS $$
 BEGIN
   NEW.updated_at := now();
   NEW.updated_by := auth.uid();
@@ -103,7 +104,9 @@ BEGIN
   UPDATE public.project_invites SET accepted_at = now(), accepted_by = auth.uid() WHERE id = inv.id;
   RETURN inv.project_id;
 END $$;
+REVOKE EXECUTE ON FUNCTION public.accept_project_invite(text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.accept_project_invite(text) TO authenticated;
+REVOKE EXECUTE ON FUNCTION public.projects_after_insert() FROM PUBLIC, anon, authenticated;
 
 -- In diretta (fase 3): le modifiche ai progetti arrivano agli altri membri.
 DO $$ BEGIN
