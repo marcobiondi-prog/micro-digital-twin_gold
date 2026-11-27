@@ -218,9 +218,10 @@ export function TabRow<T extends string>({ items, value, onChange, label, fill }
         return (
           <button key={id} ref={on ? active : undefined} type="button" role="tab" aria-selected={on} onClick={() => onChange(id)}
             className={cn("inline-flex h-11 snap-center items-center gap-2 whitespace-nowrap rounded-full px-5 text-[15px] font-semibold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
-              fill ? "min-w-0 flex-1 justify-center" : "shrink-0",
+              fill ? "min-w-0 flex-1 justify-center px-3" : "shrink-0",
               on ? "bg-secondary text-secondary-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]" : "text-foreground/85 hover:bg-foreground/[0.06]")}>
-            {Icon && <Icon className="size-4" aria-hidden="true" />}{l}{locked && <Lock className="size-3.5 opacity-70" aria-label="bloccato" />}
+            {/* The icon never shrinks: in equal halves a long label ("Vigneto condiviso") squeezed it to a dot; the label is cut instead. */}
+            {Icon && <Icon className="size-4 shrink-0" aria-hidden="true" />}{fill ? <span className="min-w-0 truncate">{l}</span> : l}{locked && <Lock className="size-3.5 shrink-0 opacity-70" aria-label="bloccato" />}
           </button>
         );
       })}
