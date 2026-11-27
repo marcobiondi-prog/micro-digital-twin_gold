@@ -17,3 +17,8 @@ export const getLivePos = () => live;
 export function useLivePos(): LivePos | null {
   return useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f); }; }, () => live, () => null);
 }
+
+/** The live position only while it is wanted (the map following the phone): otherwise no re-render at each fix. */
+export function useLivePosIf(on: boolean): LivePos | null {
+  return useSyncExternalStore((f) => { if (!on) return () => {}; subs.add(f); return () => { subs.delete(f); }; }, () => (on ? live : null), () => null);
+}

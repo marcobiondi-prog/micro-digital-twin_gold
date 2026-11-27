@@ -35,7 +35,7 @@ import { drawnAreaFor, freeM2, initialRingAngle, leversForZones, vineLeversForZo
 import type { Ring } from "@/models/place-area";
 import { openSimTab, openSimAt, openSimAtArc, type SimKind } from "@/views/v8/console";
 import { PlaceSearch, gpsFollowing, setGpsHold } from "@/views/SimulationGrid";
-import { useLivePos } from "@/lib/live-position";
+import { useLivePosIf } from "@/lib/live-position";
 import { loadRealObjects } from "@/lib/real-objects-client";
 import { circleRing, realCountText, type RealObject } from "@/models/real-objects";
 import { findsCountText, useFieldFinds, type FieldFind } from "@/models/field-finds";
@@ -115,10 +115,11 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   // While the GPS follows the phone the pin stands on the fix itself (the live position, not the map's anchor nor the
   // centre of the nearest mapped square or field, which put it tens of metres away from where one stands).
   // The live fix (lib/live-position) moves the pin and the camera fix by fix, saving nothing.
-  const livePos = useLivePos();
   // Drawing the area or a zone, or arranging: the GPS holds still (setGpsHold) and the map stops following the phone.
   const [drawHold, setDrawHold] = useState(false);
   const following = !liveLoc.pending && !saved && gpsFollowing() && !drawHold;
+  // Read only while following: a GPS fix (sent to the colleagues also while paused) never redraws the map otherwise.
+  const livePos = useLivePosIf(following);
   const at = following ? [livePos?.lat ?? liveLoc.lat, livePos?.lng ?? liveLoc.lng] as [number, number] : pinFix ?? drawnCentre ?? centre ?? null;
   const pin = at ? { lat: at[0], lng: at[1] } : { lat: loc.lat, lng: loc.lng };
   const people = useMemo(() => [...gpsPeople, ...projectSpots(share.people, colleagues, gpsPeople, project.user, drawnCentre ? { lat: drawnCentre[0], lng: drawnCentre[1] } : pin)],

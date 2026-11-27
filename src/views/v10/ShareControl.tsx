@@ -79,7 +79,7 @@ export function ShareControl() {
   const projectName = nameOfPlace(placeOf(kind, lab).label);
   // Where this person is on the ground (the map's GPS, while it follows): the colleagues see a named dot there.
   const live = useLivePos();
-  const pos = live ? { lat: Math.round(live.lat * 1e5) / 1e5, lng: Math.round(live.lng * 1e5) / 1e5 } : null;
+  const pos = live ? { lat: Math.round(live.lat * 1e4) / 1e4, lng: Math.round(live.lng * 1e4) / 1e4 } : null; // about 10 m: GPS jitter sends nothing
   const online = usePresence(id, me, whereOf(path, tab), pos);
   // The simulation's ⋮ menu asks for this panel by name ("Condivisione"): signed out, the account panel opens instead.
   useEffect(() => {

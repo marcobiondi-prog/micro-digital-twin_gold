@@ -73,16 +73,36 @@ export function useOnline(): { project: string | null; list: Online[] } {
  */
 export function usePresence(projectId: string | null, me: { id: string; name: string; avatar: string | null } | null, where: string, pos: { lat: number; lng: number } | null = null): Online[] {
   const [online, setOnline] = useState<Online[]>([]);
-  const meId = me?.id ?? null, meName = me?.name ?? "", meAvatar = me?.avatar ?? null;
+  const meId = me?.id ?? null, meName = me?.name ?? "";
+  // A picture as a data URL would make every presence message heavy: only a link is sent.
+  const meAvatar = me?.avatar && !me.avatar.startsWith("data:") ? me.avatar : null;
   const chRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const ready = useRef(false);
-  const state = useRef({ where, pos });
-  state.current = { where, pos };
+  const state = useRef({ where, pos, name: meName, avatar: meAvatar });
+  state.current = { where, pos, name: meName, avatar: meAvatar };
+  // Realtime limits how often a client may send its presence (ClientPresenceRateLimitReached kicked the channel and the
+  // colleagues read "Nessuno connesso ora"): one message at most every TRACK_GAP_MS, the latest state, only when changed.
+  const sent = useRef("");
+  const lastAt = useRef(0);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const send = useCallback(() => {
+    const ch = chRef.current;
+    if (!ch || !ready.current) return;
+    const st = state.current;
+    const sig = JSON.stringify([st.where, st.pos, st.name, st.avatar]);
+    if (sig === sent.current) return;
+    const wait = TRACK_GAP_MS - (Date.now() - lastAt.current);
+    if (wait > 0) { if (!timer.current) timer.current = setTimeout(() => { timer.current = null; send(); }, wait); return; }
+    sent.current = sig; lastAt.current = Date.now();
+    void ch.track({ name: st.name, avatar: st.avatar, where: st.where, pos: st.pos, at: Date.now() });
+  }, []);
+  // A channel dropped (rate limit, network): joined again after a pause.
+  const [round, setRound] = useState(0);
   useEffect(() => {
     if (!projectId || !meId) { setOnline([]); publish(null, []); return; }
     const ch = supabase.channel(`project:${projectId}`, { config: { presence: { key: meId } } });
     chRef.current = ch;
-    let seen: Set<string> | null = null;
+    let seen: Set<string> | null = null, retry: ReturnType<typeof setTimeout> | null = null;
     const read = () => {
       const st = ch.presenceState() as Record<string, Array<Partial<Online>>>;
       const list: Online[] = Object.entries(st).map(([id, metas]) => {
@@ -99,27 +119,22 @@ export function usePresence(projectId: string | null, me: { id: string; name: st
     };
     if (import.meta.env.DEV) setTimeout(read, 300);
     ch.on("presence", { event: "sync" }, read).subscribe((status) => {
-      if (status !== "SUBSCRIBED") return;
-      ready.current = true;
-      void ch.track({ name: meName, avatar: meAvatar, where: state.current.where, pos: state.current.pos, at: Date.now() });
+      if (status === "SUBSCRIBED") { ready.current = true; sent.current = ""; send(); return; }
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        ready.current = false;
+        if (!retry) retry = setTimeout(() => setRound((n) => n + 1), 15000);
+      }
     });
-    return () => { ready.current = false; chRef.current = null; publish(null, []); void supabase.removeChannel(ch); };
-  }, [projectId, meId, meName, meAvatar]);
-  // The page or the position changed: tracked again (the position at most every 4 s).
-  const lastPosAt = useRef(0);
+    return () => { ready.current = false; chRef.current = null; if (retry) clearTimeout(retry); publish(null, []); void supabase.removeChannel(ch); };
+  }, [projectId, meId, round, send]);
+  // The page, the name, the picture or the position (about 10 m) changed: sent again, within the limit.
   const posKey = pos ? `${pos.lat},${pos.lng}` : "";
-  useEffect(() => {
-    const ch = chRef.current;
-    if (!ch || !ready.current) return;
-    const wait = Math.max(0, 4000 - (Date.now() - lastPosAt.current));
-    const t = setTimeout(() => {
-      lastPosAt.current = Date.now();
-      void ch.track({ name: meName, avatar: meAvatar, where: state.current.where, pos: state.current.pos, at: Date.now() });
-    }, posKey ? wait : 0);
-    return () => clearTimeout(t);
-  }, [where, posKey, meName, meAvatar]);
+  useEffect(() => { send(); }, [where, posKey, meName, meAvatar, send]);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
   return online;
 }
+
+const TRACK_GAP_MS = 12000;
 
 export const initials = (name: string) => name.split(/\s+|@/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "?";
 export const kindWord = (k: ProjectKind) => (k === "piazza" ? "la piazza" : "il vigneto");
