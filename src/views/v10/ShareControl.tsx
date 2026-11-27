@@ -10,7 +10,7 @@ import { useAccountAvatar } from "@/lib/account-avatar";
 import { getLastSection } from "@/lib/last-section";
 import { useProId } from "@/lib/use-pro-id";
 import { syncProject, useCurrentProject, useSharedOpen } from "@/lib/project-sync";
-import { askToRejoin, leaveSharedProject, useLeftProject, useRejoinRequests } from "@/lib/project-rejoin";
+import { askToRejoin, cancelRejoin, leaveSharedProject, useLeftProject, useRejoinRequests } from "@/lib/project-rejoin";
 import {
   ROLE_LABEL, cancelInvite, createInvite, initials, inviteLink, kindWord, removePerson, setRole,
   useProjectPeople, usePresence, type Invite, type Online, type Person, type ProjectRole,
@@ -369,6 +369,14 @@ function RejoinCard({ kind, left }: { kind: ProjectKind; left: { owner: string; 
           catch (e) { toast.error("Richiesta non inviata", { description: (e as Error).message }); }
           finally { setBusy(false); }
         }} className="h-10 rounded-full bg-foreground px-4 text-sm font-semibold text-background disabled:opacity-60">{left.status === "denied" ? "Chiedi di nuovo" : "Chiedi di rientrare"}</button>
+      )}
+      {waiting && (
+        <button type="button" disabled={busy} onClick={async () => {
+          setBusy(true);
+          try { await cancelRejoin(kind); toast("Richiesta revocata", { description: `${left.owner} non la vede più.` }); }
+          catch (e) { toast.error("Richiesta non revocata", { description: (e as Error).message }); }
+          finally { setBusy(false); }
+        }} className="h-10 rounded-full border border-foreground/25 px-4 text-sm font-semibold disabled:opacity-60">Revoca</button>
       )}
     </div>
   );

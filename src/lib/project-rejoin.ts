@@ -64,6 +64,18 @@ export async function askToRejoin(kind: ProjectKind): Promise<void> {
   setLeft(user, kind, { ...left, asked: data as string, status: "pending" });
 }
 
+/** Revoca: the pending request withdrawn; the owner's notice goes away. If it was accepted meanwhile, back in the project. */
+export async function cancelRejoin(kind: ProjectKind): Promise<void> {
+  const user = await me();
+  const left = user ? read()[user]?.[kind] : null;
+  if (!user || !left?.asked) return;
+  const { error } = await db().rpc("cancel_join_request", { req: left.asked });
+  if (error) throw new Error(error.message ?? "errore");
+  const { data } = await db().from("project_join_requests").select("status").eq("id", left.asked).maybeSingle();
+  if ((data as { status?: string } | null)?.status === "accepted") { await comeBack(user, kind, left); return; }
+  setLeft(user, kind, { ...left, asked: null, status: null });
+}
+
 async function comeBack(user: string, kind: ProjectKind, left: LeftProject) {
   setLeft(user, kind, null);
   await openSharedProject(kind, left.id);
@@ -71,7 +83,7 @@ async function comeBack(user: string, kind: ProjectKind, left: LeftProject) {
   toast.success(`Sei di nuovo nel progetto di ${left.owner}`, { id: `mdt-rejoined-${left.id}`, description: `${left.name}: ${left.owner} ha accettato la tua richiesta.` });
 }
 
-type Req = { id: string; project_id: string; user_id: string; name: string; email: string; avatar: string | null; status: "pending" | "accepted" | "denied" };
+type Req = { id: string; project_id: string; user_id: string; name: string; email: string; avatar: string | null; status: "pending" | "accepted" | "denied" | "cancelled" };
 
 /**
  * Mounted once (ShareControl): the requester waits for the answer (realtime, and every 15 s), the owner sees each new
@@ -100,6 +112,8 @@ export function useRejoinRequests(user: string | null) {
       }
       // As owner: requests to answer.
       for (const r of rows) {
+        // Withdrawn (Revoca) or answered elsewhere: its notice goes away.
+        if (r.status !== "pending" && shown.has(r.id)) { shown.delete(r.id); if (r.status === "cancelled") toast.dismiss(`mdt-join-${r.id}`); continue; }
         if (r.status !== "pending" || r.user_id === user || shown.has(r.id)) continue;
         shown.add(r.id);
         playDrop();
