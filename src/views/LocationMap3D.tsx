@@ -490,13 +490,18 @@ export function LocationMap3D({ lat, lng, label, apiKey, area = [], sim = null, 
     const timer = window.setTimeout(() => {
       void import("@/views/v10/g3d-models").then(({ modelSpots }) => {
         if (cancelled) return;
-        const { spots, ensure } = modelSpots(sim, { lat: aLat, lng: aLng }, models === "lite");
+        const lite = models === "lite";
+        const built = modelSpots(sim, { lat: aLat, lng: aLng }, lite);
         const dLat = floor.n / 111_320, dLng = floor.e / (111_320 * Math.cos((aLat * Math.PI) / 180));
+        // Phones and tablets: every copy of a model in one model (merged), so 20 trees load as one; computers: one each.
+        const spots = lite
+          ? built.merged().map((m) => ({ key: m.id, lat: m.lat, lng: m.lng, heading: 0, up: m.up, get: m.ensure }))
+          : built.spots.map((sp) => ({ ...sp, get: () => built.ensure(sp.key) }));
         const want = new Map(spots.map((sp) => [`${sp.key}@${(sp.lat + dLat).toFixed(7)},${(sp.lng + dLng).toFixed(7)},${sp.heading.toFixed(1)},${floor.h}`, sp]));
         for (const [id, node] of pool) if (!want.has(id)) { node.remove(); pool.delete(id); }
         for (const [id, sp] of want) {
           if (pool.has(id)) continue;
-          void ensure(sp.key).then((src) => {
+          void sp.get().then((src) => {
             if (cancelled || !src || pool.has(id)) return;
             try {
               const node = new Model({ src, position: { lat: sp.lat + dLat, lng: sp.lng + dLng, altitude: floor.h + (sp.up ?? 0) }, altitudeMode: "RELATIVE_TO_GROUND", orientation: { heading: sp.heading, tilt: 270, roll: 0 }, scale: 1 });

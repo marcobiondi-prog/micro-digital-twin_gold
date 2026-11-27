@@ -28,7 +28,7 @@ import type { SimLayout } from "@/views/v10/map-area";
  * up made the map's up).
  */
 /** `up`: metres over the ground (the bed tiles a little lifted so the ground’s waves never cover them). */
-export type ModelSpot = { key: string; lat: number; lng: number; heading: number; up?: number };
+export type ModelSpot = { key: string; lat: number; lng: number; heading: number; up?: number; x?: number; z?: number; yaw?: number };
 
 const cache = new Map<string, Promise<string | null>>();
 
@@ -153,11 +153,9 @@ function flatten(root: THREE.Object3D): THREE.Group {
 }
 
 async function toDataUrl(obj: THREE.Object3D, glow: number, lite = false): Promise<string> {
-  await waitTextures(obj);
-  trimMaps(obj);
-  brighten(obj, glow);
-  bake(obj);
-  const buf = (await new GLTFExporter().parseAsync(flatten(obj), { binary: true, maxTextureSize: lite ? 256 : 512 })) as ArrayBuffer;
+  const prepared = obj.userData["prepared"] === true;
+  if (!prepared) { await waitTextures(obj); trimMaps(obj); brighten(obj, glow); bake(obj); }
+  const buf = (await new GLTFExporter().parseAsync(prepared ? obj : flatten(obj), { binary: true, maxTextureSize: lite ? 256 : 512 })) as ArrayBuffer;
   if (typeof FileReader !== "undefined") {
     const blob = new Blob([buf], { type: "model/gltf-binary" });
     return new Promise<string>((resolve, reject) => {
@@ -245,7 +243,7 @@ const deg = (yaw: number) => ((-yaw * 180) / Math.PI + 360) % 360;
  * What to place for a simulation: every object of its layout with its model key, spot and heading, the models built
  * on demand by `ensure`. Trees are the species recognised in that flow (else the realistic oak, three variants).
  */
-export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number }, lite = false): { spots: ModelSpot[]; ensure: (key: string) => Promise<string | null> } {
+export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number }, lite = false): { spots: ModelSpot[]; ensure: (key: string) => Promise<string | null>; merged: () => MergedSpot[] } {
   const kx = 111_320 * Math.cos((origin.lat * Math.PI) / 180);
   const xz = ([lat, lng]: LatLng) => ({ x: (lng - origin.lng) * kx, z: -(lat - origin.lat) * 111_320 });
   const ll = (x: number, z: number) => ({ lat: origin.lat - z / 111_320, lng: origin.lng + x / kx });
@@ -253,7 +251,7 @@ export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number },
   const builders = new Map<string, () => THREE.Object3D | Promise<THREE.Object3D | null> | null>();
   const glows = new Map<string, number>();
   const add = (key: string, x: number, z: number, yaw: number, build: () => THREE.Object3D | Promise<THREE.Object3D | null> | null, glow = 0.15, up = 0) => {
-    spots.push({ key, ...ll(x, z), heading: deg(yaw), ...(up ? { up } : {}) });
+    spots.push({ key, ...ll(x, z), heading: deg(yaw), ...(up ? { up } : {}), x, z, yaw });
     if (!builders.has(key)) { builders.set(key, build); glows.set(key, glow); }
   };
   if (sim.kind === "piazza") {
@@ -348,5 +346,46 @@ export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number },
       }
     }
   }
-  return { spots, ensure: (key) => modelUrl(key, builders.get(key) ?? (() => null), glows.get(key) ?? 0.15, lite) };
+  return {
+    spots,
+    ensure: (key) => modelUrl(key, builders.get(key) ?? (() => null), glows.get(key) ?? 0.15, lite),
+    merged: () => mergeSpots(spots, ll, builders, glows, lite),
+  };
+}
+
+/**
+ * Phones and tablets: every copy of one model laid as ONE model (asked "unisci per tipo"): its high-poly meshes are
+ * written once in the GLB and placed by a node per copy (translation and turn, no scale), so 20 trees weigh about one
+ * tree (1,2 MB) instead of 20 (24 MB) — Google's 3D froze loading them one by one. The group stands at the copies'
+ * middle, at its ground height: on a slope a copy can sit a little over or under the ground.
+ */
+export type MergedSpot = { id: string; lat: number; lng: number; up: number; ensure: () => Promise<string | null> };
+function mergeSpots(spots: ModelSpot[], ll: (x: number, z: number) => { lat: number; lng: number }, builders: Map<string, () => THREE.Object3D | Promise<THREE.Object3D | null> | null>, glows: Map<string, number>, lite: boolean): MergedSpot[] {
+  const groups = new Map<string, ModelSpot[]>();
+  for (const sp of spots) { const g = groups.get(sp.key); if (g) g.push(sp); else groups.set(sp.key, [sp]); }
+  return [...groups].map(([key, list]) => {
+    const cx = list.reduce((t, p) => t + (p.x ?? 0), 0) / list.length, cz = list.reduce((t, p) => t + (p.z ?? 0), 0) / list.length;
+    const places = list.map((p) => ({ x: (p.x ?? 0) - cx, z: (p.z ?? 0) - cz, yaw: p.yaw ?? 0 }));
+    const sig = places.map((p) => `${p.x.toFixed(2)},${p.z.toFixed(2)},${p.yaw.toFixed(2)}`).join(";");
+    let h = 0; for (let i = 0; i < sig.length; i++) h = (h * 31 + sig.charCodeAt(i)) | 0;
+    const id = `many:${key}:${list.length}:${h}`;
+    const build = builders.get(key) ?? (() => null);
+    return {
+      id, ...ll(cx, cz), up: list[0]!.up ?? 0,
+      ensure: () => modelUrl(id, async () => {
+        const o = await Promise.resolve().then(build).catch(() => null);
+        if (!o) return null;
+        await waitTextures(o); trimMaps(o); brighten(o, glows.get(key) ?? 0.15); bake(o);
+        const flat = flatten(o), root = new THREE.Group();
+        root.userData["prepared"] = true;
+        for (const pl of places) {
+          const copy = new THREE.Group();
+          copy.position.set(pl.x, 0, pl.z); copy.rotation.y = pl.yaw;
+          for (const m of flat.children as THREE.Mesh[]) copy.add(new THREE.Mesh(m.geometry, m.material));
+          root.add(copy);
+        }
+        return root;
+      }, glows.get(key) ?? 0.15, lite),
+    };
+  });
 }
