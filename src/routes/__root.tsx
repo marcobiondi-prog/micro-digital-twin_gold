@@ -17,6 +17,7 @@ import { CameraDockButton, CameraSheet } from "@/views/CameraDock";
 import { PermissionsSheet } from "@/views/v10/Permissions";
 // The sector page is loaded after the first paint (it covers the app only with no profile, or when asked).
 const DesktopTour = lazy(() => import("@/views/v10/DesktopTour"));
+const TermsGate = lazy(() => import("@/views/v10/TermsGate").then((m) => ({ default: m.TermsGate })));
 const SectorGate = lazy(() => import("@/views/v10/SectorGate").then((m) => ({ default: m.SectorGate })));
 import { syncAppOrientation } from "@/lib/ar-orientation";
 import { isSlate, isTouchDevice, markSlate, markTouchDevice } from "@/lib/touch-device";
@@ -838,6 +839,7 @@ function RootComponent() {
       {!intro && <BottomNav />}
       <CameraSheet />
       <PermissionsSheet />
+      <Suspense fallback={null}><TermsGate /></Suspense>
       <Suspense fallback={null}><SectorGate /></Suspense>
       {/* Desktop: the tutorial as speech bubbles (first access, the "i" button, hover tips). */}
       <Suspense fallback={null}><DesktopTour /></Suspense>

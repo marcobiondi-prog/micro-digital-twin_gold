@@ -1,3 +1,4 @@
+import { useTermsAcceptedAt } from "@/lib/terms";
 import { useContext, useEffect, useState, type ReactNode } from "react";
 import { comparison, nextPhase, prototypeChoice } from "@/models/scenarios";
 import { UNIT_COST, grouped } from "@/models/intervention-cost";
@@ -238,9 +239,16 @@ export function LicensesPage() {
   );
 }
 
+function TermsAccepted() {
+  const at = useTermsAcceptedAt();
+  if (!at) return null;
+  return <p className="rounded-3xl bg-primary/10 px-5 py-3 text-sm font-semibold text-primary">Accettati il {new Date(at).toLocaleDateString("it-IT")} alle {new Date(at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}</p>;
+}
+
 export function TermsPage() {
   return (
     <InfoPage title="Termini di servizio" intro={DRAFT}>
+      <TermsAccepted />
       <InfoCard title="Il servizio">
         <p>Micro Digital Twin è uno strumento dimostrativo per simulare interventi di adattamento al clima in una piazza e in un vigneto. È offerto da [titolare] così com’è, senza garanzie di disponibilità continua.</p>
       </InfoCard>

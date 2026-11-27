@@ -1,3 +1,4 @@
+import { useTermsAcceptedAt } from "@/lib/terms";
 import { useEffect, useState } from "react";
 import { useLocation } from "@tanstack/react-router";
 import { Bell, Camera, Check, Loader2, Lock, MapPin, type LucideIcon } from "lucide-react";
@@ -88,13 +89,14 @@ export function PermissionsSheet() {
   const [all, setAll] = useState(false);
   const id = useProId();
   const guest = useGuest();
+  const terms = useTermsAcceptedAt();
   useEffect(() => {
-    if (open || (!id && !guest) || pathname === "/" || pathname === "/scegli" || permsAsked() || !states) return;
+    if (open || !terms || (!id && !guest) || pathname === "/" || pathname === "/scegli" || permsAsked() || !states) return;
     if (PERMS.every((p) => states[p.kind] !== "prompt")) { markPermsAsked(); return; }
     // A beat after the page shows, so the sheet does not land on top of the page change.
     const t = window.setTimeout(() => { markPermsAsked(); setOpen(true); }, 1200);
     return () => window.clearTimeout(t);
-  }, [pathname, states, open, id, guest]);
+  }, [pathname, states, open, id, guest, terms]);
   const askAll = async () => {
     setAll(true);
     // One after the other: the phone shows one question at a time.
