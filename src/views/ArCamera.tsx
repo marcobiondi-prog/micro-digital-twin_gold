@@ -1,12 +1,15 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal, flushSync } from "react-dom";
 import "@/styles/ar-camera.css";
 import { isTouchDevice } from "@/lib/touch-device";
-import { ArLive, arFullscreen, requestArSession, type FanGroup } from "@/views/ArLive";
+import { arFullscreen, requestArSession, type FanGroup } from "@/views/ar-session";
+// The AR view (three.js, the realistic models, ARCore's depth) loads only when AR is opened: «Rileva» stays light.
+const loadArLive = () => import("@/views/ArLive");
+const ArLive = lazy(() => loadArLive().then((m) => ({ default: m.ArLive })));
 import { ScanSheet } from "@/views/ScanSheet";
 import { recognisedPlants, type PlacedObject } from "@/models/ar-objects";
 import { toast } from "sonner";
-import { Check, ClipboardList, PanelBottomOpen, History, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grape, Leaf, Rows3, Shovel, TreeDeciduous, Snowflake, Umbrella, Plus, ScanSearch, Square, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
+import { Camera, Combine, Move, Sparkles, Check, ClipboardList, PanelBottomOpen, History, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Flame, Info, Grape, Leaf, Rows3, Shovel, TreeDeciduous, Snowflake, Umbrella, Plus, ScanSearch, Square, Trash2, Undo2, X, Zap, ZapOff } from "lucide-react";
 import { supportsCameraTorch, setCameraTorch, probeCameraTorch } from "@/lib/camera-torch";
 import { detectArObject, getReferencePhoto, type Detection, type Soil } from "@/controllers/ar-detect.functions";
 import { gbifPhotoSearchUrl, pickGbifPhoto, type ReferencePhoto } from "@/models/ar-reference-photo";
@@ -82,7 +85,7 @@ const FOCUS_ICONS = { auto: ScanSearch, tree: TreeDeciduous, ground: Shovel, lea
 const URBAN_TUTORIAL = [
   { title: "1 · Inquadra", text: "Inquadra un albero della piazza, oppure il suolo davanti a te: la fotocamera capisce da sola cosa c’è." },
   { title: "2 · Scansiona", text: "Avvia la scansione: della pianta trovi specie e ombra, del suolo permeabilità e depavimentazione: sopra lo scatto compare la scheda con «Aggiungi al progetto», e gli esiti completi finiscono nel cassetto «Scansioni», a destra dello scatto, dove puoi riaprirli o eliminarne più insieme." },
-  { title: "3 · AR", text: "In alto passa da «Rileva» ad «AR». Il pulsante AI apre «Cosa vuoi fare?»: scegli un intervento o una pianta riconosciuta e tocca il pavimento per posarla a grandezza vera." },
+  { title: "3 · AR", text: "In alto passa da «Rileva» ad «AR». Il pulsante AI apre «Cosa vuoi fare?»: scegli un albero, un’aiuola, una vela ombreggiante, un nebulizzatore, un innaffiatoio o una pianta riconosciuta, e tocca il pavimento per posarli a grandezza vera." },
   { title: "4 · Sposta e ruota", text: "Trascina un oggetto con un dito; con due dita lo ruoti e lo ingrandisci. Con «Sposta» segue il mirino e gira con il telefono. Il telefono vibra a ogni mezzo metro e ogni 15°, più forte davanti a un ostacolo." },
   { title: "5 · Unisci e riporta", text: "Avvicina due vele o due aiuole: il contorno diventa verde e si uniscono. «Modellino» prova tutto in piccolo, «Riporta» li manda sulla mappa; con l’area allineata vedi anche gli interventi della mappa al loro posto." },
   { title: "6 · Scatta", text: "Tocca per una foto, tieni premuto per uno scatto multiplo: foto e video vanno nel progetto e nei report della piazza." },
@@ -360,11 +363,11 @@ export function ArCamera({
   const guideSwipe = useRef<{ id: number; x: number; y: number; rotation: number } | null>(null);
   const closeGuide = () => {
     setGuideOpen(false); setGuideStep(0);
-    try { localStorage.setItem((kind === "urban" ? "ar-tutorial-seen-urban-v3" : "ar-tutorial-seen-v3"), "1"); } catch { /* storage non disponibile */ }
+    try { localStorage.setItem((kind === "urban" ? "ar-tutorial-seen-urban-v4" : "ar-tutorial-seen-v4"), "1"); } catch { /* storage non disponibile */ }
   };
   useEffect(() => {
     if (!mode || !ready) return;
-    try { if (!localStorage.getItem((kind === "urban" ? "ar-tutorial-seen-urban-v3" : "ar-tutorial-seen-v3"))) { setGuideStep(0); setGuideOpen(true); } } catch { setGuideOpen(true); }
+    try { if (!localStorage.getItem((kind === "urban" ? "ar-tutorial-seen-urban-v4" : "ar-tutorial-seen-v4"))) { setGuideStep(0); setGuideOpen(true); } } catch { setGuideOpen(true); }
   }, [mode, ready]);
   const [scanPhase, setScanPhase] = useState<"leaf" | "catalogue">("leaf");
   useEffect(() => {
@@ -1258,6 +1261,7 @@ export function ArCamera({
       // ARCore opens the phone's camera itself: asked while ours is still being released, the phone refuses the
       // session ("The specified session configuration is not supported"). A short wait lets the camera go; the
       // tap's activation lasts long enough (Chrome keeps it about 5 s).
+      void loadArLive(); // the AR view's code comes down while the session starts
       new Promise((r) => window.setTimeout(r, 450))
         .then(() => requestArSession(root))
         .then((session) => { setLiveAr({ session, root }); void resetAppOrientation(); arFullscreen(session, root); })
@@ -1380,11 +1384,11 @@ export function ArCamera({
   const liveView = liveAr ? createPortal(
     // The camera's own gestures (close swipe, tap to place) must not see the live view's taps.
     <div onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()} onPointerMove={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
-      <ArLive key={liveAr.n ?? 0} kind={kind} session={liveAr.session} why={liveAr.why} stream={liveAr.session ? null : streamRef.current} plants={arPlants} onShot={(f) => onCapture([f])} onEnd={endLive} onRotate={rotateLive} torch={liveAr.torch ?? false} carry={liveAr.carry} rotation={liveAr.session ? 0 : viewport.rotation} onFlashPreview={flashPreview}
+      <Suspense fallback={<div className="fixed inset-0 grid place-items-center bg-black/40 text-sm text-white">Preparo la realtà aumentata…</div>}><ArLive key={liveAr.n ?? 0} kind={kind} session={liveAr.session} why={liveAr.why} stream={liveAr.session ? null : streamRef.current} plants={arPlants} onShot={(f) => onCapture([f])} onEnd={endLive} onRotate={rotateLive} torch={liveAr.torch ?? false} carry={liveAr.carry} rotation={liveAr.session ? 0 : viewport.rotation} onFlashPreview={flashPreview}
         {...(!liveAr.session && liveAr.retry && arCoreSupported ? { onRetry: retryArCore } : {})}
         burst={{ shots: burstShots, open: burst, setOpen: setBurst, discarded, add: () => burstActs.current.add(), discardAll: () => burstActs.current.discardAll(),
           push: (shot) => setBurstShots((p) => [...p, shot]),
-          toggle: (id) => setDiscarded((d) => { const n = new Set(d); if (n.has(id)) n.delete(id); else n.add(id); return n; }) }} />
+          toggle: (id) => setDiscarded((d) => { const n = new Set(d); if (n.has(id)) n.delete(id); else n.add(id); return n; }) }} /></Suspense>
     </div>, liveAr.root) : null;
   // The preview without ARCore turns with the camera: when the page stays upright and the camera's surface is turned
   // by CSS (the phone held sideways without fullscreen), the AR view and its controls are turned the same way.
@@ -1981,11 +1985,13 @@ export function ArCamera({
               <div className="ar-tutorial-demo" data-step={index} aria-hidden="true">
                 <span className="ar-demo-target"><span /><span /><span /><span /></span>
                 <span className="ar-demo-sweep" />
-                <span className="ar-demo-balance"><span /></span>
+                <span className="ar-demo-floor" />
+                <span className="ar-demo-drop" />
+                <span className="ar-demo-join"><span /><span /></span>
                 <span className="ar-demo-shutter" />
               </div>
               <div className="ar-tutorial-icon" aria-hidden="true">
-                {index === 0 ? <ScanSearch className="size-5" /> : index === 1 ? <Info className="size-5" /> : index === 2 ? <Flame className="size-5" /> : <Zap className="size-5" />}
+                {index === 0 ? <ScanSearch className="size-5" /> : index === 1 ? <ClipboardList className="size-5" /> : index === 2 ? <Sparkles className="size-5" /> : index === 3 ? <Move className="size-5" /> : index === 4 ? <Combine className="size-5" /> : <Camera className="size-5" />}
               </div>
               <div className="ar-tutorial-step">
                 <p className="ar-tutorial-title">{slide.title.replace(/^\d+ · /, "")}</p>

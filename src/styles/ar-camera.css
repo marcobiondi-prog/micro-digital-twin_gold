@@ -246,16 +246,25 @@
 .ar-demo-target::after { transform: rotate(80deg); left: 34px; }
 .ar-demo-sweep { position: absolute; left: 40px; right: 40px; top: 12px; height: 2px; background: currentColor; box-shadow: 0 0 12px currentColor; animation: ar-demo-scan 2s ease-in-out infinite; display: none; }
 .ar-tutorial-demo[data-step="1"] .ar-demo-sweep { display: block; }
-.ar-demo-balance { display: none; position: absolute; left: 12px; right: 12px; top: 42px; height: 12px; border-radius: 6px; background: var(--ar-thermal-scale); }
-.ar-demo-balance > span { position: absolute; top: -5px; width: 22px; height: 22px; border-radius: 50%; background: var(--camera-ink); animation: ar-demo-balance 2.4s ease-in-out infinite; }
-.ar-tutorial-demo[data-step="2"] .ar-demo-target, .ar-tutorial-demo[data-step="3"] .ar-demo-target { display: none; }
-.ar-tutorial-demo[data-step="2"] .ar-demo-balance { display: block; }
-.ar-demo-shutter { display: none; position: absolute; left: 50%; top: 18px; margin-left: -30px; width: 60px; height: 60px; border: 3px solid var(--camera-ink); border-radius: 50%; background: var(--camera-glass); animation: ar-demo-capture 2s ease-in-out infinite; }
-.ar-demo-shutter::after { content: ""; position: absolute; inset: 6px; background: var(--camera-ink); border-radius: inherit; }
-.ar-tutorial-demo[data-step="3"] .ar-demo-shutter { display: block; }
+/* 3 · AR: a tree dropped onto the floor's ring. 4 · Sposta e ruota: it slides and turns over the floor. 5 · Unisci:
+   two beds come together and join, turning green. 6 · Scatta: the shutter. */
+.ar-demo-floor, .ar-demo-drop, .ar-demo-join, .ar-demo-shutter { display: none; }
+.ar-tutorial-demo[data-step="2"] .ar-demo-target, .ar-tutorial-demo[data-step="3"] .ar-demo-target, .ar-tutorial-demo[data-step="4"] .ar-demo-target, .ar-tutorial-demo[data-step="5"] .ar-demo-target { display: none; }
+.ar-demo-floor { position: absolute; left: 50%; bottom: 10px; width: 70px; height: 22px; margin-left: -35px; border: 2px solid currentColor; border-radius: 50%; box-shadow: 0 0 10px currentColor; }
+.ar-demo-drop { position: absolute; left: 50%; bottom: 20px; width: 0; height: 0; margin-left: -16px; border-left: 16px solid transparent; border-right: 16px solid transparent; border-bottom: 46px solid #4ade80; filter: drop-shadow(0 4px 6px rgb(0 0 0 / .45)); }
+.ar-demo-drop::after { content: ""; position: absolute; left: -3px; top: 46px; width: 6px; height: 10px; background: #8b5a2b; }
+.ar-tutorial-demo[data-step="2"] .ar-demo-floor, .ar-tutorial-demo[data-step="2"] .ar-demo-drop, .ar-tutorial-demo[data-step="3"] .ar-demo-floor, .ar-tutorial-demo[data-step="3"] .ar-demo-drop { display: block; }
+.ar-tutorial-demo[data-step="2"] .ar-demo-drop { animation: ar-demo-place 2.2s cubic-bezier(.3,1.4,.6,1) infinite; }
+.ar-tutorial-demo[data-step="3"] .ar-demo-drop, .ar-tutorial-demo[data-step="3"] .ar-demo-floor { animation: ar-demo-move 2.6s ease-in-out infinite; }
+.ar-demo-join { position: absolute; inset: 0; }
+.ar-demo-join > span { position: absolute; top: 34px; width: 42px; height: 28px; border-radius: 6px; background: #22c55e; border: 2px solid #fde047; }
+.ar-demo-join > span:first-child { left: 18px; animation: ar-demo-join-l 2.6s ease-in-out infinite; }
+.ar-demo-join > span:last-child { right: 18px; animation: ar-demo-join-r 2.6s ease-in-out infinite; }
+.ar-tutorial-demo[data-step="4"] .ar-demo-join { display: block; }
+.ar-tutorial-demo[data-step="5"] .ar-demo-shutter { display: block; }
 @media (prefers-reduced-motion: reduce) {
 .ar-tutorial-demo * { animation: none; }
-.ar-demo-balance > span { left: 50%; }}
+.ar-demo-join > span:first-child { left: 38px; } .ar-demo-join > span:last-child { right: 38px; }}
 .ar-rotation-viewport { view-transition-name: ar-camera-rotation; background: var(--camera-surface); }
 .ar-start-swipe-hint { position: absolute; z-index: 35; top: calc(100% + .25rem); left: 50%; transform: translateX(-50%); width: max-content; max-width: 100%; padding: .2rem .6rem; border-radius: 8px; border: 1px solid color-mix(in oklab, var(--camera-ink) 20%, transparent); background: color-mix(in oklab, var(--camera-surface) 20%, transparent); color: var(--camera-ink); -webkit-backdrop-filter: blur(16px) saturate(1.2); backdrop-filter: blur(16px) saturate(1.2); font-size: .6875rem; line-height: 1.4; text-align: center; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity 240ms ease, visibility 240ms; }
 .ar-camera-surface[data-landscape=true] .ar-start-swipe-hint { top: 100%; padding-block: 0; font-size: .625rem; }
@@ -487,7 +496,10 @@
 @keyframes ar-lock-confirm { 0% { border-color: var(--camera-ink); } 45% { border-color: var(--ar-outline); box-shadow: 0 0 16px var(--ar-outline); } 100% { border-color: var(--ar-outline); } }
 @keyframes ar-demo-lock { 0%,100% { transform: scale(1.08); opacity: .6; } 40%,70% { transform: scale(.9); opacity: 1; } }
 @keyframes ar-demo-scan { 0%,100% { transform: translateY(0); opacity: 0; } 15%,85% { opacity: 1; } 90% { transform: translateY(68px); } }
-@keyframes ar-demo-balance { 0%,100% { left: 8%; } 50% { left: 78%; } }
+@keyframes ar-demo-place { 0% { transform: translateY(-60px); opacity: 0; } 30% { opacity: 1; } 55%,85% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(0); opacity: 0; } }
+@keyframes ar-demo-move { 0%,100% { transform: translateX(-34px) rotate(-12deg); } 50% { transform: translateX(34px) rotate(14deg); } }
+@keyframes ar-demo-join-l { 0%,15% { transform: translateX(0); border-color: #fde047; } 55%,90% { transform: translateX(20px); border-color: #22c55e; } 100% { transform: translateX(0); } }
+@keyframes ar-demo-join-r { 0%,15% { transform: translateX(0); border-color: #fde047; } 55%,90% { transform: translateX(-20px); border-color: #22c55e; } 100% { transform: translateX(0); } }
 @keyframes ar-demo-capture { 0%,70%,100% { transform: scale(1); } 80% { transform: scale(.88); } }
 
 @keyframes ar-confirm-in { from { opacity: 0; transform: scale(.96); filter: blur(8px); } to { opacity: 1; transform: none; filter: blur(0); } }
