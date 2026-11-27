@@ -572,8 +572,10 @@ function LiveColleagues({ me, people, list, spots, edit }: { me: string | null; 
   const faces = [...list.map((o) => ({ id: o.user_id, name: o.name, avatar: o.avatar, on: true })),
     ...others.filter((p) => !list.some((o) => o.user_id === p.user_id)).map((p) => ({ id: p.user_id, name: p.name || p.email, avatar: p.avatar, on: false }))].slice(0, 3);
   return (
-    <div key={joinKey} role="status" className="pill-join pointer-events-none absolute bottom-3 left-3 z-[3] flex max-w-[calc(100%-6rem)] items-center gap-2 rounded-2xl bg-black/50 py-1.5 pl-1.5 pr-3 text-white shadow-[0_2px_10px_rgb(0_0_0/0.4)] ring-1 ring-white/15 backdrop-blur-sm">
-      <span className="flex shrink-0 -space-x-2" aria-hidden="true">
+    <div key={joinKey} role="status" className={`${joinKey !== "j0" ? "pill-join " : ""}pointer-events-none absolute bottom-3 left-3 z-[3] flex max-w-[calc(100%-6rem)] items-center gap-2 rounded-2xl bg-black/50 py-1.5 pl-1.5 pr-3 text-white shadow-[0_2px_10px_rgb(0_0_0/0.4)] ring-1 ring-white/15 backdrop-blur-sm`}>
+      <span className="relative flex shrink-0 -space-x-2" aria-hidden="true">
+        {/* The arrival: a ring of light turning round the first face before the pill opens out of it. */}
+        {joinKey !== "j0" && list.length > 0 && <span className="pill-ring" />}
         {faces.map((f) => (
           <span key={`${f.id}:${f.on}`} className={cn("grid size-7 place-items-center overflow-hidden rounded-full bg-slate-600 text-[10px] font-bold ring-2", f.on ? "pill-face-join ring-emerald-400" : "ring-black/60 opacity-70")}>
             {f.avatar ? <img src={f.avatar} alt="" className="size-full object-cover" referrerPolicy="no-referrer" /> : initials(f.name)}

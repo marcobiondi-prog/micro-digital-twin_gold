@@ -2604,11 +2604,22 @@ html[data-slate] .nav-orb-glow {
 .map-dragging > * { transform: scale(1.18); filter: drop-shadow(0 0 6px rgb(45 212 191 / 0.9)) drop-shadow(0 4px 8px rgb(0 0 0 / 0.5)); transition: transform 120ms ease-out; }
 .map-dragging { z-index: 10; }
 
-/* Someone connecting, on the project pill at the map's foot (asked: there, not on the map's badge): the whole pill
-   glows turquoise and pulses twice, the face of whoever connects pops in. */
-.pill-join { animation: pill-join 1.4s ease-out both; }
-@keyframes pill-join { 0% { transform: scale(0.96); box-shadow: 0 0 0 0 rgb(45 212 191 / 0.8), 0 2px 10px rgb(0 0 0 / 0.4); } 25% { transform: scale(1.04); } 50% { transform: scale(1); box-shadow: 0 0 0 10px rgb(45 212 191 / 0), 0 2px 10px rgb(0 0 0 / 0.4); } 55% { box-shadow: 0 0 0 0 rgb(45 212 191 / 0.6), 0 2px 10px rgb(0 0 0 / 0.4); } 100% { transform: scale(1); box-shadow: 0 0 0 12px rgb(45 212 191 / 0), 0 2px 10px rgb(0 0 0 / 0.4); } }
-@media (prefers-reduced-motion: reduce) { .pill-join { animation: none; } }
+/* Someone connecting, on the project pill at the map's foot (asked: "la tab si espande dal cerchio e prima c'è il cerchio
+   rotante attorno al cerchio"): first only the face shows, with a ring of light turning round it (.pill-ring, 0,9 s), then
+   the pill opens out of the circle to its full width (clip-path) and its text fades in. */
+.pill-join { animation: pill-open 520ms cubic-bezier(0.22, 1, 0.36, 1) 0.85s both; }
+.pill-join > span:last-child { animation: pill-text 380ms ease-out 1.15s both; }
+@keyframes pill-open { from { clip-path: inset(0 calc(100% - 2.5rem) 0 0 round 9999px); } to { clip-path: inset(0 0 0 0 round 1rem); } }
+@keyframes pill-text { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+.pill-ring {
+  position: absolute; left: -4px; top: -4px; width: 36px; height: 36px; border-radius: 9999px; pointer-events: none; padding: 2.5px; z-index: 2;
+  background: conic-gradient(from var(--pile-angle), rgb(45 212 191 / 0.1) 0deg, rgb(45 212 191) 80deg, #fff 110deg, rgb(45 212 191) 140deg, rgb(45 212 191 / 0.1) 220deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: pile-turn 0.9s linear 2, pill-ring-out 400ms ease-out 1.6s forwards;
+}
+@keyframes pill-ring-out { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .pill-join, .pill-join > span:last-child { animation: none; } .pill-ring { display: none; } }
 .pill-face-join { animation: pill-face-join 900ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
 @keyframes pill-face-join { 0% { transform: scale(0.3); box-shadow: 0 0 0 0 rgb(52 211 153 / 0.9); } 60% { transform: scale(1.15); box-shadow: 0 0 0 8px rgb(52 211 153 / 0); } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .pill-face-join { animation: none; } }
