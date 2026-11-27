@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "@tanstack/react-router";
 import { ArrowRight, Check, Copy, Link2, Loader2, LogOut, Mail, Radio, RefreshCw, Send, Share2, Trash2, UserPlus, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { openAccount } from "@/lib/camera-dock";
+import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccountAvatar } from "@/lib/account-avatar";
@@ -219,10 +220,11 @@ function PersonRow({ p, me, owner, online, busy, onRole, onRemove }: { p: Person
   const self = p.user_id === me;
   return (
     <li className="flex items-center gap-3 p-3">
-      <span className="relative"><Face name={p.name} avatar={p.avatar} size={36} />{online && <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full bg-emerald-400 ring-2 ring-card" aria-label="connesso adesso" />}</span>
-      <span className="min-w-0 flex-1">
+      {/* Not connected now (asked): face, name and email dimmed, "non connesso" said. */}
+      <span className={cn("relative transition-opacity", !online && !self && "opacity-45 grayscale")}><Face name={p.name} avatar={p.avatar} size={36} />{online && <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full bg-emerald-400 ring-2 ring-card" aria-label="connesso adesso" />}</span>
+      <span className={cn("min-w-0 flex-1 transition-opacity", !online && !self && "opacity-50")}>
         <span className="block truncate text-sm font-medium">{p.name}{self ? " · tu" : ""}</span>
-        <span className="block truncate text-xs text-muted-foreground">{p.email}</span>
+        <span className="block truncate text-xs text-muted-foreground">{!online && !self ? `Non connesso · ${p.email}` : p.email}</span>
         {ask && <span className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">Togliere {p.name} dal progetto?
           <button type="button" className="rounded-full px-2 py-1 hover:bg-foreground/10" onClick={() => setAsk(false)}>Annulla</button>
           <button type="button" className="rounded-full bg-red-500/90 px-2.5 py-1 font-semibold text-white" onClick={() => { setAsk(false); onRemove(); }}>Togli</button></span>}
