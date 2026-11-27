@@ -154,6 +154,18 @@ export const getLab = () => { load(); return state; };
 const edits = new Set<(kind: "piazza" | "vigneto") => void>();
 export function onLabEdit(f: (kind: "piazza" | "vigneto") => void) { edits.add(f); return () => { edits.delete(f); }; }
 
+/**
+ * Signed out: the project of the account (its own or one shared with it) leaves this device — the simulation of that
+ * kind goes back to empty (no place, no interventions, no area), without counting as an edit. Signing in brings it back.
+ */
+export function dropProjectState(kind: "piazza" | "vigneto") {
+  load();
+  readOnly[kind] = false; roSubs.forEach((f) => f());
+  const d = defaults();
+  state = kind === "piazza" ? { ...state, urban: d.urban } : { ...state, vineyard: d.vineyard };
+  emit(kind === "piazza" ? "urban" : "vineyard", true);
+}
+
 /** A project's simulation read from the account put in place, without counting as an edit nor showing "Salvato". */
 export function applyProjectState(kind: "piazza" | "vigneto", slice: Record<string, unknown>) {
   load();

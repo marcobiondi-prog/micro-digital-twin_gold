@@ -3,7 +3,7 @@ import { describeChange } from "@/models/live-edit";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { focusProjectArea } from "@/lib/gps-hold";
-import { applyProjectState, getLab, isLabReadOnly, onLabEdit, onReadOnlyRefused, setLabReadOnly } from "@/models/lab-store";
+import { applyProjectState, dropProjectState, getLab, isLabReadOnly, onLabEdit, onReadOnlyRefused, setLabReadOnly } from "@/models/lab-store";
 import { placeOf, projectName, projectSlice, syncStep, type ProjectKind, type SyncMeta } from "@/models/project-state";
 
 /**
@@ -78,6 +78,7 @@ let lastUser: string | null = null;
 async function userId(): Promise<string | null> {
   const { data } = await supabase.auth.getSession();
   lastUser = data.session?.user.id ?? null;
+  try { if (lastUser) localStorage.setItem("mdt-project-owner-v1", lastUser); } catch { /* storage off */ }
   return lastUser;
 }
 
@@ -171,6 +172,27 @@ function checkMissing(error: { code?: string; message?: string }) {
   if (error.code === "42P01" || error.code === "PGRST205" || /does not exist|schema cache/i.test(error.message ?? "")) missing = true;
 }
 
+/**
+ * Signed out (asked "quando sono disconnesso scollegami dal progetto"): the account's projects leave this device — the
+ * simulation of each kind that had one goes back to empty, its pending edits forgotten, nothing sent; the next sign-in
+ * reads them back. Also on opening signed out after the account was left with a reload (leaveAccount).
+ */
+const OWNER_KEY = "mdt-project-owner-v1";
+function leaveProjects(me: string) {
+  try { localStorage.removeItem(OWNER_KEY); } catch { /* storage off */ }
+  const left = KINDS.filter((k) => metaOf(me, k)?.id);
+  const wasShared = left.some((k) => metaOf(me, k)?.shared);
+  for (const k of left) {
+    dropProjectState(k);
+    // Not in step any more: the next sign-in reads the project back from the account.
+    const m = metaOf(me, k)!; setMeta(me, k, { ...(m.id ? { id: m.id } : {}), ...(m.shared ? { shared: true } : {}) });
+  }
+  if (left.length) {
+    write(EDIT_KEY, {});
+    toast(wasShared ? "Sei uscito dal progetto condiviso" : "Il progetto resta nel tuo account", { id: "mdt-left-project", description: "Su questo dispositivo la simulazione riparte vuota: rientra con il tuo account per ritrovarla." });
+  }
+}
+
 export function syncAllProjects(announce = true) { for (const k of KINDS) void syncProject(k, { announce }); }
 
 /** Mounted once by the root. */
@@ -196,7 +218,12 @@ export function useProjectSync() {
     const start = window.setTimeout(() => syncAllProjects(), 1500);
     // In diretta: a colleague's save to one of this account's projects comes down by itself (RLS: members only).
     let me: string | null = null;
-    void userId().then((u) => { me = u; });
+    void userId().then((u) => {
+      me = u;
+      // Opened signed out after leaving the account with a reload: that account's projects leave this device too.
+      let owner: string | null = null; try { owner = localStorage.getItem(OWNER_KEY); } catch { /* storage off */ }
+      if (!u && owner) leaveProjects(owner);
+    });
     // A safety net under the live channels: every 20 s, while the app is in front, only the projects' update times are
     // read (a few bytes); a project changed elsewhere and not yet here comes down.
     const poll = window.setInterval(async () => {
@@ -217,7 +244,14 @@ export function useProjectSync() {
       if (metaOf(me, row.kind)?.id !== row.id) return;
       void syncProject(row.kind, { announce: true, by: "colleague" });
     }).subscribe();
-    const { data } = supabase.auth.onAuthStateChange((event) => { if (event === "SIGNED_IN") { missing = false; window.setTimeout(() => syncAllProjects(), 800); } void userId().then((u) => { me = u; }); void refreshLive(); });
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      // Signed out (asked "quando sono disconnesso scollegami dal progetto"): the account's projects leave this device —
+      // the simulation of each kind that had one goes back to empty, its pending edits forgotten, nothing sent.
+      if (event === "SIGNED_OUT" && me) leaveProjects(me);
+      if (event === "SIGNED_IN") { missing = false; window.setTimeout(() => syncAllProjects(), 800); }
+      void userId().then((u) => { me = u; });
+      void refreshLive();
+    });
     const back = () => { if (document.visibilityState === "visible") syncAllProjects(); };
     const online = () => syncAllProjects();
     document.addEventListener("visibilitychange", back);
