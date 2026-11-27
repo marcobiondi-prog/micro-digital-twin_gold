@@ -1,5 +1,6 @@
 import { isKeyRejected, loadGoogleMaps, onKeyRejected } from "@/lib/google-maps-js";
 import { useModels3D } from "@/lib/use-ios-3d";
+import { firstName, personInitials, spotsKey, type ColleagueSpot } from "@/lib/colleagues";
 import { densify, tileRing } from "@/models/drape";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { bedParts, BEDS_3D, crownRing, hedgeParts, netParts, vineRowParts, PERGOLA_COLORS, pergolaParts, shadePatchBlocks, treeParts } from "@/models/area-layout";
@@ -267,6 +268,33 @@ function misterBadges(lib: Maps3D, map: HTMLElement, pool: Map<string, HTMLEleme
   }
 }
 
+/**
+ * Progetti condivisi in Google's 3D: each colleague connected now as a pill with their initials and first name, 2,5 m
+ * over the ground where their phone's GPS puts them, drawn when hidden behind buildings. Kept in a pool like the misting
+ * poles' badges (a Marker3DElement taken off the map kept being drawn): one who leaves goes under the ground.
+ */
+function personBadges(lib: Maps3D, map: HTMLElement, pool: Map<string, HTMLElement>, people: ColleagueSpot[]) {
+  const want = new Map(people.map((p) => [p.id, p]));
+  for (const [id, mk] of pool) {
+    const m = mk as HTMLElement & { position: unknown; drawsWhenOccluded: boolean };
+    const p = want.get(id);
+    if (p) { m.position = { lat: p.lat, lng: p.lng, altitude: 2.5 }; m.drawsWhenOccluded = true; want.delete(id); }
+    else { m.drawsWhenOccluded = false; m.position = { lat: Number((m.position as { lat: number }).lat), lng: Number((m.position as { lng: number }).lng), altitude: -500 }; }
+  }
+  for (const [id, p] of want) {
+    try {
+      const mk = new lib.Marker3DElement({ position: { lat: p.lat, lng: p.lng, altitude: 2.5 }, altitudeMode: "RELATIVE_TO_GROUND", drawsWhenOccluded: true, sizePreserved: true, extruded: true });
+      const name = firstName(p.name).replace(/[<&>"]/g, ""), ini = personInitials(p.name).replace(/[<&>"]/g, "");
+      const w = 44 + Math.min(14, name.length) * 8.4;
+      const tpl = document.createElement("template");
+      tpl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="34" viewBox="0 0 ${w} 34"><rect x="1.5" y="1.5" width="${w - 3}" height="31" rx="15.5" fill="#0b0f15" fill-opacity="0.85" stroke="#2dd4bf" stroke-width="2"/><circle cx="17" cy="17" r="12" fill="#2dd4bf"/><text x="17" y="21" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" font-weight="700" fill="#0b0f15">${ini}</text><text x="35" y="22" font-family="system-ui,sans-serif" font-size="14" font-weight="600" fill="#ffffff">${name}</text></svg>`;
+      mk.append(tpl);
+      map.append(mk);
+      pool.set(id, mk);
+    } catch { /* an older build without custom markers */ }
+  }
+}
+
 /** How much the drawing is raised (or lowered) over Google's ground model, per place, set by hand; kept on this device. */
 /** The drawing's correction over Google's 3D, per place: h up (m), n north and e east (m); kept on this device. */
 type Adjust = { h: number; n: number; e: number };
@@ -302,7 +330,7 @@ function applyCamera(map: Map3D, camera: Camera, animate: boolean) {
   Object.assign(map, camera);
 }
 
-export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], sim = null, follow = false }: { lat: number; lng: number; label: string; apiKey: string; fallback?: ReactNode; area?: Array<[number, number]>; sim?: SimLayout | null; follow?: boolean }) {
+export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], sim = null, follow = false, people = [] }: { lat: number; lng: number; label: string; apiKey: string; fallback?: ReactNode; area?: Array<[number, number]>; sim?: SimLayout | null; follow?: boolean; people?: ColleagueSpot[] }) {
   const rejected = useKeyRejected();
   // The map is built for a place, not for each GPS fix: the pin can follow the phone metre by metre, and rebuilding the
   // photographic 3D at every fix left it blank half the time. A new place (over 30 m away) builds a new map.
@@ -324,6 +352,8 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
   const libs = useRef<Maps3D | null>(null);
   // The misting poles' number badges, one per pole and kind, reused for the map's whole life (misterBadges).
   const badges = useRef(new Map<string, HTMLElement>());
+  // Progetti condivisi: one name badge per colleague connected now, kept for the map's life (personBadges).
+  const peopleBadges = useRef(new Map<string, HTMLElement>());
   // The drawing's height over Google's ground, set by hand (− / +), per place.
   const [adj, setAdjState] = useState<Adjust>(NO_ADJUST);
   const [adjusting, setAdjusting] = useState(false);
@@ -384,8 +414,16 @@ export function LocationMap3D({ lat, lng, label, apiKey, fallback, area = [], si
       console.error("[LocationMap3D] Failed to load 3D map:", err);
       if (!cancelled) setState("error");
     });
-    return () => { cancelled = true; mapRef.current = null; markerRef.current = null; badges.current.clear(); el?.replaceChildren(); };
+    return () => { cancelled = true; mapRef.current = null; markerRef.current = null; badges.current.clear(); peopleBadges.current.clear(); el?.replaceChildren(); };
   }, [aLat, aLng, apiKey, attempt]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The colleagues connected now to this project, their name where their phone's GPS puts them (as in 2D).
+  const peopleKey = spotsKey(people);
+  useEffect(() => {
+    const map = mapRef.current, lib = libs.current;
+    if (state !== "ready" || !map || !lib) return;
+    personBadges(lib, map, peopleBadges.current, people);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, peopleKey]);
   // The pin follows the place (a GPS fix, a pin moved by hand) and its name without rebuilding the map.
   useEffect(() => {
     const m = markerRef.current;

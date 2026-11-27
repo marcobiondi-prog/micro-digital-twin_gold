@@ -3,11 +3,12 @@ import { useModels3D } from "@/lib/use-ios-3d";
 import { Crosshair, LoaderCircle } from "lucide-react";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Ring } from "@/models/place-area";
-import { addAreaLayers, addSimLayers, placePinElement, setAreaData, setSimData, SIM_TREES_3D, type SimLayout, MAP_LOCALE } from "@/views/v10/map-area";
+import { addAreaLayers, addSimLayers, personElement, placePinElement, setAreaData, setSimData, SIM_TREES_3D, type SimLayout, MAP_LOCALE } from "@/views/v10/map-area";
 import type { GeoJSONSource, Map as MlMap } from "maplibre-gl";
 import { useSimWhen } from "@/models/sim-when";
 import { sunAt } from "@/models/sun-shadow";
 import type { SimThreeLayer } from "@/views/v10/three-layer";
+import { spotsKey, type ColleagueSpot } from "@/lib/colleagues";
 
 /**
  * 3D view without the browser key: an open vector map tilted, with the buildings raised from their heights and a pin
@@ -17,7 +18,10 @@ const STYLE = "https://tiles.openfreemap.org/styles/liberty";
 
 type Camera = { center: [number, number]; zoom: number; pitch: number; bearing: number };
 
-export function OpenMap3D({ lat, lng, label, zoom, area = [], sim = null, follow = false }: { lat: number; lng: number; label: string; zoom: number; area?: Ring; sim?: SimLayout | null; follow?: boolean }) {
+export function OpenMap3D({ lat, lng, label, zoom, area = [], sim = null, follow = false, people = [] }: { lat: number; lng: number; label: string; zoom: number; area?: Ring; sim?: SimLayout | null; follow?: boolean; people?: ColleagueSpot[] }) {
+  type Mark = { setLngLat: (p: [number, number]) => Mark; addTo: (m: unknown) => Mark; remove: () => void };
+  const markerLib = useRef<{ Marker: new (o: Record<string, unknown>) => Mark } | null>(null);
+  const peopleMarks = useRef(new Map<string, Mark>());
   // Built once per place: a GPS fix of a few metres moves the pin, it no longer rebuilds the whole 3D map.
   const anchor = useRef({ lat, lng });
   if (!follow && Math.hypot((anchor.current.lat - lat) * 111_320, (anchor.current.lng - lng) * 111_320 * Math.cos((lat * Math.PI) / 180)) > 30) anchor.current = { lat, lng };
@@ -71,11 +75,12 @@ export function OpenMap3D({ lat, lng, label, zoom, area = [], sim = null, follow
         console.warn("[OpenMap3D] non-fatal map error:", e);
       });
       map.on("webglcontextlost", () => { if (!cancelled) setState("error"); });
+      markerLib.current = maplibregl as unknown as { Marker: new (o: Record<string, unknown>) => Mark };
       markerRef.current = new maplibregl.Marker({ element: placePinElement(), anchor: "bottom" }).setLngLat([lng, lat]).setPopup(new maplibregl.Popup({ offset: 38 }).setText(label)).addTo(map);
       mapRef.current = map;
       remove = () => map.remove();
     }).catch(() => { if (!cancelled) setState("error"); });
-    return () => { cancelled = true; mapRef.current = null; markerRef.current = null; engine.current = null; remove?.(); };
+    return () => { cancelled = true; mapRef.current = null; markerRef.current = null; engine.current = null; peopleMarks.current.forEach((m) => m.remove()); peopleMarks.current.clear(); remove?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aLat, aLng, zoom, models]);
   // The pin and the drawn area follow without rebuilding the map.
@@ -84,6 +89,21 @@ export function OpenMap3D({ lat, lng, label, zoom, area = [], sim = null, follow
     // Following the phone: the camera glides after the pin, keeping the person's zoom, tilt and turn.
     if (follow && state === "ready") (mapRef.current as unknown as { easeTo: (o: Record<string, unknown>) => void } | null)?.easeTo({ center: [lng, lat], duration: 900 });
   }, [lat, lng, state, follow]);
+  // Progetti condivisi: the colleagues connected now, by name, where their phone's GPS puts them (as on the 2D map).
+  const peopleKey = spotsKey(people);
+  useEffect(() => {
+    const map = mapRef.current, lib = markerLib.current;
+    if (state !== "ready" || !map || !lib) return;
+    const marks = peopleMarks.current, keep = new Set<string>();
+    for (const p of people) {
+      keep.add(p.id);
+      const m = marks.get(p.id);
+      if (m) m.setLngLat([p.lng, p.lat]);
+      else marks.set(p.id, new lib.Marker({ element: personElement(p.name, p.avatar), anchor: "bottom" }).setLngLat([p.lng, p.lat]).addTo(map));
+    }
+    for (const [id, m] of marks) if (!keep.has(id)) { m.remove(); marks.delete(id); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, peopleKey]);
   useEffect(() => {
     const e = engine.current;
     if (state === "ready" && e) setAreaData(e.map, area);

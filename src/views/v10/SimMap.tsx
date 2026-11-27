@@ -19,8 +19,7 @@ import { openAccount } from "@/lib/camera-dock";
 import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn } from "@/lib/demo-login";
 import { cn } from "@/lib/utils";
 import { setUrban, setVineyard, useLab, useLabReadOnly, vineMetrics } from "@/models/lab-store";
-import { useCurrentProject } from "@/lib/project-sync";
-import { useOnline } from "@/lib/project-share";
+import { useColleagues } from "@/lib/colleagues";
 import { shadeOpenness, piazzaLayout, piazzaShadows, vineShadows, TREE_SHADE_M2, vineLayout, type LayoutEdits, type PiazzaLayout } from "@/models/area-layout";
 import { dayLight, solarHour, sunAt, sunHeightDeg } from "@/models/sun-shadow";
 import { getSimWhen, useSimWhen } from "@/models/sim-when";
@@ -66,10 +65,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   // Progetti condivisi: in "Solo visione" the map is only looked at — no place search, drawing, zones nor proposals.
   const readOnly = useLabReadOnly(kind === "urban" ? "piazza" : "vigneto");
   // Progetti condivisi: the colleagues connected now on this project — named dots where they stand, a line over the map.
-  const project = useCurrentProject(kind === "urban" ? "piazza" : "vigneto");
-  const onlineNow = useOnline();
-  const colleagues = project.id && onlineNow.project === project.id ? onlineNow.list.filter((o) => o.user_id !== project.user) : [];
-  const people = colleagues.filter((o) => o.pos).map((o) => ({ id: o.user_id, name: o.name, avatar: o.avatar, lat: o.pos!.lat, lng: o.pos!.lng }));
+  const { list: colleagues, spots: people } = useColleagues(kind === "urban" ? "piazza" : "vigneto");
   const liveLoc = kind === "urban" ? lab.urban.location : lab.vineyard.location;
   // The maps follow the place, not every metre of it: a GPS fix settling a few metres away, or the same place saved again
   // under its street's name, rebuilt every map from scratch (each was keyed and built on the exact coordinates and
@@ -432,9 +428,9 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
         {!drawing && !drawingZone && proposalPill}
         {show3d
           ? <Suspense fallback={<div className="h-full w-full bg-card" />}><MapLight kind={kind} lat={pin.lat} lng={pin.lng}>{key
-            ? <LocationMap3D key={`map3d-${kind}`} follow={following} lat={pin.lat} lng={pin.lng} label={name ?? ""} apiKey={key} area={ring} sim={sim}
-              fallback={<OpenMap3D follow={following} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />} />
-            : <OpenMap3D key={`openmap3d-${kind}`} follow={following} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />}</MapLight></Suspense>
+            ? <LocationMap3D key={`map3d-${kind}`} people={people} follow={following} lat={pin.lat} lng={pin.lng} label={name ?? ""} apiKey={key} area={ring} sim={sim}
+              fallback={<OpenMap3D people={people} follow={following} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />} />
+            : <OpenMap3D key={`openmap3d-${kind}`} people={people} follow={following} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom3d} area={ring} sim={sim} />}</MapLight></Suspense>
           : <Suspense fallback={<div className="h-full w-full bg-card" />}><SatelliteMap2D key={`map2d-${kind}`} apiKey={key} lat={pin.lat} lng={pin.lng} label={name ?? ""} zoom={zoom} area={ring} people={people} drawing={drawing || drawingZone}
             onAreaChange={drawingZone ? setZoneDraft : setDraft} sim={editingZone && sim ? { ...sim, inner: (sim.inner ?? []).filter((z) => z.id !== editingZone) } : sim} arranging={arranging} onMove={moved} proposal={proposal}
             outline={drawingZone ? saved?.ring ?? null : null} onOutside={() => toast("La zona va dentro l’area disegnata")} onPinMove={arranging ? undefined : movePin} /></Suspense>}
@@ -884,6 +880,10 @@ function VrButton({ kind, area, guest = false }: { kind: SimKind; area: DrawnAre
   const [ok, setOk] = useState(false);
   const [busy, setBusy] = useState(false);
   const [hint, setHint] = useState(false);
+  // Progetti condivisi: the colleagues connected now, read by the headset every second.
+  const colleagues = useColleagues(kind === "urban" ? "piazza" : "vigneto").spots;
+  const peopleRef = useRef(colleagues);
+  peopleRef.current = colleagues;
   useEffect(() => { if (!guest) setHint(false); }, [guest]);
   useEffect(() => {
     let live = true;
@@ -895,7 +895,7 @@ function VrButton({ kind, area, guest = false }: { kind: SimKind; area: DrawnAre
     if (guest) { setHint(true); return; }
     setBusy(true);
     void import("@/views/v10/vr-view")
-      .then((m) => m.startVr(kind === "urban" ? "urban" : "vineyard", area, () => setBusy(false)))
+      .then((m) => m.startVr(kind === "urban" ? "urban" : "vineyard", area, () => setBusy(false), () => peopleRef.current))
       .then(() => toast("Visore VR · Grilletto per spostarti dove punti, levetta di lato per girarti."))
       .catch((e: unknown) => { setBusy(false); toast.error("Il visore non è partito", { description: e instanceof Error ? e.message : String(e) }); });
   };

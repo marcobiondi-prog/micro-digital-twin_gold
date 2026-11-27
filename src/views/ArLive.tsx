@@ -19,6 +19,8 @@ import { realTree, wantsRealTree } from "@/views/ar-tree";
 import { ArShadows, castShadows } from "@/views/ar-shadow";
 import { XREstimatedLight } from "three/examples/jsm/webxr/XREstimatedLight.js";
 import { ZoomDial } from "@/views/ZoomDial";
+import { syncPeople } from "@/views/person-3d";
+import { spotsKey, useColleagues } from "@/lib/colleagues";
 import { ArcZoomDial } from "@/views/ArcZoomDial";
 import { ZOOM_MAX } from "@/lib/camera-zoom";
 import { probeCameraTorch, setCameraTorch, supportsCameraTorch } from "@/lib/camera-torch";
@@ -472,6 +474,8 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
           for (const g of t.objects.values()) if (Math.abs(g.position.y - t.floorY) < RAISED_M) g.position.y = floor;
         }
         if (floor !== null) t.floorY = floor;
+        const cg = t.scene.getObjectByName("colleagues");
+        if (cg && t.floorY !== null) cg.position.y = t.floorY;
         const place = placementFor(hit, t.floorY, modelRef.current < 1);
         let target: V | null = null;
         if (place && hit && place.kind !== "floor-under") target = { x: hit.x, y: place.y, z: hit.z };
@@ -1166,6 +1170,27 @@ export function ArLive({ kind, session, stream = null, plants = [], onShot, onEn
       setNotice({ text: `Dal progetto: ${said}${alignment.how === "gps" ? " · posizione dal GPS, tocca i 2 angoli per allinearli bene" : ""}`, tone: "ok" });
     }
   }, [alignment, area, origin, showPlan, kind, planKey, merge, joinBeds, plantKey]);
+
+  // Progetti condivisi: the colleagues connected now to this project stand where their phone's GPS puts them, once the
+  // AR is aligned with the map (the area's 2 corners, else GPS and compass), with their name over a pole.
+  const colleagues = useColleagues(kind === "urban" ? "piazza" : "vigneto").spots;
+  const colleaguesKey = spotsKey(colleagues);
+  const colleaguesSaid = useRef("");
+  useEffect(() => {
+    const t = three.current;
+    if (!t) return;
+    let g = t.scene.getObjectByName("colleagues") as THREE.Group | undefined;
+    if (!g) { g = new THREE.Group(); g.name = "colleagues"; t.scene.add(g); }
+    g.position.y = t.floorY ?? 0;
+    const a = alignment?.a;
+    syncPeople(g, colleagues, a ? (lat, lng) => enToAr(toEN(lat, lng, origin), a) : () => null);
+    const names = colleagues.map((c) => c.name.split(/\s+/)[0]).join(", ");
+    const said = `${a ? "on" : "off"}:${names}`;
+    if (!names || colleaguesSaid.current === said) return;
+    colleaguesSaid.current = said;
+    setNotice({ text: a ? `In diretta: ${names} · ${colleagues.length > 1 ? "i loro nomi sono dove si trovano" : "il suo nome è dove si trova"}` : `In diretta: ${names} nel progetto · allinea l’AR alla mappa (Riporta, i 2 angoli) per vedere dove si trova${colleagues.length > 1 ? "no" : ""}`, tone: "ok" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colleaguesKey, alignment, origin, found]);
 
   // The light the sails answer to, read twice a second: ARCore's estimate of the room's or the piazza's light (primary
   // light and ambient) while it gives one, else the camera's picture (its mean brightness), smoothed; when it crosses

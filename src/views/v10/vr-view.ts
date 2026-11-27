@@ -10,6 +10,8 @@ import { sunAt } from "@/models/sun-shadow";
 import { vineMixOf, zoneMixOf } from "@/models/vine-interventions";
 import { buildPlan, growPlan } from "@/views/ar-plan";
 import { castShadows } from "@/views/ar-shadow";
+import { syncPeople } from "@/views/person-3d";
+import type { ColleagueSpot } from "@/lib/colleagues";
 
 /**
  * The project in a VR headset (WebXR immersive-vr: Windows Mixed Reality, Quest through Link or Air Link, SteamVR,
@@ -30,7 +32,7 @@ export async function vrSupported(): Promise<boolean> {
   } catch { return false; }
 }
 
-export async function startVr(kind: "urban" | "vineyard", area: DrawnArea, onEnd: () => void): Promise<void> {
+export async function startVr(kind: "urban" | "vineyard", area: DrawnArea, onEnd: () => void, getPeople: () => ColleagueSpot[] = () => []): Promise<void> {
   const xr = navigator.xr!;
   // Asked first, while the tap still counts; the scene is built after.
   const session = await xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor", "bounded-floor"] });
@@ -136,9 +138,18 @@ export async function startVr(kind: "urban" | "vineyard", area: DrawnArea, onEnd
   for (const c of ctrls) c.addEventListener("select", () => { const h = hitOf(c); if (h) { rig.x = h.x; rig.z = h.z; applyRig(); } });
   const turned = new WeakSet<XRInputSource>();
 
+  // Progetti condivisi: the colleagues connected now stand where their phone's GPS puts them, their name over a pole,
+  // read again every second while the headset is on.
+  const people = new THREE.Group();
+  scene.add(people);
+  let peopleAt = 0;
+  const placePeople = () => syncPeople(people, getPeople(), (lat, lng) => { const v = at([lat, lng]); return { x: v.x, z: v.z }; }, 0, 0.035);
+  placePeople();
+
   await renderer.xr.setSession(session);
   baseSpace = renderer.xr.getReferenceSpace();
-  renderer.setAnimationLoop((_t, frame) => {
+  renderer.setAnimationLoop((t, frame) => {
+    if (t - peopleAt > 1000) { peopleAt = t; placePeople(); }
     let shown = false;
     for (const c of ctrls) { const h = hitOf(c); if (h && !shown) { marker.position.set(h.x, 0.04, h.z); shown = true; } }
     marker.visible = shown;

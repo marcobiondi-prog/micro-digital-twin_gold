@@ -61,6 +61,7 @@ export async function removePerson(projectId: string, userId: string) {
 let onlineNow: { project: string | null; list: Online[] } = { project: null, list: [] };
 const onlineSubs = new Set<() => void>();
 function publish(project: string | null, list: Online[]) { onlineNow = { project, list }; onlineSubs.forEach((f) => f()); }
+export const getOnline = () => onlineNow;
 export function useOnline(): { project: string | null; list: Online[] } {
   return useSyncExternalStore((f) => { onlineSubs.add(f); return () => { onlineSubs.delete(f); }; }, () => onlineNow, () => onlineNow);
 }
