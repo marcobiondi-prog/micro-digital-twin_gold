@@ -173,15 +173,57 @@ async function toDataUrl(obj: THREE.Object3D, glow: number, lite = false): Promi
   return `data:model/gltf-binary;base64,${btoa(bin)}`;
 }
 
-/** A model's data URL, built once per key for the session. */
-// Builds models sequentially with brief pauses between so the browser event loop stays responsive.
+/**
+ * A model's data URL, built once per key and kept on the device (IndexedDB "mdt-g3d-models", MODEL_STORE_V): building a
+ * high-poly model and writing its GLB runs on the page's own thread and held a phone's 3D still for seconds, so it is
+ * done once per device; the next openings lay the models straight away. Builds wait for an idle moment and run one at
+ * a time, with a pause between them (longer on phones), so the map keeps moving under the finger.
+ */
+const MODEL_STORE_V = 1;
+let dbP: Promise<IDBDatabase | null> | null = null;
+function db(): Promise<IDBDatabase | null> {
+  if (dbP) return dbP;
+  dbP = new Promise((resolve) => {
+    try {
+      const req = indexedDB.open("mdt-g3d-models", 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore("models"); };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    } catch { resolve(null); }
+  });
+  return dbP;
+}
+async function stored(id: string): Promise<string | null> {
+  const d = await db();
+  if (!d) return null;
+  return new Promise((resolve) => {
+    try { const r = d.transaction("models").objectStore("models").get(`${MODEL_STORE_V}:${id}`); r.onsuccess = () => resolve((r.result as string | undefined) ?? null); r.onerror = () => resolve(null); } catch { resolve(null); }
+  });
+}
+async function store(id: string, url: string) {
+  const d = await db();
+  try { d?.transaction("models", "readwrite").objectStore("models").put(url, `${MODEL_STORE_V}:${id}`); } catch { /* full or private: built again next time */ }
+}
+const idle = (ms: number) => new Promise<void>((r) => {
+  const ric = (window as unknown as { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+  setTimeout(() => (ric ? ric(() => r(), { timeout: 2000 }) : r()), ms);
+});
 let modelQueue: Promise<unknown> = Promise.resolve();
 export function modelUrl(key: string, build: () => THREE.Object3D | Promise<THREE.Object3D | null> | null, glow = 0.15, lite = false): Promise<string | null> {
   const id = lite ? `lite:${key}` : key;
   let p = cache.get(id);
   if (!p) {
-    const make = () => Promise.resolve().then(build).then((o) => (o ? toDataUrl(o, glow, lite) : null)).catch(() => null);
-    p = modelQueue.then(() => new Promise((r) => setTimeout(r, 40))).then(make);
+    const make = async () => {
+      const kept = await stored(id);
+      if (kept) return kept;
+      await idle(lite ? 250 : 60);
+      const o = await Promise.resolve().then(build).catch(() => null);
+      if (!o) return null;
+      const url = await toDataUrl(o, glow, lite).catch(() => null);
+      if (url) void store(id, url);
+      return url;
+    };
+    p = modelQueue.then(make);
     modelQueue = p.catch(() => null);
     cache.set(id, p);
   }

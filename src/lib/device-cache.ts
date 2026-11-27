@@ -29,6 +29,8 @@ export async function deviceCacheBytes(): Promise<number | null> {
 export async function clearDeviceCache(): Promise<number | null> {
   const before = await deviceCacheBytes();
   if (typeof caches !== "undefined") for (const name of await caches.keys()) await caches.delete(name);
+  // The 3D models built on this device (views/v10/g3d-models): built again when next needed.
+  try { indexedDB.deleteDatabase("mdt-g3d-models"); } catch { /* unavailable */ }
   try { LOOKUP_KEYS.forEach((k) => localStorage.removeItem(k)); } catch { /* storage off */ }
   const after = await deviceCacheBytes();
   return before === null ? null : Math.max(0, before - (after ?? 0));
