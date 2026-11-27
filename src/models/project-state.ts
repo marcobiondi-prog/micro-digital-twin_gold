@@ -6,7 +6,8 @@ import type { LabState } from "./lab-store";
 
 export type ProjectKind = "piazza" | "vigneto";
 /** Per account and kind, on this device: which project, the account's last update already seen, when it was last in step. */
-export type SyncMeta = { id?: string; known?: string; syncedAt?: number };
+/** shared: the project in use is someone else's, shared with this account (an invite accepted). */
+export type SyncMeta = { id?: string; known?: string; syncedAt?: number; shared?: boolean };
 
 /** What goes to the account: the whole slice of the simulation, less what only this device works out (the clock's air). */
 export function projectSlice(kind: ProjectKind, lab: LabState): Record<string, unknown> {

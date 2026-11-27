@@ -31,7 +31,7 @@ export function currentProjectId(user: string, kind: ProjectKind): string | unde
 export async function openSharedProject(kind: ProjectKind, id: string): Promise<void> {
   const user = await userId();
   if (!user) return;
-  setMeta(user, kind, { id });
+  setMeta(user, kind, { id, shared: true });
   await syncProject(kind, { announce: false });
 }
 
@@ -41,6 +41,23 @@ export function useCurrentProject(kind: ProjectKind): { user: string | null; id:
   useEffect(() => {
     let alive = true;
     const refresh = async () => { const user = await userId(); if (alive) setState({ user, id: user ? metaOf(user, kind)?.id ?? null : null }); };
+    void refresh();
+    metaSubs.add(refresh);
+    const { data } = supabase.auth.onAuthStateChange(() => void refresh());
+    return () => { alive = false; metaSubs.delete(refresh); data.subscription.unsubscribe(); };
+  }, [kind]);
+  return state;
+}
+
+/**
+ * Whether the project in use for a kind is someone else's shared with this account (undefined while not read yet). An
+ * invitee of the other sector — an officer invited to a vineyard — opens that simulation through it.
+ */
+export function useSharedOpen(kind: ProjectKind): boolean | undefined {
+  const [state, setState] = useState<boolean | undefined>(undefined);
+  useEffect(() => {
+    let alive = true;
+    const refresh = async () => { const user = await userId(); if (alive) setState(!!(user && metaOf(user, kind)?.shared)); };
     void refresh();
     metaSubs.add(refresh);
     const { data } = supabase.auth.onAuthStateChange(() => void refresh());
@@ -78,10 +95,12 @@ export async function syncProject(kind: ProjectKind, opts: { announce?: boolean;
       row = (data as Row[] | null)?.[0] ?? null;
     }
     // The account's role in it: a viewer only looks (its edits are refused and nothing goes up).
-    let viewer = false;
+    let viewer = false, shared = false;
     if (row) {
       const { data: role } = await (supabase as unknown as { rpc: (f: string, a: Record<string, unknown>) => Promise<{ data: unknown }> }).rpc("project_role", { p: row.id });
       viewer = role === "viewer";
+      // Someone else's project, shared with this account: it opens even outside this profile's own sector.
+      shared = role === "viewer" || role === "editor";
     }
     setLabReadOnly(kind, viewer);
     const lab = getLab();
@@ -91,26 +110,26 @@ export async function syncProject(kind: ProjectKind, opts: { announce?: boolean;
     if (step === "create") {
       const { data, error } = await table().insert({ kind, name: projectName(place.label), place, state: projectSlice(kind, lab) }).select("id, updated_at").single();
       if (error) return void checkMissing(error);
-      setMeta(user, kind, { id: data.id, known: data.updated_at, syncedAt: Date.now() });
+      setMeta(user, kind, { id: data.id, known: data.updated_at, syncedAt: Date.now(), shared: false });
       if (opts.announce !== false) toast.success(kind === "piazza" ? "La piazza ora è nel tuo account" : "Il vigneto ora è nel tuo account", { description: "La ritrovi su ogni telefono o computer con cui entri." });
     } else if (step === "push" && row && viewer) {
       // Edits made here before becoming a viewer never go up: the project comes down instead.
       if (row.state && Object.keys(row.state).length) applyProjectState(kind, row.state);
-      setMeta(user, kind, { id: row.id, known: row.updated_at, syncedAt: Date.now() });
+      setMeta(user, kind, { id: row.id, known: row.updated_at, syncedAt: Date.now(), shared });
     } else if (step === "push" && row) {
       const { data, error } = await table().update({ name: projectName(place.label), place, state: projectSlice(kind, lab) }).eq("id", row.id).select("updated_at").single();
       if (error) return void checkMissing(error);
-      setMeta(user, kind, { id: row.id, known: data.updated_at, syncedAt: Date.now() });
+      setMeta(user, kind, { id: row.id, known: data.updated_at, syncedAt: Date.now(), shared });
     } else if (step === "pull" && row) {
       const changed = JSON.stringify(row.state) !== JSON.stringify(projectSlice(kind, lab));
       if (row.state && Object.keys(row.state).length) applyProjectState(kind, row.state);
-      setMeta(user, kind, { id: row.id, known: row.updated_at, syncedAt: Date.now() });
+      setMeta(user, kind, { id: row.id, known: row.updated_at, syncedAt: Date.now(), shared });
       if (changed && opts.announce !== false) {
         if (opts.by === "colleague") toast(kind === "piazza" ? "Piazza aggiornata da un collaboratore" : "Vigneto aggiornato da un collaboratore", { id: `mdt-colleague-${kind}`, description: "Vedi le sue modifiche in diretta." });
         else toast(kind === "piazza" ? "Piazza aggiornata dal tuo account" : "Vigneto aggiornato dal tuo account", { description: "Hai ritrovato le modifiche fatte su un altro dispositivo." });
       }
     } else if (row && !known) {
-      setMeta(user, kind, { id: row.id, known: row.updated_at, syncedAt: Date.now() });
+      setMeta(user, kind, { id: row.id, known: row.updated_at, syncedAt: Date.now(), shared });
     }
   } catch { /* offline or refused: tried again later */ } finally { busy.delete(kind); }
 }

@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "@tanstack/react-router";
-import { Check, Copy, Link2, Loader2, LogOut, Mail, Radio, Send, Share2, Trash2, UserPlus, Users, X } from "lucide-react";
+import { useLocation, useNavigate } from "@tanstack/react-router";
+import { ArrowRight, Check, Copy, Link2, Loader2, LogOut, Mail, Radio, Send, Share2, Trash2, UserPlus, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccountAvatar } from "@/lib/account-avatar";
 import { getLastSection } from "@/lib/last-section";
 import { useProId } from "@/lib/use-pro-id";
-import { useCurrentProject } from "@/lib/project-sync";
+import { useCurrentProject, useSharedOpen } from "@/lib/project-sync";
 import {
   ROLE_LABEL, cancelInvite, createInvite, initials, inviteLink, kindWord, removePerson, setRole,
   useProjectPeople, usePresence, type Invite, type Online, type Person, type ProjectRole,
@@ -15,7 +15,7 @@ import {
 import { placeOf, projectName as nameOfPlace, type ProjectKind } from "@/models/project-state";
 import { useLab } from "@/models/lab-store";
 import { useLivePos } from "@/lib/live-position";
-import { useSimTab } from "@/views/v8/console";
+import { openSimTab, useSimTab } from "@/views/v8/console";
 
 /**
  * Progetti condivisi in the header, beside the "i": a round badge with the faces of the people in the project — a
@@ -26,10 +26,11 @@ import { useSimTab } from "@/views/v8/console";
 function useKind(): ProjectKind {
   const pro = useProId();
   const path = useLocation({ select: (l) => l.pathname });
-  if (pro?.kind === "agronomo") return "vigneto";
-  if (pro?.kind === "funzionario") return "piazza";
+  // The simulation open first (an officer working on a vineyard shared with them), then the profile's own.
   if (path.startsWith("/vigneto")) return "vigneto";
   if (path.startsWith("/urbano")) return "piazza";
+  if (pro?.kind === "agronomo") return "vigneto";
+  if (pro?.kind === "funzionario") return "piazza";
   return getLastSection();
 }
 
@@ -101,6 +102,7 @@ export function ShareControl() {
             <DialogTitle>Chi è in condivisione</DialogTitle>
             <DialogDescription>{kind === "piazza" ? "Il progetto della piazza" : "Il progetto del vigneto"}: chi ci lavora, chi è connesso adesso e gli inviti.</DialogDescription>
           </DialogHeader>
+          <OtherShared kind={kind} onGo={() => setOpen(false)} />
           {!id ? (
             <p className="rounded-2xl border border-foreground/10 bg-foreground/[0.04] p-4 text-sm text-muted-foreground">
               Scegli un luogo nella simulazione: {kindWord(kind)} va nel tuo account e da lì puoi invitare altre persone.
@@ -111,6 +113,26 @@ export function ShareControl() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+/**
+ * The project of the other kind shared with this account (an officer invited to a vineyard, or the reverse): the bottom
+ * bar shows only the profile's own section, so the way there is here.
+ */
+function OtherShared({ kind, onGo }: { kind: ProjectKind; onGo: () => void }) {
+  const other: ProjectKind = kind === "piazza" ? "vigneto" : "piazza";
+  const shared = useSharedOpen(other);
+  const navigate = useNavigate();
+  if (!shared) return null;
+  return (
+    <button type="button" onClick={() => { onGo(); openSimTab(other === "piazza" ? "urban" : "vineyard", "mappa"); void navigate({ to: other === "piazza" ? "/urbano" : "/vigneto" }); }}
+      className="flex w-full items-center gap-3 rounded-2xl border border-teal-300/30 bg-teal-300/[0.08] px-4 py-3 text-left outline-none transition-colors hover:bg-teal-300/[0.14] focus-visible:ring-2 focus-visible:ring-ring">
+      <Users className="size-5 shrink-0 text-teal-300" aria-hidden="true" />
+      <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{other === "piazza" ? "Apri la piazza condivisa con te" : "Apri il vigneto condiviso con te"}</span>
+        <span className="block text-xs text-muted-foreground">Ti hanno invitato: ci lavori anche se il tuo profilo è di un altro settore.</span></span>
+      <ArrowRight className="size-4 shrink-0" aria-hidden="true" />
+    </button>
   );
 }
 

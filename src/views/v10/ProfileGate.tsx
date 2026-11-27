@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowRight, Building2, Grape, Lock, UserRound } from "lucide-react";
 import { openSectorGate, useGuest, useProId } from "@/lib/use-pro-id";
+import { useSharedOpen } from "@/lib/project-sync";
 import { KIND_LABEL, KIND_SECTION, SECTION_KIND, SECTION_LABEL, proSummary, unlocks, type ProKind, type Section } from "@/models/professional-id";
 import { toast } from "sonner";
 import { Ambient, PageHero, TabRow, openSimTab } from "@/views/v8/console";
@@ -95,15 +96,19 @@ export function SectionGate({ section, children }: { section: Section; children:
   // Identified with the other sector's profile: the page goes to that profile's own simulation (the farmer to the
   // vineyard, the officer to the piazza) instead of showing this section locked.
   const elsewhere = id ? KIND_SECTION[id.kind] : null;
-  const redirect = !!id && elsewhere !== section;
+  // Progetti condivisi: a project of this section shared with the account (an invite accepted) opens whatever the
+  // profile's own sector — an officer invited to a vineyard works on it, then goes back to the piazza.
+  const shared = useSharedOpen(section === "urban" ? "piazza" : "vigneto");
+  const otherSector = !!id && elsewhere !== section;
+  const redirect = otherSector && shared === false;
   useEffect(() => {
     if (!redirect || !elsewhere) return;
     openSimTab(elsewhere, "mappa");
     void navigate({ to: elsewhere === "urban" ? "/urbano" : "/vigneto", replace: true });
   }, [redirect, elsewhere, navigate]);
-  if (id === undefined || redirect || (!id && !guest)) return <div className="min-h-[60vh]" />;
+  if (id === undefined || redirect || (otherSector && shared === undefined) || (!id && !guest)) return <div className="min-h-[60vh]" />;
   // A guest (no profile) tries both simulations.
-  if (unlocks(id, section) || (guest && !id)) return <>{children}</>;
+  if (unlocks(id, section) || (guest && !id) || (id && shared)) return <>{children}</>;
   const Icon = section === "urban" ? Building2 : Grape;
   const need = SECTION_KIND[section];
   const done = () => {
