@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { isLabReadOnly, setUrban, setVineyard, useLab, type SharedWhen } from "@/models/lab-store";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Bell, CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, Clock, Globe } from "lucide-react";
@@ -21,7 +22,7 @@ import { cn } from "@/lib/utils";
 export function useSeasonClock(lat: number, lng: number, kind?: "urban" | "vineyard") {
   // "Riprendi nella simulazione" from the history can ask for the season and hour of a past intervention: the clock then starts there, by hand.
   const [asked] = useState(() => (kind ? peekRequestedWhen(kind) : null));
-  const [live, setLive] = useState(!asked);
+  const [live, setLiveRaw] = useState(!asked);
   const fetchSeasons = useServerFn(getSeasonalClimate);
   const climate = useQuery({ queryKey: ["season-climate", lat, lng], queryFn: () => fetchSeasons({ data: { lat, lng } }), staleTime: Infinity, retry: 1 });
   // The place's time zone, automatic from its position (worked out on the device), else the one its weather year
@@ -40,23 +41,52 @@ export function useSeasonClock(lat: number, lng: number, kind?: "urban" | "viney
   const tz = placeZone ?? deviceTimeZone();
   // Ora solare or legale by hand ("auto" follows the calendar): the clock reads that many minutes on.
   const [dstMode, setDstModeState] = useState<DstMode>(() => readDstMode(kind));
-  const setDstMode = (m: DstMode) => { setDstModeState(m); saveChoice(DST_KEY, kind, m === "auto" ? null : m); };
+  const setDstMode = (m: DstMode) => { dirty.current = true; setDstModeState(m); saveChoice(DST_KEY, kind, m === "auto" ? null : m); };
   const at = (ms: number) => placeTime(ms + dstShift(ms, tz, dstMode) * 60_000, tz);
-  const [season, setSeason] = useState<Season>(() => asked?.season ?? seasonOfMonth(at(worldNow()).month));
+  const [season, setSeasonRaw] = useState<Season>(() => asked?.season ?? seasonOfMonth(at(worldNow()).month));
   const [hour, setHourOnly] = useState(() => asked?.hour ?? at(worldNow()).hour);
   // The minutes follow the clock while live; an hour chosen by hand starts on the hour.
   const [minute, setMinute] = useState(() => (asked ? asked.minute ?? 0 : at(worldNow()).minute));
   // The ora the clock is read in: the one chosen by hand, else the calendar's (none where there is no ora legale).
   const calendar = summerTime(worldNow(), tz).kind;
   const dst = zoneOffsets(worldNow(), tz) ? (dstMode === "auto" ? (calendar === "nessuna" ? undefined : calendar) : dstMode) : undefined;
-  const setHour = (h: number | ((h: number) => number)) => { setHourOnly(h); setMinute(0); };
+  const setHourRaw = (h: number | ((h: number) => number)) => { setHourOnly(h); setMinute(0); };
+  // Progetti condivisi: a season, hour or ora set by hand (or "Adesso", back to live) goes with the project (lab-store
+  // `when`), so the people of a shared project see the same moment; theirs comes back here. Live ticks are not sent.
+  const lab = useLab();
+  const sharedWhen: SharedWhen | undefined = kind === "urban" ? lab.urban.when : kind === "vineyard" ? lab.vineyard.when : undefined;
+  const dirty = useRef(false), seenAt = useRef<number | null>(null);
+  const touch = <T,>(f: (v: T) => void) => (v: T) => { dirty.current = true; f(v); };
+  const setLiveShared = touch(setLiveRaw), setSeasonShared = touch(setSeasonRaw), setHour = touch(setHourRaw);
+  useEffect(() => {
+    if (!kind || !dirty.current) return;
+    dirty.current = false;
+    const w: SharedWhen = { live, season, hour, minute, dstMode, at: Date.now() };
+    seenAt.current = w.at;
+    // A viewer only looks: their moment stays on their device.
+    if (isLabReadOnly(kind === "urban" ? "piazza" : "vigneto")) return;
+    if (kind === "urban") setUrban({ when: w }); else setVineyard({ when: w });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live, season, hour, dstMode]);
+  useEffect(() => {
+    const w = sharedWhen;
+    if (!w || w.at === seenAt.current) return;
+    const first = seenAt.current === null;
+    seenAt.current = w.at;
+    // On opening only a recent moment (12 h) is taken: an old one does not stop the clock following the time.
+    if (first && (asked || Date.now() - w.at > 12 * 3_600_000)) return;
+    setLiveRaw(w.live);
+    if (!w.live) { setSeasonRaw(w.season); setHourOnly(w.hour); setMinute(w.minute ?? 0); }
+    if (w.dstMode && w.dstMode !== dstMode) { setDstModeState(w.dstMode); saveChoice(DST_KEY, kind, w.dstMode === "auto" ? null : w.dstMode); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sharedWhen?.at]);
   useEffect(() => { if (kind) clearRequestedWhen(kind); }, [kind]);
   // What the simulation is set to now, for the history to record with an intervention.
   useEffect(() => { if (kind) setSimWhen(kind, { season, hour, minute, ...(dst ? { dst } : {}) }); }, [kind, season, hour, minute, dst]);
   useEffect(() => {
     if (!live) return;
     let on = true;
-    const sync = () => { if (!on) return; const now = at(worldNow()); setSeason(seasonOfMonth(now.month)); setHourOnly(now.hour); setMinute(now.minute); };
+    const sync = () => { if (!on) return; const now = at(worldNow()); setSeasonRaw(seasonOfMonth(now.month)); setHourOnly(now.hour); setMinute(now.minute); };
     sync();
     // Once the world time is known, again (a phone whose clock is off moves to the right minute).
     void syncWorldTime().then(sync);
@@ -72,7 +102,7 @@ export function useSeasonClock(lat: number, lng: number, kind?: "urban" | "viney
   // The year is hour by hour in the zone it came in (the same as the position's but at a border).
   const placeHour = yearZone && yearZone !== tz ? shiftHour(calHour, worldNow(), tz, yearZone) : calHour;
   const real = climate.data?.profile[season][placeHour] ?? null;
-  return { live, setLive, season, setSeason, hour, setHour, minute, tz, placeZone: !!placeZone, dstMode, setDstMode, dst, pending: climate.isPending, real };
+  return { live, setLive: setLiveShared, season, setSeason: setSeasonShared, hour, setHour, minute, tz, placeZone: !!placeZone, dstMode, setDstMode, dst, pending: climate.isPending, real };
 }
 export type SeasonClock = ReturnType<typeof useSeasonClock>;
 

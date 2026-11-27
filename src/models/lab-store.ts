@@ -9,12 +9,17 @@ import { movePlace, samePlace, type PlaceSnap } from "./place-memory";
 /** A place; pending while none has been chosen yet (no default place: the GPS or a search sets the first one). */
 export type Loc = { label: string; lat: number; lng: number; pending?: boolean };
 export type VineZoneState = { temperature: number; moisture: number; wind: number; rain: boolean; irrigation?: number; shade?: number; windbreak?: number };
+/**
+ * The season and hour the simulation was set to by hand (or back to live), kept with the project so the people of a
+ * shared project see the same moment (views/v10/when useSeasonClock): `at` when it was set.
+ */
+export type SharedWhen = { live: boolean; season: "inverno" | "primavera" | "estate" | "autunno"; hour: number; minute?: number; dstMode?: "auto" | "solare" | "legale"; at: number };
 export type LabState = {
   savedAt?: number | null;
   syncedAt?: number | null;
   syncedTargets?: string[] | null;
-  urban: { trees: number; permeable: number; shade: number; misters?: number; sprinklers?: number; location: Loc; treeCells: number[] | null; permeableCells: number[] | null; shadeCells: number[] | null; realTemp?: number | null; realWeather?: RealWeather | null; area?: DrawnArea | null; places?: PlaceSnap<UrbanSnap>[] };
-  vineyard: { zones: VineZoneState[]; phase: Pheno; selected: number; allZones: boolean; location: Loc; irrigation?: number; shade?: number; windbreak?: number; climateKey?: string; area?: DrawnArea | null; places?: PlaceSnap<VineSnap>[] };
+  urban: { trees: number; permeable: number; shade: number; misters?: number; sprinklers?: number; location: Loc; treeCells: number[] | null; permeableCells: number[] | null; shadeCells: number[] | null; realTemp?: number | null; realWeather?: RealWeather | null; area?: DrawnArea | null; places?: PlaceSnap<UrbanSnap>[]; when?: SharedWhen };
+  vineyard: { zones: VineZoneState[]; phase: Pheno; selected: number; allZones: boolean; location: Loc; irrigation?: number; shade?: number; windbreak?: number; climateKey?: string; area?: DrawnArea | null; places?: PlaceSnap<VineSnap>[]; when?: SharedWhen };
 };
 /** What is kept per place (models/place-memory): the interventions and the area drawn, with its zones and edits. */
 type UrbanSnap = { trees: number; permeable: number; shade: number; misters?: number; sprinklers?: number; area: DrawnArea | null };
