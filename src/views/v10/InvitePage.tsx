@@ -44,7 +44,7 @@ export function InvitePage() {
     const { error: e } = await db().rpc("accept_project_invite", { t: token });
     if (e) { setBusy(false); toast.error("Invito non accettato", { description: /already used/.test(e.message ?? "") ? "Questo invito è già stato usato da un altro account." : e.message }); return; }
     await openSharedProject(info.kind, info.project_id);
-    toast.success(`Sei nel progetto ${info.name}`, { description: `${ROLE_LABEL[info.role]} · invitato da ${info.inviter}` });
+    toast.success(`Sei nel progetto ${info.name}`, { description: `${ROLE_LABEL[info.role]} · invitato da ${info.inviter}. La mappa resta sull’area del progetto: il GPS mostra agli altri dove sei, senza spostarla.` });
     openSimTab(info.kind === "piazza" ? "urban" : "vineyard", "mappa");
     void navigate({ to: info.kind === "piazza" ? "/urbano" : "/vigneto", replace: true });
   };

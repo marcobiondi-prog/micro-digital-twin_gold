@@ -70,9 +70,29 @@ let missing = false;
 const busy = new Set<ProjectKind>();
 type Row = { id: string; state: Record<string, unknown>; updated_at: string };
 
+let lastUser: string | null = null;
 async function userId(): Promise<string | null> {
   const { data } = await supabase.auth.getSession();
-  return data.session?.user.id ?? null;
+  lastUser = data.session?.user.id ?? null;
+  return lastUser;
+}
+
+/** Read at once (no wait): the project of this kind in use is someone else's, shared with this account. */
+export function sharedNow(kind: ProjectKind): boolean {
+  const user = lastUser ?? storedUser();
+  return !!(user && metaOf(user, kind)?.shared);
+}
+/** The signed-in account as the auth library keeps it on the device, before its first read. */
+function storedUser(): string | null {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !/^sb-.*-auth-token$/.test(k)) continue;
+      const id = (JSON.parse(localStorage.getItem(k) ?? "null") as { user?: { id?: string } } | null)?.user?.id;
+      if (id) return id;
+    }
+  } catch { /* storage unavailable */ }
+  return null;
 }
 
 /** Brings one kind in step with the account. */

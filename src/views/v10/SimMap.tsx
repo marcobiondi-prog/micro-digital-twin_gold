@@ -20,6 +20,8 @@ import { DEMO_LOGIN_AVAILABLE, setDemoSignedIn } from "@/lib/demo-login";
 import { cn } from "@/lib/utils";
 import { setUrban, setVineyard, useLab, useLabReadOnly, vineMetrics } from "@/models/lab-store";
 import { useColleagues } from "@/lib/colleagues";
+import { useCurrentProject } from "@/lib/project-sync";
+import { initials, useProjectPeople, type Online } from "@/lib/project-share";
 import { shadeOpenness, piazzaLayout, piazzaShadows, vineShadows, TREE_SHADE_M2, vineLayout, type LayoutEdits, type PiazzaLayout } from "@/models/area-layout";
 import { dayLight, solarHour, sunAt, sunHeightDeg } from "@/models/sun-shadow";
 import { getSimWhen, useSimWhen } from "@/models/sim-when";
@@ -423,7 +425,7 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
       <div data-sim-map-box="" data-map-gestures={show3d ? "" : undefined} className="relative -mx-4 h-[52vh] min-h-72 overflow-hidden bg-card sm:mx-0 sm:rounded-3xl">
         {/* The temperature the interventions bring, on the map itself (2D and 3D), following the levers live. */}
         <MapReading kind={kind} lat={pin.lat} lng={pin.lng} />
-        <LiveColleagues list={colleagues} />
+        <LiveColleagues kind={kind === "urban" ? "piazza" : "vigneto"} list={colleagues} spots={people} />
         {/* How many misting poles the map shows, exactly: those in the zones drawn for them and those the app placed. */}
         {sim?.kind === "piazza" && sim.data.misters.length > 0 && !drawing && (
           <p role="status" className="pointer-events-none absolute left-1/2 top-12 z-[3] -translate-x-1/2 whitespace-nowrap rounded-full bg-black/45 px-3 py-1 text-[12px] font-semibold text-white ring-1 ring-white/15 backdrop-blur-sm [text-shadow:0_1px_2px_rgb(0_0_0/.6)]">
@@ -496,16 +498,43 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   );
 }
 
-/** Progetti condivisi: who else is in the project right now and where, in one pill at the map's foot. */
-function LiveColleagues({ list }: { list: Array<{ user_id: string; name: string; where: string }> }) {
-  if (!list.length) return null;
-  const first = (n: string) => n.split(/\s+/)[0] || "Un collaboratore";
-  const text = list.length === 1 ? `${first(list[0]!.name)} è ${list[0]!.where || "nell’app"}` : list.length === 2 ? `${first(list[0]!.name)} e ${first(list[1]!.name)} sono qui` : `${first(list[0]!.name)} e altri ${list.length - 1} sono qui`;
+/**
+ * Progetti condivisi: over the map (2D and 3D), who the project belongs to or is shared with and who is in it right now —
+ * also those whose GPS is off (they are not on the map), so the people of the project are always said here.
+ */
+function LiveColleagues({ kind, list, spots }: { kind: "piazza" | "vigneto"; list: Online[]; spots: Array<{ id: string }> }) {
+  const project = useCurrentProject(kind);
+  const share = useProjectPeople(project.id, project.user);
+  const others = share.people.filter((p) => p.user_id !== project.user);
+  if (!list.length && !others.length) return null;
+  const first = (n: string) => n.split(/\s+|@/)[0] || "Un collaboratore";
+  const mine = share.people.find((p) => p.user_id === project.user)?.role === "owner";
+  const owner = share.people.find((p) => p.role === "owner");
+  const onMap = new Set(spots.map((p) => p.id));
+  const head = mine ? `Condiviso con ${others.length === 1 ? first(others[0]!.name || others[0]!.email) : `${others.length} persone`}` : owner ? `Progetto di ${first(owner.name || owner.email)}` : "Progetto condiviso";
+  const noGps = (o: Online) => (onMap.has(o.user_id) ? "" : " · GPS spento");
+  const live = list.length === 0 ? (mine ? "Nessuno connesso ora" : "Nessuno connesso ora")
+    : list.length === 1 ? `${first(list[0]!.name)} è ${list[0]!.where || "nell’app"}${noGps(list[0]!)}`
+    : list.length === 2 ? `${first(list[0]!.name)} e ${first(list[1]!.name)} sono qui` : `${first(list[0]!.name)} e altri ${list.length - 1} sono qui`;
+  const faces = [...list.map((o) => ({ id: o.user_id, name: o.name, avatar: o.avatar, on: true })),
+    ...others.filter((p) => !list.some((o) => o.user_id === p.user_id)).map((p) => ({ id: p.user_id, name: p.name || p.email, avatar: p.avatar, on: false }))].slice(0, 3);
   return (
-    <p role="status" className="pointer-events-none absolute bottom-3 left-3 z-[3] flex max-w-[calc(100%-6rem)] items-center gap-2 rounded-full bg-black/45 px-3 py-1.5 text-[13px] font-medium text-white shadow-[0_2px_10px_rgb(0_0_0/0.4)] ring-1 ring-white/15 backdrop-blur-sm">
-      <span className="share-badge-dot size-2 shrink-0 rounded-full bg-emerald-400" aria-hidden="true" />
-      <span className="truncate">In diretta · {text}</span>
-    </p>
+    <div role="status" className="pointer-events-none absolute bottom-3 left-3 z-[3] flex max-w-[calc(100%-6rem)] items-center gap-2 rounded-2xl bg-black/50 py-1.5 pl-1.5 pr-3 text-white shadow-[0_2px_10px_rgb(0_0_0/0.4)] ring-1 ring-white/15 backdrop-blur-sm">
+      <span className="flex shrink-0 -space-x-2" aria-hidden="true">
+        {faces.map((f) => (
+          <span key={f.id} className={cn("grid size-7 place-items-center overflow-hidden rounded-full bg-slate-600 text-[10px] font-bold ring-2", f.on ? "ring-emerald-400" : "ring-black/60 opacity-70")}>
+            {f.avatar ? <img src={f.avatar} alt="" className="size-full object-cover" referrerPolicy="no-referrer" /> : initials(f.name)}
+          </span>
+        ))}
+      </span>
+      <span className="min-w-0 leading-tight">
+        <span className="block truncate text-[11px] text-white/70">{head}</span>
+        <span className="flex items-start gap-1.5 text-[13px] font-medium">
+          {list.length > 0 && <span className="share-badge-dot mt-1.5 size-2 shrink-0 rounded-full bg-emerald-400" aria-hidden="true" />}
+          <span className="line-clamp-2">{list.length > 0 ? `In diretta · ${live}` : live}</span>
+        </span>
+      </span>
+    </div>
   );
 }
 
