@@ -37,8 +37,9 @@ async function statistics(bearer: string, request: unknown) {
 /** Premium (signed-in): Sentinel-2 NDVI and Sentinel-3 surface temperature around a place. */
 export const getCopernicusReading = createServerFn({ method: "POST" })
   .middleware([optionalSupabaseAuth])
-  .inputValidator((d) => z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).parse(d))
-  .handler(async ({ data }): Promise<CopernicusReading & { configured: boolean }> => {
+  .inputValidator((d: unknown) => d as { lat: number; lng: number })
+  .handler(async ({ data: raw }): Promise<CopernicusReading & { configured: boolean }> => {
+    const data = z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).parse(raw);
     const id = process.env["CDSE_CLIENT_ID"], secret = process.env["CDSE_CLIENT_SECRET"];
     if (!id || !secret) return { configured: false, ndvi: null, surfaceTemp: null, errors: [] };
     const key = `${data.lat.toFixed(3)},${data.lng.toFixed(3)}`;

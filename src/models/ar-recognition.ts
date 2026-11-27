@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { plantPhotoBounds } from "@/models/ar-plant-photo";
 
-export const groundSurveySchema = z.object({
+export const groundSurveySchema = /*#__PURE__*/ (() => z.object({
   consistency: z.string(),
   heatNote: z.string(),
   regions: z.array(z.object({
@@ -10,7 +10,7 @@ export const groundSurveySchema = z.object({
     exposure: z.enum(["ombra", "mista", "esposta", "incerta"]),
     plantable: z.boolean(),
   }).strict()),
-}).strict();
+}).strict())();
 export type GroundSurvey = z.infer<typeof groundSurveySchema>;
 
 /** Image coordinates only: neither a metric survey nor a temperature measurement. */
@@ -19,7 +19,7 @@ export function groundRegionAt(survey: GroundSurvey, x: number, y: number) {
   return survey.regions.find(({ box }) => x >= box.x && x <= box.x + box.w && y >= box.y && y <= box.y + box.h) ?? null;
 }
 
-export const arRecognitionSchema = z.object({
+export const arRecognitionSchema = /*#__PURE__*/ (() => z.object({
   identification: z.object({
     level: z.enum(["species", "genus", "uncertain"]),
     leafVisible: z.boolean(), evidence: z.string(),
@@ -50,7 +50,7 @@ export const arRecognitionSchema = z.object({
     label: z.string(), permeability: z.enum(["bassa", "media", "alta"]),
     plantable: z.boolean(), note: z.string(),
   }).nullable(),
-}).strict();
+}).strict())();
 
 /** A reply from the plain-JSON fallback (or an older model) may omit plant.alternatives or plant.specimen: read them as none. */
 export function withPlantAlternatives(raw: unknown): unknown {

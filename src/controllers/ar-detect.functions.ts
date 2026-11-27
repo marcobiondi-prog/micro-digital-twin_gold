@@ -141,22 +141,25 @@ async function referencePhoto(name: string, gbifKey: number | null): Promise<Ref
   return photo;
 }
 
-const detectInput = z.object({ image: z.string().regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/).max(3_000_000), detailImage: z.string().regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/).max(1_000_000).optional(), kind: z.enum(["urban", "vineyard"]).default("urban"), target: z.enum(["auto", "tree", "ground", "leaf", "canopy", "interrow"]).optional(), focus: z.object({x:z.number().min(0).max(1),y:z.number().min(0).max(1),w:z.number().min(0).max(1),h:z.number().min(0).max(1)}).optional(), place: z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180), label: z.string().max(120).optional() }).optional(), month: z.number().int().min(1).max(12).optional(), satellite: z.object({ ndvi: z.number().min(-1).max(1).optional(), ndviDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), surfaceTemp: z.number().min(-60).max(80).optional(), tempDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }).optional() });
+// Built and checked on the server only (in the handlers): a schema at module level, or zod in the input validator,
+// came down to the phone with the camera's code (zod, about 100 kB).
+const detectInput = () => z.object({ image: z.string().regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/).max(3_000_000), detailImage: z.string().regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/).max(1_000_000).optional(), kind: z.enum(["urban", "vineyard"]).default("urban"), target: z.enum(["auto", "tree", "ground", "leaf", "canopy", "interrow"]).optional(), focus: z.object({x:z.number().min(0).max(1),y:z.number().min(0).max(1),w:z.number().min(0).max(1),h:z.number().min(0).max(1)}).optional(), place: z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180), label: z.string().max(120).optional() }).optional(), month: z.number().int().min(1).max(12).optional(), satellite: z.object({ ndvi: z.number().min(-1).max(1).optional(), ndviDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), surfaceTemp: z.number().min(-60).max(80).optional(), tempDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }).optional() });
 type DetectResult = { detection: Detection; soil?: Soil; survey?: GroundSurvey | null; error?: string; status?: number };
 
 /** Foto di riferimento della specie riconosciuta, chiesta dalla fotocamera dopo la scansione. */
 export const getReferencePhoto = createServerFn({ method: "POST" })
   .middleware([optionalSupabaseAuth])
-  .inputValidator((d) => z.object({ name: z.string().trim().min(2).max(80), gbifKey: z.number().int().positive().nullable() }).parse(d))
-  .handler(async ({ data }): Promise<ReferencePhoto | null> => referencePhoto(data.name, data.gbifKey));
+  .inputValidator((d: unknown) => d as { name: string; gbifKey: number | null })
+  .handler(async ({ data: raw }): Promise<ReferencePhoto | null> => { const data = z.object({ name: z.string().trim().min(2).max(80), gbifKey: z.number().int().positive().nullable() }).parse(raw); return referencePhoto(data.name, data.gbifKey); });
 
 /** Riconosce oggetto e specie inquadrati dalla fotocamera AR. */
 export const detectArObject = createServerFn({ method: "POST" })
   .middleware([optionalSupabaseAuth])
-  .inputValidator((d) => detectInput.parse(d))
-  .handler(async ({ data }): Promise<DetectResult> => {
+  .inputValidator((d: unknown) => d as DetectIn)
+  .handler(async ({ data: raw }): Promise<DetectResult> => {
     // Unexpected server failures come back as a readable error instead of a thrown request.
     try {
+      const data = detectInput().parse(raw);
       // Never past the host's 60 s: past 55 s the camera gets a readable answer instead of a cut request.
       let timer: ReturnType<typeof setTimeout> | undefined;
       const late = new Promise<DetectResult>((resolve) => { timer = setTimeout(() => resolve({ detection: null, error: "L’analisi ha impiegato troppo: riprova la scansione." }), 55_000); });
@@ -168,7 +171,8 @@ export const detectArObject = createServerFn({ method: "POST" })
     }
   });
 
-async function recognize(data: z.infer<typeof detectInput>): Promise<DetectResult> {
+type DetectIn = z.infer<ReturnType<typeof detectInput>>;
+async function recognize(data: DetectIn): Promise<DetectResult> {
     if (!aiConfigured()) return { detection: null, error: "Servizio AI non configurato." };
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data: blocked, error: stateError } = await supabaseAdmin.from("ar_ai_access_state").select("status,reason").eq("scope", "recognition").maybeSingle();

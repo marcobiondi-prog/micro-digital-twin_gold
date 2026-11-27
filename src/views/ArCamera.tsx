@@ -209,6 +209,18 @@ export function ArCamera({
   const [recording, setRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sceneRef = useRef<ArScene | null>(null);
+  // The 3D overlay, loaded on first need (a recognised plant put over the camera), never on opening.
+  const sceneLoad = useRef<Promise<ArScene | null> | null>(null);
+  const ensureScene = (): Promise<ArScene | null> => {
+    if (sceneRef.current) return Promise.resolve(sceneRef.current);
+    sceneLoad.current ??= import("@/views/ar-scene").then((m) => {
+      const scene = m.createArScene();
+      if (arCoreRef.current) scene.setArCoreManager?.(arCoreRef.current);
+      sceneRef.current = scene;
+      return scene;
+    }).catch(() => null);
+    return sceneLoad.current;
+  };
   // Composizione del fotogramma: l'anteprima mostra la griglia, lo scatto no.
   const paintRef = useRef<((showGrid: boolean) => boolean) | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -602,15 +614,9 @@ export function ArCamera({
     setPanelOpen(true);
     setToolsOpen(false); setActiveTool(null);
     setLayers(new Set(["objects"]));
-    void import("@/views/ar-scene").then((m) => {
-      if (!cancelled) {
-        const scene = m.createArScene();
-        if (arCoreRef.current) scene.setArCoreManager?.(arCoreRef.current);
-        sceneRef.current = scene;
-      }
-    }).catch(() => {
-      if (!cancelled) setError("Anteprima AR non disponibile su questo dispositivo.");
-    });
+    // The 3D overlay (three.js, ~135 kB compressed) is no longer loaded on opening: only when a recognised plant is
+    // first put over the camera (ensureScene), so «Rileva» opens light.
+    sceneLoad.current = null;
     // Riconoscimento del terreno: il piano della griglia segue l'inclinazione reale del telefono.
     // Inclinazione corretta anche in orizzontale: gli assi beta/gamma ruotano con lo schermo,
     // quindi li riallineiamo all'angolo di orientamento prima di inclinare la griglia.
@@ -925,16 +931,14 @@ export function ArCamera({
       setLayers((s) => new Set(s).add("objects"));
       const identified = d.species ? { ...d.species, cooling: d.cooling, identification: d.identification } : null;
       setSpecies(identified);
-      if (identified && sceneRef.current) {
-        sceneRef.current.place(type, d.box.x + d.box.w / 2, Math.min(0.98, d.box.y + d.box.h), Math.max(0.15, d.box.h), {
+      if (identified) void ensureScene().then((scene) => scene?.place(type, d.box.x + d.box.w / 2, Math.min(0.98, d.box.y + d.box.h), Math.max(0.15, d.box.h), {
           speciesName: identified.commonName,
           scientificName: identified.scientificName,
           shadeM2: identified.cooling?.shadeM2 ?? 18,
           cooling: identified.cooling?.deltaT ?? 0.4,
           is3D: true,
           image: cutout ?? undefined,
-        });
-      }
+        }));
       playCameraSound("scan-done", 1.8); hapticTick([40, 60, 40]);
       const outcome = d.species
         ? `${d.species.commonName} · ${d.identification?.level === "genus" ? "genere probabile" : "specie probabile"}`
