@@ -28,6 +28,7 @@ import { Route as VignetoRouteImport } from './routes/vigneto'
 import { Route as CronologiaIdRouteImport } from './routes/cronologia_.$id'
 import { Route as IdentificazioneAgronomoRouteImport } from './routes/identificazione.agronomo'
 import { Route as IdentificazioneFunzionarioRouteImport } from './routes/identificazione.funzionario'
+import { Route as InvitoTokenRouteImport } from './routes/invito.$token'
 import { Route as LegaleLicenzeRouteImport } from './routes/legale/licenze'
 import { Route as LegaleTerminiRouteImport } from './routes/legale/termini'
 import { Route as PrivacyAutorizzazioniRouteImport } from './routes/privacy/autorizzazioni'
@@ -134,6 +135,11 @@ const IdentificazioneFunzionarioRoute =
     path: '/identificazione/funzionario',
     getParentRoute: () => rootRouteImport,
   } as any)
+const InvitoTokenRoute = InvitoTokenRouteImport.update({
+  id: '/invito/$token',
+  path: '/invito/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LegaleLicenzeRoute = LegaleLicenzeRouteImport.update({
   id: '/legale/licenze',
   path: '/legale/licenze',
@@ -202,6 +208,7 @@ export interface FileRoutesByFullPath {
   '/cronologia/$id': typeof CronologiaIdRoute
   '/identificazione/agronomo': typeof IdentificazioneAgronomoRoute
   '/identificazione/funzionario': typeof IdentificazioneFunzionarioRoute
+  '/invito/$token': typeof InvitoTokenRoute
   '/legale/licenze': typeof LegaleLicenzeRoute
   '/legale/termini': typeof LegaleTerminiRoute
   '/privacy/autorizzazioni': typeof PrivacyAutorizzazioniRoute
@@ -232,6 +239,7 @@ export interface FileRoutesByTo {
   '/cronologia/$id': typeof CronologiaIdRoute
   '/identificazione/agronomo': typeof IdentificazioneAgronomoRoute
   '/identificazione/funzionario': typeof IdentificazioneFunzionarioRoute
+  '/invito/$token': typeof InvitoTokenRoute
   '/legale/licenze': typeof LegaleLicenzeRoute
   '/legale/termini': typeof LegaleTerminiRoute
   '/privacy/autorizzazioni': typeof PrivacyAutorizzazioniRoute
@@ -263,6 +271,7 @@ export interface FileRoutesById {
   '/cronologia_/$id': typeof CronologiaIdRoute
   '/identificazione/agronomo': typeof IdentificazioneAgronomoRoute
   '/identificazione/funzionario': typeof IdentificazioneFunzionarioRoute
+  '/invito/$token': typeof InvitoTokenRoute
   '/legale/licenze': typeof LegaleLicenzeRoute
   '/legale/termini': typeof LegaleTerminiRoute
   '/privacy/autorizzazioni': typeof PrivacyAutorizzazioniRoute
@@ -295,6 +304,7 @@ export interface FileRouteTypes {
     | '/cronologia/$id'
     | '/identificazione/agronomo'
     | '/identificazione/funzionario'
+    | '/invito/$token'
     | '/legale/licenze'
     | '/legale/termini'
     | '/privacy/autorizzazioni'
@@ -325,6 +335,7 @@ export interface FileRouteTypes {
     | '/cronologia/$id'
     | '/identificazione/agronomo'
     | '/identificazione/funzionario'
+    | '/invito/$token'
     | '/legale/licenze'
     | '/legale/termini'
     | '/privacy/autorizzazioni'
@@ -355,6 +366,7 @@ export interface FileRouteTypes {
     | '/cronologia_/$id'
     | '/identificazione/agronomo'
     | '/identificazione/funzionario'
+    | '/invito/$token'
     | '/legale/licenze'
     | '/legale/termini'
     | '/privacy/autorizzazioni'
@@ -386,6 +398,7 @@ export interface RootRouteChildren {
   CronologiaIdRoute: typeof CronologiaIdRoute
   IdentificazioneAgronomoRoute: typeof IdentificazioneAgronomoRoute
   IdentificazioneFunzionarioRoute: typeof IdentificazioneFunzionarioRoute
+  InvitoTokenRoute: typeof InvitoTokenRoute
   LegaleLicenzeRoute: typeof LegaleLicenzeRoute
   LegaleTerminiRoute: typeof LegaleTerminiRoute
   PrivacyAutorizzazioniRoute: typeof PrivacyAutorizzazioniRoute
@@ -532,6 +545,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IdentificazioneFunzionarioRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/invito/$token': {
+      id: '/invito/$token'
+      path: '/invito/$token'
+      fullPath: '/invito/$token'
+      preLoaderRoute: typeof InvitoTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/legale/licenze': {
       id: '/legale/licenze'
       path: '/legale/licenze'
@@ -618,6 +638,7 @@ const rootRouteChildren: RootRouteChildren = {
   CronologiaIdRoute: CronologiaIdRoute,
   IdentificazioneAgronomoRoute: IdentificazioneAgronomoRoute,
   IdentificazioneFunzionarioRoute: IdentificazioneFunzionarioRoute,
+  InvitoTokenRoute: InvitoTokenRoute,
   LegaleLicenzeRoute: LegaleLicenzeRoute,
   LegaleTerminiRoute: LegaleTerminiRoute,
   PrivacyAutorizzazioniRoute: PrivacyAutorizzazioniRoute,

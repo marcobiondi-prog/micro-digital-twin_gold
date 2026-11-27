@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { applyProjectState, getLab, onLabEdit } from "@/models/lab-store";
@@ -19,12 +19,35 @@ type Store = Record<string, Partial<Record<ProjectKind, SyncMeta>>>;
 const read = <T,>(k: string, d: T): T => { try { return (JSON.parse(localStorage.getItem(k) ?? "null") as T) ?? d; } catch { return d; } };
 const write = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* full */ } };
 const metaOf = (user: string, kind: ProjectKind) => read<Store>(META_KEY, {})[user]?.[kind];
-function setMeta(user: string, kind: ProjectKind, m: SyncMeta) { const s = read<Store>(META_KEY, {}); s[user] = { ...s[user], [kind]: m }; write(META_KEY, s); }
+const metaSubs = new Set<() => void>();
+function setMeta(user: string, kind: ProjectKind, m: SyncMeta) { const s = read<Store>(META_KEY, {}); s[user] = { ...s[user], [kind]: m }; write(META_KEY, s); metaSubs.forEach((f) => f()); }
 const editedAt = (kind: ProjectKind) => read<Partial<Record<ProjectKind, number>>>(EDIT_KEY, {})[kind] ?? 0;
 function markEdited(kind: ProjectKind) { write(EDIT_KEY, { ...read(EDIT_KEY, {}), [kind]: Date.now() }); }
 
 /** The project in use for a kind, for other modules (phase 1: sharing). */
 export function currentProjectId(user: string, kind: ProjectKind): string | undefined { return metaOf(user, kind)?.id; }
+
+/** Switches a kind to a project shared with this account (an invite accepted): its simulation comes down at once. */
+export async function openSharedProject(kind: ProjectKind, id: string): Promise<void> {
+  const user = await userId();
+  if (!user) return;
+  setMeta(user, kind, { id });
+  await syncProject(kind, { announce: false });
+}
+
+/** The signed-in account and its project of a kind, kept up to date (null id while none exists yet). */
+export function useCurrentProject(kind: ProjectKind): { user: string | null; id: string | null } {
+  const [state, setState] = useState<{ user: string | null; id: string | null }>({ user: null, id: null });
+  useEffect(() => {
+    let alive = true;
+    const refresh = async () => { const user = await userId(); if (alive) setState({ user, id: user ? metaOf(user, kind)?.id ?? null : null }); };
+    void refresh();
+    metaSubs.add(refresh);
+    const { data } = supabase.auth.onAuthStateChange(() => void refresh());
+    return () => { alive = false; metaSubs.delete(refresh); data.subscription.unsubscribe(); };
+  }, [kind]);
+  return state;
+}
 
 let missing = false;
 const busy = new Set<ProjectKind>();
@@ -36,7 +59,7 @@ async function userId(): Promise<string | null> {
 }
 
 /** Brings one kind in step with the account. */
-export async function syncProject(kind: ProjectKind, opts: { announce?: boolean } = {}): Promise<void> {
+export async function syncProject(kind: ProjectKind, opts: { announce?: boolean; by?: "colleague" } = {}): Promise<void> {
   if (missing || busy.has(kind) || (typeof navigator !== "undefined" && navigator.onLine === false)) return;
   const user = await userId();
   if (!user) return;
@@ -71,7 +94,10 @@ export async function syncProject(kind: ProjectKind, opts: { announce?: boolean 
       const changed = JSON.stringify(row.state) !== JSON.stringify(projectSlice(kind, lab));
       if (row.state && Object.keys(row.state).length) applyProjectState(kind, row.state);
       setMeta(user, kind, { id: row.id, known: row.updated_at, syncedAt: Date.now() });
-      if (changed && opts.announce !== false) toast(kind === "piazza" ? "Piazza aggiornata dal tuo account" : "Vigneto aggiornato dal tuo account", { description: "Hai ritrovato le modifiche fatte su un altro dispositivo." });
+      if (changed && opts.announce !== false) {
+        if (opts.by === "colleague") toast(kind === "piazza" ? "Piazza aggiornata da un collaboratore" : "Vigneto aggiornato da un collaboratore", { id: `mdt-colleague-${kind}`, description: "Vedi le sue modifiche in diretta." });
+        else toast(kind === "piazza" ? "Piazza aggiornata dal tuo account" : "Vigneto aggiornato dal tuo account", { description: "Hai ritrovato le modifiche fatte su un altro dispositivo." });
+      }
     } else if (row && !known) {
       setMeta(user, kind, { id: row.id, known: row.updated_at, syncedAt: Date.now() });
     }
@@ -94,13 +120,22 @@ export function useProjectSync() {
       timers[kind] = window.setTimeout(() => void syncProject(kind), 1000);
     });
     const start = window.setTimeout(() => syncAllProjects(), 1500);
+    // In diretta: a colleague's save to one of this account's projects comes down by itself (RLS: members only).
+    let me: string | null = null;
+    void userId().then((u) => { me = u; });
+    const live = supabase.channel("mdt-projects-live").on("postgres_changes" as never, { event: "UPDATE", schema: "public", table: "projects" } as never, (payload: { new?: { id?: string; kind?: ProjectKind; updated_by?: string } }) => {
+      const row = payload.new;
+      if (!row?.id || !row.kind || !me || row.updated_by === me) return;
+      if (metaOf(me, row.kind)?.id !== row.id) return;
+      void syncProject(row.kind, { announce: true, by: "colleague" });
+    }).subscribe();
     const { data } = supabase.auth.onAuthStateChange((event) => { if (event === "SIGNED_IN") { missing = false; window.setTimeout(() => syncAllProjects(), 800); } });
     const back = () => { if (document.visibilityState === "visible") syncAllProjects(); };
     const online = () => syncAllProjects();
     document.addEventListener("visibilitychange", back);
     window.addEventListener("online", online);
     return () => {
-      offEdit(); window.clearTimeout(start); data.subscription.unsubscribe();
+      offEdit(); window.clearTimeout(start); data.subscription.unsubscribe(); void supabase.removeChannel(live);
       Object.values(timers).forEach((t) => window.clearTimeout(t));
       document.removeEventListener("visibilitychange", back); window.removeEventListener("online", online);
     };

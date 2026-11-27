@@ -2539,3 +2539,20 @@ html[data-slate] .nav-orb-glow {
   .rail-cam { margin-top: auto; padding-top: 0.25rem; }
   .rail-cam .ps-nav-camera { width: 2.75rem !important; height: 2.75rem !important; }
 }
+
+/* Progetti condivisi: the share badge in the header breathes while a colleague has the project open. */
+.share-badge-ring {
+  background: conic-gradient(from var(--pile-angle, 0deg), oklch(0.78 0.13 185 / 0) 0deg, oklch(0.78 0.13 185) 120deg, oklch(0.8 0.16 160) 200deg, oklch(0.78 0.13 185 / 0) 300deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+  animation: share-ring-turn 2.6s linear infinite;
+}
+.share-badge[data-live] { box-shadow: 0 0 0 0 oklch(0.78 0.13 185 / 0.45); animation: share-badge-breath 2.6s ease-in-out infinite; }
+.share-badge-dot, .share-live-icon { animation: share-dot-pulse 1.6s ease-in-out infinite; }
+@keyframes share-ring-turn { to { --pile-angle: 360deg; } }
+@keyframes share-badge-breath { 0%, 100% { box-shadow: 0 0 0 0 oklch(0.78 0.13 185 / 0.35); } 50% { box-shadow: 0 0 14px 3px oklch(0.78 0.13 185 / 0.35); } }
+@keyframes share-dot-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.55; transform: scale(0.82); } }
+@media (prefers-reduced-motion: reduce) {
+  .share-badge-ring, .share-badge[data-live], .share-badge-dot, .share-live-icon { animation: none; }
+  .share-badge-ring { background: oklch(0.78 0.13 185); }
+}

@@ -35,7 +35,7 @@ const SECTORS: Array<{ kind: ProKind; Icon: typeof Building2; name: string; who:
   { kind: "funzionario", Icon: Building2, name: "Settore urbano", who: "Per i funzionari del Comune", opens: "Si apre la piazza: alberi, aiuole e ombra contro il caldo." },
   { kind: "agronomo", Icon: Grape, name: "Settore agricolo", who: "Per chi lavora nel settore agricolo", opens: "Si apre il vigneto: acqua, ombra e frangivento contro la sete delle viti." },
 ];
-const FREE_PATHS = ["/", "/scegli", "/identificazione", "/privacy", "/legale", "/faq", "/chi-siamo", "/contatti", "/piani", "/reset-password", "/admin"];
+const FREE_PATHS = ["/", "/scegli", "/identificazione", "/privacy", "/legale", "/faq", "/chi-siamo", "/contatti", "/piani", "/reset-password", "/admin", "/invito"];
 const shownOn = (path: string) => !FREE_PATHS.some((p) => (p === "/" ? path === "/" : path === p || path.startsWith(`${p}/`)));
 
 export function SectorGate() {

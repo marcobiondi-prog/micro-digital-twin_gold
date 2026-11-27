@@ -31,6 +31,7 @@ import { useSyncHistoryArchive } from "@/models/history-archive";
 import { useSyncSimHidden } from "@/models/sim-hidden";
 import { useRegisterDevice } from "@/lib/account-devices";
 import { useProjectSync } from "@/lib/project-sync";
+import { ShareControl } from "@/views/v10/ShareControl";
 import { useMediaSync } from "@/lib/use-media-sync";
 import { useDstNotice } from "@/lib/dst-notice";
 import { installAppPermissionGuards, usePermissions } from "@/lib/app-permissions";
@@ -560,7 +561,7 @@ function RootComponent() {
         const tutorial = onIndex && (!introSeen() || /[?&](rivedi|scenario)=/.test(window.location.search));
         if (!onIndex || tutorial || Date.now() - start > 3000) {
           // Not before the sector page is up when nobody is identified: the page behind (Benvenuto…) never shows.
-          const free = /^\/(scegli|identificazione|privacy|legale|faq|chi-siamo|contatti|piani|reset-password|admin)(\/|$)/.test(window.location.pathname);
+          const free = /^\/(scegli|identificazione|privacy|legale|faq|chi-siamo|contatti|piani|reset-password|admin|invito)(\/|$)/.test(window.location.pathname);
           const needGate = !onIndex && introSeen() && !free && !getProId() && !isGuest();
           if (needGate && !document.querySelector('[aria-label="Scegli il settore"]') && Date.now() - start < 3000) { setTimeout(check, 40); return; }
           resolve();
@@ -814,6 +815,8 @@ function RootComponent() {
           {/* No logo nor name here: the account sits where the logo was, the theme switch on the right. */}
           <div className="flex min-w-0 items-center"><AccountControl /></div>
           <div className="flex shrink-0 items-center gap-2 md:flex-col lg:flex-row slate-stack">
+            {/* Progetti condivisi: who is in the project and who has it open now (signed-in accounts only). */}
+            <ShareControl />
             {/* "i" shows the tutorial again (only the tutorial: it ends by coming back here). */}
             <button type="button" onClick={() => { if (!isSlate() && window.matchMedia("(min-width: 1024px), (orientation: landscape) and (min-width: 900px) and (min-height: 600px)").matches) window.dispatchEvent(new CustomEvent("mdt-desk-tour")); else void navigate({ to: "/?rivedi=1" as any }); }} aria-label="Come funziona" title="Come funziona"
               className="grid size-9 shrink-0 place-items-center rounded-full border border-foreground/15 bg-foreground/[0.06] text-foreground outline-none transition-colors hover:bg-foreground/[0.12] focus-visible:ring-2 focus-visible:ring-ring sm:size-10">
