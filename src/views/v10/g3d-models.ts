@@ -243,7 +243,7 @@ const deg = (yaw: number) => ((-yaw * 180) / Math.PI + 360) % 360;
  * What to place for a simulation: every object of its layout with its model key, spot and heading, the models built
  * on demand by `ensure`. Trees are the species recognised in that flow (else the realistic oak, three variants).
  */
-export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number }, lite = false): { spots: ModelSpot[]; ensure: (key: string) => Promise<string | null>; merged: () => MergedSpot[] } {
+export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number }, lite = false): { spots: ModelSpot[]; ensure: (key: string) => Promise<string | null>; merged: (heightOf?: (p: { lat: number; lng: number }) => number | undefined) => MergedSpot[] } {
   const kx = 111_320 * Math.cos((origin.lat * Math.PI) / 180);
   const xz = ([lat, lng]: LatLng) => ({ x: (lng - origin.lng) * kx, z: -(lat - origin.lat) * 111_320 });
   const ll = (x: number, z: number) => ({ lat: origin.lat - z / 111_320, lng: origin.lng + x / kx });
@@ -349,7 +349,7 @@ export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number },
   return {
     spots,
     ensure: (key) => modelUrl(key, builders.get(key) ?? (() => null), glows.get(key) ?? 0.15, lite),
-    merged: () => mergeSpots(spots, ll, builders, glows, lite),
+    merged: (heightOf?: (p: { lat: number; lng: number }) => number | undefined) => mergeSpots(spots, ll, builders, glows, lite, heightOf),
   };
 }
 
@@ -361,7 +361,7 @@ export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number },
  */
 const MERGE_CELL_M = 8, MERGE_TILES = 6;
 export type MergedSpot = { id: string; lat: number; lng: number; up: number; ensure: () => Promise<string | null> };
-function mergeSpots(spots: ModelSpot[], ll: (x: number, z: number) => { lat: number; lng: number }, builders: Map<string, () => THREE.Object3D | Promise<THREE.Object3D | null> | null>, glows: Map<string, number>, lite: boolean): MergedSpot[] {
+function mergeSpots(spots: ModelSpot[], ll: (x: number, z: number) => { lat: number; lng: number }, builders: Map<string, () => THREE.Object3D | Promise<THREE.Object3D | null> | null>, glows: Map<string, number>, lite: boolean, heightOf?: (p: { lat: number; lng: number }) => number | undefined): MergedSpot[] {
   // The copies of a kind are cut into tiles like the ground shapes (models/drape tileRing: cells of at least 8 m,
   // growing to keep at most MERGE_TILES per kind), each tile one model at its own ground height, so the groups follow a
   // hilly ground while staying few.
@@ -380,8 +380,11 @@ function mergeSpots(spots: ModelSpot[], ll: (x: number, z: number) => { lat: num
   }
   return [...groups.values()].map(({ key, list }) => {
     const cx = list.reduce((t, p) => t + (p.x ?? 0), 0) / list.length, cz = list.reduce((t, p) => t + (p.z ?? 0), 0) / list.length;
-    const places = list.map((p) => ({ x: (p.x ?? 0) - cx, z: (p.z ?? 0) - cz, yaw: p.yaw ?? 0 }));
-    const sig = places.map((p) => `${p.x.toFixed(2)},${p.z.toFixed(2)},${p.yaw.toFixed(2)}`).join(";");
+    // Each copy raised or lowered by its own ground's height against the group's middle (the ground's heights, when
+    // known), so a group on a slope follows it instead of half sinking into it.
+    const hc = heightOf?.(ll(cx, cz));
+    const places = list.map((p) => { const h = hc === undefined ? undefined : heightOf?.({ lat: p.lat, lng: p.lng }); return { x: (p.x ?? 0) - cx, z: (p.z ?? 0) - cz, yaw: p.yaw ?? 0, y: h === undefined || hc === undefined ? 0 : h - hc }; });
+    const sig = places.map((p) => `${p.x.toFixed(2)},${p.z.toFixed(2)},${p.yaw.toFixed(2)},${p.y.toFixed(1)}`).join(";");
     let h = 0; for (let i = 0; i < sig.length; i++) h = (h * 31 + sig.charCodeAt(i)) | 0;
     const id = `many:${key}:${list.length}:${h}`;
     const build = builders.get(key) ?? (() => null);
@@ -395,7 +398,7 @@ function mergeSpots(spots: ModelSpot[], ll: (x: number, z: number) => { lat: num
         root.userData["prepared"] = true;
         for (const pl of places) {
           const copy = new THREE.Group();
-          copy.position.set(pl.x, 0, pl.z); copy.rotation.y = pl.yaw;
+          copy.position.set(pl.x, pl.y, pl.z); copy.rotation.y = pl.yaw;
           for (const m of flat.children as THREE.Mesh[]) copy.add(new THREE.Mesh(m.geometry, m.material));
           root.add(copy);
         }
