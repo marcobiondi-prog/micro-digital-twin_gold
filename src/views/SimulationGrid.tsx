@@ -97,6 +97,12 @@ function saveGps(on: boolean) { try { localStorage.setItem(GPS_KEY, on ? "on" : 
 /** A place chosen by hand while the GPS is on pauses the following (kept across openings) until "Seguimi di nuovo". */
 const GPS_PAUSE_KEY = "mdt-gps-paused-v1";
 function readGpsPaused() { try { return typeof localStorage !== "undefined" && localStorage.getItem(GPS_PAUSE_KEY) === "1"; } catch { return false; } }
+/**
+ * While an area or a zone is being drawn (or the elements arranged) on the map the GPS holds still: it keeps running but
+ * moves neither the live position nor the place, so the map and the pins stay where one is drawing.
+ */
+let gpsHold = false;
+export function setGpsHold(on: boolean) { gpsHold = on; }
 /** The GPS is on and following the phone (not paused on a place chosen by hand): the map's pin then stands on the fix itself. */
 export function gpsFollowing() { return readGps() && !readGpsPaused(); }
 function saveGpsPaused(on: boolean) { try { if (on) localStorage.setItem(GPS_PAUSE_KEY, "1"); else localStorage.removeItem(GPS_PAUSE_KEY); } catch { /* storage unavailable */ } }
@@ -201,7 +207,7 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
       lastFix.current = here; lastAcc.current = coords.accuracy || 9999; setFixAcc(Math.round(coords.accuracy || 0) || null);
       setLocating(false);
       setError(null); // a fix came: any earlier "not available" is over
-      if (pausedRef.current) return;
+      if (pausedRef.current || gpsHold) return;
 
       const acc = coords.accuracy || 9999, moved = metresBetween(placeRef.current, here);
       // Every fix moves only the live position (the map's pin and camera follow it, nothing is saved, nothing rebuilt),
@@ -215,6 +221,9 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
       appliedAcc.current = acc;
       const updated: SearchedLocation = {
         ...placeRef.current,
+        // A place set from no place yet reads as the position until the reverse lookup names it (it stayed "Nessun
+        // luogo scelto" when the lookup did not answer).
+        ...(placeRef.current.pending ? { label: `La mia posizione (${here.lat.toFixed(5)}, ${here.lng.toFixed(5)})` } : {}),
         lat: here.lat,
         lng: here.lng,
         pending: false,

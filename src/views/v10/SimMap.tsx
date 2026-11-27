@@ -32,7 +32,7 @@ import type { MovedPart } from "@/views/v10/SatelliteMap2D";
 import { drawnAreaFor, freeM2, initialRingAngle, leversForZones, vineLeversForZones, vineLeversOfZones, VINE_ZONE_KINDS, leversOfZones, lotsOf, MAX_PINS, moveZones, pinsM2, rotateZone, surfaceText, usableM2, ZONE_KINDS, ZONE_LABEL, zoneName, zonesOfArea, type DrawnArea, type SubArea, type ZoneKind } from "@/models/drawn-area";
 import type { Ring } from "@/models/place-area";
 import { openSimTab, openSimAt, openSimAtArc, type SimKind } from "@/views/v8/console";
-import { PlaceSearch, gpsFollowing } from "@/views/SimulationGrid";
+import { PlaceSearch, gpsFollowing, setGpsHold } from "@/views/SimulationGrid";
 import { useLivePos } from "@/lib/live-position";
 import { loadRealObjects } from "@/lib/real-objects-client";
 import { circleRing, realCountText, type RealObject } from "@/models/real-objects";
@@ -111,7 +111,9 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   // centre of the nearest mapped square or field, which put it tens of metres away from where one stands).
   // The live fix (lib/live-position) moves the pin and the camera fix by fix, saving nothing.
   const livePos = useLivePos();
-  const following = !liveLoc.pending && !saved && gpsFollowing();
+  // Drawing the area or a zone, or arranging: the GPS holds still (setGpsHold) and the map stops following the phone.
+  const [drawHold, setDrawHold] = useState(false);
+  const following = !liveLoc.pending && !saved && gpsFollowing() && !drawHold;
   const at = following ? [livePos?.lat ?? liveLoc.lat, livePos?.lng ?? liveLoc.lng] as [number, number] : pinFix ?? drawnCentre ?? centre ?? null;
   const pin = at ? { lat: at[0], lng: at[1] } : { lat: loc.lat, lng: loc.lng };
   const movePin = (lat: number, lng: number) => { setPinFix(loc.lat, loc.lng, [lat, lng]); toast.success("Pin spostato", { description: "Resta qui per questo luogo, anche in 3D." }); };
@@ -167,6 +169,13 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   // The simulation inside the saved area: automatic from the levers, plus what was moved by hand (kept with the area).
   const [arranging, setArranging] = useState(false);
   useEffect(() => { if (!saved) setArranging(false); }, [saved]);
+  useEffect(() => {
+    if (preview) return;
+    const hold = drawing || drawingZone || arranging;
+    setDrawHold(hold);
+    setGpsHold(hold);
+    return () => setGpsHold(false);
+  }, [preview, drawing, drawingZone, arranging]);
   const reading = usePiazzaReading(), rSeason = reading?.season, rHour = reading?.hour;
   // The vineyard's clock (its "when" chip): the shade cloths' shadows follow it.
   const vWhen = useSimWhen("vineyard");

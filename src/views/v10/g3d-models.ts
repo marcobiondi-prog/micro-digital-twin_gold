@@ -13,6 +13,7 @@ import { realSprinkler } from "@/views/ar-sprinkler";
 import { realShadeNet } from "@/views/ar-shadenet";
 import { realWindbreak } from "@/views/ar-windbreak";
 import { realVine } from "@/views/ar-vine";
+import { realDrip } from "@/views/ar-drip";
 import { realTree } from "@/views/ar-tree";
 import type { SimLayout } from "@/views/v10/map-area";
 
@@ -191,8 +192,9 @@ export function modelUrl(key: string, build: () => THREE.Object3D | Promise<THRE
 }
 
 const half = (v: number) => Math.max(0.5, Math.round(v * 2) / 2);
-/** The vineyard's rows in Google's 3D: pieces of about 5 m, at most 400 in all. */
-const VINE_PIECE_M = 5, MAX_VINE_PIECES = 400;
+// Pieces of vine row and of pipe, each a model at its own ground height. Fewer vine pieces than before (400 froze the
+// photographic 3D on phones: it would not pan); the pipes in short pieces so a drip line follows a hilly ground.
+const VINE_PIECE_M = 6, MAX_VINE_PIECES = 200, DRIP_PIECE_M = 1.5, MAX_DRIP_PIECES = 320;
 /** The side of the bed tiles (m): small enough to follow a hilly ground, large enough to keep the models few. */
 export const BED_TILE_M = 1;
 const deg = (yaw: number) => ((-yaw * 180) / Math.PI + 360) % 360;
@@ -260,15 +262,34 @@ export function modelSpots(sim: SimLayout, origin: { lat: number; lng: number },
     // in a light version seen from afar; pieces grow longer while there would be more than MAX_VINE_PIECES.
     const rows = vineRowSegments(L.patches.filter((p) => p.kind === "zone").map((p) => p.ring), 160).map(([a, b]) => [xz(a), xz(b)] as const);
     const total = rows.reduce((t, [a, b]) => t + Math.hypot(b.x - a.x, b.z - a.z), 0);
-    const piece = Math.max(VINE_PIECE_M, total / MAX_VINE_PIECES);
+    const piece = Math.max(VINE_PIECE_M, total / (lite ? MAX_VINE_PIECES / 2 : MAX_VINE_PIECES));
     let n = 0;
     for (const [a, b] of rows) {
       const len = Math.hypot(b.x - a.x, b.z - a.z);
       if (len < 1) continue;
-      const k = Math.max(1, Math.round(len / piece)), w = half(len / k), yaw = -Math.atan2(b.z - a.z, b.x - a.x);
+      // Whole metres: few lengths, so few models to build (each build is heavy and held the map still meanwhile).
+      const k = Math.max(1, Math.round(len / piece)), w = Math.max(1, Math.round(len / k)), yaw = -Math.atan2(b.z - a.z, b.x - a.x);
       for (let i = 0; i < k; i++) {
         const t = (i + 0.5) / k, v = n++ % 2;
         add(`vine:${w}:${v}`, a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t, yaw, () => realVine({ h: 1.6, w }, v + 1, { far: true }), 0.12);
+      }
+    }
+    // The irrigation: the drip lines (16 mm, drippers every 50 cm) and the main pipes (32 mm) as real pipes, cut in
+    // short pieces each laid at its own ground height a few centimetres up, so they never run under the soil.
+    const pipes = L.lines.filter((l) => l.kind === "drip" || l.kind === "main").flatMap((l) => {
+      const pts = l.line.map(xz), out: Array<{ a: { x: number; z: number }; b: { x: number; z: number }; main: boolean }> = [];
+      for (let i = 0; i + 1 < pts.length; i++) out.push({ a: pts[i]!, b: pts[i + 1]!, main: l.kind === "main" });
+      return out;
+    });
+    const pipeLen = pipes.reduce((t, { a, b }) => t + Math.hypot(b.x - a.x, b.z - a.z), 0);
+    const pipePiece = Math.max(DRIP_PIECE_M, pipeLen / (lite ? MAX_DRIP_PIECES / 2 : MAX_DRIP_PIECES));
+    for (const { a, b, main } of pipes) {
+      const len = Math.hypot(b.x - a.x, b.z - a.z);
+      if (len < 0.3) continue;
+      const k = Math.max(1, Math.round(len / pipePiece)), w = half(len / k), yaw = -Math.atan2(b.z - a.z, b.x - a.x);
+      for (let i = 0; i < k; i++) {
+        const t = (i + 0.5) / k;
+        add(`pipe:${main ? "main" : "drip"}:${w}`, a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t, yaw, () => realDrip([{ x: -w / 2, z: 0 }, { x: w / 2, z: 0 }], main), 0.12, 0.06);
       }
     }
     for (const l of L.lines) {

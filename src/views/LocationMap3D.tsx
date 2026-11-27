@@ -69,12 +69,12 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
     p.outerCoordinates = ring.map(([pLat, pLng]) => ({ lat: pLat + dLat, lng: pLng + dLng, altitude: h + UP }));
     return p;
   };
-  const absLine = (o: Record<string, unknown>, coords: Array<{ lat: number; lng: number; h: number }>) => {
+  const absLine = (o: Record<string, unknown>, coords: Array<{ lat: number; lng: number; h: number }>, step = DRAPE_STEP) => {
     const pl = new Polyline3DElement!({ ...o, altitudeMode: MODE, drawsOccludedSegments: true }) as Shape;
     pl.style.pointerEvents = "none";
     pl.style.touchAction = "none";
     const vertical = coords.length === 2 && coords[0]!.lat === coords[1]!.lat && coords[0]!.lng === coords[1]!.lng;
-    pl.coordinates = (vertical ? coords : densify(coords, DRAPE_STEP)).map((c) => ({ lat: c.lat + dLat, lng: c.lng + dLng, altitude: c.h + UP }));
+    pl.coordinates = (vertical ? coords : densify(coords, step)).map((c) => ({ lat: c.lat + dLat, lng: c.lng + dLng, altitude: c.h + UP }));
     return pl;
   };
   /** A polygon draped on the ground: tiles for its fill, a densified polyline for its edge; small ones stay whole. */
@@ -214,9 +214,12 @@ function build3DOverlay({ Polygon3DElement, Polyline3DElement }: Maps3D, area: A
         for (const p of sim.data.patches.filter((x) => x.kind === "cloth").flatMap((x) => netParts(x.ring, true))) part(p, p.height, "#0b1220", 2);
         for (const p of sim.data.lines.filter((l) => l.kind === "wind").flatMap((l) => hedgeParts(l.line, l.strength ?? 0))) part(p, p.height, "#1d4a1b", 1);
       }
-      if (Polyline3DElement) for (const l of sim.data.lines.filter((x) => x.kind !== "wind")) {
+      // With the realistic models the drip lines and main pipes are real pipes in short pieces (g3d-models); as lines
+      // they get a point every metre, so on a hilly vineyard they follow the ground and no longer run under it.
+      if (Polyline3DElement) for (const l of sim.data.lines.filter((x) => x.kind !== "wind" && !(models && (x.kind === "drip" || x.kind === "main")))) {
         const style = { strokeColor: l.kind === "drip" ? SIM_COLORS.drip : l.kind === "main" ? SIM_COLORS.main : "#ffffff", strokeWidth: l.kind === "drip" ? 2 : l.kind === "main" ? 5 : 3 };
-        if (flat) { out.push(absLine(style, l.line.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, h: 0.5 })))); continue; }
+        const pipe = l.kind === "drip" || l.kind === "main";
+        if (flat) { out.push(absLine(style, l.line.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, h: pipe ? 0.35 : 0.5 })), pipe ? 1 : DRAPE_STEP)); continue; }
         const pl = meshLine({ ...style, drawsOccludedSegments: true }) as Shape;
         pl.coordinates = l.line.map(([pLat, pLng]) => ({ lat: pLat, lng: pLng, altitude: LIFT }));
         out.push(pl);
