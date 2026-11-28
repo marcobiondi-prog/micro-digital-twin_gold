@@ -626,6 +626,8 @@ export function LocationMap3D({ lat, lng, label, apiKey, area = [], sim = null, 
   return <div data-map-gestures="" className="relative h-full w-full overflow-hidden bg-lab-surface touch-none">
     {/* touch-none + data-map-gestures: drag, pinch and rotate belong to the 3D map, not to the page. */}
     <div ref={host} data-map-gestures="" style={{ filter: "var(--map-light-filter, none)" }} className="absolute inset-0 touch-none transition-[filter] duration-700 motion-reduce:transition-none" aria-label={`Vista 3D di ${label}`} />
+    {/* The hour's light as a veil over the map too (the filter above does not reach Google's 3D on every phone). */}
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 transition-[background-color] duration-700 motion-reduce:transition-none" style={{ backgroundColor: "var(--map-light-veil, transparent)" }} />
     {/* Top-left: Google keeps its map-type thumbnail top-right, compass and fullscreen bottom-right, logo bottom-left. */}
     {state === "ready" && <button type="button" onClick={() => recenter(true)} aria-label="Ricentra la vista 3D sul punto" className="absolute left-2 top-2 grid size-9 place-items-center rounded-full border border-border/60 bg-background/90 text-foreground shadow-sm backdrop-blur"><Crosshair className="size-4" aria-hidden="true" /></button>}
     {/* The drawing's position by hand: Google's ground can lie under the photographed floor (the shapes slide when

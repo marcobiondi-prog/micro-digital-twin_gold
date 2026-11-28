@@ -715,7 +715,11 @@ export function lightFilter(height: number | null | undefined): string {
 /** Hands the 3D maps the light of the simulation's hour (--map-light-filter, applied to the photographic map's canvas). */
 function MapLight({ kind, lat, lng, children }: { kind: SimKind; lat: number; lng: number; children: React.ReactNode }) {
   const light = useDayLight(kind, lat, lng);
-  return <div className="h-full w-full" style={{ ["--map-light-filter" as string]: lightFilter(light?.height) }}>{children}</div>;
+  // Also a see-through veil of the hour's colour (--map-light-veil), laid over the 3D map: on some phones Google's 3D
+  // draws on its own layer and the CSS filter did not reach it, so the night never showed in 3D. Lighter than the 2D
+  // veil, as the filter may darken the map as well.
+  const veil = light?.veil ? light.veil.replace(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/, (_m, r, g, b, a) => `rgba(${r}, ${g}, ${b}, ${(Number(a) * 0.7).toFixed(3)})`) : "transparent";
+  return <div className="h-full w-full" style={{ ["--map-light-filter" as string]: lightFilter(light?.height), ["--map-light-veil" as string]: veil }}>{children}</div>;
 }
 
 /** A see-through veil over the map: none by day, golden at dawn and dusk, blue twilight, dark blue at night. */
