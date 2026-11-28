@@ -135,7 +135,7 @@ function SwipeRow({
 /** `embedded`: inside a page section (Fold) that brings its own title, so no own toggle; the cameras
  * then mount on document.body, since a closed section would hide them with it. */
 /** Tablet in verticale: no drag-and-drop there (asked), only the large Carica / Invia / Elimina tiles. */
-const uprightTablet = () => typeof window !== "undefined" && window.matchMedia("(orientation: portrait) and (min-width: 640px) and (max-width: 1279.98px)").matches;
+const uprightTablet = () => typeof window !== "undefined" && (document.documentElement.hasAttribute("data-slate") || window.matchMedia("(orientation: portrait) and (min-width: 640px) and (max-width: 1279.98px)").matches);
 
 export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | "vineyard"; context?: string; embedded?: boolean }) {
   const [mounted, setMounted] = useState(false);

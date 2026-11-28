@@ -2636,3 +2636,15 @@ html[data-sys-camera] nav {
   html .lab-media-actions .lab-media-action.lab-media-ai, html .lab-media-actions .lab-media-action.lab-media-folder,
   html .lab-media-actions .lab-media-action.lab-media-upload-menu { display: none !important; }
 }
+/* The same in a 2-in-1's tablet mode (html[data-slate], the rail), whatever the window's shape: a Surface held upright
+   in its Windows app window read as landscape, so the portrait rules above did not apply (asked "questa modalità tablet verticale"). */
+html[data-slate] .lab-media-actions { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem !important; width: 100% !important; margin-inline-start: 0 !important; padding: 0 !important; border-radius: 0 !important; background: none !important; border: 0 !important; box-shadow: none !important; }
+html[data-slate] .lab-media-actions .lab-media-action {
+  display: flex !important; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem !important;
+  height: 5.5rem !important; min-height: 5.5rem !important; padding: 0.5rem 1rem !important; border-radius: 9999px !important;
+  font-size: 1.0625rem !important; font-weight: 600;
+}
+html[data-slate] .lab-media-actions .lab-media-action svg { width: 1.75rem !important; height: 1.75rem !important; }
+html[data-slate] .lab-media-dropzone, html[data-slate] .lab-media-empty-tiles,
+html[data-slate] .lab-media-actions .lab-media-action.lab-media-ai, html[data-slate] .lab-media-actions .lab-media-action.lab-media-folder,
+html[data-slate] .lab-media-actions .lab-media-action.lab-media-upload-menu { display: none !important; }
