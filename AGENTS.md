@@ -545,3 +545,7 @@
   - If a chunk of an older version is missing, the page reloads once (sessionStorage mdt-map-reload, 30 s).
   - The error has a Riprova button that builds the map again (`attempt`).
   - `resetGoogleMaps` keeps Google's script when any gmp-map / gmp-map-3d / gmp-advanced-marker element is registered. Reloading the script would fail to define them again, and the 2D Google base broke after the 3D Riprova.
+- Upright tablet media panel (portrait, 640–1279 px; CSS at the end of styles.css):
+  - No drag-and-drop. The dropzone is hidden and LabMedia ignores dropped files (`uprightTablet`).
+  - No AI button, no Cartella, no Carica menu, no empty-panel Galleria/Fotocamera tiles.
+  - Carica, Invia and Elimina are three large tiles in a row: 7 rem tall, icon above the label.

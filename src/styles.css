@@ -2619,3 +2619,20 @@ html[data-sys-camera] nav {
 .pill-face-join { animation: pill-face-join 900ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
 @keyframes pill-face-join { 0% { transform: scale(0.3); box-shadow: 0 0 0 0 rgb(52 211 153 / 0.9); } 60% { transform: scale(1.15); box-shadow: 0 0 0 8px rgb(52 211 153 / 0); } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .pill-face-join { animation: none; } }
+
+/* Tablet in verticale (asked): no drag-and-drop box, no AI button (the rail's camera has it), and Carica, Invia and
+   Elimina as three large tiles side by side. */
+@media (orientation: portrait) and (min-width: 640px) and (max-width: 1279.98px) {
+  .lab-media-actions { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem !important; width: 100% !important; margin-inline-start: 0 !important; padding: 0 !important; border-radius: 0 !important; background: none !important; border: 0 !important; box-shadow: none !important; }
+  .lab-media-actions .lab-media-action, html[data-slate] .lab-media-actions .lab-media-action {
+    display: flex !important; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem !important;
+    height: 7rem !important; min-height: 7rem !important; padding: 0.75rem !important; border-radius: 1.25rem !important;
+    font-size: 1.0625rem !important; font-weight: 600;
+  }
+  .lab-media-actions .lab-media-action svg { width: 2rem !important; height: 2rem !important; }
+  /* After the tiles' own display, so these stay hidden: the drop box, the AI button, Cartella, the Carica menu and the
+     empty panel's Galleria / Fotocamera tiles (Carica covers them). */
+  .lab-media-dropzone, .lab-media-empty-tiles,
+  html .lab-media-actions .lab-media-action.lab-media-ai, html .lab-media-actions .lab-media-action.lab-media-folder,
+  html .lab-media-actions .lab-media-action.lab-media-upload-menu { display: none !important; }
+}

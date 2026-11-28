@@ -134,6 +134,9 @@ function SwipeRow({
 /** Foto e video del sopralluogo come pannello a soffietto: l'intestazione apre e chiude caricamento ed elenco. */
 /** `embedded`: inside a page section (Fold) that brings its own title, so no own toggle; the cameras
  * then mount on document.body, since a closed section would hide them with it. */
+/** Tablet in verticale: no drag-and-drop there (asked), only the large Carica / Invia / Elimina tiles. */
+const uprightTablet = () => typeof window !== "undefined" && window.matchMedia("(orientation: portrait) and (min-width: 640px) and (max-width: 1279.98px)").matches;
+
 export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | "vineyard"; context?: string; embedded?: boolean }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -406,10 +409,10 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
   return (
     <div className="relative"
       // Desktop: photos, videos and whole folders dragged from the computer onto the panel go to the review sheet.
-      onDragOver={(e: React.DragEvent<HTMLDivElement>) => { if (Array.from(e.dataTransfer.types).includes("Files")) { e.preventDefault(); setDragging(true); } }}
+      onDragOver={(e: React.DragEvent<HTMLDivElement>) => { if (Array.from(e.dataTransfer.types).includes("Files") && !uprightTablet()) { e.preventDefault(); setDragging(true); } }}
       onDragLeave={(e: React.DragEvent<HTMLDivElement>) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false); }}
       onDrop={(e: React.DragEvent<HTMLDivElement>) => {
-        if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+        if (!Array.from(e.dataTransfer.types).includes("Files") || uprightTablet()) return;
         e.preventDefault(); setDragging(false);
         void filesFromDrop(e.dataTransfer).then((files) => { if (files.length) review(files); else toast.info("Nessuna foto né video tra i file trascinati"); });
       }}>
@@ -795,7 +798,7 @@ export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | 
           ) : (
             uploads.length === 0 && (
               <div className="mt-3 flex flex-col gap-3">
-                <div className="grid grid-cols-1 gap-2.5 max-sm:hidden sm:grid-cols-2">
+                <div className="lab-media-empty-tiles grid grid-cols-1 gap-2.5 max-sm:hidden sm:grid-cols-2">
                   <button
                     type="button"
                     disabled={busy}
