@@ -23,7 +23,8 @@ import { projectSpots, useColleagues } from "@/lib/colleagues";
 import { sendDrag, useCurrentProject, useLiveEdit, useRemoteDrags, type LiveEdit } from "@/lib/project-sync";
 import { MAP_DRAG_EVENT, type MapDrag } from "@/views/v10/map-area";
 import { focusProjectArea, followGpsAgain, isExploring } from "@/lib/gps-hold";
-import { useLeftProject } from "@/lib/project-rejoin";
+import { leaveSharedProject, useLeftProject } from "@/lib/project-rejoin";
+import { placeOf, projectName } from "@/models/project-state";
 import { initials, useProjectPeople, type Online, type Person } from "@/lib/project-share";
 import { shadeOpenness, piazzaLayout, piazzaShadows, vineShadows, TREE_SHADE_M2, vineLayout, type LayoutEdits, type PiazzaLayout } from "@/models/area-layout";
 import { dayLight, solarHour, sunAt, sunHeightDeg } from "@/models/sun-shadow";
@@ -91,6 +92,19 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
     const t = window.setTimeout(() => setSolo(true), SOLO_AFTER_MS);
     return () => window.clearTimeout(t);
   }, [ownerAway]);
+  // …and is taken out of the project (asked "Deve chiedere"): as with Esci dal progetto, to come back the guest asks in
+  // the share card and the admin accepts or denies.
+  const leftFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (preview || !solo || !project.id || leftFor.current === project.id) return;
+    leftFor.current = project.id;
+    const pk = kind === "urban" ? "piazza" : "vigneto";
+    const owner = share.people.find((p) => p.role === "owner");
+    const ownerName = (owner?.name || owner?.email || "l’admin").split(/\s+|@/)[0]!;
+    void leaveSharedProject(pk, project.id, { name: projectName(placeOf(pk, lab).label), owner: ownerName })
+      .then(() => toast(`${ownerName} si è disconnesso`, { id: "mdt-owner-left", description: "Sei uscito dal progetto e il GPS ti segue. Per rientrare tocca «Chiedi di rientrare» nella scheda di condivisione." }))
+      .catch(() => { leftFor.current = null; });
+  }, [solo, preview, project.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [, setGpsTick] = useState(0);
   useEffect(() => {
     if (preview || !myRole || myRole === "owner") return;
