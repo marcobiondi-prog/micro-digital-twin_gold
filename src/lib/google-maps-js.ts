@@ -12,12 +12,17 @@ const rejectedSubs = new Set<() => void>();
 if (typeof window !== "undefined") {
   (window as typeof window & { gm_authFailure?: () => void }).gm_authFailure = () => { keyRejected = true; rejectedSubs.forEach((f) => f()); };
   // The API says why only in the console: keep the error's name so the 3D notice can show it.
-  const error = console.error.bind(console);
-  console.error = (...args: unknown[]) => {
-    const m = typeof args[0] === "string" ? /Google Maps JavaScript API (?:error|warning): (\w+)/.exec(args[0]) : null;
-    if (m?.[1] && !keyError) { keyError = m[1]; rejectedSubs.forEach((f) => f()); }
-    error(...args);
-  };
+  // Read from console.error and console.warn, whichever argument carries it.
+  for (const level of ["error", "warn"] as const) {
+    const original = console[level].bind(console);
+    console[level] = (...args: unknown[]) => {
+      if (!keyError) for (const a of args) {
+        const m = /Google Maps JavaScript API (?:error|warning): (\w+)/.exec(typeof a === "string" ? a : a instanceof Error ? a.message : "");
+        if (m?.[1] && /MapError$/.test(m[1])) { keyError = m[1]; rejectedSubs.forEach((f) => f()); break; }
+      }
+      original(...args);
+    };
+  }
 }
 export const isKeyRejected = () => keyRejected;
 export const keyRejectedReason = () => keyError;
@@ -35,4 +40,22 @@ export function loadGoogleMaps(key: string): Promise<GoogleNs> {
     document.head.appendChild(script);
   }).catch((error) => { loader = undefined; throw error; });
   return loader;
+}
+
+/**
+ * Riprova on a refused key: only the map is asked again, not the page. Google's script is taken away (its tag and the
+ * window.google it left) and the refusal forgotten, so the next loadGoogleMaps loads it afresh and asks Google again.
+ */
+export function resetGoogleMaps(): void {
+  if (typeof window === "undefined") return;
+  // Once Google's map elements are registered they cannot be registered again: the script stays and only a new map is
+  // built (it asks Google for its tiles afresh). Otherwise the script is loaded again from scratch.
+  if (!customElements.get("gmp-map-3d")) {
+    loader = undefined;
+    document.querySelectorAll('script[src^="https://maps.googleapis.com/maps/api/js"]').forEach((el) => el.remove());
+    const w = window as typeof window & { google?: unknown };
+    try { delete w.google; } catch { w.google = undefined; }
+  }
+  keyRejected = false; keyError = "";
+  rejectedSubs.forEach((f) => f());
 }

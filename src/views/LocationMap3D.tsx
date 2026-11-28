@@ -1,4 +1,4 @@
-import { isKeyRejected, keyRejectedReason, loadGoogleMaps, onKeyRejected } from "@/lib/google-maps-js";
+import { isKeyRejected, keyRejectedReason, loadGoogleMaps, onKeyRejected, resetGoogleMaps } from "@/lib/google-maps-js";
 import { useModels3D } from "@/lib/use-ios-3d";
 import { firstName, personInitials, spotsKey, type ColleagueSpot } from "@/lib/colleagues";
 import { densify, tileRing } from "@/models/drape";
@@ -616,8 +616,8 @@ export function LocationMap3D({ lat, lng, label, apiKey, area = [], sim = null, 
         <p className="text-sm font-semibold">Vista 3D fotografica non disponibile ora</p>
         <p className="max-w-xs text-xs text-muted-foreground">{rejected ? `Google non ha accettato la richiesta della mappa 3D${reason ? `: ${REASON[reason] ?? reason}` : ". Riprova o usa la 2D."}` : "La mappa 3D non si è caricata: può dipendere dalla rete o dal limite giornaliero delle mappe."}</p>
         {rejected && reason && <p className="font-mono text-[10px] text-muted-foreground/70">{reason}</p>}
-        {/* A refused key cannot be asked again in the same page (Google loads once): Riprova reloads it. */}
-        <button type="button" onClick={() => { if (rejected) { window.location.reload(); return; } setState("loading"); setAttempt((n) => n + 1); }} className="rounded-full bg-foreground px-4 py-2 text-xs font-semibold text-background">Riprova</button>
+        {/* Riprova renews only the map: after a refusal Google's script is loaded again (resetGoogleMaps), the page stays. */}
+        <button type="button" onClick={() => { if (rejected) resetGoogleMaps(); setState("loading"); setAttempt((n) => n + 1); }} className="rounded-full bg-foreground px-4 py-2 text-xs font-semibold text-background">Riprova</button>
       </div>
     </div>
   );
