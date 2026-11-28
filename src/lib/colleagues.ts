@@ -25,22 +25,21 @@ export const personInitials = initials;
 export const spotsKey = (s: ColleagueSpot[]) => s.map((p) => `${p.id}:${p.lat.toFixed(6)},${p.lng.toFixed(6)}`).join("|");
 
 /**
- * The people of a shared project who are not on the map by their GPS (connected with the GPS off, or not connected now),
- * so that every account of the project shows on the 2D and 3D maps: gathered round the area's middle, a few metres
- * apart, named with why they stand there. Their id carries the note, so a person turning the GPS on moves to their spot.
+ * The people of a shared project connected now but not on the map by their GPS (GPS off): gathered round the area's
+ * middle, a few metres apart, "senza GPS". Members not connected are not on the maps at all. Their id carries the note, so a person turning the GPS on moves to their spot.
  */
 export function projectSpots(people: Array<{ user_id: string; name: string; email: string; avatar: string | null }>, online: Online[], onMap: ColleagueSpot[], me: string | null, at: { lat: number; lng: number }): ColleagueSpot[] {
   const placed = new Set(onMap.map((p) => p.id));
-  const rest = people.filter((p) => p.user_id !== me && !placed.has(p.user_id));
+  // Only who is connected now shows on the maps (asked): a member not connected is not drawn at all.
+  const rest = people.filter((p) => p.user_id !== me && !placed.has(p.user_id) && online.some((o) => o.user_id === p.user_id));
   const M = 111320, r = 9;
   return rest.map((p, i) => {
     const a = (i / Math.max(1, rest.length)) * Math.PI * 2 - Math.PI / 2;
-    const on = online.some((o) => o.user_id === p.user_id);
-    const note = on ? "senza GPS" : "non connesso";
+    const note = "senza GPS";
     return {
       id: `${p.user_id}|${note}`, name: p.name || p.email.split("@")[0] || "Collaboratore", avatar: p.avatar,
       lat: at.lat + (Math.sin(a) * r) / M, lng: at.lng + (Math.cos(a) * r) / (M * Math.cos((at.lat * Math.PI) / 180)),
-      note, away: !on,
+      note, away: false,
     };
   });
 }
