@@ -101,6 +101,8 @@ export function usePresence(projectId: string | null, me: { id: string; name: st
   const [round, setRound] = useState(0);
   // When this device's live channel dropped, and for which project (the reconnection sound plays once, for that project).
   const dropSince = useRef<{ project: string; at: number } | null>(null);
+  // The project whose channel has been live at least once since this page opened.
+  const wasLive = useRef<string | null>(null);
   useEffect(() => {
     // Out of the project (left, removed, signed out): a drop before it is forgotten, so nothing rings later.
     if (!projectId || !meId) { dropSince.current = null; setOnline([]); publish(null, []); return; }
@@ -135,13 +137,18 @@ export function usePresence(projectId: string | null, me: { id: string; name: st
         ready.current = true; sent.current = ""; send();
         // The only sound: my own connection back to the same project after a real drop (more than 5 s away), once.
         const lost = dropSince.current;
-        if (lost && lost.project === projectId && Date.now() - lost.at > 5_000) playReconnect();
+        if (lost && lost.project === projectId && Date.now() - lost.at > 5_000 && Date.now() - enteredAt > ENTRY_QUIET_MS) playReconnect();
+        wasLive.current = projectId;
         dropSince.current = null;
         dropped = false;
         return;
       }
       if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-        ready.current = false; if (!dropped) dropSince.current ??= { project: projectId, at: Date.now() }; dropped = true;
+        // A drop counts only for a channel that was live, with the app in front: the first join failing on opening, or
+        // the phone closing the connection while the app was in the background, is not a lost connection.
+        ready.current = false;
+        if (!dropped && wasLive.current === projectId && document.visibilityState === "visible") dropSince.current ??= { project: projectId, at: Date.now() };
+        dropped = true;
         if (!retry) retry = setTimeout(() => setRound((n) => n + 1), 15000);
       }
     });
@@ -155,6 +162,10 @@ export function usePresence(projectId: string | null, me: { id: string; name: st
 }
 
 const TRACK_GAP_MS = 12000;
+/** Entering the app (opening it, or coming back to it) never rings: the reconnection sound stays quiet this long after. */
+const ENTRY_QUIET_MS = 15_000;
+let enteredAt = Date.now();
+if (typeof document !== "undefined") document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") enteredAt = Date.now(); });
 /** When each colleague was last seen connected (for the arrival notice). */
 const lastSeenAt = new Map<string, number>();
 

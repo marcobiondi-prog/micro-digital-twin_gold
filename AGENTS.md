@@ -565,3 +565,7 @@
   - The error notice has a dark backdrop over the Google imagery and shows the error's own message in small text, so a user's screenshot tells what failed.
 - 2D map "Cannot read properties of undefined (reading 'then')": Google's MaxZoomService.getMaxZoomAtLatLng returns nothing in some API builds (it answers via callback). SatelliteMap2D now passes a callback, uses the promise only if one comes back, and wraps the call in try. Before, it broke the whole 2D map after Google loaded.
 - Day/night in Google 3D: on top of the CSS filter (`--map-light-filter`, which on some phones does not reach Google's 3D drawn on its own layer), LocationMap3D lays a see-through veil of the hour's colour (`--map-light-veil` from MapLight, 70 % of the 2D veil's alpha) over the map and under its buttons.
+- The reconnection sound is quiet on entering the app:
+  - A drop counts only if the project's channel had been live on this page (`wasLive`) and the app was in front.
+  - The sound never plays within ENTRY_QUIET_MS (15 s) of opening the app or coming back to it (visibilitychange).
+  - Before this, a first join failing on opening, or the background closing the socket, made it ring on entry.
