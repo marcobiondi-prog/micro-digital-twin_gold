@@ -563,3 +563,4 @@
 - 2D map error diagnostics:
   - `remove` is set right after the maplibre map is created, so a map whose setup throws later is still removed (it used to leak its WebGL context).
   - The error notice has a dark backdrop over the Google imagery and shows the error's own message in small text, so a user's screenshot tells what failed.
+- 2D map "Cannot read properties of undefined (reading 'then')": Google's MaxZoomService.getMaxZoomAtLatLng returns nothing in some API builds (it answers via callback). SatelliteMap2D now passes a callback, uses the promise only if one comes back, and wraps the call in try. Before, it broke the whole 2D map after Google loaded.

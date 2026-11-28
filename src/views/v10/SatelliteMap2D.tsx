@@ -41,7 +41,7 @@ const STYLE: StyleSpecification = {
 type Camera = { center: [number, number]; zoom: number; bearing: number };
 type GMap = { moveCamera: (c: { center?: { lat: number; lng: number }; zoom?: number }) => void; addListener?: (event: string, f: () => void) => unknown };
 /** Google's service saying how close its satellite photos go at a spot (often 19–20 outside town centres). */
-type MaxZoom = { getMaxZoomAtLatLng: (at: { lat: number; lng: number }) => Promise<{ zoom?: number }> };
+type MaxZoom = { getMaxZoomAtLatLng: (at: { lat: number; lng: number }, done?: (r: { zoom?: number; status?: string }) => void) => Promise<{ zoom?: number }> | undefined };
 /** Until the service answers: a closeness Google has nearly everywhere, so the map never opens on its grey "no imagery" tiles. */
 const GOOGLE_SAFE = 19;
 
@@ -149,7 +149,15 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
         const el = under.current!;
         let cap = GOOGLE_SAFE;
         const Svc = gmaps?.MaxZoomService;
-        if (Svc) void new Svc().getMaxZoomAtLatLng({ lat, lng }).then((r) => { if (r.zoom && !cancelled) { cap = Math.min(GOOGLE_MAX, r.zoom); follow(); } }, () => undefined);
+        // Some builds of Google's API answer only through the callback and return nothing (".then" of undefined broke the
+        // whole 2D map); the answer is taken from either, once, and a failure just keeps the safe cap.
+        const capAt = (r?: { zoom?: number } | null) => { if (r?.zoom && !cancelled) { cap = Math.min(GOOGLE_MAX, r.zoom); follow(); } };
+        if (Svc) {
+          try {
+            const answer = new Svc().getMaxZoomAtLatLng({ lat, lng }, capAt);
+            if (answer && typeof answer.then === "function") answer.then(capAt, () => undefined);
+          } catch { /* the safe cap stays */ }
+        }
         const follow = () => {
           const c = map.getCenter(), z = map.getZoom() + 1, gz = Math.min(z, cap);
           base.moveCamera({ center: { lat: c.lat, lng: c.lng }, zoom: gz });
