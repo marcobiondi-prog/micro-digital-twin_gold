@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { playDrop } from "@/lib/ui-sounds";
+import { playReconnect } from "@/lib/ui-sounds";
 import type { ProjectKind } from "@/models/project-state";
 
 /**
@@ -113,12 +113,10 @@ export function usePresence(projectId: string | null, me: { id: string; name: st
       // Dev only: the screenshot scripts add colleagues here (window.__mdtPresence), as Realtime cannot be mocked there.
       const fake = import.meta.env.DEV && typeof window !== "undefined" ? ((window as unknown as { __mdtPresence?: Online[] }).__mdtPresence ?? []) : [];
       const all = [...list, ...fake.filter((f) => !list.some((l) => l.user_id === f.user_id))];
-      // A colleague comes (back) in, or this device is back in after a drop: a water drop sound.
-      // Only someone really arriving (not seen in the last 3 minutes): a flapping connection is not an arrival.
+      // Only someone really arriving (not seen in the last 3 minutes) gets a notice, without sound: a flapping connection is not an arrival.
       const now = Date.now();
       const arrived = seen ? all.filter((o) => o.user_id !== meId && !seen!.has(o.user_id) && now - (lastSeenAt.get(o.user_id) ?? 0) > 180_000) : [];
       for (const o of all) lastSeenAt.set(o.user_id, now);
-      if (arrived.length) playDrop();
       for (const o of arrived) toast(`${o.name || "Un collaboratore"} è entrato nel progetto`, { id: `mdt-join-${o.user_id}`, description: `In diretta ${o.where || "nell’app"}.` });
       seen = new Set(all.map((o) => o.user_id));
       setOnline(all);
@@ -128,8 +126,8 @@ export function usePresence(projectId: string | null, me: { id: string; name: st
     ch.on("presence", { event: "sync" }, read).subscribe((status) => {
       if (status === "SUBSCRIBED") {
         ready.current = true; sent.current = ""; send();
-        // Back in after a real drop (more than 20 s away), once.
-        if ((round > 0 || dropped) && Date.now() - droppedAt > 20_000) playDrop();
+        // The only sound: my own connection back after a real drop (more than 5 s away).
+        if ((round > 0 || dropped) && Date.now() - droppedAt > 5_000) playReconnect();
         dropped = false;
         return;
       }
@@ -148,7 +146,7 @@ export function usePresence(projectId: string | null, me: { id: string; name: st
 }
 
 const TRACK_GAP_MS = 12000;
-/** When each colleague was last seen connected (for the arrival sound and notice). */
+/** When each colleague was last seen connected (for the arrival notice). */
 const lastSeenAt = new Map<string, number>();
 
 export const initials = (name: string) => name.split(/\s+|@/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "?";

@@ -2,7 +2,6 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { forgetProject, openSharedProject } from "@/lib/project-sync";
-import { playDrop } from "@/lib/ui-sounds";
 import type { ProjectKind } from "@/models/project-state";
 
 /**
@@ -79,7 +78,6 @@ export async function cancelRejoin(kind: ProjectKind): Promise<void> {
 async function comeBack(user: string, kind: ProjectKind, left: LeftProject) {
   setLeft(user, kind, null);
   await openSharedProject(kind, left.id);
-  playDrop();
   toast.success(`Sei di nuovo nel progetto di ${left.owner}`, { id: `mdt-rejoined-${left.id}`, description: `${left.name}: ${left.owner} ha accettato la tua richiesta.` });
 }
 
@@ -87,7 +85,7 @@ type Req = { id: string; project_id: string; user_id: string; name: string; emai
 
 /**
  * Mounted once (ShareControl): the requester waits for the answer (realtime, and every 15 s), the owner sees each new
- * request as a lasting notice with Accetta / Nega and a drop sound.
+ * request as a lasting notice with Accetta / Nega (no sound: that is kept for one's own reconnection).
  */
 export function useRejoinRequests(user: string | null) {
   useEffect(() => {
@@ -116,7 +114,6 @@ export function useRejoinRequests(user: string | null) {
         if (r.status !== "pending" && shown.has(r.id)) { shown.delete(r.id); if (r.status === "cancelled") toast.dismiss(`mdt-join-${r.id}`); continue; }
         if (r.status !== "pending" || r.user_id === user || shown.has(r.id)) continue;
         shown.add(r.id);
-        playDrop();
         const who = r.name || r.email || "Un collaboratore";
         const answer = async (accept: boolean) => {
           const { error } = await db().rpc("answer_join_request", { req: r.id, accept });

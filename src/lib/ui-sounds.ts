@@ -173,29 +173,34 @@ export function installUiClicks(): () => void {
  * A water drop (synthesized, no file): a short sine falling quickly in pitch with a soft second "plip", for a shared
  * project coming back in real time (lib/project-share). Never blocks: without audio it does nothing.
  */
-let lastDropAt = 0;
-/** At most one drop a minute (DROP_GAP_MS): a channel rejoining or a colleague's connection flapping played it on and on. */
-const DROP_GAP_MS = 60_000;
-export function playDrop(volume = 0.5): void {
-  if (Date.now() - lastDropAt < DROP_GAP_MS) return;
-  lastDropAt = Date.now();
+let lastReconnectAt = 0;
+/** Never twice within RECONNECT_GAP_MS: a connection going up and down must not ring on and on. */
+const RECONNECT_GAP_MS = 30_000;
+/**
+ * Connection back (the shared project's live channel joined again after a real drop): two soft bell notes rising a fifth
+ * (E5 then B5), each a sine with a quiet octave overtone and a slow fade. Played only for one's own reconnection.
+ */
+export function playReconnect(volume = 0.4): void {
+  if (Date.now() - lastReconnectAt < RECONNECT_GAP_MS) return;
+  lastReconnectAt = Date.now();
   try {
     const ctx = audioContext();
     if (!ctx) return;
     if (ctx.state === "suspended") void ctx.resume();
-    const t = ctx.currentTime + 0.01;
-    const blip = (at: number, from: number, to: number, gain: number, len: number) => {
-      const o = ctx.createOscillator(), g = ctx.createGain();
-      o.type = "sine";
-      o.frequency.setValueAtTime(from, at);
-      o.frequency.exponentialRampToValueAtTime(to, at + len * 0.6);
-      g.gain.setValueAtTime(0.0001, at);
-      g.gain.exponentialRampToValueAtTime(gain * volume, at + 0.006);
-      g.gain.exponentialRampToValueAtTime(0.0001, at + len);
-      o.connect(g).connect(ctx.destination);
-      o.start(at); o.stop(at + len + 0.02);
+    const t = ctx.currentTime + 0.02;
+    const bell = (at: number, freq: number, gain: number, len: number) => {
+      for (const [mult, part] of [[1, 1], [2, 0.18]] as const) {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = "sine";
+        o.frequency.setValueAtTime(freq * mult, at);
+        g.gain.setValueAtTime(0.0001, at);
+        g.gain.exponentialRampToValueAtTime(gain * part * volume, at + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, at + len * (mult === 1 ? 1 : 0.5));
+        o.connect(g).connect(ctx.destination);
+        o.start(at); o.stop(at + len + 0.05);
+      }
     };
-    blip(t, 1500, 520, 0.9, 0.16);
-    blip(t + 0.09, 1900, 900, 0.35, 0.1);
+    bell(t, 659.25, 0.7, 0.45);
+    bell(t + 0.13, 987.77, 0.6, 0.6);
   } catch { /* no audio */ }
 }
