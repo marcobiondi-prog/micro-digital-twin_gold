@@ -2648,3 +2648,24 @@ html[data-slate] .lab-media-actions .lab-media-action svg { width: 1.5rem !impor
 html[data-slate] .lab-media-dropzone, html[data-slate] .lab-media-empty-tiles,
 html[data-slate] .lab-media-actions .lab-media-action.lab-media-ai, html[data-slate] .lab-media-actions .lab-media-action.lab-media-folder,
 html[data-slate] .lab-media-actions .lab-media-action.lab-media-upload-menu { display: none !important; }
+
+/* Tablet rail on a low screen (Surface Pro in tablet mode, about 860 px of height under Windows' taskbar): the foot of
+   the rail (account, share badge, "i", theme) was cut at the bottom. Smaller foot buttons, tighter gaps, a margin at the
+   bottom and a smaller camera, so the whole rail fits. */
+@media (min-width: 768px) and (max-width: 1023.98px) and (max-height: 1000px) {
+  .slate-stack { gap: 0.375rem !important; }
+  .slate-head > div { padding-top: 0.375rem !important; padding-bottom: calc(0.75rem + env(safe-area-inset-bottom)) !important; }
+  .slate-head button, .slate-head [role="button"] { width: 2.5rem !important; height: 2.5rem !important; }
+  .slate-head button img, .slate-head button > span { max-width: 2.5rem; max-height: 2.5rem; }
+  .rail-logo { margin-bottom: 0.5rem !important; }
+  .rail-cam [class~="ps-nav-camera"] { width: 3.25rem !important; height: 3.25rem !important; }
+}
+@media (min-width: 1024px) and (max-height: 1000px) {
+  html[data-slate] .slate-stack { gap: 0.375rem !important; }
+  /* Windows' taskbar in tablet mode can lie over the window's last pixels: a wider margin under the theme button. */
+  html[data-slate] .slate-head > div { padding-top: 0.375rem !important; padding-bottom: calc(2rem + env(safe-area-inset-bottom)) !important; }
+  html[data-slate] .slate-head button, html[data-slate] .slate-head [role="button"] { width: 2.5rem !important; height: 2.5rem !important; }
+  html[data-slate] .slate-head button img, html[data-slate] .slate-head button > span { max-width: 2.5rem; max-height: 2.5rem; }
+  html[data-slate] .rail-logo { margin-bottom: 0.5rem !important; }
+  html[data-slate] .rail-cam [class~="ps-nav-camera"] { width: 3.25rem !important; height: 3.25rem !important; }
+}
