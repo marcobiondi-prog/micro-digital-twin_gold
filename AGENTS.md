@@ -548,5 +548,5 @@
 - Upright tablet media panel (portrait, 640–1279 px; CSS at the end of styles.css):
   - No drag-and-drop. The dropzone is hidden and LabMedia ignores dropped files (`uprightTablet`).
   - No AI button, no Cartella, no Carica menu, no empty-panel Galleria/Fotocamera tiles.
-  - Carica, Invia and Elimina are three large pills in a row: 5.5 rem tall, fully rounded, icon above the label (asked back after trying it beside).
+  - Carica, Invia and Elimina are three large pills in a row: 4 rem tall, fully rounded, icon beside the label (final choice after trying it above).
 - The upright-tablet media panel rules (pills, no dropzone/AI/Cartella) also apply in a 2-in-1's tablet mode (`html[data-slate]`, Surface Pro), whatever the window's shape. The Surface's Windows app window read as landscape, so the portrait-only rules did not apply. `uprightTablet()` in LabMedia also checks data-slate.
