@@ -54,7 +54,7 @@ export function resetGoogleMaps(): void {
     loader = undefined;
     document.querySelectorAll('script[src^="https://maps.googleapis.com/maps/api/js"]').forEach((el) => el.remove());
     const w = window as typeof window & { google?: unknown };
-    try { delete w.google; } catch { w.google = undefined; }
+    try { delete w.google; } catch { /* not deletable: the new script replaces it */ }
   }
   keyRejected = false; keyError = "";
   rejectedSubs.forEach((f) => f());
