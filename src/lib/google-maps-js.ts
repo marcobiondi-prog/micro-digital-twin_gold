@@ -48,9 +48,9 @@ export function loadGoogleMaps(key: string): Promise<GoogleNs> {
  */
 export function resetGoogleMaps(): void {
   if (typeof window === "undefined") return;
-  // Once Google's map elements are registered they cannot be registered again: the script stays and only a new map is
+  // Once Google's map elements are registered (by the 2D map's library or the 3D one) they cannot be registered again: the script stays and only a new map is
   // built (it asks Google for its tiles afresh). Otherwise the script is loaded again from scratch.
-  if (!customElements.get("gmp-map-3d")) {
+  if (!["gmp-map", "gmp-map-3d", "gmp-advanced-marker"].some((n) => customElements.get(n))) {
     loader = undefined;
     document.querySelectorAll('script[src^="https://maps.googleapis.com/maps/api/js"]').forEach((el) => el.remove());
     const w = window as typeof window & { google?: unknown };

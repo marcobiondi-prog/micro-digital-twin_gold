@@ -89,6 +89,8 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
   const paintTrails = () => { const map = mapRef.current; if (map?.getSource("drag-trails")) setTrails(map, [...(myTrail.current ? [myTrail.current] : []), ...otherTrails.current]); };
   const trailOf = (path: Array<[number, number]> | null) => { myTrail.current = path ? [...path] : null; paintTrails(); };
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  // Riprova on the error: the map built again.
+  const [attempt, setAttempt] = useState(0);
   const [googleOn, setGoogleOn] = useState(false);
   // The map turned away from north (Google's own credits are then outside the box: said in a corner instead).
   const [turnedOn, setTurnedOn] = useState(false);
@@ -119,10 +121,14 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
           : { width: "100%", height: "100%", left: "0px", top: "0px" });
       };
       sizeUnder();
-      const base = gmaps && under.current ? new gmaps.Map(under.current, {
-        center: { lat, lng }, zoom: Math.min(zoom + 1, GOOGLE_SAFE), mapTypeId: "hybrid", disableDefaultUI: true, gestureHandling: "none", keyboardShortcuts: false,
-        clickableIcons: false, isFractionalZoomEnabled: true, tilt: 0, backgroundColor: "#1d2129",
-      }) : null;
+      // Google's base failing to build is no reason for no map: the open imagery stays under the drawing.
+      let base: GMap | null = null;
+      try {
+        base = gmaps && under.current ? new gmaps.Map(under.current, {
+          center: { lat, lng }, zoom: Math.min(zoom + 1, GOOGLE_SAFE), mapTypeId: "hybrid", disableDefaultUI: true, gestureHandling: "none", keyboardShortcuts: false,
+          clickableIcons: false, isFractionalZoomEnabled: true, tilt: 0, backgroundColor: "#1d2129",
+        }) : null;
+      } catch (error) { console.warn("Google base map not built", error); base = null; }
       setGoogleOn(!!base);
       const map = new maplibregl.Map({ container: host.current, style: STYLE, locale: MAP_LOCALE, ...camera, maxZoom: base ? 23 : 22, pitchWithRotate: false, cooperativeGestures: false, attributionControl: false });
       map.touchPitch.disable();
@@ -194,10 +200,17 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
         (w.__mdtMaps ??= []).push(map);
       }
       remove = () => { offKey?.(); map.remove(); };
-    }).catch(() => { if (!cancelled) setState("error"); });
+    }).catch((error: unknown) => {
+      console.error("2D map failed", error);
+      // Files of an older version (the app was updated while open): the page reloads once with the new ones.
+      if (/dynamically imported module|Importing a module script failed/i.test(String((error as Error)?.message ?? error))) {
+        try { if (Date.now() - Number(sessionStorage.getItem("mdt-map-reload") ?? 0) > 30_000) { sessionStorage.setItem("mdt-map-reload", String(Date.now())); window.location.reload(); return; } } catch { /* no storage */ }
+      }
+      if (!cancelled) setState("error");
+    });
     return () => { cancelled = true; mapRef.current = null; placePin.current = null; pins.current = []; handles.current = []; remove?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zoom, label]);
+  }, [zoom, label, attempt]);
   // The pin follows its place (the square's centre arriving, a pin moved by hand) without rebuilding the map; the map
   // centres on it unless the hand just put it there.
   useEffect(() => {
@@ -362,7 +375,7 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
       {/* Google's tiles carry its name on the map, as in the 3D view; turned, its corners leave the box, so it is said here. */}
       {googleOn && turnedOn && <span className="pointer-events-none absolute bottom-1 left-2 text-[10px] font-medium text-white/85 [text-shadow:0_1px_2px_rgba(0,0,0,0.8)]">Google · Immagini e dati mappa</span>}
       {state === "loading" && <div className="pointer-events-none absolute inset-0 grid place-items-center text-muted-foreground"><LoaderCircle className="size-5 animate-spin" aria-label="Caricamento mappa" /></div>}
-      {state === "error" && <p role="status" className="absolute inset-0 grid place-items-center px-4 text-center text-sm text-muted-foreground">Mappa non disponibile in questo momento.</p>}
+      {state === "error" && <div role="status" className="absolute inset-0 grid place-content-center justify-items-center gap-3 px-4 text-center text-sm text-muted-foreground"><p>Mappa non disponibile in questo momento.</p><button type="button" onClick={() => setAttempt((n) => n + 1)} className="rounded-full bg-foreground px-4 py-2 text-xs font-semibold text-background">Riprova</button></div>}
     </div>
   );
 }

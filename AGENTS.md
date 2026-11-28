@@ -539,3 +539,9 @@
 - Maps show only people connected now. `projectSpots` (lib/colleagues.ts) no longer draws members who are not connected ("non connesso" at the area's middle). Connected people without GPS still stand round the area's middle ("senza GPS"). GPS spots come from live presence only. The share panel still lists offline people, dimmed.
 - Sprinkler animation (Google 3D in LocationMap3D, 2D `animateSprinklers` in map-area.ts) runs also with prefers-reduced-motion. Phones in battery saving turn that setting on, which made the sprinklers stand still, and the animation was asked for.
 - Tablet rail (TabletRail in __root.tsx): the bottom padding follows the real height of the fixed header at its foot (`--rail-foot`, set by a ResizeObserver on #app-header). It used to be a fixed pb-48, so the share badge (signed in) pushed the account over the AI camera on an upright tablet. The open page's rail item no longer has the pill background (no halo; the turning ring stays). The AI camera circle (.ps-nav-camera and its ::after) has a stronger blue glow.
+- 2D map "Mappa non disponibile" hardening (SatelliteMap2D):
+  - If Google's base map cannot be built, the open imagery is used instead of an error.
+  - The real error is logged.
+  - If a chunk of an older version is missing, the page reloads once (sessionStorage mdt-map-reload, 30 s).
+  - The error has a Riprova button that builds the map again (`attempt`).
+  - `resetGoogleMaps` keeps Google's script when any gmp-map / gmp-map-3d / gmp-advanced-marker element is registered. Reloading the script would fail to define them again, and the 2D Google base broke after the 3D Riprova.
