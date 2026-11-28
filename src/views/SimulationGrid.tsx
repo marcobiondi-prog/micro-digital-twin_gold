@@ -223,7 +223,7 @@ function LocationSearch({ initial, onSelect, bare = false, previous = null, keep
     const id = navigator.geolocation.watchPosition(async ({ coords }) => {
       const here = { lat: coords.latitude, lng: coords.longitude };
       // The first fix of each switch-on is said once: the GPS is on and following.
-      if (!lastFix.current) toast.success("GPS attivo", { description: pausedRef.current ? "Hai scelto tu la zona: il GPS resta acceso ma non la sposta." : "La mappa ti segue passo passo in tempo reale.", id: "gps-state" });
+      if (!lastFix.current) toast.success("GPS attivo", { description: pausedRef.current && sharedRef.current ? "Progetto condiviso: la mappa resta sull’area del progetto, gli altri vedono dove sei." : pausedRef.current ? "Hai scelto tu la zona: il GPS resta acceso ma non la sposta." : "La mappa ti segue passo passo in tempo reale.", id: "gps-state" });
       lastFix.current = here; lastAcc.current = coords.accuracy || 9999; setFixAcc(Math.round(coords.accuracy || 0) || null);
       setLocating(false);
       setError(null); // a fix came: any earlier "not available" is over
