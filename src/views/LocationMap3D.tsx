@@ -509,7 +509,7 @@ export function LocationMap3D({ lat, lng, label, apiKey, area = [], sim = null, 
   }, [state, areaKey, shadowKey, adjKey]); // eslint-disable-line react-hooks/exhaustive-deps
   // The sprinklers animated (asked "anima gli innaffiatoi"): per sprinkler, rings of spray leaving the head in an arc
   // and widening to its 3 m circle as they fade, and a jet of water turning round once every 6 s — a few shapes moved
-  // about 10 times a second, only while the page is in front; still with reduced motion.
+  // about 10 times a second, only while the page is in front.
   const sprKey = sim?.kind === "piazza" ? JSON.stringify(sim.data.sprinklers ?? []) : "";
   useEffect(() => {
     const map = mapRef.current, lib = libs.current;
@@ -531,7 +531,6 @@ export function LocationMap3D({ lat, lng, label, apiKey, area = [], sim = null, 
         map.append(el); jets.push({ c, el });
       }
     }
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const paint = (t: number) => {
       for (const r of rings) {
         const p = ((t / 1600) + r.i / RINGS) % 1, rad = 0.3 + 2.7 * p, h = 0.15 + 0.9 * Math.sin(Math.PI * p);
@@ -545,7 +544,8 @@ export function LocationMap3D({ lat, lng, label, apiKey, area = [], sim = null, 
       }
     };
     paint(0);
-    const id = still ? 0 : window.setInterval(() => { if (document.visibilityState === "visible") paint(performance.now()); }, 100);
+    // Also with reduced motion: phones in battery saving turn it on, and the sprinklers stood still (asked to be animated).
+    const id = window.setInterval(() => { if (document.visibilityState === "visible") paint(performance.now()); }, 100);
     return () => { window.clearInterval(id); rings.forEach((r) => r.el.remove()); jets.forEach((j) => j.el.remove()); };
   }, [state, sprKey, adjKey]); // eslint-disable-line react-hooks/exhaustive-deps
   // The realistic models (views/v10/g3d-models): each placed model is kept by what it is and where it stands, so a

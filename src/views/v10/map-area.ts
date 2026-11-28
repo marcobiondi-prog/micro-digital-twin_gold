@@ -562,11 +562,11 @@ export const MAP_LOCALE: Record<string, string> = {
 
 /**
  * The sprinklers animated on the 2D map (asked "anima gli innaffiatoi"): two rings of spray widening from each sprinkler
- * to about 26 px and fading, half a cycle apart, about 12 times a second while the page is in front; none with reduced
- * motion. Returns the stop.
+ * to about 26 px and fading, half a cycle apart, about 12 times a second while the page is in front, also with reduced
+ * motion (phones in battery saving turn it on, and the animation was asked for). Returns the stop.
  */
 export function animateSprinklers(map: MlMap): () => void {
-  if (typeof window === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return () => {};
+  if (typeof window === "undefined") return () => {};
   const id = window.setInterval(() => {
     try {
       if (document.visibilityState !== "visible" || !map.getLayer("sim-sprinkler-wave-a")) return;
