@@ -559,3 +559,4 @@
   - Status callbacks of a channel closed on purpose (cleanup: project left or changed) are ignored (`alive`). Their CLOSED used to count as a drop, start a retry round and ring again after leaving the project.
   - The sound plays only once after a real drop of the same project (`dropSince` ref). Before, `round > 0` rang at every later subscribe.
   - Being out of the project forgets any pending drop.
+- 2D ⇄ 3D switching: each map gives its WebGL context back when it closes. `releaseWebGL` (lib/release-webgl.ts) runs on Google 3D's element (open shadow roots included) and on the 2D Google base. Google's 3D element kept its context, and after a few switches phones had none left, so whichever map opened second failed. The 2D map also retries once by itself 800 ms after an error before showing Riprova.

@@ -12,6 +12,7 @@ import type { LatLng } from "@/models/area-layout";
 export type MovedPart = { part: "tree"; index: number; at: LatLng } | { part: "lawn" | "shade" | "wind"; at: LatLng } | { part: "zones"; ids: string[]; from: LatLng; at: LatLng }
   | { part: "lawnAngle" | "shadeAngle"; angle: number } | { part: "zoneAngle"; id: string; angle: number };
 import { Crosshair, LoaderCircle, Navigation2 } from "lucide-react";
+import { releaseWebGL } from "@/lib/release-webgl";
 import { isKeyRejected, loadGoogleMaps, onKeyRejected } from "@/lib/google-maps-js";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { StyleSpecification } from "maplibre-gl";
@@ -91,6 +92,7 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   // Riprova on the error: the map built again.
   const [attempt, setAttempt] = useState(0);
+  const autoRetry = useRef(0);
   const [googleOn, setGoogleOn] = useState(false);
   // The map turned away from north (Google's own credits are then outside the box: said in a corner instead).
   const [turnedOn, setTurnedOn] = useState(false);
@@ -168,7 +170,7 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
       libRef.current = maplibregl;
       // A drag, pinch, turn or wheel by hand (an originalEvent; not the map's own easing to the GPS) means exploring.
       map.on("movestart", (e: { originalEvent?: unknown }) => { if (e.originalEvent && !still) exploringMap(); });
-      map.on("load", () => { addAreaLayers(map); addSimLayers(map, lat); addTrailLayers(map); const stopSpr = animateSprinklers(map); map.once("remove", stopSpr); if (!cancelled) setState("ready"); });
+      map.on("load", () => { addAreaLayers(map); addSimLayers(map, lat); addTrailLayers(map); const stopSpr = animateSprinklers(map); map.once("remove", stopSpr); if (!cancelled) { autoRetry.current = 0; setState("ready"); } });
       // The aiuole keep their stripes the same size on screen: laid again for the new zoom once it settles.
       // …and during the zoom too, so the grass never swells under the fingers.
       // Once per frame at most: only the aiuole's own light source is laid again.
@@ -199,13 +201,15 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
         const w = window as unknown as { __mdtMaps?: unknown[] };
         (w.__mdtMaps ??= []).push(map);
       }
-      remove = () => { offKey?.(); map.remove(); };
+      remove = () => { offKey?.(); map.remove(); releaseWebGL(under.current); };
     }).catch((error: unknown) => {
       console.error("2D map failed", error);
       // Files of an older version (the app was updated while open): the page reloads once with the new ones.
       if (/dynamically imported module|Importing a module script failed/i.test(String((error as Error)?.message ?? error))) {
         try { if (Date.now() - Number(sessionStorage.getItem("mdt-map-reload") ?? 0) > 30_000) { sessionStorage.setItem("mdt-map-reload", String(Date.now())); window.location.reload(); return; } } catch { /* no storage */ }
       }
+      // Once by itself a moment later (a graphics context freed by the 3D map just closed), then the notice with Riprova.
+      if (!cancelled && autoRetry.current < 1) { autoRetry.current += 1; window.setTimeout(() => setAttempt((n) => n + 1), 800); return; }
       if (!cancelled) setState("error");
     });
     return () => { cancelled = true; mapRef.current = null; placePin.current = null; pins.current = []; handles.current = []; remove?.(); };

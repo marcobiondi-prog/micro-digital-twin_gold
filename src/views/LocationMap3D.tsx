@@ -1,3 +1,4 @@
+import { releaseWebGL } from "@/lib/release-webgl";
 import { isKeyRejected, keyRejectedReason, loadGoogleMaps, onKeyRejected, resetGoogleMaps } from "@/lib/google-maps-js";
 import { useModels3D } from "@/lib/use-ios-3d";
 import { firstName, personInitials, spotsKey, type ColleagueSpot } from "@/lib/colleagues";
@@ -449,7 +450,8 @@ export function LocationMap3D({ lat, lng, label, apiKey, area = [], sim = null, 
       console.error("[LocationMap3D] Failed to load 3D map:", err);
       if (!cancelled) setState("error");
     });
-    return () => { cancelled = true; mapRef.current = null; markerRef.current = null; badges.current.clear(); peopleBadges.current.clear(); el?.replaceChildren(); };
+    // The 3D map's WebGL context given back before the map goes (the 2D map opened next needs one).
+    return () => { cancelled = true; releaseWebGL(mapRef.current ?? el); mapRef.current = null; markerRef.current = null; badges.current.clear(); peopleBadges.current.clear(); el?.replaceChildren(); };
   }, [aLat, aLng, apiKey, attempt]); // eslint-disable-line react-hooks/exhaustive-deps
   // The colleagues connected now to this project, their name where their phone's GPS puts them (as in 2D).
   const peopleKey = spotsKey(people);
