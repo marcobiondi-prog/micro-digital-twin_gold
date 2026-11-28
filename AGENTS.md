@@ -548,4 +548,4 @@
 - Upright tablet media panel (portrait, 640–1279 px; CSS at the end of styles.css):
   - No drag-and-drop. The dropzone is hidden and LabMedia ignores dropped files (`uprightTablet`).
   - No AI button, no Cartella, no Carica menu, no empty-panel Galleria/Fotocamera tiles.
-  - Carica, Invia and Elimina are three large tiles in a row: 7 rem tall, icon above the label.
+  - Carica, Invia and Elimina are three large pills in a row: 5.5 rem tall, fully rounded, icon above the label.
