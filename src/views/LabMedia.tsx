@@ -134,8 +134,8 @@ function SwipeRow({
 /** Foto e video del sopralluogo come pannello a soffietto: l'intestazione apre e chiude caricamento ed elenco. */
 /** `embedded`: inside a page section (Fold) that brings its own title, so no own toggle; the cameras
  * then mount on document.body, since a closed section would hide them with it. */
-/** Tablet in verticale: no drag-and-drop there (asked), only the large Carica / Invia / Elimina tiles. */
-const uprightTablet = () => typeof window !== "undefined" && (document.documentElement.hasAttribute("data-slate") || window.matchMedia("(orientation: portrait) and (min-width: 640px) and (max-width: 1279.98px)").matches);
+/** Where the side rail shows (tablet, 2-in-1 tablet mode): no drag-and-drop there (asked), only the Carica / Invia / Elimina pills. */
+const uprightTablet = () => typeof window !== "undefined" && (document.documentElement.hasAttribute("data-slate") || window.matchMedia("(min-width: 768px) and (max-width: 1023.98px), (orientation: landscape) and (min-width: 768px) and (max-height: 500px)").matches);
 
 export function LabMedia({ kind, context, embedded = false }: { kind: "urban" | "vineyard"; context?: string; embedded?: boolean }) {
   const [mounted, setMounted] = useState(false);

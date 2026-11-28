@@ -535,7 +535,11 @@
 - Header share badge: the amber broken-link look (`waitingBack`) shows only while a rejoin request is pending. If no request was made, or it was revoked or denied, the badge has its base look. The panel still shows RejoinCard whenever the person is out of the project.
 - Map RejoinPill has no buttons. It shows only while a rejoin request is pending ("In attesa che … ti accetti"). "Chiedi di rientrare" and "Revoca" are only in the share card by the "i" button, as asked.
 - Connection sound: `playReconnect` (lib/ui-sounds.ts) replaced `playDrop`. It plays two soft bell notes, E5 then B5, with a quiet octave overtone. It plays only when this device's own live channel joins again after a real drop (more than 5 s, or a retry round), at most once every 30 s. Colleagues arriving, rejoin requests and accepted rejoins make no sound.
-- The admin is in charge (asked "Resta sull'area"). A guest still in a shared project always stays on the project's area, whether the admin is connected or not. The guest's map is never on the guest's own GPS (`solo` is always false in SimMap). Only leaving the project (forgetProject / leaveProjects → followGpsAgain) lets the GPS follow the phone. Before this, the guest's map jumped to their GPS whenever the admin's presence was missing, including on opening. The GPS-on notice for a shared project now says the map stays on the project's area.
+- Shared guest and the admin (SimMap):
+  - While the admin is connected, the guest stays on the project's area.
+  - When the admin disconnects (asked later, replacing "Resta sull'area"), the guest leaves the area and the GPS follows them. The project's people and pill are hidden (`solo`).
+  - `solo` turns on only after the admin has been away SOLO_AFTER_MS (20 s), so opening the app or a blinking connection does not make the map jump.
+  - When the admin is back, the guest returns to the area (focusProjectArea). The GPS-on notice for a shared project now says the map stays on the project's area.
 - Maps show only people connected now. `projectSpots` (lib/colleagues.ts) no longer draws members who are not connected ("non connesso" at the area's middle). Connected people without GPS still stand round the area's middle ("senza GPS"). GPS spots come from live presence only. The share panel still lists offline people, dimmed.
 - Sprinkler animation (Google 3D in LocationMap3D, 2D `animateSprinklers` in map-area.ts) runs also with prefers-reduced-motion. Phones in battery saving turn that setting on, which made the sprinklers stand still, and the animation was asked for.
 - Tablet rail (TabletRail in __root.tsx): the bottom padding follows the real height of the fixed header at its foot (`--rail-foot`, set by a ResizeObserver on #app-header). It used to be a fixed pb-48, so the share badge (signed in) pushed the account over the AI camera on an upright tablet. The open page's rail item no longer has the pill background (no halo; the turning ring stays). The turquoise ring round the open item glows brighter (.nav-orb-glow hugs the ring in and out, breathing with nav-ring-glow; shown on the tablet rail too). The AI camera's glow is unchanged.
@@ -545,7 +549,7 @@
   - If a chunk of an older version is missing, the page reloads once (sessionStorage mdt-map-reload, 30 s).
   - The error has a Riprova button that builds the map again (`attempt`).
   - `resetGoogleMaps` keeps Google's script when any gmp-map / gmp-map-3d / gmp-advanced-marker element is registered. Reloading the script would fail to define them again, and the 2D Google base broke after the 3D Riprova.
-- Upright tablet media panel (portrait, 640–1279 px; CSS at the end of styles.css):
+- Media panel where the side rail shows (768–1023 px any orientation, low landscape ≤500 px tall, or html[data-slate]; asked "from when the rail appears"; CSS at the end of styles.css):
   - No drag-and-drop. The dropzone is hidden and LabMedia ignores dropped files (`uprightTablet`).
   - No AI button, no Cartella, no Carica menu, no empty-panel Galleria/Fotocamera tiles.
   - Carica, Invia and Elimina are three large pills in a row: 4 rem tall, fully rounded, icon beside the label (final choice after trying it above).

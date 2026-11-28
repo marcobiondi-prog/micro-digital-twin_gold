@@ -22,7 +22,7 @@ import { setUrban, setVineyard, useLab, useLabReadOnly, vineMetrics } from "@/mo
 import { projectSpots, useColleagues } from "@/lib/colleagues";
 import { sendDrag, useCurrentProject, useLiveEdit, useRemoteDrags, type LiveEdit } from "@/lib/project-sync";
 import { MAP_DRAG_EVENT, type MapDrag } from "@/views/v10/map-area";
-import { focusProjectArea, isExploring } from "@/lib/gps-hold";
+import { focusProjectArea, followGpsAgain, isExploring } from "@/lib/gps-hold";
 import { useLeftProject } from "@/lib/project-rejoin";
 import { initials, useProjectPeople, type Online, type Person } from "@/lib/project-share";
 import { shadeOpenness, piazzaLayout, piazzaShadows, vineShadows, TREE_SHADE_M2, vineLayout, type LayoutEdits, type PiazzaLayout } from "@/models/area-layout";
@@ -66,6 +66,9 @@ function keepSeeded(seen: Set<string>) {
  * `preview`: a small still map above the simulation's arc (2D, a third of the screen): the area with what the levers
  * lay in it, updated live, the reading pill and day/night; no search, no drawing, no gestures — a tap opens Mappa.
  */
+/** How long the administrator must be away before a guest's map leaves the area and follows the guest's own GPS. */
+const SOLO_AFTER_MS = 20_000;
+
 export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boolean }) {
   const lab = useLab();
   // Progetti condivisi: in "Solo visione" the map is only looked at — no place search, drawing, zones nor proposals.
@@ -76,14 +79,22 @@ export function SimMap({ kind, preview = false }: { kind: SimKind; preview?: boo
   const project = useCurrentProject(kind === "urban" ? "piazza" : "vigneto");
   const share = useProjectPeople(project.id, project.user);
   const myRole = share.people.find((p) => p.user_id === project.user)?.role;
-  // The admin is the one in charge (asked "Resta sull'area"): a guest still in the project always stays on the project's
-  // area chosen by the admin, whether the admin is connected or not; never on the guest's own GPS. Only leaving the
-  // project (forgetProject / leaveProjects) lets the GPS follow the phone again.
-  const solo = false;
+  // Admin connected: a guest stays on the project's area the admin chose (the admin is in charge). Admin disconnected
+  // (asked): the guest leaves the area and the GPS follows the guest where they really are, without the project's people
+  // and pill on the map. Only once the admin has been away SOLO_AFTER_MS: on opening, before the live presence has
+  // arrived, and when the admin's connection blinks, the map no longer jumps to the guest's GPS and back.
+  const ownerId = share.people.find((p) => p.role === "owner")?.user_id;
+  const ownerAway = !!myRole && myRole !== "owner" && !(ownerId && colleagues.some((o) => o.user_id === ownerId));
+  const [solo, setSolo] = useState(false);
+  useEffect(() => {
+    if (!ownerAway) { setSolo(false); return; }
+    const t = window.setTimeout(() => setSolo(true), SOLO_AFTER_MS);
+    return () => window.clearTimeout(t);
+  }, [ownerAway]);
   const [, setGpsTick] = useState(0);
   useEffect(() => {
     if (preview || !myRole || myRole === "owner") return;
-    focusProjectArea();
+    if (solo) followGpsAgain(); else focusProjectArea();
     setGpsTick((n) => n + 1);
   }, [solo, preview, myRole]);
   const liveLoc = kind === "urban" ? lab.urban.location : lab.vineyard.location;
