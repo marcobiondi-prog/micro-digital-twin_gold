@@ -99,11 +99,17 @@ export function usePresence(projectId: string | null, me: { id: string; name: st
   }, []);
   // A channel dropped (rate limit, network): joined again after a pause.
   const [round, setRound] = useState(0);
+  // When this device's live channel dropped, and for which project (the reconnection sound plays once, for that project).
+  const dropSince = useRef<{ project: string; at: number } | null>(null);
   useEffect(() => {
-    if (!projectId || !meId) { setOnline([]); publish(null, []); return; }
+    // Out of the project (left, removed, signed out): a drop before it is forgotten, so nothing rings later.
+    if (!projectId || !meId) { dropSince.current = null; setOnline([]); publish(null, []); return; }
     const ch = supabase.channel(`project:${projectId}`, { config: { presence: { key: meId } } });
     chRef.current = ch;
-    let seen: Set<string> | null = null, retry: ReturnType<typeof setTimeout> | null = null, dropped = false, droppedAt = 0;
+    let seen: Set<string> | null = null, retry: ReturnType<typeof setTimeout> | null = null, dropped = false;
+    // Closed on purpose (the project left or changed, the page leaving): its CLOSED is not a drop, and no retry nor
+    // reconnection sound follows — the sound kept coming after leaving the project.
+    let alive = true;
     const read = () => {
       const st = ch.presenceState() as Record<string, Array<Partial<Online>>>;
       const list: Online[] = Object.entries(st).map(([id, metas]) => {
@@ -124,19 +130,22 @@ export function usePresence(projectId: string | null, me: { id: string; name: st
     };
     if (import.meta.env.DEV) setTimeout(read, 300);
     ch.on("presence", { event: "sync" }, read).subscribe((status) => {
+      if (!alive) return;
       if (status === "SUBSCRIBED") {
         ready.current = true; sent.current = ""; send();
-        // The only sound: my own connection back after a real drop (more than 5 s away).
-        if ((round > 0 || dropped) && Date.now() - droppedAt > 5_000) playReconnect();
+        // The only sound: my own connection back to the same project after a real drop (more than 5 s away), once.
+        const lost = dropSince.current;
+        if (lost && lost.project === projectId && Date.now() - lost.at > 5_000) playReconnect();
+        dropSince.current = null;
         dropped = false;
         return;
       }
       if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-        ready.current = false; if (!dropped) droppedAt = Date.now(); dropped = true;
+        ready.current = false; if (!dropped) dropSince.current ??= { project: projectId, at: Date.now() }; dropped = true;
         if (!retry) retry = setTimeout(() => setRound((n) => n + 1), 15000);
       }
     });
-    return () => { ready.current = false; chRef.current = null; if (retry) clearTimeout(retry); publish(null, []); void supabase.removeChannel(ch); };
+    return () => { alive = false; ready.current = false; chRef.current = null; if (retry) clearTimeout(retry); publish(null, []); void supabase.removeChannel(ch); };
   }, [projectId, meId, round, send]);
   // The page, the name, the picture or the position (about 10 m) changed: sent again, within the limit.
   const posKey = pos ? `${pos.lat},${pos.lng}` : "";

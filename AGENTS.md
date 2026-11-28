@@ -555,3 +555,7 @@
   - Carica, Invia and Elimina are three large pills in a row: 4 rem tall, fully rounded, icon beside the label (final choice after trying it above).
 - The upright-tablet media panel rules (pills, no dropzone/AI/Cartella) also apply in a 2-in-1's tablet mode (`html[data-slate]`, Surface Pro), whatever the window's shape. The Surface's Windows app window read as landscape, so the portrait-only rules did not apply. `uprightTablet()` in LabMedia also checks data-slate.
 - Tablet rail on low screens (max-height 1000px; md rail, and html[data-slate] from 1024 px, e.g. a Surface Pro in tablet mode): the foot is compact so nothing is cut. Foot buttons are 2.5 rem, gaps are tighter, the camera is smaller and the logo margin is smaller. In slate mode there is a 2 rem bottom margin, because Windows' taskbar can lie over the window's last pixels. The foot used to be cut, with the theme button under the taskbar.
+- Reconnection sound fixes (usePresence, project-share.ts):
+  - Status callbacks of a channel closed on purpose (cleanup: project left or changed) are ignored (`alive`). Their CLOSED used to count as a drop, start a retry round and ring again after leaving the project.
+  - The sound plays only once after a real drop of the same project (`dropSince` ref). Before, `round > 0` rang at every later subscribe.
+  - Being out of the project forgets any pending drop.
