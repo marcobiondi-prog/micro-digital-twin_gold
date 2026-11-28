@@ -493,15 +493,27 @@ function TabletRail() {
     const lock = !guest && (it.to === "/urbano" || it.to === "/vigneto") && proId !== undefined && !unlocks(proId, it.to === "/urbano" ? "urban" : "vineyard");
     return (
       <Link key={it.to} to={it.to} aria-current={on ? "page" : undefined} replace={pathname !== "/"} aria-label={it.l}
-        className={`rail-item relative flex w-16 flex-col items-center gap-1 rounded-2xl px-1 py-2 text-[11px] leading-tight outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${on ? "bg-foreground/10 font-semibold text-foreground" : "text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"}`}>
+        className={`rail-item relative flex w-16 flex-col items-center gap-1 rounded-2xl px-1 py-2 text-[11px] leading-tight outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${on ? "font-semibold text-foreground" : "text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"}`}>
         <span className="nav-orb rail-orb mb-1 mt-1">{on && <><span className="nav-orb-glow" aria-hidden="true" /><span className="nav-orb-ring" aria-hidden="true" /></>}<it.I className="size-6 shrink-0" strokeWidth={1.8} aria-hidden="true" /></span>
         <span className="rail-label w-full truncate text-center">{it.l}</span>
         {lock && <Lock className="absolute right-1.5 top-1.5 size-3" aria-label="bloccato" />}
       </Link>
     );
   };
+  // The account, the share badge, the "i" and the theme stand at the rail's foot (the header, fixed there): the rail keeps
+  // their real height free under the camera. A fixed 12 rem was left for three buttons, and the share badge (signed in)
+  // pushed the account over the AI camera on an upright tablet.
+  useEffect(() => {
+    const head = document.getElementById("app-header");
+    if (!head) return;
+    const set = () => document.documentElement.style.setProperty("--rail-foot", `${Math.ceil(head.getBoundingClientRect().height)}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(head);
+    return () => ro.disconnect();
+  }, []);
   return (
-    <aside className="fixed inset-y-0 left-0 z-[999999995] hidden w-20 flex-col items-center border-r border-foreground/10 bg-background/70 pb-48 pt-[calc(1rem+env(safe-area-inset-top))] backdrop-blur-xl md:flex lg:hidden slate-on rail">
+    <aside className="fixed inset-y-0 left-0 z-[999999995] hidden w-20 flex-col items-center border-r border-foreground/10 bg-background/70 pb-[calc(var(--rail-foot,12rem)+0.75rem)] pt-[calc(1rem+env(safe-area-inset-top))] backdrop-blur-xl md:flex lg:hidden slate-on rail">
       <Link to="/urbano" onClick={() => openSimTab("urban", "mappa")} aria-label="Micro Digital Twin · Simulazione urbana" className="rail-logo mb-5 rounded-xl p-1 outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <img src={logoCompact} alt="" className="size-9 object-contain" />
       </Link>
