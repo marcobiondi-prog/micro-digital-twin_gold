@@ -93,6 +93,8 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
   // Riprova on the error: the map built again.
   const [attempt, setAttempt] = useState(0);
   const autoRetry = useRef(0);
+  // The error's own words, shown small under the notice: what failed on the person's device can be read from a screenshot.
+  const [errorText, setErrorText] = useState("");
   const [googleOn, setGoogleOn] = useState(false);
   // The map turned away from north (Google's own credits are then outside the box: said in a corner instead).
   const [turnedOn, setTurnedOn] = useState(false);
@@ -133,6 +135,8 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
       } catch (error) { console.warn("Google base map not built", error); base = null; }
       setGoogleOn(!!base);
       const map = new maplibregl.Map({ container: host.current, style: STYLE, locale: MAP_LOCALE, ...camera, maxZoom: base ? 23 : 22, pitchWithRotate: false, cooperativeGestures: false, attributionControl: false });
+      // Taken away on unmount even if a later step of this setup throws (a map left behind kept its graphics context).
+      remove = () => { offKey?.(); map.remove(); releaseWebGL(under.current); };
       map.touchPitch.disable();
       if (base) {
         // Google's camera follows every frame (its zoom is one more: its tiles are 256 px, maplibre's 512). Its satellite
@@ -201,9 +205,9 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
         const w = window as unknown as { __mdtMaps?: unknown[] };
         (w.__mdtMaps ??= []).push(map);
       }
-      remove = () => { offKey?.(); map.remove(); releaseWebGL(under.current); };
     }).catch((error: unknown) => {
       console.error("2D map failed", error);
+      setErrorText(String((error as Error)?.message ?? error).slice(0, 160));
       // Files of an older version (the app was updated while open): the page reloads once with the new ones.
       if (/dynamically imported module|Importing a module script failed/i.test(String((error as Error)?.message ?? error))) {
         try { if (Date.now() - Number(sessionStorage.getItem("mdt-map-reload") ?? 0) > 30_000) { sessionStorage.setItem("mdt-map-reload", String(Date.now())); window.location.reload(); return; } } catch { /* no storage */ }
@@ -379,7 +383,7 @@ export function SatelliteMap2D({ apiKey, lat, lng, label, zoom, area = [], drawi
       {/* Google's tiles carry its name on the map, as in the 3D view; turned, its corners leave the box, so it is said here. */}
       {googleOn && turnedOn && <span className="pointer-events-none absolute bottom-1 left-2 text-[10px] font-medium text-white/85 [text-shadow:0_1px_2px_rgba(0,0,0,0.8)]">Google · Immagini e dati mappa</span>}
       {state === "loading" && <div className="pointer-events-none absolute inset-0 grid place-items-center text-muted-foreground"><LoaderCircle className="size-5 animate-spin" aria-label="Caricamento mappa" /></div>}
-      {state === "error" && <div role="status" className="absolute inset-0 grid place-content-center justify-items-center gap-3 px-4 text-center text-sm text-muted-foreground"><p>Mappa non disponibile in questo momento.</p><button type="button" onClick={() => setAttempt((n) => n + 1)} className="rounded-full bg-foreground px-4 py-2 text-xs font-semibold text-background">Riprova</button></div>}
+      {state === "error" && <div role="status" className="absolute inset-0 z-[5] grid place-content-center justify-items-center gap-3 bg-black/55 px-4 text-center text-sm text-white/85 backdrop-blur-sm"><p>Mappa non disponibile in questo momento.</p>{errorText && <p className="max-w-xs font-mono text-[10px] leading-snug opacity-70">{errorText}</p>}<button type="button" onClick={() => setAttempt((n) => n + 1)} className="rounded-full bg-foreground px-4 py-2 text-xs font-semibold text-background">Riprova</button></div>}
     </div>
   );
 }
